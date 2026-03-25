@@ -2,27 +2,42 @@
 module CCIP.LockReleaseTokenPoolTypes where
 
 import DA.Crypto.Text (BytesHex)
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+
+import MCMS.RawInstanceAddress (RawInstanceAddress)
 
 data ChainUpdate = ChainUpdate
     with
-        remoteChainSelector : Numeric 0          -- Chain selector for this config update
-        remotePools : [BytesHex]                 -- Allowed remote pool addresses for this chain
-        remoteTokenAddress : BytesHex            -- The token address on the remote chain
-        inboundCCVs : [RawInstanceAddress]       -- Required CCVs for incoming transfers
-        outboundCCVs : [RawInstanceAddress]      -- Required CCVs for outgoing transfers
-        inboundRateLimiter : RawInstanceAddress  -- Required rate limiter for incoming transfers
-        outboundRateLimiter : RawInstanceAddress -- Required rate limiter for outgoing transfers
+        remoteChainSelector : Numeric 0                                 -- Chain selector for this config update
+        remotePools : [BytesHex]                                        -- Allowed remote pool addresses for this chain
+        remoteTokenAddress : BytesHex                                   -- The token address on the remote chain
+        inboundCCVs : [RawInstanceAddress]                              -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]                             -- Required CCVs for outgoing transfers
+        minBlockConfirmations : Int                                     -- Minimum accepted source-chain confirmations; 0 means finalized-only
+        inboundRateLimiter : RawInstanceAddress                         -- Required rate limiter for incoming transfers
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
+        outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
     deriving (Eq, Show)
 
 data RemoteChainConfig = RemoteChainConfig
     with 
-        remotePools : [BytesHex]                 -- Allowed remote pool addresses for this chain
-        remoteTokenAddress : BytesHex            -- The token address on the remote chain
-        inboundCCVs : [RawInstanceAddress]       -- Required CCVs for incoming transfers
-        outboundCCVs : [RawInstanceAddress]      -- Required CCVs for outgoing transfers
-        inboundRateLimiter : RawInstanceAddress  -- Required rate limiter for incoming transfers
-        outboundRateLimiter : RawInstanceAddress -- Required rate limiter for outgoing transfers
+        remotePools : [BytesHex]                                        -- Allowed remote pool addresses for this chain
+        remoteTokenAddress : BytesHex                                   -- The token address on the remote chain
+        inboundCCVs : [RawInstanceAddress]                              -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]                             -- Required CCVs for outgoing transfers
+        minBlockConfirmations : Int                                     -- Minimum accepted source-chain confirmations; 0 means finalized-only
+        inboundRateLimiter : RawInstanceAddress                         -- Required rate limiter for incoming transfers
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
+        outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
+    deriving (Eq, Show)
+
+data TokenTransferFeeConfigArgs = TokenTransferFeeConfigArgs
+    with
+        destChainSelector : Numeric 0 -- Chain selector for this config update
+        isEnabled : Bool              -- Whether this config is enabled
+        destGasOverhead : Int         -- Gas charged to execute the token transfer on the destination chain.
+        destBytesOverhead : Int       -- Data availability bytes.
+        feeUSDCents : Numeric 0       -- Fee to charge for token transfers, multiples of 0.01 USD.
+        feeBps : Numeric 0            -- Proportional token fee in bps, applied by the pool during LockOrBurn.
     deriving (Eq, Show)
 
 data TokenTransferFeeConfig = TokenTransferFeeConfig
@@ -31,11 +46,13 @@ data TokenTransferFeeConfig = TokenTransferFeeConfig
         destGasOverhead : Int   -- Gas charged to execute the token transfer on the destination chain.
         destBytesOverhead : Int -- Data availability bytes.
         feeUSDCents : Numeric 0 -- Fee to charge for token transfers, multiples of 0.01 USD.
+        feeBps : Numeric 0      -- Proportional token fee in bps, applied by the pool during LockOrBurn.
     deriving (Eq, Show)
 
-data RateLimiterConfigArgs = RateLimiterConfigArgs
+data RateLimitConfigArgs = RateLimitConfigArgs
     with
         remoteChainSelector : Numeric 0
         inboundRateLimiter : RawInstanceAddress
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress
         outboundRateLimiter : RawInstanceAddress
     deriving (Eq, Show)

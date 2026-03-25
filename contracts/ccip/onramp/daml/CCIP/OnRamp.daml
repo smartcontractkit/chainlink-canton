@@ -3,16 +3,20 @@ module CCIP.OnRamp where
 
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
-import DA.List (dedup)
+import DA.List (dedup, unique)
 import DA.Map qualified as Map
-import DA.Optional (fromOptional, isSome)
+import DA.Optional (fromOptional, fromSomeNote)
 
+import qualified CCIP.Client
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
+import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
-import qualified CCIP.RawInstanceAddress
+import qualified CCIP.Internal
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
@@ -24,8 +28,40 @@ import CCIP.Codec
   , decodeOptionalRawInstanceAddressAt
   )
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Crypto (assertValidHex, isValidHex)
 
-import qualified Splice.Api.Token.HoldingV1
+messageStaticSize : Int
+messageStaticSize = 67
+
+tokenTransferBaseSizeWithoutExtraData : Int -> Int
+tokenTransferBaseSizeWithoutExtraData remoteAddressBytes =
+    1 + 32 + (1 + 32) + (1 + 32) + (1 + remoteAddressBytes) + (1 + remoteAddressBytes) + 2
+
+computeExecutorDestBytesOverhead : Int -> Int -> Int -> Int
+computeExecutorDestBytesOverhead remoteAddressBytes payloadBytes executorArgsBytes =
+    messageStaticSize
+    + (1 + 32) -- onRampAddress
+    + (1 + remoteAddressBytes) -- offRampAddress
+    + (1 + 32) -- sender
+    + (1 + remoteAddressBytes) -- receiver
+    + (2 + executorArgsBytes) -- destBlob
+    + 2 -- tokenTransfer length prefix, no token transfer payload for message-only sends
+    + (2 + payloadBytes) -- messageData
+
+computeExecutorDestBytesOverheadWithToken : Int -> Int -> Int -> Int
+computeExecutorDestBytesOverheadWithToken remoteAddressBytes payloadBytes executorArgsBytes =
+    messageStaticSize
+    + (1 + 32) -- onRampAddress
+    + (1 + remoteAddressBytes) -- offRampAddress
+    + (1 + 32) -- sender
+    + (1 + remoteAddressBytes) -- receiver
+    + (2 + executorArgsBytes) -- destBlob
+    + (2 + tokenTransferBaseSizeWithoutExtraData remoteAddressBytes) -- tokenTransfer without pool extraData
+    + (2 + payloadBytes) -- messageData
+
+noExecutionAddressBytes : BytesHex
+noExecutionAddressBytes =
+    "eba517d200000000000000000000000000000000000000000000000000000000"
 
 onRampKey : Text
 onRampKey = "on-ramp"
@@ -33,34 +69,52 @@ onRampKey = "on-ramp"
 lookupOnRampCid : CCIP.Context.CCIPContext -> Update (ContractId OnRamp)
 lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
 
-rawInstanceAddress : OnRamp -> CCIP.RawInstanceAddress.RawInstanceAddress
-rawInstanceAddress onRamp = CCIP.RawInstanceAddress.make onRamp.instanceId onRamp.ccipOwner
+rawInstanceAddress : OnRamp -> RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress onRamp = RawInstanceAddress.make onRamp.instanceId onRamp.ccipOwner
 
 data OnRampDeps = OnRampDeps
     with
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
-        ccvRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        globalConfig : RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
+        feeQuoter : RawInstanceAddress.RawInstanceAddress
+        ccvRegistry : RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data SetDepsParams = SetDepsParams
     with
-        globalConfig : Optional CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : Optional CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : Optional CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : Optional CCIP.RawInstanceAddress.RawInstanceAddress
-        ccvRegistry : Optional CCIP.RawInstanceAddress.RawInstanceAddress
+        globalConfig : Optional RawInstanceAddress.RawInstanceAddress
+        rmnRemote : Optional RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : Optional RawInstanceAddress.RawInstanceAddress
+        feeQuoter : Optional RawInstanceAddress.RawInstanceAddress
+        ccvRegistry : Optional RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
+
+resolveSenderRequiredCCVs
+    : [RawInstanceAddress.RawInstanceAddress]
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Bool
+    -> [RawInstanceAddress.RawInstanceAddress]
+resolveSenderRequiredCCVs defaultCCVs senderRequiredCCVs isTokenOnlyTransfer =
+    case senderRequiredCCVs of
+        [] ->
+            if isTokenOnlyTransfer
+            then []
+            else defaultCCVs
+        _ -> CCIP.Internal.resolveDefaultCCVs
+            defaultCCVs
+            CCIP.Internal.useDefaultCCVs
+            senderRequiredCCVs
 
 template OnRamp
     with
         instanceId : Text
         ccipOwner : Party
+        maxUSDCentsPerMsg : Numeric 0
         deps : OnRampDeps
     where
         signatory ccipOwner
+        ensure assertValidInstanceId instanceId
 
         choice SetDeps : ContractId OnRamp
             with
@@ -77,14 +131,14 @@ template OnRamp
 
         -- | Get required CCV raw instance addresses for outbound message.
         -- TODO: this should not concat default and lane mandated CCVs and return
-        nonconsuming choice GetRequiredCCVsForSend : [CCIP.RawInstanceAddress.RawInstanceAddress]
+        nonconsuming choice GetRequiredCCVsForSend : [RawInstanceAddress.RawInstanceAddress]
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 destChainSelector : Numeric 0
             controller ccipOwner
             do
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
+                RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 destConfigOpt <- exercise globalConfigCid
@@ -98,44 +152,39 @@ template OnRamp
 
         -- | Build SendingMessageV1 for outbound message.
         -- Validates fee token is accepted, reads network fee from DestChainConfig.
-        -- Message construction is deferred to AddExecutorWithFee for all sends.
+        -- Message construction is deferred until execution metadata is finalized.
         nonconsuming choice PrepareSendFromRouter : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
+                destChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
+
                 routerPartyOwner : Party
                 routerInstanceId : Text
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                destChainSelector : Numeric 0
-                receiver : BytesHex
-                payload : BytesHex
-                ccipReceiveGasLimit : Int
-                blockConfirmations : Optional Int
                 currentSequenceNumber : Numeric 0
-                senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-                tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
-                tokenReceiver : Optional BytesHex
-                tokenArgs : BytesHex
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller ccipOwner
             do
+                -- Fetch dependencies
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
+                RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "onramp: rmn mismatch"
+                RawInstanceAddress.assertEqual "onramp: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "onramp: tokenadminregistry instance address mismatch"
+                RawInstanceAddress.assertEqual "onramp: tokenadminregistry instance address mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 feeQuoter <- fetch feeQuoterCid
-                CCIP.RawInstanceAddress.assertEqual "onramp: feequoter instance address mismatch"
+                RawInstanceAddress.assertEqual "onramp: feequoter instance address mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
+                -- RMN curse check
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = ccipOwner
                     chainSelector = destChainSelector
@@ -151,39 +200,74 @@ template OnRamp
                         assertMsg "onramp: destination chain disabled" c.isEnabled
                         pure c
 
+                -- Validate message fields
+                assertValidHex "receiver" message.receiver
+                assertValidHex "payload" message.payload
+
+                -- Parse extraArgs and validate fields
+                extraArgs <- case message.extraArgs of
+                        CCIP.Client.V3 v3 -> pure v3
+                        _ -> abort "onramp: unsupported extraArgs version" -- exhaustive default match to ensure this fails if new versions of extraArgs are added without updating the onramp
+                assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
+                assertMsg "onramp: block confirmations not allowed from Canton" (extraArgs.blockConfirmations == 0)
+                assertValidHex "tokenReceiver" extraArgs.tokenReceiver
+                assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
+                assertValidHex "tokenArgs" extraArgs.tokenArgs
+                assertMsg "onramp: CCVs cannot contain duplicates" (unique extraArgs.ccvs)
+
+                case Map.lookup destChainSelector feeQuoter.destChainConfigs of
+                    Some feeDestConfig ->
+                        assertMsg "onramp: payload exceeds destination maxDataBytes"
+                            (byteCount message.payload <= feeDestConfig.maxDataBytes)
+                    None -> pure ()
+
                 _ <- exercise feeQuoterCid CCIP.FeeQuoter.GetTokenPrice with
-                    instrumentId = feeToken
+                    instrumentId = message.feeToken.token
                     caller = ccipOwner
 
-                let hasTokenTransfer = isSome tokenInstrumentId
+                let (hasTokenTransfer, tokenInstrumentId) = case message.tokenTransfer of
+                        None -> (False, None)
+                        Some tt -> (True, Some tt.token)
+                -- A pure token transfer is defined as:
+                -- - receiver callback gas limit is 0
+                -- - message payload is empty
+                -- - the message sends a token
                 let isTokenOnlyTransfer = hasTokenTransfer
-                        && payload == ""
-                        && ccipReceiveGasLimit == 0
+                        && message.payload == ""
+                        && extraArgs.gasLimit == 0
+                
                 let resolvedCCVs = dedup (
-                        (if null senderRequiredCCVs
-                            then if isTokenOnlyTransfer
-                                then []
-                                else destConfig.defaultCCVs
-                            else senderRequiredCCVs)
+                        resolveSenderRequiredCCVs
+                            destConfig.defaultCCVs
+                            extraArgs.ccvs
+                            isTokenOnlyTransfer
                         ++ destConfig.laneMandatedCCVs)
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
+                assertMsg "onramp: sequence number exceeds uint64"
+                    (newSequenceNumber <= 18446744073709551615.0)
                 let onRampAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
                 let senderAddr = CCIP.MessageCodecV1.encodePartyAddress routerPartyOwner
                 let resolvedTokenReceiver = if hasTokenTransfer
-                        then validateDestChainAddress (fromOptional receiver tokenReceiver) destConfig.addressBytesLength
+                        then validateDestChainAddress (if extraArgs.tokenReceiver /= "" then extraArgs.tokenReceiver else message.receiver) destConfig.addressBytesLength
                         else ""
-                let resolvedBlockConfirmations = fromOptional 0 blockConfirmations
-
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
                         else destConfig.messageNetworkFeeUSDCents
+                let initialState = if hasTokenTransfer
+                        then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
+                        else CCIP.SendingMessageV1.SendingMessageState_Prepared
+                let (resolvedExecutorAddress, executionMode) = case extraArgs.executor of
+                        Some _ ->
+                            ("", Some CCIP.SendingMessageV1.ExecutionMode_Executor)
+                        None ->
+                            (noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
 
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
                     sender = routerPartyOwner
                     deps = CCIP.SendingMessageV1.SendingMessageDeps with
-                        router = CCIP.RawInstanceAddress.make routerInstanceId routerPartyOwner
+                        router = RawInstanceAddress.make routerInstanceId routerPartyOwner
                         onRamp = rawInstanceAddress this
                         globalConfig = deps.globalConfig
                         rmnRemote = deps.rmnRemote
@@ -194,26 +278,28 @@ template OnRamp
                     requiredCCVs = resolvedCCVs
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
-                    receiver = validateDestChainAddress receiver destConfig.addressBytesLength
-                    payload = payload
+                    receiver = validateDestChainAddress message.receiver destConfig.addressBytesLength
+                    payload = message.payload
                     executionGasLimit = 0
-                    ccipReceiveGasLimit
-                    blockConfirmations = resolvedBlockConfirmations
+                    ccipReceiveGasLimit = extraArgs.gasLimit -- TODO: does this default to default gas limit if 0?
                     ccvAndExecutorHash = ""
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress
                     tokenReceiver = resolvedTokenReceiver
-                    tokenArgs = tokenArgs
+                    tokenArgs = extraArgs.tokenArgs
                     message = None
                     encodedMessage = ""
                     messageId = ""
-                    feeToken
+                    feeToken = message.feeToken.token
                     networkFeeUSDCents = networkFeeUSD
                     expectedTokenInstrumentId = tokenInstrumentId
                     outboundPoolCCVs = None
-                    executorAddress = CCIP.RawInstanceAddress.make "" ccipOwner
+                    executorAddress = resolvedExecutorAddress
+                    executionMode = executionMode
                     executorArgs = ""
                     executorFee = None
+                    executorDestGasLimit = 0
+                    executorDestBytesOverhead = 0
                     executorFeeTokenAmount = 0.0
                     ccvFees = []
                     tokenSendFee = None
@@ -224,7 +310,135 @@ template OnRamp
                     ccvOwners = []
                     tokenSendData = None
                     observingParties = [routerPartyOwner]
-                    state = CCIP.SendingMessageV1.SendingMessageState_Prepared
+                    state = initialState
+
+        -- | Finalize execution metadata and fees from the router. Message
+        -- construction remains a separate state-machine transition.
+        nonconsuming choice FinalizeFeeFromRouter : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                routerPartyOwner : Party
+                routerInstanceId : Text
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            controller ccipOwner
+            do
+                sendingMsg <- fetch sendingMessageCid
+                assertMsg "sendingMessage ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == ccipOwner)
+                assertMsg "sendingMessage sender mismatch"
+                    (sendingMsg.sender == routerPartyOwner)
+                RawInstanceAddress.assertEqual "router instance mismatch"
+                    routerInstanceId routerPartyOwner sendingMsg.deps.router
+                RawInstanceAddress.assertEqual "onramp instance mismatch"
+                    instanceId ccipOwner sendingMsg.deps.onRamp
+                assertMsg "sendingMessage feeQuoter mismatch"
+                    (sendingMsg.deps.feeQuoter == deps.feeQuoter)
+                assertMsg "sendingMessage globalConfig mismatch"
+                    (sendingMsg.deps.globalConfig == deps.globalConfig)
+
+                globalConfig <- fetch globalConfigCid
+                RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                feeQuoter <- fetch feeQuoterCid
+                RawInstanceAddress.assertEqual "onramp: feequoter instance address mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+
+                destConfigOpt <- exercise globalConfigCid
+                    CCIP.GlobalConfig.GetDestChainConfig with
+                        destChainSelector = sendingMsg.destChainSelector
+                        caller = ccipOwner
+                destConfig <- case destConfigOpt of
+                    None -> abort "onramp: unknown destination chain"
+                    Some cfg -> do
+                        assertMsg "onramp: destination chain disabled" cfg.isEnabled
+                        pure cfg
+
+                feeDestConfig <- exercise feeQuoterCid
+                    CCIP.FeeQuoter.GetDestChainConfig with
+                        destChainSelector = sendingMsg.destChainSelector
+                        caller = ccipOwner
+
+                let hasTokenTransfer = sendingMsg.expectedTokenInstrumentId /= None
+                let executorDestGasLimit = destConfig.baseExecutionGasCost + sendingMsg.ccipReceiveGasLimit
+                let executorDestBytesOverhead = if hasTokenTransfer
+                        then computeExecutorDestBytesOverheadWithToken
+                            destConfig.addressBytesLength
+                            (byteCount sendingMsg.payload)
+                            (byteCount sendingMsg.executorArgs)
+                        else computeExecutorDestBytesOverhead
+                            destConfig.addressBytesLength
+                            (byteCount sendingMsg.payload)
+                            (byteCount sendingMsg.executorArgs)
+
+                let tokenPrice = fromSomeNote
+                        ("No price found for " <> sendingMsg.feeToken.id)
+                        (Map.lookup sendingMsg.feeToken feeQuoter.usdPerToken)
+                let ccvGasSum = foldl (\acc fee -> acc + fee.destGasLimit) 0 sendingMsg.ccvFees
+                let ccvBytesSum = foldl (\acc fee -> acc + fee.destBytesOverhead) 0 sendingMsg.ccvFees
+                let poolGas = case sendingMsg.tokenSendFee of
+                        Some fee -> fee.destGasOverhead
+                        None -> 0
+                let poolBytes = case sendingMsg.tokenSendFee of
+                        Some fee -> fee.destBytesOverhead
+                        None -> 0
+                let nonCalldataGas =
+                        feeDestConfig.destGasOverhead
+                        + ccvGasSum
+                        + poolGas
+                        + executorDestGasLimit
+                let calldataSize =
+                        byteCount sendingMsg.payload
+                        + ccvBytesSum
+                        + poolBytes
+                        + executorDestBytesOverhead
+                quote <- exercise feeQuoterCid CCIP.FeeQuoter.QuoteGasForExec with
+                    destChainSelector = sendingMsg.destChainSelector
+                    nonCalldataGas
+                    calldataSize
+                    feeToken = sendingMsg.feeToken
+                    caller = ccipOwner
+
+                let premiumize feeUSDCents =
+                        CCIP.Math.mulDivDown feeUSDCents quote.premiumMultiplier 100000000.0
+                let ccvPremiumUSDCents =
+                        foldl (\acc fee -> acc + premiumize fee.feeUSDCents) 0.0 sendingMsg.ccvFees
+                let poolPremiumUSDCents = case sendingMsg.tokenSendFee of
+                        Some fee -> premiumize fee.feeUSDCents
+                        None -> 0.0
+                let networkPremiumUSDCents = premiumize sendingMsg.networkFeeUSDCents
+                let executorFlatUSDCents = case sendingMsg.executionMode of
+                        Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor -> 0.0
+                        _ -> case sendingMsg.executorFee of
+                            Some fee -> fee.feeUSDCents
+                            None -> 0.0
+                let executionCostUSDCents = case sendingMsg.executionMode of
+                        Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor -> 0.0
+                        _ -> quote.gasCostUSDCents
+                let totalUSDCents =
+                        ccvPremiumUSDCents
+                        + poolPremiumUSDCents
+                        + networkPremiumUSDCents
+                        + executorFlatUSDCents
+                        + executionCostUSDCents
+
+                finalizedCid <- exercise sendingMessageCid
+                    CCIP.SendingMessageV1.FinalizeFee with
+                        feeTokenPrice = tokenPrice.price
+                        premiumMultiplier = quote.premiumMultiplier
+                        totalExecutionGasLimit = quote.totalGas
+                        executorDestGasLimit = executorDestGasLimit
+                        executorDestBytesOverhead = executorDestBytesOverhead
+                        executionCostUSDCents = executionCostUSDCents
+
+                finalizedMsg <- fetch finalizedCid
+                assertMsg "onramp: message fee exceeds maxUSDCentsPerMsg"
+                    (totalUSDCents <= maxUSDCentsPerMsg)
+                assertMsg "onramp: execution gas exceeds destination maxPerMsgGasLimit"
+                    (finalizedMsg.executionGasLimit <= feeDestConfig.maxPerMsgGasLimit)
+
+                pure finalizedCid
 
         -- | Validate and finalize a CCIP send.
         -- Reads accumulated data from SendingMessageV1. Fee collection happens
@@ -245,9 +459,9 @@ template OnRamp
                     (sendingMsg.ccipOwner == ccipOwner)
                 assertMsg "sendingMessage sender mismatch"
                     (sendingMsg.sender == routerPartyOwner)
-                CCIP.RawInstanceAddress.assertEqual "router instance mismatch"
+                RawInstanceAddress.assertEqual "router instance mismatch"
                     routerInstanceId routerPartyOwner sendingMsg.deps.router
-                CCIP.RawInstanceAddress.assertEqual "onramp instance mismatch"
+                RawInstanceAddress.assertEqual "onramp instance mismatch"
                     instanceId ccipOwner sendingMsg.deps.onRamp
                 assertMsg "sendingMessage globalConfig mismatch"
                     (sendingMsg.deps.globalConfig == deps.globalConfig)
@@ -269,16 +483,16 @@ template OnRamp
                     (sendingMsg.sequenceNumber == currentSequenceNumber + 1.0)
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "globalconfig mismatch"
+                RawInstanceAddress.assertEqual "globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner
                     sendingMsg.deps.globalConfig
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "onramp: rmn mismatch"
+                RawInstanceAddress.assertEqual "onramp: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner sendingMsg.deps.rmnRemote
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "tar mismatch"
+                RawInstanceAddress.assertEqual "tar mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner
                     sendingMsg.deps.tokenAdminRegistry
 
@@ -299,23 +513,19 @@ template OnRamp
                         pure c
 
                 -- Validate required CCVs covered by verifierData
-                let verifierAddresses = map
-                        (\vd -> CCIP.MessageCodecV1.encodeInstanceAddress
-                            vd.ccvInstanceId vd.ccvOwner)
+                let verifierRawAddrs = map
+                        (\vd -> RawInstanceAddress.make vd.ccvInstanceId vd.ccvOwner)
                         sendingMsg.verifierData
                 Foldable.forA_ sendingMsg.requiredCCVs $ \requiredCCV ->
-                    let addr = CCIP.RawInstanceAddress.toInstanceAddress requiredCCV
-                    in assertMsg ("missing required CCV " <> show requiredCCV)
-                        (addr `elem` verifierAddresses)
+                    assertMsg ("missing required CCV " <> show requiredCCV)
+                        (requiredCCV `elem` verifierRawAddrs)
 
-                let ccvFeeAddresses = map
-                        (\fee -> CCIP.MessageCodecV1.encodeInstanceAddress
-                            fee.ccvInstanceId fee.ccvOwner)
+                let ccvFeeRawAddrs = map
+                        (\fee -> RawInstanceAddress.make fee.ccvInstanceId fee.ccvOwner)
                         sendingMsg.ccvFees
                 Foldable.forA_ sendingMsg.requiredCCVs $ \requiredCCV ->
-                    let addr = CCIP.RawInstanceAddress.toInstanceAddress requiredCCV
-                    in assertMsg ("missing CCV fee for " <> show requiredCCV)
-                        (addr `elem` ccvFeeAddresses)
+                    assertMsg ("missing CCV fee for " <> show requiredCCV)
+                        (requiredCCV `elem` ccvFeeRawAddrs)
 
                 case (sendingMsg.tokenSendData, sendingMsg.tokenSendFee) of
                     (Some _, None) -> abort "missing token pool fee"
@@ -349,18 +559,19 @@ template OnRamp
                     _ -> abort "token transfer / token send data mismatch"
 
                 let receipts = assembleReceipts sendingMsg
+                let finalVerifierData = orderedVerifierData sendingMsg
                 finalizeResult <- exercise sendingMessageCid CCIP.SendingMessageV1.FinalizeSend with
                     messageSender = routerPartyOwner
-                    messageSentObservers = concatMap (.messageSentObservers) sendingMsg.verifierData
-                    verifierBlobs = map (.verifierBlob) sendingMsg.verifierData
+                    messageSentObservers = concatMap (.messageSentObservers) finalVerifierData
+                    verifierBlobs = map (.verifierBlob) finalVerifierData
                     receipts = receipts
 
                 pure CCIPSendFromRouterResult with
                     ccipMessageSent = finalizeResult.ccipMessageSent
                     verifierBlobs =
-                        map (.verifierBlob) sendingMsg.verifierData
+                        map (.verifierBlob) finalVerifierData
                     messageSentObservers =
-                        concatMap (.messageSentObservers) sendingMsg.verifierData
+                        concatMap (.messageSentObservers) finalVerifierData
                     receipts
 
         interface instance MCMSReceiver for OnRamp where
@@ -376,9 +587,11 @@ template OnRamp
 
             case functionName of
               "SetDeps" -> do
-                case decodeSetDepsParams operationData of
+                case decodeSetDepsParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: SetDeps"
-                  Some newDeps -> do
+                  Some (newDeps, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetDeps" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid SetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
@@ -392,6 +605,29 @@ data CCIPSendFromRouterResult = CCIPSendFromRouterResult
         receipts : [CCIP.Tickets.Receipt]
     deriving (Eq, Show)
 
+orderedVerifierDataByCCVs
+    : [BytesHex]
+    -> [CCIP.SendingMessageV1.VerifierData]
+    -> [CCIP.SendingMessageV1.VerifierData]
+orderedVerifierDataByCCVs finalCCVs verifierData =
+    let
+        lookupVerifier ccvAddr =
+            case filter
+                (\vd -> CCIP.MessageCodecV1.encodeInstanceAddress vd.ccvInstanceId vd.ccvOwner == ccvAddr)
+                verifierData of
+                [vd] -> vd
+                [] -> error ("missing verifier data for CCV address " <> ccvAddr)
+                _ -> error ("duplicate verifier data for CCV address " <> ccvAddr)
+    in
+        map (\ccv -> lookupVerifier ccv) finalCCVs
+
+orderedVerifierData : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.SendingMessageV1.VerifierData]
+orderedVerifierData sendingMsg =
+    let
+        finalCCVs = map RawInstanceAddress.toInstanceAddress
+            (dedup (sendingMsg.requiredCCVs ++ fromOptional [] sendingMsg.outboundPoolCCVs))
+    in
+        orderedVerifierDataByCCVs finalCCVs sendingMsg.verifierData
 
 -- | Assemble final receipts from the separated fee fields, verifier data,
 -- token send data, executor fee, and the network fee. Receipt order matches
@@ -399,10 +635,11 @@ data CCIPSendFromRouterResult = CCIPSendFromRouterResult
 assembleReceipts : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.Tickets.Receipt]
 assembleReceipts sendingMsg =
     let
+        finalVerifierData = orderedVerifierData sendingMsg
         ccvReceipts = map
             (assembleCCVReceipt sendingMsg.ccvFees
                 sendingMsg.ccvFeeTokenAmounts)
-            sendingMsg.verifierData
+            finalVerifierData
 
         poolReceipt = case (sendingMsg.tokenSendData, sendingMsg.tokenSendFee) of
             (Some tsd, Some fee) ->
@@ -418,17 +655,23 @@ assembleReceipts sendingMsg =
                     extraArgs = ""]
             _ -> []
 
-        executorReceipt = case sendingMsg.executorFee of
+        executorReceipt = case sendingMsg.executionMode of
             None -> []
-            Some fee ->
-                let execAddr = CCIP.MessageCodecV1.encodeInstanceAddress
-                        fee.executorInstanceId fee.executorOwner
+            Some execMode ->
+                let execAddr = case execMode of
+                        CCIP.SendingMessageV1.ExecutionMode_Executor ->
+                            case sendingMsg.executorFee of
+                                Some fee -> CCIP.MessageCodecV1.encodeInstanceAddress
+                                    fee.executorInstanceId fee.executorOwner
+                                None -> error "missing executor fee"
+                        CCIP.SendingMessageV1.ExecutionMode_NoExecutor ->
+                            noExecutionAddressBytes
                 in [CCIP.Tickets.Receipt with
                     issuerType = CCIP.Tickets.IssuerType_Executor
                     issuerAddress = execAddr
                     versionTag = None
-                    destGasLimit = fee.destGasLimit
-                    destBytesOverhead = fee.destBytesOverhead
+                    destGasLimit = sendingMsg.executorDestGasLimit
+                    destBytesOverhead = sendingMsg.executorDestBytesOverhead
                     feeTokenAmount = sendingMsg.executorFeeTokenAmount
                     extraArgs = sendingMsg.executorArgs]
 
@@ -468,29 +711,37 @@ findFeeWithAmount (f :: fs) (a :: as) pred =
     if pred f then (f, a)
     else findFeeWithAmount fs as pred
 
--- | Validates a destination-chain address against the chain's expected address length.
+-- | Validates a destination-chain address against the chain's expected address length and hex validity.
 -- The message receiver, tokenReceiver, and destTokenAddress are all validated using this function since they're all remote chain addresses.
 validateDestChainAddress : BytesHex -> Int -> BytesHex
 validateDestChainAddress address addressBytesLength =
-    let actualLength = byteCount address
-    in if actualLength == addressBytesLength
-        then address
-        else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
+    if not (isValidHex address)
+    then error ("InvalidDestChainAddress: not valid hex: " <> show address)
+    else let actualLength = byteCount address
+         in if actualLength == addressBytesLength
+            then address
+            else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
 
 -- ===========================================================================
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
 -- ===========================================================================
 
--- | Decode SetDeps params (Optional fields)
+-- | Decode SetDeps params with final offset (Optional fields)
 -- Format: [OptRIA globalConfig][OptRIA rmnRemote][OptRIA tokenAdminRegistry][OptRIA feeQuoter][OptRIA ccvRegistry]
-decodeSetDepsParams : BytesHex -> Optional SetDepsParams
-decodeSetDepsParams encoded = do
+decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
+decodeSetDepsParamsWithOffset encoded = do
   (globalConfig, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
   (rmnRemote, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
   (tokenAdminRegistry, offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
   (feeQuoter, offset4) <- decodeOptionalRawInstanceAddressAt encoded offset3
-  (ccvRegistry, _offset5) <- decodeOptionalRawInstanceAddressAt encoded offset4
-  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry feeQuoter ccvRegistry)
+  (ccvRegistry, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded offset4
+  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry feeQuoter ccvRegistry, finalOffset)
+
+-- | Decode SetDeps params (discards final offset)
+decodeSetDepsParams : BytesHex -> Optional SetDepsParams
+decodeSetDepsParams encoded = do
+  (result, _) <- decodeSetDepsParamsWithOffset encoded
+  Some result
 
 -- | Encode SetDeps params (Optional fields)
 encodeSetDepsParams : SetDepsParams -> BytesHex

@@ -38,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
@@ -45,6 +46,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -526,10 +528,22 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 			LaneMandatedOutboundCCVs: nil,
 			DefaultExecutor:          contracts.RawInstanceAddress(normalizedSourceExecutor),
-			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{NetworkFeeUSDCents: 0, DefaultTokenFeeUSDCents: 0},
-			ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{},
-			AddressBytesLength:       addressBytesLength,
-			BaseExecutionGasCost:     0,
+			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+				IsEnabled:                   true,
+				MaxDataBytes:                50000,
+				MaxPerMsgGasLimit:           4000000,
+				DestGasOverhead:             300000,
+				DestGasPerPayloadByteBase:   16,
+				ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+				DefaultTxGasLimit:           200000,
+				LinkFeeMultiplierPercent:    90,
+				DefaultTokenFeeUSDCents:     0,
+				DefaultTokenDestGasOverhead: 34000,
+				NetworkFeeUSDCents:          0,
+			},
+			ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+			AddressBytesLength:      addressBytesLength,
+			BaseExecutionGasCost:    0,
 		}
 		config.Config.Input.RemoteChains[remoteSelector] = remoteChainConfig
 	}
@@ -1041,8 +1055,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						FeeTokensToRemove: []splice_api_token_holding_v1.InstrumentId{},
 						FeeTokensToAdd: []feequoter.FeeTokenArgs{
 							{
-								InstrumentId:      feeTokenInstrument,
-								PremiumMultiplier: types.NUMERIC("100000000"),
+								InstrumentId: feeTokenInstrument,
 							},
 						},
 					}),
@@ -1079,7 +1092,16 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 								{InstrumentId: feeTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 								{InstrumentId: linkTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 							},
-							GasPriceUpdates: []feequoter.GasPriceUpdate{},
+							// Gas price must be 0 until TransferFactory is
+							// properly wired (see TODO above). A non-zero gas
+							// price produces a non-zero fee, triggering a
+							// TransferFactory_Transfer on the invalid CID.
+							GasPriceUpdates: []feequoter.GasPriceUpdate{
+								{
+									DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
+									UsdPerUnitGas:     types.NUMERIC("0"),
+								},
+							},
 						},
 						Caller: types.PARTY(party),
 					}),
@@ -1110,8 +1132,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	senderRequiredCCVs := make([]common.RawInstanceAddress, 0, len(opts.CCVs))
-	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
+	senderRequiredCCVs := make([]mcmsbindings.RawInstanceAddress, 0, len(opts.CCVs))
+	ccvSendInputs := make([]ccipclient.CCVSendInput, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
@@ -1155,8 +1177,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("construct verifier raw address: %w", err)
 			}
 		}
-		senderRequiredCCVs = append(senderRequiredCCVs, rawAddr.Binding())
-		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
+		senderRequiredCCVs = append(senderRequiredCCVs, mcmsbindings.RawInstanceAddress{
+			Unpack: types.TEXT(rawAddr.String()),
+		})
+		ccvSendInputs = append(ccvSendInputs, ccipclient.CCVSendInput{
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
 			VerifierArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
 			CcvExtraContext: common.CCIPContext{},
@@ -1189,32 +1213,45 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	sendArgs := ccipsender.Send{
-		Context:           sendContext,
-		RouterCid:         routerCID,
-		DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
-		Receiver:          types.TEXT(hex.EncodeToString(fields.Receiver)),
-		Payload:           types.TEXT(hex.EncodeToString(fields.Data)),
-		ExtraArgs: ccipsender.CantonExtraArgsV1{
-			GasLimit:           types.INT64(opts.ExecutionGasLimit),
-			BlockConfirmations: nil,
-			SenderRequiredCCVs: senderRequiredCCVs,
-			ExecutorCid:        executorCID,
-			ExecutorArgs:       nil,
-			TokenReceiver:      nil,
-			TokenArgs:          types.TEXT(""),
-		},
-		FeeToken: feeTokenInstrument,
-		FeeTokenInput: interfaces.TokenInput{
-			TransferFactory: routerCID,
-			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-				Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
-				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+		Context:                  sendContext,
+		RouterCid:                routerCID,
+		DestinationChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
+		Message: ccipclient.Canton2AnyMessage{
+			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
+			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
+			FeeToken: ccipclient.FeeTokenInput{
+				Token: feeTokenInstrument,
+				TokenInput: interfaces.TokenInput{
+					// TODO: replace with a real Splice TransferFactory CID from the
+					// transfer-instruction API. Using routerCID is invalid because
+					// CCIPSend is a consuming choice on the router, so exercising
+					// TransferFactory_Transfer on the same CID fails with
+					// CONTRACT_NOT_ACTIVE. This only works today because total fees
+					// are 0 (gas price set to 0 below) so the transfer is skipped.
+					TransferFactory: routerCID,
+					ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+						Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
+						Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+					},
+					TokenPoolHoldings: nil,
+				},
+				SenderInputCids: nil,
 			},
-			TokenPoolHoldings: nil,
+			ExtraArgs: ccipclient.ExtraArgs{
+				V3: &ccipclient.GenericExtraArgsV3{
+					GasLimit:           types.INT64(opts.ExecutionGasLimit),
+					BlockConfirmations: 0,
+					Ccvs:               senderRequiredCCVs,
+					Executor: &ccipclient.ExecutorInput{
+						ExecutorCid:  executorCID,
+						ExecutorArgs: types.TEXT(""),
+					},
+					TokenReceiver: types.TEXT(""),
+					TokenArgs:     types.TEXT(""),
+				},
+			},
 		},
-		FeeTokenHoldingCids: nil,
-		TokenTransfer:       nil,
-		CcvSendInputs:       ccvSendInputs,
+		Ccvs: ccvSendInputs,
 	}
 	sendArgsMap := sendArgs.ToMap()
 	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {

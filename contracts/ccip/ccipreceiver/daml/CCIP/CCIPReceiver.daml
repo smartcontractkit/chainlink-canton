@@ -9,14 +9,14 @@ module CCIP.CCIPReceiver where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Action (foldlA)
-import DA.List (dedup)
+import DA.List (unique)
 
 import qualified CCIP.Context
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.PerPartyRouter
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import qualified CCIP.TokenAdminRegistry
 
 -- | Per-CCV verification input. Pairs a verifier contract (via interface)
@@ -46,13 +46,19 @@ template CCIPReceiver
         -- IAny2EVMMessageReceiverV2.getCCVs() in the EVM implementation.
         -- Passed to PerPartyRouter.Execute as receiverRequiredCCVs.
         requiredCCVs : [RawInstanceAddress]
+        optionalCCVs : [RawInstanceAddress]
+        optionalThreshold : Int
+        -- Minimum source-chain block confirmations this receiver will accept for FTF messages.
+        -- A value of 0 means finalized-only and rejects FTF.
+        minBlockConfirmations : Int
     where
         signatory owner
+        -- Ensure that requiredCCVs are unique
+        ensure assertValidInstanceId instanceId && unique requiredCCVs
 
         -- | Query the receiver's CCV requirements. Off-chain code calls this
         -- to discover which CCVs need verification inputs before calling
         -- Execute. Analogous to IAny2EVMMessageReceiverV2.getCCVs().
-        -- TODO: consider combining all CCV requirements
         nonconsuming choice GetRequiredCCVs : [RawInstanceAddress]
             with
                 caller : Party
@@ -64,8 +70,9 @@ template CCIPReceiver
             with
                 newRequiredCCVs : [RawInstanceAddress]
             controller owner
-            do create this with requiredCCVs = newRequiredCCVs
-
+            do
+                assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in new required CCVs" (unique newRequiredCCVs)
+                create this with requiredCCVs = newRequiredCCVs
 
         -- | Executes an inbound CCIP message end-to-end.
         -- TODO: consider allowing arbitrary callers
@@ -86,10 +93,6 @@ template CCIPReceiver
                 -- One entry per CCV that should verify this message.
                 -- Accepts any ICrossChainVerifier implementation.
                 ccvInputs : [CCVInput]
-
-                -- Per-execute receiver CCV requirements, combined with the template's
-                -- requiredCCVs.
-                additionalRequiredCCVs : [RawInstanceAddress]
             controller owner
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
@@ -102,7 +105,21 @@ template CCIPReceiver
                     encodedMessage = encodedMessage
                     receiverParty = owner
                     tokenReceiverParty = fmap (.tokenReceiverParty) tokenTransfer
+                    receiverRequiredCCVs = requiredCCVs
+                    receiverOptionalCCVs = optionalCCVs
+                    receiverOptionalThreshold = optionalThreshold
+                    receiverMinBlockConfirmations = minBlockConfirmations
                     caller = owner
+
+                -- Token transfers must resolve pool CCVs before any CCV can contribute.
+                emCid <- case tokenTransfer of
+                    None -> pure emCid
+                    Some tt -> exercise tt.tokenPoolCid
+                        CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            extraContext = tt.poolExtraContext
+                            executingMessageCid = emCid
+                            caller = owner
 
                 -- CCV verification: thread executingMessageCid through each CCV
                 emCid <- foldlA (\cid input ->
@@ -115,23 +132,10 @@ template CCIPReceiver
                             caller = owner
                     ) emCid ccvInputs
 
-                -- Pool CCV verification: confirm that CCV results contain token pool required CCVs
-                emCid <- case tokenTransfer of
-                    None -> pure emCid
-                    Some tt -> exercise tt.tokenPoolCid
-                        CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            extraContext = tt.poolExtraContext
-                            executingMessageCid = emCid
-                            caller = owner
-
                 -- Execute with the final executingMessageCid
-                let allRequiredCCVs = dedup (requiredCCVs ++ additionalRequiredCCVs)
-
                 result <- exercise routerCid CCIP.PerPartyRouter.Execute with
                     context = context
                     executingMessageCid = emCid
-                    receiverRequiredCCVs = allRequiredCCVs
 
                 -- Token release
                 tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of

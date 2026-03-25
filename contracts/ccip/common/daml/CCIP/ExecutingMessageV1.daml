@@ -5,12 +5,14 @@
 module CCIP.ExecutingMessageV1 where
 
 import DA.Crypto.Text (BytesHex)
-import DA.List (dedup)
+import DA.List (dedup, unique)
+import DA.Optional (isNone, isSome)
 
 import qualified CCIP.Events
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.Tickets
 import qualified Splice.Api.Token.HoldingV1
 
@@ -24,8 +26,8 @@ data CCVVerification = CCVVerification
     deriving (Eq, Show)
 
 data ExecutingMessageState
-    = ExecutingMessageState_Prepared
-    | ExecutingMessageState_PoolVerified
+    = ExecutingMessageState_RequirePoolCCVs
+    | ExecutingMessageState_Prepared
     deriving (Eq, Show)
 
 data ExecutingMessageDeps = ExecutingMessageDeps
@@ -57,13 +59,19 @@ template ExecutingMessageV1
         ccvVerifications : [CCVVerification]
         -- Explicit list of CCV owner parties accumulated via AddCCVVerification.
         ccvOwners : [Party]
+        -- Resolved execute-time CCV requirements, computed during PrepareExecute.
+        requiredCCVs : [RawInstanceAddress]
+        optionalCCVs : [RawInstanceAddress]
+        optionalCCVThreshold : Int
+        receiverMinBlockConfirmations : Int
+        sourceDefaultCCVs : [RawInstanceAddress]
         -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
         -- None = pool hasn't been called; Some [] = called, no requirements.
         inboundPoolCCVs : Optional [RawInstanceAddress]
         deps : ExecutingMessageDeps
         -- State machine:
         --   message-only: Prepared -(FinalizeExecute)-> consumed
-        --   token-receive: Prepared -> PoolVerified -(FinalizeExecute)-> consumed
+        --   token-receive: RequirePoolCCVs -> Prepared -(FinalizeExecute)-> consumed
         state : ExecutingMessageState
     where
         signatory dedup (ccipOwner :: ccvOwners)
@@ -89,6 +97,14 @@ template ExecutingMessageV1
                 caller : Party
             controller caller
             do
+                assertMsg "executingMessage: AddCCVVerification only allowed in Prepared"
+                    (state == ExecutingMessageState_Prepared)
+                CCIP.Internal.assertCCVInstanceId
+                    "executingMessage: caller is not an allowed CCV"
+                    requiredCCVs
+                    (Some optionalCCVs)
+                    ccvInstanceId
+                    caller
                 assertMsg "executingMessage: duplicate CCV verification"
                     (not (any (\v -> v.ccvInstanceId == ccvInstanceId && v.ccvOwner == caller) ccvVerifications))
 
@@ -107,14 +123,27 @@ template ExecutingMessageV1
                 poolCCVs : [RawInstanceAddress]
             controller ccipOwner
             do
-                assertMsg "executingMessage: SetInboundPoolCCVs only allowed in Prepared"
-                    (state == ExecutingMessageState_Prepared)
+                assertMsg "executingMessage: SetInboundPoolCCVs only allowed while pool CCVs are required"
+                    (state == ExecutingMessageState_RequirePoolCCVs)
                 assertMsg "executingMessage: inbound pool verification only valid for token transfers"
-                    (tokenReceiver /= None)
-                assertMsg "setInboundPoolCCVs: already set" (inboundPoolCCVs == None)
+                    (isSome tokenReceiver)
+                assertMsg "SetInboundPoolCCVs: already set" (isNone inboundPoolCCVs)
+                assertMsg "SetInboundPoolCCVs: duplicate CCVs not allowed" (unique poolCCVs)
+                let resolvedPoolCCVs = case poolCCVs of
+                        [] -> sourceDefaultCCVs
+                        _ -> CCIP.Internal.resolveDefaultCCVs
+                            sourceDefaultCCVs
+                            CCIP.Internal.useDefaultCCVs
+                            poolCCVs
+                let mergedRequiredCCVs = dedup (requiredCCVs ++ resolvedPoolCCVs)
+                let (mergedOptionalCCVs, mergedOptionalCCVThreshold) =
+                        CCIP.Internal.resolveOptionalCCVs resolvedPoolCCVs optionalCCVs optionalCCVThreshold
                 create this with
+                    requiredCCVs = mergedRequiredCCVs
+                    optionalCCVs = mergedOptionalCCVs
+                    optionalCCVThreshold = mergedOptionalCCVThreshold
                     inboundPoolCCVs = Some poolCCVs
-                    state = ExecutingMessageState_PoolVerified
+                    state = ExecutingMessageState_Prepared
 
         -- Consuming finalize choice for the success path. Always consumes the
         -- executing message and emits an ExecutionStateChanged event. For token
@@ -130,11 +159,8 @@ template ExecutingMessageV1
                 returnData : BytesHex
             controller ccipOwner
             do
-                let isTokenTransfer = tokenReceiver /= None
                 assertMsg "executingMessage: invalid state for FinalizeExecute"
-                    (if isTokenTransfer
-                        then state == ExecutingMessageState_PoolVerified
-                        else state == ExecutingMessageState_Prepared)
+                    (state == ExecutingMessageState_Prepared)
                 tokenReceiveTicket <- case (maybePoolOwner, maybeTicketReceiver, maybeTokenReceiver, maybeInstrumentId, maybeAmount) of
                     (Some poolOwner, Some ticketReceiver, Some resolvedTokenReceiver, Some instrumentId, Some amount) -> do
                         assertMsg "executingMessage: ticket receiver mismatch"
@@ -147,6 +173,9 @@ template ExecutingMessageV1
                         ticketCid <- create CCIP.Tickets.TokenReceiveTicket with
                             ccipOwner = ccipOwner
                             ccvOwners = ccvOwners
+                            verifiedCCVs = dedup (map
+                                (\verification -> RawInstanceAddress.make verification.ccvInstanceId verification.ccvOwner)
+                                ccvVerifications)
                             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
                             poolOwner = poolOwner
                             receiver = ticketReceiver
@@ -154,8 +183,9 @@ template ExecutingMessageV1
                             instrumentId = instrumentId
                             amount = amount
                             sourcePoolData
-                            messageHash = messageId
+                            messageId = messageId
                             sourceChainSelector = message.sourceChainSelector
+                            finality = message.finality
                         pure (Some ticketCid)
                     (None, None, None, None, None) ->
                         pure None

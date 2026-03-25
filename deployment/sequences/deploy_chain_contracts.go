@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -132,22 +133,17 @@ var DeployChainContracts = operations.NewSequence(
 				Id:    types.TEXT("link-token"),
 			}
 		}
-		maxFeeJuels := input.FeeQuoterConfig.Template.MaxFeeJuelsPerMsg
-		if maxFeeJuels == "" {
-			maxFeeJuels = types.NUMERIC("1000000000000000000000000")
-		}
 		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{party},
 			Template: feequoter.FeeQuoter{
 				Owner:                            types.PARTY(input.CCIPOwnerParty),
-				FeeTokens:                        nil,
+				FeeTokens:                        types.SET{},
 				DestChainConfigs:                 nil,
 				TokenTransferFeeConfigs:          nil,
 				UsdPerUnitGasByDestChainSelector: nil,
 				UsdPerToken:                      nil,
 				LinkTokenInstrumentId:            linkTokenId,
-				MaxFeeJuelsPerMsg:                maxFeeJuels,
 				PriceUpdaters:                    input.FeeQuoterConfig.Template.PriceUpdaters,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
@@ -189,13 +185,14 @@ var DeployChainContracts = operations.NewSequence(
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{party},
 			Template: onrampBinding.OnRamp{
-				CcipOwner: types.PARTY(input.CCIPOwnerParty),
+				CcipOwner:         types.PARTY(input.CCIPOwnerParty),
+				MaxUSDCentsPerMsg: types.NUMERIC("100000000"),
 				Deps: onrampBinding.OnRampDeps{
 					GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
 					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
 					TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
 					FeeQuoter:          feeQuoterRawInstanceAddress.Binding(),
-					CcvRegistry:        common.RawInstanceAddress{},
+					CcvRegistry:        mcms.RawInstanceAddress{},
 				},
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),

@@ -9,16 +9,16 @@ import qualified Splice.Api.Token.TransferInstructionV1
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
+import qualified CCIP.Events
 import qualified CCIP.TokenAdminRegistry
 
 -- | Direction of token transfer for CCV requirement lookup.
 data TransferDirection = Outbound | Inbound
     deriving (Eq, Show)
-
 
 interface ITokenPool where
     viewtype TokenPoolView
@@ -78,9 +78,11 @@ interface ITokenPool where
         do tokenPool_releaseFromTicketImpl this self arg
 
     -- Lock/burn tokens for outbound transfer. The pool is the source of
-    -- truth for the locked amount, which it records via SendingMessageV1.AddTokenSend.
+    -- truth for the locked amount, which it records via SendingMessageV1.AddTokenSend
+    -- through TAR after pool-registration validation.
     nonconsuming choice TokenPool_LockOrBurn : LockOrBurnResult
         with
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -91,18 +93,19 @@ interface ITokenPool where
         controller caller
         do tokenPool_lockOrBurnImpl this self arg
 
-    -- Calculate fee for outbound token transfer, which it records via
-    -- SendingMessageV1.AddTokenFee
+    -- Calculate fee for outbound token transfer, which it records on
+    -- SendingMessageV1 through TAR after pool-registration validation.
     nonconsuming choice TokenPool_CalculateFee
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
             tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
             caller : Party
         controller caller
         do tokenPool_calculateFeeImpl this self arg
-
 
 -- View of the TokenPool
 data TokenPoolView = TokenPoolView
@@ -129,6 +132,7 @@ data ReleaseOrMintResult = ReleaseOrMintResult
     with
         output : ReleaseOrMintResult_Output
         poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        claimedEventCid : ContractId CCIP.Events.TokenReceiveTicketClaimed
     deriving (Eq, Show)
 
 data ReleaseOrMintResult_Output

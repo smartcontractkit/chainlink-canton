@@ -2,6 +2,7 @@ package fee_quoter
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -29,6 +30,16 @@ var Deploy = contract.NewDeploy(contract.DeployParams[feequoter.FeeQuoter]{
 	},
 	PackageName: string(contracts.CCIPFeeQuoter),
 	Prefix:      "feequoter",
+})
+
+var ApplyPriceUpdatersUpdate = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyPriceUpdatersUpdate]{
+	Name:         "canton/ccip/fee_quoter/apply_price_updates",
+	Version:      Version,
+	Description:  "Adds and removed prices updaters on a Canton FeeQuoter",
+	ContractType: ContractType,
+	Validate:     nil,
+	Template:     feequoter.FeeQuoter{},
+	Method:       feequoter.FeeQuoter{}.ApplyPriceUpdatersUpdate,
 })
 
 var UpdatePrices = contract.NewExercise(contract.ExerciseParams[feequoter.UpdatePrices]{
@@ -63,7 +74,12 @@ var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[f
 	Description:  "Applies destination chain configuration updates to the FeeQuoter",
 	ContractType: ContractType,
 	Validate: func(input feequoter.ApplyDestChainConfigUpdates2) error {
-		// TODO add validation
+		for _, cfg := range input.DestChainConfigArgs {
+			if cfg.DestChainConfig.LinkFeeMultiplierPercent == "" {
+				return fmt.Errorf("linkFeeMultiplierPercent cannot be empty for dest chain %s", cfg.DestChainSelector)
+			}
+		}
+
 		return nil
 	},
 	Template: feequoter.FeeQuoter{},

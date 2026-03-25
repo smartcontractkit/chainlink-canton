@@ -6,9 +6,10 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Map qualified as Map
 
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.OnRamp
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - SET DEPS
@@ -31,9 +32,10 @@ testOnRampMCMSEntrypoint_SetDeps = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps = initialDeps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
   let newDeps = SetDepsParams with
@@ -80,9 +82,10 @@ testOnRampMCMSEntrypoint_SetDeps_Partial = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps = initialDeps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
   let partialDeps = SetDepsParams with
@@ -129,9 +132,10 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps = initialDeps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
   let deps2 = SetDepsParams with
@@ -199,9 +203,10 @@ testOnRampMCMSEntrypoint_UnknownFunction = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
   submitMustFail ccipOwner do
@@ -228,9 +233,10 @@ testOnRampMCMSEntrypoint_InvalidParams = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
   submitMustFail ccipOwner do
@@ -257,6 +263,7 @@ testOnRampMCMSEntrypoint_MissingSelfCid = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid

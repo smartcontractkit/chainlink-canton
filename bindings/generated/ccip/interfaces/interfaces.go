@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "690e3b3a63fa18b4f014bb4b25da40a14f32e0c0d0e45784fd145b7d9d25bae8"
+	PackageID   = "b4a8b502321469bdc71fbc677840db5c1e521a6a045ca0df1c0accc6c3a81aaf"
 	SDKVersion  = "3.4.10"
 )
 
@@ -141,8 +141,9 @@ func (t *LockOrBurnResult) UnmarshalHex(data string) error {
 
 // ReleaseOrMintResult is a Record type
 type ReleaseOrMintResult struct {
-	Output         ReleaseOrMintResultOutput `json:"output"`
-	PoolChangeCids []types.CONTRACT_ID       `json:"poolChangeCids"`
+	Output          ReleaseOrMintResultOutput `json:"output"`
+	PoolChangeCids  []types.CONTRACT_ID       `json:"poolChangeCids"`
+	ClaimedEventCid types.CONTRACT_ID         `json:"claimedEventCid"`
 }
 
 // ToMap converts ReleaseOrMintResult to a map for DAML arguments
@@ -163,6 +164,14 @@ func (t ReleaseOrMintResult) ToMap() map[string]any {
 			res = append(res, e)
 		}
 		return res
+	}()
+
+	m["claimedEventCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ClaimedEventCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ClaimedEventCid
 	}()
 
 	return m
@@ -444,15 +453,33 @@ func (t *TokenPoolView) UnmarshalHex(data string) error {
 
 // TokenPoolCalculateFee is a Record type
 type TokenPoolCalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller            types.PARTY                              `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext                       `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller                types.PARTY                              `json:"caller"`
 }
 
 // ToMap converts TokenPoolCalculateFee to a map for DAML arguments
 func (t TokenPoolCalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
 
 	m["sendingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -564,18 +591,27 @@ func (t *TokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 
 // TokenPoolLockOrBurn is a Record type
 type TokenPoolLockOrBurn struct {
-	RmnRemoteCid      types.CONTRACT_ID   `json:"rmnRemoteCid"`
-	ExtraContext      common.CCIPContext  `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID   `json:"sendingMessageCid"`
-	TokenInput        TokenInput          `json:"tokenInput"`
-	SenderInputCids   []types.CONTRACT_ID `json:"senderInputCids"`
-	Amount            types.NUMERIC       `json:"amount"`
-	Caller            types.PARTY         `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID   `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID   `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext  `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID   `json:"sendingMessageCid"`
+	TokenInput            TokenInput          `json:"tokenInput"`
+	SenderInputCids       []types.CONTRACT_ID `json:"senderInputCids"`
+	Amount                types.NUMERIC       `json:"amount"`
+	Caller                types.PARTY         `json:"caller"`
 }
 
 // ToMap converts TokenPoolLockOrBurn to a map for DAML arguments
 func (t TokenPoolLockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
 
 	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }

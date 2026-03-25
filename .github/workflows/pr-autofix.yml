@@ -35,10 +35,39 @@ jobs:
             ⏳ **Autofix is running...**
             Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.client_payload.pull_request.head.ref }}
           fetch-depth: 0
+          token: ${{ steps.setup-github-token.outputs.access-token }}
+      - name: Remove previous autofix commits
+        id: prepare-branch
+        run: |
+          branch="${{ github.event.client_payload.pull_request.head.ref }}"
+          reset_target="HEAD"
+
+          while true; do
+            subject="$(git log -1 --format=%s "$reset_target")"
+            if [[ ! "$subject" =~ ^\[autofix\]\  ]]; then
+              break
+            fi
+
+            if ! git rev-parse "${reset_target}^" >/dev/null 2>&1; then
+              echo "Branch history is entirely autofix commits; refusing to reset past the root commit."
+              exit 1
+            fi
+
+            reset_target="${reset_target}^"
+          done
+
+          if [[ "$reset_target" != "HEAD" ]]; then
+            git reset --hard "$reset_target"
+            git push --force-with-lease origin "HEAD:${branch}"
+          fi
+
+          git fetch origin "$branch"
+          expected_remote_head="$(git rev-parse "origin/${branch}")"
+          echo "expected_remote_head=${expected_remote_head}" >> "$GITHUB_OUTPUT"
       - name: Install Go
         uses: actions/setup-go@v6
         with:
@@ -65,9 +94,25 @@ jobs:
             git commit -m "[autofix] apply fix-all to PR"
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
+      - name: Verify branch unchanged before signed push
+        if: steps.commit.outputs.has_changes == 'true'
+        run: |
+          branch="${{ github.event.client_payload.pull_request.head.ref }}"
+          expected_remote_head="${{ steps.prepare-branch.outputs.expected_remote_head }}"
+
+          git fetch origin "$branch"
+          current_remote_head="$(git rev-parse "origin/${branch}")"
+
+          if [[ "$current_remote_head" != "$expected_remote_head" ]]; then
+            echo "Remote branch changed before push-signed-commits."
+            echo "Expected: $expected_remote_head"
+            echo "Actual:   $current_remote_head"
+            exit 1
+          fi
       - name: Push signed commits
         if: steps.commit.outputs.has_changes == 'true'
-        uses: asana/push-signed-commits@d615ca88d8e1a946734c24970d1e7a6c56f34897 # v1
+        # use forked push-signed-commits so that commits can be generated when there are DARs and support chunking
+        uses: cfal/push-signed-commits@79a6e400798f7cb290f63bb16854f3f91afc08b4 # v1
         with:
           github-token: ${{ steps.setup-github-token.outputs.access-token }}
           local_branch_name: ${{ github.event.client_payload.pull_request.head.ref }}

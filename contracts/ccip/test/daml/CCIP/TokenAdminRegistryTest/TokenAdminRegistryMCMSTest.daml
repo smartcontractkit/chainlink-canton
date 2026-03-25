@@ -8,7 +8,8 @@ import DA.Map qualified as Map
 import DA.Optional (isSome)
 
 import qualified Splice.Api.Token.HoldingV1
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.MessageCodecV1
 import CCIP.TokenAdminRegistry
 import CCIP.TokenAdminRegistryCodec
@@ -38,7 +39,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
         (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
         ]
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode SetPool params
@@ -90,7 +91,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
         (encodedInstrumentId, TokenConfig instrumentId (Some owner) None (Some existingPool))
         ]
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode SetPool params with None (remove pool)
@@ -136,7 +137,7 @@ testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
       owner
       tokenConfigs = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode ProposeAdministrator params
@@ -186,7 +187,7 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
         (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
         ]
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode TransferAdminRole params
@@ -199,13 +200,15 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
 
-  -- Verify admin was transferred
+  -- Verify transfer creates a pending admin and leaves current admin unchanged
   contracts <- query @TokenAdminRegistry owner
   case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
     [(_, tar)] ->
       case Map.lookup encodedInstrumentId tar.tokenConfigs of
         None -> abort "Expected token config"
-        Some config -> config.admin === Some newAdmin
+        Some config -> do
+          config.admin === Some owner
+          config.pendingAdmin === Some newAdmin
     _ -> abort "Expected exactly one TokenAdminRegistry contract"
 
   pure ()
@@ -233,7 +236,7 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
         (encodedInstrumentId, TokenConfig instrumentId None (Some owner) None)
         ]
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode AcceptAdminRole params
@@ -276,7 +279,7 @@ testTokenAdminRegistryMCMSEntrypoint_UnknownFunction = script do
       owner
       tokenConfigs = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Call with unknown function name - should fail
@@ -301,7 +304,7 @@ testTokenAdminRegistryMCMSEntrypoint_InvalidParams = script do
       owner
       tokenConfigs = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Call with invalid/truncated operationData - should fail

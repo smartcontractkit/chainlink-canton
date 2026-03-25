@@ -5,7 +5,7 @@ import Daml.Script
 import DA.Assert ((===))
 
 import CCIP.PerPartyRouter
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
 -- SETDEPSPARAMS ENCODING/DECODING TESTS (Optional fields)

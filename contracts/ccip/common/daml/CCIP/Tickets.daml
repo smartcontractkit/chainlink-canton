@@ -4,8 +4,8 @@ module CCIP.Tickets where
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
+import MCMS.RawInstanceAddress (RawInstanceAddress)
 import qualified Splice.Api.Token.HoldingV1
-
 
 -- | Issuer type for receipts.
 data IssuerType
@@ -27,7 +27,6 @@ data Receipt = Receipt
         extraArgs : BytesHex           -- Entity-specific arguments
     deriving (Eq, Show)
 
-
 -- | Ticket issued by consuming ExecutingMessageV1 after successful message verification.
 -- The signatory set includes CCV-owner parties accumulated during inbound verification,
 -- giving third-party pools an independent trust check beyond ccipOwner alone.
@@ -37,6 +36,9 @@ template TokenReceiveTicket
         -- CCV owner parties accumulated from ExecutingMessageV1's finalize choice.
         -- Mirrors the widened signatory set for deterministic pool-side validation.
         ccvOwners : [Party]
+        -- Exact CCV instances that verified the message on the inbound path.
+        -- Pools use these to preserve instance-level trust checks.
+        verifiedCCVs : [RawInstanceAddress]
         tokenAdminRegistryInstanceId : Text  -- Identifies the issuing TAR
         poolOwner : Party           -- Observer - pool that should release
         receiver : Party            -- Message receiver (observer)
@@ -46,8 +48,9 @@ template TokenReceiveTicket
         amount : Numeric 0
         sourcePoolData : BytesHex
 
-        messageHash : BytesHex
+        messageId : BytesHex
         sourceChainSelector : Numeric 0
+        finality : Int
     where
         signatory dedup (ccipOwner :: ccvOwners)
         observer poolOwner, receiver, tokenReceiver

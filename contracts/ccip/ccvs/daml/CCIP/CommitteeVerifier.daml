@@ -1,71 +1,52 @@
-module CCIP.CommitteeVerifier where
+module CCIP.CommitteeVerifier (
+    module CCIP.CommitteeVerifier,
+    module CCIP.CommitteeVerifierTypes,
+) where
 
 import qualified DA.Action
 import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1WithEcdsaOnly)
 import DA.Foldable (forA_)
 import DA.List (dedup, (\\))
 import DA.Map qualified as Map
-import DA.Optional (fromSomeNote)
-
+import DA.Optional (fromOptional, fromSomeNote)
+import CCIP.CommitteeVerifierCodec (
+    decodeApplySignatureConfigsParams,
+    decodeSetDynamicConfigParams,
+    decodeApplyRemoteChainConfigUpdatesParams,
+    decodeApplyAllowListUpdatesParams,
+    decodeTransferStorageLocationsAdminParams,
+    decodeUpdateStorageLocationsParams,
+    decodeSetDepsParams,
+    )
+import CCIP.CommitteeVerifierTypes (
+    DynamicConfig(..),
+    RemoteChainConfig(..),
+    RemoteChainConfigArgs(..),
+    CommitteeVerifierDeps(..),
+    SetDepsParams(..),
+    SignatureConfig(..),
+    AllowListConfigArgs(..),
+    )
 import qualified CCIP.Context
+import qualified CCIP.Crypto.DerEncoding
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Interfaces.CrossChainVerifier
 
-import qualified CCIP.Crypto.DerEncoding
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
+-- The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0"))
+versionTagV1_7_0 : BytesHex
 versionTagV1_7_0 : BytesHex = "49ff34ed"
 
+signature_length : Int
 signature_length : Int = 64
+signature_component_length : Int
 signature_component_length : Int = 32
-
-data DynamicConfig = DynamicConfig
-    with
-        allowListAdmin : Optional Party -- Party capable of adding or removing allowed senders
-        messageSentObservers : [Party]  -- List of parties that will be added to CCIPMessageSent contracts as additional observers
-    deriving (Eq, Show)
-
-data RemoteChainConfigArgs = RemoteChainConfigArgs
-    with
-        remoteChainSelector : Numeric 0 -- The chain selector that this config applies to.
-        feeUSDCents : Numeric 0         -- The fee in USD cents for messages to this remote chain.
-        gasForVerification : Int        -- The gas to reserve for verification of messages on the remote chain.
-        payloadSizeBytes : Int          -- The size of the verification payload on the remote chain.
-        allowListEnabled : Bool         -- True if the allowlist is enabled. To update the list of allowed senders, see ApplyAllowlistUpdates.
-    deriving (Eq, Show)
-
-data RemoteChainConfig = RemoteChainConfig
-    with
-        feeUSDCents : Numeric 0      -- The fee in USD cents for messages to this remote chain.
-        gasForVerification : Int     -- The gas to reserve for verification of messages on the remote chain.
-        payloadSizeBytes : Int       -- The size of the verification payload on the remote chain.
-        allowListEnabled : Bool      -- True if the allowlist is enabled
-        allowedSendersList : [Party] -- The list of parties allowed to send messages.
-    deriving (Eq, Show)
-
-data AllowListConfigArgs = AllowListConfigArgs
-    with
-        destChainSelector : Numeric 0       -- The chain selector that this allowlist config applies to.
-        allowListEnabled : Bool             -- True if the allowlist is enabled for the destination chain.
-        addedAllowListedSenders : [Party]   -- List of parties to add to the allowlist for the destination chain.
-        removedAllowListedSenders : [Party] -- List of parties to remove from the allowlist for the destination chain.
-    deriving (Eq, Show)
-
--- | Per-source-chain signature config for inbound message verification.
-data SignatureConfig = SignatureConfig
-    with
-        sourceChainSelector : Numeric 0
-        threshold : Int
-        signerKeys : [BytesHex]
-    deriving (Eq, Show)
-
-data CommitteeVerifierDeps = CommitteeVerifierDeps
-    with
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-    deriving (Eq, Show)
 
 template CommitteeVerifier
     with
@@ -73,7 +54,7 @@ template CommitteeVerifier
         owner : Party
 
         ccipOwner : Party
-        versionTag : BytesHex              -- Version tag for this CCV (e.g., "49ff34ed")
+        versionTag : BytesHex -- Version tag for this CCV (e.g., "49ff34ed")
         
         -- | Dynamic config
         -- Party capable of adding or removing allowed senders
@@ -91,18 +72,23 @@ template CommitteeVerifier
 
         -- | The remote chain specific configs. Keyed by remote chain selector.
         remoteChainConfigs : Map.Map (Numeric 0) RemoteChainConfig
-
+        -- | The signer configs for inbound message verification. Keyed by source chain selector.
         signerConfigs : Map.Map (Numeric 0) SignatureConfig
+
         deps : CommitteeVerifierDeps
     where
         signatory owner
         observer storageLocationsAdmin :: pendingStorageLocationsAdmin :: optional [] pure allowListAdmin
 
-        -- Ensure that for each signerConfig the number of signer keys is >= threshold and that threshold > 0
-        ensure versionTag /= "" && all (\config -> (length config.signerKeys >= config.threshold) && (config.threshold > 0)) (Map.values signerConfigs)
+        -- Ensure signer configs have a positive threshold, enough signers,
+        -- and no duplicate signer keys.
+        ensure assertValidInstanceId instanceId
+          && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
+                instanceId = instanceId
+                owner = owner
                 ccipOwner = ccipOwner
                 storageLocations = storageLocations
 
@@ -119,6 +105,7 @@ template CommitteeVerifier
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_CalculateFee
                     with
                         sendingMessageCid = arg.sendingMessageCid
+                        extraContext = arg.extraContext
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
@@ -134,6 +121,12 @@ template CommitteeVerifier
         -- |                Config                 |
         -- =========================================
 
+        -- Sets the dynamic configuration
+        --
+        -- Params:
+        -- dynamicConfig: The configuration
+        --
+        -- Only callable by the owner.
         choice SetDynamicConfig : ContractId CommitteeVerifier
             with
                 dynamicConfig : DynamicConfig
@@ -143,6 +136,13 @@ template CommitteeVerifier
                     allowListAdmin = dynamicConfig.allowListAdmin
                     messageSentObservers = dynamicConfig.messageSentObservers
 
+        -- Updates allowlistConfig for Senders.
+        --
+        -- Params:
+        -- allowListConfigArgsItems: List of AllowlistConfigArguments where each item is for a destChainSelector.
+        -- caller: The party initiating the update
+        --
+        -- Only callable by the owner or allowListAdmin (if set in dynamic config).
         choice ApplyAllowListUpdates : ContractId CommitteeVerifier
             with
                 allowListConfigArgsItems : [AllowListConfigArgs]
@@ -176,7 +176,12 @@ template CommitteeVerifier
                 create this with
                     remoteChainConfigs = updatedRemoteChainConfigs
 
-
+        -- Updates remote chains specific configs.
+        --
+        -- Params:
+        -- remoteChainConfigArgsItems: List of remote chain specific configs.
+        --
+        -- Only callable by the owner.
         choice ApplyRemoteChainConfigUpdates : ContractId CommitteeVerifier
             with
                 remoteChainConfigArgs : [RemoteChainConfigArgs]
@@ -186,6 +191,7 @@ template CommitteeVerifier
                 forA_ remoteChainConfigArgs $ \args -> do
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid gas for verification: " <> show args.gasForVerification) (args.gasForVerification > 0)
+                    assertMsg ("ApplyRemoteChainConfigUpdates: invalid payload size bytes: " <> show args.payloadSizeBytes) (args.payloadSizeBytes >= 0)
                 -- Update
                 let updatedRemoteChainConfigs = foldl
                         (\configs args -> do
@@ -204,7 +210,7 @@ template CommitteeVerifier
                 create this with
                     remoteChainConfigs = updatedRemoteChainConfigs
 
-        choice CommitteeVerifier_ApplySignatureConfigs : ContractId CommitteeVerifier
+        choice ApplySignatureConfigs : ContractId CommitteeVerifier
             with
                 sourceChainSelectorsToRemove : [Numeric 0]
                 signatureConfigs : [SignatureConfig]
@@ -212,11 +218,22 @@ template CommitteeVerifier
             do
                 -- Remove existing signer configs for specified source chains
                 let signerConfigsAfterRemoval = foldr Map.delete signerConfigs sourceChainSelectorsToRemove
-                -- Add new signer configs - for each config, check that threshold > 0 and number of signer keys >= threshold
-                assertMsg "invalid signature config: threshold must be > 0 and signerKeys must be >= threshold"
-                    (all (\config -> (config.threshold > 0) && (length config.signerKeys >= config.threshold)) signatureConfigs)
+                -- Add new signer configs - for each config, check that threshold > 0,
+                -- number of signer keys >= threshold, and signer keys are unique.
+                assertMsg "invalid signature config: threshold must be > 0, signerKeys must be >= threshold, and signerKeys must be unique"
+                    (all isValidSignatureConfig signatureConfigs)
                 let newSignerConfigs = foldr (\config acc -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
                 create this with signerConfigs = newSignerConfigs
+
+        -- | Update dependencies selectively (None = keep existing)
+        choice SetDeps : ContractId CommitteeVerifier
+            with
+                newDeps : SetDepsParams
+            controller owner
+            do
+                let mergedDeps = CommitteeVerifierDeps with
+                        rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
+                create this with deps = mergedDeps
 
         -- ==========================================
         -- |           Storage Locations            |
@@ -225,7 +242,7 @@ template CommitteeVerifier
         -- | Initiates the two-step transfer for the storage locations admin role.
         -- Caller must be the current storage locations admin.
         -- @param newAdmin The proposed new storage locations admin party
-        choice CommitteeVerifier_TransferStorageLocationsAdmin : ContractId CommitteeVerifier
+        choice TransferStorageLocationsAdmin : ContractId CommitteeVerifier
             with
                 newAdmin : Party
             controller storageLocationsAdmin
@@ -234,7 +251,7 @@ template CommitteeVerifier
 
         -- | Completes the transfer of the storage locations admin role.
         -- Caller must be the proposed new storage locations admin.
-        choice CommitteeVerifier_AcceptStorageLocationsAdmin : ContractId CommitteeVerifier
+        choice AcceptStorageLocationsAdmin : ContractId CommitteeVerifier
             controller pendingStorageLocationsAdmin
             do
                 assertMsg "No pending admin transfer to accept" (pendingStorageLocationsAdmin /= storageLocationsAdmin)
@@ -243,7 +260,7 @@ template CommitteeVerifier
         -- | Updates the storage locations identifiers.
         -- Caller must be the storage locations admin.
         -- @param newLocations The new storage location identifiers
-        choice CommitteeVerifier_UpdateStorageLocations : ContractId CommitteeVerifier
+        choice UpdateStorageLocations : ContractId CommitteeVerifier
             with
                 newLocations : [Text]
             controller storageLocationsAdmin
@@ -275,7 +292,7 @@ template CommitteeVerifier
 
                 -- Validate RMN instance and check source chain curse
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
+                RawInstanceAddress.assertEqual "verifier: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "verifier: executing message rmn mismatch"
                     (execMsg.deps.rmnRemote == deps.rmnRemote)
@@ -322,10 +339,13 @@ template CommitteeVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                extraContext : CCIP.Context.CCIPContext
                 caller : Party
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
+                assertMsg "verifier: sending message ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == ccipOwner)
                 let chainConfig = fromSomeNote "no fee config for dest chain"
                         (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
 
@@ -349,10 +369,12 @@ template CommitteeVerifier
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
+                assertMsg "verifier: sending message ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == ccipOwner)
 
                 -- Validate RMN instance and check destination chain curse
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
+                RawInstanceAddress.assertEqual "verifier: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "verifier: sending message rmn mismatch"
                     (sendingMsg.deps.rmnRemote == deps.rmnRemote)
@@ -375,6 +397,85 @@ template CommitteeVerifier
                     messageSentObservers = messageSentObservers
                     caller = owner
 
+        -- ==========================================
+        -- |         MCMSReceiver Interface         |
+        -- ==========================================
+
+        interface instance MCMSReceiver for CommitteeVerifier where
+            view = MCMSReceiverView with
+                mcmsController = owner
+                instanceId
+
+            mcmsEntrypoint functionName operationData contractIds = do
+                let instAddr = instanceId <> "@" <> partyToText owner
+                selfCid <- case Map.lookup instAddr contractIds of
+                    None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+                    Some cid -> pure (coerceContractId cid : ContractId CommitteeVerifier)
+
+                case functionName of
+                    "ApplySignatureConfigs" -> do
+                        case decodeApplySignatureConfigsParams operationData of
+                            None -> abort "E_INVALID_PARAMS: ApplySignatureConfigs"
+                            Some ((selectorsToRemove, signatureConfigs), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: ApplySignatureConfigs" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid ApplySignatureConfigs with
+                                    sourceChainSelectorsToRemove = selectorsToRemove
+                                    signatureConfigs = signatureConfigs
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "SetDynamicConfig" -> do
+                        case decodeSetDynamicConfigParams operationData of
+                            None -> abort "E_INVALID_PARAMS: SetDynamicConfig"
+                            Some ((dynamicConfig), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: SetDynamicConfig" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid SetDynamicConfig with
+                                    dynamicConfig = dynamicConfig
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "ApplyRemoteChainConfigUpdates" -> do
+                        case decodeApplyRemoteChainConfigUpdatesParams operationData of
+                            None -> abort "E_INVALID_PARAMS: ApplyRemoteChainConfigUpdates"
+                            Some ((remoteChainConfigArgs), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: ApplyRemoteChainConfigUpdates" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid ApplyRemoteChainConfigUpdates with
+                                    remoteChainConfigArgs = remoteChainConfigArgs
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "SetDeps" -> do
+                        case decodeSetDepsParams operationData of
+                            None -> abort "E_INVALID_PARAMS: SetDeps"
+                            Some ((newDeps), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: SetDeps" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid SetDeps with
+                                    newDeps = newDeps
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "ApplyAllowListUpdates" -> do
+                        case decodeApplyAllowListUpdatesParams operationData of
+                            None -> abort "E_INVALID_PARAMS: ApplyAllowListUpdates"
+                            Some ((allowListConfigArgsItems, caller), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: ApplyAllowListUpdates" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid ApplyAllowListUpdates with
+                                    allowListConfigArgsItems = allowListConfigArgsItems
+                                    caller = caller
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "TransferStorageLocationsAdmin" -> do
+                        case decodeTransferStorageLocationsAdminParams operationData of
+                            None -> abort "E_INVALID_PARAMS: TransferStorageLocationsAdmin"
+                            Some ((newAdmin), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: TransferStorageLocationsAdmin" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid TransferStorageLocationsAdmin with
+                                    newAdmin = newAdmin
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "AcceptStorageLocationsAdmin" -> do
+                        assertMsg "E_TRAILING_BYTES: AcceptStorageLocationsAdmin" (0 == byteCount operationData)
+                        newCid <- exercise selfCid AcceptStorageLocationsAdmin with
+                        pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "UpdateStorageLocations" -> do
+                        case decodeUpdateStorageLocationsParams operationData of
+                            None -> abort "E_INVALID_PARAMS: UpdateStorageLocations"
+                            Some ((newLocations), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: UpdateStorageLocations" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid UpdateStorageLocations with
+                                    newLocations = newLocations
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 parseSignatures : BytesHex -> [(BytesHex, BytesHex)]
 parseSignatures signatureData =
@@ -410,3 +511,9 @@ isValidSigner messageHash signatures signerKey =
 countValidSigners : [(BytesHex, Bool)] -> Int
 countValidSigners validSignersMap =
     length (filter snd validSignersMap)
+
+isValidSignatureConfig : SignatureConfig -> Bool
+isValidSignatureConfig config =
+    config.threshold > 0
+        && length config.signerKeys >= config.threshold
+        && length config.signerKeys == length (dedup config.signerKeys)

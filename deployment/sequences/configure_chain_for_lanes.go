@@ -15,8 +15,11 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
+	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -73,18 +76,19 @@ var ConfigureChainForLanes = operations.NewSequence(
 		// Create inputs for each operation
 		globalConfigSourceChainConfigArgs := make([]common.SourceChainConfigArgs, 0, len(input.RemoteChains))
 		globalConfigDestChainConfigArgs := make([]common.DestChainConfigArgs, 0, len(input.RemoteChains))
+		feeQuoterDestChainConfigArgs := make([]feequoter.DestChainConfigArgs2, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
 
 			// Inbound / OffRamp
-			defaultInboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.DefaultInboundCCVs))
+			defaultInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.DefaultInboundCCVs))
 			for _, ccv := range remoteConfig.DefaultInboundCCVs {
-				defaultInboundCCVs = append(defaultInboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				defaultInboundCCVs = append(defaultInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
-			laneMandatedInboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedInboundCCVs))
+			laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedInboundCCVs))
 			for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
-				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
 			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamps))
 			for _, onRamp := range remoteConfig.OnRamps {
@@ -104,27 +108,46 @@ var ConfigureChainForLanes = operations.NewSequence(
 				DefaultCCVs:         defaultInboundCCVs,
 			})
 
-			defaultOutboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.DefaultOutboundCCVs))
+			defaultOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.DefaultOutboundCCVs))
 			for _, ccv := range remoteConfig.DefaultOutboundCCVs {
-				defaultOutboundCCVs = append(defaultOutboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				defaultOutboundCCVs = append(defaultOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
-			laneMandatedOutboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedOutboundCCVs))
+			laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedOutboundCCVs))
 			for _, ccv := range remoteConfig.LaneMandatedOutboundCCVs {
-				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
+			defaultExecutor := mcms.RawInstanceAddress{Unpack: types.TEXT(remoteConfig.DefaultExecutor)}
 
 			// Outbound / OnRamp
 			globalConfigDestChainConfigArgs = append(globalConfigDestChainConfigArgs, common.DestChainConfigArgs{
 				DestChainSelector:         types.NUMERIC(remoteSelectorStr),
 				IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
 				AddressBytesLength:        types.INT64(remoteConfig.AddressBytesLength),
+				TokenReceiverAllowed:      types.BOOL(true), // TODO this is missing from the input
+				BaseExecutionGasCost:      types.INT64(remoteConfig.BaseExecutionGasCost),
 				OffRampAddress:            types.TEXT(hex.EncodeToString(remoteConfig.OffRamp)), // Remote chain off-ramp for outbound execution
+				DefaultExecutor:           defaultExecutor,
 				LaneMandatedCCVs:          laneMandatedOutboundCCVs,
 				DefaultCCVs:               defaultOutboundCCVs,
 				MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),
 				TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)), // TODO: check if this is accurate
 			})
-			// TODO: Other configs once the contracts are ready
+
+			fqConfig := remoteConfig.FeeQuoterDestChainConfig
+			feeQuoterDestChainConfigArgs = append(feeQuoterDestChainConfigArgs, feequoter.DestChainConfigArgs2{
+				DestChainSelector: types.NUMERIC(remoteSelectorStr),
+				DestChainConfig: feequoter.DestChainConfig2{
+					IsEnabled:                   types.BOOL(fqConfig.IsEnabled),
+					MaxDataBytes:                types.INT64(fqConfig.MaxDataBytes),
+					MaxPerMsgGasLimit:           types.INT64(fqConfig.MaxPerMsgGasLimit),
+					DestGasOverhead:             types.INT64(fqConfig.DestGasOverhead),
+					DestGasPerPayloadByteBase:   types.INT64(fqConfig.DestGasPerPayloadByteBase),
+					DefaultTxGasLimit:           types.INT64(fqConfig.DefaultTxGasLimit),
+					LinkFeeMultiplierPercent:    types.NUMERIC(strconv.FormatUint(uint64(fqConfig.LinkFeeMultiplierPercent), 10)),
+					DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatUint(uint64(fqConfig.DefaultTokenFeeUSDCents), 10)),
+					DefaultTokenDestGasOverhead: types.INT64(fqConfig.DefaultTokenDestGasOverhead),
+				},
+			})
 		}
 
 		// Apply SourceChainConfigs to GlobalConfig
@@ -161,7 +184,20 @@ var ConfigureChainForLanes = operations.NewSequence(
 			},
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates: %w", err)
+		}
+
+		// Apply DestChainConfigs to FeeQuoter
+		_, err = operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, deps, contract.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
+			ChainSelector:   deps.Chain.Selector,
+			InstanceAddress: input.FeeQuoter,
+			ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
+			Args: feequoter.ApplyDestChainConfigUpdates2{
+				DestChainConfigArgs: feeQuoterDestChainConfigArgs,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply fee quoter dest chain config updates: %w", err)
 		}
 
 		return sequences.OnChainOutput{}, nil

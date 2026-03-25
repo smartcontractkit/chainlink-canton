@@ -1,11 +1,17 @@
 -- | Per-party router for CCIP message sending and receiving.
 module CCIP.PerPartyRouter where
 
+import DA.Action (foldlA)
+import DA.List (dedup, unique)
 import DA.Map qualified as Map
-import DA.Crypto.Text (BytesHex, keccak256)
+import DA.Set (Set)
+import DA.Set qualified as Set
+import DA.Crypto.Text (BytesHex, keccak256, byteCount)
+import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional)
-import DA.Time (addRelTime, hours)
+import DA.Time (time)
 
+import qualified CCIP.Client
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
@@ -15,8 +21,8 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
-import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
@@ -28,11 +34,24 @@ import CCIP.Codec
   , encodeOptionalRawInstanceAddress
   , decodeOptionalRawInstanceAddressAt
   )
+import MCMS.Codec (decodePartyList, encodePartyList)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
+
+-- | Far-future time used as "never expires" for pending transfers.
+-- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
+maxTime : Time
+maxTime = time (date 9999 Dec 31) 23 59 59
+
+maxExecutedMessagesSize : Int
+-- Conservatively sized based on Daml Script test validation. Larger values passed locally
+-- up to 25000, while much larger values caused the script runner to cancel under resource
+-- pressure. TODO: benchmark and tune this against a real Canton participant/synchronizer
+-- setup instead of relying on script-runner limits.
+maxExecutedMessagesSize = 25000
 
 data PerPartyRouterDeps = PerPartyRouterDeps
     with
@@ -54,8 +73,60 @@ data SetDepsParams = SetDepsParams
         rmnRemote : Optional RawInstanceAddress
     deriving (Eq, Show)
 
+addFeeForParty : Map.Map Party (Numeric 0) -> Party -> Numeric 0 -> Map.Map Party (Numeric 0)
+addFeeForParty allocs recipient amount =
+    let existing = fromOptional 0.0 (Map.lookup recipient allocs)
+    in Map.insert recipient (existing + amount) allocs
+
+sumAllocatedFees : Map.Map Party (Numeric 0) -> Numeric 0
+sumAllocatedFees allocations = foldl (+) 0.0 (map snd (Map.toList allocations))
+
+buildCCVFeeAllocations
+    : [CCIP.SendingMessageV1.CCVFee]
+    -> [Numeric 0]
+    -> Map.Map Party (Numeric 0)
+buildCCVFeeAllocations ccvFees ccvAmounts =
+    if length ccvFees /= length ccvAmounts
+    then error "router: inconsistent CCV fee vectors"
+    else foldl
+        (\allocations (fee, amount) ->
+            addFeeForParty allocations fee.ccvOwner amount)
+        Map.empty
+        (zip ccvFees ccvAmounts)
+
+lookupExecutedMessage
+    : BytesHex
+    -> Set BytesHex
+    -> [ContractId ArchivedExecutedMessages]
+    -> Update Bool
+lookupExecutedMessage messageHash executedMessages archivedExecutionContractIds =
+    if Set.member messageHash executedMessages then pure True else
+        -- Searches newest-to-oldest as a heuristic because recent messages are
+        -- more likely to be queried or replayed than older messages.
+        foldlA
+            (\found archivedExecutionContractId ->
+                if found then pure True else do
+                    exercise archivedExecutionContractId IsExecuted with messageHash
+            )
+            False
+            (reverse archivedExecutionContractIds)
+
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
+--
+-- IMPORTANT: There must only ever be a single PerPartyRouterFactory per CCIP
+-- deployment, and only a single CCIP deployment per ccipOwner party. OnRamp
+-- and OffRamp do not carry a PerPartyRouterFactory dep and do not verify
+-- which router is calling — they rely solely on ccipOwner authority as the
+-- gatekeeper. If a second factory existed (whether from a duplicate within
+-- the same deployment or from a separate CCIP deployment sharing the same
+-- ccipOwner), it could create duplicate routers for the same party, each with
+-- independent executionStates maps, breaking messageId replay protection on
+-- the execution path.
+-- The single-factory-per-deployment constraint is enforced by
+-- CCIPFactory.perPartyRouterFactoryDeployed. The single-deployment-per-party
+-- constraint is an operational invariant: a ccipOwner must not be reused
+-- across independent CCIP deployments.
 template PerPartyRouterFactory
     with
         instanceId : Text
@@ -64,6 +135,7 @@ template PerPartyRouterFactory
         registeredRouters : Map.Map Party Text  -- partyOwner -> router instanceId
     where
         signatory ccipOwner
+        ensure assertValidInstanceId instanceId
 
         choice FactorySetDeps : ContractId PerPartyRouterFactory
             with
@@ -86,7 +158,7 @@ template PerPartyRouterFactory
             controller partyOwner
             do
                 -- Check party doesn't already have a router.
-                -- Prevents messageId replay since executionStates is per-router.
+                -- Prevents messageId replay since executedMessages is per-router.
                 assertMsg "router already exists for this party"
                     (not (Map.member partyOwner registeredRouters))
 
@@ -99,7 +171,9 @@ template PerPartyRouterFactory
                     instanceId = instanceId
                     deps = deps
                     outboundSequenceNumbers = Map.empty
-                    executionStates = Map.empty
+                    executedMessages = Set.empty
+                    archivedExecutionContractIds = []
+                    customObservers = []
 
                 newFactoryCid <- create this with
                     registeredRouters = Map.insert partyOwner instanceId registeredRouters
@@ -128,14 +202,15 @@ template PerPartyRouterFactory
 
             case functionName of
               "FactorySetDeps" -> do
-                case decodeSetDepsParams operationData of
+                case decodeSetDepsParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: FactorySetDeps"
-                  Some newDeps -> do
+                  Some (newDeps, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: FactorySetDeps" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid FactorySetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
 
 data CreateRouterResult = CreateRouterResult
     with
@@ -143,6 +218,27 @@ data CreateRouterResult = CreateRouterResult
         factory : ContractId PerPartyRouterFactory
     deriving (Eq, Show)
 
+-- | Archived set of executed messages.
+-- This is used as a simple solution to avoid re-creating big maps every time an execution ends.
+-- The expectation is that there won't be many users that go past the maxExecutedMessageSize limit -
+-- we will consider a cleaner sharding or offchain indexing solution if this changes.
+template ArchivedExecutedMessages
+    with
+        ccipOwner : Party
+        partyOwner : Party
+        perPartyRouterInstanceId : Text
+        archiveIndex : Int
+        executedMessages : Set BytesHex
+    where
+        signatory ccipOwner
+        observer partyOwner
+
+        nonconsuming choice IsExecuted : Bool
+            with
+                messageHash : BytesHex
+            controller ccipOwner
+            do
+                pure $ Set.member messageHash executedMessages
 
 -- | Per-party router - state container with delegation to OnRamp/OffRamp.
 -- No stored CIDs; users pass all CIDs via explicit disclosure.
@@ -153,10 +249,13 @@ template PerPartyRouter
         partyOwner : Party
         deps : PerPartyRouterDeps
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
-        executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
+        executedMessages : Set BytesHex
+        archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
+        customObservers : [Party]
     where
         signatory ccipOwner
-        observer partyOwner
+        observer partyOwner :: customObservers
+        ensure assertValidInstanceId instanceId && unique customObservers
 
         choice SetDeps : ContractId PerPartyRouter
             with
@@ -172,20 +271,30 @@ template PerPartyRouter
                         rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
                 create this with deps = mergedDeps
 
+        choice AddCustomObservers : ContractId PerPartyRouter
+            with
+                parties : [Party]
+            controller ccipOwner
+            do
+                create this with
+                    customObservers =
+                        filter (\p -> p /= ccipOwner && p /= partyOwner)
+                            (dedup (customObservers ++ parties))
+
+        choice RemoveCustomObservers : ContractId PerPartyRouter
+            with
+                parties : [Party]
+            controller ccipOwner
+            do
+                create this with
+                    customObservers = filter (`notElem` parties) customObservers
+
         -- | Create SendingMessageV1 via OnRamp. Validates fee token, sets network fee.
         nonconsuming choice PrepareSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
+                destinationChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
                 context : CCIP.Context.CCIPContext
-                destChainSelector : Numeric 0
-                receiver : BytesHex
-                payload : BytesHex
-                ccipReceiveGasLimit : Int
-                blockConfirmations : Optional Int
-                senderRequiredCCVs : [RawInstanceAddress]
-                tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
-                tokenReceiver : Optional BytesHex
-                tokenArgs : BytesHex
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -195,46 +304,84 @@ template PerPartyRouter
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 feeQuoter <- fetch feeQuoterCid
-                CCIP.RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                RawInstanceAddress.assertEqual "router: feequoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
+                RawInstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 let currentSeqNum = fromOptional 0.0
-                        (Map.lookup destChainSelector outboundSequenceNumbers)
+                        (Map.lookup destinationChainSelector outboundSequenceNumbers)
 
                 exercise onRampCid CCIP.OnRamp.PrepareSendFromRouter with
+                    destChainSelector = destinationChainSelector
+                    message = message
+
                     routerPartyOwner = partyOwner
                     routerInstanceId = instanceId
                     globalConfigCid
                     tokenAdminRegistryCid
                     feeQuoterCid
                     rmnRemoteCid
-                    destChainSelector
-                    receiver
-                    payload
-                    ccipReceiveGasLimit
-                    blockConfirmations
                     currentSequenceNumber = currentSeqNum
-                    senderRequiredCCVs
-                    tokenInstrumentId
-                    tokenReceiver
-                    tokenArgs
-                    feeToken
+
+        nonconsuming choice FinalizeFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                context : CCIP.Context.CCIPContext
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            controller partyOwner
+            do
+                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
+                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
+                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+
+                onRamp <- fetch onRampCid
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
+                    onRamp.instanceId onRamp.ccipOwner deps.onRamp
+
+                globalConfig <- fetch globalConfigCid
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                feeQuoter <- fetch feeQuoterCid
+                RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+
+                sendingMsg <- fetch sendingMessageCid
+                RawInstanceAddress.assertEqual "router instance mismatch"
+                    instanceId partyOwner sendingMsg.deps.router
+                RawInstanceAddress.assertEqual "router: onramp sending message mismatch"
+                    onRamp.instanceId onRamp.ccipOwner sendingMsg.deps.onRamp
+                assertMsg "router: feequoter sending message mismatch"
+                    (sendingMsg.deps.feeQuoter == deps.feeQuoter)
+                assertMsg "router: globalconfig sending message mismatch"
+                    (sendingMsg.deps.globalConfig == deps.globalConfig)
+
+                smCid <- exercise onRampCid CCIP.OnRamp.FinalizeFeeFromRouter with
+                    routerPartyOwner = partyOwner
+                    routerInstanceId = instanceId
+                    globalConfigCid = globalConfigCid
+                    feeQuoterCid = feeQuoterCid
+                    sendingMessageCid = sendingMessageCid
+
+                sm <- fetch smCid
+                if sm.expectedTokenInstrumentId == None
+                    then exercise smCid CCIP.SendingMessageV1.BuildMessage with
+                        caller = partyOwner
+                    else pure smCid
 
         -- | Finalize a CCIP send. Collects total fee from sender, delegates to
         -- OnRamp, updates sequence number state, emits CCIPMessageSent event.
@@ -254,19 +401,19 @@ template PerPartyRouter
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
+                RawInstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 sendingMsg <- fetch sendingMessageCid
@@ -283,28 +430,64 @@ template PerPartyRouter
                 -- TODO: move to OnRamp
                 feeChangeCids <- if totalFee > 0.0
                     then do
-                        -- TODO: check executeBefore
-                        now <- getTime
-                        let feeTransfer =
-                                Splice.Api.Token.TransferInstructionV1.Transfer with
-                                    sender = partyOwner
-                                    receiver = ccipOwner
-                                    amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.totalFee" totalFee
-                                    instrumentId = sendingMsg.feeToken
-                                    requestedAt = now
-                                    executeBefore = addRelTime now (hours 1)
-                                    inputHoldingCids = feeTokenHoldingCids
-                                    meta = Splice.Api.Token.MetadataV1.emptyMetadata
-                        feeResult <- exercise
-                            feeTokenInput.transferFactory
-                            Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
-                                expectedAdmin = sendingMsg.feeToken.admin
-                                transfer = feeTransfer
-                                extraArgs = feeTokenInput.extraArgs
-                        case feeResult.output of
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
-                                pure feeResult.senderChangeCids
-                            _ -> abort "fee transfer did not complete"
+                        -- Fees owed to verifier owners.
+                        let verifierFees = buildCCVFeeAllocations
+                                sendingMsg.ccvFees
+                                sendingMsg.ccvFeeTokenAmounts
+                        -- Add pool fee (if token send), then compute owner residual.
+                        let verifierAndPoolFees = case sendingMsg.tokenSendFee of
+                                None -> verifierFees
+                                Some poolFee ->
+                                    addFeeForParty verifierFees poolFee.poolOwner sendingMsg.tokenSendFeeTokenAmount
+                        -- Sum of verifier + pool fee allocations; excludes owner residual (ccipOwner).
+                        let allocatedNonOwnerFees = sumAllocatedFees verifierAndPoolFees
+                        let ownerResidual = totalFee - allocatedNonOwnerFees
+                        assertMsg "router: fee allocation exceeds total fee"
+                            (ownerResidual >= 0.0)
+                        -- Add owner residual so map now includes all fee recipients.
+                        let recipientFees = addFeeForParty verifierAndPoolFees ccipOwner ownerResidual
+                        -- Convert to transfer list and skip zero-amount transfers.
+                        let payoutEntries = filter (\entry -> snd entry > 0.0) (Map.toList recipientFees)
+
+                        let executeFeeTransfer inputHoldingCids recipient amount = do
+                                now <- getTime
+                                let feeTransfer =
+                                        Splice.Api.Token.TransferInstructionV1.Transfer with
+                                            sender = partyOwner
+                                            receiver = recipient
+                                            amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.feeTransfer" amount
+                                            instrumentId = sendingMsg.feeToken
+                                            requestedAt = now
+                                            executeBefore = maxTime
+                                            inputHoldingCids = inputHoldingCids
+                                            meta = Splice.Api.Token.MetadataV1.emptyMetadata
+                                feeResult <- exercise
+                                    feeTokenInput.transferFactory
+                                    Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+                                        expectedAdmin = sendingMsg.feeToken.admin
+                                        transfer = feeTransfer
+                                        extraArgs = feeTokenInput.extraArgs
+                                case feeResult.output of
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
+                                        pure feeResult.senderChangeCids
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
+                                        acceptResult <- exercise transferInstructionCid
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+                                                extraArgs = feeTokenInput.extraArgs
+                                        case acceptResult.output of
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
+                                                pure feeResult.senderChangeCids
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
+                                                abort "fee transfer instruction failed"
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
+                                                abort "fee transfer instruction is still pending"
+                                    _ -> abort "fee transfer did not complete"
+
+                        foldlA
+                            (\currentHoldingCids (recipient, amount) ->
+                                executeFeeTransfer currentHoldingCids recipient amount)
+                            feeTokenHoldingCids
+                            payoutEntries
                     else pure []
 
                 result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with
@@ -337,45 +520,11 @@ template PerPartyRouter
                 encodedMessage : BytesHex
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
+                receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+                receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
+                receiverOptionalThreshold : Int
+                receiverMinBlockConfirmations : Int
                 caller : Party
-            controller partyOwner
-            do
-                offRampCid <- CCIP.OffRamp.lookupOffRampCid context
-                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
-
-                offRamp <- fetch offRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
-                    offRamp.instanceId offRamp.ccipOwner deps.offRamp
-
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
-
-                -- Early replay check (informational; Execute is authoritative)
-                let messageId = keccak256 encodedMessage
-                let currentState = fromOptional
-                        CCIP.Internal.UNTOUCHED
-                        (Map.lookup messageId executionStates)
-                case currentState of
-                    CCIP.Internal.SUCCESS -> abort "message already executed successfully"
-                    CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
-                    _ -> pure ()
-
-                exercise offRampCid CCIP.OffRamp.PrepareExecute with
-                    encodedMessage = encodedMessage
-                    rmnRemoteCid = rmnRemoteCid
-                    receiverParty = receiverParty
-                    tokenReceiverParty = tokenReceiverParty
-                    caller = caller
-
-
-        -- | Execute an inbound CCIP message.
-        -- TODO: consider relaxing to allow `controller caller`
-        choice Execute : ExecuteResult
-            with
-                context : CCIP.Context.CCIPContext
-                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
-                receiverRequiredCCVs : [RawInstanceAddress]
             controller partyOwner
             do
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
@@ -384,43 +533,106 @@ template PerPartyRouter
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
+                RawInstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
+                RawInstanceAddress.assertEqual "router: rmn mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+
+                -- Early replay check (informational; Execute is authoritative)
+                let messageId = keccak256 encodedMessage
+                alreadyExecuted <- lookupExecutedMessage
+                    messageId
+                    executedMessages
+                    archivedExecutionContractIds
+                if alreadyExecuted then abort "message already executed successfully" else pure ()
+
+                exercise offRampCid CCIP.OffRamp.PrepareExecute with
+                    encodedMessage = encodedMessage
+                    globalConfigCid = globalConfigCid
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    receiverRequiredCCVs = receiverRequiredCCVs
+                    receiverOptionalCCVs = receiverOptionalCCVs
+                    receiverOptionalThreshold = receiverOptionalThreshold
+                    receiverMinBlockConfirmations = receiverMinBlockConfirmations
+                    rmnRemoteCid = rmnRemoteCid
+                    receiverParty = receiverParty
+                    tokenReceiverParty = tokenReceiverParty
+                    caller = caller
+
+        -- TODO: consider relaxing to allow `controller caller`
+        -- | Execute an inbound CCIP message.
+        -- Parameters:
+        -- context: The CCIP context for this message, retrieved from EDS.
+        -- executingMessageCid: The contract ID of the ExecutingMessageV1 that was created in PrepareExecute and is being executed. This is used to read the message data, CCV verifications, and pool verification state for the execute request.
+        choice Execute : ExecuteResult
+            with
+                context : CCIP.Context.CCIPContext
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+            controller partyOwner
+            do
+                offRampCid <- CCIP.OffRamp.lookupOffRampCid context
+                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
+                tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
+                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
+
+                offRamp <- fetch offRampCid
+                RawInstanceAddress.assertEqual "router: offramp mismatch"
+                    offRamp.instanceId offRamp.ccipOwner deps.offRamp
+
+                globalConfig <- fetch globalConfigCid
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+
+                rmnRemote <- fetch rmnRemoteCid
+                RawInstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 execMsg <- fetch executingMessageCid
                 let messageId = execMsg.messageId
 
-                let currentState = fromOptional
-                        CCIP.Internal.UNTOUCHED
-                        (Map.lookup messageId executionStates)
+                alreadyExecuted <- lookupExecutedMessage
+                    messageId
+                    executedMessages
+                    archivedExecutionContractIds
 
-                case currentState of
-                    CCIP.Internal.SUCCESS -> abort "message already executed successfully"
-                    CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
-                    _ -> pure ()
+                if alreadyExecuted then abort "message already executed successfully" else pure ()
 
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
-                    receiverRequiredCCVs = receiverRequiredCCVs
                     executingMessageCid = executingMessageCid
                     rmnRemoteCid = rmnRemoteCid
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid
 
-                let newStates = Map.insert result.messageId CCIP.Internal.SUCCESS executionStates
-                routerCid <- create this with executionStates = newStates
+                routerCid <-
+                    if Set.size executedMessages >= maxExecutedMessagesSize then do
+                        archivedExecutionMessagesCid <- create ArchivedExecutedMessages with
+                            ccipOwner = ccipOwner
+                            partyOwner = partyOwner
+                            perPartyRouterInstanceId = instanceId
+                            archiveIndex = length archivedExecutionContractIds
+                            executedMessages = executedMessages
+                        create this with
+                            executedMessages = Set.singleton result.messageId
+                            archivedExecutionContractIds =
+                                archivedExecutionContractIds <> [archivedExecutionMessagesCid]
+                    else
+                        create this with
+                            executedMessages = Set.insert result.messageId executedMessages
 
                 pure ExecuteResult with
                     router = routerCid
@@ -433,9 +645,16 @@ template PerPartyRouter
         nonconsuming choice GetExecutionState : CCIP.Internal.MessageExecutionState
             with
                 messageHash : BytesHex
-            controller partyOwner
+                caller : Party
+            controller caller
             do
-                pure (fromOptional CCIP.Internal.UNTOUCHED (Map.lookup messageHash executionStates))
+                alreadyExecuted <- lookupExecutedMessage
+                    messageHash
+                    executedMessages
+                    archivedExecutionContractIds
+                pure $ if alreadyExecuted
+                    then CCIP.Internal.SUCCESS
+                    else CCIP.Internal.UNTOUCHED
 
         nonconsuming choice GetSequenceNumber : Numeric 0
             with
@@ -455,11 +674,11 @@ template PerPartyRouter
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
 
                 onRamp <- fetch onRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSend with
@@ -478,11 +697,11 @@ template PerPartyRouter
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
 
                 offRamp <- fetch offRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
+                RawInstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 exercise offRampCid CCIP.OffRamp.GetRequiredCCVsForExecute with
@@ -503,14 +722,33 @@ template PerPartyRouter
 
             case functionName of
               "SetDeps" -> do
-                case decodeSetDepsParams operationData of
+                case decodeSetDepsParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: SetDeps"
-                  Some newDeps -> do
+                  Some (newDeps, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetDeps" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid SetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
-              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+              "AddCustomObservers" -> do
+                case decodePartyList operationData 0 of
+                  None -> abort "E_INVALID_PARAMS: AddCustomObservers"
+                  Some (parties, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: AddCustomObservers" $
+                      finalOffset == byteCount operationData
+                    newCid <- exercise selfCid AddCustomObservers with parties
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
+              "RemoveCustomObservers" -> do
+                case decodePartyList operationData 0 of
+                  None -> abort "E_INVALID_PARAMS: RemoveCustomObservers"
+                  Some (parties, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: RemoveCustomObservers" $
+                      finalOffset == byteCount operationData
+                    newCid <- exercise selfCid RemoveCustomObservers with parties
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 data CCIPSendResult = CCIPSendResult
     with
@@ -534,17 +772,23 @@ data ExecuteResult = ExecuteResult
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
 -- ===========================================================================
 
--- | Decode SetDeps params (Optional fields)
+-- | Decode SetDeps params with final offset (Optional fields)
 -- Format: [OptRIA onRamp][OptRIA offRamp][OptRIA globalConfig][OptRIA tokenAdminRegistry][OptRIA feeQuoter][OptRIA rmnRemote]
-decodeSetDepsParams : BytesHex -> Optional SetDepsParams
-decodeSetDepsParams encoded = do
+decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
+decodeSetDepsParamsWithOffset encoded = do
   (onRamp, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
   (offRamp, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
   (globalConfig, offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
   (tokenAdminRegistry, offset4) <- decodeOptionalRawInstanceAddressAt encoded offset3
   (feeQuoter, offset5) <- decodeOptionalRawInstanceAddressAt encoded offset4
-  (rmnRemote, _offset6) <- decodeOptionalRawInstanceAddressAt encoded offset5
-  Some (SetDepsParams onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote)
+  (rmnRemote, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded offset5
+  Some (SetDepsParams onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote, finalOffset)
+
+-- | Decode SetDeps params (discards final offset)
+decodeSetDepsParams : BytesHex -> Optional SetDepsParams
+decodeSetDepsParams encoded = do
+  (result, _) <- decodeSetDepsParamsWithOffset encoded
+  Some result
 
 -- | Encode SetDeps params (Optional fields)
 encodeSetDepsParams : SetDepsParams -> BytesHex
@@ -567,6 +811,12 @@ decodePerPartyRouterDepsAt encoded offset = do
   (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
   (rmnRemote, offset6) <- decodeRawInstanceAddressAt encoded offset5
   Some (PerPartyRouterDeps onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote, offset6)
+
+encodeAddCustomObserversParams : [Party] -> BytesHex
+encodeAddCustomObserversParams = encodePartyList
+
+encodeRemoveCustomObserversParams : [Party] -> BytesHex
+encodeRemoveCustomObserversParams = encodePartyList
 
 -- | Encode PerPartyRouterDeps (full, non-optional)
 encodePerPartyRouterDeps : PerPartyRouterDeps -> BytesHex

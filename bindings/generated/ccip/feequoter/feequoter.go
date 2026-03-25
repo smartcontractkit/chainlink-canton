@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "910efa22e2a583cb9dd0034dba9b36a65231c285629b5ba4e29d76fa95ae1186"
+	PackageID   = "88290433c52d1f7363f5345547da721a25a36f043141bd3ac70346569be050d8"
 	SDKVersion  = "3.4.10"
 )
 
@@ -51,6 +51,48 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AddPriceUpdaters is a Record type
+type AddPriceUpdaters struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts AddPriceUpdaters to a map for DAML arguments
+func (t AddPriceUpdaters) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t AddPriceUpdaters) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPriceUpdaters) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPriceUpdaters to hex string (Canton MCMS format)
+func (t AddPriceUpdaters) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPriceUpdaters from hex string (Canton MCMS format)
+func (t *AddPriceUpdaters) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ApplyDestChainConfigUpdates2 is a Record type
@@ -161,6 +203,57 @@ func (t *ApplyFeeTokenUpdates) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ApplyPriceUpdatersUpdate is a Record type
+type ApplyPriceUpdatersUpdate struct {
+	AddedPriceUpdaters   []types.PARTY `json:"addedPriceUpdaters"`
+	RemovedPriceUpdaters []types.PARTY `json:"removedPriceUpdaters"`
+}
+
+// ToMap converts ApplyPriceUpdatersUpdate to a map for DAML arguments
+func (t ApplyPriceUpdatersUpdate) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["addedPriceUpdaters"] = func() []any {
+		res := make([]any, 0, len(t.AddedPriceUpdaters))
+		for _, e := range t.AddedPriceUpdaters {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	m["removedPriceUpdaters"] = func() []any {
+		res := make([]any, 0, len(t.RemovedPriceUpdaters))
+		for _, e := range t.RemovedPriceUpdaters {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyPriceUpdatersUpdate) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyPriceUpdatersUpdate) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyPriceUpdatersUpdate to hex string (Canton MCMS format)
+func (t ApplyPriceUpdatersUpdate) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyPriceUpdatersUpdate from hex string (Canton MCMS format)
+func (t *ApplyPriceUpdatersUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // DestChainConfig2 is a Record type
 type DestChainConfig2 struct {
 	IsEnabled                   types.BOOL    `json:"isEnabled"`
@@ -168,9 +261,8 @@ type DestChainConfig2 struct {
 	MaxPerMsgGasLimit           types.INT64   `json:"maxPerMsgGasLimit"`
 	DestGasOverhead             types.INT64   `json:"destGasOverhead"`
 	DestGasPerPayloadByteBase   types.INT64   `json:"destGasPerPayloadByteBase"`
-	ChainFamilySelector         types.TEXT    `json:"chainFamilySelector" hex:"bytes"`
 	DefaultTxGasLimit           types.INT64   `json:"defaultTxGasLimit"`
-	NetworkFeeUSD               types.NUMERIC `json:"networkFeeUSD"`
+	LinkFeeMultiplierPercent    types.NUMERIC `json:"linkFeeMultiplierPercent"`
 	DefaultTokenFeeUSD          types.NUMERIC `json:"defaultTokenFeeUSD"`
 	DefaultTokenDestGasOverhead types.INT64   `json:"defaultTokenDestGasOverhead"`
 }
@@ -189,11 +281,9 @@ func (t DestChainConfig2) ToMap() map[string]any {
 
 	m["destGasPerPayloadByteBase"] = int64(t.DestGasPerPayloadByteBase)
 
-	m["chainFamilySelector"] = string(t.ChainFamilySelector)
-
 	m["defaultTxGasLimit"] = int64(t.DefaultTxGasLimit)
 
-	m["networkFeeUSD"] = t.NetworkFeeUSD
+	m["linkFeeMultiplierPercent"] = t.LinkFeeMultiplierPercent
 
 	m["defaultTokenFeeUSD"] = t.DefaultTokenFeeUSD
 
@@ -273,13 +363,12 @@ func (t *DestChainConfigArgs2) UnmarshalHex(data string) error {
 type FeeQuoter struct {
 	InstanceId                       types.TEXT                               `json:"instanceId"`
 	Owner                            types.PARTY                              `json:"owner"`
-	FeeTokens                        types.GENMAP                             `json:"feeTokens"`
+	FeeTokens                        types.SET                                `json:"feeTokens"`
 	DestChainConfigs                 types.GENMAP                             `json:"destChainConfigs"`
 	TokenTransferFeeConfigs          types.GENMAP                             `json:"tokenTransferFeeConfigs"`
 	UsdPerUnitGasByDestChainSelector types.GENMAP                             `json:"usdPerUnitGasByDestChainSelector"`
 	UsdPerToken                      types.GENMAP                             `json:"usdPerToken"`
 	LinkTokenInstrumentId            splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
-	MaxFeeJuelsPerMsg                types.NUMERIC                            `json:"maxFeeJuelsPerMsg"`
 	PriceUpdaters                    []types.PARTY                            `json:"priceUpdaters"`
 }
 
@@ -305,10 +394,11 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = func() any {
-		if t.FeeTokens == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeTokens).(mapper); ok {
+			return m.toMap()
 		}
-		return map[string]any{"_type": "genmap", "value": t.FeeTokens}
+		return t.FeeTokens
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -351,10 +441,6 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 		}
 		return t.LinkTokenInstrumentId
 	}()
-
-	if t.MaxFeeJuelsPerMsg != "" {
-		args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
-	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -383,10 +469,11 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = func() any {
-		if t.FeeTokens == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeTokens).(mapper); ok {
+			return m.toMap()
 		}
-		return map[string]any{"_type": "genmap", "value": t.FeeTokens}
+		return t.FeeTokens
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -429,10 +516,6 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 		}
 		return t.LinkTokenInstrumentId
 	}()
-
-	if t.MaxFeeJuelsPerMsg != "" {
-		args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
-	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -472,6 +555,27 @@ func (t *FeeQuoter) UnmarshalHex(data string) error {
 }
 
 // Choice methods for FeeQuoter
+
+// QuoteGasForExec exercises the QuoteGasForExec choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) QuoteGasForExec(contractID string, args QuoteGasForExec) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "QuoteGasForExec",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// QuoteGasForExecWithPackageID exercises the QuoteGasForExec choice using the provided package ID instead of package name
+func (t FeeQuoter) QuoteGasForExecWithPackageID(contractID string, packageID string, args QuoteGasForExec) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "QuoteGasForExec",
+		Arguments:  argsToMap(args),
+	}
+}
 
 // GetTokenPrice exercises the GetTokenPrice choice on this FeeQuoter contract
 // This method uses the package name in the template ID
@@ -536,65 +640,23 @@ func (t FeeQuoter) UpdatePricesWithPackageID(contractID string, packageID string
 	}
 }
 
-// FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
+// GetTokenTransferFee exercises the GetTokenTransferFee choice on this FeeQuoter contract
 // This method uses the package name in the template ID
-func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
+func (t FeeQuoter) GetTokenTransferFee(contractID string, args GetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
-		Choice:     "FeeQuoter_GetTokenTransferFee",
+		Choice:     "GetTokenTransferFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// FeeQuoterGetTokenTransferFeeWithPackageID exercises the FeeQuoter_GetTokenTransferFee choice using the provided package ID instead of package name
-func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, packageID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
+// GetTokenTransferFeeWithPackageID exercises the GetTokenTransferFee choice using the provided package ID instead of package name
+func (t FeeQuoter) GetTokenTransferFeeWithPackageID(contractID string, packageID string, args GetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
-		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FeeQuoterFinalizeFee exercises the FeeQuoter_FinalizeFee choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) FeeQuoterFinalizeFee(contractID string, args FeeQuoterFinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FeeQuoterFinalizeFeeWithPackageID exercises the FeeQuoter_FinalizeFee choice using the provided package ID instead of package name
-func (t FeeQuoter) FeeQuoterFinalizeFeeWithPackageID(contractID string, packageID string, args FeeQuoterFinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetPremiumMultiplierWeiPerEth exercises the GetPremiumMultiplierWeiPerEth choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) GetPremiumMultiplierWeiPerEth(contractID string, args GetPremiumMultiplierWeiPerEth) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "GetPremiumMultiplierWeiPerEth",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetPremiumMultiplierWeiPerEthWithPackageID exercises the GetPremiumMultiplierWeiPerEth choice using the provided package ID instead of package name
-func (t FeeQuoter) GetPremiumMultiplierWeiPerEthWithPackageID(contractID string, packageID string, args GetPremiumMultiplierWeiPerEth) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "GetPremiumMultiplierWeiPerEth",
+		Choice:     "GetTokenTransferFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -704,6 +766,69 @@ func (t FeeQuoter) GetFeeTokensWithPackageID(contractID string, packageID string
 	}
 }
 
+// ApplyPriceUpdatersUpdate exercises the ApplyPriceUpdatersUpdate choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) ApplyPriceUpdatersUpdate(contractID string, args ApplyPriceUpdatersUpdate) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "ApplyPriceUpdatersUpdate",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyPriceUpdatersUpdateWithPackageID exercises the ApplyPriceUpdatersUpdate choice using the provided package ID instead of package name
+func (t FeeQuoter) ApplyPriceUpdatersUpdateWithPackageID(contractID string, packageID string, args ApplyPriceUpdatersUpdate) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "ApplyPriceUpdatersUpdate",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddPriceUpdaters exercises the AddPriceUpdaters choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) AddPriceUpdaters(contractID string, args AddPriceUpdaters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "AddPriceUpdaters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddPriceUpdatersWithPackageID exercises the AddPriceUpdaters choice using the provided package ID instead of package name
+func (t FeeQuoter) AddPriceUpdatersWithPackageID(contractID string, packageID string, args AddPriceUpdaters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "AddPriceUpdaters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemovePriceUpdaters exercises the RemovePriceUpdaters choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) RemovePriceUpdaters(contractID string, args RemovePriceUpdaters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "RemovePriceUpdaters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemovePriceUpdatersWithPackageID exercises the RemovePriceUpdaters choice using the provided package ID instead of package name
+func (t FeeQuoter) RemovePriceUpdatersWithPackageID(contractID string, packageID string, args RemovePriceUpdaters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "RemovePriceUpdaters",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // ApplyFeeTokenUpdates exercises the ApplyFeeTokenUpdates choice on this FeeQuoter contract
 // This method uses the package name in the template ID
 func (t FeeQuoter) ApplyFeeTokenUpdates(contractID string, args ApplyFeeTokenUpdates) *model.ExerciseCommand {
@@ -750,140 +875,9 @@ func (t FeeQuoter) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 
 var _ mcms.IMCMSReceiver = (*FeeQuoter)(nil)
 
-// FeeQuoterFinalizeFee is a Record type
-type FeeQuoterFinalizeFee struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	Caller            types.PARTY       `json:"caller"`
-}
-
-// ToMap converts FeeQuoterFinalizeFee to a map for DAML arguments
-func (t FeeQuoterFinalizeFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t FeeQuoterFinalizeFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *FeeQuoterFinalizeFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes FeeQuoterFinalizeFee to hex string (Canton MCMS format)
-func (t FeeQuoterFinalizeFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes FeeQuoterFinalizeFee from hex string (Canton MCMS format)
-func (t *FeeQuoterFinalizeFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// FeeQuoterFinalizeFeeMCMSParams is FeeQuoterFinalizeFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type FeeQuoterFinalizeFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-}
-
-// MarshalHex encodes FeeQuoterFinalizeFeeMCMSParams to hex string for MCMS operationData.
-func (t FeeQuoterFinalizeFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes FeeQuoterFinalizeFeeMCMSParams from hex string.
-func (t *FeeQuoterFinalizeFeeMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// FeeQuoterGetTokenTransferFee is a Record type
-type FeeQuoterGetTokenTransferFee struct {
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	Token             splice_api_token_holding_v1.InstrumentId `json:"token"`
-	Caller            types.PARTY                              `json:"caller"`
-}
-
-// ToMap converts FeeQuoterGetTokenTransferFee to a map for DAML arguments
-func (t FeeQuoterGetTokenTransferFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["token"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Token).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Token
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t FeeQuoterGetTokenTransferFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *FeeQuoterGetTokenTransferFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes FeeQuoterGetTokenTransferFee to hex string (Canton MCMS format)
-func (t FeeQuoterGetTokenTransferFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes FeeQuoterGetTokenTransferFee from hex string (Canton MCMS format)
-func (t *FeeQuoterGetTokenTransferFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// FeeQuoterGetTokenTransferFeeMCMSParams is FeeQuoterGetTokenTransferFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type FeeQuoterGetTokenTransferFeeMCMSParams struct {
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	Token             splice_api_token_holding_v1.InstrumentId `json:"token"`
-}
-
-// MarshalHex encodes FeeQuoterGetTokenTransferFeeMCMSParams to hex string for MCMS operationData.
-func (t FeeQuoterGetTokenTransferFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes FeeQuoterGetTokenTransferFeeMCMSParams from hex string.
-func (t *FeeQuoterGetTokenTransferFeeMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // FeeTokenArgs is a Record type
 type FeeTokenArgs struct {
-	InstrumentId      splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	PremiumMultiplier types.NUMERIC                            `json:"premiumMultiplier"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 }
 
 // ToMap converts FeeTokenArgs to a map for DAML arguments
@@ -897,8 +891,6 @@ func (t FeeTokenArgs) ToMap() map[string]any {
 		}
 		return t.InstrumentId
 	}()
-
-	m["premiumMultiplier"] = t.PremiumMultiplier
 
 	return m
 }
@@ -1184,69 +1176,6 @@ func (t *GetFeeTokensMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetPremiumMultiplierWeiPerEth is a Record type
-type GetPremiumMultiplierWeiPerEth struct {
-	Token  splice_api_token_holding_v1.InstrumentId `json:"token"`
-	Caller types.PARTY                              `json:"caller"`
-}
-
-// ToMap converts GetPremiumMultiplierWeiPerEth to a map for DAML arguments
-func (t GetPremiumMultiplierWeiPerEth) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["token"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Token).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Token
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t GetPremiumMultiplierWeiPerEth) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *GetPremiumMultiplierWeiPerEth) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes GetPremiumMultiplierWeiPerEth to hex string (Canton MCMS format)
-func (t GetPremiumMultiplierWeiPerEth) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetPremiumMultiplierWeiPerEth from hex string (Canton MCMS format)
-func (t *GetPremiumMultiplierWeiPerEth) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GetPremiumMultiplierWeiPerEthMCMSParams is GetPremiumMultiplierWeiPerEth without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type GetPremiumMultiplierWeiPerEthMCMSParams struct {
-	Token splice_api_token_holding_v1.InstrumentId `json:"token"`
-}
-
-// MarshalHex encodes GetPremiumMultiplierWeiPerEthMCMSParams to hex string for MCMS operationData.
-func (t GetPremiumMultiplierWeiPerEthMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetPremiumMultiplierWeiPerEthMCMSParams from hex string.
-func (t *GetPremiumMultiplierWeiPerEthMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // GetTokenPrice is a Record type
 type GetTokenPrice struct {
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
@@ -1310,6 +1239,73 @@ func (t *GetTokenPriceMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetTokenTransferFee is a Record type
+type GetTokenTransferFee struct {
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	Token             splice_api_token_holding_v1.InstrumentId `json:"token"`
+	Caller            types.PARTY                              `json:"caller"`
+}
+
+// ToMap converts GetTokenTransferFee to a map for DAML arguments
+func (t GetTokenTransferFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["token"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Token).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Token
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t GetTokenTransferFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetTokenTransferFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetTokenTransferFee to hex string (Canton MCMS format)
+func (t GetTokenTransferFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetTokenTransferFee from hex string (Canton MCMS format)
+func (t *GetTokenTransferFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetTokenTransferFeeMCMSParams is GetTokenTransferFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetTokenTransferFeeMCMSParams struct {
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	Token             splice_api_token_holding_v1.InstrumentId `json:"token"`
+}
+
+// MarshalHex encodes GetTokenTransferFeeMCMSParams to hex string for MCMS operationData.
+func (t GetTokenTransferFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetTokenTransferFeeMCMSParams from hex string.
+func (t *GetTokenTransferFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // PriceUpdates is a Record type
 type PriceUpdates struct {
 	TokenPriceUpdates []TokenPriceUpdate `json:"tokenPriceUpdates"`
@@ -1367,6 +1363,168 @@ func (t PriceUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes PriceUpdates from hex string (Canton MCMS format)
 func (t *PriceUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// QuoteGasForExec is a Record type
+type QuoteGasForExec struct {
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	NonCalldataGas    types.INT64                              `json:"nonCalldataGas"`
+	CalldataSize      types.INT64                              `json:"calldataSize"`
+	FeeToken          splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	Caller            types.PARTY                              `json:"caller"`
+}
+
+// ToMap converts QuoteGasForExec to a map for DAML arguments
+func (t QuoteGasForExec) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["nonCalldataGas"] = int64(t.NonCalldataGas)
+
+	m["calldataSize"] = int64(t.CalldataSize)
+
+	m["feeToken"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t QuoteGasForExec) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *QuoteGasForExec) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes QuoteGasForExec to hex string (Canton MCMS format)
+func (t QuoteGasForExec) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes QuoteGasForExec from hex string (Canton MCMS format)
+func (t *QuoteGasForExec) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// QuoteGasForExecMCMSParams is QuoteGasForExec without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type QuoteGasForExecMCMSParams struct {
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	NonCalldataGas    types.INT64                              `json:"nonCalldataGas"`
+	CalldataSize      types.INT64                              `json:"calldataSize"`
+	FeeToken          splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+}
+
+// MarshalHex encodes QuoteGasForExecMCMSParams to hex string for MCMS operationData.
+func (t QuoteGasForExecMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes QuoteGasForExecMCMSParams from hex string.
+func (t *QuoteGasForExecMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// QuoteGasForExecResult is a Record type
+type QuoteGasForExecResult struct {
+	TotalGas          types.INT64   `json:"totalGas"`
+	GasCostUSDCents   types.NUMERIC `json:"gasCostUSDCents"`
+	FeeTokenPrice     types.NUMERIC `json:"feeTokenPrice"`
+	PremiumMultiplier types.NUMERIC `json:"premiumMultiplier"`
+}
+
+// ToMap converts QuoteGasForExecResult to a map for DAML arguments
+func (t QuoteGasForExecResult) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["totalGas"] = int64(t.TotalGas)
+
+	m["gasCostUSDCents"] = t.GasCostUSDCents
+
+	m["feeTokenPrice"] = t.FeeTokenPrice
+
+	m["premiumMultiplier"] = t.PremiumMultiplier
+
+	return m
+}
+
+func (t QuoteGasForExecResult) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *QuoteGasForExecResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes QuoteGasForExecResult to hex string (Canton MCMS format)
+func (t QuoteGasForExecResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes QuoteGasForExecResult from hex string (Canton MCMS format)
+func (t *QuoteGasForExecResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RemovePriceUpdaters is a Record type
+type RemovePriceUpdaters struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts RemovePriceUpdaters to a map for DAML arguments
+func (t RemovePriceUpdaters) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemovePriceUpdaters) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemovePriceUpdaters) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemovePriceUpdaters to hex string (Canton MCMS format)
+func (t RemovePriceUpdaters) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemovePriceUpdaters from hex string (Canton MCMS format)
+func (t *RemovePriceUpdaters) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1566,12 +1724,10 @@ func (t *UpdatePricesMCMSParams) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AddPriceUpdaters(args AddPriceUpdaters) (*bind.EncodedChoice, error)
 	ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error)
 	ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.EncodedChoice, error)
-	FeeQuoterFinalizeFee(args FeeQuoterFinalizeFee) (*bind.EncodedChoice, error)
-	FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error)
-	FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee) (*bind.EncodedChoice, error)
-	FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error)
+	ApplyPriceUpdatersUpdate(args ApplyPriceUpdatersUpdate) (*bind.EncodedChoice, error)
 	Get(args Get) (*bind.EncodedChoice, error)
 	GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error)
 	GetDestChainConfig2(args GetDestChainConfig2) (*bind.EncodedChoice, error)
@@ -1580,10 +1736,13 @@ type MCMSEncoder interface {
 	GetDestinationChainGasPriceMCMSParams(args GetDestinationChainGasPriceMCMSParams) (*bind.EncodedChoice, error)
 	GetFeeTokens(args GetFeeTokens) (*bind.EncodedChoice, error)
 	GetFeeTokensMCMSParams(args GetFeeTokensMCMSParams) (*bind.EncodedChoice, error)
-	GetPremiumMultiplierWeiPerEth(args GetPremiumMultiplierWeiPerEth) (*bind.EncodedChoice, error)
-	GetPremiumMultiplierWeiPerEthMCMSParams(args GetPremiumMultiplierWeiPerEthMCMSParams) (*bind.EncodedChoice, error)
 	GetTokenPrice(args GetTokenPrice) (*bind.EncodedChoice, error)
 	GetTokenPriceMCMSParams(args GetTokenPriceMCMSParams) (*bind.EncodedChoice, error)
+	GetTokenTransferFee(args GetTokenTransferFee) (*bind.EncodedChoice, error)
+	GetTokenTransferFeeMCMSParams(args GetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error)
+	QuoteGasForExec(args QuoteGasForExec) (*bind.EncodedChoice, error)
+	QuoteGasForExecMCMSParams(args QuoteGasForExecMCMSParams) (*bind.EncodedChoice, error)
+	RemovePriceUpdaters(args RemovePriceUpdaters) (*bind.EncodedChoice, error)
 	UpdatePrices(args UpdatePrices) (*bind.EncodedChoice, error)
 	UpdatePricesMCMSParams(args UpdatePricesMCMSParams) (*bind.EncodedChoice, error)
 }
@@ -1615,6 +1774,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
+// AddPriceUpdaters encodes parameters for the AddPriceUpdaters choice.
+func (e *encoder) AddPriceUpdaters(args AddPriceUpdaters) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPriceUpdaters", args)
+}
+
 // ApplyDestChainConfigUpdates2 encodes parameters for the ApplyDestChainConfigUpdates2 choice.
 func (e *encoder) ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates2", args)
@@ -1625,24 +1789,9 @@ func (e *encoder) ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.Encoded
 	return e.EncodeChoiceArgs("ApplyFeeTokenUpdates", args)
 }
 
-// FeeQuoterFinalizeFee encodes parameters for the FeeQuoterFinalizeFee choice.
-func (e *encoder) FeeQuoterFinalizeFee(args FeeQuoterFinalizeFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FeeQuoterFinalizeFee", args)
-}
-
-// FeeQuoterFinalizeFeeMCMSParams encodes MCMS parameters (without Caller) for the FeeQuoterFinalizeFee choice.
-func (e *encoder) FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FeeQuoterFinalizeFee", args)
-}
-
-// FeeQuoterGetTokenTransferFee encodes parameters for the FeeQuoterGetTokenTransferFee choice.
-func (e *encoder) FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FeeQuoterGetTokenTransferFee", args)
-}
-
-// FeeQuoterGetTokenTransferFeeMCMSParams encodes MCMS parameters (without Caller) for the FeeQuoterGetTokenTransferFee choice.
-func (e *encoder) FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FeeQuoterGetTokenTransferFee", args)
+// ApplyPriceUpdatersUpdate encodes parameters for the ApplyPriceUpdatersUpdate choice.
+func (e *encoder) ApplyPriceUpdatersUpdate(args ApplyPriceUpdatersUpdate) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyPriceUpdatersUpdate", args)
 }
 
 // Get encodes parameters for the Get choice.
@@ -1685,16 +1834,6 @@ func (e *encoder) GetFeeTokensMCMSParams(args GetFeeTokensMCMSParams) (*bind.Enc
 	return e.EncodeChoiceArgs("GetFeeTokens", args)
 }
 
-// GetPremiumMultiplierWeiPerEth encodes parameters for the GetPremiumMultiplierWeiPerEth choice.
-func (e *encoder) GetPremiumMultiplierWeiPerEth(args GetPremiumMultiplierWeiPerEth) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetPremiumMultiplierWeiPerEth", args)
-}
-
-// GetPremiumMultiplierWeiPerEthMCMSParams encodes MCMS parameters (without Caller) for the GetPremiumMultiplierWeiPerEth choice.
-func (e *encoder) GetPremiumMultiplierWeiPerEthMCMSParams(args GetPremiumMultiplierWeiPerEthMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetPremiumMultiplierWeiPerEth", args)
-}
-
 // GetTokenPrice encodes parameters for the GetTokenPrice choice.
 func (e *encoder) GetTokenPrice(args GetTokenPrice) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetTokenPrice", args)
@@ -1703,6 +1842,31 @@ func (e *encoder) GetTokenPrice(args GetTokenPrice) (*bind.EncodedChoice, error)
 // GetTokenPriceMCMSParams encodes MCMS parameters (without Caller) for the GetTokenPrice choice.
 func (e *encoder) GetTokenPriceMCMSParams(args GetTokenPriceMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetTokenPrice", args)
+}
+
+// GetTokenTransferFee encodes parameters for the GetTokenTransferFee choice.
+func (e *encoder) GetTokenTransferFee(args GetTokenTransferFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetTokenTransferFee", args)
+}
+
+// GetTokenTransferFeeMCMSParams encodes MCMS parameters (without Caller) for the GetTokenTransferFee choice.
+func (e *encoder) GetTokenTransferFeeMCMSParams(args GetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetTokenTransferFee", args)
+}
+
+// QuoteGasForExec encodes parameters for the QuoteGasForExec choice.
+func (e *encoder) QuoteGasForExec(args QuoteGasForExec) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("QuoteGasForExec", args)
+}
+
+// QuoteGasForExecMCMSParams encodes MCMS parameters (without Caller) for the QuoteGasForExec choice.
+func (e *encoder) QuoteGasForExecMCMSParams(args QuoteGasForExecMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("QuoteGasForExec", args)
+}
+
+// RemovePriceUpdaters encodes parameters for the RemovePriceUpdaters choice.
+func (e *encoder) RemovePriceUpdaters(args RemovePriceUpdaters) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemovePriceUpdaters", args)
 }
 
 // UpdatePrices encodes parameters for the UpdatePrices choice.

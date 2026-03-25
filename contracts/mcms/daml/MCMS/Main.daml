@@ -14,11 +14,11 @@
 module MCMS.Main where
 
 import DA.Map qualified as Map
-import DA.List ((!!))
+import DA.List ((!!), dedup)
 import DA.Action (unless)
 import DA.Foldable (forA_)
-import DA.Time (RelTime, seconds, addRelTime)
-import DA.Text (parseInt)
+import DA.Time (RelTime, seconds, addRelTime, time)
+import DA.Date (date, Month(..))
 import DA.Crypto.Text (BytesHex)
 import MCMS.Types
   ( Role(..)
@@ -38,15 +38,69 @@ import MCMS.Types
   )
 import MCMS.GroupVoting
 import MCMS.Crypto
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), makeInstanceAddress, parseInstanceIdText, parsePartyIdText)
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress (assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.Codec
-  ( decodeSetConfigParams
-  , decodeBlockedFunction
-  , decodeSelfDispatchSetConfig
-  , decodeScheduleBatchParams
-  , decodeBypasserExecuteBatchParams
-  , decodeCancelBatchParams
+  ( decodeBlockedFunctionWithOffset
+  , decodeSelfDispatchSetConfigWithOffset
+  , decodeScheduleBatchParamsWithOffset
+  , decodeBypasserExecuteBatchParamsWithOffset
+  , decodeCancelBatchParamsWithOffset
+  , decodeInt64At
   )
+import DA.Crypto.Text (byteCount)
+
+-- | Validate MultisigConfig structure
+-- Shared validation for SetConfig choice and executeSelfDispatch handler
+validateMultisigConfig : MultisigConfig -> Update ()
+validateMultisigConfig config = do
+  assertMsg "mcms: signer count exceeds maximum allowed" $
+    length config.signers <= maxNumSigners
+  assertMsg "mcms: must have at least one signer" $
+    not (null config.signers)
+  assertMsg "mcms: group quorums array must have 32 entries" $
+    length config.groupQuorums == numGroups
+  assertMsg "mcms: group parents array must have 32 entries" $
+    length config.groupParents == numGroups
+  -- Validate groupQuorums are non-negative
+  forA_ (zip [0..(numGroups - 1)] config.groupQuorums) $ \(idx, quorum) ->
+    assertMsg ("mcms: groupQuorum[" <> show idx <> "] must be non-negative, got " <> show quorum) $
+      quorum >= 0
+  assertMsg "mcms: root group must be its own parent" $
+    (config.groupParents !! 0) == 0
+  -- Validate signerGroup bounds [0, 31] for all signers
+  forA_ config.signers $ \signer ->
+    assertMsg ("mcms: signerGroup out of bounds [0,31]: " <> show signer.signerGroup) $
+      signer.signerGroup >= 0 && signer.signerGroup < numGroups
+  -- Disabled group children check (signers cannot be in disabled groups)
+  forA_ config.signers $ \signer -> do
+    let groupQuorum = config.groupQuorums !! signer.signerGroup
+    assertMsg ("mcms: signer in disabled group " <> show signer.signerGroup) $
+      groupQuorum > 0
+  -- Validate groupParents bounds and DAG structure (parent index < self index for non-root)
+  forA_ (zip [0..(numGroups - 1)] config.groupParents) $ \(idx, parentIdx) ->
+    if idx == 0
+      then assertMsg "mcms: root group must be its own parent" $ parentIdx == 0
+      else assertMsg ("mcms: group " <> show idx <> " parent must be < " <> show idx <> " (DAG constraint), got " <> show parentIdx) $
+        parentIdx >= 0 && parentIdx < idx
+  -- Quorum reachability validation
+  -- Count children per group (signers + enabled child groups)
+  let signerCounts = countSignersPerGroup config.signers
+  let childCounts = computeChildCounts signerCounts config.groupQuorums config.groupParents
+  forA_ (zip3 [0..(numGroups - 1)] config.groupQuorums childCounts) $ \(idx, quorum, children) ->
+    if quorum > 0
+      then assertMsg ("mcms: group " <> show idx <> " quorum " <> show quorum <> " exceeds children count " <> show children) $
+             children >= quorum
+      else assertMsg ("mcms: disabled group " <> show idx <> " has children") $
+             children == 0
+  -- Validate signer addresses are unique
+  let signerAddrs = map (\s -> s.signerAddress) config.signers
+  assertMsg "mcms: duplicate signer addresses" $
+    length (dedup signerAddrs) == length signerAddrs
+  -- Validate signer addresses are valid hex
+  forA_ config.signers $ \signer ->
+    assertValidHex "signerAddress" signer.signerAddress
 
 template MCMS
   with
@@ -62,6 +116,7 @@ template MCMS
     timelockTimestamps : Map.Map Text Time     -- opId -> readyTime (or doneTimestamp if done)
   where
     signatory owner
+    ensure assertValidInstanceId instanceId
 
     -- | Set signer configuration
     -- Validates the configuration and optionally clears the root
@@ -75,25 +130,23 @@ template MCMS
       controller owner
       do
         let newConfig = MultisigConfig newSigners newGroupQuorums newGroupParents
-
-        -- Basic validation
-        assertMsg "mcms: signer count exceeds maximum allowed" $ length newSigners <= maxNumSigners
-        assertMsg "mcms: group quorums array must have 32 entries" $ length newGroupQuorums == numGroups
-        assertMsg "mcms: group parents array must have 32 entries" $ length newGroupParents == numGroups
-
-        -- Validate group tree structure
-        assertMsg "mcms: root group must be its own parent" $ (newGroupParents !! 0) == 0
+        validateMultisigConfig newConfig
 
         let rs = getRoleState targetRole this
-
-        -- Optionally clear the root for the selected role
-        let newExpiringRoot = if clearRoot
-              then rs.expiringRoot with root = ""
-              else rs.expiringRoot
-
+        let (newExpiringRoot, newRootMetadata) = if clearRoot
+              then
+                let opCount = rs.expiringRoot.opCount
+                    instanceAddress = RawInstanceAddress.makeText instanceId owner
+                    epoch = time (date 1970 Jan 1) 0 0 0
+                in ( ExpiringRoot "" epoch opCount
+                   , RootMetadata chainId (makeMcmsId instanceAddress targetRole)
+                       opCount opCount True
+                   )
+              else (rs.expiringRoot, rs.rootMetadata)
         let newRs = rs with
               config = newConfig
               expiringRoot = newExpiringRoot
+              rootMetadata = newRootMetadata
 
         create (setRoleState targetRole newRs this)
 
@@ -111,6 +164,14 @@ template MCMS
         signatures : [RawSignature]            -- Raw ECDSA signatures
       controller submitter
       do
+        -- 0. Validate BytesHex inputs
+        assertValidHex "newRoot" newRoot
+        forA_ metadataProof $ \p -> assertValidHex "metadataProof" p
+        forA_ signatures $ \sig -> do
+          assertValidHex "signature.publicKey" sig.publicKey
+          assertValidHex "signature.r" sig.r
+          assertValidHex "signature.s" sig.s
+
         now <- getTime
         let rs = getRoleState targetRole this
 
@@ -122,12 +183,12 @@ template MCMS
           not $ Map.member signedHash rs.seenHashes
 
         -- 3. Validate timestamps
-        assertMsg "mcms: root has expired" $ now < validUntil
+        assertMsg "mcms: root has expired" $ now <= validUntil
 
         -- 4. Validate metadata matches this role
         assertMsg ("mcms: chain ID mismatch, expected " <> show chainId) $
           metadata.chainId == chainId
-        let instanceAddress = makeInstanceAddress instanceId owner
+        let instanceAddress = RawInstanceAddress.makeText instanceId owner
         let expectedMultisigId = makeMcmsId instanceAddress targetRole
         assertMsg ("mcms: multisig ID mismatch, expected " <> expectedMultisigId) $
           metadata.multisigId == expectedMultisigId
@@ -177,10 +238,12 @@ template MCMS
     --   1. Validate merkle proof against the root set by SetRoot
     --   2. Decode parameters from op.operationData (like Aptos BCS deserialization)
     --   3. Dispatch based on op.functionName:
-    --      - "schedule_batch" → schedule with delay (Proposer role)
-    --      - "bypasser_execute_batch" → immediate execution (Bypasser role)
-    --      - "cancel_batch" → cancel pending operation (Canceller role)
-    --      - "set_config", "clear_root" → MCMS self-dispatch
+    --      - "ScheduleBatch" → schedule with delay (Proposer role)
+    --      - "BypasserExecuteBatch" → immediate execution (Bypasser role)
+    --      - "CancelBatch" → cancel pending operation (Canceller role)
+    --
+    -- Note: SetConfig/ClearRoot are NOT handled here - they go through the timelock
+    -- flow via ScheduleBatch → delay → ExecuteScheduledBatch → executeSelfDispatch.
     --
     -- ANYONE CAN EXECUTE (with disclosures) - Security comes from:
     --   1. Merkle proof verification (operation was approved by signers)
@@ -198,11 +261,15 @@ template MCMS
         targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceAddress to contract ID
       controller submitter
       do
+        -- 0. Validate BytesHex inputs
+        forA_ opProof $ \p -> assertValidHex "opProof" p
+        assertValidHex "op.operationData" op.operationData
+
         now <- getTime
         let rs = getRoleState targetRole this
 
         -- 1. Validate operation targets this MCMS
-        let instanceAddress = makeInstanceAddress instanceId owner
+        let instanceAddress = RawInstanceAddress.makeText instanceId owner
         assertMsg ("mcms: chain ID mismatch, expected " <> show chainId) $
           op.chainId == chainId
         assertMsg ("mcms: multisig ID mismatch, expected " <> makeMcmsId instanceAddress targetRole) $
@@ -230,54 +297,39 @@ template MCMS
             assertMsg "mcms: ScheduleBatch requires Proposer role" $ targetRole == Proposer
             assertMsg "mcms: self-dispatch must target own instance address" $
               op.targetInstanceAddress == instanceAddress
-            case decodeScheduleBatchParams op.operationData of
+            case decodeScheduleBatchParamsWithOffset op.operationData of
               None -> abort "mcms: failed to decode ScheduleBatch parameters"
-              Some params ->
+              Some (params, finalOffset) -> do
+                assertMsg "mcms: trailing bytes in ScheduleBatch operationData" $
+                  finalOffset == byteCount op.operationData
                 scheduleBatchInternal now this rs params.calls params.predecessor params.salt (seconds params.delaySecs)
 
           "BypasserExecuteBatch" -> do
             assertMsg "mcms: BypasserExecuteBatch requires Bypasser role" $ targetRole == Bypasser
             assertMsg "mcms: self-dispatch must target own instance address" $
               op.targetInstanceAddress == instanceAddress
-            case decodeBypasserExecuteBatchParams op.operationData of
+            case decodeBypasserExecuteBatchParamsWithOffset op.operationData of
               None -> abort "mcms: failed to decode BypasserExecuteBatch parameters"
-              Some params ->
+              Some (params, finalOffset) -> do
+                assertMsg "mcms: trailing bytes in BypasserExecuteBatch operationData" $
+                  finalOffset == byteCount op.operationData
+                -- Validate targetCids size to prevent DoS via inflated maps
+                validateTargetCidsSize instanceAddress params.calls targetCids
                 bypasserExecuteBatchInternal owner this rs params.calls targetCids
 
           "CancelBatch" -> do
             assertMsg "mcms: CancelBatch requires Canceller role" $ targetRole == Canceller
             assertMsg "mcms: self-dispatch must target own instance address" $
               op.targetInstanceAddress == instanceAddress
-            case decodeCancelBatchParams op.operationData of
+            case decodeCancelBatchParamsWithOffset op.operationData of
               None -> abort "mcms: failed to decode CancelBatch parameters"
-              Some params ->
+              Some (params, finalOffset) -> do
+                assertMsg "mcms: trailing bytes in CancelBatch operationData" $
+                  finalOffset == byteCount op.operationData
                 cancelBatchInternal this rs params.opId
 
-          -- Self-dispatch: MCMS configuration changes (admin operations)
-          "SetConfig" -> do
-            assertMsg "mcms: self-dispatch must target own instance address" $
-              op.targetInstanceAddress == instanceAddress
-            case decodeSetConfigParams op.operationData of
-              None -> abort "mcms: failed to decode SetConfig parameters"
-              Some params -> do
-                let newConfig = MultisigConfig params.signers params.groupQuorums params.groupParents
-                assertMsg "mcms: signer count exceeds maximum allowed" $ length newConfig.signers <= maxNumSigners
-                assertMsg "mcms: group quorums array must have 32 entries" $ length newConfig.groupQuorums == numGroups
-                assertMsg "mcms: group parents array must have 32 entries" $ length newConfig.groupParents == numGroups
-                assertMsg "mcms: root group must be its own parent" $ (newConfig.groupParents !! 0) == 0
-                let clearedRoot = if params.clearRoot
-                      then rs.expiringRoot with root = ""
-                      else rs.expiringRoot
-                let newExpiringRoot = clearedRoot with opCount = rs.expiringRoot.opCount + 1
-                let newRs = rs with config = newConfig, expiringRoot = newExpiringRoot
-                create (setRoleState targetRole newRs this)
-
-          "ClearRoot" -> do
-            assertMsg "mcms: self-dispatch must target own instance address" $
-              op.targetInstanceAddress == instanceAddress
-            let newRs = rs with
-                  expiringRoot = rs.expiringRoot with root = "", opCount = rs.expiringRoot.opCount + 1
-            create (setRoleState targetRole newRs this)
+          -- SetConfig and ClearRoot are NOT handled here - they must go through the proper
+          -- timelock flow via ScheduleBatch → delay → ExecuteScheduledBatch → executeSelfDispatch.
 
           _ -> abort $ "mcms: unknown function: " <> op.functionName
 
@@ -298,6 +350,11 @@ template MCMS
         targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceAddress to contract ID
       controller submitter
       do
+        -- 0. Validate BytesHex inputs
+        assertValidHex "predecessor" predecessor
+        assertValidHex "salt" salt
+        forA_ calls $ \call -> assertValidHex "call.operationData" call.operationData
+
         now <- getTime
 
         -- 1. Verify opId matches provided data
@@ -322,10 +379,14 @@ template MCMS
                 Some predTime ->
                   assertMsg "mcms: predecessor operation not complete" $ predTime == doneTimestamp
 
-            -- 6. Process all calls (self-dispatch inline, external via MCMSReceiver)
+            -- 6. Validate targetCids size to prevent DoS via inflated maps
+            let mcmsInstanceAddress = RawInstanceAddress.makeText instanceId owner
+            validateTargetCidsSize mcmsInstanceAddress calls targetCids
+
+            -- 7. Process all calls (self-dispatch inline, external via MCMSReceiver)
             (_, finalMcms) <- processCallsLoop owner targetCids this calls
 
-            -- 7. Mark as done (set to doneTimestamp)
+            -- 8. Mark as done (set to doneTimestamp)
             create (finalMcms with
               timelockTimestamps = Map.insert opId doneTimestamp finalMcms.timelockTimestamps)
 
@@ -343,7 +404,7 @@ template MCMS
       do
         now <- getTime
         let rs = getRoleState targetRole this
-        let instanceAddress = makeInstanceAddress instanceId owner
+        let instanceAddress = RawInstanceAddress.makeText instanceId owner
         pure $
           op.chainId == chainId &&
           op.multisigId == makeMcmsId instanceAddress targetRole &&
@@ -478,6 +539,45 @@ setRoleState Proposer rs m = m with proposer = rs
 setRoleState Canceller rs m = m with canceller = rs
 setRoleState Bypasser rs m = m with bypasser = rs
 
+-- | Helper: Count signers per group
+countSignersPerGroup : [SignerInfo] -> [Int]
+countSignersPerGroup signers =
+  let counts = replicate numGroups 0
+  in foldl (\acc s -> MCMS.GroupVoting.incrementAt s.signerGroup acc) counts signers
+
+-- | Helper: Compute total children counts (signers + enabled child groups)
+-- Process groups from highest index to lowest (children before parents)
+computeChildCounts : [Int] -> [Int] -> [Int] -> [Int]
+computeChildCounts signerCounts groupQuorums groupParents =
+  let initial = signerCounts
+  in foldr (propagateChildCount groupQuorums groupParents) initial (reverse [1..(numGroups - 1)])
+
+-- | Helper: Propagate enabled child group to parent's count
+propagateChildCount : [Int] -> [Int] -> Int -> [Int] -> [Int]
+propagateChildCount groupQuorums groupParents idx counts =
+  let quorum = groupQuorums !! idx
+      parentIdx = groupParents !! idx
+  in if quorum > 0  -- enabled group propagates to parent
+     then MCMS.GroupVoting.incrementAt parentIdx counts
+     else counts
+
+-- | Count distinct external target addresses in a list of calls
+-- External = any call where targetInstanceAddress != mcmsInstanceAddress
+countDistinctExternalTargets : Text -> [TimelockCall] -> Int
+countDistinctExternalTargets mcmsInstanceAddress calls =
+  let externalTargets = [c.targetInstanceAddress | c <- calls, c.targetInstanceAddress /= mcmsInstanceAddress]
+  in length (dedup externalTargets)
+
+-- | Validate targetCids map size against distinct external targets
+-- Prevents DoS by inflating map with irrelevant entries
+validateTargetCidsSize : Text -> [TimelockCall] -> Map.Map Text (ContractId MCMSReceiver) -> Update ()
+validateTargetCidsSize mcmsInstanceAddress calls targetCids = do
+  let distinctTargets = countDistinctExternalTargets mcmsInstanceAddress calls
+  let mapSize = Map.size targetCids
+  assertMsg ("mcms: targetCids size " <> show mapSize <>
+             " exceeds distinct external targets " <> show distinctTargets) $
+    mapSize <= distinctTargets
+
 -- | Execute a self-dispatch call (admin operations routed through timelock)
 -- This function does NOT perform role checks. This is intentional and safe because:
 -- This function is only reachable via two validated paths:
@@ -498,43 +598,63 @@ executeSelfDispatch : MCMS -> TimelockCall -> Update MCMS
 executeSelfDispatch mcms call =
   case call.functionName of
     "UpdateMinDelay" ->
-      case parseInt call.operationData of
-        None -> abort "mcms: delay must be integer seconds"
-        Some secs -> pure $ mcms with minDelay = seconds secs
+      case decodeInt64At call.operationData 0 of
+        None -> abort "mcms: failed to decode UpdateMinDelay parameters"
+        Some (secs, finalOffset) -> do
+          assertMsg "mcms: trailing bytes in UpdateMinDelay operationData" $
+            finalOffset == byteCount call.operationData
+          assertMsg "mcms: delay must be positive" $ secs > 0
+          pure $ mcms with minDelay = seconds secs
 
     "BlockFunction" ->
-      case decodeBlockedFunction call.operationData of
+      case decodeBlockedFunctionWithOffset call.operationData of
         None -> abort "mcms: failed to decode blocked function parameters"
-        Some bf ->
+        Some (bf, finalOffset) -> do
+          assertMsg "mcms: trailing bytes in BlockFunction operationData" $
+            finalOffset == byteCount call.operationData
           if bf `notElem` mcms.blockedFunctions
           then pure $ mcms with blockedFunctions = bf :: mcms.blockedFunctions
           else pure mcms
 
     "UnblockFunction" ->
-      case decodeBlockedFunction call.operationData of
+      case decodeBlockedFunctionWithOffset call.operationData of
         None -> abort "mcms: failed to decode blocked function parameters"
-        Some bf -> pure $ mcms with blockedFunctions = filter (/= bf) mcms.blockedFunctions
+        Some (bf, finalOffset) -> do
+          assertMsg "mcms: trailing bytes in UnblockFunction operationData" $
+            finalOffset == byteCount call.operationData
+          pure $ mcms with blockedFunctions = filter (/= bf) mcms.blockedFunctions
 
     "SetConfig" ->
-      case decodeSelfDispatchSetConfig call.operationData of
+      case decodeSelfDispatchSetConfigWithOffset call.operationData of
         None -> abort "mcms: failed to decode SetConfig parameters"
-        Some (targetRole, params) -> do
-          let rs = getRoleState targetRole mcms
+        Some ((targetRole, params), finalOffset) -> do
+          assertMsg "mcms: trailing bytes in SetConfig operationData" $
+            finalOffset == byteCount call.operationData
           let newConfig = MultisigConfig params.signers params.groupQuorums params.groupParents
-          assertMsg "mcms: signer count exceeds maximum allowed" $ length newConfig.signers <= maxNumSigners
-          assertMsg "mcms: group quorums array must have 32 entries" $ length newConfig.groupQuorums == numGroups
-          assertMsg "mcms: group parents array must have 32 entries" $ length newConfig.groupParents == numGroups
-          assertMsg "mcms: root group must be its own parent" $ (newConfig.groupParents !! 0) == 0
-          let clearedRoot = if params.clearRoot
-                then rs.expiringRoot with root = ""
-                else rs.expiringRoot
-          let newRs = rs with config = newConfig, expiringRoot = clearedRoot
+          validateMultisigConfig newConfig
+          let rs = getRoleState targetRole mcms
+          let (clearedRoot, clearedMetadata) = if params.clearRoot
+                then
+                  let opCount = rs.expiringRoot.opCount
+                      instanceAddress = RawInstanceAddress.makeText mcms.instanceId mcms.owner
+                      epoch = time (date 1970 Jan 1) 0 0 0
+                  in ( ExpiringRoot "" epoch opCount
+                     , RootMetadata mcms.chainId (makeMcmsId instanceAddress targetRole)
+                         opCount opCount True
+                     )
+                else (rs.expiringRoot, rs.rootMetadata)
+          let newRs = rs with
+                config = newConfig
+                expiringRoot = clearedRoot
+                rootMetadata = clearedMetadata
           pure $ setRoleState targetRole newRs mcms
 
     "ScheduleBatch" ->
-      case decodeScheduleBatchParams call.operationData of
+      case decodeScheduleBatchParamsWithOffset call.operationData of
         None -> abort "mcms: failed to decode ScheduleBatch parameters"
-        Some params -> do
+        Some (params, finalOffset) -> do
+          assertMsg "mcms: trailing bytes in ScheduleBatch operationData" $
+            finalOffset == byteCount call.operationData
           now <- getTime
           let delay = seconds params.delaySecs
           assertMsg "mcms: delay shorter than minimum required" $ delay >= mcms.minDelay
@@ -548,9 +668,11 @@ executeSelfDispatch mcms call =
           pure $ mcms with timelockTimestamps = Map.insert opId readyTime mcms.timelockTimestamps
 
     "CancelBatch" ->
-      case decodeCancelBatchParams call.operationData of
+      case decodeCancelBatchParamsWithOffset call.operationData of
         None -> abort "mcms: failed to decode CancelBatch parameters"
-        Some params -> do
+        Some (params, finalOffset) -> do
+          assertMsg "mcms: trailing bytes in CancelBatch operationData" $
+            finalOffset == byteCount call.operationData
           case Map.lookup params.opId mcms.timelockTimestamps of
             None -> abort "mcms: operation not found in timelock"
             Some readyTime -> do
@@ -623,29 +745,44 @@ cancelBatchInternal mcms rs opIdToCancel = do
 -- | Process timelock calls: self-dispatch inline, external via MCMSReceiver
 -- Uses a map keyed by instanceAddress to support multiple calls to the same contract.
 -- After each external call, the map is updated with the new CID returned from MCMSReceiver_Entrypoint.
+--
+-- Converts typed→untyped map once at start, carries untyped through loop,
+-- Converts untyped→typed once at end. This avoids O(k*n) map conversions where k = external calls.
 processCallsLoop : Party -> Map.Map Text (ContractId MCMSReceiver) -> MCMS -> [TimelockCall] -> Update (Map.Map Text (ContractId MCMSReceiver), MCMS)
-processCallsLoop _ cidMap mcms [] = pure (cidMap, mcms)
-processCallsLoop ownerParty cidMap mcms (call :: rest) = do
+processCallsLoop ownerParty typedCidMap mcms calls = do
+  -- Convert typed→untyped once at start
+  let untypedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList typedCidMap]
+  -- Process all calls with untyped map
+  (finalUntypedMap, finalMcms) <- processCallsLoopInternal ownerParty untypedCidMap mcms calls
+  -- Convert untyped→typed once at end
+  let finalTypedMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList finalUntypedMap]
+  pure (finalTypedMap, finalMcms)
+
+-- | Internal loop that operates on untyped ContractId maps to avoid per-iteration conversions
+processCallsLoopInternal : Party -> Map.Map Text (ContractId ()) -> MCMS -> [TimelockCall] -> Update (Map.Map Text (ContractId ()), MCMS)
+processCallsLoopInternal _ cidMap mcms [] = pure (cidMap, mcms)
+processCallsLoopInternal ownerParty cidMap mcms (call :: rest) = do
   -- Calculate MCMS's own instanceAddress for comparison
-  let mcmsInstanceAddress = makeInstanceAddress mcms.instanceId mcms.owner
+  let mcmsInstanceAddress = RawInstanceAddress.makeText mcms.instanceId mcms.owner
 
   if call.targetInstanceAddress == mcmsInstanceAddress then do
     -- Self-dispatch: execute internal function (no CID lookup needed)
     newMcms <- executeSelfDispatch mcms call
-    processCallsLoop ownerParty cidMap newMcms rest
+    processCallsLoopInternal ownerParty cidMap newMcms rest
   else do
     -- External call: lookup CID from map and validate
-    targetCid <- case Map.lookup call.targetInstanceAddress cidMap of
+    -- Coerce untyped CID to typed for fetch/exercise
+    targetCid : ContractId MCMSReceiver <- case Map.lookup call.targetInstanceAddress cidMap of
       None -> abort $ "mcms: no contract ID for instance: " <> call.targetInstanceAddress
-      Some cid -> pure cid
+      Some cid -> pure (coerceContractId cid)
 
     -- Parse instanceId from the call's targetInstanceAddress (from merkle leaf)
-    expectedInstanceId <- case parseInstanceIdText call.targetInstanceAddress of
+    expectedInstanceId <- case RawInstanceAddress.parseInstanceIdText call.targetInstanceAddress of
       None -> abort "mcms: invalid address format, expected instanceId@partyId"
       Some instId -> pure instId
 
     -- Parse partyId from the call's targetInstanceAddress (from merkle leaf)
-    expectedPartyText <- case parsePartyIdText call.targetInstanceAddress of
+    expectedPartyText <- case RawInstanceAddress.parsePartyIdText call.targetInstanceAddress of
       None -> abort "mcms: invalid address format, expected instanceId@partyId"
       Some partyId -> pure partyId
 
@@ -665,18 +802,14 @@ processCallsLoop ownerParty cidMap mcms (call :: rest) = do
           partyToText singleSig == expectedPartyText
       _ -> abort "mcms: target must have exactly one signatory"
 
-    -- Convert typed map to untyped for interface
-    let untypedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList cidMap]
-
     -- Execute call and get updated map from entrypoint
-    -- The entrypoint returns a Map with all updated CIDs (including self)
+    -- The entrypoint returns a Map with all updated CIDs (including self and any delegated calls)
     returnedCidMap <- exercise targetCid MCMSReceiver_Entrypoint with
       functionName = call.functionName
       operationData = call.operationData
-      contractIds = untypedCidMap
+      contractIds = cidMap
 
-    -- Convert returned map back to typed for next iteration
-    let updatedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList returnedCidMap]
-
-    -- Continue with updated map
-    processCallsLoop ownerParty updatedCidMap mcms rest
+    -- Continue with updated map (already untyped from entrypoint)
+    -- Note: We trust the returned map because the receiver is a signatory of the owner,
+    -- and delegated calls (e.g., OffRamp -> CCIP) need to update multiple CIDs
+    processCallsLoopInternal ownerParty returnedCidMap mcms rest

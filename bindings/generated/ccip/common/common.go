@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "d0e5d1b09e7ef9288e5f094cf40938cdece297a7cfeef58f6b30eed189b113f2"
+	PackageID   = "e16a9f41471d6022fe7318d52c0dddb98c111d231036cafa08a83f8eb7b17f0c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -209,79 +209,67 @@ func (t *AddCCVVerificationMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// AddExecutorWithFee is a Record type
-type AddExecutorWithFee struct {
+// AddExecutorFee is a Record type
+type AddExecutorFee struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
-	DestGasLimit       types.INT64   `json:"destGasLimit"`
-	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
 	Caller             types.PARTY   `json:"caller"`
 }
 
-// ToMap converts AddExecutorWithFee to a map for DAML arguments
-func (t AddExecutorWithFee) ToMap() map[string]any {
+// ToMap converts AddExecutorFee to a map for DAML arguments
+func (t AddExecutorFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["executorInstanceId"] = string(t.ExecutorInstanceId)
 
 	m["executorArgs"] = string(t.ExecutorArgs)
 
-	m["blockConfirmations"] = int64(t.BlockConfirmations)
-
 	m["feeUSDCents"] = t.FeeUSDCents
-
-	m["destGasLimit"] = int64(t.DestGasLimit)
-
-	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
 
 	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
 
-func (t AddExecutorWithFee) MarshalJSON() ([]byte, error) {
+func (t AddExecutorFee) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *AddExecutorWithFee) UnmarshalJSON(data []byte) error {
+func (t *AddExecutorFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes AddExecutorWithFee to hex string (Canton MCMS format)
-func (t AddExecutorWithFee) MarshalHex() (string, error) {
+// MarshalHex encodes AddExecutorFee to hex string (Canton MCMS format)
+func (t AddExecutorFee) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes AddExecutorWithFee from hex string (Canton MCMS format)
-func (t *AddExecutorWithFee) UnmarshalHex(data string) error {
+// UnmarshalHex decodes AddExecutorFee from hex string (Canton MCMS format)
+func (t *AddExecutorFee) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// AddExecutorWithFeeMCMSParams is AddExecutorWithFee without the Caller field for MCMS operationData encoding.
+// AddExecutorFeeMCMSParams is AddExecutorFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
-type AddExecutorWithFeeMCMSParams struct {
+type AddExecutorFeeMCMSParams struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
-	DestGasLimit       types.INT64   `json:"destGasLimit"`
-	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
 }
 
-// MarshalHex encodes AddExecutorWithFeeMCMSParams to hex string for MCMS operationData.
-func (t AddExecutorWithFeeMCMSParams) MarshalHex() (string, error) {
+// MarshalHex encodes AddExecutorFeeMCMSParams to hex string for MCMS operationData.
+func (t AddExecutorFeeMCMSParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes AddExecutorWithFeeMCMSParams from hex string.
-func (t *AddExecutorWithFeeMCMSParams) UnmarshalHex(data string) error {
+// UnmarshalHex decodes AddExecutorFeeMCMSParams from hex string.
+func (t *AddExecutorFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -294,7 +282,6 @@ type AddTokenSend struct {
 	Amount           types.NUMERIC                            `json:"amount"`
 	DestTokenAddress types.TEXT                               `json:"destTokenAddress"`
 	ExtraData        types.TEXT                               `json:"extraData"`
-	Caller           types.PARTY                              `json:"caller"`
 }
 
 // ToMap converts AddTokenSend to a map for DAML arguments
@@ -318,8 +305,6 @@ func (t AddTokenSend) ToMap() map[string]any {
 	m["destTokenAddress"] = string(t.DestTokenAddress)
 
 	m["extraData"] = string(t.ExtraData)
-
-	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -346,29 +331,6 @@ func (t *AddTokenSend) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// AddTokenSendMCMSParams is AddTokenSend without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type AddTokenSendMCMSParams struct {
-	PoolInstanceId   types.TEXT                               `json:"poolInstanceId"`
-	PoolOwner        types.PARTY                              `json:"poolOwner"`
-	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount           types.NUMERIC                            `json:"amount"`
-	DestTokenAddress types.TEXT                               `json:"destTokenAddress"`
-	ExtraData        types.TEXT                               `json:"extraData"`
-}
-
-// MarshalHex encodes AddTokenSendMCMSParams to hex string for MCMS operationData.
-func (t AddTokenSendMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes AddTokenSendMCMSParams from hex string.
-func (t *AddTokenSendMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // AddTokenSendFee is a Record type
 type AddTokenSendFee struct {
 	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
@@ -376,7 +338,6 @@ type AddTokenSendFee struct {
 	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
-	Caller            types.PARTY   `json:"caller"`
 }
 
 // ToMap converts AddTokenSendFee to a map for DAML arguments
@@ -392,8 +353,6 @@ func (t AddTokenSendFee) ToMap() map[string]any {
 	m["destGasOverhead"] = int64(t.DestGasOverhead)
 
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
-
-	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -416,28 +375,6 @@ func (t AddTokenSendFee) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddTokenSendFee from hex string (Canton MCMS format)
 func (t *AddTokenSendFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// AddTokenSendFeeMCMSParams is AddTokenSendFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type AddTokenSendFeeMCMSParams struct {
-	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
-	PoolOwner         types.PARTY   `json:"poolOwner"`
-	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
-}
-
-// MarshalHex encodes AddTokenSendFeeMCMSParams to hex string for MCMS operationData.
-func (t AddTokenSendFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes AddTokenSendFeeMCMSParams from hex string.
-func (t *AddTokenSendFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -748,6 +685,59 @@ func (t ApplySourceChainConfigUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplySourceChainConfigUpdates from hex string (Canton MCMS format)
 func (t *ApplySourceChainConfigUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// BuildMessage is a Record type
+type BuildMessage struct {
+	Caller types.PARTY `json:"caller"`
+}
+
+// ToMap converts BuildMessage to a map for DAML arguments
+func (t BuildMessage) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t BuildMessage) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *BuildMessage) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes BuildMessage to hex string (Canton MCMS format)
+func (t BuildMessage) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BuildMessage from hex string (Canton MCMS format)
+func (t *BuildMessage) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// BuildMessageMCMSParams is BuildMessage without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type BuildMessageMCMSParams struct {
+}
+
+// MarshalHex encodes BuildMessageMCMSParams to hex string for MCMS operationData.
+func (t BuildMessageMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BuildMessageMCMSParams from hex string.
+func (t *BuildMessageMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1241,6 +1231,8 @@ func (t *ConsumeCapacityResult) UnmarshalHex(data string) error {
 
 // CrossChainVerifierView is a Record type
 type CrossChainVerifierView struct {
+	InstanceId       types.TEXT   `json:"instanceId"`
+	Owner            types.PARTY  `json:"owner"`
 	CcipOwner        types.PARTY  `json:"ccipOwner"`
 	StorageLocations []types.TEXT `json:"storageLocations"`
 }
@@ -1248,6 +1240,10 @@ type CrossChainVerifierView struct {
 // ToMap converts CrossChainVerifierView to a map for DAML arguments
 func (t CrossChainVerifierView) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["owner"] = t.Owner.ToMap()
 
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
@@ -1287,6 +1283,7 @@ func (t *CrossChainVerifierView) UnmarshalHex(data string) error {
 // CrossChainVerifierCalculateFee is a Record type
 type CrossChainVerifierCalculateFee struct {
 	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+	ExtraContext      CCIPContext       `json:"extraContext"`
 	Caller            types.PARTY       `json:"caller"`
 }
 
@@ -1300,6 +1297,14 @@ func (t CrossChainVerifierCalculateFee) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.SendingMessageCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["caller"] = t.Caller.ToMap()
@@ -1463,13 +1468,16 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 
 // DestChainConfig is a Record type
 type DestChainConfig struct {
-	IsEnabled                 types.BOOL           `json:"isEnabled"`
-	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
-	OffRampAddress            types.TEXT           `json:"offRampAddress"`
-	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
-	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
-	MessageNetworkFeeUSDCents types.NUMERIC        `json:"messageNetworkFeeUSDCents"`
-	TokenNetworkFeeUSDCents   types.NUMERIC        `json:"tokenNetworkFeeUSDCents"`
+	IsEnabled                 types.BOOL                `json:"isEnabled"`
+	AddressBytesLength        types.INT64               `json:"addressBytesLength"`
+	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
+	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
+	OffRampAddress            types.TEXT                `json:"offRampAddress"`
+	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
+	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
+	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
+	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
+	TokenNetworkFeeUSDCents   types.NUMERIC             `json:"tokenNetworkFeeUSDCents"`
 }
 
 // ToMap converts DestChainConfig to a map for DAML arguments
@@ -1480,7 +1488,19 @@ func (t DestChainConfig) ToMap() map[string]any {
 
 	m["addressBytesLength"] = int64(t.AddressBytesLength)
 
+	m["tokenReceiverAllowed"] = bool(t.TokenReceiverAllowed)
+
+	m["baseExecutionGasCost"] = int64(t.BaseExecutionGasCost)
+
 	m["offRampAddress"] = string(t.OffRampAddress)
+
+	m["defaultExecutor"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DefaultExecutor).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DefaultExecutor
+	}()
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -1539,14 +1559,17 @@ func (t *DestChainConfig) UnmarshalHex(data string) error {
 
 // DestChainConfigArgs is a Record type
 type DestChainConfigArgs struct {
-	DestChainSelector         types.NUMERIC        `json:"destChainSelector"`
-	IsEnabled                 types.BOOL           `json:"isEnabled"`
-	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
-	OffRampAddress            types.TEXT           `json:"offRampAddress"`
-	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
-	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
-	MessageNetworkFeeUSDCents types.NUMERIC        `json:"messageNetworkFeeUSDCents"`
-	TokenNetworkFeeUSDCents   types.NUMERIC        `json:"tokenNetworkFeeUSDCents"`
+	DestChainSelector         types.NUMERIC             `json:"destChainSelector"`
+	IsEnabled                 types.BOOL                `json:"isEnabled"`
+	AddressBytesLength        types.INT64               `json:"addressBytesLength"`
+	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
+	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
+	OffRampAddress            types.TEXT                `json:"offRampAddress"`
+	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
+	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
+	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
+	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
+	TokenNetworkFeeUSDCents   types.NUMERIC             `json:"tokenNetworkFeeUSDCents"`
 }
 
 // ToMap converts DestChainConfigArgs to a map for DAML arguments
@@ -1559,7 +1582,19 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 
 	m["addressBytesLength"] = int64(t.AddressBytesLength)
 
+	m["tokenReceiverAllowed"] = bool(t.TokenReceiverAllowed)
+
+	m["baseExecutionGasCost"] = int64(t.BaseExecutionGasCost)
+
 	m["offRampAddress"] = string(t.OffRampAddress)
+
+	m["defaultExecutor"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DefaultExecutor).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DefaultExecutor
+	}()
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -1618,10 +1653,10 @@ func (t *DestChainConfigArgs) UnmarshalHex(data string) error {
 
 // ExecutingMessageDeps is a Record type
 type ExecutingMessageDeps struct {
-	OffRamp            RawInstanceAddress `json:"offRamp"`
-	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
+	OffRamp            mcms.RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
 }
 
 // ToMap converts ExecutingMessageDeps to a map for DAML arguments
@@ -1689,9 +1724,9 @@ func (t *ExecutingMessageDeps) UnmarshalHex(data string) error {
 type ExecutingMessageState string
 
 const (
-	ExecutingMessageStateExecutingMessageState_Prepared ExecutingMessageState = "ExecutingMessageState_Prepared"
+	ExecutingMessageStateExecutingMessageState_RequirePoolCCVs ExecutingMessageState = "ExecutingMessageState_RequirePoolCCVs"
 
-	ExecutingMessageStateExecutingMessageState_PoolVerified ExecutingMessageState = "ExecutingMessageState_PoolVerified"
+	ExecutingMessageStateExecutingMessageState_Prepared ExecutingMessageState = "ExecutingMessageState_Prepared"
 )
 
 func (e ExecutingMessageState) GetEnumConstructor() string { return string(e) }
@@ -1731,18 +1766,23 @@ var _ types.ENUM = ExecutingMessageState("")
 
 // ExecutingMessageV1 is a Template type
 type ExecutingMessageV1 struct {
-	CcipOwner        types.PARTY           `json:"ccipOwner"`
-	Message          MessageV1             `json:"message"`
-	MessageId        types.TEXT            `json:"messageId"`
-	Receiver         types.PARTY           `json:"receiver"`
-	TokenReceiver    *types.PARTY          `json:"tokenReceiver" hex:"optional"`
-	Executor         types.PARTY           `json:"executor"`
-	ObservingParties []types.PARTY         `json:"observingParties"`
-	CcvVerifications []CCVVerification     `json:"ccvVerifications"`
-	CcvOwners        []types.PARTY         `json:"ccvOwners"`
-	InboundPoolCCVs  *[]RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
-	Deps             ExecutingMessageDeps  `json:"deps"`
-	State            ExecutingMessageState `json:"state"`
+	CcipOwner                     types.PARTY                `json:"ccipOwner"`
+	Message                       MessageV1                  `json:"message"`
+	MessageId                     types.TEXT                 `json:"messageId"`
+	Receiver                      types.PARTY                `json:"receiver"`
+	TokenReceiver                 *types.PARTY               `json:"tokenReceiver" hex:"optional"`
+	Executor                      types.PARTY                `json:"executor"`
+	ObservingParties              []types.PARTY              `json:"observingParties"`
+	CcvVerifications              []CCVVerification          `json:"ccvVerifications"`
+	CcvOwners                     []types.PARTY              `json:"ccvOwners"`
+	RequiredCCVs                  []mcms.RawInstanceAddress  `json:"requiredCCVs"`
+	OptionalCCVs                  []mcms.RawInstanceAddress  `json:"optionalCCVs"`
+	OptionalCCVThreshold          types.INT64                `json:"optionalCCVThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                `json:"receiverMinBlockConfirmations"`
+	SourceDefaultCCVs             []mcms.RawInstanceAddress  `json:"sourceDefaultCCVs"`
+	InboundPoolCCVs               *[]mcms.RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
+	Deps                          ExecutingMessageDeps       `json:"deps"`
+	State                         ExecutingMessageState      `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1819,6 +1859,54 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 		res := make([]any, 0, len(t.CcvOwners))
 		for _, e := range t.CcvOwners {
 			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVThreshold"] = int64(t.OptionalCCVThreshold)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sourceDefaultCCVs"] = func() []any {
+		res := make([]any, 0, len(t.SourceDefaultCCVs))
+		for _, e := range t.SourceDefaultCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -1923,6 +2011,54 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 		res := make([]any, 0, len(t.CcvOwners))
 		for _, e := range t.CcvOwners {
 			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVThreshold"] = int64(t.OptionalCCVThreshold)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sourceDefaultCCVs"] = func() []any {
+		res := make([]any, 0, len(t.SourceDefaultCCVs))
+		for _, e := range t.SourceDefaultCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -2091,6 +2227,50 @@ func (t ExecutingMessageV1) ArchiveWithPackageID(contractID string, packageID st
 		Arguments:  map[string]any{},
 	}
 }
+
+// ExecutionMode is an enum type
+type ExecutionMode string
+
+const (
+	ExecutionModeExecutionMode_Executor ExecutionMode = "ExecutionMode_Executor"
+
+	ExecutionModeExecutionMode_NoExecutor ExecutionMode = "ExecutionMode_NoExecutor"
+)
+
+func (e ExecutionMode) GetEnumConstructor() string { return string(e) }
+
+func (e ExecutionMode) GetEnumTypeID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "ExecutionMode")
+}
+
+// GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
+func (e ExecutionMode) GetEnumTypeIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "ExecutionMode")
+}
+
+func (e ExecutionMode) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(e)
+}
+
+func (e *ExecutionMode) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, e)
+}
+
+// MarshalHex encodes ExecutionMode to hex string (Canton MCMS format)
+func (e ExecutionMode) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(e)
+}
+
+// UnmarshalHex decodes ExecutionMode from hex string (Canton MCMS format)
+func (e *ExecutionMode) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, e)
+}
+
+var _ types.ENUM = ExecutionMode("")
 
 // ExecutionStateChanged is a Template type
 type ExecutionStateChanged struct {
@@ -2282,8 +2462,6 @@ type ExecutorFee struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorOwner      types.PARTY   `json:"executorOwner"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
-	DestGasLimit       types.INT64   `json:"destGasLimit"`
-	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
 }
 
 // ToMap converts ExecutorFee to a map for DAML arguments
@@ -2295,10 +2473,6 @@ func (t ExecutorFee) ToMap() map[string]any {
 	m["executorOwner"] = t.ExecutorOwner.ToMap()
 
 	m["feeUSDCents"] = t.FeeUSDCents
-
-	m["destGasLimit"] = int64(t.DestGasLimit)
-
-	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
 
 	return m
 }
@@ -2327,12 +2501,15 @@ func (t *ExecutorFee) UnmarshalHex(data string) error {
 
 // ExecutorView is a Record type
 type ExecutorView struct {
-	Owner types.PARTY `json:"owner"`
+	InstanceId types.TEXT  `json:"instanceId"`
+	Owner      types.PARTY `json:"owner"`
 }
 
 // ToMap converts ExecutorView to a map for DAML arguments
 func (t ExecutorView) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["instanceId"] = string(t.InstanceId)
 
 	m["owner"] = t.Owner.ToMap()
 
@@ -2365,6 +2542,7 @@ func (t *ExecutorView) UnmarshalHex(data string) error {
 type ExecutorCalculateFee struct {
 	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT        `json:"executorArgs"`
+	ExtraContext      CCIPContext       `json:"extraContext"`
 	Caller            types.PARTY       `json:"caller"`
 }
 
@@ -2381,6 +2559,14 @@ func (t ExecutorCalculateFee) ToMap() map[string]any {
 	}()
 
 	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -2617,8 +2803,12 @@ func (t *FinalizeExecuteResult) UnmarshalHex(data string) error {
 
 // FinalizeFee is a Record type
 type FinalizeFee struct {
-	FeeTokenPrice     types.NUMERIC `json:"feeTokenPrice"`
-	PremiumMultiplier types.NUMERIC `json:"premiumMultiplier"`
+	FeeTokenPrice             types.NUMERIC `json:"feeTokenPrice"`
+	PremiumMultiplier         types.NUMERIC `json:"premiumMultiplier"`
+	TotalExecutionGasLimit    types.INT64   `json:"totalExecutionGasLimit"`
+	ExecutorDestGasLimit      types.INT64   `json:"executorDestGasLimit"`
+	ExecutorDestBytesOverhead types.INT64   `json:"executorDestBytesOverhead"`
+	ExecutionCostUSDCents     types.NUMERIC `json:"executionCostUSDCents"`
 }
 
 // ToMap converts FinalizeFee to a map for DAML arguments
@@ -2628,6 +2818,14 @@ func (t FinalizeFee) ToMap() map[string]any {
 	m["feeTokenPrice"] = t.FeeTokenPrice
 
 	m["premiumMultiplier"] = t.PremiumMultiplier
+
+	m["totalExecutionGasLimit"] = int64(t.TotalExecutionGasLimit)
+
+	m["executorDestGasLimit"] = int64(t.ExecutorDestGasLimit)
+
+	m["executorDestBytesOverhead"] = int64(t.ExecutorDestBytesOverhead)
+
+	m["executionCostUSDCents"] = t.ExecutionCostUSDCents
 
 	return m
 }
@@ -3583,27 +3781,6 @@ func (t RateLimiter) ConsumeCapacityWithPackageID(contractID string, packageID s
 	}
 }
 
-// Archive exercises the Archive choice on this RateLimiter contract
-// This method uses the package name in the template ID
-func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "RateLimiter"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
-func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "RateLimiter"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
 // SetConfig exercises the SetConfig choice on this RateLimiter contract
 // This method uses the package name in the template ID
 func (t RateLimiter) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
@@ -3625,41 +3802,51 @@ func (t RateLimiter) SetConfigWithPackageID(contractID string, packageID string,
 	}
 }
 
-// RawInstanceAddress is a Record type
-type RawInstanceAddress struct {
-	Unpack types.TEXT `json:"unpack"`
+// Archive exercises the Archive choice on this RateLimiter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
 }
 
-// ToMap converts RawInstanceAddress to a map for DAML arguments
-func (t RawInstanceAddress) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["unpack"] = string(t.Unpack)
-
-	return m
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
 }
 
-func (t RawInstanceAddress) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this RateLimiter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t RateLimiter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
 }
 
-func (t *RawInstanceAddress) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t RateLimiter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
 }
 
-// MarshalHex encodes RawInstanceAddress to hex string (Canton MCMS format)
-func (t RawInstanceAddress) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
+// Verify interface implementations for RateLimiter
 
-// UnmarshalHex decodes RawInstanceAddress from hex string (Canton MCMS format)
-func (t *RawInstanceAddress) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
+var _ mcms.IMCMSReceiver = (*RateLimiter)(nil)
 
 // Receipt is a Record type
 type Receipt struct {
@@ -3732,12 +3919,12 @@ func (t *Receipt) UnmarshalHex(data string) error {
 
 // SendingMessageDeps is a Record type
 type SendingMessageDeps struct {
-	Router             RawInstanceAddress `json:"router"`
-	OnRamp             RawInstanceAddress `json:"onRamp"`
-	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          RawInstanceAddress `json:"feeQuoter"`
+	Router             mcms.RawInstanceAddress `json:"router"`
+	OnRamp             mcms.RawInstanceAddress `json:"onRamp"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
 }
 
 // ToMap converts SendingMessageDeps to a map for DAML arguments
@@ -3821,9 +4008,9 @@ func (t *SendingMessageDeps) UnmarshalHex(data string) error {
 type SendingMessageState string
 
 const (
-	SendingMessageStateSendingMessageState_Prepared SendingMessageState = "SendingMessageState_Prepared"
+	SendingMessageStateSendingMessageState_RequirePoolCCVs SendingMessageState = "SendingMessageState_RequirePoolCCVs"
 
-	SendingMessageStateSendingMessageState_PoolVerified SendingMessageState = "SendingMessageState_PoolVerified"
+	SendingMessageStateSendingMessageState_Prepared SendingMessageState = "SendingMessageState_Prepared"
 
 	SendingMessageStateSendingMessageState_TokenLocked SendingMessageState = "SendingMessageState_TokenLocked"
 
@@ -3874,15 +4061,15 @@ type SendingMessageV1 struct {
 	Sender                    types.PARTY                               `json:"sender"`
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
-	RequiredCCVs              []RawInstanceAddress                      `json:"requiredCCVs"`
-	ExecutorAddress           RawInstanceAddress                        `json:"executorAddress"`
+	RequiredCCVs              []mcms.RawInstanceAddress                 `json:"requiredCCVs"`
+	ExecutorAddress           types.TEXT                                `json:"executorAddress"`
+	ExecutionMode             *ExecutionMode                            `json:"executionMode" hex:"optional"`
 	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
 	SenderAddress             types.TEXT                                `json:"senderAddress"`
 	Receiver                  types.TEXT                                `json:"receiver"`
 	Payload                   types.TEXT                                `json:"payload"`
 	ExecutionGasLimit         types.INT64                               `json:"executionGasLimit"`
 	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations        types.INT64                               `json:"blockConfirmations"`
 	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
 	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
 	OffRampAddress            types.TEXT                                `json:"offRampAddress"`
@@ -3891,9 +4078,11 @@ type SendingMessageV1 struct {
 	FeeToken                  splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 	NetworkFeeUSDCents        types.NUMERIC                             `json:"networkFeeUSDCents"`
 	ExpectedTokenInstrumentId *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
-	OutboundPoolCCVs          *[]RawInstanceAddress                     `json:"outboundPoolCCVs" hex:"optional"`
+	OutboundPoolCCVs          *[]mcms.RawInstanceAddress                `json:"outboundPoolCCVs" hex:"optional"`
 	ExecutorArgs              types.TEXT                                `json:"executorArgs"`
 	ExecutorFee               *ExecutorFee                              `json:"executorFee" hex:"optional"`
+	ExecutorDestGasLimit      types.INT64                               `json:"executorDestGasLimit"`
+	ExecutorDestBytesOverhead types.INT64                               `json:"executorDestBytesOverhead"`
 	ExecutorFeeTokenAmount    types.NUMERIC                             `json:"executorFeeTokenAmount"`
 	ObservingParties          []types.PARTY                             `json:"observingParties"`
 	CcvFees                   []CCVFee                                  `json:"ccvFees"`
@@ -3962,13 +4151,18 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["executorAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutorAddress).(mapper); ok {
-			return m.toMap()
+	args["executorAddress"] = string(t.ExecutorAddress)
+
+	if t.ExecutionMode != nil {
+		args["executionMode"] = map[string]any{
+			"_type": "optional",
+			"value": *t.ExecutionMode,
 		}
-		return t.ExecutorAddress
-	}()
+	} else {
+		args["executionMode"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	if t.SourceChainSelector != "" {
 		args["sourceChainSelector"] = t.SourceChainSelector
@@ -3988,9 +4182,6 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -4055,6 +4246,12 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 			"_type": "optional",
 		}
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["executorDestGasLimit"] = int64(t.ExecutorDestGasLimit)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["executorDestBytesOverhead"] = int64(t.ExecutorDestBytesOverhead)
 
 	if t.ExecutorFeeTokenAmount != "" {
 		args["executorFeeTokenAmount"] = t.ExecutorFeeTokenAmount
@@ -4220,13 +4417,18 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["executorAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutorAddress).(mapper); ok {
-			return m.toMap()
+	args["executorAddress"] = string(t.ExecutorAddress)
+
+	if t.ExecutionMode != nil {
+		args["executionMode"] = map[string]any{
+			"_type": "optional",
+			"value": *t.ExecutionMode,
 		}
-		return t.ExecutorAddress
-	}()
+	} else {
+		args["executionMode"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	if t.SourceChainSelector != "" {
 		args["sourceChainSelector"] = t.SourceChainSelector
@@ -4246,9 +4448,6 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -4313,6 +4512,12 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 			"_type": "optional",
 		}
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["executorDestGasLimit"] = int64(t.ExecutorDestGasLimit)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["executorDestBytesOverhead"] = int64(t.ExecutorDestBytesOverhead)
 
 	if t.ExecutorFeeTokenAmount != "" {
 		args["executorFeeTokenAmount"] = t.ExecutorFeeTokenAmount
@@ -4481,23 +4686,23 @@ func (t SendingMessageV1) FinalizeFeeWithPackageID(contractID string, packageID 
 	}
 }
 
-// AddExecutorWithFee exercises the AddExecutorWithFee choice on this SendingMessageV1 contract
+// AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
-func (t SendingMessageV1) AddExecutorWithFee(contractID string, args AddExecutorWithFee) *model.ExerciseCommand {
+func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
-		Choice:     "AddExecutorWithFee",
+		Choice:     "AddVerifierData",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// AddExecutorWithFeeWithPackageID exercises the AddExecutorWithFee choice using the provided package ID instead of package name
-func (t SendingMessageV1) AddExecutorWithFeeWithPackageID(contractID string, packageID string, args AddExecutorWithFee) *model.ExerciseCommand {
+// AddVerifierDataWithPackageID exercises the AddVerifierData choice using the provided package ID instead of package name
+func (t SendingMessageV1) AddVerifierDataWithPackageID(contractID string, packageID string, args AddVerifierData) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
-		Choice:     "AddExecutorWithFee",
+		Choice:     "AddVerifierData",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -4519,6 +4724,48 @@ func (t SendingMessageV1) AddCCVFeeWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "AddCCVFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddTokenSend exercises the AddTokenSend choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) AddTokenSend(contractID string, args AddTokenSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddTokenSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddTokenSendWithPackageID exercises the AddTokenSend choice using the provided package ID instead of package name
+func (t SendingMessageV1) AddTokenSendWithPackageID(contractID string, packageID string, args AddTokenSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddTokenSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// BuildMessage exercises the BuildMessage choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) BuildMessage(contractID string, args BuildMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "BuildMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// BuildMessageWithPackageID exercises the BuildMessage choice using the provided package ID instead of package name
+func (t SendingMessageV1) BuildMessageWithPackageID(contractID string, packageID string, args BuildMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "BuildMessage",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -4565,44 +4812,23 @@ func (t SendingMessageV1) SetOutboundPoolCCVsWithPackageID(contractID string, pa
 	}
 }
 
-// AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
+// AddExecutorFee exercises the AddExecutorFee choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
-func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
+func (t SendingMessageV1) AddExecutorFee(contractID string, args AddExecutorFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
-		Choice:     "AddVerifierData",
+		Choice:     "AddExecutorFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// AddVerifierDataWithPackageID exercises the AddVerifierData choice using the provided package ID instead of package name
-func (t SendingMessageV1) AddVerifierDataWithPackageID(contractID string, packageID string, args AddVerifierData) *model.ExerciseCommand {
+// AddExecutorFeeWithPackageID exercises the AddExecutorFee choice using the provided package ID instead of package name
+func (t SendingMessageV1) AddExecutorFeeWithPackageID(contractID string, packageID string, args AddExecutorFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
-		Choice:     "AddVerifierData",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// AddTokenSend exercises the AddTokenSend choice on this SendingMessageV1 contract
-// This method uses the package name in the template ID
-func (t SendingMessageV1) AddTokenSend(contractID string, args AddTokenSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddTokenSend",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// AddTokenSendWithPackageID exercises the AddTokenSend choice using the provided package ID instead of package name
-func (t SendingMessageV1) AddTokenSendWithPackageID(contractID string, packageID string, args AddTokenSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddTokenSend",
+		Choice:     "AddExecutorFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -4714,7 +4940,7 @@ func (t *SetConfig) UnmarshalHex(data string) error {
 
 // SetInboundPoolCCVs is a Record type
 type SetInboundPoolCCVs struct {
-	PoolCCVs []RawInstanceAddress `json:"poolCCVs"`
+	PoolCCVs []mcms.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetInboundPoolCCVs to a map for DAML arguments
@@ -4761,7 +4987,7 @@ func (t *SetInboundPoolCCVs) UnmarshalHex(data string) error {
 
 // SetOutboundPoolCCVs is a Record type
 type SetOutboundPoolCCVs struct {
-	PoolCCVs []RawInstanceAddress `json:"poolCCVs"`
+	PoolCCVs []mcms.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetOutboundPoolCCVs to a map for DAML arguments
@@ -4808,10 +5034,10 @@ func (t *SetOutboundPoolCCVs) UnmarshalHex(data string) error {
 
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
-	IsEnabled        types.BOOL           `json:"isEnabled"`
-	OnRampAddresses  []types.TEXT         `json:"onRampAddresses"`
-	DefaultCCVs      []RawInstanceAddress `json:"defaultCCVs"`
-	LaneMandatedCCVs []RawInstanceAddress `json:"laneMandatedCCVs"`
+	IsEnabled        types.BOOL                `json:"isEnabled"`
+	OnRampAddresses  []types.TEXT              `json:"onRampAddresses"`
+	DefaultCCVs      []mcms.RawInstanceAddress `json:"defaultCCVs"`
+	LaneMandatedCCVs []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
 
 // ToMap converts SourceChainConfig to a map for DAML arguments
@@ -4881,11 +5107,11 @@ func (t *SourceChainConfig) UnmarshalHex(data string) error {
 
 // SourceChainConfigArgs is a Record type
 type SourceChainConfigArgs struct {
-	SourceChainSelector types.NUMERIC        `json:"sourceChainSelector"`
-	IsEnabled           types.BOOL           `json:"isEnabled"`
-	OnRampAddresses     []types.TEXT         `json:"onRampAddresses"`
-	DefaultCCVs         []RawInstanceAddress `json:"defaultCCVs"`
-	LaneMandatedCCVs    []RawInstanceAddress `json:"laneMandatedCCVs"`
+	SourceChainSelector types.NUMERIC             `json:"sourceChainSelector"`
+	IsEnabled           types.BOOL                `json:"isEnabled"`
+	OnRampAddresses     []types.TEXT              `json:"onRampAddresses"`
+	DefaultCCVs         []mcms.RawInstanceAddress `json:"defaultCCVs"`
+	LaneMandatedCCVs    []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
 
 // ToMap converts SourceChainConfigArgs to a map for DAML arguments
@@ -4959,6 +5185,7 @@ func (t *SourceChainConfigArgs) UnmarshalHex(data string) error {
 type TokenReceiveTicket struct {
 	CcipOwner                    types.PARTY                              `json:"ccipOwner"`
 	CcvOwners                    []types.PARTY                            `json:"ccvOwners"`
+	VerifiedCCVs                 []mcms.RawInstanceAddress                `json:"verifiedCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
 	PoolOwner                    types.PARTY                              `json:"poolOwner"`
 	Receiver                     types.PARTY                              `json:"receiver"`
@@ -4966,8 +5193,9 @@ type TokenReceiveTicket struct {
 	InstrumentId                 splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Amount                       types.NUMERIC                            `json:"amount"`
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
-	MessageHash                  types.TEXT                               `json:"messageHash"`
+	MessageId                    types.TEXT                               `json:"messageId"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
+	Finality                     types.INT64                              `json:"finality"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -4997,58 +5225,15 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["poolOwner"] = t.PoolOwner.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["receiver"] = t.Receiver.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenReceiver"] = t.TokenReceiver.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.InstrumentId
-	}()
-
-	if t.Amount != "" {
-		args["amount"] = t.Amount
-	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["sourcePoolData"] = string(t.SourcePoolData)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["messageHash"] = string(t.MessageHash)
-
-	if t.SourceChainSelector != "" {
-		args["sourceChainSelector"] = t.SourceChainSelector
-	}
-
-	return &model.CreateCommand{
-		TemplateID: t.GetTemplateID(),
-		Arguments:  args,
-	}
-}
-
-// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
-func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]any)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["ccipOwner"] = t.CcipOwner.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["ccvOwners"] = func() []any {
-		res := make([]any, 0, len(t.CcvOwners))
-		for _, e := range t.CcvOwners {
-			res = append(res, e.ToMap())
+	args["verifiedCCVs"] = func() []any {
+		res := make([]any, 0, len(t.VerifiedCCVs))
+		for _, e := range t.VerifiedCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -5082,11 +5267,88 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	args["sourcePoolData"] = string(t.SourcePoolData)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["messageHash"] = string(t.MessageHash)
+	args["messageId"] = string(t.MessageId)
 
 	if t.SourceChainSelector != "" {
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["finality"] = int64(t.Finality)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccvOwners"] = func() []any {
+		res := make([]any, 0, len(t.CcvOwners))
+		for _, e := range t.CcvOwners {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["verifiedCCVs"] = func() []any {
+		res := make([]any, 0, len(t.VerifiedCCVs))
+		for _, e := range t.VerifiedCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolOwner"] = t.PoolOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["receiver"] = t.Receiver.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenReceiver"] = t.TokenReceiver.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	if t.Amount != "" {
+		args["amount"] = t.Amount
+	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sourcePoolData"] = string(t.SourcePoolData)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["messageId"] = string(t.MessageId)
+
+	if t.SourceChainSelector != "" {
+		args["sourceChainSelector"] = t.SourceChainSelector
+	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["finality"] = int64(t.Finality)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -5137,6 +5399,397 @@ func (t TokenReceiveTicket) ArchiveWithPackageID(contractID string, packageID st
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
 	}
+}
+
+// TokenReceiveTicketClaimed is a Template type
+type TokenReceiveTicketClaimed struct {
+	CcipOwner             types.PARTY                    `json:"ccipOwner"`
+	CcvOwners             []types.PARTY                  `json:"ccvOwners"`
+	PoolOwner             types.PARTY                    `json:"poolOwner"`
+	Receiver              types.PARTY                    `json:"receiver"`
+	TokenReceiver         types.PARTY                    `json:"tokenReceiver"`
+	TokenReceiveTicketCid types.CONTRACT_ID              `json:"tokenReceiveTicketCid"`
+	Event                 TokenReceiveTicketClaimedEvent `json:"event"`
+}
+
+// GetTemplateID returns the template ID for this template using the package name
+func (t TokenReceiveTicketClaimed) GetTemplateID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Events", "TokenReceiveTicketClaimed")
+}
+
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t TokenReceiveTicketClaimed) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Events", "TokenReceiveTicketClaimed")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t TokenReceiveTicketClaimed) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccvOwners"] = func() []any {
+		res := make([]any, 0, len(t.CcvOwners))
+		for _, e := range t.CcvOwners {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolOwner"] = t.PoolOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["receiver"] = t.Receiver.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenReceiver"] = t.TokenReceiver.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenReceiveTicketCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenReceiveTicketCid
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["event"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Event).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Event
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t TokenReceiveTicketClaimed) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccvOwners"] = func() []any {
+		res := make([]any, 0, len(t.CcvOwners))
+		for _, e := range t.CcvOwners {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolOwner"] = t.PoolOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["receiver"] = t.Receiver.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenReceiver"] = t.TokenReceiver.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenReceiveTicketCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenReceiveTicketCid
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["event"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Event).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Event
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
+func (t TokenReceiveTicketClaimed) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenReceiveTicketClaimed) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenReceiveTicketClaimed to hex string (Canton MCMS format)
+func (t TokenReceiveTicketClaimed) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenReceiveTicketClaimed from hex string (Canton MCMS format)
+func (t *TokenReceiveTicketClaimed) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Choice methods for TokenReceiveTicketClaimed
+
+// Archive exercises the Archive choice on this TokenReceiveTicketClaimed contract
+// This method uses the package name in the template ID
+func (t TokenReceiveTicketClaimed) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Events", "TokenReceiveTicketClaimed"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t TokenReceiveTicketClaimed) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Events", "TokenReceiveTicketClaimed"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// TokenReceiveTicketClaimedEvent is a Record type
+type TokenReceiveTicketClaimedEvent struct {
+	VerifiedCCVs                 []mcms.RawInstanceAddress                `json:"verifiedCCVs"`
+	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
+	InstrumentId                 splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Amount                       types.NUMERIC                            `json:"amount"`
+	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
+	MessageId                    types.TEXT                               `json:"messageId"`
+	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
+	Finality                     types.INT64                              `json:"finality"`
+	Output                       TokenReceiveTicketClaimedOutput          `json:"output"`
+}
+
+// ToMap converts TokenReceiveTicketClaimedEvent to a map for DAML arguments
+func (t TokenReceiveTicketClaimedEvent) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["verifiedCCVs"] = func() []any {
+		res := make([]any, 0, len(t.VerifiedCCVs))
+		for _, e := range t.VerifiedCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
+
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["amount"] = t.Amount
+
+	m["sourcePoolData"] = string(t.SourcePoolData)
+
+	m["messageId"] = string(t.MessageId)
+
+	m["sourceChainSelector"] = t.SourceChainSelector
+
+	m["finality"] = int64(t.Finality)
+
+	m["output"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Output).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Output
+	}()
+
+	return m
+}
+
+func (t TokenReceiveTicketClaimedEvent) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenReceiveTicketClaimedEvent) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenReceiveTicketClaimedEvent to hex string (Canton MCMS format)
+func (t TokenReceiveTicketClaimedEvent) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenReceiveTicketClaimedEvent from hex string (Canton MCMS format)
+func (t *TokenReceiveTicketClaimedEvent) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenReceiveTicketClaimedCompleted is a Record type
+type TokenReceiveTicketClaimedCompleted struct {
+	ReceiverHoldingCids []types.CONTRACT_ID `json:"receiverHoldingCids"`
+}
+
+// ToMap converts TokenReceiveTicketClaimedCompleted to a map for DAML arguments
+func (t TokenReceiveTicketClaimedCompleted) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["receiverHoldingCids"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverHoldingCids))
+		for _, e := range t.ReceiverHoldingCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t TokenReceiveTicketClaimedCompleted) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenReceiveTicketClaimedCompleted) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenReceiveTicketClaimedCompleted to hex string (Canton MCMS format)
+func (t TokenReceiveTicketClaimedCompleted) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenReceiveTicketClaimedCompleted from hex string (Canton MCMS format)
+func (t *TokenReceiveTicketClaimedCompleted) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenReceiveTicketClaimedOutput is a variant/union type
+type TokenReceiveTicketClaimedOutput struct {
+	TokenReceiveTicketClaimedPending   *TokenReceiveTicketClaimedPending   `json:"TokenReceiveTicketClaimed_Pending,omitempty"`
+	TokenReceiveTicketClaimedCompleted *TokenReceiveTicketClaimedCompleted `json:"TokenReceiveTicketClaimed_Completed,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for TokenReceiveTicketClaimedOutput
+func (v TokenReceiveTicketClaimedOutput) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(v)
+}
+
+// UnmarshalJSON implements custom JSON unmarshalling for TokenReceiveTicketClaimedOutput
+func (v *TokenReceiveTicketClaimedOutput) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes TokenReceiveTicketClaimedOutput to hex string (Canton MCMS format)
+func (v TokenReceiveTicketClaimedOutput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes TokenReceiveTicketClaimedOutput from hex string (Canton MCMS format)
+func (v *TokenReceiveTicketClaimedOutput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
+}
+
+// GetVariantTag implements types.VARIANT interface
+func (v TokenReceiveTicketClaimedOutput) GetVariantTag() string {
+
+	if v.TokenReceiveTicketClaimedPending != nil {
+		return "TokenReceiveTicketClaimed_Pending"
+	}
+
+	if v.TokenReceiveTicketClaimedCompleted != nil {
+		return "TokenReceiveTicketClaimed_Completed"
+	}
+
+	return ""
+}
+
+// GetVariantValue implements types.VARIANT interface
+func (v TokenReceiveTicketClaimedOutput) GetVariantValue() any {
+
+	if v.TokenReceiveTicketClaimedPending != nil {
+		return v.TokenReceiveTicketClaimedPending
+	}
+
+	if v.TokenReceiveTicketClaimedCompleted != nil {
+		return v.TokenReceiveTicketClaimedCompleted
+	}
+
+	return nil
+}
+
+var _ types.VARIANT = (*TokenReceiveTicketClaimedOutput)(nil)
+
+// TokenReceiveTicketClaimedPending is a Record type
+type TokenReceiveTicketClaimedPending struct {
+	TransferInstructionCid types.CONTRACT_ID `json:"transferInstructionCid"`
+}
+
+// ToMap converts TokenReceiveTicketClaimedPending to a map for DAML arguments
+func (t TokenReceiveTicketClaimedPending) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["transferInstructionCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TransferInstructionCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TransferInstructionCid
+	}()
+
+	return m
+}
+
+func (t TokenReceiveTicketClaimedPending) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenReceiveTicketClaimedPending) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenReceiveTicketClaimedPending to hex string (Canton MCMS format)
+func (t TokenReceiveTicketClaimedPending) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenReceiveTicketClaimedPending from hex string (Canton MCMS format)
+func (t *TokenReceiveTicketClaimedPending) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenSendData is a Record type
@@ -5376,16 +6029,16 @@ type MCMSEncoder interface {
 	AddCCVFeeMCMSParams(args AddCCVFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddCCVVerification(args AddCCVVerification) (*bind.EncodedChoice, error)
 	AddCCVVerificationMCMSParams(args AddCCVVerificationMCMSParams) (*bind.EncodedChoice, error)
-	AddExecutorWithFee(args AddExecutorWithFee) (*bind.EncodedChoice, error)
-	AddExecutorWithFeeMCMSParams(args AddExecutorWithFeeMCMSParams) (*bind.EncodedChoice, error)
+	AddExecutorFee(args AddExecutorFee) (*bind.EncodedChoice, error)
+	AddExecutorFeeMCMSParams(args AddExecutorFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error)
-	AddTokenSendMCMSParams(args AddTokenSendMCMSParams) (*bind.EncodedChoice, error)
 	AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, error)
-	AddTokenSendFeeMCMSParams(args AddTokenSendFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error)
 	AddVerifierDataMCMSParams(args AddVerifierDataMCMSParams) (*bind.EncodedChoice, error)
 	ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) (*bind.EncodedChoice, error)
 	ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error)
+	BuildMessage(args BuildMessage) (*bind.EncodedChoice, error)
+	BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
 	CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.EncodedChoice, error)
 	ConsumeCapacity(args ConsumeCapacity) (*bind.EncodedChoice, error)
@@ -5450,14 +6103,14 @@ func (e *encoder) AddCCVVerificationMCMSParams(args AddCCVVerificationMCMSParams
 	return e.EncodeChoiceArgs("AddCCVVerification", args)
 }
 
-// AddExecutorWithFee encodes parameters for the AddExecutorWithFee choice.
-func (e *encoder) AddExecutorWithFee(args AddExecutorWithFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddExecutorWithFee", args)
+// AddExecutorFee encodes parameters for the AddExecutorFee choice.
+func (e *encoder) AddExecutorFee(args AddExecutorFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddExecutorFee", args)
 }
 
-// AddExecutorWithFeeMCMSParams encodes MCMS parameters (without Caller) for the AddExecutorWithFee choice.
-func (e *encoder) AddExecutorWithFeeMCMSParams(args AddExecutorWithFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddExecutorWithFee", args)
+// AddExecutorFeeMCMSParams encodes MCMS parameters (without Caller) for the AddExecutorFee choice.
+func (e *encoder) AddExecutorFeeMCMSParams(args AddExecutorFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddExecutorFee", args)
 }
 
 // AddTokenSend encodes parameters for the AddTokenSend choice.
@@ -5465,18 +6118,8 @@ func (e *encoder) AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddTokenSend", args)
 }
 
-// AddTokenSendMCMSParams encodes MCMS parameters (without Caller) for the AddTokenSend choice.
-func (e *encoder) AddTokenSendMCMSParams(args AddTokenSendMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddTokenSend", args)
-}
-
 // AddTokenSendFee encodes parameters for the AddTokenSendFee choice.
 func (e *encoder) AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddTokenSendFee", args)
-}
-
-// AddTokenSendFeeMCMSParams encodes MCMS parameters (without Caller) for the AddTokenSendFee choice.
-func (e *encoder) AddTokenSendFeeMCMSParams(args AddTokenSendFeeMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddTokenSendFee", args)
 }
 
@@ -5498,6 +6141,16 @@ func (e *encoder) ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) 
 // ApplySourceChainConfigUpdates encodes parameters for the ApplySourceChainConfigUpdates choice.
 func (e *encoder) ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplySourceChainConfigUpdates", args)
+}
+
+// BuildMessage encodes parameters for the BuildMessage choice.
+func (e *encoder) BuildMessage(args BuildMessage) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("BuildMessage", args)
+}
+
+// BuildMessageMCMSParams encodes MCMS parameters (without Caller) for the BuildMessage choice.
+func (e *encoder) BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("BuildMessage", args)
 }
 
 // CancelExecute encodes parameters for the CancelExecute choice.

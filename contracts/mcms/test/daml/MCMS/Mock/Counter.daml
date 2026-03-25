@@ -1,8 +1,11 @@
 module MCMS.Mock.Counter where
 
 import DA.Map qualified as Map
-import DA.Text qualified as T
+import DA.Crypto.Text (byteCount)
 import MCMS.MCMSReceiver
+import MCMS.Codec (decodeInt64At)
+import MCMS.RawInstanceAddress (assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 -- ===========================================================================
 -- COUNTER CONTRACT (Implements MCMSReceiver)
@@ -23,6 +26,7 @@ template Counter
     value : Int                                -- Current counter value
   where
     signatory owner
+    ensure assertValidInstanceId instanceId
 
     -- Implement MCMSReceiver interface
     interface instance MCMSReceiver for Counter where
@@ -32,7 +36,7 @@ template Counter
 
       mcmsEntrypoint functionName operationData contractIds = do
         -- Calculate full instanceAddress for map lookup
-        let instanceAddress = makeInstanceAddress instanceId owner
+        let instanceAddress = RawInstanceAddress.makeText instanceId owner
 
         -- Look up self CID from map using full address
         selfCid <- case Map.lookup instanceAddress contractIds of
@@ -45,11 +49,13 @@ template Counter
             pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
 
           "SetValue" -> do
-            case T.parseInt operationData of
-              Some newValue -> do
+            case decodeInt64At operationData 0 of
+              None -> abort $ "counter: failed to decode SetValue int64: " <> operationData
+              Some (newValue, finalOffset) -> do
+                assertMsg "counter: trailing bytes in SetValue operationData" $
+                  finalOffset == byteCount operationData
                 newCid <- exercise selfCid (SetValue newValue)
                 pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
-              None -> abort $ "counter: invalid integer value: " <> operationData
 
           "Reset" -> do
             newCid <- exercise selfCid Reset
@@ -95,5 +101,5 @@ template Counter
       with
         viewer : Party
       controller viewer
-      do pure (makeInstanceAddress instanceId owner)
+      do pure (RawInstanceAddress.makeText instanceId owner)
 

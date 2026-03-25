@@ -27,11 +27,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
+	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -229,10 +231,19 @@ func TestCCIPSend(t *testing.T) {
 						LaneMandatedInboundCCVs:  nil,
 						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedOutboundCCVs: nil,
-						DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // random executor
+						DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // TODO: replace with actual executor, currently deployed down below and not used yet
 						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
-							NetworkFeeUSDCents:      0,
-							DefaultTokenFeeUSDCents: 0,
+							IsEnabled:                   true,
+							MaxDataBytes:                50000,
+							MaxPerMsgGasLimit:           4000000,
+							DestGasOverhead:             300000,
+							DestGasPerPayloadByteBase:   16,
+							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+							DefaultTxGasLimit:           200000,
+							LinkFeeMultiplierPercent:    90,
+							DefaultTokenFeeUSDCents:     10,
+							DefaultTokenDestGasOverhead: 34000,
+							NetworkFeeUSDCents:          25,
 						},
 						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
 						AddressBytesLength:      20,
@@ -286,8 +297,6 @@ func TestCCIPSend(t *testing.T) {
 
 	// Configure FeeToken: Add FeeToken to FeeQuoter
 
-	// ApplyFeeTokenUpdates: Add the fee token with Canton E8 premium multiplier (1.0x)
-	premiumMultiplier := "100000000"
 	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -300,8 +309,7 @@ func TestCCIPSend(t *testing.T) {
 						FeeTokensToRemove: []splice_api_token_holding_v1.InstrumentId{},
 						FeeTokensToAdd: []feequoter.FeeTokenArgs{
 							{
-								InstrumentId:      feeTokenInstrumentId,
-								PremiumMultiplier: types.NUMERIC(premiumMultiplier),
+								InstrumentId: feeTokenInstrumentId,
 							},
 						},
 					}),
@@ -347,7 +355,12 @@ func TestCCIPSend(t *testing.T) {
 									UsdPerToken:  types.NUMERIC("1500000000"),
 								},
 							},
-							GasPriceUpdates: []feequoter.GasPriceUpdate{},
+							GasPriceUpdates: []feequoter.GasPriceUpdate{
+								{
+									DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+									UsdPerUnitGas:     types.NUMERIC("38"),
+								},
+							},
 						},
 						Caller: types.PARTY(partyCCIP),
 					}),
@@ -359,6 +372,46 @@ func TestCCIPSend(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to update prices")
 	t.Logf("Updated FeeToken price to $%s per token", usdPerToken)
+
+	// Apply FeeQuoter dest chain config (needed by OnRamp.FinalizeFeeFromRouter)
+	disclosedFeeQuoterForConfig, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter",
+	})
+	require.NoError(t, err)
+	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
+					ContractId: disclosedFeeQuoterForConfig.ContractId,
+					Choice:     "ApplyDestChainConfigUpdates",
+					ChoiceArgument: ledger.MapToValue(feequoter.ApplyDestChainConfigUpdates2{
+						DestChainConfigArgs: []feequoter.DestChainConfigArgs2{
+							{
+								DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+								DestChainConfig: feequoter.DestChainConfig2{
+									IsEnabled:                   true,
+									MaxDataBytes:                50000,
+									MaxPerMsgGasLimit:           4000000,
+									DestGasOverhead:             300000,
+									DestGasPerPayloadByteBase:   16,
+									DefaultTxGasLimit:           200000,
+									LinkFeeMultiplierPercent:    types.NUMERIC("90"),
+									DefaultTokenFeeUSD:          types.NUMERIC("10"),
+									DefaultTokenDestGasOverhead: 34000,
+								},
+							},
+						},
+					}),
+				}},
+			}},
+			ActAs:              []string{partyCCIP},
+			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFeeQuoterForConfig},
+		},
+	})
+	require.NoError(t, err, "failed to apply FeeQuoter dest chain config")
+	t.Log("Applied FeeQuoter dest chain config")
 
 	// Create PerPartyRouter for sender
 	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
@@ -376,6 +429,7 @@ func TestCCIPSend(t *testing.T) {
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partySender),
+						InstanceId: "router-sender",
 					}),
 				}},
 			}},
@@ -511,10 +565,10 @@ func TestCCIPSend(t *testing.T) {
 
 	t.Logf("partySender=%q", partySender)
 
-	// Mint Amulet tokens to sender so they can pay the fee
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100.00")
+	// Mint 100 whole AMT in local 1e8 units so the sender can cover non-zero fees.
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
-	t.Logf("Minted 100 Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
+	t.Logf("Minted 100 whole Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -618,29 +672,40 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	sendArgs := ccipsender.Send{
-		Context:           sendContext,
-		RouterCid:         types.CONTRACT_ID(routerCid),
-		DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Receiver:          types.TEXT(receiverHex),
-		Payload:           types.TEXT(testPayloadHex),
-		ExtraArgs: ccipsender.CantonExtraArgsV1{
-			GasLimit:           types.INT64(100000),
-			BlockConfirmations: nil,
-			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
-			ExecutorCid:        types.CONTRACT_ID(executorCid),
-			ExecutorArgs:       nil,
-			TokenReceiver:      nil,
-			TokenArgs:          types.TEXT(""),
+		Context:                  sendContext,
+		RouterCid:                types.CONTRACT_ID(routerCid),
+		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		Message: ccipclient.Canton2AnyMessage{
+			Receiver: types.TEXT(receiverHex),
+			Payload:  types.TEXT(testPayloadHex),
+			FeeToken: ccipclient.FeeTokenInput{
+				Token:           feeTokenInstrumentId,
+				TokenInput:      feeTokenInput,
+				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			},
+			ExtraArgs: ccipclient.ExtraArgs{
+				V3: &ccipclient.GenericExtraArgsV3{
+					GasLimit:           100_000,
+					BlockConfirmations: 0,
+					Ccvs: []mcmsbindings.RawInstanceAddress{
+						{Unpack: types.TEXT(committeeVerifierRawAddr.String())},
+					},
+					Executor: &ccipclient.ExecutorInput{
+						ExecutorCid:  types.CONTRACT_ID(executorCid),
+						ExecutorArgs: types.TEXT(""),
+					},
+					TokenReceiver: types.TEXT(""),
+					TokenArgs:     types.TEXT(""),
+				},
+			},
 		},
-		FeeToken:            feeTokenInstrumentId,
-		FeeTokenInput:       feeTokenInput,
-		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-		TokenTransfer:       nil,
-		CcvSendInputs: []ccipsender.CCVSendInput{{
-			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-			VerifierArgs:    types.TEXT(""),
-			CcvExtraContext: common.CCIPContext{},
-		}},
+		Ccvs: []ccipclient.CCVSendInput{
+			{
+				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+				VerifierArgs:    types.TEXT(""),
+				CcvExtraContext: common.CCIPContext{},
+			},
+		},
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)

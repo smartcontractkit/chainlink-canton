@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "bfc3941392cee26656776b09ed4410d143e7c6cbde4a8a20629c226b7caf3afe"
+	PackageID   = "1ec44d5b8e60ee8a12ba0ce9910fde4cdbbf83ce43b5c2da0de7018546ae0bf6"
 	SDKVersion  = "3.4.10"
 )
 
@@ -66,11 +66,12 @@ func argsToMap(args any) map[string]any {
 
 // CCIPFactory is a Template type
 type CCIPFactory struct {
-	InstanceId        types.TEXT   `json:"instanceId"`
-	Owner             types.PARTY  `json:"owner"`
-	McmsParty         types.PARTY  `json:"mcmsParty"`
-	UsedInstanceIds   types.GENMAP `json:"usedInstanceIds"`
-	DeployedContracts types.GENMAP `json:"deployedContracts"`
+	InstanceId                    types.TEXT   `json:"instanceId"`
+	Owner                         types.PARTY  `json:"owner"`
+	McmsParty                     types.PARTY  `json:"mcmsParty"`
+	UsedInstanceIds               types.GENMAP `json:"usedInstanceIds"`
+	DeployedContracts             types.GENMAP `json:"deployedContracts"`
+	PerPartyRouterFactoryDeployed types.BOOL   `json:"perPartyRouterFactoryDeployed"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -112,6 +113,9 @@ func (t CCIPFactory) CreateCommand() *model.CreateCommand {
 		return map[string]any{"_type": "genmap", "value": t.DeployedContracts}
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["perPartyRouterFactoryDeployed"] = bool(t.PerPartyRouterFactoryDeployed)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -146,6 +150,9 @@ func (t CCIPFactory) CreateCommandWithPackageID(packageID string) *model.CreateC
 		}
 		return map[string]any{"_type": "genmap", "value": t.DeployedContracts}
 	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["perPartyRouterFactoryDeployed"] = bool(t.PerPartyRouterFactoryDeployed)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -561,9 +568,12 @@ func (t *DeployCCIPReceiver) UnmarshalHex(data string) error {
 
 // DeployCCIPReceiverParams is a Record type
 type DeployCCIPReceiverParams struct {
-	InstanceId   types.TEXT                  `json:"instanceId"`
-	Owner        types.PARTY                 `json:"owner"`
-	RequiredCCVs []common.RawInstanceAddress `json:"requiredCCVs"`
+	InstanceId            types.TEXT                `json:"instanceId"`
+	Owner                 types.PARTY               `json:"owner"`
+	RequiredCCVs          []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs          []mcms.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold     types.INT64               `json:"optionalThreshold"`
+	MinBlockConfirmations types.INT64               `json:"minBlockConfirmations"`
 }
 
 // ToMap converts DeployCCIPReceiverParams to a map for DAML arguments
@@ -586,6 +596,23 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["optionalThreshold"] = int64(t.OptionalThreshold)
+
+	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
 
 	return m
 }
@@ -737,16 +764,16 @@ func (t *DeployCommitteeVerifier) UnmarshalHex(data string) error {
 
 // DeployCommitteeVerifierParams is a Record type
 type DeployCommitteeVerifierParams struct {
-	InstanceId                   types.TEXT                `json:"instanceId"`
-	Owner                        types.PARTY               `json:"owner"`
-	CcipOwner                    types.PARTY               `json:"ccipOwner"`
-	VersionTag                   types.TEXT                `json:"versionTag"`
-	AllowListAdmin               *types.PARTY              `json:"allowListAdmin" hex:"optional"`
-	MessageSentObservers         []types.PARTY             `json:"messageSentObservers"`
-	RmnRemote                    common.RawInstanceAddress `json:"rmnRemote"`
-	StorageLocations             []types.TEXT              `json:"storageLocations"`
-	StorageLocationsAdmin        types.PARTY               `json:"storageLocationsAdmin"`
-	PendingStorageLocationsAdmin types.PARTY               `json:"pendingStorageLocationsAdmin"`
+	InstanceId                   types.TEXT              `json:"instanceId"`
+	Owner                        types.PARTY             `json:"owner"`
+	CcipOwner                    types.PARTY             `json:"ccipOwner"`
+	VersionTag                   types.TEXT              `json:"versionTag"`
+	AllowListAdmin               *types.PARTY            `json:"allowListAdmin" hex:"optional"`
+	MessageSentObservers         []types.PARTY           `json:"messageSentObservers"`
+	RmnRemote                    mcms.RawInstanceAddress `json:"rmnRemote"`
+	StorageLocations             []types.TEXT            `json:"storageLocations"`
+	StorageLocationsAdmin        types.PARTY             `json:"storageLocationsAdmin"`
+	PendingStorageLocationsAdmin types.PARTY             `json:"pendingStorageLocationsAdmin"`
 }
 
 // ToMap converts DeployCommitteeVerifierParams to a map for DAML arguments
@@ -871,7 +898,6 @@ func (t *DeployFeeQuoter) UnmarshalHex(data string) error {
 type DeployFeeQuoterParams struct {
 	InstanceId            types.TEXT                               `json:"instanceId"`
 	LinkTokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
-	MaxFeeJuelsPerMsg     types.NUMERIC                            `json:"maxFeeJuelsPerMsg"`
 }
 
 // ToMap converts DeployFeeQuoterParams to a map for DAML arguments
@@ -887,8 +913,6 @@ func (t DeployFeeQuoterParams) ToMap() map[string]any {
 		}
 		return t.LinkTokenInstrumentId
 	}()
-
-	m["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
 
 	return m
 }
@@ -1041,13 +1065,14 @@ func (t *DeployLockReleaseTokenPool) UnmarshalHex(data string) error {
 // DeployLockReleaseTokenPoolParams is a Record type
 type DeployLockReleaseTokenPoolParams struct {
 	InstanceId         types.TEXT                               `json:"instanceId"`
-	CcipOwner          types.PARTY                              `json:"ccipOwner"`
 	PoolOwner          types.PARTY                              `json:"poolOwner"`
+	CcipOwner          types.PARTY                              `json:"ccipOwner"`
 	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Decimals           types.INT64                              `json:"decimals"`
-	TokenAdminRegistry common.RawInstanceAddress                `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress                `json:"feeQuoter"`
-	RmnRemote          common.RawInstanceAddress                `json:"rmnRemote"`
+	RateLimitAdmin     *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
+	TokenAdminRegistry mcms.RawInstanceAddress                  `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress                  `json:"feeQuoter"`
+	RmnRemote          mcms.RawInstanceAddress                  `json:"rmnRemote"`
 }
 
 // ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments
@@ -1056,9 +1081,9 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 
 	m["instanceId"] = string(t.InstanceId)
 
-	m["ccipOwner"] = t.CcipOwner.ToMap()
-
 	m["poolOwner"] = t.PoolOwner.ToMap()
+
+	m["ccipOwner"] = t.CcipOwner.ToMap()
 
 	m["instrumentId"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1069,6 +1094,17 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	}()
 
 	m["decimals"] = int64(t.Decimals)
+
+	if t.RateLimitAdmin != nil {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.RateLimitAdmin).ToMap(),
+		}
+	} else {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["tokenAdminRegistry"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1163,10 +1199,10 @@ func (t *DeployOffRamp) UnmarshalHex(data string) error {
 
 // DeployOffRampParams is a Record type
 type DeployOffRampParams struct {
-	InstanceId         types.TEXT                `json:"instanceId"`
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
+	InstanceId         types.TEXT              `json:"instanceId"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
 }
 
 // ToMap converts DeployOffRampParams to a map for DAML arguments
@@ -1268,12 +1304,13 @@ func (t *DeployOnRamp) UnmarshalHex(data string) error {
 
 // DeployOnRampParams is a Record type
 type DeployOnRampParams struct {
-	InstanceId         types.TEXT                `json:"instanceId"`
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
+	InstanceId         types.TEXT              `json:"instanceId"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	CcvRegistry        mcms.RawInstanceAddress `json:"ccvRegistry"`
+	MaxUSDCentsPerMsg  types.NUMERIC           `json:"maxUSDCentsPerMsg"`
 }
 
 // ToMap converts DeployOnRampParams to a map for DAML arguments
@@ -1321,6 +1358,8 @@ func (t DeployOnRampParams) ToMap() map[string]any {
 		}
 		return t.CcvRegistry
 	}()
+
+	m["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
 
 	return m
 }
@@ -1391,13 +1430,13 @@ func (t *DeployPerPartyRouterFactory) UnmarshalHex(data string) error {
 
 // DeployPerPartyRouterFactoryParams is a Record type
 type DeployPerPartyRouterFactoryParams struct {
-	InstanceId         types.TEXT                `json:"instanceId"`
-	OnRamp             common.RawInstanceAddress `json:"onRamp"`
-	OffRamp            common.RawInstanceAddress `json:"offRamp"`
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+	InstanceId         types.TEXT              `json:"instanceId"`
+	OnRamp             mcms.RawInstanceAddress `json:"onRamp"`
+	OffRamp            mcms.RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
 }
 
 // ToMap converts DeployPerPartyRouterFactoryParams to a map for DAML arguments
@@ -1826,11 +1865,12 @@ func (t *DeployTokenAdminRegistryParams) UnmarshalHex(data string) error {
 
 // FactoryState is a Record type
 type FactoryState struct {
-	InstanceId        types.TEXT   `json:"instanceId"`
-	Owner             types.PARTY  `json:"owner"`
-	McmsParty         types.PARTY  `json:"mcmsParty"`
-	UsedInstanceIds   types.GENMAP `json:"usedInstanceIds"`
-	DeployedContracts types.GENMAP `json:"deployedContracts"`
+	InstanceId                    types.TEXT   `json:"instanceId"`
+	Owner                         types.PARTY  `json:"owner"`
+	McmsParty                     types.PARTY  `json:"mcmsParty"`
+	UsedInstanceIds               types.GENMAP `json:"usedInstanceIds"`
+	DeployedContracts             types.GENMAP `json:"deployedContracts"`
+	PerPartyRouterFactoryDeployed types.BOOL   `json:"perPartyRouterFactoryDeployed"`
 }
 
 // ToMap converts FactoryState to a map for DAML arguments
@@ -1856,6 +1896,8 @@ func (t FactoryState) ToMap() map[string]any {
 		}
 		return map[string]any{"_type": "genmap", "value": t.DeployedContracts}
 	}()
+
+	m["perPartyRouterFactoryDeployed"] = bool(t.PerPartyRouterFactoryDeployed)
 
 	return m
 }

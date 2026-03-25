@@ -82,6 +82,19 @@ type TimelockCall struct {
 // ZeroHash represents "no predecessor" in timelock operations
 const ZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
+var (
+	// opLeafDomainSeparator = keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_CANTON")
+	opLeafDomainSeparator = func() string {
+		data := []byte("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_CANTON")
+		return hex.EncodeToString(crypto.Keccak256(data))
+	}()
+	// metadataLeafDomainSeparator = keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_CANTON")
+	metadataLeafDomainSeparator = func() string {
+		data := []byte("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_CANTON")
+		return hex.EncodeToString(crypto.Keccak256(data))
+	}()
+)
+
 // ===========================================================================
 // TYPE CONVERSION HELPERS (local <-> generated mcms bindings)
 // ===========================================================================
@@ -331,13 +344,23 @@ func TimeToHex(t time.Time) string {
 }
 
 // HashOpLeaf hashes an operation to get its Merkle leaf
-// Matches Canton's hashOpLeafNative
+// Matches Canton's hashOpLeafNative with domain separator and length-prefixed encoding for variable-length fields
 func HashOpLeaf(op MCMSOp) string {
-	encoded := PadLeft32(IntToHex(op.ChainId)) +
-		AsciiToHex(op.MultisigId) +
+	multisigIdHex := TextToHex(op.MultisigId)
+	targetAddressHex := TextToHex(op.TargetInstanceAddress)
+	functionNameHex := TextToHex(op.FunctionName)
+
+	// Domain separator followed by length prefixes (byte count for all fields)
+	encoded := opLeafDomainSeparator +
+		PadLeft32(IntToHex(op.ChainId)) +
+		PadLeft32(IntToHex(len(op.MultisigId))) + // Length prefix for multisigId (UTF-8 byte count)
+		multisigIdHex +
 		PadLeft32(IntToHex(op.Nonce)) +
-		AsciiToHex(op.TargetInstanceAddress) +
-		AsciiToHex(op.FunctionName) +
+		PadLeft32(IntToHex(len(op.TargetInstanceAddress))) + // Length prefix for targetInstanceAddress (UTF-8 byte count)
+		targetAddressHex +
+		PadLeft32(IntToHex(len(op.FunctionName))) + // Length prefix for functionName (UTF-8 byte count)
+		functionNameHex +
+		PadLeft32(IntToHex(len(op.OperationData)/2)) + // Length prefix for operationData (byte count)
 		op.OperationData
 
 	data, _ := hex.DecodeString(encoded)
@@ -346,15 +369,20 @@ func HashOpLeaf(op MCMSOp) string {
 }
 
 // HashMetadataLeaf hashes metadata to get its Merkle leaf
-// Matches Canton's hashMetadataLeafNative
+// Matches Canton's hashMetadataLeafNative with domain separator and length-prefixed encoding
 func HashMetadataLeaf(meta MCMSRootMetadata) string {
 	overrideFlag := "00"
 	if meta.OverridePreviousRoot {
 		overrideFlag = "01"
 	}
 
-	encoded := PadLeft32(IntToHex(meta.ChainId)) +
-		AsciiToHex(meta.MultisigId) +
+	multisigIdHex := TextToHex(meta.MultisigId)
+
+	// Domain separator followed by length prefixes (byte count for all fields)
+	encoded := metadataLeafDomainSeparator +
+		PadLeft32(IntToHex(meta.ChainId)) +
+		PadLeft32(IntToHex(len(meta.MultisigId))) + // Length prefix for multisigId (UTF-8 byte count)
+		multisigIdHex +
 		PadLeft32(IntToHex(meta.PreOpCount)) +
 		PadLeft32(IntToHex(meta.PostOpCount)) +
 		overrideFlag
@@ -365,19 +393,34 @@ func HashMetadataLeaf(meta MCMSRootMetadata) string {
 }
 
 // HashTimelockOpId computes the operation ID for timelock operations
-// Matches Canton's hashTimelockOpId: keccak256(encodedCalls || predecessor || salt)
+// Matches Canton's hashTimelockOpId with length-prefixed encoding to prevent collision attacks
 // Note: predecessor and salt are BytesHex (already hex-encoded), used directly without conversion.
 func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
-	// Encode calls
 	var sb strings.Builder
+
+	// Length prefix for calls array (32-byte padded)
+	sb.WriteString(PadLeft32(IntToHex(len(calls))))
+
+	// Encode each call with length prefixes
 	for _, call := range calls {
-		sb.WriteString(AsciiToHex(call.TargetInstanceAddress))
-		sb.WriteString(AsciiToHex(call.FunctionName))
-		sb.WriteString(EncodeOperationDataForHash(call.OperationData))
+		// Length prefix for targetInstanceAddress (UTF-8 byte count)
+		sb.WriteString(PadLeft32(IntToHex(len(call.TargetInstanceAddress))))
+		sb.WriteString(TextToHex(call.TargetInstanceAddress))
+		// Length prefix for functionName (UTF-8 byte count)
+		sb.WriteString(PadLeft32(IntToHex(len(call.FunctionName))))
+		sb.WriteString(TextToHex(call.FunctionName))
+		// Length prefix for operationData (byte count = hex length / 2)
+		opData := EncodeOperationDataForHash(call.OperationData)
+		sb.WriteString(PadLeft32(IntToHex(len(opData) / 2)))
+		sb.WriteString(opData)
 	}
 
-	// Combine with predecessor and salt (already BytesHex, no conversion needed)
+	// Length prefix for predecessor (byte count = hex length / 2)
+	sb.WriteString(PadLeft32(IntToHex(len(predecessor) / 2)))
 	sb.WriteString(predecessor)
+
+	// Length prefix for salt (byte count = hex length / 2)
+	sb.WriteString(PadLeft32(IntToHex(len(salt) / 2)))
 	sb.WriteString(salt)
 
 	data, err := hex.DecodeString(sb.String())
@@ -390,13 +433,13 @@ func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
 
 // EncodeOperationDataForHash matches the on-chain MCMS.Crypto.encodeOperationData:
 // - If operationData is valid hex (even length, hex digits only), treat it as raw bytes (already hex)
-// - Otherwise, treat it as ASCII and hex-encode it
+// - Otherwise, treat it as text and hex-encode it (UTF-8)
 func EncodeOperationDataForHash(operationData string) string {
 	if isValidHex(operationData) {
 		return operationData
 	}
 
-	return AsciiToHex(operationData)
+	return TextToHex(operationData)
 }
 
 func isValidHex(s string) bool {
@@ -585,21 +628,17 @@ func IntToHex(n int) string {
 	return fmt.Sprintf("%x", n)
 }
 
-// AsciiToHex converts ASCII string to hex
-func AsciiToHex(s string) string {
+// TextToHex converts a string to hex via UTF-8 encoding.
+// Matches Daml's DA.Crypto.Text.toHex function.
+func TextToHex(s string) string {
 	return hex.EncodeToString([]byte(s))
 }
 
 // EncodeMinDelay encodes a delay value (in seconds) for UpdateMinDelay operationData.
-// Daml's parseInt expects a decimal string, but BytesHex requires valid hex (even length).
-// This pads the number with a leading zero if needed: 1 → "01", 120 → "0120"
+// Uses 8-byte big-endian encoding (16 hex chars)
+// Example: 120 → "0000000000000078"
 func EncodeMinDelay(seconds int) string {
-	s := fmt.Sprintf("%d", seconds)
-	if len(s)%2 != 0 {
-		s = "0" + s
-	}
-
-	return s
+	return fmt.Sprintf("%016x", seconds)
 }
 
 // ===========================================================================

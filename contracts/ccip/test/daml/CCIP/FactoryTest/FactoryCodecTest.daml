@@ -27,8 +27,8 @@ import CCIP.Codec
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.Factory
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
 
 -- ===========================================================================
@@ -44,7 +44,6 @@ encodeDeployFeeQuoterParams : DeployFeeQuoterParams -> BytesHex
 encodeDeployFeeQuoterParams params =
   encodeText params.instanceId
   <> encodeInstrumentId params.linkTokenInstrumentId
-  <> encodeNumeric0 params.maxFeeJuelsPerMsg
 
 encodeDeployTokenAdminRegistryParams : DeployTokenAdminRegistryParams -> BytesHex
 encodeDeployTokenAdminRegistryParams params =
@@ -58,6 +57,7 @@ encodeDeployOnRampParams params =
   <> encodeRawInstanceAddress params.tokenAdminRegistry
   <> encodeRawInstanceAddress params.feeQuoter
   <> encodeRawInstanceAddress params.ccvRegistry
+  <> encodeNumeric0 params.maxUSDCentsPerMsg
 
 encodeDeployOffRampParams : DeployOffRampParams -> BytesHex
 encodeDeployOffRampParams params =
@@ -100,10 +100,11 @@ encodeDeployCommitteeVerifierParams params =
 encodeDeployLockReleaseTokenPoolParams : DeployLockReleaseTokenPoolParams -> BytesHex
 encodeDeployLockReleaseTokenPoolParams params =
   encodeText params.instanceId
-  <> encodeParty params.ccipOwner
   <> encodeParty params.poolOwner
+  <> encodeParty params.ccipOwner
   <> encodeInstrumentId params.instrumentId
   <> fromSome (encodeInt64 params.decimals)
+  <> encodeOptional params.rateLimitAdmin encodeParty
   <> encodeRawInstanceAddress params.tokenAdminRegistry
   <> encodeRawInstanceAddress params.feeQuoter
   <> encodeRawInstanceAddress params.rmnRemote
@@ -138,6 +139,9 @@ encodeDeployCCIPReceiverParams params =
   encodeText params.instanceId
   <> encodeParty params.owner
   <> encodeRawInstanceAddressList params.requiredCCVs
+  <> encodeRawInstanceAddressList params.optionalCCVs
+  <> fromSome (encodeInt64 params.optionalThreshold)
+  <> fromSome (encodeInt64 params.minBlockConfirmations)
 
 -- ===========================================================================
 -- ROUND-TRIP TESTS
@@ -180,7 +184,6 @@ testDecodeDeployFeeQuoterParams = script do
   let params = DeployFeeQuoterParams with
         instanceId = "fq-1"
         linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-        maxFeeJuelsPerMsg = 1000000000000000000.0
       encoded = encodeDeployFeeQuoterParams params
 
   case decodeDeployFeeQuoterParams encoded of
@@ -188,7 +191,6 @@ testDecodeDeployFeeQuoterParams = script do
     Some decoded -> do
       decoded.instanceId === params.instanceId
       decoded.linkTokenInstrumentId === params.linkTokenInstrumentId
-      decoded.maxFeeJuelsPerMsg === params.maxFeeJuelsPerMsg
 
   pure ()
 
@@ -213,6 +215,7 @@ testDecodeDeployOnRampParams = script do
         tokenAdminRegistry = RawInstanceAddress "tar@owner"
         feeQuoter = RawInstanceAddress "fq@owner"
         ccvRegistry = RawInstanceAddress "ccv@owner"
+        maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 
   case decodeDeployOnRampParams encoded of
@@ -224,6 +227,7 @@ testDecodeDeployOnRampParams = script do
       decoded.tokenAdminRegistry === params.tokenAdminRegistry
       decoded.feeQuoter === params.feeQuoter
       decoded.ccvRegistry === params.ccvRegistry
+      decoded.maxUSDCentsPerMsg === params.maxUSDCentsPerMsg
 
   pure ()
 
@@ -387,34 +391,37 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
 
 testDecodeDeployLockReleaseTokenPoolParams : Script ()
 testDecodeDeployLockReleaseTokenPoolParams = script do
-  ccipOwner <- allocateParty "ccip_owner"
   poolOwner <- allocateParty "pool_owner"
+  ccipOwner <- allocateParty "ccip_owner"
   tokenAdmin <- allocateParty "token_admin"
+  rateLimitAdmin <- allocateParty "rate_limit_admin"
   feeOwner <- allocateParty "fee_owner"
   rmnOwner <- allocateParty "rmn_owner"
 
   let params = DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
-        ccipOwner
         poolOwner
+        ccipOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
         decimals = 6
-        tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" tokenAdmin
-        feeQuoter = CCIP.RawInstanceAddress.make "fq-1" feeOwner
-        rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" rmnOwner
+        rateLimitAdmin = Some rateLimitAdmin
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   case decodeDeployLockReleaseTokenPoolParams encoded of
     None -> abort "Failed to decode DeployLockReleaseTokenPoolParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
-      decoded.ccipOwner === params.ccipOwner
       decoded.poolOwner === params.poolOwner
+      decoded.ccipOwner === params.ccipOwner
       decoded.instrumentId === params.instrumentId
+      decoded.decimals === params.decimals
+      decoded.rateLimitAdmin === params.rateLimitAdmin
       decoded.tokenAdminRegistry === params.tokenAdminRegistry
       decoded.feeQuoter === params.feeQuoter
       decoded.rmnRemote === params.rmnRemote
-      decoded.decimals === params.decimals
 
   pure ()
 
@@ -499,6 +506,9 @@ testDecodeDeployCCIPReceiverParams = script do
         instanceId = "receiver-1"
         owner
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
+        optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
+        optionalThreshold = 20
+        minBlockConfirmations = 42
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
@@ -507,6 +517,9 @@ testDecodeDeployCCIPReceiverParams = script do
       decoded.instanceId === params.instanceId
       decoded.owner === params.owner
       decoded.requiredCCVs === params.requiredCCVs
+      decoded.optionalCCVs === params.optionalCCVs
+      decoded.optionalThreshold === params.optionalThreshold
+      decoded.minBlockConfirmations === params.minBlockConfirmations
 
   pure ()
 
@@ -518,11 +531,18 @@ testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
         instanceId = "receiver-empty"
         owner
         requiredCCVs = []
+        optionalCCVs = []
+        optionalThreshold = 0
+        minBlockConfirmations = 0
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
     None -> abort "Failed to decode with empty requiredCCVs"
-    Some decoded -> decoded.requiredCCVs === []
+    Some decoded -> do
+      decoded.requiredCCVs === []
+      decoded.optionalCCVs === []
+      decoded.optionalThreshold === 0
+      decoded.minBlockConfirmations === 0
 
   pure ()
 

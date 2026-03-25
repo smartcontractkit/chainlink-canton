@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "257db41e9166bbaf2603e96e10cab0f0ce281b5ea50d5a7fa8988e15efd7742d"
+	PackageID   = "c89fa315dc1e52c9131e7d402606afe56528fbf5cbb1e37a2af9852fd4782c42"
 	SDKVersion  = "3.4.10"
 )
 
@@ -50,6 +51,203 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// ApplyAllowedCCVUpdates is a Record type
+type ApplyAllowedCCVUpdates struct {
+	CcvsToRemove        []mcms.RawInstanceAddress `json:"ccvsToRemove"`
+	CcvsToAdd           []mcms.RawInstanceAddress `json:"ccvsToAdd"`
+	CcvAllowlistEnabled types.BOOL                `json:"ccvAllowlistEnabled"`
+}
+
+// ToMap converts ApplyAllowedCCVUpdates to a map for DAML arguments
+func (t ApplyAllowedCCVUpdates) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["ccvsToRemove"] = func() []any {
+		res := make([]any, 0, len(t.CcvsToRemove))
+		for _, e := range t.CcvsToRemove {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["ccvsToAdd"] = func() []any {
+		res := make([]any, 0, len(t.CcvsToAdd))
+		for _, e := range t.CcvsToAdd {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["ccvAllowlistEnabled"] = bool(t.CcvAllowlistEnabled)
+
+	return m
+}
+
+func (t ApplyAllowedCCVUpdates) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyAllowedCCVUpdates) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyAllowedCCVUpdates to hex string (Canton MCMS format)
+func (t ApplyAllowedCCVUpdates) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyAllowedCCVUpdates from hex string (Canton MCMS format)
+func (t *ApplyAllowedCCVUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplyDestChainUpdates is a Record type
+type ApplyDestChainUpdates struct {
+	DestChainSelectorsToRemove []types.NUMERIC         `json:"destChainSelectorsToRemove"`
+	DestChainSelectorsToAdd    []RemoteChainConfigArgs `json:"destChainSelectorsToAdd"`
+}
+
+// ToMap converts ApplyDestChainUpdates to a map for DAML arguments
+func (t ApplyDestChainUpdates) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelectorsToRemove"] = func() []any {
+		res := make([]any, 0, len(t.DestChainSelectorsToRemove))
+		for _, e := range t.DestChainSelectorsToRemove {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["destChainSelectorsToAdd"] = func() []any {
+		res := make([]any, 0, len(t.DestChainSelectorsToAdd))
+		for _, e := range t.DestChainSelectorsToAdd {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyDestChainUpdates) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyDestChainUpdates) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyDestChainUpdates to hex string (Canton MCMS format)
+func (t ApplyDestChainUpdates) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyDestChainUpdates from hex string (Canton MCMS format)
+func (t *ApplyDestChainUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CalculateFee is a Record type
+type CalculateFee struct {
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExecutorArgs      types.TEXT         `json:"executorArgs"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	Caller            types.PARTY        `json:"caller"`
+}
+
+// ToMap converts CalculateFee to a map for DAML arguments
+func (t CalculateFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t CalculateFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CalculateFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CalculateFee to hex string (Canton MCMS format)
+func (t CalculateFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CalculateFee from hex string (Canton MCMS format)
+func (t *CalculateFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type CalculateFeeMCMSParams struct {
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExecutorArgs      types.TEXT         `json:"executorArgs"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+}
+
+// MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
+func (t CalculateFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CalculateFeeMCMSParams from hex string.
+func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // DynamicConfig is a Record type
@@ -105,12 +303,12 @@ func (t *DynamicConfig) UnmarshalHex(data string) error {
 
 // Executor is a Template type
 type Executor struct {
-	InstanceId         types.TEXT                  `json:"instanceId"`
-	Owner              types.PARTY                 `json:"owner"`
-	MaxCCVsPerMsg      types.INT64                 `json:"maxCCVsPerMsg"`
-	DynamicConfig      DynamicConfig               `json:"dynamicConfig"`
-	AllowedCCVs        []common.RawInstanceAddress `json:"allowedCCVs"`
-	RemoteChainConfigs types.GENMAP                `json:"remoteChainConfigs"`
+	InstanceId         types.TEXT                `json:"instanceId"`
+	Owner              types.PARTY               `json:"owner"`
+	MaxCCVsPerMsg      types.INT64               `json:"maxCCVsPerMsg"`
+	DynamicConfig      DynamicConfig             `json:"dynamicConfig"`
+	AllowedCCVs        []mcms.RawInstanceAddress `json:"allowedCCVs"`
+	RemoteChainConfigs types.GENMAP              `json:"remoteChainConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -247,170 +445,86 @@ func (t *Executor) UnmarshalHex(data string) error {
 
 // Choice methods for Executor
 
-// ExecutorApplyDestChainUpdates exercises the Executor_ApplyDestChainUpdates choice on this Executor contract
+// SetDynamicConfig exercises the SetDynamicConfig choice on this Executor contract
 // This method uses the package name in the template ID
-func (t Executor) ExecutorApplyDestChainUpdates(contractID string, args ExecutorApplyDestChainUpdates) *model.ExerciseCommand {
+func (t Executor) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_ApplyDestChainUpdates",
+		Choice:     "SetDynamicConfig",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecutorApplyDestChainUpdatesWithPackageID exercises the Executor_ApplyDestChainUpdates choice using the provided package ID instead of package name
-func (t Executor) ExecutorApplyDestChainUpdatesWithPackageID(contractID string, packageID string, args ExecutorApplyDestChainUpdates) *model.ExerciseCommand {
+// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
+func (t Executor) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_ApplyDestChainUpdates",
+		Choice:     "SetDynamicConfig",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecutorSetDynamicConfig exercises the Executor_SetDynamicConfig choice on this Executor contract
+// GetMinBlockConfirmations exercises the GetMinBlockConfirmations choice on this Executor contract
 // This method uses the package name in the template ID
-func (t Executor) ExecutorSetDynamicConfig(contractID string, args ExecutorSetDynamicConfig) *model.ExerciseCommand {
+func (t Executor) GetMinBlockConfirmations(contractID string, args GetMinBlockConfirmations) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_SetDynamicConfig",
+		Choice:     "GetMinBlockConfirmations",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecutorSetDynamicConfigWithPackageID exercises the Executor_SetDynamicConfig choice using the provided package ID instead of package name
-func (t Executor) ExecutorSetDynamicConfigWithPackageID(contractID string, packageID string, args ExecutorSetDynamicConfig) *model.ExerciseCommand {
+// GetMinBlockConfirmationsWithPackageID exercises the GetMinBlockConfirmations choice using the provided package ID instead of package name
+func (t Executor) GetMinBlockConfirmationsWithPackageID(contractID string, packageID string, args GetMinBlockConfirmations) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_SetDynamicConfig",
+		Choice:     "GetMinBlockConfirmations",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecutorApplyAllowedCCVUpdates exercises the Executor_ApplyAllowedCCVUpdates choice on this Executor contract
+// CalculateFee exercises the CalculateFee choice on this Executor contract
 // This method uses the package name in the template ID
-func (t Executor) ExecutorApplyAllowedCCVUpdates(contractID string, args ExecutorApplyAllowedCCVUpdates) *model.ExerciseCommand {
+func (t Executor) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_ApplyAllowedCCVUpdates",
+		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecutorApplyAllowedCCVUpdatesWithPackageID exercises the Executor_ApplyAllowedCCVUpdates choice using the provided package ID instead of package name
-func (t Executor) ExecutorApplyAllowedCCVUpdatesWithPackageID(contractID string, packageID string, args ExecutorApplyAllowedCCVUpdates) *model.ExerciseCommand {
+// CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
+func (t Executor) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_ApplyAllowedCCVUpdates",
+		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecutorGetDestChains exercises the Executor_GetDestChains choice on this Executor contract
+// ApplyDestChainUpdates exercises the ApplyDestChainUpdates choice on this Executor contract
 // This method uses the package name in the template ID
-func (t Executor) ExecutorGetDestChains(contractID string, args ExecutorGetDestChains) *model.ExerciseCommand {
+func (t Executor) ApplyDestChainUpdates(contractID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_GetDestChains",
+		Choice:     "ApplyDestChainUpdates",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecutorGetDestChainsWithPackageID exercises the Executor_GetDestChains choice using the provided package ID instead of package name
-func (t Executor) ExecutorGetDestChainsWithPackageID(contractID string, packageID string, args ExecutorGetDestChains) *model.ExerciseCommand {
+// ApplyDestChainUpdatesWithPackageID exercises the ApplyDestChainUpdates choice using the provided package ID instead of package name
+func (t Executor) ApplyDestChainUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_GetDestChains",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorGetDynamicConfig exercises the Executor_GetDynamicConfig choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) ExecutorGetDynamicConfig(contractID string, args ExecutorGetDynamicConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "Executor_GetDynamicConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorGetDynamicConfigWithPackageID exercises the Executor_GetDynamicConfig choice using the provided package ID instead of package name
-func (t Executor) ExecutorGetDynamicConfigWithPackageID(contractID string, packageID string, args ExecutorGetDynamicConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "Executor_GetDynamicConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorGetAllowedCCVs exercises the Executor_GetAllowedCCVs choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) ExecutorGetAllowedCCVs(contractID string, args ExecutorGetAllowedCCVs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "Executor_GetAllowedCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorGetAllowedCCVsWithPackageID exercises the Executor_GetAllowedCCVs choice using the provided package ID instead of package name
-func (t Executor) ExecutorGetAllowedCCVsWithPackageID(contractID string, packageID string, args ExecutorGetAllowedCCVs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "Executor_GetAllowedCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorGetMaxCCVsPerMessage exercises the Executor_GetMaxCCVsPerMessage choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) ExecutorGetMaxCCVsPerMessage(contractID string, args ExecutorGetMaxCCVsPerMessage) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "Executor_GetMaxCCVsPerMessage",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorGetMaxCCVsPerMessageWithPackageID exercises the Executor_GetMaxCCVsPerMessage choice using the provided package ID instead of package name
-func (t Executor) ExecutorGetMaxCCVsPerMessageWithPackageID(contractID string, packageID string, args ExecutorGetMaxCCVsPerMessage) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "Executor_GetMaxCCVsPerMessage",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorGetMinBlockConfirmations exercises the Executor_GetMinBlockConfirmations choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) ExecutorGetMinBlockConfirmations(contractID string, args ExecutorGetMinBlockConfirmations) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "Executor_GetMinBlockConfirmations",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorGetMinBlockConfirmationsWithPackageID exercises the Executor_GetMinBlockConfirmations choice using the provided package ID instead of package name
-func (t Executor) ExecutorGetMinBlockConfirmationsWithPackageID(contractID string, packageID string, args ExecutorGetMinBlockConfirmations) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "Executor_GetMinBlockConfirmations",
+		Choice:     "ApplyDestChainUpdates",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -436,11 +550,137 @@ func (t Executor) ArchiveWithPackageID(contractID string, packageID string) *mod
 	}
 }
 
+// GetDestChains exercises the GetDestChains choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) GetDestChains(contractID string, args GetDestChains) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "GetDestChains",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetDestChainsWithPackageID exercises the GetDestChains choice using the provided package ID instead of package name
+func (t Executor) GetDestChainsWithPackageID(contractID string, packageID string, args GetDestChains) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "GetDestChains",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetDynamicConfig exercises the GetDynamicConfig choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) GetDynamicConfig(contractID string, args GetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "GetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetDynamicConfigWithPackageID exercises the GetDynamicConfig choice using the provided package ID instead of package name
+func (t Executor) GetDynamicConfigWithPackageID(contractID string, packageID string, args GetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "GetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetAllowedCCVs exercises the GetAllowedCCVs choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) GetAllowedCCVs(contractID string, args GetAllowedCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "GetAllowedCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetAllowedCCVsWithPackageID exercises the GetAllowedCCVs choice using the provided package ID instead of package name
+func (t Executor) GetAllowedCCVsWithPackageID(contractID string, packageID string, args GetAllowedCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "GetAllowedCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetMaxCCVsPerMessage exercises the GetMaxCCVsPerMessage choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) GetMaxCCVsPerMessage(contractID string, args GetMaxCCVsPerMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "GetMaxCCVsPerMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetMaxCCVsPerMessageWithPackageID exercises the GetMaxCCVsPerMessage choice using the provided package ID instead of package name
+func (t Executor) GetMaxCCVsPerMessageWithPackageID(contractID string, packageID string, args GetMaxCCVsPerMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "GetMaxCCVsPerMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyAllowedCCVUpdates exercises the ApplyAllowedCCVUpdates choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) ApplyAllowedCCVUpdates(contractID string, args ApplyAllowedCCVUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "ApplyAllowedCCVUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyAllowedCCVUpdatesWithPackageID exercises the ApplyAllowedCCVUpdates choice using the provided package ID instead of package name
+func (t Executor) ApplyAllowedCCVUpdatesWithPackageID(contractID string, packageID string, args ApplyAllowedCCVUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "ApplyAllowedCCVUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this Executor contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t Executor) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t Executor) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // ExecutorCalculateFee exercises the Executor_CalculateFee choice on this Executor contract via the IIExecutor interface
 // This method uses the package name in the template ID
 func (t Executor) ExecutorCalculateFee(contractID string, args common.ExecutorCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "IExecutor"),
 		ContractID: contractID,
 		Choice:     "Executor_CalculateFee",
 		Arguments:  argsToMap(args),
@@ -450,7 +690,7 @@ func (t Executor) ExecutorCalculateFee(contractID string, args common.ExecutorCa
 // ExecutorCalculateFeeWithPackageID exercises the Executor_CalculateFee choice using the provided package ID instead of package name
 func (t Executor) ExecutorCalculateFeeWithPackageID(contractID string, packageID string, args common.ExecutorCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "IExecutor"),
 		ContractID: contractID,
 		Choice:     "Executor_CalculateFee",
 		Arguments:  argsToMap(args),
@@ -459,183 +699,17 @@ func (t Executor) ExecutorCalculateFeeWithPackageID(contractID string, packageID
 
 // Verify interface implementations for Executor
 
+var _ mcms.IMCMSReceiver = (*Executor)(nil)
+
 var _ common.IIExecutor = (*Executor)(nil)
 
-// ExecutorApplyAllowedCCVUpdates is a Record type
-type ExecutorApplyAllowedCCVUpdates struct {
-	CcvsToRemove        []common.RawInstanceAddress `json:"ccvsToRemove"`
-	CcvsToAdd           []common.RawInstanceAddress `json:"ccvsToAdd"`
-	CcvAllowlistEnabled types.BOOL                  `json:"ccvAllowlistEnabled"`
-}
-
-// ToMap converts ExecutorApplyAllowedCCVUpdates to a map for DAML arguments
-func (t ExecutorApplyAllowedCCVUpdates) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["ccvsToRemove"] = func() []any {
-		res := make([]any, 0, len(t.CcvsToRemove))
-		for _, e := range t.CcvsToRemove {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["ccvsToAdd"] = func() []any {
-		res := make([]any, 0, len(t.CcvsToAdd))
-		for _, e := range t.CcvsToAdd {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["ccvAllowlistEnabled"] = bool(t.CcvAllowlistEnabled)
-
-	return m
-}
-
-func (t ExecutorApplyAllowedCCVUpdates) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ExecutorApplyAllowedCCVUpdates) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ExecutorApplyAllowedCCVUpdates to hex string (Canton MCMS format)
-func (t ExecutorApplyAllowedCCVUpdates) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ExecutorApplyAllowedCCVUpdates from hex string (Canton MCMS format)
-func (t *ExecutorApplyAllowedCCVUpdates) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ExecutorApplyDestChainUpdates is a Record type
-type ExecutorApplyDestChainUpdates struct {
-	DestChainSelectorsToRemove []types.NUMERIC         `json:"destChainSelectorsToRemove"`
-	DestChainSelectorsToAdd    []RemoteChainConfigArgs `json:"destChainSelectorsToAdd"`
-}
-
-// ToMap converts ExecutorApplyDestChainUpdates to a map for DAML arguments
-func (t ExecutorApplyDestChainUpdates) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["destChainSelectorsToRemove"] = func() []any {
-		res := make([]any, 0, len(t.DestChainSelectorsToRemove))
-		for _, e := range t.DestChainSelectorsToRemove {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	m["destChainSelectorsToAdd"] = func() []any {
-		res := make([]any, 0, len(t.DestChainSelectorsToAdd))
-		for _, e := range t.DestChainSelectorsToAdd {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t ExecutorApplyDestChainUpdates) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ExecutorApplyDestChainUpdates) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ExecutorApplyDestChainUpdates to hex string (Canton MCMS format)
-func (t ExecutorApplyDestChainUpdates) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ExecutorApplyDestChainUpdates from hex string (Canton MCMS format)
-func (t *ExecutorApplyDestChainUpdates) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ExecutorCalculateFee2 is a Record type
-type ExecutorCalculateFee2 struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	ExecutorArgs      types.TEXT        `json:"executorArgs"`
-	Caller            types.PARTY       `json:"caller"`
-}
-
-// ToMap converts ExecutorCalculateFee2 to a map for DAML arguments
-func (t ExecutorCalculateFee2) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["executorArgs"] = string(t.ExecutorArgs)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t ExecutorCalculateFee2) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ExecutorCalculateFee2) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ExecutorCalculateFee2 to hex string (Canton MCMS format)
-func (t ExecutorCalculateFee2) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ExecutorCalculateFee2 from hex string (Canton MCMS format)
-func (t *ExecutorCalculateFee2) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ExecutorGetAllowedCCVs is a Record type
-type ExecutorGetAllowedCCVs struct {
+// GetAllowedCCVs is a Record type
+type GetAllowedCCVs struct {
 	Caller types.PARTY `json:"caller"`
 }
 
-// ToMap converts ExecutorGetAllowedCCVs to a map for DAML arguments
-func (t ExecutorGetAllowedCCVs) ToMap() map[string]any {
+// ToMap converts GetAllowedCCVs to a map for DAML arguments
+func (t GetAllowedCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
@@ -643,52 +717,52 @@ func (t ExecutorGetAllowedCCVs) ToMap() map[string]any {
 	return m
 }
 
-func (t ExecutorGetAllowedCCVs) MarshalJSON() ([]byte, error) {
+func (t GetAllowedCCVs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ExecutorGetAllowedCCVs) UnmarshalJSON(data []byte) error {
+func (t *GetAllowedCCVs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ExecutorGetAllowedCCVs to hex string (Canton MCMS format)
-func (t ExecutorGetAllowedCCVs) MarshalHex() (string, error) {
+// MarshalHex encodes GetAllowedCCVs to hex string (Canton MCMS format)
+func (t GetAllowedCCVs) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetAllowedCCVs from hex string (Canton MCMS format)
-func (t *ExecutorGetAllowedCCVs) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetAllowedCCVs from hex string (Canton MCMS format)
+func (t *GetAllowedCCVs) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetAllowedCCVsMCMSParams is ExecutorGetAllowedCCVs without the Caller field for MCMS operationData encoding.
+// GetAllowedCCVsMCMSParams is GetAllowedCCVs without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
-type ExecutorGetAllowedCCVsMCMSParams struct {
+type GetAllowedCCVsMCMSParams struct {
 }
 
-// MarshalHex encodes ExecutorGetAllowedCCVsMCMSParams to hex string for MCMS operationData.
-func (t ExecutorGetAllowedCCVsMCMSParams) MarshalHex() (string, error) {
+// MarshalHex encodes GetAllowedCCVsMCMSParams to hex string for MCMS operationData.
+func (t GetAllowedCCVsMCMSParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetAllowedCCVsMCMSParams from hex string.
-func (t *ExecutorGetAllowedCCVsMCMSParams) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetAllowedCCVsMCMSParams from hex string.
+func (t *GetAllowedCCVsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetDestChains is a Record type
-type ExecutorGetDestChains struct {
+// GetDestChains is a Record type
+type GetDestChains struct {
 	Caller types.PARTY `json:"caller"`
 }
 
-// ToMap converts ExecutorGetDestChains to a map for DAML arguments
-func (t ExecutorGetDestChains) ToMap() map[string]any {
+// ToMap converts GetDestChains to a map for DAML arguments
+func (t GetDestChains) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
@@ -696,52 +770,52 @@ func (t ExecutorGetDestChains) ToMap() map[string]any {
 	return m
 }
 
-func (t ExecutorGetDestChains) MarshalJSON() ([]byte, error) {
+func (t GetDestChains) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ExecutorGetDestChains) UnmarshalJSON(data []byte) error {
+func (t *GetDestChains) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ExecutorGetDestChains to hex string (Canton MCMS format)
-func (t ExecutorGetDestChains) MarshalHex() (string, error) {
+// MarshalHex encodes GetDestChains to hex string (Canton MCMS format)
+func (t GetDestChains) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetDestChains from hex string (Canton MCMS format)
-func (t *ExecutorGetDestChains) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetDestChains from hex string (Canton MCMS format)
+func (t *GetDestChains) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetDestChainsMCMSParams is ExecutorGetDestChains without the Caller field for MCMS operationData encoding.
+// GetDestChainsMCMSParams is GetDestChains without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
-type ExecutorGetDestChainsMCMSParams struct {
+type GetDestChainsMCMSParams struct {
 }
 
-// MarshalHex encodes ExecutorGetDestChainsMCMSParams to hex string for MCMS operationData.
-func (t ExecutorGetDestChainsMCMSParams) MarshalHex() (string, error) {
+// MarshalHex encodes GetDestChainsMCMSParams to hex string for MCMS operationData.
+func (t GetDestChainsMCMSParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetDestChainsMCMSParams from hex string.
-func (t *ExecutorGetDestChainsMCMSParams) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetDestChainsMCMSParams from hex string.
+func (t *GetDestChainsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetDynamicConfig is a Record type
-type ExecutorGetDynamicConfig struct {
+// GetDynamicConfig is a Record type
+type GetDynamicConfig struct {
 	Caller types.PARTY `json:"caller"`
 }
 
-// ToMap converts ExecutorGetDynamicConfig to a map for DAML arguments
-func (t ExecutorGetDynamicConfig) ToMap() map[string]any {
+// ToMap converts GetDynamicConfig to a map for DAML arguments
+func (t GetDynamicConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
@@ -749,52 +823,52 @@ func (t ExecutorGetDynamicConfig) ToMap() map[string]any {
 	return m
 }
 
-func (t ExecutorGetDynamicConfig) MarshalJSON() ([]byte, error) {
+func (t GetDynamicConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ExecutorGetDynamicConfig) UnmarshalJSON(data []byte) error {
+func (t *GetDynamicConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ExecutorGetDynamicConfig to hex string (Canton MCMS format)
-func (t ExecutorGetDynamicConfig) MarshalHex() (string, error) {
+// MarshalHex encodes GetDynamicConfig to hex string (Canton MCMS format)
+func (t GetDynamicConfig) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetDynamicConfig from hex string (Canton MCMS format)
-func (t *ExecutorGetDynamicConfig) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetDynamicConfig from hex string (Canton MCMS format)
+func (t *GetDynamicConfig) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetDynamicConfigMCMSParams is ExecutorGetDynamicConfig without the Caller field for MCMS operationData encoding.
+// GetDynamicConfigMCMSParams is GetDynamicConfig without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
-type ExecutorGetDynamicConfigMCMSParams struct {
+type GetDynamicConfigMCMSParams struct {
 }
 
-// MarshalHex encodes ExecutorGetDynamicConfigMCMSParams to hex string for MCMS operationData.
-func (t ExecutorGetDynamicConfigMCMSParams) MarshalHex() (string, error) {
+// MarshalHex encodes GetDynamicConfigMCMSParams to hex string for MCMS operationData.
+func (t GetDynamicConfigMCMSParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetDynamicConfigMCMSParams from hex string.
-func (t *ExecutorGetDynamicConfigMCMSParams) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetDynamicConfigMCMSParams from hex string.
+func (t *GetDynamicConfigMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetMaxCCVsPerMessage is a Record type
-type ExecutorGetMaxCCVsPerMessage struct {
+// GetMaxCCVsPerMessage is a Record type
+type GetMaxCCVsPerMessage struct {
 	Caller types.PARTY `json:"caller"`
 }
 
-// ToMap converts ExecutorGetMaxCCVsPerMessage to a map for DAML arguments
-func (t ExecutorGetMaxCCVsPerMessage) ToMap() map[string]any {
+// ToMap converts GetMaxCCVsPerMessage to a map for DAML arguments
+func (t GetMaxCCVsPerMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
@@ -802,52 +876,52 @@ func (t ExecutorGetMaxCCVsPerMessage) ToMap() map[string]any {
 	return m
 }
 
-func (t ExecutorGetMaxCCVsPerMessage) MarshalJSON() ([]byte, error) {
+func (t GetMaxCCVsPerMessage) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ExecutorGetMaxCCVsPerMessage) UnmarshalJSON(data []byte) error {
+func (t *GetMaxCCVsPerMessage) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ExecutorGetMaxCCVsPerMessage to hex string (Canton MCMS format)
-func (t ExecutorGetMaxCCVsPerMessage) MarshalHex() (string, error) {
+// MarshalHex encodes GetMaxCCVsPerMessage to hex string (Canton MCMS format)
+func (t GetMaxCCVsPerMessage) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetMaxCCVsPerMessage from hex string (Canton MCMS format)
-func (t *ExecutorGetMaxCCVsPerMessage) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetMaxCCVsPerMessage from hex string (Canton MCMS format)
+func (t *GetMaxCCVsPerMessage) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetMaxCCVsPerMessageMCMSParams is ExecutorGetMaxCCVsPerMessage without the Caller field for MCMS operationData encoding.
+// GetMaxCCVsPerMessageMCMSParams is GetMaxCCVsPerMessage without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
-type ExecutorGetMaxCCVsPerMessageMCMSParams struct {
+type GetMaxCCVsPerMessageMCMSParams struct {
 }
 
-// MarshalHex encodes ExecutorGetMaxCCVsPerMessageMCMSParams to hex string for MCMS operationData.
-func (t ExecutorGetMaxCCVsPerMessageMCMSParams) MarshalHex() (string, error) {
+// MarshalHex encodes GetMaxCCVsPerMessageMCMSParams to hex string for MCMS operationData.
+func (t GetMaxCCVsPerMessageMCMSParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetMaxCCVsPerMessageMCMSParams from hex string.
-func (t *ExecutorGetMaxCCVsPerMessageMCMSParams) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetMaxCCVsPerMessageMCMSParams from hex string.
+func (t *GetMaxCCVsPerMessageMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetMinBlockConfirmations is a Record type
-type ExecutorGetMinBlockConfirmations struct {
+// GetMinBlockConfirmations is a Record type
+type GetMinBlockConfirmations struct {
 	Caller types.PARTY `json:"caller"`
 }
 
-// ToMap converts ExecutorGetMinBlockConfirmations to a map for DAML arguments
-func (t ExecutorGetMinBlockConfirmations) ToMap() map[string]any {
+// ToMap converts GetMinBlockConfirmations to a map for DAML arguments
+func (t GetMinBlockConfirmations) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
@@ -855,83 +929,41 @@ func (t ExecutorGetMinBlockConfirmations) ToMap() map[string]any {
 	return m
 }
 
-func (t ExecutorGetMinBlockConfirmations) MarshalJSON() ([]byte, error) {
+func (t GetMinBlockConfirmations) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ExecutorGetMinBlockConfirmations) UnmarshalJSON(data []byte) error {
+func (t *GetMinBlockConfirmations) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ExecutorGetMinBlockConfirmations to hex string (Canton MCMS format)
-func (t ExecutorGetMinBlockConfirmations) MarshalHex() (string, error) {
+// MarshalHex encodes GetMinBlockConfirmations to hex string (Canton MCMS format)
+func (t GetMinBlockConfirmations) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetMinBlockConfirmations from hex string (Canton MCMS format)
-func (t *ExecutorGetMinBlockConfirmations) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetMinBlockConfirmations from hex string (Canton MCMS format)
+func (t *GetMinBlockConfirmations) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorGetMinBlockConfirmationsMCMSParams is ExecutorGetMinBlockConfirmations without the Caller field for MCMS operationData encoding.
+// GetMinBlockConfirmationsMCMSParams is GetMinBlockConfirmations without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
-type ExecutorGetMinBlockConfirmationsMCMSParams struct {
+type GetMinBlockConfirmationsMCMSParams struct {
 }
 
-// MarshalHex encodes ExecutorGetMinBlockConfirmationsMCMSParams to hex string for MCMS operationData.
-func (t ExecutorGetMinBlockConfirmationsMCMSParams) MarshalHex() (string, error) {
+// MarshalHex encodes GetMinBlockConfirmationsMCMSParams to hex string for MCMS operationData.
+func (t GetMinBlockConfirmationsMCMSParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorGetMinBlockConfirmationsMCMSParams from hex string.
-func (t *ExecutorGetMinBlockConfirmationsMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ExecutorSetDynamicConfig is a Record type
-type ExecutorSetDynamicConfig struct {
-	NewDynamicConfig DynamicConfig `json:"newDynamicConfig"`
-}
-
-// ToMap converts ExecutorSetDynamicConfig to a map for DAML arguments
-func (t ExecutorSetDynamicConfig) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["newDynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.NewDynamicConfig).(mapper); ok {
-			return m.toMap()
-		}
-		return t.NewDynamicConfig
-	}()
-
-	return m
-}
-
-func (t ExecutorSetDynamicConfig) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ExecutorSetDynamicConfig) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ExecutorSetDynamicConfig to hex string (Canton MCMS format)
-func (t ExecutorSetDynamicConfig) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ExecutorSetDynamicConfig from hex string (Canton MCMS format)
-func (t *ExecutorSetDynamicConfig) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetMinBlockConfirmationsMCMSParams from hex string.
+func (t *GetMinBlockConfirmationsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1020,22 +1052,66 @@ func (t *RemoteChainConfigArgs) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetDynamicConfig is a Record type
+type SetDynamicConfig struct {
+	NewDynamicConfig DynamicConfig `json:"newDynamicConfig"`
+}
+
+// ToMap converts SetDynamicConfig to a map for DAML arguments
+func (t SetDynamicConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newDynamicConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.NewDynamicConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewDynamicConfig
+	}()
+
+	return m
+}
+
+func (t SetDynamicConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDynamicConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDynamicConfig to hex string (Canton MCMS format)
+func (t SetDynamicConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDynamicConfig from hex string (Canton MCMS format)
+func (t *SetDynamicConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	ExecutorApplyAllowedCCVUpdates(args ExecutorApplyAllowedCCVUpdates) (*bind.EncodedChoice, error)
-	ExecutorApplyDestChainUpdates(args ExecutorApplyDestChainUpdates) (*bind.EncodedChoice, error)
-	ExecutorGetAllowedCCVs(args ExecutorGetAllowedCCVs) (*bind.EncodedChoice, error)
-	ExecutorGetAllowedCCVsMCMSParams(args ExecutorGetAllowedCCVsMCMSParams) (*bind.EncodedChoice, error)
-	ExecutorGetDestChains(args ExecutorGetDestChains) (*bind.EncodedChoice, error)
-	ExecutorGetDestChainsMCMSParams(args ExecutorGetDestChainsMCMSParams) (*bind.EncodedChoice, error)
-	ExecutorGetDynamicConfig(args ExecutorGetDynamicConfig) (*bind.EncodedChoice, error)
-	ExecutorGetDynamicConfigMCMSParams(args ExecutorGetDynamicConfigMCMSParams) (*bind.EncodedChoice, error)
-	ExecutorGetMaxCCVsPerMessage(args ExecutorGetMaxCCVsPerMessage) (*bind.EncodedChoice, error)
-	ExecutorGetMaxCCVsPerMessageMCMSParams(args ExecutorGetMaxCCVsPerMessageMCMSParams) (*bind.EncodedChoice, error)
-	ExecutorGetMinBlockConfirmations(args ExecutorGetMinBlockConfirmations) (*bind.EncodedChoice, error)
-	ExecutorGetMinBlockConfirmationsMCMSParams(args ExecutorGetMinBlockConfirmationsMCMSParams) (*bind.EncodedChoice, error)
-	ExecutorSetDynamicConfig(args ExecutorSetDynamicConfig) (*bind.EncodedChoice, error)
+	ApplyAllowedCCVUpdates(args ApplyAllowedCCVUpdates) (*bind.EncodedChoice, error)
+	ApplyDestChainUpdates(args ApplyDestChainUpdates) (*bind.EncodedChoice, error)
+	CalculateFee(args CalculateFee) (*bind.EncodedChoice, error)
+	CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error)
+	GetAllowedCCVs(args GetAllowedCCVs) (*bind.EncodedChoice, error)
+	GetAllowedCCVsMCMSParams(args GetAllowedCCVsMCMSParams) (*bind.EncodedChoice, error)
+	GetDestChains(args GetDestChains) (*bind.EncodedChoice, error)
+	GetDestChainsMCMSParams(args GetDestChainsMCMSParams) (*bind.EncodedChoice, error)
+	GetDynamicConfig(args GetDynamicConfig) (*bind.EncodedChoice, error)
+	GetDynamicConfigMCMSParams(args GetDynamicConfigMCMSParams) (*bind.EncodedChoice, error)
+	GetMaxCCVsPerMessage(args GetMaxCCVsPerMessage) (*bind.EncodedChoice, error)
+	GetMaxCCVsPerMessageMCMSParams(args GetMaxCCVsPerMessageMCMSParams) (*bind.EncodedChoice, error)
+	GetMinBlockConfirmations(args GetMinBlockConfirmations) (*bind.EncodedChoice, error)
+	GetMinBlockConfirmationsMCMSParams(args GetMinBlockConfirmationsMCMSParams) (*bind.EncodedChoice, error)
+	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1065,69 +1141,79 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// ExecutorApplyAllowedCCVUpdates encodes parameters for the ExecutorApplyAllowedCCVUpdates choice.
-func (e *encoder) ExecutorApplyAllowedCCVUpdates(args ExecutorApplyAllowedCCVUpdates) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorApplyAllowedCCVUpdates", args)
+// ApplyAllowedCCVUpdates encodes parameters for the ApplyAllowedCCVUpdates choice.
+func (e *encoder) ApplyAllowedCCVUpdates(args ApplyAllowedCCVUpdates) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyAllowedCCVUpdates", args)
 }
 
-// ExecutorApplyDestChainUpdates encodes parameters for the ExecutorApplyDestChainUpdates choice.
-func (e *encoder) ExecutorApplyDestChainUpdates(args ExecutorApplyDestChainUpdates) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorApplyDestChainUpdates", args)
+// ApplyDestChainUpdates encodes parameters for the ApplyDestChainUpdates choice.
+func (e *encoder) ApplyDestChainUpdates(args ApplyDestChainUpdates) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyDestChainUpdates", args)
 }
 
-// ExecutorGetAllowedCCVs encodes parameters for the ExecutorGetAllowedCCVs choice.
-func (e *encoder) ExecutorGetAllowedCCVs(args ExecutorGetAllowedCCVs) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetAllowedCCVs", args)
+// CalculateFee encodes parameters for the CalculateFee choice.
+func (e *encoder) CalculateFee(args CalculateFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CalculateFee", args)
 }
 
-// ExecutorGetAllowedCCVsMCMSParams encodes MCMS parameters (without Caller) for the ExecutorGetAllowedCCVs choice.
-func (e *encoder) ExecutorGetAllowedCCVsMCMSParams(args ExecutorGetAllowedCCVsMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetAllowedCCVs", args)
+// CalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the CalculateFee choice.
+func (e *encoder) CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CalculateFee", args)
 }
 
-// ExecutorGetDestChains encodes parameters for the ExecutorGetDestChains choice.
-func (e *encoder) ExecutorGetDestChains(args ExecutorGetDestChains) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetDestChains", args)
+// GetAllowedCCVs encodes parameters for the GetAllowedCCVs choice.
+func (e *encoder) GetAllowedCCVs(args GetAllowedCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetAllowedCCVs", args)
 }
 
-// ExecutorGetDestChainsMCMSParams encodes MCMS parameters (without Caller) for the ExecutorGetDestChains choice.
-func (e *encoder) ExecutorGetDestChainsMCMSParams(args ExecutorGetDestChainsMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetDestChains", args)
+// GetAllowedCCVsMCMSParams encodes MCMS parameters (without Caller) for the GetAllowedCCVs choice.
+func (e *encoder) GetAllowedCCVsMCMSParams(args GetAllowedCCVsMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetAllowedCCVs", args)
 }
 
-// ExecutorGetDynamicConfig encodes parameters for the ExecutorGetDynamicConfig choice.
-func (e *encoder) ExecutorGetDynamicConfig(args ExecutorGetDynamicConfig) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetDynamicConfig", args)
+// GetDestChains encodes parameters for the GetDestChains choice.
+func (e *encoder) GetDestChains(args GetDestChains) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDestChains", args)
 }
 
-// ExecutorGetDynamicConfigMCMSParams encodes MCMS parameters (without Caller) for the ExecutorGetDynamicConfig choice.
-func (e *encoder) ExecutorGetDynamicConfigMCMSParams(args ExecutorGetDynamicConfigMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetDynamicConfig", args)
+// GetDestChainsMCMSParams encodes MCMS parameters (without Caller) for the GetDestChains choice.
+func (e *encoder) GetDestChainsMCMSParams(args GetDestChainsMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDestChains", args)
 }
 
-// ExecutorGetMaxCCVsPerMessage encodes parameters for the ExecutorGetMaxCCVsPerMessage choice.
-func (e *encoder) ExecutorGetMaxCCVsPerMessage(args ExecutorGetMaxCCVsPerMessage) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetMaxCCVsPerMessage", args)
+// GetDynamicConfig encodes parameters for the GetDynamicConfig choice.
+func (e *encoder) GetDynamicConfig(args GetDynamicConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDynamicConfig", args)
 }
 
-// ExecutorGetMaxCCVsPerMessageMCMSParams encodes MCMS parameters (without Caller) for the ExecutorGetMaxCCVsPerMessage choice.
-func (e *encoder) ExecutorGetMaxCCVsPerMessageMCMSParams(args ExecutorGetMaxCCVsPerMessageMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetMaxCCVsPerMessage", args)
+// GetDynamicConfigMCMSParams encodes MCMS parameters (without Caller) for the GetDynamicConfig choice.
+func (e *encoder) GetDynamicConfigMCMSParams(args GetDynamicConfigMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDynamicConfig", args)
 }
 
-// ExecutorGetMinBlockConfirmations encodes parameters for the ExecutorGetMinBlockConfirmations choice.
-func (e *encoder) ExecutorGetMinBlockConfirmations(args ExecutorGetMinBlockConfirmations) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetMinBlockConfirmations", args)
+// GetMaxCCVsPerMessage encodes parameters for the GetMaxCCVsPerMessage choice.
+func (e *encoder) GetMaxCCVsPerMessage(args GetMaxCCVsPerMessage) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetMaxCCVsPerMessage", args)
 }
 
-// ExecutorGetMinBlockConfirmationsMCMSParams encodes MCMS parameters (without Caller) for the ExecutorGetMinBlockConfirmations choice.
-func (e *encoder) ExecutorGetMinBlockConfirmationsMCMSParams(args ExecutorGetMinBlockConfirmationsMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorGetMinBlockConfirmations", args)
+// GetMaxCCVsPerMessageMCMSParams encodes MCMS parameters (without Caller) for the GetMaxCCVsPerMessage choice.
+func (e *encoder) GetMaxCCVsPerMessageMCMSParams(args GetMaxCCVsPerMessageMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetMaxCCVsPerMessage", args)
 }
 
-// ExecutorSetDynamicConfig encodes parameters for the ExecutorSetDynamicConfig choice.
-func (e *encoder) ExecutorSetDynamicConfig(args ExecutorSetDynamicConfig) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ExecutorSetDynamicConfig", args)
+// GetMinBlockConfirmations encodes parameters for the GetMinBlockConfirmations choice.
+func (e *encoder) GetMinBlockConfirmations(args GetMinBlockConfirmations) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetMinBlockConfirmations", args)
+}
+
+// GetMinBlockConfirmationsMCMSParams encodes MCMS parameters (without Caller) for the GetMinBlockConfirmations choice.
+func (e *encoder) GetMinBlockConfirmationsMCMSParams(args GetMinBlockConfirmationsMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetMinBlockConfirmations", args)
+}
+
+// SetDynamicConfig encodes parameters for the SetDynamicConfig choice.
+func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDynamicConfig", args)
 }
 
 // Verify MCMSEncoder interface implementation

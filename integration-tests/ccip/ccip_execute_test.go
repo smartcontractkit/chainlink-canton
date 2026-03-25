@@ -453,10 +453,22 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          "",
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{},
-						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{},
-						AddressBytesLength:       20,
-						BaseExecutionGasCost:     0,
+						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+							IsEnabled:                   true,
+							MaxDataBytes:                50000,
+							MaxPerMsgGasLimit:           4000000,
+							DestGasOverhead:             300000,
+							DestGasPerPayloadByteBase:   16,
+							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+							DefaultTxGasLimit:           200000,
+							LinkFeeMultiplierPercent:    90,
+							DefaultTokenFeeUSDCents:     0,
+							DefaultTokenDestGasOverhead: 34000,
+							NetworkFeeUSDCents:          0,
+						},
+						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+						AddressBytesLength:      20,
+						BaseExecutionGasCost:    0,
 					},
 				},
 			},
@@ -482,6 +494,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partyReceiver),
+						InstanceId: "router-receiver",
 					}),
 				}},
 			}},
@@ -502,6 +515,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NotEmpty(t, routerCid)
 	t.Logf("Created PerPartyRouter for receiver: %s", routerCid)
 
+	localOffRampAddress := contracts.HexToInstanceAddress(offRamp.Address).Bytes()
+
 	// Build message (no token transfer, just payload data)
 	testPayload := []byte("Hello CCIP - this is a test message payload!")
 	msg := &MessageV1{
@@ -513,7 +528,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		Finality:            2000,
 		CCVAndExecutorHash:  [32]byte{},
 		OnRampAddress:       hexToBytes("000000000000000000000000f6eced5e96fff2de4f0ecd722beb57556fc443fd"), // left-padded to 32 bytes
-		OffRampAddress:      hexToBytes("0000000000000000000000000000000000000002"),
+		OffRampAddress:      localOffRampAddress,
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
 		Receiver:            EncodePartyID(partyReceiver),
 		DestBlob:            []byte{},
@@ -543,7 +558,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+						{Label: "minBlockConfirmations", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+						{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+						{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
 					}},
 				}},
 			}},
@@ -581,7 +599,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 								{Label: "ccvExtraContext", Value: emptyCCIPContext},
 							}}}},
 						}}}}},
-						{Label: "additionalRequiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 					}}}},
 				}},
 			}},

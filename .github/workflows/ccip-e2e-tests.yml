@@ -23,13 +23,13 @@ jobs:
         uses: runs-on/action@cd2b598b0515d39d78c38a02d529db87d2196d1e # v2.0.3
 
       - name: Check out chainlink-canton
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: smartcontractkit/chainlink-canton
           path: chainlink-canton
 
       - name: Check out chainlink-ccv
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: smartcontractkit/chainlink-ccv
           path: chainlink-ccv

@@ -4,12 +4,17 @@ module PerPartyRouter where
 import Daml.Script
 
 import DA.Assert
+import DA.Crypto.Text (BytesHex)
 import DA.Date (datetime, Month(Jan))
 import DA.Map qualified as Map
 import DA.Optional
+import DA.Set qualified as Set
+import qualified DA.Text as Text
 import qualified DA.TextMap as TextMap
 
+import qualified CCIP.Client
 import qualified CCIP.Context
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
@@ -17,24 +22,136 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
+import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Executor
+import qualified CommitteeVerifier.DummyCommitteeVerifier
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 
 import qualified TestToken
 
+seedExecutedMessages : Int -> [BytesHex]
+seedExecutedMessages n =
+    [ mkHexMessageId i | i <- [0..(n - 1)] ]
+
+mkHexMessageId : Int -> BytesHex
+mkHexMessageId i =
+    let suffix = show i
+        padding = replicateText (64 - Text.length suffix) "0"
+    in padding <> suffix
+
+replicateText : Int -> Text -> Text
+replicateText n t =
+    if n <= 0 then ""
+    else t <> replicateText (n - 1) t
+
 mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
+
+basicFeeToken : Splice.Api.Token.HoldingV1.InstrumentId -> CCIP.Interfaces.TokenPool.TokenInput -> CCIP.Client.FeeTokenInput
+basicFeeToken token tokenInput = CCIP.Client.FeeTokenInput with
+    token = token
+    tokenInput = tokenInput
+    senderInputCids = []
+
+-- Script-level helper to create a TokenInput for fee collection tests.
+mkTokenInput : Party -> Script (ContractId TestToken.TestTransferFactory, CCIP.Interfaces.TokenPool.TokenInput)
+mkTokenInput admin = do
+    transferFactory <- submit admin do
+        createCmd TestToken.TestTransferFactory with
+            admin = admin
+            preapprovalCid = None
+    pure (transferFactory, CCIP.Interfaces.TokenPool.TokenInput with
+        transferFactory = toInterfaceContractId transferFactory
+        extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            meta = Splice.Api.Token.MetadataV1.emptyMetadata
+        tokenPoolHoldings = [])
+
+basicExtraArgs : Int -> CCIP.Client.ExtraArgs
+basicExtraArgs gasLimit = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+    gasLimit = gasLimit
+    blockConfirmations = 0
+    ccvs = []
+    executor = None
+    tokenReceiver = ""
+    tokenArgs = ""
+
+extraArgsWithExecutor
+    : Int
+    -> ContractId CCIP.Interfaces.Executor.IExecutor
+    -> BytesHex
+    -> CCIP.Client.ExtraArgs
+extraArgsWithExecutor gasLimit executorCid executorArgs =
+    CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+        gasLimit = gasLimit
+        blockConfirmations = 0
+        ccvs = []
+        executor = Some (CCIP.Client.ExecutorInput with
+            executorCid = executorCid
+            executorArgs = executorArgs
+            executorExtraContext = CCIP.Context.emptyCCIPContext)
+        tokenReceiver = ""
+        tokenArgs = ""
+
+-- | Test payout split math used by PerPartyRouter.CCIPSend.
+testCCIPSendFeeSplitLogic : Script ()
+testCCIPSendFeeSplitLogic = script do
+    ccvOwnerA <- allocateParty "ccv-owner-a"
+    ccvOwnerB <- allocateParty "ccv-owner-b"
+    poolOwner <- allocateParty "pool-owner"
+    ccipOwner <- allocateParty "ccip-owner-split"
+
+    let ccvFees = [
+            CCIP.SendingMessageV1.CCVFee with
+                ccvInstanceId = "ccv-a-1"
+                ccvOwner = ccvOwnerA
+                feeUSDCents = 0.0
+                destGasLimit = 0
+                destBytesOverhead = 0
+          , CCIP.SendingMessageV1.CCVFee with
+                ccvInstanceId = "ccv-a-2"
+                ccvOwner = ccvOwnerA
+                feeUSDCents = 0.0
+                destGasLimit = 0
+                destBytesOverhead = 0
+          , CCIP.SendingMessageV1.CCVFee with
+                ccvInstanceId = "ccv-b-1"
+                ccvOwner = ccvOwnerB
+                feeUSDCents = 0.0
+                destGasLimit = 0
+                destBytesOverhead = 0
+          ]
+    let ccvAmounts : [Numeric 0] = [10.0, 20.0, 5.0]
+    let verifierFees = CCIP.PerPartyRouter.buildCCVFeeAllocations ccvFees ccvAmounts
+    let withPool = CCIP.PerPartyRouter.addFeeForParty verifierFees poolOwner 7.0
+    let ownerResidual = 50.0 - CCIP.PerPartyRouter.sumAllocatedFees withPool
+    let recipientFees = CCIP.PerPartyRouter.addFeeForParty withPool ccipOwner ownerResidual
+
+    case Map.lookup ccvOwnerA recipientFees of
+        Some v -> v === 30.0
+        None -> assertMsg "missing ccvOwnerA payout" False
+    case Map.lookup ccvOwnerB recipientFees of
+        Some v -> v === 5.0
+        None -> assertMsg "missing ccvOwnerB payout" False
+    case Map.lookup poolOwner recipientFees of
+        Some v -> v === 7.0
+        None -> assertMsg "missing poolOwner payout" False
+    case Map.lookup ccipOwner recipientFees of
+        Some v -> v === 8.0
+        None -> assertMsg "missing ccipOwner payout" False
+
+    debug "testCCIPSendFeeSplitLogic: PASSED"
 
 -- | Test CCIP send via PerPartyRouter (message-only, no fees collected).
 testCCIPSend : Script ()
@@ -57,10 +174,10 @@ testCCIPSend = script do
             id = "FeeToken"
 
     -- Compute instance addresses
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Deploy GlobalConfig with network fee fields
     globalConfig <- submit ccipOwner do
@@ -71,7 +188,10 @@ testCCIPSend = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
+                baseExecutionGasCost = 12345
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.make "test-executor" ccipOwner -- this default executor will be used if no executor is specified as part of the extraArgs
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -99,16 +219,27 @@ testCCIPSend = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter"
             owner = ccipOwner
-            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
-            destChainConfigs = Map.empty
+            feeTokens = Set.fromList [testFeeTokenId]
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 1000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                defaultTxGasLimit = 1
+                linkFeeMultiplierPercent = 100.0
+                defaultTokenFeeUSD = 0.0
+                defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 0.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
             usdPerToken = Map.fromList [(testFeeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = testFeeTokenId
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     -- Deploy OnRamp
@@ -116,11 +247,12 @@ testCCIPSend = script do
         createCmd CCIP.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
             deps = CCIP.OnRamp.OnRampDeps with
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
                 ccvRegistry = ccvRegistryInstanceAddress
 
     -- Deploy production Executor
@@ -144,11 +276,11 @@ testCCIPSend = script do
             instanceId = factoryInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make "unused-offramp" ccipOwner
+                onRamp = RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp" ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             registeredRouters = Map.empty
 
@@ -171,6 +303,8 @@ testCCIPSend = script do
 
     let receiver = "9df48df28ecc2863af9e90cde2e82fa62a9ee2c5" -- 20 bytes
 
+    (transferFactory, feeTokenInput) <- mkTokenInput ccipOwner
+
     -- PrepareSend: create SendingMessageV1 (message deferred to executor)
     sendingMessageCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -180,44 +314,33 @@ testCCIPSend = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = "48656c6c6f20576f726c64"
-            ccipReceiveGasLimit = 100000
-            blockConfirmations = None
-            senderRequiredCCVs = []
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = testFeeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "48656c6c6f20576f726c64"
+                tokenTransfer = None
+                feeToken = basicFeeToken testFeeTokenId feeTokenInput
+                extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
 
-    -- Executor fee and message finalization
-    disclosedExecutor <- fromSome <$> queryDisclosure ccipOwner executor
-    sendingMessageCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedExecutor) do
+    -- Executor fee calculation (must happen before FinalizeFee)
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccipOwner <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
             CCIP.Interfaces.Executor.Executor_CalculateFee with
                 sendingMessageCid = sendingMessageCid
                 executorArgs = ""
+                extraContext = CCIP.Context.emptyCCIPContext
                 caller = ccipOwner
 
-    -- FinalizeFee (no CCV/pool fees, just network fee = 0)
-    sendingMessageCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedFeeQuoter) do
-        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
+    sendingMessageCid <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
+        exerciseCmd router CCIP.PerPartyRouter.FinalizeFee with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
+                    ]
             sendingMessageCid = sendingMessageCid
-            caller = user
-
-    -- Deploy a fee token transfer factory for CCIPSend
-    transferFactory <- submit ccipOwner do
-        createCmd TestToken.TestTransferFactory with
-            admin = ccipOwner
-            preapprovalCid = None
-
-    let feeTokenInput = CCIP.Interfaces.TokenPool.TokenInput with
-            transferFactory = toInterfaceContractId transferFactory
-            extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
-                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-                meta = Splice.Api.Token.MetadataV1.emptyMetadata
-            tokenPoolHoldings = []
 
     disclosedTransferFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
 
@@ -239,6 +362,8 @@ testCCIPSend = script do
     Some msgSent <- user `queryContractId` sendResult.ccipMessageSent
     msgSent.event.sequenceNumber === 1.0
     msgSent.event.destChainSelector === destChainSelector
+    let decoded = fromSome (CCIP.MessageCodecV1.decodeMessageV1 msgSent.event.encodedMessage)
+    decoded.executionGasLimit === 112345
 
     debug ("message sent: " <> show sendResult.messageId)
 
@@ -251,29 +376,33 @@ testCCIPSend = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = "48656c6c6f20576f726c6432"
-            ccipReceiveGasLimit = 100000
-            blockConfirmations = None
-            senderRequiredCCVs = []
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = testFeeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "48656c6c6f20576f726c6432"
+                tokenTransfer = None
+                feeToken = basicFeeToken testFeeTokenId feeTokenInput
+                extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
 
-    -- Executor fee and message finalization for second message
-    sendingMessageCid2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedExecutor) do
+    -- Executor fee for second message (must happen before FinalizeFee)
+    disclosedSm2 <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid2
+    sendingMessageCid2 <- submit (actAs ccipOwner <> disclose disclosedSm2) do
         exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
             CCIP.Interfaces.Executor.Executor_CalculateFee with
                 sendingMessageCid = sendingMessageCid2
                 executorArgs = ""
+                extraContext = CCIP.Context.emptyCCIPContext
                 caller = ccipOwner
 
-    sendingMessageCid2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedFeeQuoter) do
-        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
+    sendingMessageCid2 <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
+        exerciseCmd newRouter CCIP.PerPartyRouter.FinalizeFee with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
+                    ]
             sendingMessageCid = sendingMessageCid2
-            caller = user
 
     sendResult2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote <> disclose disclosedTransferFactory) do
         exerciseCmd newRouter CCIP.PerPartyRouter.CCIPSend with
@@ -293,25 +422,29 @@ testCCIPSend = script do
 
     pure ()
 
-
 -- | Test CCIP execute via PerPartyRouter.
+testCCIPExecute : Script ()
 testCCIPExecute = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
+    ccvOwner <- allocateParty "ccv-owner"
     receiver <- allocateParty "receiver"
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
 
     let globalConfigInstanceId = "test-globalconfig"
     let offRampInstanceId = "test-offramp"
     let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
+    let ccvInstanceId = "test-ccv"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
     -- Compute instance addresses
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvInstanceAddress = RawInstanceAddress.make ccvInstanceId ccvOwner
 
     -- Deploy GlobalConfig
     globalConfig <- submit ccipOwner do
@@ -324,7 +457,7 @@ testCCIPExecute = script do
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000001"]
                 laneMandatedCCVs = []
-                defaultCCVs = [])]
+                defaultCCVs = [ccvInstanceAddress])]
 
     -- Deploy RMNRemote
     rmnRemote <- submit rmnOwner do
@@ -358,11 +491,11 @@ testCCIPExecute = script do
             instanceId = factoryInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make "unused-onramp" ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner
+                onRamp = RawInstanceAddress.make "unused-onramp" ccipOwner
+                offRamp = RawInstanceAddress.make offRampInstanceId ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "unused-feequoter" ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             registeredRouters = Map.empty
 
@@ -385,7 +518,7 @@ testCCIPExecute = script do
             finality = 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
-            offRampAddress = "0000000000000000000000000000000000000002"
+            offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
             sender = "0000000000000000000000000000000000000003"
             receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
@@ -401,15 +534,28 @@ testCCIPExecute = script do
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- PrepareExecute
-    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareExecute with
             context = CCIP.Context.CCIPContext with
                 values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
+            receiverRequiredCCVs = []
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
             caller = receiver
+
+    -- Add CCV verification
+    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ""
+            caller = ccvOwner
 
     -- Execute
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
@@ -420,7 +566,6 @@ testCCIPExecute = script do
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
-            receiverRequiredCCVs = []
 
     executeResult.state === CCIP.Internal.SUCCESS
 
@@ -430,12 +575,15 @@ testCCIPExecute = script do
 
     pure ()
 
--- | Test PrepareSend applies blockConfirmations and token-only default CCV behavior.
+-- | Test PrepareSend keeps token-only default CCV behavior without per-message block confirmations.
 -- Executor finalization is tested separately; after PrepareSend message is always None.
+testPrepareSendExtraArgs : Script ()
 testPrepareSendExtraArgs = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
     user <- allocateParty "user"
+
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
 
     let globalConfigInstanceId = "test-globalconfig"
     let onRampInstanceId = "test-onramp"
@@ -445,34 +593,46 @@ testPrepareSendExtraArgs = script do
     let ccvRegistryInstanceId = "test-ccvregistry"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
+    let destChainSelector2 : Numeric 0 = 3333333333.0
 
     let feeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
             admin = ccipOwner
             id = "FeeToken"
-    let tokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
-            admin = ccipOwner
-            id = "TestToken"
+    let defaultCCV = RawInstanceAddress.make "default-ccv" ccipOwner
 
-    let defaultCCV = CCIP.RawInstanceAddress.make "default-ccv" ccipOwner
-
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = sourceChainSelector
-            destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
-                isEnabled = True
-                addressBytesLength = 20
-                offRampAddress = "0000000000000000000000000000000000000003"
-                laneMandatedCCVs = []
-                defaultCCVs = [defaultCCV]
-                messageNetworkFeeUSDCents = cents 0.0
-                tokenNetworkFeeUSDCents = cents 0.0)]
+            destChainConfigs = Map.fromList [
+                (destChainSelector, CCIP.GlobalConfig.DestChainConfig with
+                    isEnabled = True
+                    addressBytesLength = 20
+                    tokenReceiverAllowed = True
+                    baseExecutionGasCost = 0
+                    offRampAddress = "0000000000000000000000000000000000000003"
+                    defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                    laneMandatedCCVs = []
+                    defaultCCVs = [defaultCCV]
+                    messageNetworkFeeUSDCents = cents 0.0
+                    tokenNetworkFeeUSDCents = cents 0.0),
+                (destChainSelector2, CCIP.GlobalConfig.DestChainConfig with
+                    isEnabled = True
+                    addressBytesLength = 20
+                    tokenReceiverAllowed = False
+                    baseExecutionGasCost = 0
+                    offRampAddress = "0000000000000000000000000000000000000003"
+                    defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                    laneMandatedCCVs = []
+                    defaultCCVs = [defaultCCV]
+                    messageNetworkFeeUSDCents = cents 0.0
+                    tokenNetworkFeeUSDCents = cents 0.0)]
             sourceChainConfigs = Map.empty
 
     rmnRemote <- submit rmnOwner do
@@ -493,27 +653,39 @@ testPrepareSendExtraArgs = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter"
             owner = ccipOwner
-            feeTokens = Map.fromList [(feeTokenId, mult 1.0)]
-            destChainConfigs = Map.empty
+            feeTokens = Set.fromList [feeTokenId]
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 1000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                defaultTxGasLimit = 1
+                linkFeeMultiplierPercent = 100.0
+                defaultTokenFeeUSD = 0.0
+                defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 0.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
             usdPerToken = Map.fromList [(feeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = feeTokenId
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
             deps = CCIP.OnRamp.OnRampDeps with
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
                 ccvRegistry = ccvRegistryInstanceAddress
 
     factory <- submit ccipOwner do
@@ -521,11 +693,11 @@ testPrepareSendExtraArgs = script do
             instanceId = factoryInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make "unused-offramp" ccipOwner
+                onRamp = RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp" ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             registeredRouters = Map.empty
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
@@ -535,128 +707,819 @@ testPrepareSendExtraArgs = script do
             instanceId = "test-router-user"
     let router = createResult.router
 
+    customVerifier <- submit user do
+        createCmd CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier with
+            instanceId = "custom-ccv"
+            owner = user
+            ccipOwner = ccipOwner
+            versionTag = CommitteeVerifier.DummyCommitteeVerifier.dummyVersionTag
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+
+    disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedCustomVerifier <- fromSome <$> queryDisclosure user customVerifier
+
+    let receiver = "b8a3d7a9c797b5bd47f8c5efd96dadecf15ddd3c"
+    let context = CCIP.Context.CCIPContext with
+            values = TextMap.fromList
+                [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                , (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter)
+                , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
+                ]
+
+    smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "01"
+                tokenTransfer = None
+                feeToken = basicFeeToken feeTokenId dummyTokenInput
+                extraArgs = basicExtraArgs 123
+
+    Some sm <- user `queryContractId` smCid
+    sm.message === None
+    sm.ccipReceiveGasLimit === 123
+    sm.requiredCCVs === [defaultCCV]
+
+    smWithCustomCCVCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "02"
+                tokenTransfer = None
+                feeToken = basicFeeToken feeTokenId dummyTokenInput
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                    gasLimit = 123
+                    blockConfirmations = 0
+                    ccvs = [RawInstanceAddress.make "custom-ccv" user]
+                    executor = None
+                    tokenReceiver = ""
+                    tokenArgs = ""
+
+    Some smWithCustomCCV <- user `queryContractId` smWithCustomCCVCid
+    smWithCustomCCV.requiredCCVs === [RawInstanceAddress.make "custom-ccv" user]
+
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context
+            destinationChainSelector = destChainSelector2
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "03"
+                tokenTransfer = None
+                feeToken = basicFeeToken feeTokenId dummyTokenInput
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                    gasLimit = 0
+                    blockConfirmations = 0
+                    ccvs = []
+                    executor = None
+                    tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89"
+                    tokenArgs = ""
+
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "12345678"
+                payload = ""
+                tokenTransfer = None
+                feeToken = basicFeeToken feeTokenId dummyTokenInput
+                extraArgs = basicExtraArgs 0
+
+    pure ()
+
+testPrepareSendRejectsOversizedPayload : Script ()
+testPrepareSendRejectsOversizedPayload = script do
+    ccipOwner <- allocateParty "ccip-owner-payload"
+    rmnOwner <- allocateParty "rmn-owner-payload"
+    user <- allocateParty "user-payload"
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
+
+    let globalConfigInstanceId = "test-globalconfig-payload"
+    let onRampInstanceId = "test-onramp-payload"
+    let rmnInstanceId = "test-rmn-payload"
+    let factoryInstanceId = "test-factory-payload"
+    let tokenAdminRegistryInstanceId = "test-tar-payload"
+    let ccvRegistryInstanceId = "test-ccvregistry-payload"
+    let feeQuoterInstanceId = "test-feequoter-payload"
+    let sourceChainSelector : Numeric 0 = 1111111111.0
+    let destChainSelector : Numeric 0 = 2222222222.0
+
+    let testFeeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "FeeToken"
+
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = sourceChainSelector
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
+                isEnabled = True
+                addressBytesLength = 20
+                tokenReceiverAllowed = False
+                baseExecutionGasCost = 0
+                offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                laneMandatedCCVs = []
+                defaultCCVs = []
+                messageNetworkFeeUSDCents = cents 0.0
+                tokenNetworkFeeUSDCents = cents 0.0)]
+            sourceChainConfigs = Map.empty
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    feeQuoter <- submit ccipOwner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            instanceId = feeQuoterInstanceId
+            owner = ccipOwner
+            feeTokens = Set.fromList [testFeeTokenId]
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 4
+                maxPerMsgGasLimit = 1000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                defaultTxGasLimit = 1
+                linkFeeMultiplierPercent = 100.0
+                defaultTokenFeeUSD = 0.0
+                defaultTokenDestGasOverhead = 0)]
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 0.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
+            usdPerToken = Map.fromList [(testFeeTokenId,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 100000000.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
+            linkTokenInstrumentId = testFeeTokenId
+            priceUpdaters = []
+
+    onRamp <- submit ccipOwner do
+        createCmd CCIP.OnRamp.OnRamp with
+            instanceId = onRampInstanceId
+            ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
+            deps = CCIP.OnRamp.OnRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                ccvRegistry = ccvRegistryInstanceAddress
+
+    factory <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
+            instanceId = factoryInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp-payload" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createRouterResult <- submit (actAs user <> disclose disclosedFactory) do
+        exerciseCmd factory CCIP.PerPartyRouter.CreateRouter with
+            partyOwner = user
+            instanceId = "router-payload"
+    let router = createRouterResult.router
+
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- Message-only send with explicit blockConfirmations.
-    -- Message is deferred to executor; only blockConfirmations is verifiable here.
-    let receiver = "b8a3d7a9c797b5bd47f8c5efd96dadecf15ddd3c" -- 20 bytes
-    smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
-        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
-            context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
-                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
-                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
-                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = "01"
-            ccipReceiveGasLimit = 123
-            blockConfirmations = Some 42
-            senderRequiredCCVs = []
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = feeTokenId
-
-    Some sm <- user `queryContractId` smCid
-    sm.blockConfirmations === 42
-    sm.message === None
-    sm.ccipReceiveGasLimit === 123
-
-    -- Token-only send (payload empty, gas 0): skip default CCVs.
-    smTokenOnlyCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
-        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
-            context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
-                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
-                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
-                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = ""
-            ccipReceiveGasLimit = 0
-            blockConfirmations = None
-            senderRequiredCCVs = []
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = None
-            tokenArgs = "aabbccdd"
-            feeToken = feeTokenId
-
-    Some smTokenOnly <- user `queryContractId` smTokenOnlyCid
-    smTokenOnly.requiredCCVs === []
-    smTokenOnly.tokenArgs === "aabbccdd"
-    smTokenOnly.tokenReceiver === receiver
-
-    -- Token-only send with separate receiver and tokenReceiver
-    let tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89" -- 20 bytes
-    smTokenOnlyCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
-        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
-            context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
-                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
-                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
-                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = ""
-            ccipReceiveGasLimit = 0
-            blockConfirmations = None
-            senderRequiredCCVs = []
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = Some tokenReceiver
-            tokenArgs = "aabbccdd"
-            feeToken = feeTokenId
-
-    Some smTokenOnly <- user `queryContractId` smTokenOnlyCid
-    smTokenOnly.requiredCCVs === []
-    smTokenOnly.tokenArgs === "aabbccdd"
-    smTokenOnly.receiver === receiver
-    smTokenOnly.tokenReceiver === tokenReceiver
-
-    -- Failure cases
     submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
-                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
-                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
-                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
+                    ]
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "0000000000000000000000000000000000000001"
+                payload = "0011223344"
+                tokenTransfer = None
+                feeToken = basicFeeToken testFeeTokenId dummyTokenInput
+                extraArgs = basicExtraArgs 100000
+
+    pure ()
+
+testGetExecutionStateUsesActiveAndArchivedMessages : Script ()
+testGetExecutionStateUsesActiveAndArchivedMessages = script do
+    ccipOwner <- allocateParty "ccip-owner-exec-state"
+    partyOwner <- allocateParty "party-owner-exec-state"
+    arbitraryCaller <- allocateParty "arbitrary-caller-exec-state"
+
+    let activeMessage = mkHexMessageId 100001
+    let olderMessage = mkHexMessageId 100002
+    let newerMessage = mkHexMessageId 100003
+    let missingMessage = mkHexMessageId 100004
+
+    let deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+            onRamp = RawInstanceAddress.make "onramp-exec-state" ccipOwner
+            offRamp = RawInstanceAddress.make "offramp-exec-state" ccipOwner
+            globalConfig = RawInstanceAddress.make "gc-exec-state" ccipOwner
+            tokenAdminRegistry = RawInstanceAddress.make "tar-exec-state" ccipOwner
+            feeQuoter = RawInstanceAddress.make "fq-exec-state" ccipOwner
+            rmnRemote = RawInstanceAddress.make "rmn-exec-state" ccipOwner
+
+    olderArchive <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
+            ccipOwner
+            partyOwner
+            perPartyRouterInstanceId = "router-exec-state"
+            archiveIndex = 0
+            executedMessages = Set.fromList [olderMessage]
+
+    newerArchive <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
+            ccipOwner
+            partyOwner
+            perPartyRouterInstanceId = "router-exec-state"
+            archiveIndex = 1
+            executedMessages = Set.fromList [newerMessage]
+
+    router <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = "router-exec-state"
+            ccipOwner
+            partyOwner
+            deps
+            outboundSequenceNumbers = Map.empty
+            executedMessages = Set.fromList [activeMessage]
+            archivedExecutionContractIds = [olderArchive, newerArchive]
+            customObservers = []
+
+    disclosedOlderArchive <- fromSome <$> queryDisclosure ccipOwner olderArchive
+    disclosedNewerArchive <- fromSome <$> queryDisclosure ccipOwner newerArchive
+    disclosedRouter <- fromSome <$> queryDisclosure ccipOwner router
+
+    let arbitraryCallerSubmission =
+            actAs arbitraryCaller
+                <> disclose disclosedOlderArchive
+                <> disclose disclosedNewerArchive
+                <> disclose disclosedRouter
+
+    activeState <- submit arbitraryCallerSubmission do
+        exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = activeMessage
+            caller = arbitraryCaller
+    activeState === CCIP.Internal.SUCCESS
+
+    newerArchiveState <- submit arbitraryCallerSubmission do
+        exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = newerMessage
+            caller = arbitraryCaller
+    newerArchiveState === CCIP.Internal.SUCCESS
+
+    olderArchiveState <- submit arbitraryCallerSubmission do
+        exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = olderMessage
+            caller = arbitraryCaller
+    olderArchiveState === CCIP.Internal.SUCCESS
+
+    missingState <- submit arbitraryCallerSubmission do
+        exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = missingMessage
+            caller = arbitraryCaller
+    missingState === CCIP.Internal.UNTOUCHED
+
+    debug "testGetExecutionStateUsesActiveAndArchivedMessages: PASSED"
+
+testExecuteRollsOverExecutedMessages : Script ()
+testExecuteRollsOverExecutedMessages = script do
+    ccipOwner <- allocateParty "ccip-owner-rollover"
+    rmnOwner <- allocateParty "rmn-owner-rollover"
+    ccvOwner <- allocateParty "ccv-owner-rollover"
+    receiver <- allocateParty "receiver-rollover"
+
+    let globalConfigInstanceId = "test-globalconfig-rollover"
+    let offRampInstanceId = "test-offramp-rollover"
+    let rmnInstanceId = "test-rmn-rollover"
+    let tokenAdminRegistryInstanceId = "test-tar-rollover"
+    let ccvInstanceId = "test-ccv-rollover"
+    let sourceChainSelector : Numeric 0 = 3333333333.0
+    let destChainSelector : Numeric 0 = 4444444444.0
+    let routerInstanceId = "test-router-rollover"
+    let olderArchivedMessage = mkHexMessageId 200001
+    let seededMessages = seedExecutedMessages CCIP.PerPartyRouter.maxExecutedMessagesSize
+    let seededMessagesSet = Set.fromList seededMessages
+    let sampleSeededMessage = mkHexMessageId 0
+
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvInstanceAddress = RawInstanceAddress.make ccvInstanceId ccvOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, CCIP.GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = ["0000000000000000000000000000000000000001"]
+                laneMandatedCCVs = []
+                defaultCCVs = [ccvInstanceAddress])]
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    offRamp <- submit ccipOwner do
+        createCmd CCIP.OffRamp.OffRamp with
+            instanceId = offRampInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    olderArchive <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
+            ccipOwner
+            partyOwner = receiver
+            perPartyRouterInstanceId = routerInstanceId
+            archiveIndex = 0
+            executedMessages = Set.fromList [olderArchivedMessage]
+
+    router <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = routerInstanceId
+            ccipOwner
+            partyOwner = receiver
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.make "unused-onramp-rollover" ccipOwner
+                offRamp = RawInstanceAddress.make offRampInstanceId ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = RawInstanceAddress.make "unused-feequoter-rollover" ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            outboundSequenceNumbers = Map.empty
+            executedMessages = seededMessagesSet
+            archivedExecutionContractIds = [olderArchive]
+            customObservers = []
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
             destChainSelector = destChainSelector
-            receiver = "12345678" -- invalid receiver (not 20 bytes)
-            payload = ""
-            ccipReceiveGasLimit = 0
-            blockConfirmations = None
-            senderRequiredCCVs = []
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = Some tokenReceiver
-            tokenArgs = "aabbccdd"
-            feeToken = feeTokenId
+            sequenceNumber = 7.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
+            sender = "0000000000000000000000000000000000000003"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "526f6c6c6f7665722054657374"
+
+    let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 message
+
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)
+                    ]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = []
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            caller = receiver
+
+    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ""
+            caller = ccvOwner
+
+    executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)
+                    ]
+            executingMessageCid = executingMessageCid
+
+    executeResult.state === CCIP.Internal.SUCCESS
+
+    Some updatedRouter <- queryContractId receiver executeResult.router
+    Set.size updatedRouter.executedMessages === 1
+    assertMsg "newly executed message should be the only active message" $
+        Set.member executeResult.messageId updatedRouter.executedMessages
+
+    length updatedRouter.archivedExecutionContractIds === 2
+    case updatedRouter.archivedExecutionContractIds of
+        [firstArchiveCid, secondArchiveCid] -> do
+            firstArchiveCid === olderArchive
+
+            Some firstArchive <- queryContractId receiver firstArchiveCid
+            Some secondArchive <- queryContractId receiver secondArchiveCid
+
+            firstArchive.archiveIndex === 0
+            secondArchive.archiveIndex === 1
+            firstArchive.perPartyRouterInstanceId === routerInstanceId
+            secondArchive.perPartyRouterInstanceId === routerInstanceId
+
+            assertMsg "older archive should still contain its original message" $
+                Set.member olderArchivedMessage firstArchive.executedMessages
+            Set.size secondArchive.executedMessages === CCIP.PerPartyRouter.maxExecutedMessagesSize
+            assertMsg "new archive should contain the pre-rollover active set" $
+                Set.member sampleSeededMessage secondArchive.executedMessages
+        _ -> assertMsg "expected exactly two archived execution contract ids after rollover" False
+
+    activeState <- submit receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = executeResult.messageId
+            caller = receiver
+    activeState === CCIP.Internal.SUCCESS
+
+    seededState <- submit receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = sampleSeededMessage
+            caller = receiver
+    seededState === CCIP.Internal.SUCCESS
+
+    olderArchiveState <- submit receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = olderArchivedMessage
+            caller = receiver
+    olderArchiveState === CCIP.Internal.SUCCESS
+
+    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)
+                    ]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = []
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            caller = receiver
+
+    debug "testExecuteRollsOverExecutedMessages: PASSED"
+
+testPrepareSendRejectsDuplicateSenderRequiredCCVs : Script ()
+testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
+    ccipOwner <- allocateParty "ccip-owner-dup-ccvs"
+    rmnOwner <- allocateParty "rmn-owner-dup-ccvs"
+    user <- allocateParty "user-dup-ccvs"
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
+
+    let globalConfigInstanceId = "test-globalconfig-dup-ccvs"
+    let onRampInstanceId = "test-onramp-dup-ccvs"
+    let rmnInstanceId = "test-rmn-dup-ccvs"
+    let factoryInstanceId = "test-factory-dup-ccvs"
+    let tokenAdminRegistryInstanceId = "test-tar-dup-ccvs"
+    let ccvRegistryInstanceId = "test-ccvregistry-dup-ccvs"
+    let feeQuoterInstanceId = "test-feequoter-dup-ccvs"
+    let sourceChainSelector : Numeric 0 = 1111111111.0
+    let destChainSelector : Numeric 0 = 2222222222.0
+
+    let testFeeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "FeeToken"
+
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = sourceChainSelector
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
+                isEnabled = True
+                addressBytesLength = 20
+                tokenReceiverAllowed = False
+                baseExecutionGasCost = 0
+                offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                laneMandatedCCVs = []
+                defaultCCVs = []
+                messageNetworkFeeUSDCents = cents 0.0
+                tokenNetworkFeeUSDCents = cents 0.0)]
+            sourceChainConfigs = Map.empty
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    feeQuoter <- submit ccipOwner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            instanceId = feeQuoterInstanceId
+            owner = ccipOwner
+            feeTokens = Set.fromList [testFeeTokenId]
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList [(testFeeTokenId,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 100000000.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
+            linkTokenInstrumentId = testFeeTokenId
+            priceUpdaters = []
+
+    onRamp <- submit ccipOwner do
+        createCmd CCIP.OnRamp.OnRamp with
+            instanceId = onRampInstanceId
+            ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
+            deps = CCIP.OnRamp.OnRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                ccvRegistry = ccvRegistryInstanceAddress
+
+    factory <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
+            instanceId = factoryInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp-dup-ccvs" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createResult <- submit (actAs user <> disclose disclosedFactory) do
+        exerciseCmd factory CCIP.PerPartyRouter.CreateRouter with
+            partyOwner = user
+            instanceId = "test-router-dup-ccvs"
+    let router = createResult.router
+
+    disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    duplicateVerifier <- submit ccipOwner do
+        createCmd CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier with
+            instanceId = "sender-ccv"
+            owner = ccipOwner
+            ccipOwner = ccipOwner
+            versionTag = CommitteeVerifier.DummyCommitteeVerifier.dummyVersionTag
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+    disclosedDuplicateVerifier <- fromSome <$> queryDisclosure ccipOwner duplicateVerifier
 
     submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
-                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
-                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
-                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = ""
-            ccipReceiveGasLimit = 0
-            blockConfirmations = None
-            senderRequiredCCVs = []
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = Some("12345678") -- invalid token receiver (not 20 bytes)
-            tokenArgs = "aabbccdd"
-            feeToken = feeTokenId
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
+                    ]
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "0000000000000000000000000000000000000001"
+                payload = "abcd"
+                feeToken = basicFeeToken testFeeTokenId dummyTokenInput
+                tokenTransfer = None
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                    gasLimit = 0
+                    blockConfirmations = 0
+                    ccvs =
+                        [ RawInstanceAddress.make "sender-ccv" ccipOwner
+                        , RawInstanceAddress.make "sender-ccv" ccipOwner
+                        ]
+                    executor = None
+                    tokenReceiver = ""
+                    tokenArgs = ""
+
+    pure ()
+
+testPrepareSendRejectsSequenceNumberOverflow : Script ()
+testPrepareSendRejectsSequenceNumberOverflow = script do
+    ccipOwner <- allocateParty "ccip-owner-seq"
+    rmnOwner <- allocateParty "rmn-owner-seq"
+    user <- allocateParty "user-seq"
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
+
+    let globalConfigInstanceId = "test-globalconfig-seq"
+    let onRampInstanceId = "test-onramp-seq"
+    let rmnInstanceId = "test-rmn-seq"
+    let tokenAdminRegistryInstanceId = "test-tar-seq"
+    let ccvRegistryInstanceId = "test-ccvregistry-seq"
+    let feeQuoterInstanceId = "test-feequoter-seq"
+    let sourceChainSelector : Numeric 0 = 1111111111.0
+    let destChainSelector : Numeric 0 = 2222222222.0
+    let maxUint64 : Numeric 0 = 18446744073709551615.0
+
+    let testFeeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "FeeToken"
+
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let feeQuoterInstanceAddress = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+    let onRampInstanceAddress = RawInstanceAddress.make onRampInstanceId ccipOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = sourceChainSelector
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
+                isEnabled = True
+                addressBytesLength = 20
+                tokenReceiverAllowed = False
+                baseExecutionGasCost = 0
+                offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                laneMandatedCCVs = []
+                defaultCCVs = []
+                messageNetworkFeeUSDCents = cents 0.0
+                tokenNetworkFeeUSDCents = cents 0.0)]
+            sourceChainConfigs = Map.empty
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    feeQuoter <- submit ccipOwner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            instanceId = feeQuoterInstanceId
+            owner = ccipOwner
+            feeTokens = Set.fromList [testFeeTokenId]
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 1000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                defaultTxGasLimit = 1
+                linkFeeMultiplierPercent = 100.0
+                defaultTokenFeeUSD = 0.0
+                defaultTokenDestGasOverhead = 0)]
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 0.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
+            usdPerToken = Map.fromList [(testFeeTokenId,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 100000000.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
+            linkTokenInstrumentId = testFeeTokenId
+            priceUpdaters = []
+
+    onRamp <- submit ccipOwner do
+        createCmd CCIP.OnRamp.OnRamp with
+            instanceId = onRampInstanceId
+            ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
+            deps = CCIP.OnRamp.OnRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = feeQuoterInstanceAddress
+                ccvRegistry = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+
+    router <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = "router-seq"
+            ccipOwner = ccipOwner
+            partyOwner = user
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = onRampInstanceAddress
+                offRamp = RawInstanceAddress.make "unused-offramp-seq" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = feeQuoterInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+            outboundSequenceNumbers = Map.fromList [(destChainSelector, maxUint64)]
+            executedMessages = Set.empty
+            archivedExecutionContractIds = []
+            customObservers = []
+
+    disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
+                    ]
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "0000000000000000000000000000000000000001"
+                payload = "abcd"
+                tokenTransfer = None
+                feeToken = basicFeeToken testFeeTokenId dummyTokenInput
+                extraArgs = basicExtraArgs 100000
 
     pure ()

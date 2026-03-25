@@ -1,20 +1,20 @@
--- | Raw instance address type for human-readable CCV identification.
+-- | Raw instance address type for human-readable contract identification.
 -- Format: "instanceId@partyId" - can be parsed to identify the contract and owner.
---
--- TODO: consider moving this or combining with MessageCodecV1 and naming make
--- `encodeRawInstanceAddress` for consistency. then `encodeInstanceAddress` can
--- leverage `encodeRawInstanceAddress` or `toInstanceAddress` below and we always
--- hash instance addresses in the same manner using the same implementation.
-module CCIP.RawInstanceAddress where
+module MCMS.RawInstanceAddress where
 
 import DA.Crypto.Text (BytesHex, keccak256, toHex)
 import DA.Text qualified as Text
-
 
 -- | Raw instance address in format "instanceId@partyId".
 -- Human-readable form used for configuration and comparison.
 newtype RawInstanceAddress = RawInstanceAddress Text
     deriving (Eq, Ord, Show)
+
+-- | Validate that an instanceId is non-empty and does not contain '@'.
+-- Intended for use in template ensure clauses.
+assertValidInstanceId : Text -> Bool
+assertValidInstanceId instanceId =
+    instanceId /= "" && not (Text.isInfixOf "@" instanceId)
 
 empty : RawInstanceAddress
 empty = RawInstanceAddress ""
@@ -26,6 +26,17 @@ make instanceId owner =
     if Text.isInfixOf "@" instanceId
     then error "RawInstanceAddress: instanceId cannot contain '@'"
     else RawInstanceAddress (instanceId <> "@" <> partyToText owner)
+
+-- | Create an instance address string from instanceId and owner.
+-- Convenience wrapper around make + toText for callers that need Text.
+makeText : Text -> Party -> Text
+makeText instanceId owner =
+    let RawInstanceAddress raw = make instanceId owner
+    in raw
+
+-- | Unwrap a RawInstanceAddress to its underlying Text representation.
+toText : RawInstanceAddress -> Text
+toText (RawInstanceAddress raw) = raw
 
 -- | Asserts that a (instanceId, owner) pair matches the expected RawInstanceAddress.
 assertEqual : Text -> Text -> Party -> RawInstanceAddress -> Update ()
@@ -47,3 +58,19 @@ ownerParty (RawInstanceAddress raw) =
 toInstanceAddress : RawInstanceAddress -> BytesHex
 toInstanceAddress (RawInstanceAddress raw) =
     keccak256 (toHex raw)
+
+-- | Parse instanceId from instanceAddress format "instanceId@partyId".
+-- Returns the instanceId text before the @ separator.
+parseInstanceIdText : Text -> Optional Text
+parseInstanceIdText instanceAddress =
+    case Text.splitOn "@" instanceAddress of
+        [instId, _partyId] -> Some instId
+        _ -> None
+
+-- | Parse partyId from instanceAddress format "instanceId@partyId".
+-- Returns the partyId text after the @ separator.
+parsePartyIdText : Text -> Optional Text
+parsePartyIdText instanceAddress =
+    case Text.splitOn "@" instanceAddress of
+        [_instanceId, partyId] -> Some partyId
+        _ -> None

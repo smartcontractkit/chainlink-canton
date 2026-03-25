@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
+	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "c13141b48cd65902990c6477d7f1e933ec427311114c497089d18cbf41c59529"
+	PackageID   = "257f9d11e5ddbfa8ee73c62d4c3a721f731e6d2fa5ac58f3dba5ce23bdb33670"
 	SDKVersion  = "3.4.10"
 )
 
@@ -206,6 +206,72 @@ func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// FinalizeFeeFromRouter is a Record type
+type FinalizeFeeFromRouter struct {
+	RouterPartyOwner  types.PARTY       `json:"routerPartyOwner"`
+	RouterInstanceId  types.TEXT        `json:"routerInstanceId"`
+	GlobalConfigCid   types.CONTRACT_ID `json:"globalConfigCid"`
+	FeeQuoterCid      types.CONTRACT_ID `json:"feeQuoterCid"`
+	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+}
+
+// ToMap converts FinalizeFeeFromRouter to a map for DAML arguments
+func (t FinalizeFeeFromRouter) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["routerPartyOwner"] = t.RouterPartyOwner.ToMap()
+
+	m["routerInstanceId"] = string(t.RouterInstanceId)
+
+	m["globalConfigCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["feeQuoterCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	return m
+}
+
+func (t FinalizeFeeFromRouter) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FinalizeFeeFromRouter) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FinalizeFeeFromRouter to hex string (Canton MCMS format)
+func (t FinalizeFeeFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FinalizeFeeFromRouter from hex string (Canton MCMS format)
+func (t *FinalizeFeeFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
 	GlobalConfigCid   types.CONTRACT_ID `json:"globalConfigCid"`
@@ -253,9 +319,10 @@ func (t *GetRequiredCCVsForSend) UnmarshalHex(data string) error {
 
 // OnRamp is a Template type
 type OnRamp struct {
-	InstanceId types.TEXT  `json:"instanceId"`
-	CcipOwner  types.PARTY `json:"ccipOwner"`
-	Deps       OnRampDeps  `json:"deps"`
+	InstanceId        types.TEXT    `json:"instanceId"`
+	CcipOwner         types.PARTY   `json:"ccipOwner"`
+	MaxUSDCentsPerMsg types.NUMERIC `json:"maxUSDCentsPerMsg"`
+	Deps              OnRampDeps    `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -277,6 +344,10 @@ func (t OnRamp) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	if t.MaxUSDCentsPerMsg != "" {
+		args["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = func() any {
@@ -302,6 +373,10 @@ func (t OnRamp) CreateCommandWithPackageID(packageID string) *model.CreateComman
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	if t.MaxUSDCentsPerMsg != "" {
+		args["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = func() any {
@@ -341,6 +416,27 @@ func (t *OnRamp) UnmarshalHex(data string) error {
 }
 
 // Choice methods for OnRamp
+
+// FinalizeFeeFromRouter exercises the FinalizeFeeFromRouter choice on this OnRamp contract
+// This method uses the package name in the template ID
+func (t OnRamp) FinalizeFeeFromRouter(contractID string, args FinalizeFeeFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "FinalizeFeeFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFeeFromRouterWithPackageID exercises the FinalizeFeeFromRouter choice using the provided package ID instead of package name
+func (t OnRamp) FinalizeFeeFromRouterWithPackageID(contractID string, packageID string, args FinalizeFeeFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "FinalizeFeeFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
 
 // CCIPSendFromRouter exercises the CCIPSendFromRouter choice on this OnRamp contract
 // This method uses the package name in the template ID
@@ -474,11 +570,11 @@ var _ mcms.IMCMSReceiver = (*OnRamp)(nil)
 
 // OnRampDeps is a Record type
 type OnRampDeps struct {
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	CcvRegistry        mcms.RawInstanceAddress `json:"ccvRegistry"`
 }
 
 // ToMap converts OnRampDeps to a map for DAML arguments
@@ -552,28 +648,30 @@ func (t *OnRampDeps) UnmarshalHex(data string) error {
 
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
-	RouterPartyOwner      types.PARTY                               `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT                                `json:"routerInstanceId"`
-	GlobalConfigCid       types.CONTRACT_ID                         `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID                         `json:"tokenAdminRegistryCid"`
-	FeeQuoterCid          types.CONTRACT_ID                         `json:"feeQuoterCid"`
-	RmnRemoteCid          types.CONTRACT_ID                         `json:"rmnRemoteCid"`
-	DestChainSelector     types.NUMERIC                             `json:"destChainSelector"`
-	Receiver              types.TEXT                                `json:"receiver"`
-	Payload               types.TEXT                                `json:"payload"`
-	CcipReceiveGasLimit   types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations    *types.INT64                              `json:"blockConfirmations" hex:"optional"`
-	CurrentSequenceNumber types.NUMERIC                             `json:"currentSequenceNumber"`
-	SenderRequiredCCVs    []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
-	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
-	TokenReceiver         *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
-	TokenArgs             types.TEXT                                `json:"tokenArgs"`
-	FeeToken              splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
+	DestChainSelector     types.NUMERIC            `json:"destChainSelector"`
+	Message               client.Canton2AnyMessage `json:"message"`
+	RouterPartyOwner      types.PARTY              `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT               `json:"routerInstanceId"`
+	GlobalConfigCid       types.CONTRACT_ID        `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID        `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          types.CONTRACT_ID        `json:"feeQuoterCid"`
+	RmnRemoteCid          types.CONTRACT_ID        `json:"rmnRemoteCid"`
+	CurrentSequenceNumber types.NUMERIC            `json:"currentSequenceNumber"`
 }
 
 // ToMap converts PrepareSendFromRouter to a map for DAML arguments
 func (t PrepareSendFromRouter) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["message"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
 
 	m["routerPartyOwner"] = t.RouterPartyOwner.ToMap()
 
@@ -611,71 +709,7 @@ func (t PrepareSendFromRouter) ToMap() map[string]any {
 		return t.RmnRemoteCid
 	}()
 
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["receiver"] = string(t.Receiver)
-
-	m["payload"] = string(t.Payload)
-
-	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	if t.BlockConfirmations != nil {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-			"value": int64(*t.BlockConfirmations),
-		}
-	} else {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
 	m["currentSequenceNumber"] = t.CurrentSequenceNumber
-
-	m["senderRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.SenderRequiredCCVs))
-		for _, e := range t.SenderRequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	if t.TokenInstrumentId != nil {
-		m["tokenInstrumentId"] = map[string]any{
-			"_type": "optional",
-			"value": *t.TokenInstrumentId,
-		}
-	} else {
-		m["tokenInstrumentId"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	if t.TokenReceiver != nil {
-		m["tokenReceiver"] = map[string]any{
-			"_type": "optional",
-			"value": string(*t.TokenReceiver),
-		}
-	} else {
-		m["tokenReceiver"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	m["tokenArgs"] = string(t.TokenArgs)
-
-	m["feeToken"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeToken
-	}()
 
 	return m
 }
@@ -746,11 +780,11 @@ func (t *SetDeps) UnmarshalHex(data string) error {
 
 // SetDepsParams is a Record type
 type SetDepsParams struct {
-	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
-	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
-	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	CcvRegistry        *common.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
+	GlobalConfig       *mcms.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	RmnRemote          *mcms.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	TokenAdminRegistry *mcms.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *mcms.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	CcvRegistry        *mcms.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments
@@ -841,6 +875,7 @@ func (t *SetDepsParams) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error)
+	FinalizeFeeFromRouter(args FinalizeFeeFromRouter) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error)
 	PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error)
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
@@ -877,6 +912,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 // CCIPSendFromRouter encodes parameters for the CCIPSendFromRouter choice.
 func (e *encoder) CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CCIPSendFromRouter", args)
+}
+
+// FinalizeFeeFromRouter encodes parameters for the FinalizeFeeFromRouter choice.
+func (e *encoder) FinalizeFeeFromRouter(args FinalizeFeeFromRouter) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FinalizeFeeFromRouter", args)
 }
 
 // GetRequiredCCVsForSend encodes parameters for the GetRequiredCCVsForSend choice.

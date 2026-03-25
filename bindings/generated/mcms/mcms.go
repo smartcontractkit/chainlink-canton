@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "e11aa1bc604db153d8177fa8c443fbd69304fb37f94d1d14373f822951ec6879"
+	PackageID   = "ad208c28475d3a37dfbd211070714718e35fc8a53eb7db23c87b403dc15549c7"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1181,48 +1181,6 @@ func (t *MCMS) UnmarshalHex(data string) error {
 
 // Choice methods for MCMS
 
-// SetConfig exercises the SetConfig choice on this MCMS contract
-// This method uses the package name in the template ID
-func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
-func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetRoot exercises the SetRoot choice on this MCMS contract
-// This method uses the package name in the template ID
-func (t MCMS) SetRoot(contractID string, args SetRoot) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetRoot",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetRootWithPackageID exercises the SetRoot choice using the provided package ID instead of package name
-func (t MCMS) SetRootWithPackageID(contractID string, packageID string, args SetRoot) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetRoot",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // ExecuteOp exercises the ExecuteOp choice on this MCMS contract
 // This method uses the package name in the template ID
 func (t MCMS) ExecuteOp(contractID string, args ExecuteOp) *model.ExerciseCommand {
@@ -1265,6 +1223,27 @@ func (t MCMS) ExecuteScheduledBatchWithPackageID(contractID string, packageID st
 	}
 }
 
+// SetRoot exercises the SetRoot choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) SetRoot(contractID string, args SetRoot) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetRoot",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetRootWithPackageID exercises the SetRoot choice using the provided package ID instead of package name
+func (t MCMS) SetRootWithPackageID(contractID string, packageID string, args SetRoot) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetRoot",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // CanExecuteOp exercises the CanExecuteOp choice on this MCMS contract
 // This method uses the package name in the template ID
 func (t MCMS) CanExecuteOp(contractID string, args CanExecuteOp) *model.ExerciseCommand {
@@ -1286,48 +1265,6 @@ func (t MCMS) CanExecuteOpWithPackageID(contractID string, packageID string, arg
 	}
 }
 
-// IsOperationReady exercises the IsOperationReady choice on this MCMS contract
-// This method uses the package name in the template ID
-func (t MCMS) IsOperationReady(contractID string, args IsOperationReady) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "IsOperationReady",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// IsOperationReadyWithPackageID exercises the IsOperationReady choice using the provided package ID instead of package name
-func (t MCMS) IsOperationReadyWithPackageID(contractID string, packageID string, args IsOperationReady) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "IsOperationReady",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// Archive exercises the Archive choice on this MCMS contract
-// This method uses the package name in the template ID
-func (t MCMS) Archive(contractID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
-func (t MCMS) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
 // GetState exercises the GetState choice on this MCMS contract
 // This method uses the package name in the template ID
 func (t MCMS) GetState(contractID string, args GetState) *model.ExerciseCommand {
@@ -1345,6 +1282,27 @@ func (t MCMS) GetStateWithPackageID(contractID string, packageID string, args Ge
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "GetState",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetConfig exercises the SetConfig choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
+func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1391,6 +1349,27 @@ func (t MCMS) IsOperationPendingWithPackageID(contractID string, packageID strin
 	}
 }
 
+// IsOperationReady exercises the IsOperationReady choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) IsOperationReady(contractID string, args IsOperationReady) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationReady",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperationReadyWithPackageID exercises the IsOperationReady choice using the provided package ID instead of package name
+func (t MCMS) IsOperationReadyWithPackageID(contractID string, packageID string, args IsOperationReady) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationReady",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // IsOperationDone exercises the IsOperationDone choice on this MCMS contract
 // This method uses the package name in the template ID
 func (t MCMS) IsOperationDone(contractID string, args IsOperationDone) *model.ExerciseCommand {
@@ -1430,6 +1409,27 @@ func (t MCMS) GetTimestampWithPackageID(contractID string, packageID string, arg
 		ContractID: contractID,
 		Choice:     "GetTimestamp",
 		Arguments:  argsToMap(args),
+	}
+}
+
+// Archive exercises the Archive choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t MCMS) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -1751,6 +1751,42 @@ func (t Op) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes Op from hex string (Canton MCMS format)
 func (t *Op) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RawInstanceAddress is a Record type
+type RawInstanceAddress struct {
+	Unpack types.TEXT `json:"unpack"`
+}
+
+// ToMap converts RawInstanceAddress to a map for DAML arguments
+func (t RawInstanceAddress) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["unpack"] = string(t.Unpack)
+
+	return m
+}
+
+func (t RawInstanceAddress) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RawInstanceAddress) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RawInstanceAddress to hex string (Canton MCMS format)
+func (t RawInstanceAddress) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RawInstanceAddress from hex string (Canton MCMS format)
+func (t *RawInstanceAddress) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

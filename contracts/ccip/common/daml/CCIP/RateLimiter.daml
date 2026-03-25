@@ -1,18 +1,36 @@
 module CCIP.RateLimiter where
 
+import DA.Map qualified as Map
 import DA.Time (convertRelTimeToMicroseconds, subTime)
+import DA.Crypto.Text (BytesHex, byteCount)
 
 import qualified CCIP.Context
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress (assertValidInstanceId)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Codec (decodeBoolAt, decodeNumeric0At)
 
 rateLimiterKey : Text
 rateLimiterKey = "rate-limiter"
 
+inboundRateLimiterKey : Text
+inboundRateLimiterKey = "inbound-rate-limiter"
+
+inboundCustomBlockConfirmationsRateLimiterKey : Text
+inboundCustomBlockConfirmationsRateLimiterKey = "inbound-custom-block-confirmations-rate-limiter"
+
 lookupRateLimiterCid : CCIP.Context.CCIPContext -> Update (ContractId RateLimiter)
 lookupRateLimiterCid ctx = CCIP.Context.getFromContextU ctx rateLimiterKey
 
-rawInstanceAddress : RateLimiter -> CCIP.RawInstanceAddress.RawInstanceAddress
-rawInstanceAddress rl = CCIP.RawInstanceAddress.make rl.instanceId rl.poolOwner
+lookupInboundRateLimiterCid : RateLimitMode -> CCIP.Context.CCIPContext -> Update (ContractId RateLimiter)
+lookupInboundRateLimiterCid mode ctx = CCIP.Context.getFromContextU ctx key
+  where
+    key = case mode of
+        RateLimitMode_DefaultFinality -> inboundRateLimiterKey
+        RateLimitMode_CustomFinality -> inboundCustomBlockConfirmationsRateLimiterKey
+
+rawInstanceAddress : RateLimiter -> RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress rl = RawInstanceAddress.make rl.instanceId rl.poolOwner
 
 data RateLimitDirection
     = RateLimitDirection_Outbound
@@ -59,6 +77,7 @@ template RateLimiter
         lastUpdated : Time
     where
         signatory poolOwner
+        ensure assertValidInstanceId instanceId
 
         choice SetConfig : ContractId RateLimiter
             with
@@ -107,3 +126,35 @@ template RateLimiter
                         rateLimiterCid = newCid
                         availableBeforeConsume = available
                         consumed = requested
+
+        interface instance MCMSReceiver for RateLimiter where
+          view = MCMSReceiverView with
+            mcmsController = poolOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let selfAddress = RawInstanceAddress.makeText instanceId poolOwner
+            selfCid <- case Map.lookup selfAddress contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> selfAddress
+              Some cid -> pure (coerceContractId cid : ContractId RateLimiter)
+
+            case functionName of
+              "SetConfig" -> do
+                case decodeSetConfigParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetConfig"
+                  Some ((newIsEnabled, newCapacity, newRate), finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetConfig" (finalOffset == byteCount operationData)
+                    newCid <- exercise selfCid SetConfig with
+                      newIsEnabled
+                      newCapacity
+                      newRate
+                    pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+-- | Decode SetConfig params: (Bool, Numeric 0, Numeric 0)
+decodeSetConfigParams : BytesHex -> Optional ((Bool, Numeric 0, Numeric 0), Int)
+decodeSetConfigParams encoded = do
+    (newIsEnabled, offset1) <- decodeBoolAt encoded 0
+    (newCapacity, offset2) <- decodeNumeric0At encoded offset1
+    (newRate, finalOffset) <- decodeNumeric0At encoded offset2
+    Some ((newIsEnabled, newCapacity, newRate), finalOffset)

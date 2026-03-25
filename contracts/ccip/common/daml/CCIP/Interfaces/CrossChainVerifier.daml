@@ -4,8 +4,11 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.Internal
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
+
+useDefaultCCVs = CCIP.Internal.useDefaultCCVs
 
 interface ICrossChainVerifier where
     viewtype CrossChainVerifierView
@@ -32,6 +35,7 @@ interface ICrossChainVerifier where
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            extraContext : CCIP.Context.CCIPContext
             caller : Party
         controller caller
         do crossChainVerifier_calculateFeeImpl this self arg
@@ -49,9 +53,10 @@ interface ICrossChainVerifier where
         controller caller
         do crossChainVerifier_forwardToVerifierImpl this self arg
 
-
 data CrossChainVerifierView = CrossChainVerifierView
     with
+        instanceId : Text
+        owner : Party
         ccipOwner : Party
         storageLocations : [Text]
     deriving (Eq, Show)

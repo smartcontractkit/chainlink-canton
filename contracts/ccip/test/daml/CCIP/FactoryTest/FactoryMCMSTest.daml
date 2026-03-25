@@ -6,10 +6,10 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Map qualified as Map
 
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.Factory
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
-import qualified CCIP.RawInstanceAddress
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FactoryTest.FactoryCodecTest
@@ -48,6 +48,7 @@ testFactoryCreate = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
   contracts <- query @CCIPFactory bootstrapOwner
   case filter (\(_, f) -> f.instanceId == instanceId) contracts of
@@ -81,6 +82,7 @@ testSetOwnerToMCMS = script do
       mcmsParty = bootstrapOwner  -- Same party to avoid authorization issues
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
   -- SetOwnerToMCMS should fail when owner == mcmsParty
   -- This verifies the assertion logic works
@@ -112,6 +114,7 @@ testSetOwnerToMCMS_AlreadyMCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
   -- SetOwnerToMCMS should fail since already MCMS-controlled
   submitMustFail mcmsParty do
@@ -135,6 +138,7 @@ testGetFactoryState = script do
       mcmsParty
       usedInstanceIds = usedIds
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
   state <- submit bootstrapOwner do
     exerciseCmd factoryCid GetFactoryState with caller = bootstrapOwner
@@ -165,8 +169,9 @@ testDeployGlobalConfig_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployGlobalConfigParams with
         instanceId = gcInstanceId
@@ -196,8 +201,9 @@ testDeployGlobalConfig_PreMCMS_Rejected = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId bootstrapOwner
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId bootstrapOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployGlobalConfigParams with
         instanceId = "gc-1"
@@ -226,8 +232,9 @@ testDeployGlobalConfig_Duplicate_Rejected = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params1 = DeployGlobalConfigParams with
         instanceId = "gc-1"
@@ -277,8 +284,9 @@ testInstanceIdCollision_Rejected = script do
       mcmsParty
       usedInstanceIds = Map.fromList [(sharedInstanceId, True)]
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployGlobalConfigParams with
         instanceId = sharedInstanceId
@@ -308,13 +316,13 @@ testDeployFeeQuoter_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployFeeQuoterParams with
         instanceId = "fee-quoter-1"
         linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-        maxFeeJuelsPerMsg = 1000000000000000000.0
       encoded = encodeDeployFeeQuoterParams params
 
   submit mcmsParty do
@@ -339,8 +347,9 @@ testDeployTokenAdminRegistry_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployTokenAdminRegistryParams with
         instanceId = "tar-1"
@@ -368,8 +377,9 @@ testDeployOnRamp_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployOnRampParams with
         instanceId = "onramp-1"
@@ -378,6 +388,7 @@ testDeployOnRamp_MCMS = script do
         tokenAdminRegistry = RawInstanceAddress "tar@owner"
         feeQuoter = RawInstanceAddress "fq@owner"
         ccvRegistry = RawInstanceAddress "ccv@owner"
+        maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 
   submit mcmsParty do
@@ -402,8 +413,9 @@ testDeployOffRamp_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployOffRampParams with
         instanceId = "offramp-1"
@@ -434,8 +446,9 @@ testDeployPerPartyRouterFactory_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployPerPartyRouterFactoryParams with
         instanceId = "ppr-factory-1"
@@ -474,8 +487,9 @@ testDeployRMNRemote_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   -- Use mcmsParty as rmnOwner so authorization works within single party
   let params = DeployRMNRemoteParams with
@@ -509,8 +523,9 @@ testDeployCommitteeVerifier_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   -- Use mcmsParty for all signatory roles to avoid authorization issues
   let params = DeployCommitteeVerifierParams with
@@ -539,6 +554,7 @@ testDeployCommitteeVerifier_MCMS = script do
 testDeployLockReleaseTokenPool_MCMS : Script ()
 testDeployLockReleaseTokenPool_MCMS = script do
   mcmsParty <- allocateParty "mcms_party"
+  rateLimitAdmin <- allocateParty "rate_limit_admin"
 
   let factoryInstanceId = "factory-lrtp"
 
@@ -549,19 +565,21 @@ testDeployLockReleaseTokenPool_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   -- Use mcmsParty as poolOwner so authorization works within single party
   let params = DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
-        ccipOwner = mcmsParty
         poolOwner = mcmsParty
+        ccipOwner = mcmsParty
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "USDC"
         decimals = 6
-        tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" mcmsParty
-        feeQuoter = CCIP.RawInstanceAddress.make "fq-1" mcmsParty
-        rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" mcmsParty
+        rateLimitAdmin = Some rateLimitAdmin
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" mcmsParty
+        feeQuoter = RawInstanceAddress.make "fq-1" mcmsParty
+        rmnRemote = RawInstanceAddress.make "rmn-1" mcmsParty
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   submit mcmsParty do
@@ -587,8 +605,9 @@ testDeployRateLimiter_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   -- Use mcmsParty as poolOwner so authorization works within single party
   let params = DeployRateLimiterParams with
@@ -626,8 +645,9 @@ testDeployCCIPSender_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   -- Use mcmsParty as owner so authorization works within single party
   let params = DeployCCIPSenderParams with
@@ -658,14 +678,18 @@ testDeployCCIPReceiver_MCMS = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   -- Use mcmsParty as owner so authorization works within single party
   let params = DeployCCIPReceiverParams with
         instanceId = "receiver-1"
         owner = mcmsParty
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
+        optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
+        optionalThreshold = 20
+        minBlockConfirmations = 7
       encoded = encodeDeployCCIPReceiverParams params
 
   submit mcmsParty do
@@ -691,8 +715,9 @@ testMultipleNonSingletonDeployments = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
 
   -- Deploy first rate limiter
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
@@ -760,8 +785,9 @@ testUnknownFunction_Rejected = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
 
   submitMustFail mcmsParty do
@@ -786,8 +812,9 @@ testInvalidParams_Rejected = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
-  let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
 
   submitMustFail mcmsParty do
@@ -812,6 +839,7 @@ testMissingSelfCid_Rejected = script do
       mcmsParty
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   let params = DeployGlobalConfigParams with

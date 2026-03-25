@@ -8,6 +8,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -25,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "a2d77b027109200b2bf3b3c191762567df14d6fd13af7d6b09d1118c6495518c"
+	PackageID   = "cdf5bfab1fc2b33f4266421e091d2fc7d58312dda65d542ea0be502cebe958d8"
 	SDKVersion  = "3.4.10"
 )
 
@@ -209,9 +210,12 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	InstanceId   types.TEXT                  `json:"instanceId"`
-	Owner        types.PARTY                 `json:"owner"`
-	RequiredCCVs []common.RawInstanceAddress `json:"requiredCCVs"`
+	InstanceId            types.TEXT                `json:"instanceId"`
+	Owner                 types.PARTY               `json:"owner"`
+	RequiredCCVs          []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs          []mcms.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold     types.INT64               `json:"optionalThreshold"`
+	MinBlockConfirmations types.INT64               `json:"minBlockConfirmations"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -248,6 +252,26 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalThreshold"] = int64(t.OptionalThreshold)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -277,6 +301,26 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 		}
 		return res
 	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalThreshold"] = int64(t.OptionalThreshold)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -448,12 +492,11 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute2 is a Record type
 type Execute2 struct {
-	Context                common.CCIPContext          `json:"context"`
-	RouterCid              types.CONTRACT_ID           `json:"routerCid"`
-	EncodedMessage         types.TEXT                  `json:"encodedMessage"`
-	TokenTransfer          *TokenTransferInput         `json:"tokenTransfer" hex:"optional"`
-	CcvInputs              []CCVInput                  `json:"ccvInputs"`
-	AdditionalRequiredCCVs []common.RawInstanceAddress `json:"additionalRequiredCCVs"`
+	Context        common.CCIPContext   `json:"context"`
+	RouterCid      types.CONTRACT_ID    `json:"routerCid"`
+	EncodedMessage types.TEXT           `json:"encodedMessage"`
+	TokenTransfer  *TokenTransferInput2 `json:"tokenTransfer" hex:"optional"`
+	CcvInputs      []CCVInput           `json:"ccvInputs"`
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
@@ -492,19 +535,6 @@ func (t Execute2) ToMap() map[string]any {
 	m["ccvInputs"] = func() []any {
 		res := make([]any, 0, len(t.CcvInputs))
 		for _, e := range t.CcvInputs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["additionalRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.AdditionalRequiredCCVs))
-		for _, e := range t.AdditionalRequiredCCVs {
 			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
@@ -593,16 +623,16 @@ func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TokenTransferInput is a Record type
-type TokenTransferInput struct {
+// TokenTransferInput2 is a Record type
+type TokenTransferInput2 struct {
 	TokenPoolCid       types.CONTRACT_ID     `json:"tokenPoolCid"`
 	TokenReceiverParty types.PARTY           `json:"tokenReceiverParty"`
 	TokenInput         interfaces.TokenInput `json:"tokenInput"`
 	PoolExtraContext   common.CCIPContext    `json:"poolExtraContext"`
 }
 
-// ToMap converts TokenTransferInput to a map for DAML arguments
-func (t TokenTransferInput) ToMap() map[string]any {
+// ToMap converts TokenTransferInput2 to a map for DAML arguments
+func (t TokenTransferInput2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenPoolCid"] = func() any {
@@ -634,31 +664,31 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	return m
 }
 
-func (t TokenTransferInput) MarshalJSON() ([]byte, error) {
+func (t TokenTransferInput2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *TokenTransferInput) UnmarshalJSON(data []byte) error {
+func (t *TokenTransferInput2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes TokenTransferInput to hex string (Canton MCMS format)
-func (t TokenTransferInput) MarshalHex() (string, error) {
+// MarshalHex encodes TokenTransferInput2 to hex string (Canton MCMS format)
+func (t TokenTransferInput2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes TokenTransferInput from hex string (Canton MCMS format)
-func (t *TokenTransferInput) UnmarshalHex(data string) error {
+// UnmarshalHex decodes TokenTransferInput2 from hex string (Canton MCMS format)
+func (t *TokenTransferInput2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
 // UpdateRequiredCCVs is a Record type
 type UpdateRequiredCCVs struct {
-	NewRequiredCCVs []common.RawInstanceAddress `json:"newRequiredCCVs"`
+	NewRequiredCCVs []mcms.RawInstanceAddress `json:"newRequiredCCVs"`
 }
 
 // ToMap converts UpdateRequiredCCVs to a map for DAML arguments

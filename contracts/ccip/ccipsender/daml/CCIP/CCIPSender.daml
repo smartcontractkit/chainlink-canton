@@ -4,51 +4,17 @@
 module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
-import DA.Crypto.Text (BytesHex)
-import DA.Optional (fromOptional)
 
+import qualified CCIP.Client
 import qualified CCIP.Context
 import qualified CCIP.FeeQuoter
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
-import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.TokenAdminRegistry
 
-import qualified Splice.Api.Token.HoldingV1
-
--- | Per-CCV send input. Pairs a verifier contract (via interface)
--- with per-CCV forwarding args and extra context.
-data CCVSendInput = CCVSendInput
-    with
-        ccvCid : ContractId ICCV.ICrossChainVerifier
-        verifierArgs : BytesHex
-        ccvExtraContext : CCIP.Context.CCIPContext
-    deriving (Eq, Show)
-
--- | Canton extra args.
-data CantonExtraArgsV1 = CantonExtraArgsV1
-    with
-        gasLimit : Int
-        blockConfirmations : Optional Int
-        senderRequiredCCVs : [RawInstanceAddress]
-        executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
-        executorArgs : Optional BytesHex
-        tokenReceiver : Optional BytesHex
-        tokenArgs : BytesHex
-    deriving (Eq, Show)
-
--- | Token transfer input for outbound sends.
-data TokenTransferInput = TokenTransferInput
-    with
-        tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
-        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
-        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-        amount : Numeric 0
-        tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        poolExtraContext : CCIP.Context.CCIPContext
-    deriving (Eq, Show)
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 
 template CCIPSender
     with
@@ -56,94 +22,81 @@ template CCIPSender
         owner : Party
     where
         signatory owner
+        ensure assertValidInstanceId instanceId
 
-        -- | Sends an outbound CCIP message end-to-end.
         nonconsuming choice Send : CCIP.PerPartyRouter.CCIPSendResult
             with
-                -- CCIP context for internal orchestration (PerPartyRouter calls).
+                destinationChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
+                ccvs : [CCIP.Client.CCVSendInput]
                 context : CCIP.Context.CCIPContext
-
-                -- CCIP contract IDs
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
-
-                destChainSelector : Numeric 0
-                receiver : BytesHex
-                payload : BytesHex
-
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-                feeTokenInput : CCIP.Interfaces.TokenPool.TokenInput
-                feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-
-                tokenTransfer : Optional TokenTransferInput
-                extraArgs : CantonExtraArgsV1
-                ccvSendInputs : [CCVSendInput]
             controller owner
             do
-                -- Extract CIDs from context using typed accessors for pool/CCV calls.
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
-                let tokenInstrumentId = case tokenTransfer of
-                        Some tt -> Some tt.tokenInstrumentId
-                        None -> None
+                extraArgs <- case message.extraArgs of
+                    CCIP.Client.V3 v3 -> pure v3
+                    _ -> abort "sender: unsupported extraArgs version"
 
-                case tokenTransfer of
-                    None -> do
-                        assertMsg "send: tokenReceiver must be None for message-only sends"
-                            (extraArgs.tokenReceiver == None)
-                        assertMsg "send: tokenArgs must be empty for message-only sends"
-                            (extraArgs.tokenArgs == "")
-                    Some _ -> pure ()
-
-                -- PrepareSend
                 smCid <- exercise routerCid CCIP.PerPartyRouter.PrepareSend with
+                    destinationChainSelector = destinationChainSelector
+                    message = message
                     context
-                    destChainSelector
-                    receiver
-                    payload
-                    ccipReceiveGasLimit = extraArgs.gasLimit
-                    blockConfirmations = extraArgs.blockConfirmations
-                    senderRequiredCCVs = extraArgs.senderRequiredCCVs
-                    tokenInstrumentId
-                    tokenReceiver = extraArgs.tokenReceiver
-                    tokenArgs = extraArgs.tokenArgs
-                    feeToken
 
-                -- CalculateFee (CCV + pool, USD cents only)
+                smCid <- case message.tokenTransfer of
+                    None -> pure smCid
+                    Some tt ->
+                        exercise tt.tokenPoolCid
+                            CCIP.Interfaces.TokenPool.TokenPool_VerifyOutboundCCVs with
+                                tokenAdminRegistryCid = tokenAdminRegistryCid
+                                extraContext = tt.poolExtraContext
+                                sendingMessageCid = smCid
+                                amount = tt.amount
+                                caller = owner
+
                 smCid <- foldlA (\cid input ->
                     exercise input.ccvCid
                         ICCV.CrossChainVerifier_CalculateFee with
                             sendingMessageCid = cid
+                            extraContext = input.ccvExtraContext
                             caller = owner
-                    ) smCid ccvSendInputs
+                    ) smCid ccvs
 
-                smCid <- case tokenTransfer of
+                smCid <- case message.tokenTransfer of
                     None -> pure smCid
-                    Some tt -> exercise tt.tokenPoolCid
-                        CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
-                            sendingMessageCid = smCid
-                            feeQuoterCid = feeQuoterCid
-                            tokenInstrumentId = tt.tokenInstrumentId
-                            caller = owner
+                    Some tt ->
+                        exercise tt.tokenPoolCid
+                            CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
+                                tokenAdminRegistryCid = tokenAdminRegistryCid
+                                extraContext = tt.poolExtraContext
+                                sendingMessageCid = smCid
+                                feeQuoterCid = feeQuoterCid
+                                tokenInstrumentId = tt.token
+                                caller = owner
 
-                -- Outbound pool CCV verification via TAR
-                smCid <- case tokenTransfer of
+                smCid <- case extraArgs.executor of
                     None -> pure smCid
-                    Some tt -> exercise tt.tokenPoolCid
-                        CCIP.Interfaces.TokenPool.TokenPool_VerifyOutboundCCVs with
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            extraContext = tt.poolExtraContext
-                            sendingMessageCid = smCid
-                            amount = tt.amount
-                            caller = owner
+                    Some executorInput ->
+                        exercise executorInput.executorCid
+                            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                                sendingMessageCid = smCid
+                                executorArgs = executorInput.executorArgs
+                                extraContext = executorInput.executorExtraContext
+                                caller = owner
 
-                -- LockOrBurn (stores token data before executor finalization)
-                smCid <- case tokenTransfer of
+                smCid <- exercise routerCid CCIP.PerPartyRouter.FinalizeFee with
+                    context
+                    sendingMessageCid = smCid
+
+                smCid <- case message.tokenTransfer of
                     None -> pure smCid
                     Some tt -> do
                         lockResult <- exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_LockOrBurn with
+                                tokenAdminRegistryCid = tokenAdminRegistryCid
                                 rmnRemoteCid = rmnRemoteCid
                                 extraContext = tt.poolExtraContext
                                 sendingMessageCid = smCid
@@ -153,21 +106,6 @@ template CCIPSender
                                 caller = owner
                         pure lockResult.sendingMessageCid
 
-                -- Executor computes fee and finalizes message via AddExecutorWithFee.
-                let resolvedExecutorArgs = fromOptional "" extraArgs.executorArgs
-                smCid <- exercise extraArgs.executorCid
-                    CCIP.Interfaces.Executor.Executor_CalculateFee with
-                        sendingMessageCid = smCid
-                        executorArgs = resolvedExecutorArgs
-                        caller = owner
-
-                -- FinalizeFee (FeeQuoter looks up price internally)
-                smCid <- exercise feeQuoterCid
-                    CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
-                        sendingMessageCid = smCid
-                        caller = owner
-
-                -- ForwardToVerifier (verifiers see committed token state)
                 smCid <- foldlA (\cid input ->
                     exercise input.ccvCid
                         ICCV.CrossChainVerifier_ForwardToVerifier with
@@ -176,11 +114,10 @@ template CCIPSender
                             sendingMessageCid = cid
                             verifierArgs = input.verifierArgs
                             caller = owner
-                    ) smCid ccvSendInputs
+                    ) smCid ccvs
 
-                -- CCIPSend (collects total fee from sender)
                 exercise routerCid CCIP.PerPartyRouter.CCIPSend with
                     context
                     sendingMessageCid = smCid
-                    feeTokenInput
-                    feeTokenHoldingCids
+                    feeTokenInput = message.feeToken.tokenInput
+                    feeTokenHoldingCids = message.feeToken.senderInputCids

@@ -5,15 +5,15 @@
 -- caller can trigger the mutation.
 module CCIP.SendingMessageV1 where
 
-import DA.Crypto.Text (BytesHex, keccak256, byteCount)
+import DA.Crypto.Text (BytesHex, byteCount, keccak256)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (isNone, fromOptional)
+import DA.Optional (isNone, isSome, fromSome, fromOptional)
 
 import qualified CCIP.Events
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.Tickets
 
 import qualified Splice.Api.Token.HoldingV1
@@ -63,23 +63,26 @@ data ExecutorFee = ExecutorFee
         executorOwner : Party
         -- Legacy field name retained; value is integer USD cents.
         feeUSDCents : Numeric 0
-        destGasLimit : Int
-        destBytesOverhead : Int
+    deriving (Eq, Show)
+
+data ExecutionMode
+    = ExecutionMode_Executor
+    | ExecutionMode_NoExecutor
     deriving (Eq, Show)
 
 data SendingMessageDeps = SendingMessageDeps
     with
-        router : CCIP.RawInstanceAddress.RawInstanceAddress
-        onRamp : CCIP.RawInstanceAddress.RawInstanceAddress
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
+        router : RawInstanceAddress.RawInstanceAddress
+        onRamp : RawInstanceAddress.RawInstanceAddress
+        globalConfig : RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
+        feeQuoter : RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data SendingMessageState
-    = SendingMessageState_Prepared
-    | SendingMessageState_PoolVerified
+    = SendingMessageState_RequirePoolCCVs
+    | SendingMessageState_Prepared
     | SendingMessageState_TokenLocked
     | SendingMessageState_ExecutorFinalized
     | SendingMessageState_FeeFinalized
@@ -93,6 +96,10 @@ premiumIdentity = 100000000.0
 usd8PerUsdCent : Numeric 0
 usd8PerUsdCent = 1000000.0
 
+gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
+gasCostUsdCents usdPerUnitGas gasUnits =
+    CCIP.Math.mulDivUp (intToNumeric gasUnits) usdPerUnitGas usd8PerUsdCent
+
 sumExecutionGasLimit : [CCVFee] -> Optional TokenSendFee -> Int -> Int
 sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
     let
@@ -103,6 +110,61 @@ sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
     in
         ccvGasLimit + poolGasLimit + executorDestGasLimit
 
+assertCCVInstanceId
+    : Text
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Optional [RawInstanceAddress.RawInstanceAddress]
+    -> Text
+    -> Party
+    -> Update ()
+assertCCVInstanceId msg requiredCCVs outboundPoolCCVs ccvInstanceId caller =
+    let claimed = RawInstanceAddress.make ccvInstanceId caller
+        allowedCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
+    in assertMsg msg (claimed `elem` allowedCCVs)
+
+buildMessageArtifacts
+    : SendingMessageV1
+    -> ([RawInstanceAddress.RawInstanceAddress], BytesHex, CCIP.MessageCodecV1.MessageV1, BytesHex, BytesHex)
+buildMessageArtifacts sm =
+    let
+        allCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
+        ccvAddrs = map RawInstanceAddress.toInstanceAddress allCCVs
+        executorAddressBytes = case sm.executionMode of
+            Some _ ->
+                sm.executorAddress
+            None ->
+                error "sendingMessage: execution mode not set"
+        finalHash =
+            CCIP.MessageCodecV1.computeCCVAndExecutorHash ccvAddrs executorAddressBytes
+        tokenTransferV1Opt = case sm.tokenSendData of
+            None -> None
+            Some tsd -> Some (CCIP.MessageCodecV1.TokenTransferV1 with
+                sourcePoolAddress = CCIP.MessageCodecV1.encodeInstanceAddress tsd.poolInstanceId tsd.poolOwner
+                sourceTokenAddress = CCIP.MessageCodecV1.encodeInstrumentId tsd.instrumentId
+                destTokenAddress = tsd.destTokenAddress
+                tokenReceiver = sm.tokenReceiver
+                amount = tsd.amount
+                extraData = tsd.extraData)
+        messageV1 = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = sm.sourceChainSelector
+            destChainSelector = sm.destChainSelector
+            sequenceNumber = sm.sequenceNumber
+            executionGasLimit = sm.executionGasLimit
+            ccipReceiveGasLimit = sm.ccipReceiveGasLimit
+            finality = 0
+            ccvAndExecutorHash = finalHash
+            onRampAddress = sm.onRampAddress
+            offRampAddress = sm.offRampAddress
+            sender = sm.senderAddress
+            receiver = sm.receiver
+            destBlob = sm.executorArgs
+            tokenTransfer = tokenTransferV1Opt
+            messageData = sm.payload
+        encoded = CCIP.MessageCodecV1.encodeMessageV1 messageV1
+        msgId = keccak256 encoded
+    in
+        (allCCVs, finalHash, messageV1, encoded, msgId)
+
 template SendingMessageV1
     with
         deps : SendingMessageDeps
@@ -111,15 +173,15 @@ template SendingMessageV1
         sender : Party
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
-        requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-        executorAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+        executorAddress : BytesHex
+        executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
         senderAddress : BytesHex
         receiver : BytesHex
         payload : BytesHex
         executionGasLimit : Int
         ccipReceiveGasLimit : Int
-        blockConfirmations : Int
         ccvAndExecutorHash : BytesHex
         onRampAddress : BytesHex
         offRampAddress : BytesHex
@@ -135,11 +197,13 @@ template SendingMessageV1
         -- Expected token instrument for outbound TAR validation
         expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
         -- Pool-required outbound CCVs, set via TAR authorization
-        outboundPoolCCVs : Optional [CCIP.RawInstanceAddress.RawInstanceAddress]
-        -- Executor arguments, set by AddExecutorWithFee
+        outboundPoolCCVs : Optional [RawInstanceAddress.RawInstanceAddress]
+        -- Executor arguments, set during PrepareSend and validated by AddExecutorFee.
         executorArgs : BytesHex
-        -- Executor fee, set by AddExecutorWithFee
+        -- Executor flat fee, set by AddExecutorFee
         executorFee : Optional ExecutorFee
+        executorDestGasLimit : Int
+        executorDestBytesOverhead : Int
         executorFeeTokenAmount : Numeric 0
         -- Appended to by AddVerifierData
         -- TODO: also allow AddTokenSend to add their own observers
@@ -166,13 +230,17 @@ template SendingMessageV1
         -- Mirrors the widened signatory set for auditability.
         ccvOwners : [Party]
 
-        -- External CCIP message, populated by AddExecutorWithFee.
+        -- External CCIP message, populated by BuildMessage.
         message : Optional CCIP.MessageCodecV1.MessageV1
         encodedMessage : BytesHex
         messageId : BytesHex
         -- State machine:
-        --   message-only: Prepared -> ExecutorFinalized -> FeeFinalized -(FinalizeSend)-> consumed
-        --   token-send: Prepared -> PoolVerified -> TokenLocked -> ExecutorFinalized -> FeeFinalized -(FinalizeSend)-> consumed
+        --   message-only: PrepareSend -> Prepared -> ExecutorFinalized -> FeeFinalized -(FinalizeSend)-> consumed
+        --   token-send: PrepareSend -> RequirePoolCCVs -> Prepared -> TokenLocked
+        --               -> ExecutorFinalized -> FeeFinalized -(FinalizeSend)-> consumed
+        -- `Prepared` means the full allowed CCV set is known. For token sends,
+        -- TAR-mediated SetOutboundPoolCCVs is the only transition that can move
+        -- the message into Prepared.
         state : SendingMessageState
     where
         signatory dedup (ccipOwner :: ccvOwners)
@@ -187,10 +255,15 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: AddCCVFee only allowed in Prepared"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "sendingMessage: duplicate CCV fee"
-                    (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
+                assertMsg "sendingMessage: AddCCVFee only allowed in Prepared" (state == SendingMessageState_Prepared)
+                assertCCVInstanceId
+                    "sendingMessage: caller is not an allowed CCV"
+                    requiredCCVs
+                    outboundPoolCCVs
+                    ccvInstanceId
+                    caller
+                assertMsg "sendingMessage: duplicate CCV fee" (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
+
                 let fee = CCVFee with
                         ccvInstanceId, ccvOwner = caller
                         feeUSDCents, destGasLimit, destBytesOverhead
@@ -205,13 +278,12 @@ template SendingMessageV1
                 feeUSDCents : Numeric 0
                 destGasOverhead : Int
                 destBytesOverhead : Int
-                caller : Party
-            controller caller
+            controller ccipOwner
             do
-                assertMsg "sendingMessage: AddTokenSendFee only allowed in Prepared"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "token send fee already set"
-                    (isNone tokenSendFee)
+                assertMsg "sendingMessage: AddTokenSendFee only allowed after pool CCVs are resolved" (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: AddTokenSendFee only valid for token sends" (isSome expectedTokenInstrumentId)
+                assertMsg "token send fee already set" (isNone tokenSendFee)
+
                 let fee = TokenSendFee with
                         poolInstanceId, poolOwner
                         feeUSDCents, destGasOverhead, destBytesOverhead
@@ -220,99 +292,119 @@ template SendingMessageV1
         -- TAR-authorized outbound pool CCV requirements.
         choice SetOutboundPoolCCVs : ContractId SendingMessageV1
             with
-                poolCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                poolCCVs : [RawInstanceAddress.RawInstanceAddress]
             controller ccipOwner
             do
-                assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed in Prepared"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "sendingMessage: outbound pool verification only valid for token sends"
-                    (expectedTokenInstrumentId /= None)
-                assertMsg "setOutboundPoolCCVs: already set" (outboundPoolCCVs == None)
+                assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
+                assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
+                assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
+
                 create this with
                     outboundPoolCCVs = Some poolCCVs
-                    state = SendingMessageState_PoolVerified
+                    state = SendingMessageState_Prepared
 
-        -- Executor fee, final CCV/executor hash computation, and message finalization.
-        -- Merges outbound pool CCVs into requiredCCVs, derives executor address from
-        -- (executorInstanceId, caller), computes ccvAndExecutorHash, and builds MessageV1.
-        choice AddExecutorWithFee : ContractId SendingMessageV1
+        -- Record the executor-selected flat fee. OnRamp computes execution
+        -- gas/bytes during fee finalization.
+        choice AddExecutorFee : ContractId SendingMessageV1
             with
                 executorInstanceId : Text
                 executorArgs : BytesHex
-                blockConfirmations : Int
                 feeUSDCents : Numeric 0
-                destGasLimit : Int
-                destBytesOverhead : Int
                 caller : Party
             controller caller
             do
-                let isTokenSend = expectedTokenInstrumentId /= None
-                assertMsg "sendingMessage: invalid state for AddExecutorWithFee"
-                    (if isTokenSend
-                        then state == SendingMessageState_TokenLocked
-                        else state == SendingMessageState_Prepared)
-                assertMsg "addExecutorWithFee: already set" (executorFee == None)
-                assertMsg "sendingMessage: token sends require outbound pool verification"
-                    (if isTokenSend then outboundPoolCCVs /= None else True)
+                assertMsg "sendingMessage: invalid state for AddExecutorFee" (state == SendingMessageState_Prepared)
+                assertMsg "addExecutorFee: already set" (isNone executorFee)
+                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
+                assertMsg "sendingMessage: executor mode already fixed to no executor"
+                    (executionMode == Some ExecutionMode_Executor)
 
-                let poolCCVs = fromOptional [] outboundPoolCCVs
-                let finalCCVs = dedup (requiredCCVs ++ poolCCVs)
-                let derivedExecutor = CCIP.RawInstanceAddress.make executorInstanceId caller
-
-                let ccvAddrs = map CCIP.RawInstanceAddress.toInstanceAddress finalCCVs
-                let execAddr = CCIP.RawInstanceAddress.toInstanceAddress derivedExecutor
-                let finalHash = CCIP.MessageCodecV1.computeCCVAndExecutorHash ccvAddrs execAddr
+                let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId
                         executorOwner = caller
                         feeUSDCents = feeUSDCents
-                        destGasLimit = destGasLimit
-                        destBytesOverhead = destBytesOverhead
-                let finalExecutionGasLimit =
-                        sumExecutionGasLimit ccvFees tokenSendFee destGasLimit
-
-                let tokenTransferV1Opt = case tokenSendData of
-                        None -> None
-                        Some tsd -> Some (CCIP.MessageCodecV1.TokenTransferV1 with
-                            sourcePoolAddress = CCIP.MessageCodecV1.encodeInstanceAddress tsd.poolInstanceId tsd.poolOwner
-                            sourceTokenAddress = CCIP.MessageCodecV1.encodeInstrumentId tsd.instrumentId
-                            destTokenAddress = tsd.destTokenAddress
-                            tokenReceiver = tokenReceiver
-                            amount = tsd.amount
-                            extraData = tsd.extraData)
-
-                let messageV1 = CCIP.MessageCodecV1.MessageV1 with
-                        sourceChainSelector
-                        destChainSelector
-                        sequenceNumber
-                        executionGasLimit = finalExecutionGasLimit
-                        ccipReceiveGasLimit
-                        finality = blockConfirmations
-                        ccvAndExecutorHash = finalHash
-                        onRampAddress
-                        offRampAddress
-                        sender = senderAddress
-                        receiver
-                        destBlob = executorArgs
-                        tokenTransfer = tokenTransferV1Opt
-                        messageData = payload
-
-                let encoded = CCIP.MessageCodecV1.encodeMessageV1 messageV1
-                let msgId = keccak256 encoded
-
                 create this with
-                    requiredCCVs = finalCCVs
                     executorAddress = derivedExecutor
                     executorArgs = executorArgs
-                    executionGasLimit = finalExecutionGasLimit
-                    blockConfirmations = blockConfirmations
-                    ccvAndExecutorHash = finalHash
                     executorFee = Some ef
+
+        -- Finalize the execution receipt metadata. This happens before the
+        -- outbound message is constructed.
+        choice FinalizeFee : ContractId SendingMessageV1
+            with
+                feeTokenPrice : Numeric 0
+                premiumMultiplier : Numeric 0
+                totalExecutionGasLimit : Int
+                executorDestGasLimit : Int
+                executorDestBytesOverhead : Int
+                executionCostUSDCents : Numeric 0
+            controller ccipOwner
+            do
+                assertMsg "sendingMessage: FinalizeFee only allowed after executor selection" (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: execution mode not set" (isSome executionMode)
+                case executionMode of
+                    Some ExecutionMode_Executor -> do
+                        assertMsg "sendingMessage: executor fee not set" (isSome executorFee)
+                        assertMsg "sendingMessage: executor address not set" (executorAddress /= "")
+                    _ -> pure ()
+                assertMsg "fee token price must be positive" (feeTokenPrice > 0.0)
+                assertMsg "premium multiplier must be positive" (premiumMultiplier > 0.0)
+
+                let promoteUsdCentsToUsd8 feeUSDCents =
+                        CCIP.Math.mulDivDown feeUSDCents usd8PerUsdCent 1.0
+                let convertWithPremium feeUSDCents =
+                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
+                        in CCIP.Math.mulDivDown feeUsd8 premiumMultiplier feeTokenPrice
+                let convertDirect feeUSDCents =
+                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
+                        in CCIP.Math.mulDivDown feeUsd8 premiumIdentity feeTokenPrice
+                let executionCostAmount =
+                        if executionMode == Some ExecutionMode_NoExecutor
+                        then 0.0
+                        else convertDirect executionCostUSDCents
+
+                let ccvAmounts = map (\fee -> convertWithPremium fee.feeUSDCents) ccvFees
+                let poolAmount = case tokenSendFee of
+                        None -> 0.0
+                        Some fee -> convertWithPremium fee.feeUSDCents
+                let executorAmount = case executorFee of
+                        None -> 0.0
+                        Some fee ->
+                            if executionMode == Some ExecutionMode_NoExecutor
+                            then 0.0
+                            else convertDirect fee.feeUSDCents
+                let networkAmount = convertWithPremium networkFeeUSDCents
+
+                create this with
+                    executionGasLimit = totalExecutionGasLimit
+                    executorDestGasLimit = executorDestGasLimit
+                    executorDestBytesOverhead = executorDestBytesOverhead
+                    ccvFeeTokenAmounts = ccvAmounts
+                    tokenSendFeeTokenAmount = poolAmount
+                    executorFeeTokenAmount = executorAmount + executionCostAmount
+                    networkFeeTokenAmount = networkAmount
+                    state = SendingMessageState_FeeFinalized
+
+        choice BuildMessage : ContractId SendingMessageV1
+            with
+                caller : Party
+            controller caller
+            do
+                assertMsg "sendingMessage: BuildMessage only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
+                assertMsg "sendingMessage: message already built" (isNone message)
+                assertMsg "sendingMessage: execution mode not set" (isSome executionMode)
+                assertMsg "sendingMessage: token sends require token data before message build" (isNone expectedTokenInstrumentId || isSome tokenSendData)
+
+                let (finalCCVs, finalHash, messageV1, encoded, msgId) =
+                        buildMessageArtifacts this
+                create this with
+                    requiredCCVs = finalCCVs
+                    ccvAndExecutorHash = finalHash
                     message = Some messageV1
                     encodedMessage = encoded
                     messageId = msgId
-                    state = SendingMessageState_ExecutorFinalized
 
         choice AddVerifierData : ContractId SendingMessageV1
             with
@@ -323,12 +415,16 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: AddVerifierData only allowed after fee finalization"
-                    (state == SendingMessageState_FeeFinalized)
-                assertMsg "version tag must be 4 bytes"
-                    (byteCount versionTag == 4)
-                assertMsg "sendingMessage: duplicate verifier data for CCV"
-                    (all (\v -> v.ccvInstanceId /= ccvInstanceId) verifierData)
+                assertMsg "sendingMessage: AddVerifierData only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
+                assertCCVInstanceId
+                    "sendingMessage: caller is not an allowed CCV"
+                    requiredCCVs
+                    outboundPoolCCVs
+                    ccvInstanceId
+                    caller
+                assertMsg "version tag must be 4 bytes" (byteCount versionTag == 4)
+                assertMsg "sendingMessage: duplicate verifier data for CCV" (all (\v -> v.ccvInstanceId /= ccvInstanceId) verifierData)
+
                 let vd = VerifierData with
                         ccvInstanceId
                         ccvOwner = caller
@@ -339,7 +435,8 @@ template SendingMessageV1
                     observingParties =
                         dedup (observingParties ++ messageSentObservers)
 
-        -- Stores token send data only. Final message is built in AddExecutorWithFee.
+        -- Stores token send data. If fees are already finalized, this also
+        -- finalizes the outbound message.
         choice AddTokenSend : ContractId SendingMessageV1
             with
                 poolInstanceId : Text
@@ -348,68 +445,34 @@ template SendingMessageV1
                 amount : Numeric 0
                 destTokenAddress : BytesHex
                 extraData : BytesHex
-                caller : Party
-            controller caller
+            controller ccipOwner
             do
-                assertMsg "sendingMessage: AddTokenSend only allowed after pool verification"
-                    (state == SendingMessageState_PoolVerified)
-                assertMsg "sendingMessage: token send requires expected instrument"
-                    (expectedTokenInstrumentId /= None)
+                assertMsg "sendingMessage: AddTokenSend only allowed after pool CCVs are resolved" (state == SendingMessageState_FeeFinalized)
+                assertMsg "sendingMessage: token send requires expected instrument" (isSome expectedTokenInstrumentId)
+                assertMsg "sendingMessage: token send requires token send fee" (isSome tokenSendFee)
                 assertMsg "token send already set" (isNone tokenSendData)
+                quotedTokenSendFee <- case tokenSendFee of
+                    None -> abort "sendingMessage: token send fee must be finalized before token data"
+                    Some fee -> pure fee
+                assertMsg "sendingMessage: pool extraData exceeds quoted destBytesOverhead"
+                    (byteCount extraData <= quotedTokenSendFee.destBytesOverhead)
+
+                -- Enforce that the token pool payload (extraData) is not larger than the destBytesOverhead that's been quoted as part of AddTokenSendFee
+                assertMsg "SourceTokenDataTooLarge: extraData size exceeds destBytesOverhead" (byteCount extraData <= (fromSome tokenSendFee).destBytesOverhead)
 
                 let tsd = TokenSendData with
                         poolInstanceId, poolOwner, instrumentId, amount
                         destTokenAddress, extraData
 
-                create this with
-                    tokenSendData = Some tsd
-                    state = SendingMessageState_TokenLocked
-
-        -- Batch-converts all USD fees to fee token units at a single price point.
-        -- CCV, pool, and network fees get the premium multiplier applied; executor
-        -- fees convert at par (EVM separates gas costs from premium costs).
-        -- Only exercisable by ccipOwner (via FeeQuoter).
-        choice FinalizeFee : ContractId SendingMessageV1
-            with
-                feeTokenPrice : Numeric 0
-                premiumMultiplier : Numeric 0
-            controller ccipOwner
-            do
-                assertMsg "sendingMessage: FinalizeFee only allowed after executor finalization"
-                    (state == SendingMessageState_ExecutorFinalized)
-                assertMsg "fee token price must be positive"
-                    (feeTokenPrice > 0.0)
-                assertMsg "premium multiplier must be positive"
-                    (premiumMultiplier > 0.0)
-
-                -- Fee config values stay in integer USD cents. Canton promotes
-                -- them into the usd8 pricing domain via * 1e6 before converting
-                -- into fee-token local smallest units.
-                let promoteUsdCentsToUsd8 feeUSDCents =
-                        CCIP.Math.mulDivDown feeUSDCents usd8PerUsdCent 1.0
-                let convertWithPremium feeUSDCents =
-                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
-                        in CCIP.Math.mulDivDown feeUsd8 premiumMultiplier feeTokenPrice
-                let convertDirect feeUSDCents =
-                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
-                        in CCIP.Math.mulDivDown feeUsd8 premiumIdentity feeTokenPrice
-
-                let ccvAmounts = map
-                        (\fee -> convertWithPremium fee.feeUSDCents) ccvFees
-                let poolAmount = case tokenSendFee of
-                        None -> 0.0
-                        Some fee -> convertWithPremium fee.feeUSDCents
-                let executorAmount = case executorFee of
-                        None -> 0.0
-                        Some fee -> convertDirect fee.feeUSDCents
-                let networkAmount = convertWithPremium networkFeeUSDCents
-
-                create this with
-                    ccvFeeTokenAmounts = ccvAmounts
-                    tokenSendFeeTokenAmount = poolAmount
-                    executorFeeTokenAmount = executorAmount
-                    networkFeeTokenAmount = networkAmount
-                    state = SendingMessageState_FeeFinalized
+                let updated = this with tokenSendData = Some tsd
+                let (finalCCVs, finalHash, messageV1, encoded, msgId) =
+                        buildMessageArtifacts updated
+                create updated with
+                    requiredCCVs = finalCCVs
+                    ccvAndExecutorHash = finalHash
+                    message = Some messageV1
+                    encodedMessage = encoded
+                    messageId = msgId
 
         choice FinalizeSend : FinalizeSendResult
             with
@@ -419,10 +482,10 @@ template SendingMessageV1
                 receipts : [CCIP.Tickets.Receipt]
             controller ccipOwner
             do
-                assertMsg "finalizeSend: only allowed after fee finalization"
-                    (state == SendingMessageState_FeeFinalized)
-                assertMsg "finalizeSend: message not yet constructed" (message /= None)
+                assertMsg "finalizeSend: only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
+                assertMsg "finalizeSend: message not yet constructed" (isSome message)
                 assertMsg "finalizeSend: sender mismatch" (messageSender == sender)
+
                 eventCid <- create CCIP.Events.CCIPMessageSent with
                     ccipOwner = ccipOwner
                     ccvOwners = ccvOwners
@@ -446,8 +509,8 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: FeeTokenAmount only allowed after fee finalization"
-                    (state == SendingMessageState_FeeFinalized)
+                assertMsg "sendingMessage: FeeTokenAmount only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
+
                 pure (Foldable.sum ccvFeeTokenAmounts
                     + tokenSendFeeTokenAmount
                     + executorFeeTokenAmount

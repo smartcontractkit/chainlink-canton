@@ -56,7 +56,7 @@ timelockScheduleOp = Op
   , nonce = 0
   , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "ScheduleBatch"
-  , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c61790002012000200000000000000000000000000000000000000000000000000000000000000000000f7363686564756c652d73616c742d310000000000000000"
+  , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c61790008000000000000007800200000000000000000000000000000000000000000000000000000000000000000000f7363686564756c652d73616c742d310000000000000000"
   }
 
 timelockScheduleMetadata : RootMetadata
@@ -69,29 +69,30 @@ timelockScheduleMetadata = RootMetadata
   }
 
 timelockScheduleRoot : Text
-timelockScheduleRoot = "51934b7f76cae30f9d5b180faa295f7fb5359eb2bb014817b77e530f93f44813"
+timelockScheduleRoot = "a562ea5617f1ad48ba3712119a12ca1c2f7736e1f8f02d6c7c319653a8663cd4"
 
 timelockScheduleMetadataProof : [Text]
 timelockScheduleMetadataProof =
-  [ "e72e067d8d1fcd93b73ffe09e2935a68caeae612feb392094f18d26e3d1095ef"
+  [ "9fce2a24c2898f9f6fb40e8245499f27a7fb27bab0578f6b6e457914380892f2"
   ]
 
 timelockScheduleOpProof : [Text]
 timelockScheduleOpProof =
-  [ "4831953f5215f18447ed9d77fd16cefa4cd0e1a593994927bbadd86abd30d62b"
+  [ "9f4f78512e46c0e493724a735afdff2c6d3f5209c69956ff5ac5784f9fa57ab1"
   ]
 
+-- Updated with domain separators and int64 encoding
 timelockScheduleSignatures : [RawSignature]
 timelockScheduleSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "c2f24a7501025cec9d95e4f48997b43d53f68e9ef291eb555176db0159999ced"
-      , s = "46d356972569bb29cac42ea8ad9d8b3dc2cc0902673f2e150c69a18a9b6cf490"
+      , r = "26e6512066c4c6b84363361cb88cc047d626f64e6270b404c684adf6d9487ea5"
+      , s = "7d8033840acdafe09a0ac00f812c88e720ead553152c0de7eb7a91fdfd3f6ef4"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "7fbe521cac6a2c04aeec1373819e998ec7268a38c28cfabe46dd3fedec198588"
-      , s = "2ea327490399f66724654d24bf8eb6ab454eb281b4c5fd081ed5b3f7bf091ac4"
+      , r = "1cd9f7e256b6ef69c680f7c2b600940fcb5f220086fa55f91b2a41daaffd8566"
+      , s = "70e4dc39e6a3babf0c9d8061a648d6c1976029bc843c64a329403ccef2dc01d9"
       }
   ]
 
@@ -103,7 +104,7 @@ timelockBypasserOp = Op
   , nonce = 0
   , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "BypasserExecuteBatch"
-  , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c617900020300"
+  , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c61790008000000000000012c"
   }
 
 timelockBypasserMetadata : RootMetadata
@@ -116,29 +117,30 @@ timelockBypasserMetadata = RootMetadata
   }
 
 timelockBypasserRoot : Text
-timelockBypasserRoot = "a7f733bbc8cf7c0035e22238ef30c67f9a88ae91a370e8ac2e41fb333469f0bf"
+timelockBypasserRoot = "03d506aeaffd933a56d3572797fa69aa96db825fa7c1c0bdaefc22cc40c51df7"
 
 timelockBypasserMetadataProof : [Text]
 timelockBypasserMetadataProof =
-  [ "26846df654a6717b38591aa8a76e2b59ee922e4533e2b797112789398fc5dfdd"
+  [ "556a135e9f63fefa204ffc1b6189ffb597bb7b81fc86433c33893f5670317c34"
   ]
 
 timelockBypasserOpProof : [Text]
 timelockBypasserOpProof =
-  [ "6fb0ca7c1189483951018ab7f466e827ed5e91a17d4227fba82fde2ae6d9d206"
+  [ "b058861759da490d5ebdca109f8a72079fdda167f282e4b2dc8f39e571df0c6d"
   ]
 
+-- Updated with domain separators and int64 encoding
 timelockBypasserSignatures : [RawSignature]
 timelockBypasserSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "928c0f1fc2b9ad1fb135f35f678a8a1705d1ace95fbd398d215eb9cdea1872d8"
-      , s = "127e32720f5cfd2c90b7c687dde9b3da1bad8a1e1bbec27f032b4d60dc19f33c"
+      , r = "8f5d9f6bcb81632dc36c80075a8c43fbaf909eaf00d93c1e548025344ff372fe"
+      , s = "7612ce1a09f29ed82976d27a8869de20d031e1bb7874acefee44b964327fe1e8"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "383d298f5c7358105f679271d316a2d8579fe7616d7846bbc0bfb0a04d13bf88"
-      , s = "4cf5060d2f554ea9c8c75b3fd2cec53eb84569ea7f84e7056590038493606346"
+      , r = "862e875a77651eeb53b07bf77e945e6457bd6f5a9def160e9ac33bc61b9e89e2"
+      , s = "40e94645ae539ee94783a3f1a9355dbe74ae44860239cd85b1348501a1d05ee0"
       }
   ]
 
@@ -180,7 +182,7 @@ testScheduleBatch = script do
       signatures = timelockScheduleSignatures
 
   -- ExecuteOp with ScheduleBatch
-  let calls = [TimelockCall timelockTestInstanceAddress "UpdateMinDelay" "0120"]
+  let calls = [TimelockCall timelockTestInstanceAddress "UpdateMinDelay" "0000000000000078"]
   let salt = "7363686564756c652d73616c742d31"
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid ExecuteOp with
@@ -533,4 +535,87 @@ testTimelockViewFunctions = script do
   assertMsg "Pending operation should not show as done" $ not isDoneNot
 
   debug "testTimelockViewFunctions PASSED!"
+  pure ()
+
+-- ===========================================================================
+-- CLEAR ROOT RECOVERY TEST
+-- ===========================================================================
+
+-- | Test that SetConfig(clearRoot=true) resets rootMetadata (EVM/Aptos parity)
+-- Scenario: root is set with postOpCount > opCount (pending ops),
+-- clearRoot should reset postOpCount = opCount so a new SetRoot
+-- without overridePreviousRoot can succeed.
+testClearRootResetsMetadata : Script ()
+testClearRootResetsMetadata = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let testInstanceId = "test-clearroot"
+      testChainId = 1
+
+  let instanceAddress = testInstanceId <> "@" <> partyToText ccipOwner
+
+  -- Create MCMS with a proposer RoleState that simulates pending ops:
+  -- opCount=1 (one op executed), postOpCount=3 (two ops still pending)
+  let stuckProposer = RoleState
+        { config = selfDispatchTestConfig
+        , seenHashes = Map.empty
+        , expiringRoot = ExpiringRoot
+            { root = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+            , validUntil = selfDispatchTestValidUntil
+            , opCount = 1
+            }
+        , rootMetadata = RootMetadata
+            { chainId = testChainId
+            , multisigId = instanceAddress <> "-proposer"
+            , preOpCount = 0
+            , postOpCount = 3
+            , overridePreviousRoot = False
+            }
+        }
+
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      instanceId = testInstanceId
+      chainId = testChainId
+      proposer = stuckProposer
+      canceller = emptyRoleState
+      bypasser = emptyRoleState
+      minDelay = seconds 0
+      blockedFunctions = []
+      timelockTimestamps = Map.empty
+
+  -- Verify initial state: opCount=1, postOpCount=3, hasActiveRoot=True
+  stateBefore <- submit ccipOwner do
+    exerciseCmd mcmsCid GetState with
+      submitter = ccipOwner
+      targetRole = Proposer
+
+  assertMsg "Before: opCount should be 1" $ stateBefore.opCount == 1
+  assertMsg "Before: postOpCount should be 3" $ stateBefore.postOpCount == 3
+  assertMsg "Before: should have active root" stateBefore.hasActiveRoot
+
+  -- Exercise SetConfig with clearRoot=True
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetConfig with
+      targetRole = Proposer
+      newSigners = selfDispatchTestSigners
+      newGroupQuorums = [2] <> replicate 31 0
+      newGroupParents = replicate 32 0
+      clearRoot = True
+
+  -- Verify state after clearRoot: opCount=1, postOpCount=1, hasActiveRoot=False
+  stateAfter <- submit ccipOwner do
+    exerciseCmd mcmsCid GetState with
+      submitter = ccipOwner
+      targetRole = Proposer
+
+  assertMsg "After: opCount should still be 1" $ stateAfter.opCount == 1
+  assertMsg "After: postOpCount should be reset to 1 (matching opCount)" $
+    stateAfter.postOpCount == 1
+  assertMsg "After: opCount should equal postOpCount (no pending ops)" $
+    stateAfter.opCount == stateAfter.postOpCount
+  assertMsg "After: root should be cleared" $ not stateAfter.hasActiveRoot
+
+  debug "testClearRootResetsMetadata PASSED!"
   pure ()

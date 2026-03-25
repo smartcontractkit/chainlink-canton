@@ -125,7 +125,8 @@ testCryptoHashOpLeaf = script do
         , functionName = "Increment"
         , operationData = ""
         }
-  let expectedLeaf = "f91f525af385e7112e20ef75cf34dbbb74ed2d2f46cf9b5d6e9457b85e050c22"
+  -- Updated expected value after adding domain separators and length prefixes
+  let expectedLeaf = "1d8c9759a27ea345789c22ffdc63695bc6c70a2af3b91372b348411035184140"
   let actualLeaf = hashOpLeafNative op
 
   assertMsg ("hashOpLeafNative mismatch: expected " <> expectedLeaf <> " got " <> actualLeaf) $
@@ -143,7 +144,7 @@ testCryptoHashMetadataLeaf = script do
   -- metadata.preOpCount = 0
   -- metadata.postOpCount = 2
   -- metadata.overridePreviousRoot = false
-  -- metadataLeaf = "29e71e3e2b836397833a36d07ba2aa7c89e9ded57bacb1798f2a6f18b1a4ed27"
+  -- Updated expected value after adding domain separator
   let meta = RootMetadata
         { chainId = 1
         , multisigId = "test-mcms-proposer"
@@ -151,7 +152,7 @@ testCryptoHashMetadataLeaf = script do
         , postOpCount = 2
         , overridePreviousRoot = False
         }
-  let expectedLeaf = "29e71e3e2b836397833a36d07ba2aa7c89e9ded57bacb1798f2a6f18b1a4ed27"
+  let expectedLeaf = "9f96281d9504e4275942e1b08a40ba1658c45bbb4d7bb4d295ccbf74c2449feb"
   let actualLeaf = hashMetadataLeafNative meta
 
   assertMsg ("hashMetadataLeafNative mismatch: expected " <> expectedLeaf <> " got " <> actualLeaf) $

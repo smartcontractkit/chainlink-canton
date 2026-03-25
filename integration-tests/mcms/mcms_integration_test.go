@@ -827,7 +827,7 @@ func testExecuteMCMSOp(
 
 	baseMcmsId := "mcms-op-test-" + uuid.New().String()[:8]
 	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
-	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
+	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleBypasser) // Use Bypasser for self-dispatch
 	t.Logf("MCMS ID: %s", multisigId)
 
 	// ========================
@@ -842,23 +842,40 @@ func testExecuteMCMSOp(
 	// |   2. Build Proposal  |
 	// ========================
 
-	t.Log("Building MCMS proposal (SetConfig targeting 'self')...")
+	t.Log("Building MCMS proposal (SetConfig via BypasserExecuteBatch)...")
 
 	// Prepare new config params (change from 2-of-3 to 1-of-3)
 	newQuorums := make([]int, NumGroups)
 	newQuorums[0] = 1 // Changed from 2 to 1
 	newParents := make([]int, NumGroups)
 
-	// Encode SetConfigParams using the encoder
+	// Encode SetConfigParams with role prefix for self-dispatch
+	// executeSelfDispatch expects: role (1 byte) + SetConfigParams
+	// We target the Proposer role's config (the test verifies proposer config)
 	encoder := NewMCMSEncoder(mcmsPkgID)
 	setConfigParams := ToBindingSetConfigParams(config.Signers, newQuorums, newParents, false)
-	encoded := MustEncodeSetConfigParams(t, encoder, setConfigParams)
-	t.Logf("Encoded SetConfig params: %s... (%d bytes)", encoded.OperationData[:min(40, len(encoded.OperationData))], len(encoded.OperationData)/2)
+	setConfigOpData, err := EncodeSelfDispatchSetConfig(MCMSRoleProposer, setConfigParams)
+	require.NoError(t, err)
+	t.Logf("Encoded SetConfig params with role: %s... (%d bytes)", setConfigOpData[:min(40, len(setConfigOpData))], len(setConfigOpData)/2)
+
+	// Wrap SetConfig in a BypasserExecuteBatch call
+	// SetConfig can only be reached through self-dispatch paths
+	bypasserParams := mcms.BypasserExecuteBatchParams{
+		Calls: []mcms.TimelockCall{
+			{
+				TargetInstanceAddress: types.TEXT(mcmsInstanceAddr), // Target self
+				FunctionName:          types.TEXT("SetConfig"),
+				OperationData:         types.TEXT(setConfigOpData),
+			},
+		},
+	}
+	bypasserChoice := MustEncodeBypasserExecuteBatch(t, encoder, bypasserParams)
+	t.Logf("Encoded BypasserExecuteBatch: %s... (%d bytes)", bypasserChoice.OperationData[:min(40, len(bypasserChoice.OperationData))], len(bypasserChoice.OperationData)/2)
 
 	// Build proposal with MCMS operation targeting this MCMS instanceAddress
-	// operationData contains the encoded params (like Aptos)
+	// operationData contains the encoded BypasserExecuteBatch params
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation(mcmsInstanceAddr, encoded.Choice, encoded.OperationData) // Params encoded in operationData
+	proposal.AddOperation(mcmsInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData)
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -901,11 +918,11 @@ func testExecuteMCMSOp(
 	// |   4. SetRoot         |
 	// ========================
 
-	t.Log("Calling SetRoot with MCMS proposal...")
+	t.Log("Calling SetRoot with MCMS proposal (Bypasser role)...")
 
 	// Use bindings for type safety
 	setRootArgs := mcms.SetRoot{
-		TargetRole: mcms.RoleProposer,
+		TargetRole: mcms.RoleBypasser,
 		Submitter:  types.PARTY(ccipOwnerParty),
 		NewRoot:    types.TEXT(root),
 		ValidUntil: types.TIMESTAMP(validUntil),
@@ -982,7 +999,7 @@ func testExecuteMCMSOp(
 	// Use bindings for type safety
 	op := proposal.Operations[0]
 	executeOpArgs := mcms.ExecuteOp{
-		TargetRole: mcms.RoleProposer,
+		TargetRole: mcms.RoleBypasser,
 		Submitter:  types.PARTY(userParty),
 		Op: mcms.Op{
 			ChainId:               types.INT64(op.ChainId),
@@ -1140,10 +1157,10 @@ func testExecuteMCMSOp(
 	t.Log("✓ ExecuteMcmsOp test completed successfully!")
 	t.Log("Summary:")
 	t.Log("  1. Created MCMS with 2-of-3 config")
-	t.Log("  2. Built MCMS proposal with SetConfig targeting 'self'")
+	t.Log("  2. Built MCMS proposal with SetConfig via BypasserExecuteBatch")
 	t.Log("  3. Signed with 2 signers")
-	t.Log("  4. SetRoot with on-chain verification")
-	t.Log("  5. ExecuteMcmsOp - self-dispatch to change config")
+	t.Log("  4. SetRoot (Bypasser role) with on-chain verification")
+	t.Log("  5. ExecuteMcmsOp - BypasserExecuteBatch self-dispatch to change config")
 	t.Log("  6. Config changed from 2-of-3 to 1-of-3 ✓")
 }
 
@@ -1609,9 +1626,9 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	}
 	scheduleParams := mcms.ScheduleBatchParams{
 		Calls:       scheduleInnerCalls,
-		Predecessor: types.TEXT(ZeroHash),                      // no predecessor
-		Salt:        types.TEXT(AsciiToHex("schedule-salt-1")), // Human-readable salt hex-encoded
-		DelaySecs:   types.INT64(0),                            // use minimum delay
+		Predecessor: types.TEXT(ZeroHash),                     // no predecessor
+		Salt:        types.TEXT(TextToHex("schedule-salt-1")), // Human-readable salt hex-encoded
+		DelaySecs:   types.INT64(0),                           // use minimum delay
 	}
 	scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
@@ -1986,7 +2003,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	externalScheduleParams := mcms.ScheduleBatchParams{
 		Calls:       externalScheduleCalls,
 		Predecessor: types.TEXT(ZeroHash),
-		Salt:        types.TEXT(AsciiToHex("external-salt-1")), // Human-readable salt hex-encoded
+		Salt:        types.TEXT(TextToHex("external-salt-1")), // Human-readable salt hex-encoded
 		DelaySecs:   types.INT64(0),
 	}
 	externalScheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, externalScheduleParams)

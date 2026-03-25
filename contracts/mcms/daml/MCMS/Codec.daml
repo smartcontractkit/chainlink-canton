@@ -5,6 +5,7 @@ module MCMS.Codec
   , SetConfigParams(..)
   , encodeBlockedFunction
   , decodeBlockedFunction
+  , decodeBlockedFunctionWithOffset
   , encodeSelfDispatchSetConfig
   , decodeSelfDispatchSetConfig
   , encodeUint8
@@ -12,6 +13,7 @@ module MCMS.Codec
   , encodeUint32
   , decodeUint8
   , decodeUint16
+  , decodeUint16At
   , decodeUint32
   , extractBytes
   , encodeText
@@ -33,6 +35,10 @@ module MCMS.Codec
   , CancelBatchParams(..)
   , encodeCancelBatchParams
   , decodeCancelBatchParams
+  , decodeScheduleBatchParamsWithOffset
+  , decodeBypasserExecuteBatchParamsWithOffset
+  , decodeCancelBatchParamsWithOffset
+  , decodeSelfDispatchSetConfigWithOffset
   , encodeTimelockCall
   , decodeTimelockCall
   -- Numeric 0 (uint64 chain selector) encoding
@@ -51,8 +57,7 @@ module MCMS.Codec
   , encodeDecimal
   , decodeDecimalAt
   , parseDecimal
-  , parseDecimalUnsafe
-  , parseIntUnsafe
+  , parseIntSafe
   , parseDigitsUnsafe
   , charToDigitInt
   , pow10
@@ -116,17 +121,24 @@ decodeSetConfigParams encoded = decodeSetConfigParamsAtOffset encoded 0
 -- | Decode SetConfigParams starting at a byte offset
 decodeSetConfigParamsAtOffset : BytesHex -> Int -> Optional SetConfigParams
 decodeSetConfigParamsAtOffset encoded startOffset = do
+  (params, _) <- decodeSetConfigParamsAtOffsetWithFinal encoded startOffset
+  Some params
+
+-- | Decode SetConfigParams starting at a byte offset, returning final offset
+decodeSetConfigParamsAtOffsetWithFinal : BytesHex -> Int -> Optional (SetConfigParams, Int)
+decodeSetConfigParamsAtOffsetWithFinal encoded startOffset = do
   (signers, offset1) <- decodeList encoded startOffset decodeSignerInfo
   (quorums, offset2) <- decodeList encoded offset1 decodeUint32WithOffset
   (parents, offset3) <- decodeList encoded offset2 decodeUint32WithOffset
   clearRootHex <- extractBytes encoded offset3 1
   clearRoot <- decodeBool clearRootHex
-  return SetConfigParams
+  let finalOffset = offset3 + 1
+  return (SetConfigParams
     { signers = signers
     , groupQuorums = quorums
     , groupParents = parents
     , clearRoot = clearRoot
-    }
+    }, finalOffset)
 
 -- ===========================================================================
 -- SIGNER INFO ENCODING
@@ -228,10 +240,18 @@ decodeUint16 hex =
   if byteCount hex /= 2 then None
   else fromHex hex
 
--- | Encode int64 (8 bytes)
+-- | Decode uint16 with offset, returns (value, newOffset)
+decodeUint16At : BytesHex -> Int -> Optional (Int, Int)
+decodeUint16At encoded offset = do
+  hex <- extractBytes encoded offset 2
+  value <- decodeUint16 hex
+  return (value, offset + 2)
+
+-- | Encode int64 (8 bytes) - rejects negative values to prevent silent sign loss
 encodeInt64 : Int -> Optional BytesHex
 encodeInt64 n =
-  Some (padLeft 16 "0" (intToHex (abs n)))
+  if n < 0 then None
+  else Some (padLeft 16 "0" (intToHex n))
 
 -- | Decode int64 (8 bytes)
 decodeInt64 : BytesHex -> Optional Int
@@ -368,9 +388,15 @@ encodeBlockedFunction bf = encodeText bf.targetInstanceAddress <> encodeText bf.
 
 decodeBlockedFunction : BytesHex -> Optional BlockedFunction
 decodeBlockedFunction encoded = do
+  (bf, _) <- decodeBlockedFunctionWithOffset encoded
+  Some bf
+
+-- | Decode BlockedFunction and return final offset for buffer consumption validation
+decodeBlockedFunctionWithOffset : BytesHex -> Optional (BlockedFunction, Int)
+decodeBlockedFunctionWithOffset encoded = do
   (targetInstanceAddress, offset1) <- decodeText encoded 0
-  (functionName, _) <- decodeText encoded offset1
-  Some $ BlockedFunction targetInstanceAddress functionName
+  (functionName, finalOffset) <- decodeText encoded offset1
+  Some (BlockedFunction targetInstanceAddress functionName, finalOffset)
 
 -- ===========================================================================
 -- SELF-DISPATCH SET CONFIG ENCODING
@@ -388,11 +414,17 @@ encodeSelfDispatchSetConfig role params =
 
 decodeSelfDispatchSetConfig : BytesHex -> Optional (Role, SetConfigParams)
 decodeSelfDispatchSetConfig encoded = do
+  (result, _) <- decodeSelfDispatchSetConfigWithOffset encoded
+  Some result
+
+-- | Decode self-dispatch SetConfig and return final offset for buffer consumption validation
+decodeSelfDispatchSetConfigWithOffset : BytesHex -> Optional ((Role, SetConfigParams), Int)
+decodeSelfDispatchSetConfigWithOffset encoded = do
   roleHex <- extractBytes encoded 0 1
   roleInt <- decodeUint8 roleHex
   role <- intToRole roleInt
-  params <- decodeSetConfigParamsAtOffset encoded 1
-  Some (role, params)
+  (params, finalOffset) <- decodeSetConfigParamsAtOffsetWithFinal encoded 1
+  Some ((role, params), finalOffset)
 
 -- ===========================================================================
 -- TIMELOCK CALL ENCODING (for schedule_batch self-dispatch)
@@ -445,6 +477,12 @@ encodeScheduleBatchParams params =
 -- | Decode ScheduleBatchParams with uint16 length prefix for predecessor and salt
 decodeScheduleBatchParams : BytesHex -> Optional ScheduleBatchParams
 decodeScheduleBatchParams encoded = do
+  (params, _) <- decodeScheduleBatchParamsWithOffset encoded
+  Some params
+
+-- | Decode ScheduleBatchParams and return final offset for buffer consumption validation
+decodeScheduleBatchParamsWithOffset : BytesHex -> Optional (ScheduleBatchParams, Int)
+decodeScheduleBatchParamsWithOffset encoded = do
   (calls, offset1) <- decodeList encoded 0 decodeTimelockCall
   -- Decode predecessor with uint16 length prefix (BytesHex, no fromHex needed)
   predLenHex <- extractBytes encoded offset1 2
@@ -459,12 +497,13 @@ decodeScheduleBatchParams encoded = do
   -- Decode delay
   delayHex <- extractBytes encoded offset3 8
   delaySecs <- decodeInt64 delayHex
-  Some ScheduleBatchParams
+  let finalOffset = offset3 + 8
+  Some (ScheduleBatchParams
     { calls = calls
     , predecessor = predecessor
     , salt = salt
     , delaySecs = delaySecs
-    }
+    }, finalOffset)
 
 -- ===========================================================================
 -- BYPASSER EXECUTE PARAMS (for bypasser_execute_batch)
@@ -482,8 +521,14 @@ encodeBypasserExecuteBatchParams params = encodeList params.calls encodeTimelock
 
 decodeBypasserExecuteBatchParams : BytesHex -> Optional BypasserExecuteBatchParams
 decodeBypasserExecuteBatchParams encoded = do
-  (calls, _) <- decodeList encoded 0 decodeTimelockCall
-  Some BypasserExecuteBatchParams { calls = calls }
+  (params, _) <- decodeBypasserExecuteBatchParamsWithOffset encoded
+  Some params
+
+-- | Decode BypasserExecuteBatchParams and return final offset for buffer consumption validation
+decodeBypasserExecuteBatchParamsWithOffset : BytesHex -> Optional (BypasserExecuteBatchParams, Int)
+decodeBypasserExecuteBatchParamsWithOffset encoded = do
+  (calls, finalOffset) <- decodeList encoded 0 decodeTimelockCall
+  Some (BypasserExecuteBatchParams { calls = calls }, finalOffset)
 
 -- ===========================================================================
 -- CANCEL BATCH PARAMS (for cancel_batch self-dispatch)
@@ -500,8 +545,14 @@ encodeCancelBatchParams params = encodeText params.opId
 
 decodeCancelBatchParams : BytesHex -> Optional CancelBatchParams
 decodeCancelBatchParams encoded = do
-  (opId, _) <- decodeText encoded 0
-  Some CancelBatchParams { opId = opId }
+  (params, _) <- decodeCancelBatchParamsWithOffset encoded
+  Some params
+
+-- | Decode CancelBatchParams and return final offset for buffer consumption validation
+decodeCancelBatchParamsWithOffset : BytesHex -> Optional (CancelBatchParams, Int)
+decodeCancelBatchParamsWithOffset encoded = do
+  (opId, finalOffset) <- decodeText encoded 0
+  Some (CancelBatchParams { opId = opId }, finalOffset)
 
 -- ===========================================================================
 -- NUMERIC 0 (UINT64 CHAIN SELECTOR) ENCODING/DECODING
@@ -608,31 +659,54 @@ decodeDecimalAt encoded offset = do
 
 -- | Parse decimal from text (handles "123.456" format)
 parseDecimal : Text -> Optional Decimal
-parseDecimal text = Some (parseDecimalUnsafe text)
+parseDecimal text =
+  if Text.length text == 0 then None
+  else
+    let parts = Text.splitOn "." text
+    in case parts of
+      [intPart] -> do
+        intVal <- parseIntSafe intPart
+        Some (intToDecimal intVal)
+      [intPart, fracPart] -> do
+        intVal <- parseIntSafe intPart
+        if Text.length fracPart == 0 || not (allDigits fracPart)
+          then None
+          else
+            let fracLen = Text.length fracPart
+                fracVal = parseDigitsUnsafe fracPart 0
+                divisor = pow10 fracLen
+            in Some (intToDecimal intVal + (intToDecimal fracVal / intToDecimal divisor))
+      _ -> None
 
-parseDecimalUnsafe : Text -> Decimal
-parseDecimalUnsafe text =
-  let parts = Text.splitOn "." text
-  in case parts of
-    [intPart] -> intToDecimal (parseIntUnsafe intPart)
-    [intPart, fracPart] ->
-      let intVal = parseIntUnsafe intPart
-          fracLen = Text.length fracPart
-          fracVal = parseIntUnsafe fracPart
-          divisor = pow10 fracLen
-      in intToDecimal intVal + (intToDecimal fracVal / intToDecimal divisor)
-    _ -> error ("Invalid decimal format: " <> text)
-
-parseIntUnsafe : Text -> Int
-parseIntUnsafe text =
-  if Text.length text == 0 then 0
+-- | Safe integer parsing - returns None on invalid input
+parseIntSafe : Text -> Optional Int
+parseIntSafe text =
+  if Text.length text == 0 then Some 0
   else
     let (negative, digits) =
           if Text.take 1 text == "-"
           then (True, Text.drop 1 text)
           else (False, text)
-        value = parseDigitsUnsafe digits 0
-    in if negative then negate value else value
+    in if Text.length digits == 0 || not (allDigits digits)
+       then None
+       else
+         let value = parseDigitsUnsafe digits 0
+         in Some (if negative then negate value else value)
+
+-- | Check if all characters in text are digits
+allDigits : Text -> Bool
+allDigits text =
+  if Text.length text == 0 then True
+  else
+    let c = Text.take 1 text
+        rest = Text.drop 1 text
+    in isDigitChar c && allDigits rest
+
+-- | Check if a single character is a digit
+isDigitChar : Text -> Bool
+isDigitChar c =
+  c == "0" || c == "1" || c == "2" || c == "3" || c == "4" ||
+  c == "5" || c == "6" || c == "7" || c == "8" || c == "9"
 
 parseDigitsUnsafe : Text -> Int -> Int
 parseDigitsUnsafe text acc =
