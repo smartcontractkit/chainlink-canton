@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -41,6 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	onrampbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
@@ -61,6 +63,8 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
@@ -292,6 +296,36 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		return nil, fmt.Errorf("failed to upload token pool dar file")
 	}
 
+	// Create Scan and Registry API clients
+	// All participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
+	tokenSource := participant.TokenSource
+	interceptor := func(ctx context.Context, req *http.Request) error {
+		token, err := tokenSource.Token()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve token: %w", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
+		return nil
+	}
+	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create token metadata client: %w", err)
+	}
+
+	// Setup Amulet token as fee token
+	// Get registry admin for Amulet tokens
+	registryAdmin, err := testhelpers.GetRegistryAdmin(ctx, tokenMetadataClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get registry admin: %w", err)
+	}
+
+	// Native is Amulet
+	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(registryAdmin),
+		Id:    types.TEXT("Amulet"),
+	}
+
 	l.Info().Any("selector", selector).Any("party", participant.PartyID).Msg("Deploying chain contracts")
 	config := cantonChangesets.CantonCSDeps[cantonChangesets.DeployChainContractsConfig]{
 		ChainSelector: selector,
@@ -306,15 +340,32 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 						ChainSelector: types.NUMERIC(strconv.FormatUint(selector, 10)),
 					},
 				},
+				NativeInstrumentId: nativeInstrumentId,
 				FeeQuoterConfig: sequences.FeeQuoterParams{
 					Template: feequoter.FeeQuoter{
 						PriceUpdaters: []types.PARTY{types.PARTY(participant.PartyID)},
 					},
+					USDPerNative: big.NewInt(100_000_000), // $1 with a decimals
 				},
 				RMNRemote: sequences.RMNRemoteParams{
 					Template: rmn.RMNRemote{
 						RmnOwner:       types.PARTY(participant.PartyID),
 						CursedSubjects: nil,
+					},
+				},
+				Executors: []sequences.ExecutorParams{
+					{
+						Qualifier: devenvcommon.DefaultExecutorQualifier,
+						Template: executorBinding.Executor{
+							Owner:         types.PARTY(participant.PartyID),
+							MaxCCVsPerMsg: 10,
+							DynamicConfig: executorBinding.DynamicConfig{
+								FeeAggregator:         nil,
+								MinBlockConfirmations: 0,
+								CcvAllowlistEnabled:   false,
+							},
+							AllowedCCVs: nil,
+						},
 					},
 				},
 			},
@@ -401,6 +452,12 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 }
 
 func (c *Chain) GetConnectionProfile(selector uint64) (lanes.ChainDefinition, changesets.CommitteeVerifierRemoteChainConfig, error) {
+	// TODO this is currently not populated by populateAddressesV2
+	globalConfig, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(selector, datastore.ContractType(global_config.ContractType), global_config.Version, ""))
+	if err != nil {
+		return lanes.ChainDefinition{}, changesets.CommitteeVerifierRemoteChainConfig{}, fmt.Errorf("failed to get GlobalConfig address for chain %d: %w", selector, err)
+	}
+
 	chainDefinition := lanes.ChainDefinition{
 		Selector:           selector,
 		AddressBytesLength: 32,
@@ -408,6 +465,7 @@ func (c *Chain) GetConnectionProfile(selector uint64) (lanes.ChainDefinition, ch
 			ChainSelector: selector,
 			Type:          datastore.ContractType(executor2.ContractType),
 			Version:       executor2.Version,
+			Qualifier:     devenvcommon.DefaultExecutorQualifier,
 		},
 		ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
 			Enabled: false,
@@ -429,11 +487,7 @@ func (c *Chain) GetConnectionProfile(selector uint64) (lanes.ChainDefinition, ch
 			},
 		},
 		CantonLaneConfig: &lanes.CantonLaneConfig{
-			GlobalConfig: datastore.AddressRef{
-				ChainSelector: selector,
-				Type:          datastore.ContractType(global_config.ContractType),
-				Version:       global_config.Version,
-			},
+			GlobalConfig: globalConfig,
 		},
 	}
 	cvConfig := changesets.CommitteeVerifierRemoteChainConfig{

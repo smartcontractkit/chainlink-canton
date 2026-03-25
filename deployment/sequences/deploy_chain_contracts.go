@@ -2,6 +2,7 @@ package sequences
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -58,6 +59,9 @@ type GlobalConfigParams struct {
 
 type FeeQuoterParams struct {
 	Template feequoter.FeeQuoter
+	// The price of the native token to be set on the FeeQuoter.
+	// If not-nil, native will be added as a fee token and the price will be set.
+	USDPerNative *big.Int
 }
 
 type DeployChainContractsParams struct {
@@ -67,6 +71,8 @@ type DeployChainContractsParams struct {
 	GlobalConfig       GlobalConfigParams
 	RMNRemote          RMNRemoteParams
 	FeeQuoterConfig    FeeQuoterParams
+	// The InstrumentId of the native token
+	NativeInstrumentId splice_api_token_holding_v1.InstrumentId
 }
 
 var DeployChainContracts = operations.NewSequence(
@@ -154,6 +160,42 @@ var DeployChainContracts = operations.NewSequence(
 		feeQuoterRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployFeeQuoterReport.Output.Labels.List()[0])
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse FeeQuoter raw instance address: %w", err)
+		}
+
+		// Add native as a fee token on the FeeQuoter
+		_, err = operations.ExecuteOperation(b, fee_quoter.ApplyFeeTokenUpdates, deps, contract.ChoiceInput[feequoter.ApplyFeeTokenUpdates]{
+			InstanceAddress: feeQuoterRawInstanceAddress.InstanceAddress(),
+			Args: feequoter.ApplyFeeTokenUpdates{
+				FeeTokensToRemove: nil,
+				FeeTokensToAdd: []feequoter.FeeTokenArgs{
+					{
+						InstrumentId: input.NativeInstrumentId,
+					},
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to add native as a fee token on FeeQuoter: %w", err)
+		}
+
+		// Update the native token price if specified
+		if input.FeeQuoterConfig.USDPerNative != nil {
+			_, err = operations.ExecuteOperation(b, fee_quoter.UpdatePrices, deps, contract.ChoiceInput[feequoter.UpdatePrices]{
+				InstanceAddress: feeQuoterRawInstanceAddress.InstanceAddress(),
+				Args: feequoter.UpdatePrices{
+					PriceUpdates: feequoter.PriceUpdates{
+						TokenPriceUpdates: []feequoter.TokenPriceUpdate{
+							{
+								InstrumentId: input.NativeInstrumentId,
+								UsdPerToken:  types.NUMERIC(input.FeeQuoterConfig.USDPerNative.String()),
+							},
+						},
+					},
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to update native token price on FeeQuoter: %w", err)
+			}
 		}
 
 		// Deploy OffRamp

@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"net/http"
 	"slices"
 	"strconv"
@@ -121,6 +122,36 @@ func TestCCIPSend(t *testing.T) {
 	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 
+	// Create Scan and Registry API clients
+	// Using the scanProxy endpoint of the 0-th participant, all participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
+	tokenSource := ccipParticipant.TokenSource
+	interceptor := func(ctx context.Context, req *http.Request) error {
+		token, err := tokenSource.Token()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve token: %w", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
+		return nil
+	}
+	scanProxyClient, err := scanProxy.NewClientWithResponses(ccipParticipant.Endpoints.ValidatorAPIURL, scanProxy.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create scan proxy client")
+	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create token metadata client")
+	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), transferInstructionV1.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create transfer instruction client")
+
+	// Setup Amulet token as fee token
+	// Get registry admin for Amulet tokens
+	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), tokenMetadataClient)
+	require.NoError(t, err, "failed to get registry admin")
+
+	// Native is Amulet
+	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(registryAdmin),
+		Id:    types.TEXT("Amulet"),
+	}
+
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
 		t.Context,
@@ -189,7 +220,9 @@ func TestCCIPSend(t *testing.T) {
 					Template: feequoter.FeeQuoter{
 						PriceUpdaters: []types.PARTY{types.PARTY(partyCCIP)},
 					},
+					USDPerNative: big.NewInt(100_000_000), // $1 with a decimals
 				},
+				NativeInstrumentId: nativeInstrumentId,
 			},
 		},
 	})
@@ -224,6 +257,9 @@ func TestCCIPSend(t *testing.T) {
 	// Deploy and configure lane for outbound sends
 	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
 	require.Truef(t, ok, "failed to get Canton Lane adapter")
+	feeQuoterDestChainConfig := lanes.DefaultFeeQuoterDestChainConfig(true, remoteSelector)
+	feeQuoterDestChainConfig.V2Params.USDPerUnitGas = big.NewInt(38)
+
 	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
 		Source: &lanes.ChainDefinition{
 			Selector: env.Chain.ChainSelector(),
@@ -259,7 +295,7 @@ func TestCCIPSend(t *testing.T) {
 		Dest: &lanes.ChainDefinition{
 			Selector:                 remoteSelector,
 			AddressBytesLength:       20,
-			FeeQuoterDestChainConfig: lanes.DefaultFeeQuoterDestChainConfig(true, remoteSelector),
+			FeeQuoterDestChainConfig: feeQuoterDestChainConfig,
 			ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
 				USDCentsFee: 50,
 				Enabled:     true,
@@ -283,126 +319,13 @@ func TestCCIPSend(t *testing.T) {
 	cldfEnv.DataStore = runningDs.Seal()
 	t.Log("Configured chain for lanes")
 
-	// Create Scan and Registry API clients
-	// Using the scanProxy endpoint of the 0-th participant, all participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
-	tokenSource := ccipParticipant.TokenSource
-	interceptor := func(ctx context.Context, req *http.Request) error {
-		token, err := tokenSource.Token()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve token: %w", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-
-		return nil
-	}
-	scanProxyClient, err := scanProxy.NewClientWithResponses(ccipParticipant.Endpoints.ValidatorAPIURL, scanProxy.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create scan proxy client")
-	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create token metadata client")
-	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), transferInstructionV1.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create transfer instruction client")
-
-	// Setup Amulet token as fee token
-	// Get registry admin for Amulet tokens
-	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), tokenMetadataClient)
-	require.NoError(t, err, "failed to get registry admin")
-
-	// Fee token is Amulet
-	feeTokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
-	}
-
-	// Get disclosed FeeQuoter contract
-	disclosedFeeQuoterForConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter",
-	})
-	require.NoError(t, err)
-
-	// Configure FeeToken: Add FeeToken to FeeQuoter
-
-	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
-					ContractId: disclosedFeeQuoterForConfig.ContractId,
-					Choice:     "ApplyFeeTokenUpdates",
-					ChoiceArgument: ledger.MapToValue(feequoter.ApplyFeeTokenUpdates{
-						FeeTokensToRemove: []splice_api_token_holding_v1.InstrumentId{},
-						FeeTokensToAdd: []feequoter.FeeTokenArgs{
-							{
-								InstrumentId: feeTokenInstrumentId,
-							},
-						},
-					}),
-				}},
-			}},
-			ActAs:              []string{partyCCIP},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFeeQuoterForConfig},
-		},
-	})
-	require.NoError(t, err, "failed to apply fee token updates")
-	t.Logf("Applied FeeToken updates to FeeQuoter")
-
-	// Get the updated FeeQuoter cID
-	disclosedFeeQuoterForConfig, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter",
-	})
-	require.NoError(t, err)
-	t.Logf("Updated FeeQuoter cID: %s", disclosedFeeQuoterForConfig.ContractId)
-
-	// UpdatePrices: Set price for FeeToken and LINK token
-	linkTokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(partyCCIP),
-		Id:    types.TEXT("link-token"),
-	}
-	usdPerToken := "100000000"
-	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
-					ContractId: disclosedFeeQuoterForConfig.ContractId,
-					Choice:     "UpdatePrices",
-					ChoiceArgument: ledger.MapToValue(feequoter.UpdatePrices{
-						PriceUpdates: feequoter.PriceUpdates{
-							TokenPriceUpdates: []feequoter.TokenPriceUpdate{
-								{
-									InstrumentId: feeTokenInstrumentId,
-									UsdPerToken:  types.NUMERIC(usdPerToken),
-								},
-								{
-									InstrumentId: linkTokenInstrumentId,
-									UsdPerToken:  types.NUMERIC("1500000000"),
-								},
-							},
-							GasPriceUpdates: []feequoter.GasPriceUpdate{
-								{
-									DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-									UsdPerUnitGas:     types.NUMERIC("38"),
-								},
-							},
-						},
-						Caller: types.PARTY(partyCCIP),
-					}),
-				}},
-			}},
-			ActAs:              []string{partyCCIP},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFeeQuoterForConfig},
-		},
-	})
-	require.NoError(t, err, "failed to update prices")
-	t.Logf("Updated FeeToken price to $%s per token", usdPerToken)
-
 	// Create PerPartyRouter for sender
 	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
 	})
 	require.NoError(t, err)
 
+	// TODO use operation to deploy PerPartyRouter
 	res, err := senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -628,7 +551,7 @@ func TestCCIPSend(t *testing.T) {
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
 			FeeToken: ccipclient.FeeTokenInput{
-				Token:           feeTokenInstrumentId,
+				Token:           nativeInstrumentId,
 				TokenInput:      feeTokenInput,
 				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 			},
