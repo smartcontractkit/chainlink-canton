@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "64769a5ee6b4cc2e6aaa55559b166cf534c69017a130f3bacfa89f4b057e0c90"
+	PackageID   = "88290433c52d1f7363f5345547da721a25a36f043141bd3ac70346569be050d8"
 	SDKVersion  = "3.4.10"
 )
 

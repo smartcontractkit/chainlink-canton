@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "78e28ea5b335dd33af47a8e3298dfa4fa4dcfa91ba332351a05f9e69e1c3aa5f"
+	PackageID   = "e16a9f41471d6022fe7318d52c0dddb98c111d231036cafa08a83f8eb7b17f0c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -3781,27 +3781,6 @@ func (t RateLimiter) ConsumeCapacityWithPackageID(contractID string, packageID s
 	}
 }
 
-// Archive exercises the Archive choice on this RateLimiter contract
-// This method uses the package name in the template ID
-func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "RateLimiter"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
-func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "RateLimiter"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
 // SetConfig exercises the SetConfig choice on this RateLimiter contract
 // This method uses the package name in the template ID
 func (t RateLimiter) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
@@ -3822,6 +3801,52 @@ func (t RateLimiter) SetConfigWithPackageID(contractID string, packageID string,
 		Arguments:  argsToMap(args),
 	}
 }
+
+// Archive exercises the Archive choice on this RateLimiter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this RateLimiter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t RateLimiter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t RateLimiter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for RateLimiter
+
+var _ mcms.IMCMSReceiver = (*RateLimiter)(nil)
 
 // Receipt is a Record type
 type Receipt struct {
