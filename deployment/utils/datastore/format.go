@@ -3,9 +3,10 @@ package datastore
 import (
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	datastore2 "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 func ToInstanceAddress(ref datastore.AddressRef) (contracts.InstanceAddress, error) {

@@ -20,14 +20,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	dsutils2 "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccvsequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -55,9 +53,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
@@ -402,224 +400,50 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	return runningDS.Seal(), nil
 }
 
-// ConnectContractsWithSelectors implements cciptestinterfaces.CCIP17Configuration.
-func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployment.Environment, selector uint64, remoteSelectors []uint64, committees *ccipOffchain.EnvironmentTopology) error {
-	l := c.logger
-	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Connecting contracts with selectors")
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		env.Logger,
-		operations.NewMemoryReporter(),
-	)
-	env.OperationsBundle = bundle
-
-	// Get InstanceAddresses of Canton contracts
-	globalConfigRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		selector,
-		datastore.ContractType(global_config.ContractType),
-		global_config.Version,
-		"",
-	))
-	if err != nil {
-		return fmt.Errorf("failed to get global config address ref for chain %d: %w", selector, err)
-	}
-	globalConfig, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-		Type: datastore.ContractType(global_config.ContractType),
-	}, selector, dsutils2.ToInstanceAddress)
-	if err != nil {
-		return fmt.Errorf("failed to get global config address for chain %d: %w", selector, err)
-	}
-	feeQuoter, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-		Type: datastore.ContractType(fee_quoter.ContractType),
-	}, selector, dsutils2.ToInstanceAddress)
-	if err != nil {
-		return fmt.Errorf("failed to get fee quoter address for chain %d: %w", selector, err)
-	}
-	onRamp, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-		Type: datastore.ContractType(onramp.ContractType),
-	}, selector, dsutils2.ToInstanceAddress)
-	if err != nil {
-		return fmt.Errorf("failed to get on ramp address for chain %d: %w", selector, err)
-	}
-	offRamp, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-		Type: datastore.ContractType(offramp.ContractType),
-	}, selector, dsutils2.ToInstanceAddress)
-	if err != nil {
-		return fmt.Errorf("failed to get off ramp address for chain %d: %w", selector, err)
-	}
-
-	config := cantonChangesets.CantonCSDeps[cantonChangesets.ConfigureChainForLanesConfig]{
-		ChainSelector: selector,
-		Participant:   0,
-		Config: cantonChangesets.ConfigureChainForLanesConfig{
-			Input: sequences.ConfigureChainForLanesInput{
-				ChainSelector:      selector,
-				GlobalConfig:       globalConfig,
-				FeeQuoter:          feeQuoter,
-				OnRamp:             onRamp,
-				OffRamp:            offRamp,
-				CommitteeVerifiers: nil,
-				RemoteChains:       make(map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress], len(remoteSelectors)),
+func (c *Chain) GetConnectionProfile(selector uint64) (lanes.ChainDefinition, changesets.CommitteeVerifierRemoteChainConfig, error) {
+	chainDefinition := lanes.ChainDefinition{
+		Selector:           selector,
+		AddressBytesLength: 32,
+		DefaultExecutor: datastore.AddressRef{
+			ChainSelector: selector,
+			Type:          datastore.ContractType(executor2.ContractType),
+			Version:       executor2.Version,
+		},
+		ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+			Enabled: false,
+		},
+		DefaultInboundCCVs: []datastore.AddressRef{
+			{
+				ChainSelector: selector,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
+				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
+			},
+		},
+		DefaultOutboundCCVs: []datastore.AddressRef{
+			{
+				ChainSelector: selector,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
+				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
+			},
+		},
+		CantonLaneConfig: &lanes.CantonLaneConfig{
+			GlobalConfig: datastore.AddressRef{
+				ChainSelector: selector,
+				Type:          datastore.ContractType(global_config.ContractType),
+				Version:       global_config.Version,
 			},
 		},
 	}
-
-	// Configure outbound defaults: use the default committee verifier as both the outbound CCV and executor,
-	// matching the reference integration test.
-	var committeeVerifierRawAddr contracts.RawInstanceAddress
-	ccvRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		selector,
-		datastore.ContractType(committee_verifier.ContractType),
-		committee_verifier.Version,
-		devenvcommon.DefaultCommitteeVerifierQualifier,
-	))
-	if err == nil && len(ccvRef.Labels.List()) > 0 {
-		committeeVerifierRawAddr = contracts.RawInstanceAddress(ccvRef.Labels.List()[0])
+	cvConfig := changesets.CommitteeVerifierRemoteChainConfig{
+		GasForVerification: 50_000,
 	}
 
-	remoteChains := make(map[uint64]lanes.ChainDefinition)
-	for _, remoteSelector := range remoteSelectors {
-		// TODO: should be moved to the ChainFamily interface.
-		var addressBytesLength uint8
-		family, err := chainsel.GetSelectorFamily(remoteSelector)
-		if err != nil {
-			return fmt.Errorf("failed to get selector family for chain %d: %w", remoteSelector, err)
-		}
-		switch family {
-		case chainsel.FamilyEVM:
-			addressBytesLength = 20
-		case chainsel.FamilyCanton:
-			addressBytesLength = 32
-		default:
-			return fmt.Errorf("unsupported family %s for chain %d", family, remoteSelector)
-		}
+	return chainDefinition, cvConfig, nil
+}
 
-		localExecutorRef, err := env.DataStore.Addresses().Get(
-			datastore.NewAddressRefKey(
-				selector,
-				datastore.ContractType(ccvsequences.ExecutorProxyType),
-				executor.Version,
-				devenvcommon.DefaultExecutorQualifier,
-			),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to get default executor for source chain %d: %w", selector, err)
-		}
-		// Normalize executor to 32 bytes (left-padded) for Canton config encoding.
-		normalizedSourceExecutor := contracts.HexToInstanceAddress(localExecutorRef.Address).Hex()
-
-		remoteChains[remoteSelector] = lanes.ChainDefinition{
-			Selector:                          remoteSelector,
-			GasPrice:                          nil,
-			TokenPrices:                       nil,
-			FeeQuoterDestChainConfigOverrides: nil,
-			RMNVerificationEnabled:            false,
-			AllowListEnabled:                  false,
-			AllowList:                         nil,
-			CommitteeVerifiers:                nil,
-			DefaultInboundCCVs:                nil,
-			LaneMandatedInboundCCVs:           nil,
-			DefaultOutboundCCVs:               nil,
-			LaneMandatedOutboundCCVs:          nil,
-			DefaultExecutor:                   localExecutorRef,
-			ExecutorDestChainConfig:           lanes.ExecutorDestChainConfig{},
-			AddressBytesLength:                0,
-			BaseExecutionGasCost:              0,
-			TokenReceiverAllowed:              nil,
-			MessageNetworkFeeUSDCents:         0,
-			TokenNetworkFeeUSDCents:           0,
-			CantonLaneConfig: &lanes.CantonLaneConfig{
-				GlobalConfig: globalConfigRef,
-			},
-			FeeQuoterVersion: nil,
-		}
-
-		remoteChainConfig := adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
-			AllowTrafficFrom:         true,
-			OnRamps:                  [][]byte{remoteOnRamp},
-			OffRamp:                  remoteOffRamp,
-			DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
-			LaneMandatedInboundCCVs:  nil,
-			DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
-			LaneMandatedOutboundCCVs: nil,
-			DefaultExecutor:          contracts.RawInstanceAddress(normalizedSourceExecutor),
-			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
-				IsEnabled:                   true,
-				MaxDataBytes:                50000,
-				MaxPerMsgGasLimit:           4000000,
-				DestGasOverhead:             300000,
-				DestGasPerPayloadByteBase:   16,
-				ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
-				DefaultTxGasLimit:           200000,
-				LinkFeeMultiplierPercent:    90,
-				DefaultTokenFeeUSDCents:     0,
-				DefaultTokenDestGasOverhead: 34000,
-				NetworkFeeUSDCents:          0,
-			},
-			ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
-			AddressBytesLength:      addressBytesLength,
-			BaseExecutionGasCost:    0,
-		}
-		config.Config.Input.RemoteChains[remoteSelector] = remoteChainConfig
-	}
-
-	for qualifier, committee := range committees.NOPTopology.Committees {
-		// Get CommitteeVerifier address for this qualifier
-		committeeVerifier, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			Type:      datastore.ContractType(committee_verifier.ContractType),
-			Qualifier: qualifier,
-		}, selector, dsutils2.ToInstanceAddress)
-		if err != nil {
-			return fmt.Errorf("failed to get committee verifier address with qualifier %s for chain %d: %w", qualifier, selector, err)
-		}
-
-		committeeVerifierConfig := adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
-			CommitteeVerifier: []contracts.InstanceAddress{committeeVerifier},
-			RemoteChains:      make(map[uint64]adapters.CommitteeVerifierRemoteChainConfig),
-		}
-
-		// Configure all remote chains with the respective signers
-		for _, remoteSelector := range remoteSelectors {
-			chainCfg, ok := committee.ChainConfigs[strconv.FormatUint(remoteSelector, 10)]
-			if !ok {
-				return fmt.Errorf("chain selector %d not found in committee %q", remoteSelector, qualifier)
-			}
-			// For each of the NOPs in this committee, get their Canton-family signer.
-			// Since the Canton CommitteeVerifier requires the (uncompressed) signer pubkey to be set on-chain,
-			// nop.SignerAddressByFamily[chainsel.FamilyCanton] must contain the signer's pubkey, NOT address
-			signers := make([]string, 0, len(chainCfg.NOPAliases))
-			for _, alias := range chainCfg.NOPAliases {
-				nop, ok := committees.NOPTopology.GetNOP(alias)
-				if !ok {
-					return fmt.Errorf("NOP alias %q not found for committee %q chain %d", alias, qualifier, remoteSelector)
-				}
-				signer, ok := nop.SignerAddressByFamily[chainsel.FamilyCanton]
-				if !ok {
-					return fmt.Errorf("no Canton pubkey signer found for NOP alias %q", alias)
-				}
-				signers = append(signers, signer)
-			}
-			committeeVerifierConfig.RemoteChains[remoteSelector] = adapters.CommitteeVerifierRemoteChainConfig{
-				AllowlistEnabled:          false,
-				AddedAllowlistedSenders:   nil,
-				RemovedAllowlistedSenders: nil,
-				FeeUSDCents:               0,
-				GasForVerification:        50_000,
-				PayloadSizeBytes:          0,
-				SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
-					Signers:   signers,
-					Threshold: chainCfg.Threshold,
-				},
-			}
-		}
-		config.Config.Input.CommitteeVerifiers = append(config.Config.Input.CommitteeVerifiers, committeeVerifierConfig)
-	}
-
-	_, err = cantonChangesets.ConfigureChainForLanes{}.Apply(*env, config)
-	if err != nil {
-		return fmt.Errorf("failed to configure chain for lanes: %w", err)
-	}
-
+func (c *Chain) PostConnect(env *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
 	return nil
 }
 

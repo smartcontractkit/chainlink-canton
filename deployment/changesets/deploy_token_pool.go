@@ -127,7 +127,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 			PoolOwnerParty: cfg.PoolOwner,
 			PoolInstanceID: out.Output.Address,
 		}
-		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, deps, regInput)
+		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
 		}

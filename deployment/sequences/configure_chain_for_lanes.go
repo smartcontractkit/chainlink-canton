@@ -7,10 +7,11 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
+	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -46,13 +47,13 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		isEnabled := len(destChain.Router) > 0
 		defaultExecutor, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.DefaultExecutor)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("getting default executor: %s", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("getting default executor: %w", err)
 		}
 		laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
 		for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
 			outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated outbound CCV: %s", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated outbound CCV: %w", err)
 			}
 			laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, outboundCCV.Binding())
 		}
@@ -60,7 +61,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
 			outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated outbound CCV: %s", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated outbound CCV: %w", err)
 			}
 			defaultOutboundCCVs = append(defaultOutboundCCVs, outboundCCV.Binding())
 		}
@@ -108,6 +109,9 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 				},
 			},
 		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to executor: %w", err)
+		}
 
 		// FeeQuoter - Dest Chain Config
 		feeQuoterAddress := contracts.BytesToInstanceAddress(sourceChain.FeeQuoter)
@@ -132,6 +136,9 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 				},
 			},
 		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to fee quoter: %w", err)
+		}
 
 		// FeeQuoter - Update prices (gas prices only, as these are per dest chain)
 		_, err = operations.ExecuteOperation(b, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
@@ -148,6 +155,9 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 				},
 			},
 		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("updating gas prices in fee quoter: %w", err)
+		}
 
 		// CommitteeVerifier - Dest Chain Config
 		for _, verifierConfig := range input.Source.CommitteeVerifiers {
@@ -155,6 +165,9 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 				ChainSelector:           chain.Selector,
 				CommitteeVerifierConfig: verifierConfig,
 			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as source: %w", err)
+			}
 		}
 
 		return sequences.OnChainOutput{}, nil
@@ -178,19 +191,19 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		// GlobalConfig - Source Chain Config
 		globalConfigAddress := contracts.HexToInstanceAddress(destChain.CantonLaneConfig.GlobalConfig.Address)
-		laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.LaneMandatedInboundCCVs))
-		for _, ccv := range sourceChain.LaneMandatedInboundCCVs {
+		laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(destChain.LaneMandatedInboundCCVs))
+		for _, ccv := range destChain.LaneMandatedInboundCCVs {
 			inboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated inbound CCV: %s", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated inbound CCV: %w", err)
 			}
 			laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, inboundCCV.Binding())
 		}
-		defaultInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.LaneMandatedInboundCCVs))
-		for _, ccv := range sourceChain.LaneMandatedInboundCCVs {
+		defaultInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(destChain.LaneMandatedInboundCCVs))
+		for _, ccv := range destChain.LaneMandatedInboundCCVs {
 			inboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated inbound CCV: %s", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated inbound CCV: %w", err)
 			}
 			defaultInboundCCVs = append(defaultInboundCCVs, inboundCCV.Binding())
 		}
@@ -216,13 +229,19 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 				},
 			},
 		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("applying source chain config updates to global config: %w", err)
+		}
 
 		// CommitteeVerifier - Source Chain Config
-		for _, verifierConfig := range input.Source.CommitteeVerifiers {
+		for _, verifierConfig := range input.Dest.CommitteeVerifiers {
 			_, err = operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsDest, deps, ConfigureCommitteeVerifierAsDestInput{
 				ChainSelector:           chain.Selector,
 				CommitteeVerifierConfig: verifierConfig,
 			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as dest: %w", err)
+			}
 		}
 
 		return sequences.OnChainOutput{}, nil

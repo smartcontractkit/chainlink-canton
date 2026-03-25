@@ -4,17 +4,18 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
-	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
-	dsutil "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	datastore2 "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	seq_core "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
+	dsutil "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 )
 
 var _ lanes.LaneAdapter = &ChainFamilyAdapter{}
@@ -85,5 +86,6 @@ func (c ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestCha
 }
 
 func (c ChainFamilyAdapter) GetDefaultGasPrice() *big.Int {
-	return big.NewInt(0)
+	// TODO calculate this
+	return big.NewInt(38)
 }

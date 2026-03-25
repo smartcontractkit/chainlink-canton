@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/Masterminds/semver/v3"
-	"github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -12,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	"github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 // TODO: should this be defined elsewhere?
