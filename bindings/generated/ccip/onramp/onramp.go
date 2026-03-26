@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "5c500bbf4869b7f7fcee8062ffc312f40ad56a776664d5eae1b00e3ccfeecf7c"
+	PackageID   = "f9b336e1e8e66559504491ae52b2328187490ff63e533b9dd82cd9f752ccac9f"
 	SDKVersion  = "3.4.10"
 )
 
@@ -209,16 +209,11 @@ func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
 
 // FinalizeFeeFromRouter is a Record type
 type FinalizeFeeFromRouter struct {
-	RouterPartyOwner    types.PARTY          `json:"routerPartyOwner"`
-	RouterInstanceId    types.TEXT           `json:"routerInstanceId"`
-	GlobalConfigCid     types.CONTRACT_ID    `json:"globalConfigCid"`
-	FeeQuoterCid        types.CONTRACT_ID    `json:"feeQuoterCid"`
-	SendingMessageCid   types.CONTRACT_ID    `json:"sendingMessageCid"`
-	QuotedCCVFees       []common.CCVFee      `json:"quotedCCVFees"`
-	QuotedTokenSendFee  *common.TokenSendFee `json:"quotedTokenSendFee" hex:"optional"`
-	QuotedExecutionMode common.ExecutionMode `json:"quotedExecutionMode"`
-	QuotedExecutorFee   *common.ExecutorFee  `json:"quotedExecutorFee" hex:"optional"`
-	ExecutorArgs        types.TEXT           `json:"executorArgs"`
+	RouterPartyOwner  types.PARTY       `json:"routerPartyOwner"`
+	RouterInstanceId  types.TEXT        `json:"routerInstanceId"`
+	GlobalConfigCid   types.CONTRACT_ID `json:"globalConfigCid"`
+	FeeQuoterCid      types.CONTRACT_ID `json:"feeQuoterCid"`
+	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
 }
 
 // ToMap converts FinalizeFeeFromRouter to a map for DAML arguments
@@ -252,51 +247,6 @@ func (t FinalizeFeeFromRouter) ToMap() map[string]any {
 		}
 		return t.SendingMessageCid
 	}()
-
-	m["quotedCCVFees"] = func() []any {
-		res := make([]any, 0, len(t.QuotedCCVFees))
-		for _, e := range t.QuotedCCVFees {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	if t.QuotedTokenSendFee != nil {
-		m["quotedTokenSendFee"] = map[string]any{
-			"_type": "optional",
-			"value": *t.QuotedTokenSendFee,
-		}
-	} else {
-		m["quotedTokenSendFee"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	m["quotedExecutionMode"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.QuotedExecutionMode).(mapper); ok {
-			return m.toMap()
-		}
-		return t.QuotedExecutionMode
-	}()
-
-	if t.QuotedExecutorFee != nil {
-		m["quotedExecutorFee"] = map[string]any{
-			"_type": "optional",
-			"value": *t.QuotedExecutorFee,
-		}
-	} else {
-		m["quotedExecutorFee"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	m["executorArgs"] = string(t.ExecutorArgs)
 
 	return m
 }
@@ -454,7 +404,6 @@ func (t *GetFeeFromRouter) UnmarshalHex(data string) error {
 // GetFeeFromRouterResult is a Record type
 type GetFeeFromRouterResult struct {
 	FeeTokenAmount types.NUMERIC `json:"feeTokenAmount"`
-	TotalUSDCents  types.NUMERIC `json:"totalUSDCents"`
 	PoolFeeBps     types.NUMERIC `json:"poolFeeBps"`
 }
 
@@ -463,8 +412,6 @@ func (t GetFeeFromRouterResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["feeTokenAmount"] = t.FeeTokenAmount
-
-	m["totalUSDCents"] = t.TotalUSDCents
 
 	m["poolFeeBps"] = t.PoolFeeBps
 

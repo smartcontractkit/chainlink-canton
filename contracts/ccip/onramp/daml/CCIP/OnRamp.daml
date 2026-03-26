@@ -112,8 +112,6 @@ data GetFeeFromRouterResult = GetFeeFromRouterResult
         -- Final amount payable in the selected fee token, including CCV fees,
         -- token-pool fee, CCIP network fee, executor flat fee, and execution gas cost.
         feeTokenAmount : Numeric 0
-        -- Total of those same fee components in USD cents before conversion into the fee token.
-        totalUSDCents : Numeric 0
         -- Token-pool fee rate in basis points as reported by the token pool quote, if any.
         poolFeeBps : Numeric 0
     deriving (Eq, Show)
@@ -449,7 +447,6 @@ template OnRamp
 
                 pure GetFeeFromRouterResult with
                     feeTokenAmount = totalFeeTokenAmount
-                    totalUSDCents = totalUSDCents
                     poolFeeBps = poolFeeBps
 
         -- | Finalize execution metadata and fees from the router. Message

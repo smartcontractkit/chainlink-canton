@@ -63,21 +63,6 @@ template DummyCommitteeVerifier
                         sendingMessageCid = arg.sendingMessageCid
                         caller = arg.caller
 
-        nonconsuming choice DummyCommitteeVerifier_GetFee
-                : CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote
-            with
-                destChainSelector : Numeric 0
-                caller : Party
-            controller caller
-            do
-                let _ = destChainSelector
-                pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
-                    ccvInstanceId = instanceId
-                    ccvOwner = owner
-                    feeUSDCents = feeUSDCents
-                    gasForVerification = destGasLimit
-                    payloadSizeBytes = destBytesOverhead
-
         nonconsuming choice DummyCommitteeVerifier_ForwardToVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with

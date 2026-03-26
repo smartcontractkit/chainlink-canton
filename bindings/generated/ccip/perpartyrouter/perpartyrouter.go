@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "471e562defdab7dd4c818dae78fa8a69c776cf1e85ed8ac74a4cea5739a2ae05"
+	PackageID   = "288043ff56bc7ac7c0f524723eb96ccd6c9f4c58afff453f40fa444d67f67a18"
 	SDKVersion  = "3.4.10"
 )
 
@@ -646,13 +646,8 @@ func (t *FactorySetDeps) UnmarshalHex(data string) error {
 
 // FinalizeFee2 is a Record type
 type FinalizeFee2 struct {
-	Context             common.CCIPContext   `json:"context"`
-	SendingMessageCid   types.CONTRACT_ID    `json:"sendingMessageCid"`
-	QuotedCCVFees       []common.CCVFee      `json:"quotedCCVFees"`
-	QuotedTokenSendFee  *common.TokenSendFee `json:"quotedTokenSendFee" hex:"optional"`
-	QuotedExecutionMode common.ExecutionMode `json:"quotedExecutionMode"`
-	QuotedExecutorFee   *common.ExecutorFee  `json:"quotedExecutorFee" hex:"optional"`
-	ExecutorArgs        types.TEXT           `json:"executorArgs"`
+	Context           common.CCIPContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
 }
 
 // ToMap converts FinalizeFee2 to a map for DAML arguments
@@ -674,51 +669,6 @@ func (t FinalizeFee2) ToMap() map[string]any {
 		}
 		return t.SendingMessageCid
 	}()
-
-	m["quotedCCVFees"] = func() []any {
-		res := make([]any, 0, len(t.QuotedCCVFees))
-		for _, e := range t.QuotedCCVFees {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	if t.QuotedTokenSendFee != nil {
-		m["quotedTokenSendFee"] = map[string]any{
-			"_type": "optional",
-			"value": *t.QuotedTokenSendFee,
-		}
-	} else {
-		m["quotedTokenSendFee"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	m["quotedExecutionMode"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.QuotedExecutionMode).(mapper); ok {
-			return m.toMap()
-		}
-		return t.QuotedExecutionMode
-	}()
-
-	if t.QuotedExecutorFee != nil {
-		m["quotedExecutorFee"] = map[string]any{
-			"_type": "optional",
-			"value": *t.QuotedExecutorFee,
-		}
-	} else {
-		m["quotedExecutorFee"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	m["executorArgs"] = string(t.ExecutorArgs)
 
 	return m
 }

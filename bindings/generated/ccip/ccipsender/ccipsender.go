@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "700a6a682877c0943d6c0c7fd69ce2edf2248fb304e97d58584bea855c155d5c"
+	PackageID   = "975b2cb5fc891f1237e64f1d6e0d61c4dd3314b02a971f63055321b0752284b9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -125,6 +125,27 @@ func (t *CCIPSender) UnmarshalHex(data string) error {
 
 // Choice methods for CCIPSender
 
+// GetFee exercises the GetFee choice on this CCIPSender contract
+// This method uses the package name in the template ID
+func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Archive exercises the Archive choice on this CCIPSender contract
 // This method uses the package name in the template ID
 func (t CCIPSender) Archive(contractID string) *model.ExerciseCommand {
@@ -163,27 +184,6 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
 		Choice:     "Send",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetFee exercises the GetFee choice on this CCIPSender contract
-// This method uses the package name in the template ID
-func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
-		ContractID: contractID,
-		Choice:     "GetFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
-func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee2) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
-		ContractID: contractID,
-		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -357,7 +357,6 @@ func (t *GetFee2) UnmarshalHex(data string) error {
 // GetFeeResult is a Record type
 type GetFeeResult struct {
 	FeeTokenAmount types.NUMERIC `json:"feeTokenAmount"`
-	TotalUSDCents  types.NUMERIC `json:"totalUSDCents"`
 	PoolFeeBps     types.NUMERIC `json:"poolFeeBps"`
 }
 
@@ -366,8 +365,6 @@ func (t GetFeeResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["feeTokenAmount"] = t.FeeTokenAmount
-
-	m["totalUSDCents"] = t.TotalUSDCents
 
 	m["poolFeeBps"] = t.PoolFeeBps
 
