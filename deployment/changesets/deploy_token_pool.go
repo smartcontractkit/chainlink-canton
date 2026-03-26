@@ -119,13 +119,10 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {
 		regInput := sequences.RegisterTokenPoolInput{
 			TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
-			InstrumentId: splice_api_token_holding_v1.InstrumentId{
-				Admin: cfg.InstrumentId.Admin,
-				Id:    cfg.InstrumentId.Id,
-			},
-			CcipParty:      cfg.CcipOwner,
-			PoolOwnerParty: cfg.PoolOwner,
-			PoolInstanceID: out.Output.Address,
+			InstrumentId:                      cfg.InstrumentId,
+			CcipParty:                         cfg.CcipOwner,
+			PoolOwnerParty:                    cfg.PoolOwner,
+			PoolInstanceID:                    cfg.InstanceID,
 		}
 		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {

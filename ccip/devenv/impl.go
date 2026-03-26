@@ -459,6 +459,7 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	if err != nil {
 		return lanes.ChainDefinition{}, changesets.CommitteeVerifierRemoteChainConfig{}, fmt.Errorf("failed to get GlobalConfig address for chain %d: %w", selector, err)
 	}
+	c.logger.Debug().Str("GlobalConfig", globalConfig.Address).Msg("Resolved GlobalConfig")
 
 	chainDefinition := lanes.ChainDefinition{
 		Selector:           selector,
