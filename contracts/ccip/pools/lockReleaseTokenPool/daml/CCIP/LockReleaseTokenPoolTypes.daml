@@ -56,3 +56,12 @@ data RateLimitConfigArgs = RateLimitConfigArgs
         inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress
         outboundRateLimiter : RawInstanceAddress
     deriving (Eq, Show)
+
+-- | Transfer timeout configuration for pending TransferInstructions.
+-- Some tokens (e.g., Amulet) have expiry constraints and reject transfers with
+-- executeBefore times beyond the token's expiry. Use RelativeHours for such tokens.
+-- Tokens without expiry (e.g., TestToken) can use Indefinite.
+data TransferTimeout
+    = Indefinite          -- Use maxTime (year 9999) - for tokens without expiry
+    | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
+    deriving (Eq, Show)

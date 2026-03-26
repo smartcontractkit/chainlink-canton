@@ -8,6 +8,8 @@ import DA.Optional (fromSome)
 import CCIP.LockReleaseTokenPoolCodec qualified as LockReleaseTokenPoolCodec
 import CCIP.LockReleaseTokenPoolTypes qualified as LockReleaseTokenPoolTypes
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import CCIP.Context qualified as Context
+import DA.TextMap qualified as TextMap
 
 -- ===============================================
 -- |              SetDynamicConfig               |
@@ -125,6 +127,67 @@ testSetRateLimitConfigParamsRoundtrip = do
     fst (fromSome (LockReleaseTokenPoolCodec.decodeSetRateLimitConfigParams encoded)) === args
     pure ()
 
+-- ===============================================
+-- |              TransferTimeout                |
+-- ===============================================
+
+testTransferTimeoutRoundtrip : Script ()
+testTransferTimeoutRoundtrip = do
+    -- Test Indefinite
+    let indefinite = LockReleaseTokenPoolTypes.Indefinite
+        encodedIndefinite = LockReleaseTokenPoolCodec.encodeTransferTimeout indefinite
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedIndefinite 0)) === indefinite
+
+    -- Test RelativeHours with various values
+    let relHours24 = LockReleaseTokenPoolTypes.RelativeHours 24
+        encodedRelHours24 = LockReleaseTokenPoolCodec.encodeTransferTimeout relHours24
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedRelHours24 0)) === relHours24
+
+    let relHours0 = LockReleaseTokenPoolTypes.RelativeHours 0
+        encodedRelHours0 = LockReleaseTokenPoolCodec.encodeTransferTimeout relHours0
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedRelHours0 0)) === relHours0
+
+    let relHoursLarge = LockReleaseTokenPoolTypes.RelativeHours 8760  -- 1 year in hours
+        encodedRelHoursLarge = LockReleaseTokenPoolCodec.encodeTransferTimeout relHoursLarge
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedRelHoursLarge 0)) === relHoursLarge
+
+-- ===============================================
+-- |           SetPoolReceiveContext             |
+-- ===============================================
+
+testSetPoolReceiveContextRoundtrip : Script ()
+testSetPoolReceiveContextRoundtrip = do
+    -- Test empty context
+    let emptyCtx = Context.emptyCCIPContext
+        encodedEmpty = LockReleaseTokenPoolCodec.encodeSetPoolReceiveContextParams emptyCtx
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetPoolReceiveContextParams encodedEmpty)) === emptyCtx
+
+    -- Test context with simple text values
+    let ctxWithText = Context.CCIPContext (TextMap.fromList [("key1", Context.AV_Text "value1"), ("key2", Context.AV_Text "value2")])
+        encodedWithText = LockReleaseTokenPoolCodec.encodeSetPoolReceiveContextParams ctxWithText
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetPoolReceiveContextParams encodedWithText)) === ctxWithText
+
+    -- Test context with int values
+    let ctxWithInt = Context.CCIPContext (TextMap.fromList [("count", Context.AV_Int 42)])
+        encodedWithInt = LockReleaseTokenPoolCodec.encodeSetPoolReceiveContextParams ctxWithInt
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetPoolReceiveContextParams encodedWithInt)) === ctxWithInt
+
+    -- Test context with bool values
+    let ctxWithBool = Context.CCIPContext (TextMap.fromList [("enabled", Context.AV_Bool True), ("disabled", Context.AV_Bool False)])
+        encodedWithBool = LockReleaseTokenPoolCodec.encodeSetPoolReceiveContextParams ctxWithBool
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetPoolReceiveContextParams encodedWithBool)) === ctxWithBool
+
+-- ===============================================
+-- |             SetTransferTimeout              |
+-- ===============================================
+
+testSetTransferTimeoutRoundtrip : Script ()
+testSetTransferTimeoutRoundtrip = do
+    -- Test using the params wrapper
+    let timeout = LockReleaseTokenPoolTypes.RelativeHours 48
+        encoded = LockReleaseTokenPoolCodec.encodeSetTransferTimeoutParams timeout
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetTransferTimeoutParams encoded)) === timeout
+
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
 -- ===========================================================================
@@ -135,6 +198,11 @@ testInvalidDataRejection = do
   case LockReleaseTokenPoolCodec.decodeApplyChainUpdatesParams "" of
     None -> pure ()  -- Expected
     Some _ -> abort "Expected decodeApplyChainUpdatesParams to fail on empty data"
+
+  -- Invalid tag for TransferTimeout should fail
+  case LockReleaseTokenPoolCodec.decodeTransferTimeoutAt "ff" 0 of
+    None -> pure ()  -- Expected
+    Some _ -> abort "Expected decodeTransferTimeoutAt to fail on invalid tag"
 
   pure ()
 
