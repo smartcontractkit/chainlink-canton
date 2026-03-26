@@ -771,6 +771,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	)...)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
+	time.Sleep(500 * time.Millisecond)
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
