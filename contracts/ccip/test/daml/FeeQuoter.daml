@@ -635,8 +635,16 @@ testFinalizeFee_PremiumAndExecutor = script do
                     feeUSDCents = cents 300.0
                 )
 
-    -- Finalize using QuoteGasForExec + SendingMessageV1.FinalizeFee.
-    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
+    -- Finalize with the explicit LINK premium inputs this test is asserting on:
+    -- 20 USD/LINK and a 90% premium multiplier (10% LINK discount).
+    sendingMessageCid <- submit owner do
+        exerciseCmd sendingMessageCid SendingMessageV1.FinalizeFee with
+            feeTokenPrice = 2000000000.0
+            premiumMultiplier = 90000000.0
+            totalExecutionGasLimit = 10000
+            executorDestGasLimit = 0
+            executorDestBytesOverhead = 0
+            executionCostUSDCents = 0.0
 
     finalized <- queryContractId owner sendingMessageCid
     let sm = fromSome finalized
@@ -1034,7 +1042,16 @@ testFinalizeFee_LinkCapMixedFees = script do
                     feeUSDCents = cents 100.0
                 )
 
-    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
+    -- Finalize with the explicit LINK conversion inputs this test is asserting on:
+    -- 20 USD/LINK with no LINK discount.
+    sendingMessageCid <- submit owner do
+        exerciseCmd sendingMessageCid SendingMessageV1.FinalizeFee with
+            feeTokenPrice = 2000000000.0
+            premiumMultiplier = 100000000.0
+            totalExecutionGasLimit = 60000
+            executorDestGasLimit = 0
+            executorDestBytesOverhead = 0
+            executionCostUSDCents = 0.0
 
     Some sm <- queryContractId owner sendingMessageCid
     sm.ccvFeeTokenAmounts === [5000000.0]

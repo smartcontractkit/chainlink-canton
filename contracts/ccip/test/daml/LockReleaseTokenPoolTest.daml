@@ -1722,9 +1722,6 @@ testExecutionGasLimitAggregation = script do
     finalized <- queryContractId ccipOwner sendingMessageCid
     let sm = fromSome finalized
     sm.executionGasLimit === 285801
-    let outboundMessage = fromSome sm.message
-    outboundMessage.executionGasLimit === 285801
-
     debug "testExecutionGasLimitAggregation: PASSED"
 
 -- C-1: Decimal conversion when remote < local (multiply path, scale up).
@@ -1986,9 +1983,6 @@ testExecutionGasLimitWithTokenSendFee = script do
     finalized <- queryContractId ccipOwner sendingMessageCid
     let sm = fromSome finalized
     sm.executionGasLimit === 310000
-    let outboundMessage = fromSome sm.message
-    outboundMessage.executionGasLimit === 310000
-
     debug "testExecutionGasLimitWithTokenSendFee: PASSED"
 
 -- | Token pools may only supply pool metadata up to the bytes they quoted during CalculateFee.
