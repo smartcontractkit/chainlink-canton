@@ -614,7 +614,7 @@ testFinalizeFee_PremiumAndExecutor = script do
             messageId = ""
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit owner do
+    sendingMessageCid <- submit (actAs owner <> actAs ccvOwner) do
         exerciseCmd sendingMessageCid SendingMessageV1.SetQuotedFees with
             quotedCCVFees =
                 [SendingMessageV1.CCVFee with
@@ -1014,7 +1014,7 @@ testFinalizeFee_LinkCapMixedFees = script do
             messageId = ""
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit owner do
+    sendingMessageCid <- submit (actAs owner <> actAs ccvOwner) do
         exerciseCmd sendingMessageCid SendingMessageV1.SetQuotedFees with
             quotedCCVFees =
                 [SendingMessageV1.CCVFee with

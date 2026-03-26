@@ -226,8 +226,7 @@ template SendingMessageV1
         -- Populated by AddVerifierData
         verifierData : [VerifierData]
 
-        -- CCV owner parties accumulated via AddVerifierData and SetQuotedFees.
-        -- Mirrors the widened signatory set for auditability.
+        -- CCV owner parties accumulated from verifier participation.
         ccvOwners : [Party]
 
         -- External CCIP message, populated by BuildMessage.
@@ -289,10 +288,6 @@ template SendingMessageV1
                     executorAddress = quotedExecutorAddress
                     executorArgs = quotedExecutorArgs
                     executorFee = quotedExecutorFee
-                    ccvOwners =
-                        dedup
-                            (ccvOwners
-                                ++ map (.ccvOwner) quotedCCVFees)
         -- Finalize the execution receipt metadata. This happens before the
         -- outbound message is constructed.
         choice FinalizeFee : ContractId SendingMessageV1
