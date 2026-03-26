@@ -322,11 +322,14 @@ testCCIPSend = script do
                 feeToken = basicFeeToken testFeeTokenId feeTokenInput
                 extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
 
-    executorQuote <- submit ccipOwner do
+    -- Executor fee calculation (must happen before FinalizeFee)
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccipOwner <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
-            CCIP.Interfaces.Executor.Executor_GetFee with
-                destChainSelector = destChainSelector
-                requiredCCVs = []
+            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                sendingMessageCid = sendingMessageCid
+                executorArgs = ""
+                extraContext = CCIP.Context.emptyCCIPContext
                 caller = ccipOwner
 
     sendingMessageCid <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
@@ -338,14 +341,6 @@ testCCIPSend = script do
                     , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
                     ]
             sendingMessageCid = sendingMessageCid
-            quotedCCVFees = []
-            quotedTokenSendFee = None
-            quotedExecutionMode = CCIP.SendingMessageV1.ExecutionMode_Executor
-            quotedExecutorFee = Some (CCIP.SendingMessageV1.ExecutorFee with
-                executorInstanceId = executorQuote.executorInstanceId
-                executorOwner = executorQuote.executorOwner
-                feeUSDCents = executorQuote.feeUSDCents)
-            executorArgs = ""
 
     disclosedTransferFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
 
@@ -389,11 +384,14 @@ testCCIPSend = script do
                 feeToken = basicFeeToken testFeeTokenId feeTokenInput
                 extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
 
-    executorQuote2 <- submit ccipOwner do
+    -- Executor fee for second message (must happen before FinalizeFee)
+    disclosedSm2 <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid2
+    sendingMessageCid2 <- submit (actAs ccipOwner <> disclose disclosedSm2) do
         exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
-            CCIP.Interfaces.Executor.Executor_GetFee with
-                destChainSelector = destChainSelector
-                requiredCCVs = []
+            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                sendingMessageCid = sendingMessageCid2
+                executorArgs = ""
+                extraContext = CCIP.Context.emptyCCIPContext
                 caller = ccipOwner
 
     sendingMessageCid2 <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
@@ -405,14 +403,6 @@ testCCIPSend = script do
                     , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
                     ]
             sendingMessageCid = sendingMessageCid2
-            quotedCCVFees = []
-            quotedTokenSendFee = None
-            quotedExecutionMode = CCIP.SendingMessageV1.ExecutionMode_Executor
-            quotedExecutorFee = Some (CCIP.SendingMessageV1.ExecutorFee with
-                executorInstanceId = executorQuote2.executorInstanceId
-                executorOwner = executorQuote2.executorOwner
-                feeUSDCents = executorQuote2.feeUSDCents)
-            executorArgs = ""
 
     sendResult2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote <> disclose disclosedTransferFactory) do
         exerciseCmd newRouter CCIP.PerPartyRouter.CCIPSend with

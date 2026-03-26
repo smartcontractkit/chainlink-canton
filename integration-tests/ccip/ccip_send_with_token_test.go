@@ -1,14 +1,12 @@
 package tests
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -921,6 +918,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		transferFactoryDisclosures,
 		tokenTransferFactoryDisclosures,
 	))
+	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
+	quotedFeeLocalUnits := numeric0ToInt64(t, quotedFee.FeeTokenAmount)
+	require.Equal(t, int64(55_000_000), quotedFeeLocalUnits, "GetFee should return the configured token-send fee quote")
+	require.Equal(t, int64(500), numeric0ToInt64(t, quotedFee.PoolFeeBps), "GetFee should return the pool feeBps for token sends")
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -978,14 +979,14 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// In this test 1 token == 100,000,000 local units, so 1 US cent == 1,000,000 units.
 	// - CCV fee: CommitteeVerifierRemoteChainConfig.FeeUSDCents = 7 => 7,000,000
 	// - Pool fee: TokenTransferFeeConfigs[remoteSelector].feeUSDCents = 10 => 10,000,000
-	// - Owner residual: 55 total cents - 7 CCV - 10 pool = 38 cents => 38,000,000
+	// - Owner residual: quoted 55 cents - 7 CCV - 10 pool = 38 cents => 38,000,000
 	const (
 		ccvFeeLocalUnits        = int64(7_000_000)
 		poolFeeLocalUnits       = int64(10_000_000)
 		ownerResidualLocalUnits = int64(38_000_000)
 	)
 	expectedCCIPOwnerDelta := ccvFeeLocalUnits + ownerResidualLocalUnits
-	expectedSenderDelta := expectedCCIPOwnerDelta
+	expectedSenderDelta := quotedFeeLocalUnits - poolFeeLocalUnits
 
 	t.Logf(
 		"Sender balance (local units): before=%d after=%d deducted=%d",
@@ -1012,42 +1013,11 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// - owner residual (network + executor): $0.38 => 38,000,000 local units
 	// => ccipOwner total in this test = 45,000,000 local units. (ccipOwner is the same as ccvOwner here so it's not 38)
 	require.Equal(t, expectedCCIPOwnerDelta, ccipOwnerDelta, "ccipOwner should receive verifier fee + owner residual")
-	require.Equal(t, int64(55_000_000), ccipOwnerDelta+poolFeeLocalUnits, "fee-token payment should split as owner share + pool share")
+	require.Equal(t, quotedFeeLocalUnits, ccipOwnerDelta+poolFeeLocalUnits, "quoted fee should split as owner share + pool share")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
-}
-
-func getHoldingsBalanceNumeric0(t *testing.T, ctx context.Context, participant canton.Participant) int64 {
-	t.Helper()
-
-	holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
-	require.NoError(t, err)
-
-	var total int64
-	for _, h := range holdings {
-		views := h.GetCreatedEvent().GetInterfaceViews()
-		if len(views) == 0 {
-			continue
-		}
-		fields := views[0].GetViewValue().GetFields()
-		if len(fields) < 3 {
-			continue
-		}
-		amountStr := fields[2].GetValue().GetNumeric()
-		intPart, fracPart, hasFrac := strings.Cut(amountStr, ".")
-		if hasFrac {
-			require.Emptyf(t, strings.Trim(fracPart, "0"), "expected integer Numeric 0, got %q", amountStr)
-		}
-		amt, err := strconv.ParseInt(intPart, 10, 64)
-		require.NoErrorf(t, err, "failed to parse Numeric %q", amountStr)
-		total += amt
-	}
-
-	return total
 }
 
 func dedupeDisclosedContracts(in []*apiv2.DisclosedContract) []*apiv2.DisclosedContract {

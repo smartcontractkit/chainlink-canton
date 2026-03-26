@@ -28,6 +28,7 @@ interface ITokenPool where
     tokenPool_verifyOutboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyOutboundCCVs -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
     tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
+    tokenPool_calculateFeeImpl : ContractId ITokenPool -> TokenPool_CalculateFee -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
     tokenPool_getFeeImpl : ContractId ITokenPool -> TokenPool_GetFee -> Update TokenPoolFeeQuote
 
     -- Get required CCV raw instance addresses for a transfer based on direction, amount, finality, etc.
@@ -92,6 +93,20 @@ interface ITokenPool where
             caller : Party
         controller caller
         do tokenPool_lockOrBurnImpl this self arg
+
+    -- Calculate fee for outbound token transfer, which it records on
+    -- SendingMessageV1 through TAR after pool-registration validation.
+    nonconsuming choice TokenPool_CalculateFee
+            : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        with
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            extraContext : CCIP.Context.CCIPContext
+            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+            tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            caller : Party
+        controller caller
+        do tokenPool_calculateFeeImpl this self arg
 
     -- Quote-only fee path for outbound token transfers.
     nonconsuming choice TokenPool_GetFee : TokenPoolFeeQuote

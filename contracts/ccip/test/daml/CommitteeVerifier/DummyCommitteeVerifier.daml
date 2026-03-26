@@ -26,6 +26,8 @@ template DummyCommitteeVerifier
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
+                instanceId = instanceId
+                owner = owner
                 ccipOwner = ccipOwner
                 storageLocations = ["ipfs://dummy"]
 
@@ -38,6 +40,14 @@ template DummyCommitteeVerifier
                             ccvInstanceId = instanceId
                             versionTag = versionTag
                             caller = owner
+
+            crossChainVerifier_calculateFeeImpl _self arg = do
+                exercise arg.sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                    ccvInstanceId = instanceId
+                    feeUSDCents = feeUSDCents
+                    destGasLimit = destGasLimit
+                    destBytesOverhead = destBytesOverhead
+                    caller = owner
 
             crossChainVerifier_getFeeImpl _self _arg = do
                 pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with

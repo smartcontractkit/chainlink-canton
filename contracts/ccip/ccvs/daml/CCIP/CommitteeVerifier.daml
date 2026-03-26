@@ -87,6 +87,8 @@ template CommitteeVerifier
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
+                instanceId = instanceId
+                owner = owner
                 ccipOwner = ccipOwner
                 storageLocations = storageLocations
 
@@ -97,6 +99,13 @@ template CommitteeVerifier
                         extraContext = arg.extraContext
                         executingMessageCid = arg.executingMessageCid
                         verifierResults = arg.verifierResults
+                        caller = arg.caller
+
+            crossChainVerifier_calculateFeeImpl self arg = do
+                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_CalculateFee
+                    with
+                        sendingMessageCid = arg.sendingMessageCid
+                        extraContext = arg.extraContext
                         caller = arg.caller
 
             crossChainVerifier_getFeeImpl self arg = do
@@ -327,6 +336,30 @@ template CommitteeVerifier
                 exercise executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
                     ccvInstanceId = instanceId
                     versionTag = versionTag
+                    caller = owner
+
+        -- | Calculate fee for outbound message (USD cents only).
+        -- Reads destChainSelector from SendingMessageV1, looks up per-chain
+        -- fee config, appends fee via AddCCVFee.
+        nonconsuming choice CommitteeVerifier_CalculateFee
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                extraContext : CCIP.Context.CCIPContext
+                caller : Party
+            controller caller
+            do
+                sendingMsg <- fetch sendingMessageCid
+                assertMsg "verifier: sending message ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == ccipOwner)
+                let chainConfig = fromSomeNote "no fee config for dest chain"
+                        (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
+
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                    ccvInstanceId = instanceId
+                    feeUSDCents = chainConfig.feeUSDCents
+                    destGasLimit = chainConfig.gasForVerification
+                    destBytesOverhead = chainConfig.payloadSizeBytes
                     caller = owner
 
         -- | Quote fee for outbound message (USD cents only).

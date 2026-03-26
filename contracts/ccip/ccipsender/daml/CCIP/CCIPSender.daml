@@ -206,10 +206,9 @@ template CCIPSender
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
             controller owner
             do
+                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
-
-                quoteInputs <- gatherQuote owner destinationChainSelector message ccvs context
 
                 smCid <- exercise routerCid CCIP.PerPartyRouter.PrepareSend with
                     destinationChainSelector = destinationChainSelector
@@ -227,14 +226,43 @@ template CCIPSender
                                 amount = tt.amount
                                 caller = owner
 
+                smCid <- foldlA (\cid input ->
+                    exercise input.ccvCid
+                        ICCV.CrossChainVerifier_CalculateFee with
+                            sendingMessageCid = cid
+                            extraContext = input.ccvExtraContext
+                            caller = owner
+                    ) smCid ccvs
+
+                smCid <- case message.tokenTransfer of
+                    None -> pure smCid
+                    Some tt ->
+                        exercise tt.tokenPoolCid
+                            CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
+                                tokenAdminRegistryCid = tokenAdminRegistryCid
+                                extraContext = tt.poolExtraContext
+                                sendingMessageCid = smCid
+                                feeQuoterCid = feeQuoterCid
+                                tokenInstrumentId = tt.token
+                                caller = owner
+
+                extraArgs <- case message.extraArgs of
+                    CCIP.Client.V3 v3 -> pure v3
+                    _ -> abort "sender: unsupported extraArgs version"
+
+                smCid <- case extraArgs.executor of
+                    None -> pure smCid
+                    Some executorInput ->
+                        exercise executorInput.executorCid
+                            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                                sendingMessageCid = smCid
+                                executorArgs = executorInput.executorArgs
+                                extraContext = executorInput.executorExtraContext
+                                caller = owner
+
                 smCid <- exercise routerCid CCIP.PerPartyRouter.FinalizeFee with
                     context
                     sendingMessageCid = smCid
-                    quotedCCVFees = quoteInputs.quotedCCVFees
-                    quotedTokenSendFee = quoteInputs.quotedTokenSendFee
-                    quotedExecutionMode = quoteInputs.quotedExecutionMode
-                    quotedExecutorFee = quoteInputs.quotedExecutorFee
-                    executorArgs = quoteInputs.executorArgs
 
                 smCid <- case message.tokenTransfer of
                     None -> pure smCid

@@ -1,13 +1,13 @@
 package tests
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -708,6 +708,27 @@ func TestCCIPSend(t *testing.T) {
 		},
 	}
 
+	sendDisclosures := slices.Concat(
+		[]*apiv2.DisclosedContract{
+			disclosedCCIPSender,
+			disclosedRouter,
+			disclosedOnRamp,
+			disclosedGlobalConfig,
+			disclosedTar,
+			disclosedRmnRemote,
+			disclosedFeeQuoter,
+			disclosedFeeTokenHolding,
+			disclosedCCV,
+			disclosedExecutor,
+		},
+		transferFactoryDisclosures,
+	)
+	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
+	quotedFeeLocalUnits := numeric0ToInt64(t, quotedFee.FeeTokenAmount)
+	require.Positive(t, quotedFeeLocalUnits, "GetFee should return a positive fee")
+
+	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
 	ccipSendArgs := ledger.MapToValue(sendArgs)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
@@ -722,11 +743,8 @@ func TestCCIPSend(t *testing.T) {
 					ChoiceArgument: ccipSendArgs,
 				}},
 			}},
-			ActAs: []string{partySender},
-			DisclosedContracts: slices.Concat(
-				[]*apiv2.DisclosedContract{disclosedCCIPSender, disclosedRouter, disclosedOnRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedFeeQuoter, disclosedFeeTokenHolding, disclosedCCV, disclosedExecutor},
-				transferFactoryDisclosures,
-			),
+			ActAs:              []string{partySender},
+			DisclosedContracts: sendDisclosures,
 		},
 	})
 	require.NoError(t, err)
@@ -768,8 +786,30 @@ func TestCCIPSend(t *testing.T) {
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
 
+	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	senderDelta := senderBalanceBefore - senderBalanceAfter
+	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
+
+	require.Equal(t, quotedFeeLocalUnits, senderDelta, "sender deduction should match GetFee quote")
+	require.Equal(t, quotedFeeLocalUnits, ccipOwnerDelta, "ccipOwner should receive the full quoted fee in this no-token flow")
+
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 	t.Logf("  Encoded message: %s", returnedEncodedMessage)
+}
+
+func numeric0ToInt64(t *testing.T, n types.NUMERIC) int64 {
+	t.Helper()
+
+	intPart, fracPart, hasFrac := strings.Cut(string(n), ".")
+	if hasFrac {
+		require.Emptyf(t, strings.Trim(fracPart, "0"), "expected integer Numeric 0, got %q", n)
+	}
+
+	value, err := strconv.ParseInt(intPart, 10, 64)
+	require.NoError(t, err)
+
+	return value
 }

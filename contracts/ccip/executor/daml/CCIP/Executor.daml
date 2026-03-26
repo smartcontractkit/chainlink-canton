@@ -3,7 +3,7 @@ module CCIP.Executor where
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (fromSome, fromSomeNote)
+import DA.Optional (fromOptional, fromSome, fromSomeNote)
 import qualified DA.Map as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -23,7 +23,9 @@ import MCMS.Codec (
     decodePartyAt,
     )
 
+import qualified CCIP.Context
 import qualified CCIP.Interfaces.Executor
+import qualified CCIP.SendingMessageV1
 import CCIP.Codec( 
     encodeRawInstanceAddress,
     decodeRawInstanceAddressAt,
@@ -66,7 +68,15 @@ template Executor
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where
             view = CCIP.Interfaces.Executor.ExecutorView with
+                instanceId = instanceId
                 owner = owner
+
+            executor_calculateFeeImpl self arg = do
+                exercise (fromInterfaceContractId @Executor self) CalculateFee with
+                    sendingMessageCid = arg.sendingMessageCid
+                    executorArgs = arg.executorArgs
+                    extraContext = arg.extraContext
+                    caller = arg.caller
 
             executor_getFeeImpl self arg = do
                 exercise (fromInterfaceContractId @Executor self) Executor_GetFee with
@@ -145,6 +155,38 @@ template Executor
             controller caller
             do
                 pure dynamicConfig.minBlockConfirmations
+
+        -- Calculates the executor flat fee and validates the message.
+        nonconsuming choice CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                executorArgs : BytesHex
+                extraContext : CCIP.Context.CCIPContext
+                caller : Party
+            controller caller
+            do
+                sm <- fetch sendingMessageCid
+
+                let remoteCfg = fromSomeNote "executor: unsupported destination chain"
+                        (Map.lookup sm.destChainSelector remoteChainConfigs)
+                assertMsg "executor: destination chain disabled" remoteCfg.enabled
+
+                let canonicalCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
+
+                if dynamicConfig.ccvAllowlistEnabled
+                    then Foldable.forA_ canonicalCCVs (\ccv ->
+                        assertMsg "executor: CCV not allowed" (ccv `elem` allowedCCVs)
+                        )
+                    else pure ()
+
+                assertMsg "executor: too many CCVs in message"
+                    (length canonicalCCVs <= maxCCVsPerMsg)
+
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddExecutorFee with
+                    executorInstanceId = instanceId
+                    executorArgs = executorArgs
+                    feeUSDCents = remoteCfg.feeUSDCents
+                    caller = owner
 
         -- Quote-only fee path for executor.
         nonconsuming choice Executor_GetFee : CCIP.Interfaces.Executor.ExecutorFeeQuote

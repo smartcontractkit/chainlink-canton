@@ -389,11 +389,6 @@ template PerPartyRouter
             with
                 context : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                quotedCCVFees : [CCIP.SendingMessageV1.CCVFee]
-                quotedTokenSendFee : Optional CCIP.SendingMessageV1.TokenSendFee
-                quotedExecutionMode : CCIP.SendingMessageV1.ExecutionMode
-                quotedExecutorFee : Optional CCIP.SendingMessageV1.ExecutorFee
-                executorArgs : BytesHex
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -428,11 +423,6 @@ template PerPartyRouter
                     globalConfigCid = globalConfigCid
                     feeQuoterCid = feeQuoterCid
                     sendingMessageCid = sendingMessageCid
-                    quotedCCVFees = quotedCCVFees
-                    quotedTokenSendFee = quotedTokenSendFee
-                    quotedExecutionMode = quotedExecutionMode
-                    quotedExecutorFee = quotedExecutorFee
-                    executorArgs = executorArgs
 
                 sm <- fetch smCid
                 if sm.expectedTokenInstrumentId == None

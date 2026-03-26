@@ -245,6 +245,49 @@ template SendingMessageV1
         signatory dedup (ccipOwner :: ccvOwners)
         observer observingParties
 
+        choice AddCCVFee : ContractId SendingMessageV1
+            with
+                ccvInstanceId : Text
+                feeUSDCents : Numeric 0
+                destGasLimit : Int
+                destBytesOverhead : Int
+                caller : Party
+            controller caller
+            do
+                assertMsg "sendingMessage: AddCCVFee only allowed in Prepared" (state == SendingMessageState_Prepared)
+                assertCCVInstanceId
+                    "sendingMessage: caller is not an allowed CCV"
+                    requiredCCVs
+                    outboundPoolCCVs
+                    ccvInstanceId
+                    caller
+                assertMsg "sendingMessage: duplicate CCV fee" (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
+
+                let fee = CCVFee with
+                        ccvInstanceId, ccvOwner = caller
+                        feeUSDCents, destGasLimit, destBytesOverhead
+                create this with
+                    ccvFees = ccvFees ++ [fee]
+                    ccvOwners = dedup (ccvOwners ++ [caller])
+
+        choice AddTokenSendFee : ContractId SendingMessageV1
+            with
+                poolInstanceId : Text
+                poolOwner : Party
+                feeUSDCents : Numeric 0
+                destGasOverhead : Int
+                destBytesOverhead : Int
+            controller ccipOwner
+            do
+                assertMsg "sendingMessage: AddTokenSendFee only allowed after pool CCVs are resolved" (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: AddTokenSendFee only valid for token sends" (isSome expectedTokenInstrumentId)
+                assertMsg "token send fee already set" (isNone tokenSendFee)
+
+                let fee = TokenSendFee with
+                        poolInstanceId, poolOwner
+                        feeUSDCents, destGasOverhead, destBytesOverhead
+                create this with tokenSendFee = Some fee
+
         -- TAR-authorized outbound pool CCV requirements.
         choice SetOutboundPoolCCVs : ContractId SendingMessageV1
             with
@@ -258,6 +301,33 @@ template SendingMessageV1
                 create this with
                     outboundPoolCCVs = Some poolCCVs
                     state = SendingMessageState_Prepared
+
+        -- Record the executor-selected flat fee. OnRamp computes execution
+        -- gas/bytes during fee finalization.
+        choice AddExecutorFee : ContractId SendingMessageV1
+            with
+                executorInstanceId : Text
+                executorArgs : BytesHex
+                feeUSDCents : Numeric 0
+                caller : Party
+            controller caller
+            do
+                assertMsg "sendingMessage: invalid state for AddExecutorFee" (state == SendingMessageState_Prepared)
+                assertMsg "addExecutorFee: already set" (isNone executorFee)
+                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
+                assertMsg "sendingMessage: executor mode already fixed to no executor"
+                    (executionMode == Some ExecutionMode_Executor)
+
+                let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
+
+                let ef = ExecutorFee with
+                        executorInstanceId = executorInstanceId
+                        executorOwner = caller
+                        feeUSDCents = feeUSDCents
+                create this with
+                    executorAddress = derivedExecutor
+                    executorArgs = executorArgs
+                    executorFee = Some ef
 
         -- Set quote-derived fee components in a single ccipOwner-authorized step.
         choice SetQuotedFees : ContractId SendingMessageV1

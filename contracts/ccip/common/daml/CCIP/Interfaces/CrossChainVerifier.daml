@@ -14,6 +14,7 @@ interface ICrossChainVerifier where
     viewtype CrossChainVerifierView
 
     crossChainVerifier_verifyMessageImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_VerifyMessage -> Update (ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1)
+    crossChainVerifier_calculateFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_CalculateFee -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
     crossChainVerifier_getFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_GetFee -> Update CrossChainVerifierFeeQuote
     crossChainVerifier_forwardToVerifierImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_ForwardToVerifier -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
 
@@ -27,6 +28,16 @@ interface ICrossChainVerifier where
             caller : Party
         controller caller
         do crossChainVerifier_verifyMessageImpl this self arg
+
+    -- Calculate fee for outbound message (USD cents only).
+    nonconsuming choice CrossChainVerifier_CalculateFee
+            : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        with
+            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            extraContext : CCIP.Context.CCIPContext
+            caller : Party
+        controller caller
+        do crossChainVerifier_calculateFeeImpl this self arg
 
     -- Quote-only fee path for outbound message.
     nonconsuming choice CrossChainVerifier_GetFee : CrossChainVerifierFeeQuote
@@ -51,6 +62,8 @@ interface ICrossChainVerifier where
 
 data CrossChainVerifierView = CrossChainVerifierView
     with
+        instanceId : Text
+        owner : Party
         ccipOwner : Party
         storageLocations : [Text]
     deriving (Eq, Show)
