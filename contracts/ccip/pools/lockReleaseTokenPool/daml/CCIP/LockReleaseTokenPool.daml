@@ -22,8 +22,8 @@ import DA.Time (time, addRelTime, hours)
 import DA.Foldable (forA_)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.LockReleaseTokenPoolCodec (decodeSetDynamicConfigParams, decodeApplyChainUpdatesParams, decodeApplyTokenTransferFeeConfigUpdatesParams, decodeSetRateLimitConfigParams)
-import CCIP.LockReleaseTokenPoolTypes (TokenTransferFeeConfig(..), RemoteChainConfig(..), ChainUpdate(..), TokenTransferFeeConfigArgs(..), RateLimitConfigArgs(..))
+import CCIP.LockReleaseTokenPoolCodec (decodeSetDynamicConfigParams, decodeApplyChainUpdatesParams, decodeApplyTokenTransferFeeConfigUpdatesParams, decodeSetRateLimitConfigParams, decodeSetPoolReceiveContextParams, decodeSetTransferTimeoutParams)
+import CCIP.LockReleaseTokenPoolTypes (TokenTransferFeeConfig(..), RemoteChainConfig(..), ChainUpdate(..), TokenTransferFeeConfigArgs(..), RateLimitConfigArgs(..), TransferTimeout(..))
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -48,15 +48,6 @@ import qualified CCIP.TokenAdminRegistry
 -- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
-
--- | Transfer timeout configuration for pending TransferInstructions.
--- Some tokens (e.g., Amulet) have expiry constraints and reject transfers with
--- executeBefore times beyond the token's expiry. Use RelativeHours for such tokens.
--- Tokens without expiry (e.g., TestToken) can use Indefinite.
-data TransferTimeout
-    = Indefinite          -- Use maxTime (year 9999) - for tokens without expiry
-    | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
-    deriving (Eq, Show)
 
 data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
     with
@@ -395,6 +386,26 @@ template LockReleaseTokenPool
                         rateLimitConfigArgs
                 create this with
                     remoteChainConfigs = remoteChainConfigsUpdated
+
+        -- Set the pool receive context (for preapproval CIDs in Splice token patterns).
+        -- The context is merged into extraArgs for inbound transfers.
+        --
+        -- Callable by poolOwner
+        choice SetPoolReceiveContext : ContractId LockReleaseTokenPool
+            with
+                newPoolReceiveContext : CCIP.Context.CCIPContext
+            controller poolOwner
+            do create this with poolReceiveContext = newPoolReceiveContext
+
+        -- Set the transfer timeout for pending TransferInstructions.
+        -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
+        --
+        -- Callable by poolOwner
+        choice SetTransferTimeout : ContractId LockReleaseTokenPool
+            with
+                newTransferTimeout : TransferTimeout
+            controller poolOwner
+            do create this with transferTimeout = newTransferTimeout
 
         -- Get required CCV raw instance addresses based on chain and direction.
         nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [RawInstanceAddress]
@@ -873,4 +884,20 @@ template LockReleaseTokenPool
                             rateLimitConfigArgs
                             caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetPoolReceiveContext" -> do
+                    case decodeSetPoolReceiveContextParams operationData of
+                        None -> abort "E_INVALID_PARAMS: SetPoolReceiveContext"
+                        Some (newPoolReceiveContext, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetPoolReceiveContext" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetPoolReceiveContext with
+                                newPoolReceiveContext
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetTransferTimeout" -> do
+                    case decodeSetTransferTimeoutParams operationData of
+                        None -> abort "E_INVALID_PARAMS: SetTransferTimeout"
+                        Some (newTransferTimeout, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetTransferTimeout" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetTransferTimeout with
+                                newTransferTimeout
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

@@ -9,12 +9,23 @@ module CCIP.LockReleaseTokenPoolCodec (
     decodeApplyTokenTransferFeeConfigUpdatesParams,
     encodeSetRateLimitConfigParams,
     decodeSetRateLimitConfigParams,
+    -- TransferTimeout codec
+    encodeTransferTimeout,
+    decodeTransferTimeoutAt,
+    -- SetPoolReceiveContext params
+    encodeSetPoolReceiveContextParams,
+    decodeSetPoolReceiveContextParams,
+    -- SetTransferTimeout params
+    encodeSetTransferTimeoutParams,
+    decodeSetTransferTimeoutParams,
     ) where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RateLimitConfigArgs(..), TokenTransferFeeConfigArgs(..))
+import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RateLimitConfigArgs(..), TokenTransferFeeConfigArgs(..), TransferTimeout(..))
+import CCIP.Context (CCIPContext)
+import CCIP.ContextCodec (encodeCCIPContext, decodeCCIPContextAt)
 
 import MCMS.Codec (
     encodeNumeric0,
@@ -33,6 +44,7 @@ import MCMS.Codec (
     decodeList,
     encodeParty,
     decodePartyAt,
+    extractBytes,
     )
 import CCIP.Codec( 
     encodeRawInstanceAddress,
@@ -157,3 +169,49 @@ decodeRateLimitConfigArgsAt encoded offset = do
     (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     Some (RateLimitConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter}, offset)
+
+-- ===============================================
+-- |              TransferTimeout                |
+-- ===============================================
+-- Format: tag byte (0x00 = Indefinite, 0x01 = RelativeHours) + optional int64
+
+-- | Encode TransferTimeout
+encodeTransferTimeout : TransferTimeout -> BytesHex
+encodeTransferTimeout Indefinite = "00"
+encodeTransferTimeout (RelativeHours h) = "01" <> fromSome (encodeInt64 h)
+
+-- | Decode TransferTimeout at offset
+decodeTransferTimeoutAt : BytesHex -> Int -> Optional (TransferTimeout, Int)
+decodeTransferTimeoutAt encoded offset = do
+    tagHex <- extractBytes encoded offset 1
+    if tagHex == "00" then Some (Indefinite, offset + 1)
+    else if tagHex == "01" then do
+        (hours, newOffset) <- decodeInt64At encoded (offset + 1)
+        Some (RelativeHours hours, newOffset)
+    else None
+
+-- ===============================================
+-- |           SetPoolReceiveContext             |
+-- ===============================================
+-- Format: CCIPContext (TextMap AnyValue encoding)
+
+-- | Encode SetPoolReceiveContext params
+encodeSetPoolReceiveContextParams : CCIPContext -> BytesHex
+encodeSetPoolReceiveContextParams ctx = encodeCCIPContext ctx
+
+-- | Decode SetPoolReceiveContext params
+decodeSetPoolReceiveContextParams : BytesHex -> Optional (CCIPContext, Int)
+decodeSetPoolReceiveContextParams encoded = decodeCCIPContextAt encoded 0
+
+-- ===============================================
+-- |             SetTransferTimeout              |
+-- ===============================================
+-- Format: TransferTimeout encoding
+
+-- | Encode SetTransferTimeout params
+encodeSetTransferTimeoutParams : TransferTimeout -> BytesHex
+encodeSetTransferTimeoutParams = encodeTransferTimeout
+
+-- | Decode SetTransferTimeout params
+decodeSetTransferTimeoutParams : BytesHex -> Optional (TransferTimeout, Int)
+decodeSetTransferTimeoutParams encoded = decodeTransferTimeoutAt encoded 0
