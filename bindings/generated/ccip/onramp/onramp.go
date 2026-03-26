@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "f9b336e1e8e66559504491ae52b2328187490ff63e533b9dd82cd9f752ccac9f"
+	PackageID   = "fb44b9126e346a1bdb6ccdf839ed16ef05c545934abe47948b8bd58ca714329c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -207,6 +207,147 @@ func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// FeeCalculationInputs is a Record type
+type FeeCalculationInputs struct {
+	FeeToken            splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	Payload             types.TEXT                               `json:"payload"`
+	ExecutorArgs        types.TEXT                               `json:"executorArgs"`
+	HasTokenTransfer    types.BOOL                               `json:"hasTokenTransfer"`
+	CcipReceiveGasLimit types.INT64                              `json:"ccipReceiveGasLimit"`
+	CcvFeeUSDCents      types.NUMERIC                            `json:"ccvFeeUSDCents"`
+	CcvGasSum           types.INT64                              `json:"ccvGasSum"`
+	CcvBytesSum         types.INT64                              `json:"ccvBytesSum"`
+	PoolFeeUSDCents     types.NUMERIC                            `json:"poolFeeUSDCents"`
+	PoolGas             types.INT64                              `json:"poolGas"`
+	PoolBytes           types.INT64                              `json:"poolBytes"`
+	ExecutorFeeUSDCents types.NUMERIC                            `json:"executorFeeUSDCents"`
+	ExecutionMode       common.ExecutionMode                     `json:"executionMode"`
+}
+
+// ToMap converts FeeCalculationInputs to a map for DAML arguments
+func (t FeeCalculationInputs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["feeToken"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	m["payload"] = string(t.Payload)
+
+	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	m["ccvFeeUSDCents"] = t.CcvFeeUSDCents
+
+	m["ccvGasSum"] = int64(t.CcvGasSum)
+
+	m["ccvBytesSum"] = int64(t.CcvBytesSum)
+
+	m["poolFeeUSDCents"] = t.PoolFeeUSDCents
+
+	m["poolGas"] = int64(t.PoolGas)
+
+	m["poolBytes"] = int64(t.PoolBytes)
+
+	m["executorFeeUSDCents"] = t.ExecutorFeeUSDCents
+
+	m["executionMode"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutionMode).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutionMode
+	}()
+
+	return m
+}
+
+func (t FeeCalculationInputs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeCalculationInputs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeCalculationInputs to hex string (Canton MCMS format)
+func (t FeeCalculationInputs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeCalculationInputs from hex string (Canton MCMS format)
+func (t *FeeCalculationInputs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FeeCalculationResult is a Record type
+type FeeCalculationResult struct {
+	TotalFeeTokenAmount       types.NUMERIC `json:"totalFeeTokenAmount"`
+	TotalUSDCents             types.NUMERIC `json:"totalUSDCents"`
+	ExecutionCostUSDCents     types.NUMERIC `json:"executionCostUSDCents"`
+	ExecutorDestGasLimit      types.INT64   `json:"executorDestGasLimit"`
+	ExecutorDestBytesOverhead types.INT64   `json:"executorDestBytesOverhead"`
+	TotalExecutionGasLimit    types.INT64   `json:"totalExecutionGasLimit"`
+	PremiumMultiplier         types.NUMERIC `json:"premiumMultiplier"`
+	FeeTokenPrice             types.NUMERIC `json:"feeTokenPrice"`
+}
+
+// ToMap converts FeeCalculationResult to a map for DAML arguments
+func (t FeeCalculationResult) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["totalFeeTokenAmount"] = t.TotalFeeTokenAmount
+
+	m["totalUSDCents"] = t.TotalUSDCents
+
+	m["executionCostUSDCents"] = t.ExecutionCostUSDCents
+
+	m["executorDestGasLimit"] = int64(t.ExecutorDestGasLimit)
+
+	m["executorDestBytesOverhead"] = int64(t.ExecutorDestBytesOverhead)
+
+	m["totalExecutionGasLimit"] = int64(t.TotalExecutionGasLimit)
+
+	m["premiumMultiplier"] = t.PremiumMultiplier
+
+	m["feeTokenPrice"] = t.FeeTokenPrice
+
+	return m
+}
+
+func (t FeeCalculationResult) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeCalculationResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeCalculationResult to hex string (Canton MCMS format)
+func (t FeeCalculationResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeCalculationResult from hex string (Canton MCMS format)
+func (t *FeeCalculationResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // FinalizeFeeFromRouter is a Record type
 type FinalizeFeeFromRouter struct {
 	RouterPartyOwner  types.PARTY       `json:"routerPartyOwner"`
@@ -288,7 +429,6 @@ type GetFeeFromRouter struct {
 	QuotedExecutorFee   *common.ExecutorFee                      `json:"quotedExecutorFee" hex:"optional"`
 	ExecutorArgs        types.TEXT                               `json:"executorArgs"`
 	FeeToken            splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
-	PoolFeeBps          types.NUMERIC                            `json:"poolFeeBps"`
 }
 
 // ToMap converts GetFeeFromRouter to a map for DAML arguments
@@ -374,8 +514,6 @@ func (t GetFeeFromRouter) ToMap() map[string]any {
 		return t.FeeToken
 	}()
 
-	m["poolFeeBps"] = t.PoolFeeBps
-
 	return m
 }
 
@@ -404,7 +542,6 @@ func (t *GetFeeFromRouter) UnmarshalHex(data string) error {
 // GetFeeFromRouterResult is a Record type
 type GetFeeFromRouterResult struct {
 	FeeTokenAmount types.NUMERIC `json:"feeTokenAmount"`
-	PoolFeeBps     types.NUMERIC `json:"poolFeeBps"`
 }
 
 // ToMap converts GetFeeFromRouterResult to a map for DAML arguments
@@ -412,8 +549,6 @@ func (t GetFeeFromRouterResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["feeTokenAmount"] = t.FeeTokenAmount
-
-	m["poolFeeBps"] = t.PoolFeeBps
 
 	return m
 }

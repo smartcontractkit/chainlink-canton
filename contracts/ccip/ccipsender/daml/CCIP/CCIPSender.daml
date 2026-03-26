@@ -12,6 +12,7 @@ import qualified CCIP.Client
 import qualified CCIP.Context
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
+import qualified CCIP.Math
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
@@ -28,8 +29,8 @@ data GetFeeResult = GetFeeResult
         -- Final amount payable in the selected fee token, including CCV fees,
         -- token-pool fee, CCIP network fee, executor flat fee, and execution gas cost.
         feeTokenAmount : Numeric 0
-        -- Token-pool fee rate in basis points as reported by the token pool quote, if any.
-        poolFeeBps : Numeric 0
+        -- Token amount deducted by the pool's bps fee, if this is a token transfer.
+        poolFeeTokenAmount : Numeric 0
     deriving (Eq, Show)
 
 data GatheredQuote = GatheredQuote
@@ -188,11 +189,15 @@ template CCIPSender
                     quotedExecutorFee = quoteInputs.quotedExecutorFee
                     executorArgs = quoteInputs.executorArgs
                     feeToken = message.feeToken.token
-                    poolFeeBps = quoteInputs.poolFeeBps
+
+                let poolFeeTokenAmount = case message.tokenTransfer of
+                        None -> 0.0
+                        Some tt ->
+                            CCIP.Math.mulDivDown tt.amount quoteInputs.poolFeeBps 10000.0
 
                 pure GetFeeResult with
                     feeTokenAmount = quote.feeTokenAmount
-                    poolFeeBps = quote.poolFeeBps
+                    poolFeeTokenAmount = poolFeeTokenAmount
 
         nonconsuming choice Send : CCIP.PerPartyRouter.CCIPSendResult
             with
@@ -206,6 +211,10 @@ template CCIPSender
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
+
+                extraArgs <- case message.extraArgs of
+                    CCIP.Client.V3 v3 -> pure v3
+                    _ -> abort "sender: unsupported extraArgs version"
 
                 smCid <- exercise routerCid CCIP.PerPartyRouter.PrepareSend with
                     destinationChainSelector = destinationChainSelector
@@ -242,10 +251,6 @@ template CCIPSender
                                 feeQuoterCid = feeQuoterCid
                                 tokenInstrumentId = tt.token
                                 caller = owner
-
-                extraArgs <- case message.extraArgs of
-                    CCIP.Client.V3 v3 -> pure v3
-                    _ -> abort "sender: unsupported extraArgs version"
 
                 smCid <- case extraArgs.executor of
                     None -> pure smCid

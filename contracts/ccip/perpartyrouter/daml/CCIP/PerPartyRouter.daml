@@ -269,7 +269,6 @@ template PerPartyRouter
                 quotedExecutorFee : Optional CCIP.SendingMessageV1.ExecutorFee
                 executorArgs : BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-                poolFeeBps : Numeric 0
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -302,7 +301,6 @@ template PerPartyRouter
                     quotedExecutorFee = quotedExecutorFee
                     executorArgs = executorArgs
                     feeToken = feeToken
-                    poolFeeBps = poolFeeBps
 
         choice SetDeps : ContractId PerPartyRouter
             with

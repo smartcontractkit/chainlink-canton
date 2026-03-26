@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "975b2cb5fc891f1237e64f1d6e0d61c4dd3314b02a971f63055321b0752284b9"
+	PackageID   = "7ee522f8d5f93c6ae504782b128496ee181cad0e8a184b6868d9be2607b43a2e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -356,8 +356,8 @@ func (t *GetFee2) UnmarshalHex(data string) error {
 
 // GetFeeResult is a Record type
 type GetFeeResult struct {
-	FeeTokenAmount types.NUMERIC `json:"feeTokenAmount"`
-	PoolFeeBps     types.NUMERIC `json:"poolFeeBps"`
+	FeeTokenAmount     types.NUMERIC `json:"feeTokenAmount"`
+	PoolFeeTokenAmount types.NUMERIC `json:"poolFeeTokenAmount"`
 }
 
 // ToMap converts GetFeeResult to a map for DAML arguments
@@ -366,7 +366,7 @@ func (t GetFeeResult) ToMap() map[string]any {
 
 	m["feeTokenAmount"] = t.FeeTokenAmount
 
-	m["poolFeeBps"] = t.PoolFeeBps
+	m["poolFeeTokenAmount"] = t.PoolFeeTokenAmount
 
 	return m
 }

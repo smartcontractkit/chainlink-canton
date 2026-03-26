@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "288043ff56bc7ac7c0f524723eb96ccd6c9f4c58afff453f40fa444d67f67a18"
+	PackageID   = "8ca4eb71f258b6bce153f304a268cc038fb43969715c6d75355c1bf2dc3f5419"
 	SDKVersion  = "3.4.10"
 )
 
@@ -764,7 +764,6 @@ type GetFee struct {
 	QuotedExecutorFee   *common.ExecutorFee                      `json:"quotedExecutorFee" hex:"optional"`
 	ExecutorArgs        types.TEXT                               `json:"executorArgs"`
 	FeeToken            splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
-	PoolFeeBps          types.NUMERIC                            `json:"poolFeeBps"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -837,8 +836,6 @@ func (t GetFee) ToMap() map[string]any {
 		}
 		return t.FeeToken
 	}()
-
-	m["poolFeeBps"] = t.PoolFeeBps
 
 	return m
 }
