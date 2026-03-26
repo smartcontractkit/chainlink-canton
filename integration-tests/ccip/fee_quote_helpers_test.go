@@ -27,13 +27,7 @@ func quoteCCIPSenderFee(
 ) ccipsender.GetFeeResult {
 	t.Helper()
 
-	getFeeArgs := ccipsender.GetFee2{
-		DestinationChainSelector: sendArgs.DestinationChainSelector,
-		Message:                  sendArgs.Message,
-		Ccvs:                     sendArgs.Ccvs,
-		Context:                  sendArgs.Context,
-		RouterCid:                sendArgs.RouterCid,
-	}
+	getFeeArgs := ccipsender.GetFee2(sendArgs)
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -68,6 +62,7 @@ func quoteCCIPSenderFee(
 			continue
 		}
 		resultRecord = exercised.GetExerciseResult().GetRecord()
+
 		break
 	}
 	require.NotNil(t, resultRecord, "GetFee should return an exercised record result")
@@ -81,6 +76,7 @@ func quoteCCIPSenderFee(
 	if len(fields) > 1 {
 		quote.PoolFeeTokenAmount = types.NUMERIC(fields[1].GetValue().GetNumeric())
 	}
+
 	return quote
 }
 
