@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
@@ -921,7 +922,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
 	quotedFeeLocalUnits := numeric0ToInt64(t, quotedFee.FeeTokenAmount)
 	require.Equal(t, int64(55_000_000), quotedFeeLocalUnits, "GetFee should return the configured token-send fee quote")
-	require.Equal(t, int64(500), numeric0ToInt64(t, quotedFee.PoolFeeBps), "GetFee should return the pool feeBps for token sends")
+	require.Equal(t, int64(500), numeric0ToInt64(t, quotedFee.PoolFeeTokenAmount), "GetFee should return the pool fee token deduction for token sends")
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
