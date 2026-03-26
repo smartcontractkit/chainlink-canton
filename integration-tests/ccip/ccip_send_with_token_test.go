@@ -178,7 +178,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 
 	tokenPriceExponentUSDCents := uint64(1e6) // 6 decimals for USDCents
-	tokenPriceExponentUSD := uint64(1e2 * tokenPriceExponentUSDCents)
+	tokenPriceExponentUSD := 1e2 * tokenPriceExponentUSDCents
 
 	// Deploy Chain contracts
 	out, err := changesets.DeployChainContracts{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployChainContractsConfig]{
@@ -234,7 +234,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					Template: feequoter.FeeQuoter{
 						PriceUpdaters: []types.PARTY{types.PARTY(partyCCIP)},
 					},
-					// TODO
+					//nolint:gosec
 					USDPerNative: big.NewInt(int64(1 * tokenPriceExponentUSD)), // $1
 				},
 				NativeInstrumentId: nativeInstrumentId,
@@ -559,10 +559,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("partySender=%q", partySender)
 
 	// Mint 100 whole AMT in local 1e8 units so the sender can cover non-zero fees.
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted 100 whole Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
-	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
+	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
 	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
@@ -699,6 +699,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
 		},
 	}
+	//nolint:gosec
 	tokenTransferAmount := int64(10 * tokenPriceExponentUSD) // Transferring 10 units
 	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
 
