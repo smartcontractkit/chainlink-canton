@@ -34,9 +34,9 @@ require (
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260323224438-d819cb3228e1
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260323224438-d819cb3228e1
-	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260325202159-75ce4e70efd8
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260325202159-75ce4e70efd8
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260326013340-f58279b00a3b
+	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260326015734-bd0a32ec7594
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260326015734-bd0a32ec7594
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260319222221-2bac99c7a470
 	github.com/smartcontractkit/chainlink-deployments-framework v0.89.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.8
@@ -375,9 +375,9 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260306142855-8d629e752265 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260323224438-d819cb3228e1 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260326013340-f58279b00a3b // indirect
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260323224438-d819cb3228e1 // indirect
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260323224438-d819cb3228e1 // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260326013340-f58279b00a3b // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-common/keystore v1.0.0 // indirect
