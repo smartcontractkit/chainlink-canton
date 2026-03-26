@@ -63,6 +63,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+
+	// Import to register adapters
+	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+
+	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 // TestCCIPSendWithTokenTransferFeeBps tests full send flow with token transfer.
@@ -266,7 +271,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Deploy and configure lane for outbound sends
 	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
 	require.Truef(t, ok, "failed to get Canton Lane adapter")
-	feeQuoterDestChainConfig := lanes.DefaultFeeQuoterDestChainConfig(true, remoteSelector)
+	evmAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0"))
+	require.Truef(t, ok, "failed to get EVM adapter")
+	feeQuoterDestChainConfig := evmAdapter.GetFeeQuoterDestChainConfig()
+	feeQuoterDestChainConfig.IsEnabled = true
 	feeQuoterDestChainConfig.V2Params.USDPerUnitGas = big.NewInt(38)
 
 	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
