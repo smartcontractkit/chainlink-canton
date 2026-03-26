@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -920,8 +921,9 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		tokenTransferFactoryDisclosures,
 	))
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
-	require.Equal(t, "55000000.0", string(quotedFee.FeeTokenAmount), "GetFee should return the configured token-send fee quote")
-	require.Equal(t, "500.0", string(quotedFee.PoolFeeTokenAmount), "GetFee should return the pool fee token deduction for token sends")
+	// Bound Numeric 0 values come back as strings with a trailing dot, e.g. "55000000.".
+	require.Equal(t, "55000000", strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "GetFee should return the configured token-send fee quote")
+	require.Equal(t, "500", strings.TrimSuffix(string(quotedFee.PoolFeeTokenAmount), "."), "GetFee should return the pool fee token deduction for token sends")
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{

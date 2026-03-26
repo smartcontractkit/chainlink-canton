@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -790,8 +791,9 @@ func TestCCIPSend(t *testing.T) {
 	senderDelta := senderBalanceBefore - senderBalanceAfter
 	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
 
-	require.Equal(t, fmt.Sprintf("%d.0", senderDelta), string(quotedFee.FeeTokenAmount), "sender deduction should match GetFee quote")
-	require.Equal(t, fmt.Sprintf("%d.0", ccipOwnerDelta), string(quotedFee.FeeTokenAmount), "ccipOwner should receive the full quoted fee in this no-token flow")
+	// Bound Numeric 0 values come back as strings with a trailing dot, e.g. "43000000.".
+	require.Equal(t, fmt.Sprintf("%d", senderDelta), strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "sender deduction should match GetFee quote")
+	require.Equal(t, fmt.Sprintf("%d", ccipOwnerDelta), strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "ccipOwner should receive the full quoted fee in this no-token flow")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
