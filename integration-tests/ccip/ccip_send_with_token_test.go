@@ -393,6 +393,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	preapprovalCid, err := testhelpers.CreateTransferPreapproval(t.Context(), ccipParticipant, scanProxyClient, partyCCIP, ccipOwnerHoldingCid)
 	require.NoError(t, err, "failed to create preapproval")
 	t.Logf("Created preapproval CID: %s", preapprovalCid)
+	// Wait for preapproval to propagate
+	time.Sleep(time.Second * 5)
 
 	tokenTransferFeeUSDCents := 10
 	tokenTransferFeeBps := 500 // 5%
@@ -531,7 +533,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err)
 	disclosedFeeQuoter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"})
 	require.NoError(t, err)
-	disclosedPreapproval, err := testhelpers.GetDisclosedContractById(t.Context(), ccipParticipant, string(preapprovalCid))
+	disclosedPreapproval, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#splice-amulet", ModuleName: "Splice.AmuletRules", EntityName: "TransferPreapproval"})
 	require.NoError(t, err)
 
 	// Prepare receiver address (destination party encoded as keccak256)
@@ -772,7 +774,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	)...)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
-	time.Sleep(500 * time.Millisecond)
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -847,7 +848,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		senderBalanceAfter.String(),
 		senderDelta.String(),
 	)
-	assert.Equal(t, 0, expectedTokenDelta.Cmp(senderDelta), "Sender should be: %s, got: %s", expectedTokenDelta.String(), senderDelta.String())
+	assert.Equal(t, 0, expectedTokenDelta.Cmp(senderDelta), "Sender should be: %s, got: %s, difference: %s", expectedTokenDelta.String(), senderDelta.String(), new(big.Float).Sub(expectedTokenDelta, senderDelta))
 
 	// Validate the CCIP Owner holdings - the amount credited should be exactly equal to the amount that the sender has paid, no tokens are lost.
 	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
@@ -858,7 +859,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		ccipOwnerBalanceAfter.String(),
 		ccipOwnerDelta.String(),
 	)
-	assert.Equal(t, 0, ccipOwnerDelta.Cmp(senderDelta), "Sender and Owner delta should be equal, got: ccipOwnerDelta: %s, senderDelta: %s", ccipOwnerDelta.String(), senderDelta.String())
+	assert.Equal(t, 0, ccipOwnerDelta.Cmp(senderDelta), "Sender and Owner delta should be equal, got: ccipOwnerDelta: %s, senderDelta: %s, difference: %s", ccipOwnerDelta.String(), senderDelta.String(), new(big.Float).Sub(ccipOwnerDelta, senderDelta))
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
