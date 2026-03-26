@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/status"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -787,7 +788,13 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			DisclosedContracts: sendDisclosures,
 		},
 	})
-	require.NoError(t, err)
+	if err != nil {
+		if s, ok := status.FromError(err); ok {
+			t.Logf("gRPC error: code=%s message=%s", s.Code(), s.Message())
+			t.Logf("Error details: %v", s.Details())
+		}
+		require.NoError(t, err)
+	}
 
 	// Extract messageId from CCIPMessageSent to verify success
 	var returnedMessageId string
