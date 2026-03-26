@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/status"
 
@@ -46,7 +45,8 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -59,12 +59,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
-
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 
 	// Import to register adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
@@ -392,9 +390,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("Minted 100 Amulet to ccipOwner, Holding CID: %s", ccipOwnerHoldingCid)
 	preapprovalCid, err := testhelpers.CreateTransferPreapproval(t.Context(), ccipParticipant, scanProxyClient, partyCCIP, ccipOwnerHoldingCid)
 	require.NoError(t, err, "failed to create preapproval")
-	t.Logf("Created preapproval CID: %s", preapprovalCid)
-	// Wait for preapproval to propagate
-	time.Sleep(time.Second * 5)
+	t.Log("Created Amulet Preapproval, Cid: ", preapprovalCid)
 
 	tokenTransferFeeUSDCents := 10
 	tokenTransferFeeBps := 500 // 5%
@@ -433,11 +429,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					"feeBps":            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
 				},
 			},
-			PoolReceiveContext: common.CCIPContext{Values: types.TEXTMAP{
-				// This transfer preapproval must be specified for transfer to the pool's owner to be automatically be accepted.
-				// The pool's EDS must also provide explicit disclosures for this preapproval contract, else the send will fail.
-				"transfer-preapproval": common.AnyValue{AVContractId: &preapprovalCid},
-			}},
+			PoolReceiveContext: common.CCIPContext{Values: types.TEXTMAP{}},
 			TransferTimeout: lockreleasetokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
@@ -678,6 +670,11 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			}
 		}
 	}
+
+	// This transfer preapproval must be specified for transfer to the pool's owner to be automatically be accepted.
+	// The pool's EDS must also provide explicit disclosures for this preapproval contract, else the send will fail.
+	preapprovalCid = types.CONTRACT_ID(disclosedPreapproval.ContractId)
+	tokenTransferContextValues["transfer-preapproval"] = splice_api_token_metadata_v1.AnyValue{AVContractId: &preapprovalCid}
 	tokenTransferInput := interfaces.TokenInput{
 		TransferFactory: types.CONTRACT_ID(tokenTransferFactoryCid),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
@@ -848,7 +845,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		senderBalanceAfter.String(),
 		senderDelta.String(),
 	)
-	assert.Equal(t, 0, expectedTokenDelta.Cmp(senderDelta), "Sender should be: %s, got: %s, difference: %s", expectedTokenDelta.String(), senderDelta.String(), new(big.Float).Sub(expectedTokenDelta, senderDelta))
+	assertInEpsilon(t, expectedTokenDelta, senderDelta, big.NewFloat(0.00000001), "Sender delta should be: %s, got: %s, difference: %s", expectedTokenDelta.String(), senderDelta.String(), new(big.Float).Sub(expectedTokenDelta, senderDelta))
 
 	// Validate the CCIP Owner holdings - the amount credited should be exactly equal to the amount that the sender has paid, no tokens are lost.
 	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
@@ -859,11 +856,20 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		ccipOwnerBalanceAfter.String(),
 		ccipOwnerDelta.String(),
 	)
-	assert.Equal(t, 0, ccipOwnerDelta.Cmp(senderDelta), "Sender and Owner delta should be equal, got: ccipOwnerDelta: %s, senderDelta: %s, difference: %s", ccipOwnerDelta.String(), senderDelta.String(), new(big.Float).Sub(ccipOwnerDelta, senderDelta))
+	assertInEpsilon(t, senderDelta, ccipOwnerDelta, big.NewFloat(0.00000001), "Sender and Owner delta should be equal, got: ccipOwnerDelta: %s, senderDelta: %s, difference: %s", ccipOwnerDelta.String(), senderDelta.String(), new(big.Float).Sub(ccipOwnerDelta, senderDelta))
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
+}
+
+func assertInEpsilon(t *testing.T, expected, actual, epsilon *big.Float, msgAndArgs ...any) {
+	difference := new(big.Float).Sub(actual, expected)
+	difference = difference.Abs(difference)
+	relativeErr := new(big.Float).Quo(difference, expected)
+	if relativeErr.Cmp(epsilon) > 0 {
+		t.Errorf(fmt.Sprintf("Relative error is too high: %s (expected) < %s (actual)\n", epsilon.String(), relativeErr.String()), msgAndArgs...)
+	}
 }
 
 func getHoldingsBalanceNumeric(t *testing.T, ctx context.Context, participant canton.Participant) *big.Float {

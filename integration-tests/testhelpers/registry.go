@@ -272,6 +272,10 @@ func MintAMT(
 	return tokenHoldingCid, nil
 }
 
+// CreateTransferPreapproval creates an AmuletRules TransferPreapproval for the specified party as a receiver.
+// It returns the ContractId of the Preapproval contract at the time of creation. Due to Amulets implementation
+// of preapprovals, the contract ID is not long-lived and should not be used directly. When interacting/using
+// the preapproval, always look it up using the ACS.
 func CreateTransferPreapproval(
 	ctx context.Context,
 	participant canton.Participant,
