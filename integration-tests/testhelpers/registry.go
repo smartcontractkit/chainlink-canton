@@ -226,10 +226,6 @@ func MintAMT(
 		return "", fmt.Errorf("failed to get open mining round: %w", err)
 	}
 
-	fmt.Println("Registry Admin:", registryAdmin)
-	fmt.Println("AmuletRulesContract:", amuletRulesContract.ContractId)
-	fmt.Println("OpenMiningRoundContract:", openMiningRoundContract.ContractId)
-
 	// Mint AMT
 	response, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
