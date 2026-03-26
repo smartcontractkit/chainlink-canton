@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "e8c92c452f46a07f740d108585fe571f93941b07bee3c79d3aad33ee5d6b5324"
+	PackageID   = "204c0937f097803cbc0ef471724490ea583abff76c7b73451bbf74ddf18df79b"
 	SDKVersion  = "3.4.10"
 )
 
@@ -639,23 +639,23 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyOutboundCCVsWithPackageI
 	}
 }
 
-// LockReleaseTokenPoolCalculateFee exercises the LockReleaseTokenPool_CalculateFee choice on this LockReleaseTokenPool contract
+// LockReleaseTokenPoolGetFee exercises the LockReleaseTokenPool_GetFee choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFee(contractID string, args LockReleaseTokenPoolCalculateFee) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) LockReleaseTokenPoolGetFee(contractID string, args LockReleaseTokenPoolGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_CalculateFee",
+		Choice:     "LockReleaseTokenPool_GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolCalculateFeeWithPackageID exercises the LockReleaseTokenPool_CalculateFee choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFeeWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolCalculateFee) *model.ExerciseCommand {
+// LockReleaseTokenPoolGetFeeWithPackageID exercises the LockReleaseTokenPool_GetFee choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolGetFeeWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_CalculateFee",
+		Choice:     "LockReleaseTokenPool_GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -891,23 +891,23 @@ func (t LockReleaseTokenPool) TokenPoolLockOrBurnWithPackageID(contractID string
 	}
 }
 
-// TokenPoolCalculateFee exercises the TokenPool_CalculateFee choice on this LockReleaseTokenPool contract via the IITokenPool interface
+// TokenPoolGetFee exercises the TokenPool_GetFee choice on this LockReleaseTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) TokenPoolCalculateFee(contractID string, args interfaces.TokenPoolCalculateFee) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) TokenPoolGetFee(contractID string, args interfaces.TokenPoolGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "ITokenPool"),
 		ContractID: contractID,
-		Choice:     "TokenPool_CalculateFee",
+		Choice:     "TokenPool_GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// TokenPoolCalculateFeeWithPackageID exercises the TokenPool_CalculateFee choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) TokenPoolCalculateFeeWithPackageID(contractID string, packageID string, args interfaces.TokenPoolCalculateFee) *model.ExerciseCommand {
+// TokenPoolGetFeeWithPackageID exercises the TokenPool_GetFee choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) TokenPoolGetFeeWithPackageID(contractID string, packageID string, args interfaces.TokenPoolGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "ITokenPool"),
 		ContractID: contractID,
-		Choice:     "TokenPool_CalculateFee",
+		Choice:     "TokenPool_GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -978,43 +978,17 @@ func (t *LockReleaseTokenPoolDeps) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// LockReleaseTokenPoolCalculateFee is a Record type
-type LockReleaseTokenPoolCalculateFee struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	ExtraContext          common.CCIPContext                       `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller                types.PARTY                              `json:"caller"`
+// LockReleaseTokenPoolGetFee is a Record type
+type LockReleaseTokenPoolGetFee struct {
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller            types.PARTY                              `json:"caller"`
 }
 
-// ToMap converts LockReleaseTokenPoolCalculateFee to a map for DAML arguments
-func (t LockReleaseTokenPoolCalculateFee) ToMap() map[string]any {
+// ToMap converts LockReleaseTokenPoolGetFee to a map for DAML arguments
+func (t LockReleaseTokenPoolGetFee) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
 
 	m["feeQuoterCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1023,6 +997,8 @@ func (t LockReleaseTokenPoolCalculateFee) ToMap() map[string]any {
 		}
 		return t.FeeQuoterCid
 	}()
+
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["tokenInstrumentId"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1037,46 +1013,44 @@ func (t LockReleaseTokenPoolCalculateFee) ToMap() map[string]any {
 	return m
 }
 
-func (t LockReleaseTokenPoolCalculateFee) MarshalJSON() ([]byte, error) {
+func (t LockReleaseTokenPoolGetFee) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *LockReleaseTokenPoolCalculateFee) UnmarshalJSON(data []byte) error {
+func (t *LockReleaseTokenPoolGetFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes LockReleaseTokenPoolCalculateFee to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolCalculateFee) MarshalHex() (string, error) {
+// MarshalHex encodes LockReleaseTokenPoolGetFee to hex string (Canton MCMS format)
+func (t LockReleaseTokenPoolGetFee) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes LockReleaseTokenPoolCalculateFee from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolCalculateFee) UnmarshalHex(data string) error {
+// UnmarshalHex decodes LockReleaseTokenPoolGetFee from hex string (Canton MCMS format)
+func (t *LockReleaseTokenPoolGetFee) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// LockReleaseTokenPoolCalculateFeeMCMSParams is LockReleaseTokenPoolCalculateFee without the Caller field for MCMS operationData encoding.
+// LockReleaseTokenPoolGetFeeMCMSParams is LockReleaseTokenPoolGetFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolCalculateFeeMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	ExtraContext          common.CCIPContext                       `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+type LockReleaseTokenPoolGetFeeMCMSParams struct {
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
 }
 
-// MarshalHex encodes LockReleaseTokenPoolCalculateFeeMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolCalculateFeeMCMSParams) MarshalHex() (string, error) {
+// MarshalHex encodes LockReleaseTokenPoolGetFeeMCMSParams to hex string for MCMS operationData.
+func (t LockReleaseTokenPoolGetFeeMCMSParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes LockReleaseTokenPoolCalculateFeeMCMSParams from hex string.
-func (t *LockReleaseTokenPoolCalculateFeeMCMSParams) UnmarshalHex(data string) error {
+// UnmarshalHex decodes LockReleaseTokenPoolGetFeeMCMSParams from hex string.
+func (t *LockReleaseTokenPoolGetFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2077,8 +2051,8 @@ var _ types.VARIANT = (*TransferTimeout)(nil)
 type MCMSEncoder interface {
 	ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice, error)
 	ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalculateFee) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolGetFee(args LockReleaseTokenPoolGetFee) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolGetFeeMCMSParams(args LockReleaseTokenPoolGetFeeMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolGetRequiredCCVs) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetRequiredCCVsMCMSParams(args LockReleaseTokenPoolGetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolLockOrBurn(args LockReleaseTokenPoolLockOrBurn) (*bind.EncodedChoice, error)
@@ -2133,14 +2107,14 @@ func (e *encoder) ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeC
 	return e.EncodeChoiceArgs("ApplyTokenTransferFeeConfigUpdates", args)
 }
 
-// LockReleaseTokenPoolCalculateFee encodes parameters for the LockReleaseTokenPoolCalculateFee choice.
-func (e *encoder) LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalculateFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolCalculateFee", args)
+// LockReleaseTokenPoolGetFee encodes parameters for the LockReleaseTokenPoolGetFee choice.
+func (e *encoder) LockReleaseTokenPoolGetFee(args LockReleaseTokenPoolGetFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetFee", args)
 }
 
-// LockReleaseTokenPoolCalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolCalculateFee choice.
-func (e *encoder) LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolCalculateFee", args)
+// LockReleaseTokenPoolGetFeeMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolGetFee choice.
+func (e *encoder) LockReleaseTokenPoolGetFeeMCMSParams(args LockReleaseTokenPoolGetFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetFee", args)
 }
 
 // LockReleaseTokenPoolGetRequiredCCVs encodes parameters for the LockReleaseTokenPoolGetRequiredCCVs choice.

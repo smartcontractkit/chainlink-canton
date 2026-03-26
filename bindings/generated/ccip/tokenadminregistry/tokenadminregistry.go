@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "5fd14dad7f4332edac898d2c735dc1ea14d7866cb6ec315c741f32e1db703a78"
+	PackageID   = "898847577c6b3a94263ac2db30bee45ace3a31630ebe39f13896f5650b48e24a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -272,27 +272,6 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVsWithPackageID(c
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryAddTokenSendFee exercises the TokenAdminRegistry_AddTokenSendFee choice on this TokenAdminRegistry contract
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSendFee(contractID string, args TokenAdminRegistryAddTokenSendFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_AddTokenSendFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryAddTokenSendFeeWithPackageID exercises the TokenAdminRegistry_AddTokenSendFee choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSendFeeWithPackageID(contractID string, packageID string, args TokenAdminRegistryAddTokenSendFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_AddTokenSendFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -701,85 +680,6 @@ func (t TokenAdminRegistryAddTokenSendMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes TokenAdminRegistryAddTokenSendMCMSParams from hex string.
 func (t *TokenAdminRegistryAddTokenSendMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// TokenAdminRegistryAddTokenSendFee is a Record type
-type TokenAdminRegistryAddTokenSendFee struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT        `json:"poolInstanceId"`
-	FeeUSDCents       types.NUMERIC     `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64       `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64       `json:"destBytesOverhead"`
-	Caller            types.PARTY       `json:"caller"`
-}
-
-// ToMap converts TokenAdminRegistryAddTokenSendFee to a map for DAML arguments
-func (t TokenAdminRegistryAddTokenSendFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["poolInstanceId"] = string(t.PoolInstanceId)
-
-	m["feeUSDCents"] = t.FeeUSDCents
-
-	m["destGasOverhead"] = int64(t.DestGasOverhead)
-
-	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t TokenAdminRegistryAddTokenSendFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *TokenAdminRegistryAddTokenSendFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes TokenAdminRegistryAddTokenSendFee to hex string (Canton MCMS format)
-func (t TokenAdminRegistryAddTokenSendFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes TokenAdminRegistryAddTokenSendFee from hex string (Canton MCMS format)
-func (t *TokenAdminRegistryAddTokenSendFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// TokenAdminRegistryAddTokenSendFeeMCMSParams is TokenAdminRegistryAddTokenSendFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type TokenAdminRegistryAddTokenSendFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT        `json:"poolInstanceId"`
-	FeeUSDCents       types.NUMERIC     `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64       `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64       `json:"destBytesOverhead"`
-}
-
-// MarshalHex encodes TokenAdminRegistryAddTokenSendFeeMCMSParams to hex string for MCMS operationData.
-func (t TokenAdminRegistryAddTokenSendFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes TokenAdminRegistryAddTokenSendFeeMCMSParams from hex string.
-func (t *TokenAdminRegistryAddTokenSendFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1519,8 +1419,6 @@ type MCMSEncoder interface {
 	TokenAdminRegistryAcceptAdminRoleMCMSParams(args TokenAdminRegistryAcceptAdminRoleMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryAddTokenSend(args TokenAdminRegistryAddTokenSend) (*bind.EncodedChoice, error)
 	TokenAdminRegistryAddTokenSendMCMSParams(args TokenAdminRegistryAddTokenSendMCMSParams) (*bind.EncodedChoice, error)
-	TokenAdminRegistryAddTokenSendFee(args TokenAdminRegistryAddTokenSendFee) (*bind.EncodedChoice, error)
-	TokenAdminRegistryAddTokenSendFeeMCMSParams(args TokenAdminRegistryAddTokenSendFeeMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryConsumeReceiveTicket(args TokenAdminRegistryConsumeReceiveTicket) (*bind.EncodedChoice, error)
 	TokenAdminRegistryConsumeReceiveTicketMCMSParams(args TokenAdminRegistryConsumeReceiveTicketMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryFinalizeExecute(args TokenAdminRegistryFinalizeExecute) (*bind.EncodedChoice, error)
@@ -1596,16 +1494,6 @@ func (e *encoder) TokenAdminRegistryAddTokenSend(args TokenAdminRegistryAddToken
 // TokenAdminRegistryAddTokenSendMCMSParams encodes MCMS parameters (without Caller) for the TokenAdminRegistryAddTokenSend choice.
 func (e *encoder) TokenAdminRegistryAddTokenSendMCMSParams(args TokenAdminRegistryAddTokenSendMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("TokenAdminRegistryAddTokenSend", args)
-}
-
-// TokenAdminRegistryAddTokenSendFee encodes parameters for the TokenAdminRegistryAddTokenSendFee choice.
-func (e *encoder) TokenAdminRegistryAddTokenSendFee(args TokenAdminRegistryAddTokenSendFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("TokenAdminRegistryAddTokenSendFee", args)
-}
-
-// TokenAdminRegistryAddTokenSendFeeMCMSParams encodes MCMS parameters (without Caller) for the TokenAdminRegistryAddTokenSendFee choice.
-func (e *encoder) TokenAdminRegistryAddTokenSendFeeMCMSParams(args TokenAdminRegistryAddTokenSendFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("TokenAdminRegistryAddTokenSendFee", args)
 }
 
 // TokenAdminRegistryConsumeReceiveTicket encodes parameters for the TokenAdminRegistryConsumeReceiveTicket choice.

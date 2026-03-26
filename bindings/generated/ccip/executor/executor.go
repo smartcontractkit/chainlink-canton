@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "3e49b927be72c014a3fdff632d704c9dca3c4850eae13bea06a4c9f31ab771ae"
+	PackageID   = "49fb8374cf61c67431cbd2f16ef95cda3e402f5f020def4ec8ad0976c8cb4cec"
 	SDKVersion  = "3.4.10"
 )
 
@@ -169,83 +169,6 @@ func (t ApplyDestChainUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplyDestChainUpdates from hex string (Canton MCMS format)
 func (t *ApplyDestChainUpdates) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CalculateFee is a Record type
-type CalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
-	ExecutorArgs      types.TEXT         `json:"executorArgs"`
-	ExtraContext      common.CCIPContext `json:"extraContext"`
-	Caller            types.PARTY        `json:"caller"`
-}
-
-// ToMap converts CalculateFee to a map for DAML arguments
-func (t CalculateFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["executorArgs"] = string(t.ExecutorArgs)
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t CalculateFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CalculateFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CalculateFee to hex string (Canton MCMS format)
-func (t CalculateFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CalculateFee from hex string (Canton MCMS format)
-func (t *CalculateFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type CalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
-	ExecutorArgs      types.TEXT         `json:"executorArgs"`
-	ExtraContext      common.CCIPContext `json:"extraContext"`
-}
-
-// MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
-func (t CalculateFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CalculateFeeMCMSParams from hex string.
-func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -487,23 +410,23 @@ func (t Executor) GetMinBlockConfirmationsWithPackageID(contractID string, packa
 	}
 }
 
-// CalculateFee exercises the CalculateFee choice on this Executor contract
+// ExecutorGetFee exercises the Executor_GetFee choice on this Executor contract via the IIExecutor interface
 // This method uses the package name in the template ID
-func (t Executor) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
+func (t Executor) ExecutorGetFee(contractID string, args common.ExecutorGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "CalculateFee",
+		Choice:     "Executor_GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
-func (t Executor) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
+// ExecutorGetFeeWithPackageID exercises the Executor_GetFee choice using the provided package ID instead of package name
+func (t Executor) ExecutorGetFeeWithPackageID(contractID string, packageID string, args common.ExecutorGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "CalculateFee",
+		Choice:     "Executor_GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -676,32 +599,64 @@ func (t Executor) MCMSReceiverEntrypointWithPackageID(contractID string, package
 	}
 }
 
-// ExecutorCalculateFee exercises the Executor_CalculateFee choice on this Executor contract via the IIExecutor interface
-// This method uses the package name in the template ID
-func (t Executor) ExecutorCalculateFee(contractID string, args common.ExecutorCalculateFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "IExecutor"),
-		ContractID: contractID,
-		Choice:     "Executor_CalculateFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecutorCalculateFeeWithPackageID exercises the Executor_CalculateFee choice using the provided package ID instead of package name
-func (t Executor) ExecutorCalculateFeeWithPackageID(contractID string, packageID string, args common.ExecutorCalculateFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "IExecutor"),
-		ContractID: contractID,
-		Choice:     "Executor_CalculateFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // Verify interface implementations for Executor
 
 var _ mcms.IMCMSReceiver = (*Executor)(nil)
 
 var _ common.IIExecutor = (*Executor)(nil)
+
+// ExecutorGetFee2 is a Record type
+type ExecutorGetFee2 struct {
+	DestChainSelector types.NUMERIC             `json:"destChainSelector"`
+	RequiredCCVs      []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	Caller            types.PARTY               `json:"caller"`
+}
+
+// ToMap converts ExecutorGetFee2 to a map for DAML arguments
+func (t ExecutorGetFee2) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ExecutorGetFee2) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutorGetFee2) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutorGetFee2 to hex string (Canton MCMS format)
+func (t ExecutorGetFee2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutorGetFee2 from hex string (Canton MCMS format)
+func (t *ExecutorGetFee2) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // GetAllowedCCVs is a Record type
 type GetAllowedCCVs struct {
@@ -1099,8 +1054,6 @@ func (t *SetDynamicConfig) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	ApplyAllowedCCVUpdates(args ApplyAllowedCCVUpdates) (*bind.EncodedChoice, error)
 	ApplyDestChainUpdates(args ApplyDestChainUpdates) (*bind.EncodedChoice, error)
-	CalculateFee(args CalculateFee) (*bind.EncodedChoice, error)
-	CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	GetAllowedCCVs(args GetAllowedCCVs) (*bind.EncodedChoice, error)
 	GetAllowedCCVsMCMSParams(args GetAllowedCCVsMCMSParams) (*bind.EncodedChoice, error)
 	GetDestChains(args GetDestChains) (*bind.EncodedChoice, error)
@@ -1149,16 +1102,6 @@ func (e *encoder) ApplyAllowedCCVUpdates(args ApplyAllowedCCVUpdates) (*bind.Enc
 // ApplyDestChainUpdates encodes parameters for the ApplyDestChainUpdates choice.
 func (e *encoder) ApplyDestChainUpdates(args ApplyDestChainUpdates) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyDestChainUpdates", args)
-}
-
-// CalculateFee encodes parameters for the CalculateFee choice.
-func (e *encoder) CalculateFee(args CalculateFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CalculateFee", args)
-}
-
-// CalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the CalculateFee choice.
-func (e *encoder) CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CalculateFee", args)
 }
 
 // GetAllowedCCVs encodes parameters for the GetAllowedCCVs choice.

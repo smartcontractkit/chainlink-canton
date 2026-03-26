@@ -2,7 +2,6 @@ module CommitteeVerifier.DummyCommitteeVerifier where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.SendingMessageV1
 import CCIP.Interfaces.CrossChainVerifier
@@ -27,8 +26,6 @@ template DummyCommitteeVerifier
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
-                instanceId = instanceId
-                owner = owner
                 ccipOwner = ccipOwner
                 storageLocations = ["ipfs://dummy"]
 
@@ -42,12 +39,13 @@ template DummyCommitteeVerifier
                             versionTag = versionTag
                             caller = owner
 
-            crossChainVerifier_calculateFeeImpl self arg = do
-                exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
-                    DummyCommitteeVerifier_CalculateFee with
-                        sendingMessageCid = arg.sendingMessageCid
-                        extraContext = arg.extraContext
-                        caller = arg.caller
+            crossChainVerifier_getFeeImpl _self _arg = do
+                pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
+                    ccvInstanceId = instanceId
+                    ccvOwner = owner
+                    feeUSDCents = feeUSDCents
+                    gasForVerification = destGasLimit
+                    payloadSizeBytes = destBytesOverhead
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
@@ -55,20 +53,20 @@ template DummyCommitteeVerifier
                         sendingMessageCid = arg.sendingMessageCid
                         caller = arg.caller
 
-        nonconsuming choice DummyCommitteeVerifier_CalculateFee
-                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice DummyCommitteeVerifier_GetFee
+                : CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote
             with
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                extraContext : CCIP.Context.CCIPContext
+                destChainSelector : Numeric 0
                 caller : Party
             controller caller
             do
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                let _ = destChainSelector
+                pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
                     ccvInstanceId = instanceId
+                    ccvOwner = owner
                     feeUSDCents = feeUSDCents
-                    destGasLimit = destGasLimit
-                    destBytesOverhead = destBytesOverhead
-                    caller = owner
+                    gasForVerification = destGasLimit
+                    payloadSizeBytes = destBytesOverhead
 
         nonconsuming choice DummyCommitteeVerifier_ForwardToVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1

@@ -1679,31 +1679,32 @@ testExecutionGasLimitAggregation = script do
             observingParties = [sender]
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    sendingMessageCid <- submit (actAs ccvOwner1 <> disclose disclosedSM) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
-            ccvInstanceId = "ccv-1"
-            feeUSDCents = cents 1.0
-            destGasLimit = 12345
-            destBytesOverhead = 0
-            caller = ccvOwner1
-
-    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    sendingMessageCid <- submit (actAs ccvOwner2 <> disclose disclosedSM) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
-            ccvInstanceId = "ccv-2"
-            feeUSDCents = cents 2.0
-            destGasLimit = 23456
-            destBytesOverhead = 0
-            caller = ccvOwner2
-    
-    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSM) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
-            executorInstanceId = "default-executor-gas"
-            executorArgs = ""
-            feeUSDCents = cents 3.0
-            caller = executorOwner
+    sendingMessageCid <- submit ccipOwner do
+        exerciseCmd sendingMessageCid SendingMessageV1.SetQuotedFees with
+            quotedCCVFees =
+                [ SendingMessageV1.CCVFee with
+                    ccvInstanceId = "ccv-1"
+                    ccvOwner = ccvOwner1
+                    feeUSDCents = cents 1.0
+                    destGasLimit = 12345
+                    destBytesOverhead = 0
+                , SendingMessageV1.CCVFee with
+                    ccvInstanceId = "ccv-2"
+                    ccvOwner = ccvOwner2
+                    feeUSDCents = cents 2.0
+                    destGasLimit = 23456
+                    destBytesOverhead = 0
+                ]
+            quotedTokenSendFee = None
+            quotedExecutionMode = SendingMessageV1.ExecutionMode_Executor
+            quotedExecutorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-gas" executorOwner)
+            quotedExecutorArgs = ""
+            quotedExecutorFee =
+                Some (SendingMessageV1.ExecutorFee with
+                    executorInstanceId = "default-executor-gas"
+                    executorOwner = executorOwner
+                    feeUSDCents = cents 3.0
+                )
 
     sendingMessageCid <- submit ccipOwner do
         exerciseCmd sendingMessageCid SendingMessageV1.FinalizeFee with
@@ -1935,33 +1936,33 @@ testExecutionGasLimitWithTokenSendFee = script do
         exerciseCmd sendingMessageCid SendingMessageV1.SetOutboundPoolCCVs with
             poolCCVs = []
 
-    -- Add CCV fee with gas 10000
-    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSM) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
-            ccvInstanceId = "ccv-pool"
-            feeUSDCents = cents 1.0
-            destGasLimit = 10000
-            destBytesOverhead = 0
-            caller = ccvOwner
-
-    -- Add token send fee with destGasOverhead 50000
     sendingMessageCid <- submit ccipOwner do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
-            poolInstanceId = "pool-gas"
-            poolOwner = poolOwner
-            feeUSDCents = cents 2.0
-            destGasOverhead = 50000
-            destBytesOverhead = 0
-
-    -- AddExecutorFee, then finalize fee before the pool appends token data.
-    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSM) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
-            executorInstanceId = "default-executor-gas-pool"
-            executorArgs = ""
-            feeUSDCents = cents 3.0
-            caller = executorOwner
+        exerciseCmd sendingMessageCid SendingMessageV1.SetQuotedFees with
+            quotedCCVFees =
+                [SendingMessageV1.CCVFee with
+                    ccvInstanceId = "ccv-pool"
+                    ccvOwner = ccvOwner
+                    feeUSDCents = cents 1.0
+                    destGasLimit = 10000
+                    destBytesOverhead = 0
+                ]
+            quotedTokenSendFee =
+                Some (SendingMessageV1.TokenSendFee with
+                    poolInstanceId = "pool-gas"
+                    poolOwner = poolOwner
+                    feeUSDCents = cents 2.0
+                    destGasOverhead = 50000
+                    destBytesOverhead = 0
+                )
+            quotedExecutionMode = SendingMessageV1.ExecutionMode_Executor
+            quotedExecutorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-gas-pool" executorOwner)
+            quotedExecutorArgs = ""
+            quotedExecutorFee =
+                Some (SendingMessageV1.ExecutorFee with
+                    executorInstanceId = "default-executor-gas-pool"
+                    executorOwner = executorOwner
+                    feeUSDCents = cents 3.0
+                )
 
     sendingMessageCid <- submit ccipOwner do
         exerciseCmd sendingMessageCid SendingMessageV1.FinalizeFee with
@@ -2052,12 +2053,20 @@ testAddTokenSendRejectsExtraDataBeyondQuotedOverhead = script do
             state = SendingMessageV1.SendingMessageState_Prepared
 
     sendingMessageCid <- submit ccipOwner do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
-            poolInstanceId = "pool-extra-bound"
-            poolOwner = poolOwner
-            feeUSDCents = cents 0.0
-            destGasOverhead = 0
-            destBytesOverhead = 4
+        exerciseCmd sendingMessageCid SendingMessageV1.SetQuotedFees with
+            quotedCCVFees = []
+            quotedTokenSendFee =
+                Some (SendingMessageV1.TokenSendFee with
+                    poolInstanceId = "pool-extra-bound"
+                    poolOwner = poolOwner
+                    feeUSDCents = cents 0.0
+                    destGasOverhead = 0
+                    destBytesOverhead = 4
+                )
+            quotedExecutionMode = SendingMessageV1.ExecutionMode_NoExecutor
+            quotedExecutorAddress = ""
+            quotedExecutorArgs = ""
+            quotedExecutorFee = None
 
     sendingMessageCid <- submit ccipOwner do
         exerciseCmd sendingMessageCid SendingMessageV1.FinalizeFee with
@@ -2632,15 +2641,28 @@ testCalculateFeeFallsBackToFeeQuoter = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
 
-    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedFq) do
+    poolFeeQuote <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
-            ITokenPool.TokenPool_CalculateFee with
-                tokenAdminRegistryCid = tokenAdminRegistry
-                extraContext = CCIP.Context.emptyCCIPContext
-                sendingMessageCid = sendingMessageCid
+            ITokenPool.TokenPool_GetFee with
                 feeQuoterCid = feeQuoter
+                destChainSelector = destChainSelector
                 tokenInstrumentId = testInstrumentId
                 caller = sender
+    sendingMessageCid <- submit ccipOwner do
+        exerciseCmd sendingMessageCid SendingMessageV1.SetQuotedFees with
+            quotedCCVFees = []
+            quotedTokenSendFee =
+                Some (SendingMessageV1.TokenSendFee with
+                    poolInstanceId = poolFeeQuote.poolInstanceId
+                    poolOwner = poolFeeQuote.poolOwner
+                    feeUSDCents = poolFeeQuote.feeUSDCents
+                    destGasOverhead = poolFeeQuote.destGasOverhead
+                    destBytesOverhead = poolFeeQuote.destBytesOverhead
+                )
+            quotedExecutionMode = SendingMessageV1.ExecutionMode_NoExecutor
+            quotedExecutorAddress = ""
+            quotedExecutorArgs = ""
+            quotedExecutorFee = None
 
     Some sm <- queryContractId ccipOwner sendingMessageCid
     let tokenSendFee = fromSome sm.tokenSendFee
@@ -2801,15 +2823,28 @@ testCalculateFeePrefersPoolOverride = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedFq <> disclose disclosedSm) do
+    poolFeeQuote <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
-            ITokenPool.TokenPool_CalculateFee with
-                tokenAdminRegistryCid = tokenAdminRegistry
-                extraContext = CCIP.Context.emptyCCIPContext
-                sendingMessageCid = sendingMessageCid
+            ITokenPool.TokenPool_GetFee with
                 feeQuoterCid = feeQuoter
+                destChainSelector = destChainSelector
                 tokenInstrumentId = testInstrumentId
                 caller = sender
+    sendingMessageCid <- submit ccipOwner do
+        exerciseCmd sendingMessageCid SendingMessageV1.SetQuotedFees with
+            quotedCCVFees = []
+            quotedTokenSendFee =
+                Some (SendingMessageV1.TokenSendFee with
+                    poolInstanceId = poolFeeQuote.poolInstanceId
+                    poolOwner = poolFeeQuote.poolOwner
+                    feeUSDCents = poolFeeQuote.feeUSDCents
+                    destGasOverhead = poolFeeQuote.destGasOverhead
+                    destBytesOverhead = poolFeeQuote.destBytesOverhead
+                )
+            quotedExecutionMode = SendingMessageV1.ExecutionMode_NoExecutor
+            quotedExecutorAddress = ""
+            quotedExecutorArgs = ""
+            quotedExecutorFee = None
 
     Some sm <- queryContractId ccipOwner sendingMessageCid
     let tokenSendFee = fromSome sm.tokenSendFee
@@ -2969,15 +3004,28 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedFq <> disclose disclosedSm) do
+    poolFeeQuote <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
-            ITokenPool.TokenPool_CalculateFee with
-                tokenAdminRegistryCid = tokenAdminRegistry
-                extraContext = CCIP.Context.emptyCCIPContext
-                sendingMessageCid = sendingMessageCid
+            ITokenPool.TokenPool_GetFee with
                 feeQuoterCid = feeQuoter
+                destChainSelector = destChainSelector
                 tokenInstrumentId = testInstrumentId
                 caller = sender
+    sendingMessageCid <- submit ccipOwner do
+        exerciseCmd sendingMessageCid SendingMessageV1.SetQuotedFees with
+            quotedCCVFees = []
+            quotedTokenSendFee =
+                Some (SendingMessageV1.TokenSendFee with
+                    poolInstanceId = poolFeeQuote.poolInstanceId
+                    poolOwner = poolFeeQuote.poolOwner
+                    feeUSDCents = poolFeeQuote.feeUSDCents
+                    destGasOverhead = poolFeeQuote.destGasOverhead
+                    destBytesOverhead = poolFeeQuote.destBytesOverhead
+                )
+            quotedExecutionMode = SendingMessageV1.ExecutionMode_NoExecutor
+            quotedExecutorAddress = ""
+            quotedExecutorArgs = ""
+            quotedExecutorFee = None
 
     Some sm <- queryContractId ccipOwner sendingMessageCid
     let tokenSendFee = fromSome sm.tokenSendFee

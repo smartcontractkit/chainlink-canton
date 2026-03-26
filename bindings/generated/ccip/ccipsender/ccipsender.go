@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "b2dc2b3d8aff4dff020740d001072a0ad615a449a7091836679da227a38be887"
+	PackageID   = "2c81b6dc170427e2f9c651b6255cd5f138e36b051502b01279bec6b55b0ccda2"
 	SDKVersion  = "3.4.10"
 )
 
@@ -167,6 +167,235 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 	}
 }
 
+// GetFee exercises the GetFee choice on this CCIPSender contract
+// This method uses the package name in the template ID
+func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GatheredQuote is a Record type
+type GatheredQuote struct {
+	QuotedCCVFees       []common.CCVFee      `json:"quotedCCVFees"`
+	QuotedTokenSendFee  *common.TokenSendFee `json:"quotedTokenSendFee" hex:"optional"`
+	QuotedExecutionMode common.ExecutionMode `json:"quotedExecutionMode"`
+	QuotedExecutorFee   *common.ExecutorFee  `json:"quotedExecutorFee" hex:"optional"`
+	CcipReceiveGasLimit types.INT64          `json:"ccipReceiveGasLimit"`
+	ExecutorArgs        types.TEXT           `json:"executorArgs"`
+	PoolFeeBps          types.NUMERIC        `json:"poolFeeBps"`
+}
+
+// ToMap converts GatheredQuote to a map for DAML arguments
+func (t GatheredQuote) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["quotedCCVFees"] = func() []any {
+		res := make([]any, 0, len(t.QuotedCCVFees))
+		for _, e := range t.QuotedCCVFees {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	if t.QuotedTokenSendFee != nil {
+		m["quotedTokenSendFee"] = map[string]any{
+			"_type": "optional",
+			"value": *t.QuotedTokenSendFee,
+		}
+	} else {
+		m["quotedTokenSendFee"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["quotedExecutionMode"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.QuotedExecutionMode).(mapper); ok {
+			return m.toMap()
+		}
+		return t.QuotedExecutionMode
+	}()
+
+	if t.QuotedExecutorFee != nil {
+		m["quotedExecutorFee"] = map[string]any{
+			"_type": "optional",
+			"value": *t.QuotedExecutorFee,
+		}
+	} else {
+		m["quotedExecutorFee"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["poolFeeBps"] = t.PoolFeeBps
+
+	return m
+}
+
+func (t GatheredQuote) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GatheredQuote) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GatheredQuote to hex string (Canton MCMS format)
+func (t GatheredQuote) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GatheredQuote from hex string (Canton MCMS format)
+func (t *GatheredQuote) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFee2 is a Record type
+type GetFee2 struct {
+	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
+	Message                  client.Canton2AnyMessage `json:"message"`
+	Ccvs                     []client.CCVSendInput    `json:"ccvs"`
+	Context                  common.CCIPContext       `json:"context"`
+	RouterCid                types.CONTRACT_ID        `json:"routerCid"`
+}
+
+// ToMap converts GetFee2 to a map for DAML arguments
+func (t GetFee2) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destinationChainSelector"] = t.DestinationChainSelector
+
+	m["message"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["ccvs"] = func() []any {
+		res := make([]any, 0, len(t.Ccvs))
+		for _, e := range t.Ccvs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
+
+	m["routerCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RouterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RouterCid
+	}()
+
+	return m
+}
+
+func (t GetFee2) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetFee2) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetFee2 to hex string (Canton MCMS format)
+func (t GetFee2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFee2 from hex string (Canton MCMS format)
+func (t *GetFee2) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFeeResult is a Record type
+type GetFeeResult struct {
+	FeeTokenAmount types.NUMERIC `json:"feeTokenAmount"`
+	TotalUSDCents  types.NUMERIC `json:"totalUSDCents"`
+	PoolFeeBps     types.NUMERIC `json:"poolFeeBps"`
+}
+
+// ToMap converts GetFeeResult to a map for DAML arguments
+func (t GetFeeResult) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["feeTokenAmount"] = t.FeeTokenAmount
+
+	m["totalUSDCents"] = t.TotalUSDCents
+
+	m["poolFeeBps"] = t.PoolFeeBps
+
+	return m
+}
+
+func (t GetFeeResult) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetFeeResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetFeeResult to hex string (Canton MCMS format)
+func (t GetFeeResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFeeResult from hex string (Canton MCMS format)
+func (t *GetFeeResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Send is a Record type
 type Send struct {
 	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
@@ -247,6 +476,7 @@ func (t *Send) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	GetFee2(args GetFee2) (*bind.EncodedChoice, error)
 	Send(args Send) (*bind.EncodedChoice, error)
 }
 
@@ -275,6 +505,11 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
+}
+
+// GetFee2 encodes parameters for the GetFee2 choice.
+func (e *encoder) GetFee2(args GetFee2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee2", args)
 }
 
 // Send encodes parameters for the Send choice.

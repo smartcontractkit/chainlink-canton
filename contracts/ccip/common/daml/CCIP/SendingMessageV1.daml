@@ -198,9 +198,9 @@ template SendingMessageV1
         expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
         -- Pool-required outbound CCVs, set via TAR authorization
         outboundPoolCCVs : Optional [RawInstanceAddress.RawInstanceAddress]
-        -- Executor arguments, set during PrepareSend and validated by AddExecutorFee.
+        -- Executor arguments, set via quoted fee persistence.
         executorArgs : BytesHex
-        -- Executor flat fee, set by AddExecutorFee
+        -- Executor flat fee, set via quoted fee persistence.
         executorFee : Optional ExecutorFee
         executorDestGasLimit : Int
         executorDestBytesOverhead : Int
@@ -209,9 +209,9 @@ template SendingMessageV1
         -- TODO: also allow AddTokenSend to add their own observers
         observingParties : [Party]
 
-        -- Populated by AddCCVFee
+        -- Populated by SetQuotedFees
         ccvFees : [CCVFee]
-        -- Populated by AddTokenSendFee
+        -- Populated by SetQuotedFees
         tokenSendFee : Optional TokenSendFee
 
         -- Populated by FinalizeFee (batch conversion from USD to fee
@@ -226,7 +226,7 @@ template SendingMessageV1
         -- Populated by AddVerifierData
         verifierData : [VerifierData]
 
-        -- CCV owner parties accumulated via AddVerifierData and AddCCVFee.
+        -- CCV owner parties accumulated via AddVerifierData and SetQuotedFees.
         -- Mirrors the widened signatory set for auditability.
         ccvOwners : [Party]
 
@@ -246,49 +246,6 @@ template SendingMessageV1
         signatory dedup (ccipOwner :: ccvOwners)
         observer observingParties
 
-        choice AddCCVFee : ContractId SendingMessageV1
-            with
-                ccvInstanceId : Text
-                feeUSDCents : Numeric 0
-                destGasLimit : Int
-                destBytesOverhead : Int
-                caller : Party
-            controller caller
-            do
-                assertMsg "sendingMessage: AddCCVFee only allowed in Prepared" (state == SendingMessageState_Prepared)
-                assertCCVInstanceId
-                    "sendingMessage: caller is not an allowed CCV"
-                    requiredCCVs
-                    outboundPoolCCVs
-                    ccvInstanceId
-                    caller
-                assertMsg "sendingMessage: duplicate CCV fee" (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
-
-                let fee = CCVFee with
-                        ccvInstanceId, ccvOwner = caller
-                        feeUSDCents, destGasLimit, destBytesOverhead
-                create this with
-                    ccvFees = ccvFees ++ [fee]
-                    ccvOwners = dedup (ccvOwners ++ [caller])
-
-        choice AddTokenSendFee : ContractId SendingMessageV1
-            with
-                poolInstanceId : Text
-                poolOwner : Party
-                feeUSDCents : Numeric 0
-                destGasOverhead : Int
-                destBytesOverhead : Int
-            controller ccipOwner
-            do
-                assertMsg "sendingMessage: AddTokenSendFee only allowed after pool CCVs are resolved" (state == SendingMessageState_Prepared)
-                assertMsg "sendingMessage: AddTokenSendFee only valid for token sends" (isSome expectedTokenInstrumentId)
-                assertMsg "token send fee already set" (isNone tokenSendFee)
-
-                let fee = TokenSendFee with
-                        poolInstanceId, poolOwner
-                        feeUSDCents, destGasOverhead, destBytesOverhead
-                create this with tokenSendFee = Some fee
-
         -- TAR-authorized outbound pool CCV requirements.
         choice SetOutboundPoolCCVs : ContractId SendingMessageV1
             with
@@ -303,33 +260,39 @@ template SendingMessageV1
                     outboundPoolCCVs = Some poolCCVs
                     state = SendingMessageState_Prepared
 
-        -- Record the executor-selected flat fee. OnRamp computes execution
-        -- gas/bytes during fee finalization.
-        choice AddExecutorFee : ContractId SendingMessageV1
+        -- Set quote-derived fee components in a single ccipOwner-authorized step.
+        choice SetQuotedFees : ContractId SendingMessageV1
             with
-                executorInstanceId : Text
-                executorArgs : BytesHex
-                feeUSDCents : Numeric 0
-                caller : Party
-            controller caller
+                quotedCCVFees : [CCVFee]
+                quotedTokenSendFee : Optional TokenSendFee
+                quotedExecutionMode : ExecutionMode
+                quotedExecutorAddress : BytesHex
+                quotedExecutorArgs : BytesHex
+                quotedExecutorFee : Optional ExecutorFee
+            controller ccipOwner
             do
-                assertMsg "sendingMessage: invalid state for AddExecutorFee" (state == SendingMessageState_Prepared)
-                assertMsg "addExecutorFee: already set" (isNone executorFee)
-                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
-                assertMsg "sendingMessage: executor mode already fixed to no executor"
-                    (executionMode == Some ExecutionMode_Executor)
+                assertMsg "sendingMessage: SetQuotedFees only allowed in Prepared"
+                    (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: quoted executor fee mismatch"
+                    (case quotedExecutionMode of
+                        ExecutionMode_NoExecutor -> isNone quotedExecutorFee
+                        ExecutionMode_Executor -> isSome quotedExecutorFee)
+                assertMsg "sendingMessage: token-send quote mismatch"
+                    (isSome expectedTokenInstrumentId == isSome quotedTokenSendFee)
+                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved"
+                    (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
 
-                let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
-
-                let ef = ExecutorFee with
-                        executorInstanceId = executorInstanceId
-                        executorOwner = caller
-                        feeUSDCents = feeUSDCents
                 create this with
-                    executorAddress = derivedExecutor
-                    executorArgs = executorArgs
-                    executorFee = Some ef
-
+                    ccvFees = quotedCCVFees
+                    tokenSendFee = quotedTokenSendFee
+                    executionMode = Some quotedExecutionMode
+                    executorAddress = quotedExecutorAddress
+                    executorArgs = quotedExecutorArgs
+                    executorFee = quotedExecutorFee
+                    ccvOwners =
+                        dedup
+                            (ccvOwners
+                                ++ map (.ccvOwner) quotedCCVFees)
         -- Finalize the execution receipt metadata. This happens before the
         -- outbound message is constructed.
         choice FinalizeFee : ContractId SendingMessageV1
@@ -457,7 +420,7 @@ template SendingMessageV1
                 assertMsg "sendingMessage: pool extraData exceeds quoted destBytesOverhead"
                     (byteCount extraData <= quotedTokenSendFee.destBytesOverhead)
 
-                -- Enforce that the token pool payload (extraData) is not larger than the destBytesOverhead that's been quoted as part of AddTokenSendFee
+                -- Enforce that the token pool payload (extraData) is not larger than the quoted destBytesOverhead.
                 assertMsg "SourceTokenDataTooLarge: extraData size exceeds destBytesOverhead" (byteCount extraData <= (fromSome tokenSendFee).destBytesOverhead)
 
                 let tsd = TokenSendData with
