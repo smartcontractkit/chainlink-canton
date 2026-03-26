@@ -12,13 +12,21 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 )
 
 var ErrHoldingDisclosureNotFound = errors.New("holding disclosure not found")
+
+var holdingInterfaceId = &apiv2.Identifier{
+	// PackageId seems to be the hashed package ID, not the human-readable one.
+	// We probably shouldn't check against a specific hash, so we ignore that part of the interface ID.
+	// PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
+	ModuleName: "Splice.Api.Token.HoldingV1",
+	EntityName: "Holding",
+}
 
 // InstrumentHoldingStore provides access to the latest instrument holdings for a given instrument ID.
 type InstrumentHoldingStore interface {
@@ -184,19 +192,40 @@ func (i *InstrumentHoldingStoreService) Run(ctx context.Context) error {
 				if tx, ok := resp.GetUpdate().(*apiv2.GetUpdatesResponse_Transaction); ok {
 					for _, event := range tx.Transaction.GetEvents() {
 						if createdEvent, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-							ac := &apiv2.ActiveContract{
-								CreatedEvent:   createdEvent.Created,
-								SynchronizerId: tx.Transaction.GetSynchronizerId(),
+							i.logger.Debug().
+								Any("createArguments", createdEvent.Created.GetCreateArguments()).
+								Str("contractID", createdEvent.Created.GetContractId()).
+								Str("packageName", createdEvent.Created.GetPackageName()).
+								Str("packageID", createdEvent.Created.GetTemplateId().GetPackageId()).
+								Str("moduleName", createdEvent.Created.GetTemplateId().GetModuleName()).
+								Str("entityName", createdEvent.Created.GetTemplateId().GetEntityName()).
+								Any("interfaceViews", createdEvent.Created.GetInterfaceViews()).
+								Msg("Processing holding")
+
+							relevantView, err := getRelevantInterfaceViewValue(createdEvent.Created.GetInterfaceViews(), holdingInterfaceId)
+							if err != nil {
+								i.logger.Debug().Err(err).Str("contractID", createdEvent.Created.GetContractId()).Msg("Failed to get relevant interface view value, skipping")
+								continue
 							}
-							holdingDisclosure, holdingView, err := getHoldingDisclosureAndView(i.owner, ac)
+
+							holdingView, err := getHoldingView(i.owner, relevantView)
 							if err != nil {
 								i.logger.Debug().Err(err).Str("contractID", createdEvent.Created.GetContractId()).Msg("Failed to get holding disclosure for created event, skipping")
 								continue
+							}
+
+							// create the disclosure
+							holdingDisclosure := &apiv2.DisclosedContract{
+								TemplateId:       createdEvent.Created.GetTemplateId(),
+								ContractId:       createdEvent.Created.GetContractId(),
+								CreatedEventBlob: createdEvent.Created.GetCreatedEventBlob(),
+								SynchronizerId:   tx.Transaction.GetSynchronizerId(),
 							}
 							i.logger.Info().
 								Any("holdingView", holdingView).
 								Any("holdingDisclosure", holdingDisclosure).
 								Msg("Recording holding disclosure")
+
 							i.mux.Lock()
 							i.ledgerEnd = tx.Transaction.GetOffset()
 							i.holdingDisclosures[holdingView.InstrumentId] = holdingDisclosure
@@ -217,25 +246,31 @@ func (i *InstrumentHoldingStoreService) Run(ctx context.Context) error {
 	}
 }
 
-func getHoldingDisclosureAndView(expectedOwner types.PARTY, ac *apiv2.ActiveContract) (*apiv2.DisclosedContract, *splice_api_token_holding_v1.HoldingView, error) {
-	// At this point we have an active holding contract, we should form the disclosure for it.
-	holdingView, err := bindings.UnmarshalCreatedEvent[splice_api_token_holding_v1.HoldingView](ac.GetCreatedEvent())
+func getHoldingView(expectedOwner types.PARTY, record *apiv2.Record) (*splice_api_token_holding_v1.HoldingView, error) {
+	var holdingView splice_api_token_holding_v1.HoldingView
+	err := ledger.RecordToStruct(record, &holdingView)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal holding view for active contract: %w", err)
+		return nil, fmt.Errorf("failed to convert record to holding view: %w", err)
 	}
 
+	// At this point we have an active holding contract, we should form the disclosure for it.
 	if holdingView.Owner != expectedOwner {
-		return nil, nil, fmt.Errorf("holding owner does not match expected owner: %w", err)
+		return nil, fmt.Errorf("holding owner does not match expected owner: %w", err)
 	}
 
-	holdingDisclosure := &apiv2.DisclosedContract{
-		TemplateId:       ac.GetCreatedEvent().GetTemplateId(),
-		ContractId:       ac.GetCreatedEvent().GetContractId(),
-		CreatedEventBlob: ac.GetCreatedEvent().GetCreatedEventBlob(),
-		SynchronizerId:   ac.GetSynchronizerId(),
-	}
+	return &holdingView, nil
+}
 
-	return holdingDisclosure, holdingView, nil
+func getRelevantInterfaceViewValue(interfaceViews []*apiv2.InterfaceView, expectedInterfaceId *apiv2.Identifier) (*apiv2.Record, error) {
+	for _, interfaceView := range interfaceViews {
+		// PackageId seems to be the hashed package ID, not the human-readable one.
+		// We probably shouldn't check against a specific hash, so we ignore that part of the interface ID.
+		if interfaceView.GetInterfaceId().GetModuleName() == expectedInterfaceId.GetModuleName() &&
+			interfaceView.GetInterfaceId().GetEntityName() == expectedInterfaceId.GetEntityName() {
+			return interfaceView.GetViewValue(), nil
+		}
+	}
+	return nil, fmt.Errorf("no interface view found for interface id: %s", expectedInterfaceId.String())
 }
 
 // backfill returns all currently-active contracts for s.filtersByParty at a given offset, indexed by InstanceAddress.
@@ -270,17 +305,32 @@ func (i *InstrumentHoldingStoreService) backfill(ctx context.Context, offset int
 
 			if ac, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
 				i.logger.Debug().
+					Any("createArguments", ac.ActiveContract.GetCreatedEvent().GetCreateArguments()).
 					Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).
 					Str("packageName", ac.ActiveContract.GetCreatedEvent().GetPackageName()).
 					Str("packageID", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetPackageId()).
 					Str("moduleName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetModuleName()).
 					Str("entityName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName()).
+					Any("interfaceViews", ac.ActiveContract.GetCreatedEvent().GetInterfaceViews()).
 					Msg("Backfilling holding")
 
-				holdingDisclosure, holdingView, err := getHoldingDisclosureAndView(i.owner, ac.ActiveContract)
+				relevantView, err := getRelevantInterfaceViewValue(ac.ActiveContract.GetCreatedEvent().GetInterfaceViews(), holdingInterfaceId)
+				if err != nil {
+					i.logger.Debug().Err(err).Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).Msg("Failed to get relevant interface view value, skipping")
+					continue
+				}
+				holdingView, err := getHoldingView(i.owner, relevantView)
 				if err != nil {
 					i.logger.Debug().Err(err).Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).Msg("Failed to get holding disclosure for active contract, skipping")
 					continue
+				}
+
+				// create the disclosure
+				holdingDisclosure := &apiv2.DisclosedContract{
+					TemplateId:       ac.ActiveContract.GetCreatedEvent().GetTemplateId(),
+					ContractId:       ac.ActiveContract.GetCreatedEvent().GetContractId(),
+					CreatedEventBlob: ac.ActiveContract.GetCreatedEvent().GetCreatedEventBlob(),
+					SynchronizerId:   ac.ActiveContract.GetSynchronizerId(),
 				}
 				i.logger.Info().
 					Any("holdingView", holdingView).

@@ -2,7 +2,7 @@
 # This configuration does not use the Nginx reverse proxy, instead connecting directly to the services.
 # See /compose/localnet to set up the environment.
 
-selector=8706591216959472610
+chain_selector=8706591216959472610
 
 scan_api_url="http://localhost:5012"
 registry_api_url="http://localhost:5012"

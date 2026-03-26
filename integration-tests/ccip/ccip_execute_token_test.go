@@ -348,6 +348,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
 					},
 				},
+				PoolOwner: partyCCIP,
 			},
 		})
 		log.Info().Msg("EDS terminated")
@@ -359,9 +360,14 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create EDS client")
 
+	// wait for EDS to start up
+	time.Sleep(20 * time.Second)
+
 	// Create PerPartyRouter for receiver via EDS
 	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)
 	require.NoError(t, err)
+	t.Logf("disclosed contracts: %v", disclosedContracts)
+	t.Logf("per party router factory cid: %s", perPartyRouterFactoryCid)
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
