@@ -920,9 +920,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		tokenTransferFactoryDisclosures,
 	))
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
-	quotedFeeLocalUnits := numeric0ToInt64(t, quotedFee.FeeTokenAmount)
-	require.Equal(t, int64(55_000_000), quotedFeeLocalUnits, "GetFee should return the configured token-send fee quote")
-	require.Equal(t, int64(500), numeric0ToInt64(t, quotedFee.PoolFeeTokenAmount), "GetFee should return the pool fee token deduction for token sends")
+	require.Equal(t, "55000000.0", string(quotedFee.FeeTokenAmount), "GetFee should return the configured token-send fee quote")
+	require.Equal(t, "500.0", string(quotedFee.PoolFeeTokenAmount), "GetFee should return the pool fee token deduction for token sends")
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -982,6 +981,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// - Pool fee: TokenTransferFeeConfigs[remoteSelector].feeUSDCents = 10 => 10,000,000
 	// - Owner residual: quoted 55 cents - 7 CCV - 10 pool = 38 cents => 38,000,000
 	const (
+		quotedFeeLocalUnits     = int64(55_000_000)
 		ccvFeeLocalUnits        = int64(7_000_000)
 		poolFeeLocalUnits       = int64(10_000_000)
 		ownerResidualLocalUnits = int64(38_000_000)

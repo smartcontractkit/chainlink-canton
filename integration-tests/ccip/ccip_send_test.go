@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -725,8 +724,7 @@ func TestCCIPSend(t *testing.T) {
 		transferFactoryDisclosures,
 	)
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
-	quotedFeeLocalUnits := numeric0ToInt64(t, quotedFee.FeeTokenAmount)
-	require.Positive(t, quotedFeeLocalUnits, "GetFee should return a positive fee")
+	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")
 
 	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
 	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
@@ -792,25 +790,11 @@ func TestCCIPSend(t *testing.T) {
 	senderDelta := senderBalanceBefore - senderBalanceAfter
 	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
 
-	require.Equal(t, quotedFeeLocalUnits, senderDelta, "sender deduction should match GetFee quote")
-	require.Equal(t, quotedFeeLocalUnits, ccipOwnerDelta, "ccipOwner should receive the full quoted fee in this no-token flow")
+	require.Equal(t, fmt.Sprintf("%d.0", senderDelta), string(quotedFee.FeeTokenAmount), "sender deduction should match GetFee quote")
+	require.Equal(t, fmt.Sprintf("%d.0", ccipOwnerDelta), string(quotedFee.FeeTokenAmount), "ccipOwner should receive the full quoted fee in this no-token flow")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 	t.Logf("  Encoded message: %s", returnedEncodedMessage)
-}
-
-func numeric0ToInt64(t *testing.T, n types.NUMERIC) int64 {
-	t.Helper()
-
-	intPart, fracPart, hasFrac := strings.Cut(string(n), ".")
-	if hasFrac {
-		require.Emptyf(t, strings.Trim(fracPart, "0"), "expected integer Numeric 0, got %q", n)
-	}
-
-	value, err := strconv.ParseInt(intPart, 10, 64)
-	require.NoError(t, err)
-
-	return value
 }
