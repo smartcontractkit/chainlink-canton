@@ -15,4 +15,5 @@ func init() {
 	adapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyCanton, &CantonAggregatorConfigAdapter{})
 	adapters.GetIndexerConfigRegistry().Register(chainsel.FamilyCanton, &CantonIndexerConfigAdapter{})
 	adapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyCanton, &CantonVerifierJobConfigAdapter{})
+	adapters.GetExecutorConfigRegistry().Register(chainsel.FamilyCanton, &CantonExecutorConfigAdapter{})
 }

@@ -422,30 +422,30 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 
 	// Add executor refs, storing raw instance addresses as labels so that
 	// SendMessage can recover the instanceId needed to match the executor service.
-	// executorRawAddr := contracts.MustNewInstanceID("executor-1").RawInstanceAddress(types.PARTY(participant.PartyID))
-	// err = runningDS.AddressRefStore.Add(datastore.AddressRef{
-	// 	Address:       executorRawAddr.InstanceAddress().Hex(),
-	// 	Labels:        datastore.NewLabelSet(executorRawAddr.String()),
-	// 	Type:          datastore.ContractType(executor.ContractType),
-	// 	Version:       executor.Version,
-	// 	Qualifier:     devenvcommon.DefaultExecutorQualifier,
-	// 	ChainSelector: selector,
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to add executor address ref: %w", err)
-	// }
-	// executorProxyRawAddr := contracts.MustNewInstanceID("executor-proxy-1").RawInstanceAddress(types.PARTY(participant.PartyID))
-	// err = runningDS.AddressRefStore.Add(datastore.AddressRef{
-	// 	Address:       executorProxyRawAddr.InstanceAddress().String(),
-	// 	Labels:        datastore.NewLabelSet(executorProxyRawAddr.String()),
-	// 	Type:          datastore.ContractType(ccvsequences.ExecutorProxyType),
-	// 	Version:       executor.Version,
-	// 	Qualifier:     devenvcommon.DefaultExecutorQualifier,
-	// 	ChainSelector: selector,
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to add executor proxy address ref: %w", err)
-	// }
+	executorRawAddr := contracts.MustNewInstanceID("executor-1").RawInstanceAddress(types.PARTY(participant.PartyID))
+	err = runningDS.AddressRefStore.Add(datastore.AddressRef{
+		Address:       executorRawAddr.InstanceAddress().Hex(),
+		Labels:        datastore.NewLabelSet(executorRawAddr.String()),
+		Type:          datastore.ContractType(executor.ContractType),
+		Version:       executor.Version,
+		Qualifier:     devenvcommon.DefaultExecutorQualifier,
+		ChainSelector: selector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add executor address ref: %w", err)
+	}
+	executorProxyRawAddr := contracts.MustNewInstanceID("executor-proxy-1").RawInstanceAddress(types.PARTY(participant.PartyID))
+	err = runningDS.AddressRefStore.Add(datastore.AddressRef{
+		Address:       executorProxyRawAddr.InstanceAddress().String(),
+		Labels:        datastore.NewLabelSet(executorProxyRawAddr.String()),
+		Type:          datastore.ContractType(ccvsequences.ExecutorProxyType),
+		Version:       executor.Version,
+		Qualifier:     devenvcommon.DefaultExecutorQualifier,
+		ChainSelector: selector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add executor proxy address ref: %w", err)
+	}
 
 	env.DataStore = runningDS.Seal()
 
