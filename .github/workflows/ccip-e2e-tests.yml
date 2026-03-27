@@ -65,7 +65,7 @@ jobs:
         working-directory: chainlink-ccv/build/devenv
         run: |
           # Build all dependent services docker images
-          just build-docker
+          just build-docker-dev-ci
         env:
           DOCKER_BUILDKIT: 1
 
