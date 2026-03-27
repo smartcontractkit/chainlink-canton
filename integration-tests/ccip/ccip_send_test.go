@@ -602,8 +602,8 @@ func TestCCIPSend(t *testing.T) {
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
 	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")
 
-	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
 	ccipSendArgs := ledger.MapToValue(sendArgs)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
@@ -661,14 +661,15 @@ func TestCCIPSend(t *testing.T) {
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
 
-	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
-	senderDelta := senderBalanceBefore - senderBalanceAfter
-	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
+	senderBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
+	senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
+	ccipOwnerDelta := new(big.Rat).Sub(ccipOwnerBalanceAfter, ccipOwnerBalanceBefore)
 
-	// Bound Numeric 0 values come back as strings with a trailing dot, e.g. "43000000.".
-	require.Equal(t, fmt.Sprintf("%d", senderDelta), strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "sender deduction should match GetFee quote")
-	require.Equal(t, fmt.Sprintf("%d", ccipOwnerDelta), strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "ccipOwner should receive the full quoted fee in this no-token flow")
+	quotedFeeAmount, ok := new(big.Rat).SetString(strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."))
+	require.True(t, ok, "quoted fee should parse as a decimal value")
+	require.Zero(t, senderDelta.Cmp(quotedFeeAmount), "sender deduction should match GetFee quote")
+	require.Zero(t, ccipOwnerDelta.Cmp(quotedFeeAmount), "ccipOwner should receive the full quoted fee in this no-token flow")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
