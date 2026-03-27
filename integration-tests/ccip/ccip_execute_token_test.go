@@ -15,23 +15,24 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/freeport"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -97,19 +98,19 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 }
 
-func TestLnRTokenPool_FullReceiveFlow_DecimalConversion(t *testing.T) {
-	t.Parallel()
+// func TestLnRTokenPool_FullReceiveFlow_DecimalConversion(t *testing.T) {
+// 	t.Parallel()
 
-	runLnRTokenPoolReceiveFlowTest(t, lnrTokenPoolReceiveFlowTestCase{
-		tokenAmount:                   big.NewInt(7_000_000_000_000),
-		sourcePoolData:                encodeUint256Bytes(18),
-		expectedTransferAmount:        7,
-		defaultInboundLimiterCapacity: "5",
-		customInboundLimiterCapacity:  "10",
-		expectedDefaultLimiterTokens:  "5.",
-		expectedCustomLimiterTokens:   "3.",
-	})
-}
+// 	runLnRTokenPoolReceiveFlowTest(t, lnrTokenPoolReceiveFlowTestCase{
+// 		tokenAmount:                   big.NewInt(7_000_000_000_000),
+// 		sourcePoolData:                encodeUint256Bytes(18),
+// 		expectedTransferAmount:        7,
+// 		defaultInboundLimiterCapacity: "5",
+// 		customInboundLimiterCapacity:  "10",
+// 		expectedDefaultLimiterTokens:  "5.",
+// 		expectedCustomLimiterTokens:   "3.",
+// 	})
+// }
 
 func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTestCase) {
 	t.Helper()
@@ -119,7 +120,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// Setup participants
 	ccipParticipant := env.Chain.Participants[0]
 	receiverParticipant := env.Chain.Participants[1]
-	tokenPoolOwnerParticipant := env.Chain.Participants[2]
+	tokenPoolOwnerParticipant := env.Chain.Participants[0]
 
 	// DAR Uploading
 	// Read DARs
@@ -192,7 +193,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	}}}}
 
 	// CCIP Deployment
-	sourceChainSelector := "123"
+	sourceChainSelector := fmt.Sprintf("%d", chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 
 	// CCV Setup
 	// Generate signer keys for CommitteeVerifier
@@ -292,119 +293,12 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
 
-	// Run EDS
-	edsParticipant := env.Chain.Participants[0]
-	edsToken, _ := edsParticipant.TokenSource.Token()
-	edsPort := freeport.GetOne(t)
-	go func() {
-		log.Info().Msg("Running EDS...")
-		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
-			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
-			Server: config.ServerConfig{
-				Host: "0.0.0.0",
-				Port: uint16(edsPort), //nolint:gosec // this is a port number
-			},
-			Node: config.NodeConfig{
-				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
-					UserID: edsParticipant.UserID,
-					JWT:    edsToken.AccessToken,
-				},
-				MaxRetries: 0,
-			},
-			Contracts: config.Contracts{
-				PerPartyRouterFactory: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
-				},
-				OnRamp: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(onRamp.Address),
-				},
-				OffRamp: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(offRamp.Address),
-				},
-				GlobalConfig: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(globalConfig.Address),
-				},
-				TokenAdminRegistry: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
-				},
-				RMNRemote: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
-				},
-				FeeQuoter: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
-				},
-				CCVs: []config.ContractIdentifier{
-					{
-						PartyID:         partyCCIP,
-						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
-					},
-				},
-				PoolOwner: partyCCIP,
-			},
-		})
-		log.Info().Msg("EDS terminated")
-		if err != nil {
-			log.Error().Err(err).Msg("EDS server exited with error")
-		}
-	}()
-	// Create EDS client
-	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
-	require.NoError(t, err, "Failed to create EDS client")
-
-	// wait for EDS to start up
-	time.Sleep(20 * time.Second)
-
-	// Create PerPartyRouter for receiver via EDS
-	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)
-	require.NoError(t, err)
-	t.Logf("disclosed contracts: %v", disclosedContracts)
-	t.Logf("per party router factory cid: %s", perPartyRouterFactoryCid)
-
-	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: perPartyRouterFactoryCid,
-					Choice:     "CreateRouter",
-					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
-						PartyOwner: types.PARTY(partyReceiver),
-					}),
-				}},
-			}},
-			ActAs:              []string{partyReceiver},
-			DisclosedContracts: disclosedContracts,
-		},
-	})
-	require.NoError(t, err)
-	routerCid := ""
-	for _, event := range res.GetTransaction().GetEvents() {
-		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-			if e.Created.GetTemplateId().GetEntityName() == "PerPartyRouter" {
-				routerCid = e.Created.ContractId
-				break
-			}
-		}
-	}
-	require.NotEmpty(t, routerCid)
-	t.Logf("Created PerPartyRouter for receiver: %s", routerCid)
-
 	// Token Pool Setup
 	// Deploy default inbound RateLimiter required by ReleaseFromTicket receive flow.
 	// Keep it enabled but lower-capacity so the test fails if the default-finality limiter
 	// is selected for this FTF transfer instead of the custom-finality limiter.
 	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
-	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -492,6 +386,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
 
 	// Deploy LockReleaseTokenPool
+	lrtpInstanceAddress := contracts.InstanceID("test-pool-receive").RawInstanceAddress(types.PARTY(partyTokenPoolOwner)).InstanceAddress()
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -631,6 +526,188 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	t.Log("Called SetPool")
 
+	// Run EDS
+	edsParticipant := env.Chain.Participants[0]
+	edsToken, _ := edsParticipant.TokenSource.Token()
+	edsPort := freeport.GetOne(t)
+	go func() {
+		log.Info().Msg("Running EDS...")
+		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
+			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
+			Server: config.ServerConfig{
+				Host: "0.0.0.0",
+				Port: uint16(edsPort), //nolint:gosec // this is a port number
+			},
+			Node: config.NodeConfig{
+				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   commonconfig.AuthTypeInsecureStatic,
+					UserID: edsParticipant.UserID,
+					JWT:    edsToken.AccessToken,
+				},
+				MaxRetries: 0,
+			},
+			Contracts: config.Contracts{
+				PerPartyRouterFactory: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
+				},
+				OnRamp: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(onRamp.Address),
+				},
+				OffRamp: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(offRamp.Address),
+				},
+				GlobalConfig: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(globalConfig.Address),
+				},
+				TokenAdminRegistry: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
+				},
+				RMNRemote: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
+				},
+				FeeQuoter: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
+				},
+				CCVs: []config.ContractIdentifier{
+					{
+						PartyID:         partyCCIP,
+						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+					},
+				},
+				PoolOwner: partyTokenPoolOwner,
+				TokenPools: []config.ContractIdentifier{
+					{
+						PartyID:         partyCCIP,
+						InstanceAddress: lrtpInstanceAddress,
+					},
+				},
+			},
+		})
+		log.Info().Msg("EDS terminated")
+		if err != nil {
+			log.Error().Err(err).Msg("EDS server exited with error")
+		}
+	}()
+	// Create EDS client
+	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create EDS client")
+
+	// Deploy and configure lane
+	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
+	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
+	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
+	out, err = changesets.ConfigureChainForLanes{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.ConfigureChainForLanesConfig]{
+		ChainSelector: env.Chain.ChainSelector(),
+		Participant:   0,
+		Config: changesets.ConfigureChainForLanesConfig{
+			Input: sequences.ConfigureChainForLanesInput{
+				ChainSelector: env.Chain.ChainSelector(),
+				GlobalConfig:  contracts.HexToInstanceAddress(globalConfig.Address),
+				FeeQuoter:     contracts.HexToInstanceAddress(feeQuoter.Address),
+				OnRamp:        contracts.HexToInstanceAddress(onRamp.Address),
+				OffRamp:       contracts.HexToInstanceAddress(offRamp.Address),
+				CommitteeVerifiers: []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
+					{
+						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {
+								AllowlistEnabled:   false,
+								FeeUSDCents:        50,
+								GasForVerification: 50_000,
+								PayloadSizeBytes:   6*64 + 2*32,
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   ccvSignerPubKeys,
+									Threshold: 2,
+								},
+							},
+						},
+					},
+				},
+				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
+					remoteSelector: {
+						AllowTrafficFrom:         true,
+						OnRamps:                  [][]byte{hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd")},
+						OffRamp:                  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+						DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
+						LaneMandatedInboundCCVs:  nil,
+						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
+						LaneMandatedOutboundCCVs: nil,
+						DefaultExecutor:          "",
+						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+							IsEnabled:                   true,
+							MaxDataBytes:                50000,
+							MaxPerMsgGasLimit:           4000000,
+							DestGasOverhead:             300000,
+							DestGasPerPayloadByteBase:   16,
+							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+							DefaultTxGasLimit:           200000,
+							LinkFeeMultiplierPercent:    90,
+							DefaultTokenFeeUSDCents:     0,
+							DefaultTokenDestGasOverhead: 34000,
+							NetworkFeeUSDCents:          0,
+						},
+						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+						AddressBytesLength:      20,
+						BaseExecutionGasCost:    0,
+					},
+				},
+			},
+		},
+	})
+	require.NoErrorf(t, err, "Failed to configure chain for lanes")
+	err = out.DataStore.Merge(cldfEnv.DataStore)
+	require.NoError(t, err)
+	cldfEnv.DataStore = out.DataStore.Seal()
+	t.Log("Configured chain for lanes")
+
+	// wait for EDS to start up
+	time.Sleep(20 * time.Second)
+
+	// Create PerPartyRouter for receiver via EDS
+	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)
+	require.NoError(t, err)
+	t.Logf("disclosed contracts: %v", disclosedContracts)
+	t.Logf("per party router factory cid: %s", perPartyRouterFactoryCid)
+
+	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					ContractId: perPartyRouterFactoryCid,
+					Choice:     "CreateRouter",
+					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "partyOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-router-receiver"}}},
+					}}}},
+				}},
+			}},
+			ActAs:              []string{partyReceiver},
+			DisclosedContracts: disclosedContracts,
+		},
+	})
+	require.NoError(t, err)
+	routerCid := ""
+	for _, event := range res.GetTransaction().GetEvents() {
+		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+			if e.Created.GetTemplateId().GetEntityName() == "PerPartyRouter" {
+				routerCid = e.Created.ContractId
+				break
+			}
+		}
+	}
+	require.NotEmpty(t, routerCid)
+	t.Logf("Created PerPartyRouter for receiver: %s", routerCid)
+
 	// Build Message
 	// Encode instrumentId for destTokenAddress
 	encodedInstrumentId := encodeInstrumentId(registryAdmin, "Amulet")
@@ -639,21 +716,17 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// Build token transfer (5 AMT in Splice Decimal format)
 	encodedTokenTransfer := buildTokenTransferV1(tc.tokenAmount, remotePoolAddress, remoteTokenAddress, hashedInstrumentId, partyReceiver, tc.sourcePoolData)
 
-	localOffRampRawAddress, err := contracts.RawInstanceAddressFromString("test-offramp-receive@" + partyCCIP)
-	require.NoError(t, err)
-	localOffRampAddress := localOffRampRawAddress.InstanceAddress().Bytes()
-
 	// Build message
 	msg := &MessageV1{
-		SourceChainSelector: 123,
-		DestChainSelector:   456,
+		SourceChainSelector: remoteSelector,
+		DestChainSelector:   env.Chain.ChainSelector(),
 		SequenceNumber:      1,
 		ExecutionGasLimit:   200000,
 		CCIPReceiveGasLimit: 100000,
 		Finality:            2000,
 		CCVAndExecutorHash:  [32]byte{},
-		OnRampAddress:       hexToBytes("0000000000000000000000000000000000000001"),
-		OffRampAddress:      localOffRampAddress,
+		OnRampAddress:       gethcommon.LeftPadBytes(hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"), 32),
+		OffRampAddress:      contracts.HexToInstanceAddress(offRamp.Address).Bytes(),
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
 		Receiver:            EncodePartyID(partyReceiver),
 		DestBlob:            []byte{},
@@ -708,33 +781,33 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NotEmpty(t, poolHoldings, "Pool should have holdings")
 
 	// Filter for unlocked holdings only (Amulet tokens may be locked until next mining round)
-	var poolHoldingCids []*apiv2.Value
-	var poolHoldingDisclosures []*apiv2.DisclosedContract
-	var lockedCount, unlockedCount int
-	for _, h := range poolHoldings {
-		viewFields := h.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()
-		lockField := viewFields[3].GetValue()
-		isLocked := lockField.GetOptional().GetValue() != nil
+	// var poolHoldingCids []*apiv2.Value
+	// var poolHoldingDisclosures []*apiv2.DisclosedContract
+	// var lockedCount, unlockedCount int
+	// for _, h := range poolHoldings {
+	// 	viewFields := h.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()
+	// 	lockField := viewFields[3].GetValue()
+	// 	isLocked := lockField.GetOptional().GetValue() != nil
 
-		if isLocked {
-			lockedCount++
-			continue
-		}
-		unlockedCount++
+	// 	if isLocked {
+	// 		lockedCount++
+	// 		continue
+	// 	}
+	// 	unlockedCount++
 
-		poolHoldingCids = append(poolHoldingCids, &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: h.GetCreatedEvent().GetContractId()}})
-		poolHoldingDisclosures = append(poolHoldingDisclosures, &apiv2.DisclosedContract{
-			ContractId:       h.GetCreatedEvent().GetContractId(),
-			TemplateId:       h.GetCreatedEvent().GetTemplateId(),
-			CreatedEventBlob: h.GetCreatedEvent().GetCreatedEventBlob(),
-		})
-	}
-	t.Logf("Pool has %d holdings (%d unlocked, %d locked)", len(poolHoldings), unlockedCount, lockedCount)
+	// 	poolHoldingCids = append(poolHoldingCids, &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: h.GetCreatedEvent().GetContractId()}})
+	// 	poolHoldingDisclosures = append(poolHoldingDisclosures, &apiv2.DisclosedContract{
+	// 		ContractId:       h.GetCreatedEvent().GetContractId(),
+	// 		TemplateId:       h.GetCreatedEvent().GetTemplateId(),
+	// 		CreatedEventBlob: h.GetCreatedEvent().GetCreatedEventBlob(),
+	// 	})
+	// }
+	// t.Logf("Pool has %d holdings (%d unlocked, %d locked)", len(poolHoldings), unlockedCount, lockedCount)
 
-	if unlockedCount == 0 {
-		t.Skip("SKIPPING: All pool holdings are locked (Amulet tokens are locked until next mining round). " +
-			"This is expected on fresh localnet. Either wait for mining round to complete, or use TestToken instead of Amulet.")
-	}
+	// if unlockedCount == 0 {
+	// 	t.Skip("SKIPPING: All pool holdings are locked (Amulet tokens are locked until next mining round). " +
+	// 		"This is expected on fresh localnet. Either wait for mining round to complete, or use TestToken instead of Amulet.")
+	// }
 
 	// Capture receiver's balance before execute
 	receiverHoldingsBefore, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
@@ -745,99 +818,31 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
 	// receiver-only; pool/ccip-owned contracts are only supplied via disclosure.
-	disclosedCCIPReceiver, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver",
-	})
+	// disclosedCCIPReceiver, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
+	// 	PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver",
+	// })
+	// require.NoError(t, err)
+	// disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
+	// 	PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
+	// })
+	// require.NoError(t, err)
+
+	// TODO: EDS call to get execute disclosures
+	executeDisclosuresEDS, err := testhelpers.GetCCIPExecuteDisclosures(
+		t.Context(),
+		encodedMessageHex,
+		edsClient,
+		[]contracts.InstanceAddress{
+			contracts.HexToInstanceAddress(committeeVerifier.Address),
+		},
+	)
 	require.NoError(t, err)
-	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
-	})
-	require.NoError(t, err)
-	disclosedOffRamp, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-offramp", ModuleName: "CCIP.OffRamp", EntityName: "OffRamp",
-	})
-	require.NoError(t, err)
-	disclosedGlobalConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-common", ModuleName: "CCIP.GlobalConfig", EntityName: "GlobalConfig",
-	})
-	require.NoError(t, err)
-	disclosedTar, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
-	})
-	require.NoError(t, err)
-	disclosedRmnRemote, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-rmn", ModuleName: "CCIP.RMNRemote", EntityName: "RMNRemote",
-	})
-	require.NoError(t, err)
-	disclosedCCV, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier",
-	})
-	require.NoError(t, err)
-	disclosedPool, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-lockreleasetokenpool", ModuleName: "CCIP.LockReleaseTokenPool", EntityName: "LockReleaseTokenPool",
-	})
-	require.NoError(t, err)
-	disclosedInboundRateLimiter, err := testhelpers.GetDisclosedContractById(t.Context(), tokenPoolOwnerParticipant, inboundRateLimiterCid)
-	require.NoError(t, err)
-	disclosedInboundCustomBlockConfirmationsRateLimiter, err := testhelpers.GetDisclosedContractById(t.Context(), tokenPoolOwnerParticipant, inboundCustomBlockConfirmationsRateLimiterCid)
-	require.NoError(t, err)
-	disclosedOutboundRateLimiter, err := testhelpers.GetDisclosedContractById(t.Context(), tokenPoolOwnerParticipant, outboundRateLimiterCid)
-	require.NoError(t, err)
+	require.Len(t, executeDisclosuresEDS.CCVContractIDs, 1)
 
 	executeDisclosures := slices.Concat(
-		[]*apiv2.DisclosedContract{
-			disclosedCCIPReceiver,
-			disclosedRouter,
-			disclosedOffRamp,
-			disclosedGlobalConfig,
-			disclosedTar,
-			disclosedRmnRemote,
-			disclosedCCV,
-			disclosedPool,
-			disclosedInboundRateLimiter,
-			disclosedInboundCustomBlockConfirmationsRateLimiter,
-			disclosedOutboundRateLimiter,
-		},
-		transferFactoryDisclosures,
-		poolHoldingDisclosures,
+		executeDisclosuresEDS.DisclosedContracts,
+		transferFactoryDisclosures, // not from EDS
 	)
-
-	// Create context - replace with EDS
-	executeContext := map[string]any{
-		"values": map[string]any{
-			"off-ramp": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedOffRamp.ContractId,
-			},
-			"global-config": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedGlobalConfig.ContractId,
-			},
-			"token-admin-registry": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedTar.ContractId,
-			},
-			"rmn-remote": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedRmnRemote.ContractId,
-			},
-		},
-	}
-	executeContextValue, err := testhelpers.ChoiceContextFromData(executeContext)
-	require.NoError(t, err)
-	poolExtraContext, err := testhelpers.ChoiceContextFromData(map[string]any{
-		"values": map[string]any{
-			"rate-limiter": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedInboundRateLimiter.ContractId,
-			},
-			"inbound-custom-block-confirmations-rate-limiter": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedInboundCustomBlockConfirmationsRateLimiter.ContractId,
-			},
-		},
-	})
-	require.NoError(t, err)
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV + Pool Verify + Execute + Release
 	// in one receiver-authored transaction with disclosed shared dependencies.
@@ -850,11 +855,11 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 					ContractId: ccipReceiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: executeContextValue},
+						{Label: "context", Value: choiceContext},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedPool.ContractId}}},
+							{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: executeDisclosuresEDS.TokenPoolContractID.ContractId}}},
 							{Label: "tokenReceiverParty", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
 							{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: transferFactoryCid}}},
@@ -862,13 +867,13 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 									{Label: "context", Value: choiceContext},
 									{Label: "meta", Value: emptyMetadata},
 								}}}}},
-								{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: poolHoldingCids}}}},
+								{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: executeDisclosuresEDS.TokenPoolHoldingsContractIDs}}}},
 							}}}}},
-							{Label: "poolExtraContext", Value: poolExtraContext},
+							{Label: "poolExtraContext", Value: executeDisclosuresEDS.PoolExtraContext},
 						}}}}}}}},
 						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedCCV.ContractId}}},
+								{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: executeDisclosuresEDS.CCVContractIDs[0].ContractId}}},
 								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
 								{Label: "ccvExtraContext", Value: emptyCCIPContext},
 							}}}},

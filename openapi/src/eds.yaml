@@ -168,20 +168,34 @@ components:
       type: object
       required:
         - choiceContext
+        - poolExtraContext
         - ccvs
-        - tokenPool
-        - tokenPoolHoldings
       properties:
         choiceContext:
           $ref: '#/components/schemas/ChoiceContext'
+        poolExtraContext:
+          type: object
+          description: |
+            The additional data to use when exercising the choice for the token pool. 
+            Will be empty if no token transfer is part of the message.
         ccvs:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/OptionalDisclosure'
         tokenPool:
-          $ref: '#/components/schemas/OptionalDisclosure'
+          allOf:
+            - $ref: '#/components/schemas/DisclosedContract'
+          nullable: true
+          description: |
+            The explicit disclosure for the token pool.
+            Only present if a token transfer is part of the message.
         tokenPoolHoldings:
-          $ref: '#/components/schemas/OptionalDisclosure'
+          allOf:
+            - $ref: '#/components/schemas/DisclosedContract'
+          nullable: true
+          description: |
+            The explicit disclosures for the token pool holdings.
+            Only present if a token transfer is part of the message.
 
     CCIPPerPartyRouterFactoryRequest:
       type: object

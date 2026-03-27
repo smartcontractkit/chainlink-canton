@@ -106,14 +106,50 @@ func (s Server) CcipExecute(c *gin.Context) {
 		convertDisclosedContract(disclosures.RMNRemote),
 	}
 
+	var (
+		poolExtraContext  = make(map[string]any)
+		tokenPool         *edsv1.DisclosedContract
+		tokenPoolHoldings *edsv1.DisclosedContract
+	)
+	if disclosures.TokenPool != nil {
+		// If TokenPool is not nil then all of these should be non-nil as well.
+		tokenPoolDisclosure := convertDisclosedContract(disclosures.TokenPool)
+		tokenPoolHoldingsDisclosure := convertDisclosedContract(disclosures.TokenPoolHolding)
+		disclosedContracts = append(disclosedContracts,
+			tokenPoolDisclosure,
+			tokenPoolHoldingsDisclosure,
+			convertDisclosedContract(disclosures.InboundRateLimiter),
+			convertDisclosedContract(disclosures.InboundCustomBlockConfirmationsRateLimiter),
+			convertDisclosedContract(disclosures.OutboundRateLimiter),
+		)
+
+		// update the poolExtraContext with the relevant data.
+		poolExtraContext = map[string]any{
+			"values": map[string]any{
+				"rate-limiter": map[string]any{
+					"tag":   "AV_ContractId",
+					"value": disclosures.InboundRateLimiter.GetContractId(),
+				},
+				"inbound-custom-block-confirmations-rate-limiter": map[string]any{
+					"tag":   "AV_ContractId",
+					"value": disclosures.InboundCustomBlockConfirmationsRateLimiter.GetContractId(),
+				},
+				// TODO: outbound rate limiter not needed?
+			},
+		}
+		tokenPool = &tokenPoolDisclosure
+		tokenPoolHoldings = &tokenPoolHoldingsDisclosure
+	}
+
 	resp := edsv1.CCIPExecuteResponse{
 		ChoiceContext: edsv1.ChoiceContext{
 			ChoiceContextData:  choiceContextData,
 			DisclosedContracts: disclosedContracts,
 		},
 		Ccvs:              make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
-		TokenPool:         convertOptionalDisclosure(disclosures.TokenPool),
-		TokenPoolHoldings: convertOptionalDisclosure(disclosures.TokenPoolHolding),
+		PoolExtraContext:  poolExtraContext,
+		TokenPool:         tokenPool,
+		TokenPoolHoldings: tokenPoolHoldings,
 	}
 
 	for address, contract := range disclosures.CCVs {
@@ -267,18 +303,5 @@ func convertDisclosedContract(contract *apiv2.DisclosedContract) edsv1.Disclosed
 		CreatedEventBlob: base64.StdEncoding.EncodeToString(contract.CreatedEventBlob),
 		SynchronizerId:   contract.SynchronizerId,
 		TemplateId:       fmt.Sprintf("%s:%s:%s", contract.GetTemplateId().GetPackageId(), contract.GetTemplateId().GetModuleName(), contract.GetTemplateId().GetEntityName()),
-	}
-}
-
-func convertOptionalDisclosure(contract *apiv2.DisclosedContract) edsv1.OptionalDisclosure {
-	if contract == nil {
-		return edsv1.OptionalDisclosure{}
-	}
-
-	disclosure := convertDisclosedContract(contract)
-
-	return edsv1.OptionalDisclosure{
-		DisclosedContract:  &disclosure,
-		RegisteredContract: nil,
 	}
 }

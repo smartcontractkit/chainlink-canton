@@ -9,6 +9,7 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
@@ -176,13 +177,20 @@ type CCIPExecuteRequest struct {
 }
 
 type CCIPExecuteDisclosures struct {
+	// These disclosures are always needed for execution.
 	OffRamp            *apiv2.DisclosedContract
 	GlobalConfig       *apiv2.DisclosedContract
 	TokenAdminRegistry *apiv2.DisclosedContract
 	RMNRemote          *apiv2.DisclosedContract
-	CCVs               map[contracts.InstanceAddress]*apiv2.DisclosedContract
-	TokenPool          *apiv2.DisclosedContract
-	TokenPoolHolding   *apiv2.DisclosedContract
+
+	// These disclosures are optional, only will be returned in the event
+	// there is a token transfer.
+	CCVs                                       map[contracts.InstanceAddress]*apiv2.DisclosedContract
+	TokenPool                                  *apiv2.DisclosedContract
+	TokenPoolHolding                           *apiv2.DisclosedContract
+	InboundRateLimiter                         *apiv2.DisclosedContract
+	InboundCustomBlockConfirmationsRateLimiter *apiv2.DisclosedContract
+	OutboundRateLimiter                        *apiv2.DisclosedContract
 }
 
 func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, request CCIPExecuteRequest) (CCIPExecuteDisclosures, error) {
@@ -262,6 +270,17 @@ func (s *DisclosureService) getTokenPoolAndHoldingDisclosure(ctx context.Context
 			return nil, nil, fmt.Errorf("can't get token pool disclosure: %w", err)
 		}
 
+		// TODO: get the rate limiters from the tp created event.
+		// tpActiveContract := s.contractStore.GetContract(ctx, tokenPoolInstanceAddress)
+		// if tpActiveContract == nil {
+		// 	return nil, nil, fmt.Errorf("can't get token pool disclosure from update store: %w", err)
+		// }
+
+		// tpCreatedEvent, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](tpActiveContract.GetCreatedEvent())
+		// if err != nil {
+		// 	return nil, nil, fmt.Errorf("can't unmarshal token pool created event: %w", err)
+		// }
+
 		// look up the instrument holding disclosure for the instrument id.
 		instrumentHoldingDisclosure, err = s.instrumentHoldingStore.GetInstrumentHolding(ctx, instrumentID)
 		if err != nil {
@@ -282,17 +301,20 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 	// -- | Maps keccak256(InstrumentId) to token configuration
 	// tokenConfigs : Map.Map BytesHex TokenConfig
 	for hashedInstrumentID, v := range tarCreatedEvent.TokenConfigs {
+		fmt.Printf("processing map: %+v\n", v)
 		// check if this instrument ID corresponds to the one we expect.
 		instrumentIDBytes, err := hex.DecodeString(hashedInstrumentID)
 		if err != nil {
 			continue
 		}
 		if !bytes.Equal(instrumentIDBytes, expectedHashedInstrumentID.Bytes()) {
+			fmt.Printf("expected hashed instrument ID: %s, but got: %s, skipping\n", expectedHashedInstrumentID.String(), hashedInstrumentID)
 			continue
 		}
 
 		configMap, ok := v.(map[string]any)
 		if !ok {
+			fmt.Printf("configMap is not a map[string]any, skipping\n")
 			continue
 		}
 		// Unmarshalled form may wrap fields in "data"
@@ -302,6 +324,7 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 		}
 		tokenPoolRaw, ok := m["tokenPool"]
 		if !ok || tokenPoolRaw == nil {
+			fmt.Printf("tokenPoolRaw is not a map[string]any, skipping\n")
 			continue
 		}
 		// Optional: {"_type": "optional", "value": <PoolRegistration map>}
@@ -315,6 +338,7 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 			tokenPoolMap, _ = tokenPoolRaw.(map[string]any)
 		}
 		if tokenPoolMap == nil {
+			fmt.Printf("tokenPoolMap is nil, skipping\n")
 			continue
 		}
 		// poolOwner may be under tokenPool.data when unmarshalled
@@ -324,10 +348,12 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 		}
 		poolOwnerStr := optionalStringFromMap(tokenPoolData, "poolOwner")
 		if poolOwnerStr == "" {
+			fmt.Printf("poolOwnerStr is empty, skipping\n")
 			continue
 		}
 		poolInstanceIDStr := optionalStringFromMap(tokenPoolData, "poolInstanceId")
 		if poolInstanceIDStr == "" {
+			fmt.Printf("poolInstanceIDStr is empty, skipping\n")
 			continue
 		}
 		tokenPoolInstanceAddress := contracts.InstanceID(poolInstanceIDStr).RawInstanceAddress(types.PARTY(poolOwnerStr)).InstanceAddress()
@@ -336,18 +362,32 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 		instrumentIDAny, ok := m["instrumentId"]
 		if !ok {
 			// this should never happen, but just in case.
+			fmt.Printf("instrumentId not found in token config, skipping\n")
 			continue
 		}
-		instrumentID, ok := instrumentIDAny.(splice_api_token_holding_v1.InstrumentId)
+
+		instrumentIDMap, ok := instrumentIDAny.(map[string]any)
 		if !ok {
-			// this should never happen, but just in case.
+			fmt.Printf("instrumentIDAny is not a map[string]any, skipping\n")
+			continue
+		}
+
+		// Decode the instrumentId using ledger.RecordToStruct.
+		var instrumentID splice_api_token_holding_v1.InstrumentId
+		err = ledger.MapToStruct(instrumentIDMap, &instrumentID)
+		if err != nil {
+			fmt.Printf("failed to decode instrumentId: %s, skipping\n", err.Error())
 			continue
 		}
 
 		return tokenPoolInstanceAddress, instrumentID, nil
 	}
 
-	return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf("token pool instance address not found in token admin registry data: %+v", tarCreatedEvent.TokenConfigs)
+	return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
+		"token pool instance address not found in token admin registry data (dest token address: %s): %+v",
+		expectedHashedInstrumentID.String(),
+		tarCreatedEvent.TokenConfigs,
+	)
 }
 
 // optionalStringFromMap gets an optional string from a map: either direct string or {"value": "<string>"}.
