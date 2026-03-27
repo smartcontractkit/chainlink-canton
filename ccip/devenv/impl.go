@@ -26,7 +26,6 @@ import (
 	ccvsequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -453,11 +452,11 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	return runningDS.Seal(), nil
 }
 
-func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint64) (lanes.ChainDefinition, changesets.CommitteeVerifierRemoteChainConfig, error) {
+func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint64) (lanes.ChainDefinition, lanes.CommitteeVerifierRemoteChainInput, error) {
 	// TODO this is currently not populated by populateAddressesV2
 	globalConfig, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(selector, datastore.ContractType(global_config.ContractType), global_config.Version, ""))
 	if err != nil {
-		return lanes.ChainDefinition{}, changesets.CommitteeVerifierRemoteChainConfig{}, fmt.Errorf("failed to get GlobalConfig address for chain %d: %w", selector, err)
+		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("failed to get GlobalConfig address for chain %d: %w", selector, err)
 	}
 	c.logger.Debug().Str("GlobalConfig", globalConfig.Address).Msg("Resolved GlobalConfig")
 
@@ -494,7 +493,7 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 			GlobalConfig: globalConfig,
 		},
 	}
-	cvConfig := changesets.CommitteeVerifierRemoteChainConfig{
+	cvConfig := lanes.CommitteeVerifierRemoteChainInput{
 		GasForVerification: 50_000,
 	}
 
