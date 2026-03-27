@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -82,7 +81,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		executorAddr, err := tcapi.GetContractAddress(
 			in,
 			cantonChain.ChainSelector(),
-			datastore.ContractType(sequences.ExecutorProxyType),
+			datastore.ContractType(executor.ContractType),
 			executor.Version.String(),
 			devenvcommon.DefaultExecutorQualifier,
 			"source executor",
