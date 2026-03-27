@@ -418,33 +418,6 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	// 	}
 	// }
 
-	// // Add executor refs, storing raw instance addresses as labels so that
-	// // SendMessage can recover the instanceId needed to match the executor service.
-	// executorRawAddr := contracts.MustNewInstanceID("executor-1").RawInstanceAddress(types.PARTY(participant.PartyID))
-	// err = runningDS.AddressRefStore.Add(datastore.AddressRef{
-	// 	Address:       executorRawAddr.InstanceAddress().Hex(),
-	// 	Labels:        datastore.NewLabelSet(executorRawAddr.String()),
-	// 	Type:          datastore.ContractType(executor.ContractType),
-	// 	Version:       executor.Version,
-	// 	Qualifier:     devenvcommon.DefaultExecutorQualifier,
-	// 	ChainSelector: selector,
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to add executor address ref: %w", err)
-	// }
-	// executorProxyRawAddr := contracts.MustNewInstanceID("executor-proxy-1").RawInstanceAddress(types.PARTY(participant.PartyID))
-	// err = runningDS.AddressRefStore.Add(datastore.AddressRef{
-	// 	Address:       executorProxyRawAddr.InstanceAddress().String(),
-	// 	Labels:        datastore.NewLabelSet(executorProxyRawAddr.String()),
-	// 	Type:          datastore.ContractType(ccvsequences.ExecutorProxyType),
-	// 	Version:       executor.Version,
-	// 	Qualifier:     devenvcommon.DefaultExecutorQualifier,
-	// 	ChainSelector: selector,
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to add executor proxy address ref: %w", err)
-	// }
-
 	env.DataStore = runningDS.Seal()
 
 	return runningDS.Seal(), nil
@@ -842,51 +815,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolved empty ccip sender contract ID")
 	}
 
-	executorInstanceID := contracts.InstanceID(opts.Executor.String())
-	fmt.Println("executorInstanceID XYZ", executorInstanceID.String())
-	// destSelectorText := strconv.FormatUint(dest, 10)
-	// _, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
-	// 	Commands: &ledgerv2.Commands{
-	// 		CommandId: uuid.New().String(),
-	// 		Commands: []*ledgerv2.Command{{
-	// 			Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
-	// 				TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-executor", ModuleName: "CCIP.Executor", EntityName: "Executor"},
-	// 				CreateArguments: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
-	// 					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: executorInstanceID.String()}}},
-	// 					{Label: "owner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: party}}},
-	// 					{Label: "maxCCVsPerMsg", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 10}}},
-	// 					{Label: "dynamicConfig", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
-	// 						{Label: "feeAggregator", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Optional{Optional: &ledgerv2.Optional{}}}},
-	// 						{Label: "minBlockConfirmations", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
-	// 						{Label: "ccvAllowlistEnabled", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Bool{Bool: false}}},
-	// 					}}}}},
-	// 					{Label: "allowedCCVs", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
-	// 					{
-	// 						Label: "remoteChainConfigs",
-	// 						Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{
-	// 							Entries: []*ledgerv2.GenMap_Entry{
-	// 								{
-	// 									Key: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: destSelectorText}},
-	// 									Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
-	// 										{Label: "feeUSDCents", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "0"}}},
-	// 										{Label: "enabled", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Bool{Bool: true}}},
-	// 									}}}},
-	// 								},
-	// 							},
-	// 						}}},
-	// 					},
-	// 				}},
-	// 			}},
-	// 		}},
-	// 		ActAs: []string{party},
-	// 	},
-	// })
-	// if err != nil {
-	// 	return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("deploy executor contract: %w", err)
-	// }
-	executorInstanceAddress := executorInstanceID.RawInstanceAddress(types.PARTY(party)).InstanceAddress()
-	executorCID, disclosedExecutor, err := resolveDisclosedByAddress("#ccip-executor:CCIP.Executor:Executor", executorInstanceAddress)
-	fmt.Println("executorCID XYZ", executorCID)
+	if len(opts.Executor) == 0 {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("executor address is required")
+	}
+	executorCID, disclosedExecutor, err := resolveDisclosedByAddress(
+		executorBinding.Executor{}.GetTemplateID(),
+		contracts.BytesToInstanceAddress(opts.Executor.Bytes()),
+	)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve executor disclosed contract: %w", err)
 	}
