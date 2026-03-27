@@ -183,6 +183,9 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 	// Manually execute
 	executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(ctx, message, 0, []protocol.UnknownAddress{result.IndexedVerifications.Results[0].VerifierResult.VerifierDestAddress}, [][]byte{result.IndexedVerifications.Results[0].VerifierResult.CCVData})
+	fmt.Print("\n\n\n")
+	fmt.Println(message)
+	fmt.Print("\n\n\n")
 	require.NoError(t, err, "failed to manually execute message on Canton chain")
 	require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State, "expected message execution to succeed")
 	require.EqualValues(t, srcSelector, executionStateChangedEvent.SourceChainSelector, "expected source chain selector to match")

@@ -17,7 +17,7 @@ import (
 // TODO: should this be defined elsewhere?
 var tokenPoolVersions = []string{
 	"1.6.1",
-	"1.7.0",
+	"2.0.0",
 }
 
 func init() {

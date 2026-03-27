@@ -117,6 +117,6 @@ getVerifierResultsForIndices indices =
     let signatures = map (\i -> rValues !! i <> sValues !! i) indices
         concatenatedSignatures = foldl (<>) "" signatures
         signatureLength = byteCount concatenatedSignatures
-    in CCIP.CommitteeVerifier.versionTagV1_7_0
+    in CCIP.CommitteeVerifier.versionTagV2_0_0
        <> fromSome(CCIP.MessageCodecV1.encodeUint16 signatureLength)
        <> concatenatedSignatures

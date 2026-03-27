@@ -77,8 +77,8 @@ type DeployChainContractsParams struct {
 
 var DeployChainContracts = operations.NewSequence(
 	"canton/ccip/deploy_chain_contracts",
-	semver.MustParse("1.7.0"),
-	"Deploys all required contracts for CCIP 1.7.0 to a Canton chain",
+	semver.MustParse("2.0.0"),
+	"Deploys all required contracts for CCIP 2.0.0 to a Canton chain",
 	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
 		var addresses []datastore.AddressRef
 
