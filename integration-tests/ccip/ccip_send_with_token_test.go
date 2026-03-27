@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -560,8 +560,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
-	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
+	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -769,6 +769,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		transferFactoryDisclosures,
 		tokenTransferFactoryDisclosures,
 	)...)
+	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
+	// Bound Numeric 0 values come back as strings with a trailing dot, e.g. "55000000.".
+	require.Equal(t, "55000000", strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "GetFee should return the configured token-send fee quote")
+	require.Equal(t, "500", strings.TrimSuffix(string(quotedFee.PoolFeeTokenAmount), "."), "GetFee should return the pool fee token deduction for token sends")
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -826,77 +830,50 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// 5% feeBps deducted from the transferred amount
 	require.Equal(t, int64(float64(tokenTransferAmount)*(1-(float64(tokenTransferFeeBps)/10_000))), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
 
-	senderBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
-	senderDelta := new(big.Float).Sub(senderBalanceBefore, senderBalanceAfter)
-
-	// Validate that the sender was charged the correct total amount:
-	// - CCV Fee
-	// - (Network) Transfer Fee
-	// - The amount of tokens that they sent
-	// Execution fees should not be charged, as the message is sent with no-execution
-	ccvFee := big.NewFloat(float64(ccvFeeUSDCents) * float64(tokenPriceExponentUSDCents))
-	transferFee := big.NewFloat(float64(tokenTransferFeeUSDCents) * float64(tokenPriceExponentUSDCents))
-	tokenTransferTotal := big.NewFloat(float64(tokenTransferAmount))
-	expectedTokenDelta := new(big.Float).Add(new(big.Float).Add(ccvFee, transferFee), tokenTransferTotal)
+	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	senderDelta := senderBalanceBefore - senderBalanceAfter
+	// Derived from config fields above and converted to local token units.
+	// In this test 1 token == 100,000,000 local units, so 1 US cent == 1,000,000 units.
+	// - CCV fee: CommitteeVerifierRemoteChainConfig.FeeUSDCents = 7 => 7,000,000
+	// - Pool fee: TokenTransferFeeConfigs[remoteSelector].feeUSDCents = 10 => 10,000,000
+	// - Owner residual: quoted 55 cents - 7 CCV - 10 pool = 38 cents => 38,000,000
+	const (
+		quotedFeeLocalUnits     = int64(55_000_000)
+		ccvFeeLocalUnits        = int64(7_000_000)
+		poolFeeLocalUnits       = int64(10_000_000)
+		ownerResidualLocalUnits = int64(38_000_000)
+	)
+	expectedCCIPOwnerDelta := ccvFeeLocalUnits + ownerResidualLocalUnits
+	expectedSenderDelta := quotedFeeLocalUnits - poolFeeLocalUnits
 
 	t.Logf(
-		"Sender balance (local units): before=%s after=%s deducted=%s",
-		senderBalanceBefore.String(),
-		senderBalanceAfter.String(),
-		senderDelta.String(),
+		"Sender balance (local units): before=%d after=%d deducted=%d",
+		senderBalanceBefore,
+		senderBalanceAfter,
+		senderDelta,
 	)
-	assertInEpsilon(t, expectedTokenDelta, senderDelta, big.NewFloat(0.00000001), "Sender delta should be: %s, got: %s, difference: %s", expectedTokenDelta.String(), senderDelta.String(), new(big.Float).Sub(expectedTokenDelta, senderDelta))
+	require.Equal(t, expectedSenderDelta, senderDelta, "sender delta should match quoted fee minus pool share")
 
 	// Validate the CCIP Owner holdings - the amount credited should be exactly equal to the amount that the sender has paid, no tokens are lost.
-	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
-	ccipOwnerDelta := new(big.Float).Sub(ccipOwnerBalanceAfter, ccipOwnerBalanceBefore)
+	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
 	t.Logf(
-		"CCIP owner balance (local units): before=%s after=%s credited=%s",
-		ccipOwnerBalanceBefore.String(),
-		ccipOwnerBalanceAfter.String(),
-		ccipOwnerDelta.String(),
+		"CCIP owner balance (local units): before=%d after=%d credited=%d",
+		ccipOwnerBalanceBefore,
+		ccipOwnerBalanceAfter,
+		ccipOwnerDelta,
 	)
-	assertInEpsilon(t, senderDelta, ccipOwnerDelta, big.NewFloat(0.00000001), "Sender and Owner delta should be equal, got: ccipOwnerDelta: %s, senderDelta: %s, difference: %s", ccipOwnerDelta.String(), senderDelta.String(), new(big.Float).Sub(ccipOwnerDelta, senderDelta))
+
+	// With payout splitting:
+	// - verifier fee (CCV owner): $0.07 => 7,000,000 local units
+	// - owner residual (network + executor): $0.38 => 38,000,000 local units
+	// => ccipOwner total in this test = 45,000,000 local units. (ccipOwner is the same as ccvOwner here so it's not 38)
+	require.Equal(t, expectedCCIPOwnerDelta, ccipOwnerDelta, "ccipOwner should receive verifier fee + owner residual")
+	require.Equal(t, quotedFeeLocalUnits, ccipOwnerDelta+poolFeeLocalUnits, "quoted fee should split as owner share + pool share")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
-}
-
-func assertInEpsilon(t *testing.T, expected, actual, epsilon *big.Float, msgAndArgs ...any) {
-	difference := new(big.Float).Sub(actual, expected)
-	difference = difference.Abs(difference)
-	relativeErr := new(big.Float).Quo(difference, expected)
-	if relativeErr.Cmp(epsilon) > 0 {
-		t.Errorf(fmt.Sprintf("Relative error is too high: %s (expected) < %s (actual)\n", epsilon.String(), relativeErr.String()), msgAndArgs...)
-	}
-}
-
-func getHoldingsBalanceNumeric(t *testing.T, ctx context.Context, participant canton.Participant) *big.Float {
-	t.Helper()
-
-	holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
-	require.NoError(t, err)
-
-	total := big.NewFloat(0)
-	for _, h := range holdings {
-		views := h.GetCreatedEvent().GetInterfaceViews()
-		if len(views) == 0 {
-			continue
-		}
-		fields := views[0].GetViewValue().GetFields()
-		if len(fields) < 3 {
-			continue
-		}
-		amountStr := fields[2].GetValue().GetNumeric()
-		amountBig, ok := new(big.Float).SetString(amountStr)
-		require.Truef(t, ok, "failed to parse amount: %s", amountStr)
-		total.Add(total, amountBig)
-	}
-
-	return total
 }
 
 // extractTokenTransferAmountFromEncodedMessageHex decodes encodedMessage and returns

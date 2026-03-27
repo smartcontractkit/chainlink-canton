@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "cd627aec090b40ec15064c73cc6d012040e948fe89e61ac0ca56fb29ce1bd0cc"
+	PackageID   = "d6457ec984567a508fa0bbf7a90723d66e6dd627592e668e1137effcb20628d1"
 	SDKVersion  = "3.4.10"
 )
 
@@ -508,6 +508,27 @@ func (t Executor) CalculateFeeWithPackageID(contractID string, packageID string,
 	}
 }
 
+// ExecutorGetFee exercises the Executor_GetFee choice on this Executor contract via the IIExecutor interface
+// This method uses the package name in the template ID
+func (t Executor) ExecutorGetFee(contractID string, args common.ExecutorGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "Executor_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ExecutorGetFeeWithPackageID exercises the Executor_GetFee choice using the provided package ID instead of package name
+func (t Executor) ExecutorGetFeeWithPackageID(contractID string, packageID string, args common.ExecutorGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "Executor_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // ApplyDestChainUpdates exercises the ApplyDestChainUpdates choice on this Executor contract
 // This method uses the package name in the template ID
 func (t Executor) ApplyDestChainUpdates(contractID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
@@ -702,6 +723,59 @@ func (t Executor) ExecutorCalculateFeeWithPackageID(contractID string, packageID
 var _ mcms.IMCMSReceiver = (*Executor)(nil)
 
 var _ common.IIExecutor = (*Executor)(nil)
+
+// ExecutorGetFee2 is a Record type
+type ExecutorGetFee2 struct {
+	DestChainSelector types.NUMERIC             `json:"destChainSelector"`
+	RequiredCCVs      []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	Caller            types.PARTY               `json:"caller"`
+}
+
+// ToMap converts ExecutorGetFee2 to a map for DAML arguments
+func (t ExecutorGetFee2) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ExecutorGetFee2) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutorGetFee2) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutorGetFee2 to hex string (Canton MCMS format)
+func (t ExecutorGetFee2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutorGetFee2 from hex string (Canton MCMS format)
+func (t *ExecutorGetFee2) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // GetAllowedCCVs is a Record type
 type GetAllowedCCVs struct {

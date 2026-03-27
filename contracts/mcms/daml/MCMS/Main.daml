@@ -19,7 +19,6 @@ import DA.Action (unless)
 import DA.Foldable (forA_)
 import DA.Time (RelTime, seconds, addRelTime, time)
 import DA.Date (date, Month(..))
-import DA.Text (parseInt)
 import DA.Crypto.Text (BytesHex)
 import MCMS.Types
   ( Role(..)
@@ -48,6 +47,7 @@ import MCMS.Codec
   , decodeScheduleBatchParamsWithOffset
   , decodeBypasserExecuteBatchParamsWithOffset
   , decodeCancelBatchParamsWithOffset
+  , decodeInt64At
   )
 import DA.Crypto.Text (byteCount)
 
@@ -598,9 +598,11 @@ executeSelfDispatch : MCMS -> TimelockCall -> Update MCMS
 executeSelfDispatch mcms call =
   case call.functionName of
     "UpdateMinDelay" ->
-      case parseInt call.operationData of
-        None -> abort "mcms: delay must be integer seconds"
-        Some secs -> do
+      case decodeInt64At call.operationData 0 of
+        None -> abort "mcms: failed to decode UpdateMinDelay parameters"
+        Some (secs, finalOffset) -> do
+          assertMsg "mcms: trailing bytes in UpdateMinDelay operationData" $
+            finalOffset == byteCount call.operationData
           assertMsg "mcms: delay must be positive" $ secs > 0
           pure $ mcms with minDelay = seconds secs
 

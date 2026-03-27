@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -583,6 +584,26 @@ func TestCCIPSend(t *testing.T) {
 		},
 	}
 
+	sendDisclosures := slices.Concat(
+		[]*apiv2.DisclosedContract{
+			disclosedCCIPSender,
+			disclosedRouter,
+			disclosedOnRamp,
+			disclosedGlobalConfig,
+			disclosedTar,
+			disclosedRmnRemote,
+			disclosedFeeQuoter,
+			disclosedFeeTokenHolding,
+			disclosedCCV,
+			disclosedExecutor,
+		},
+		transferFactoryDisclosures,
+	)
+	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
+	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")
+
+	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
 	ccipSendArgs := ledger.MapToValue(sendArgs)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
@@ -597,11 +618,8 @@ func TestCCIPSend(t *testing.T) {
 					ChoiceArgument: ccipSendArgs,
 				}},
 			}},
-			ActAs: []string{partySender},
-			DisclosedContracts: slices.Concat(
-				[]*apiv2.DisclosedContract{disclosedCCIPSender, disclosedRouter, disclosedOnRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedFeeQuoter, disclosedFeeTokenHolding, disclosedCCV, disclosedExecutor},
-				transferFactoryDisclosures,
-			),
+			ActAs:              []string{partySender},
+			DisclosedContracts: sendDisclosures,
 		},
 	})
 	require.NoError(t, err)
@@ -642,6 +660,15 @@ func TestCCIPSend(t *testing.T) {
 	}
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
+
+	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	senderDelta := senderBalanceBefore - senderBalanceAfter
+	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
+
+	// Bound Numeric 0 values come back as strings with a trailing dot, e.g. "43000000.".
+	require.Equal(t, fmt.Sprintf("%d", senderDelta), strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "sender deduction should match GetFee quote")
+	require.Equal(t, fmt.Sprintf("%d", ccipOwnerDelta), strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "ccipOwner should receive the full quoted fee in this no-token flow")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)

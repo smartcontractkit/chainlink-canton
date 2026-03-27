@@ -3,6 +3,7 @@ module CCIP.Interfaces.Executor where
 import DA.Crypto.Text (BytesHex)
 import qualified CCIP.Context
 import qualified CCIP.SendingMessageV1
+import MCMS.RawInstanceAddress (RawInstanceAddress)
 
 interface IExecutor where
     viewtype ExecutorView
@@ -11,6 +12,10 @@ interface IExecutor where
         ContractId IExecutor ->
         Executor_CalculateFee ->
         Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
+    executor_getFeeImpl :
+        ContractId IExecutor ->
+        Executor_GetFee ->
+        Update ExecutorFeeQuote
 
     nonconsuming choice Executor_CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
@@ -21,8 +26,23 @@ interface IExecutor where
         controller caller
         do executor_calculateFeeImpl this self arg
 
+    nonconsuming choice Executor_GetFee : ExecutorFeeQuote
+        with
+            destChainSelector : Numeric 0
+            requiredCCVs : [RawInstanceAddress]
+            caller : Party
+        controller caller
+        do executor_getFeeImpl this self arg
+
 data ExecutorView = ExecutorView
     with
         instanceId : Text
         owner : Party
+    deriving (Eq, Show)
+
+data ExecutorFeeQuote = ExecutorFeeQuote
+    with
+        executorInstanceId : Text
+        executorOwner : Party
+        feeUSDCents : Numeric 0
     deriving (Eq, Show)

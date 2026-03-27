@@ -108,6 +108,12 @@ template CommitteeVerifier
                         extraContext = arg.extraContext
                         caller = arg.caller
 
+            crossChainVerifier_getFeeImpl self arg = do
+                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_GetFee
+                    with
+                        destChainSelector = arg.destChainSelector
+                        caller = arg.caller
+
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_ForwardToVerifier
                     with
@@ -355,6 +361,24 @@ template CommitteeVerifier
                     destGasLimit = chainConfig.gasForVerification
                     destBytesOverhead = chainConfig.payloadSizeBytes
                     caller = owner
+
+        -- | Quote fee for outbound message (USD cents only).
+        nonconsuming choice CommitteeVerifier_GetFee
+                : CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote
+            with
+                destChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do
+                let chainConfig = fromSomeNote "no fee config for dest chain"
+                        (Map.lookup destChainSelector remoteChainConfigs)
+
+                pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
+                    ccvInstanceId = instanceId
+                    ccvOwner = owner
+                    feeUSDCents = chainConfig.feeUSDCents
+                    gasForVerification = chainConfig.gasForVerification
+                    payloadSizeBytes = chainConfig.payloadSizeBytes
 
         -- | Forward message for verification. Exercises AddVerifierData
         -- directly on SendingMessageV1.

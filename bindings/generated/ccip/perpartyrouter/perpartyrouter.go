@@ -10,6 +10,7 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -27,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "6c6bcc873637054551deed9b8844490f4202a82e6621e7439b3b25c2d9b470da"
+	PackageID   = "8ca4eb71f258b6bce153f304a268cc038fb43969715c6d75355c1bf2dc3f5419"
 	SDKVersion  = "3.4.10"
 )
 
@@ -751,6 +752,116 @@ func (t *GetExecutionStateMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetFee is a Record type
+type GetFee struct {
+	Context             common.CCIPContext                       `json:"context"`
+	DestChainSelector   types.NUMERIC                            `json:"destChainSelector"`
+	Payload             types.TEXT                               `json:"payload"`
+	CcipReceiveGasLimit types.INT64                              `json:"ccipReceiveGasLimit"`
+	QuotedCCVFees       []common.CCVFee                          `json:"quotedCCVFees"`
+	QuotedTokenSendFee  *common.TokenSendFee                     `json:"quotedTokenSendFee" hex:"optional"`
+	QuotedExecutionMode common.ExecutionMode                     `json:"quotedExecutionMode"`
+	QuotedExecutorFee   *common.ExecutorFee                      `json:"quotedExecutorFee" hex:"optional"`
+	ExecutorArgs        types.TEXT                               `json:"executorArgs"`
+	FeeToken            splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+}
+
+// ToMap converts GetFee to a map for DAML arguments
+func (t GetFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["payload"] = string(t.Payload)
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	m["quotedCCVFees"] = func() []any {
+		res := make([]any, 0, len(t.QuotedCCVFees))
+		for _, e := range t.QuotedCCVFees {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	if t.QuotedTokenSendFee != nil {
+		m["quotedTokenSendFee"] = map[string]any{
+			"_type": "optional",
+			"value": *t.QuotedTokenSendFee,
+		}
+	} else {
+		m["quotedTokenSendFee"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["quotedExecutionMode"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.QuotedExecutionMode).(mapper); ok {
+			return m.toMap()
+		}
+		return t.QuotedExecutionMode
+	}()
+
+	if t.QuotedExecutorFee != nil {
+		m["quotedExecutorFee"] = map[string]any{
+			"_type": "optional",
+			"value": *t.QuotedExecutorFee,
+		}
+	} else {
+		m["quotedExecutorFee"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["feeToken"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	return m
+}
+
+func (t GetFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetFee to hex string (Canton MCMS format)
+func (t GetFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFee from hex string (Canton MCMS format)
+func (t *GetFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetRequiredCCVsForExecute2 is a Record type
 type GetRequiredCCVsForExecute2 struct {
 	Context              common.CCIPContext        `json:"context"`
@@ -1173,6 +1284,27 @@ func (t PerPartyRouter) CCIPSendWithPackageID(contractID string, packageID strin
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "CCIPSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetFee exercises the GetFee choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t PerPartyRouter) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -2134,6 +2266,7 @@ type MCMSEncoder interface {
 	FinalizeFee2(args FinalizeFee2) (*bind.EncodedChoice, error)
 	GetExecutionState(args GetExecutionState) (*bind.EncodedChoice, error)
 	GetExecutionStateMCMSParams(args GetExecutionStateMCMSParams) (*bind.EncodedChoice, error)
+	GetFee(args GetFee) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForExecute2(args GetRequiredCCVsForExecute2) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForSend2(args GetRequiredCCVsForSend2) (*bind.EncodedChoice, error)
 	GetSequenceNumber(args GetSequenceNumber) (*bind.EncodedChoice, error)
@@ -2212,6 +2345,11 @@ func (e *encoder) GetExecutionState(args GetExecutionState) (*bind.EncodedChoice
 // GetExecutionStateMCMSParams encodes MCMS parameters (without Caller) for the GetExecutionState choice.
 func (e *encoder) GetExecutionStateMCMSParams(args GetExecutionStateMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetExecutionState", args)
+}
+
+// GetFee encodes parameters for the GetFee choice.
+func (e *encoder) GetFee(args GetFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
 }
 
 // GetRequiredCCVsForExecute2 encodes parameters for the GetRequiredCCVsForExecute2 choice.

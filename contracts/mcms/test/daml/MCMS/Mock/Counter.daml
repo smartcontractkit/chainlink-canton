@@ -1,8 +1,9 @@
 module MCMS.Mock.Counter where
 
 import DA.Map qualified as Map
-import DA.Text qualified as T
+import DA.Crypto.Text (byteCount)
 import MCMS.MCMSReceiver
+import MCMS.Codec (decodeInt64At)
 import MCMS.RawInstanceAddress (assertValidInstanceId)
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
@@ -48,11 +49,13 @@ template Counter
             pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
 
           "SetValue" -> do
-            case T.parseInt operationData of
-              Some newValue -> do
+            case decodeInt64At operationData 0 of
+              None -> abort $ "counter: failed to decode SetValue int64: " <> operationData
+              Some (newValue, finalOffset) -> do
+                assertMsg "counter: trailing bytes in SetValue operationData" $
+                  finalOffset == byteCount operationData
                 newCid <- exercise selfCid (SetValue newValue)
                 pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
-              None -> abort $ "counter: invalid integer value: " <> operationData
 
           "Reset" -> do
             newCid <- exercise selfCid Reset
