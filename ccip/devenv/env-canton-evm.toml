@@ -262,17 +262,6 @@ execution_interval = 15_000_000_000
   trace_sample_ratio = 1.0
   trace_batch_timeout = 10
 
-[[token_verifier]]
-  mode = "standalone"
-  image = "token-verifier:latest"
-  container_name = "token-verifier-1"
-  port = 8700
-  [token_verifier.db]
-    image = "postgres:16-alpine"
-    name = "token-verifier-1-db"
-    port = 8450
-
-
 [[executor]]
   image = "executor:latest"
   port = 8101
@@ -329,22 +318,8 @@ BatchSize = 100
 MaxBatchWaitTime = 50
 Since = 0
 
-[[indexer.indexer_config.Verifier]]
-Type = "rest"
-Name = "Token Verifier (Primary)"
-BaseURL = "http://token-verifier-1:8100/v1"
-BatchSize = 10
-MaxBatchWaitTime = 100
-Since = 0
-
 [indexer.committee_verifier_name_to_qualifier]
 "CommiteeVerifier (Primary)" = "default"
-
-[indexer.cctp_verifier_name_to_qualifier]
-"Token Verifier (Primary)" = "CCTP"
-
-[indexer.lombard_verifier_name_to_qualifier]
-"Token Verifier (Primary)" = "Lombard"
 
 [indexer.indexer_config.Storage]
 Strategy = "single"
