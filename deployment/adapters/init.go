@@ -12,4 +12,5 @@ func init() {
 
 	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyCanton, v, &ChainFamilyAdapter{})
 	adapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyCanton, &CantonCommitteeVerifierContractAdapter{})
+	adapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyCanton, &CantonAggregatorConfigAdapter{})
 }
