@@ -219,9 +219,11 @@ template FeeQuoter
                 feeTokenPrice <- exercise self GetTokenPrice with
                     instrumentId = feeToken
                     caller
+                -- LINK gets a discounted multiplier (e.g. 90% → 9e9 in E10); other tokens get
+                -- premiumIdentity (1e10 = 100%).
                 let premiumMultiplier =
                         if feeToken == linkTokenInstrumentId
-                        then CCIP.Math.numeric0ToDecimal (destChainConfig.linkFeeMultiplierPercent * 100000000.0)
+                        then CCIP.Math.numeric0ToDecimal (destChainConfig.linkFeeMultiplierPercent * CCIP.Math.e10PerPercent)
                         else CCIP.Math.numeric0ToDecimal CCIP.Math.premiumIdentity
                 let gasCostUSDCents =
                         gasCostUsdCents gasPrice.price totalGas

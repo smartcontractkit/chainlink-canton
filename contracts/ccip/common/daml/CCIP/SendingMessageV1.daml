@@ -88,6 +88,8 @@ data SendingMessageState
     | SendingMessageState_FeeFinalized
     deriving (Eq, Show)
 
+-- ceil(gasUnits * usdPerUnitGas / usdPerUsdCent) → integer USD cents.
+-- EVM FeeQuoter.sol line 333: (totalGas * price + (1e16 - 1)) / 1e16.
 gasCostUsdCents : Decimal -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
     CCIP.Math.mulDivUp (intToNumeric gasUnits) (CCIP.Math.decimalToNumeric0 usdPerUnitGas) CCIP.Math.usdPerUsdCent
@@ -344,14 +346,25 @@ template SendingMessageV1
                 assertMsg "fee token price must be positive" (feeTokenPrice > 0.0)
                 assertMsg "premium multiplier must be positive" (premiumMultiplier > 0.0)
 
-                -- Convert Decimal prices to Numeric 0 for exact integer math.
+                -- All math in Numeric 0 to avoid Canton's banker's rounding.
+                -- EVM FeeQuoter.sol line 750:
+                --   fee = (totalGas * gasPrice * 1e18 + premiumUSD) / feeTokenPrice
+                -- Canton analog (per-component):
+                --   fee = floor(cents * usdPerUsdCent * multiplier / feeTokenPrice)
+                -- where usdPerUsdCent (1e8) promotes cents back to E10, and
+                -- multiplier/price are both E10-scaled so the ratio preserves units.
                 let feeTokenPriceN = CCIP.Math.decimalToNumeric0 feeTokenPrice
                 let premiumMultiplierN = CCIP.Math.decimalToNumeric0 premiumMultiplier
                 let promoteUsdCentsToUsd10 feeUSDCents =
                         CCIP.Math.mulDivDown feeUSDCents CCIP.Math.usdPerUsdCent 1.0
+                -- Applies the premium multiplier (e.g. LINK discount) to a
+                -- USD-cents fee and converts to fee token smallest units.
                 let convertWithPremium feeUSDCents =
                         let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
                         in CCIP.Math.numeric0ToDecimal (CCIP.Math.mulDivDown feeUsd10 premiumMultiplierN feeTokenPriceN)
+                -- Identity conversion (no premium): used for gas execution cost
+                -- and executor flat fees, matching EVM where the gas term in the
+                -- numerator uses 1e18 (identity) rather than the multiplier.
                 let convertDirect feeUSDCents =
                         let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
                         in CCIP.Math.numeric0ToDecimal (CCIP.Math.mulDivDown feeUsd10 CCIP.Math.premiumIdentity feeTokenPriceN)
