@@ -132,7 +132,7 @@ execution_interval = 15_000_000_000
   number_of_canton_validators = 1
 
 [fake]
-  image = "ccv-fakes:latest"
+  image = "ccv-fakes:dev"
   port = 9111
 
 #################
@@ -141,7 +141,7 @@ execution_interval = 15_000_000_000
 
 ## Default Verifier Setup
 [[verifier]]
-  image = "verifier:latest"
+  image = "verifier:dev"
   container_name = "default-verifier-1"
   nop_alias = "evm-default-verifier-1"
   port = 8100
@@ -154,7 +154,7 @@ execution_interval = 15_000_000_000
 
 
 [[verifier]]
-  image = "verifier:latest"
+  image = "verifier:dev"
   container_name = "default-verifier-2"
   nop_alias = "evm-default-verifier-2"
   port = 8200
@@ -171,7 +171,7 @@ execution_interval = 15_000_000_000
 
 ## Default Verifier Setup
 [[verifier]]
-  image = "verifier:latest"
+  image = "verifier:dev"
   # Will get prefixed appropriately by the modifier.
   container_name = "default-verifier-1"
   nop_alias = "canton-default-verifier-1"
@@ -206,7 +206,7 @@ execution_interval = 15_000_000_000
 
 
 [[verifier]]
-  image = "verifier:latest"
+  image = "verifier:dev"
   # Will get prefixed appropriately by the modifier.
   container_name = "default-verifier-2"
   nop_alias = "canton-default-verifier-2"
@@ -263,14 +263,14 @@ execution_interval = 15_000_000_000
   trace_batch_timeout = 10
 
 [[executor]]
-  image = "executor:latest"
+  image = "executor:dev"
   port = 8101
   container_name = "default-executor-1"
   nop_alias = "default-executor-1"
   executor_qualifier = "default"
 
 [[indexer]]
-  image = "indexer:latest"
+  image = "indexer:dev"
   port = 8104
   [indexer.db]
     image = "postgres:16-alpine"
@@ -338,7 +338,7 @@ URI = "postgresql://indexer:indexer@indexer-db:5432/indexer?sslmode=disable"
 
 [[aggregator]]
   committee_name = "default"
-  image = "aggregator:latest"
+  image = "aggregator:dev"
   host_port = 50051
 
   [aggregator.db]
