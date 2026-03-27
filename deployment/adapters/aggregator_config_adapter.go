@@ -8,17 +8,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
-	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 type CantonAggregatorConfigAdapter struct{}
@@ -37,15 +38,15 @@ func (a *CantonAggregatorConfigAdapter) ScanCommitteeStates(ctx context.Context,
 
 	cantonChains := env.BlockChains.CantonChains()
 	if cantonChains == nil {
-		return nil, fmt.Errorf("no Canton chains found in environment")
+		return nil, fmt.Errorf("no canton chains found in environment")
 	}
 
 	chain, ok := cantonChains[chainSelector]
 	if !ok {
-		return nil, fmt.Errorf("Canton chain %d not found in environment", chainSelector)
+		return nil, fmt.Errorf("canton chain %d not found in environment", chainSelector)
 	}
 	if len(chain.Participants) == 0 {
-		return nil, fmt.Errorf("no participants configured for Canton chain %d", chainSelector)
+		return nil, fmt.Errorf("no participants configured for canton chain %d", chainSelector)
 	}
 
 	participant := chain.Participants[0]
@@ -129,11 +130,12 @@ func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapte
 		if thr < 0 || thr > 255 {
 			return nil, fmt.Errorf("threshold %d out of range for uint8", thr)
 		}
+		thrU8 := uint8(thr) //nolint:gosec // G115: thr is range-checked above
 
 		out = append(out, adapters.SignatureConfig{
 			SourceChainSelector: sourceSel,
 			Signers:             signers,
-			Threshold:           uint8(thr),
+			Threshold:           thrU8,
 		})
 	}
 
@@ -156,6 +158,7 @@ func numericToUint64(n types.NUMERIC) (uint64, error) {
 		}
 		s = s[:i]
 	}
+
 	return strconv.ParseUint(s, 10, 64)
 }
 
