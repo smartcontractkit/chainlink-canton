@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "b3ecef2e08ecd857024d2e92f20bd8904868c5b2989aa72154d710a7d780f87d"
+	PackageID   = "eca019ca16b4223109a1bf7abcbb809117efc802ebee5a03540a94038adac0d5"
 	SDKVersion  = "3.4.10"
 )
 
@@ -695,6 +695,27 @@ func (t CommitteeVerifier) ArchiveWithPackageID(contractID string, packageID str
 	}
 }
 
+// CommitteeVerifierGetFee exercises the CommitteeVerifier_GetFee choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierGetFee(contractID string, args CommitteeVerifierGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierGetFeeWithPackageID exercises the CommitteeVerifier_GetFee choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierGetFeeWithPackageID(contractID string, packageID string, args CommitteeVerifierGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // SetDynamicConfig exercises the SetDynamicConfig choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
@@ -838,6 +859,27 @@ func (t CommitteeVerifier) CrossChainVerifierCalculateFeeWithPackageID(contractI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CrossChainVerifierGetFee exercises the CrossChainVerifier_GetFee choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CrossChainVerifierGetFee(contractID string, args common.CrossChainVerifierGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		ContractID: contractID,
+		Choice:     "CrossChainVerifier_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CrossChainVerifierGetFeeWithPackageID exercises the CrossChainVerifier_GetFee choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CrossChainVerifierGetFeeWithPackageID(contractID string, packageID string, args common.CrossChainVerifierGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		ContractID: contractID,
+		Choice:     "CrossChainVerifier_GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1067,6 +1109,63 @@ func (t CommitteeVerifierForwardToVerifierMCMSParams) MarshalHex() (string, erro
 
 // UnmarshalHex decodes CommitteeVerifierForwardToVerifierMCMSParams from hex string.
 func (t *CommitteeVerifierForwardToVerifierMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CommitteeVerifierGetFee is a Record type
+type CommitteeVerifierGetFee struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	Caller            types.PARTY   `json:"caller"`
+}
+
+// ToMap converts CommitteeVerifierGetFee to a map for DAML arguments
+func (t CommitteeVerifierGetFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t CommitteeVerifierGetFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CommitteeVerifierGetFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CommitteeVerifierGetFee to hex string (Canton MCMS format)
+func (t CommitteeVerifierGetFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierGetFee from hex string (Canton MCMS format)
+func (t *CommitteeVerifierGetFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CommitteeVerifierGetFeeMCMSParams is CommitteeVerifierGetFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type CommitteeVerifierGetFeeMCMSParams struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+}
+
+// MarshalHex encodes CommitteeVerifierGetFeeMCMSParams to hex string for MCMS operationData.
+func (t CommitteeVerifierGetFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierGetFeeMCMSParams from hex string.
+func (t *CommitteeVerifierGetFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1581,6 +1680,8 @@ type MCMSEncoder interface {
 	CommitteeVerifierCalculateFeeMCMSParams(args CommitteeVerifierCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error)
 	CommitteeVerifierForwardToVerifierMCMSParams(args CommitteeVerifierForwardToVerifierMCMSParams) (*bind.EncodedChoice, error)
+	CommitteeVerifierGetFee(args CommitteeVerifierGetFee) (*bind.EncodedChoice, error)
+	CommitteeVerifierGetFeeMCMSParams(args CommitteeVerifierGetFeeMCMSParams) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error)
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
@@ -1660,6 +1761,16 @@ func (e *encoder) CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwa
 // CommitteeVerifierForwardToVerifierMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierForwardToVerifier choice.
 func (e *encoder) CommitteeVerifierForwardToVerifierMCMSParams(args CommitteeVerifierForwardToVerifierMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CommitteeVerifierForwardToVerifier", args)
+}
+
+// CommitteeVerifierGetFee encodes parameters for the CommitteeVerifierGetFee choice.
+func (e *encoder) CommitteeVerifierGetFee(args CommitteeVerifierGetFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierGetFee", args)
+}
+
+// CommitteeVerifierGetFeeMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierGetFee choice.
+func (e *encoder) CommitteeVerifierGetFeeMCMSParams(args CommitteeVerifierGetFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierGetFee", args)
 }
 
 // CommitteeVerifierVerifyMessage encodes parameters for the CommitteeVerifierVerifyMessage choice.

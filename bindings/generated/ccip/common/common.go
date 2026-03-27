@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "094d62e5d255970e6062a24f934c9d33df6570c5af08a49979a6ee72aaab21fe"
+	PackageID   = "53527d01102e85c53f2dd9b17b628f8acde80fbd0428abd99e3f201b07c44aab"
 	SDKVersion  = "3.4.10"
 )
 
@@ -46,6 +46,9 @@ type IICrossChainVerifier interface {
 	// CrossChainVerifierCalculateFee executes the CrossChainVerifier_CalculateFee choice
 	CrossChainVerifierCalculateFee(contractID string, args CrossChainVerifierCalculateFee) *model.ExerciseCommand
 
+	// CrossChainVerifierGetFee executes the CrossChainVerifier_GetFee choice
+	CrossChainVerifierGetFee(contractID string, args CrossChainVerifierGetFee) *model.ExerciseCommand
+
 	// CrossChainVerifierForwardToVerifier executes the CrossChainVerifier_ForwardToVerifier choice
 	CrossChainVerifierForwardToVerifier(contractID string, args CrossChainVerifierForwardToVerifier) *model.ExerciseCommand
 }
@@ -58,6 +61,9 @@ type IIExecutor interface {
 
 	// ExecutorCalculateFee executes the Executor_CalculateFee choice
 	ExecutorCalculateFee(contractID string, args ExecutorCalculateFee) *model.ExerciseCommand
+
+	// ExecutorGetFee executes the Executor_GetFee choice
+	ExecutorGetFee(contractID string, args ExecutorGetFee) *model.ExerciseCommand
 }
 
 func argsToMap(args any) map[string]any {
@@ -1229,6 +1235,54 @@ func (t *ConsumeCapacityResult) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// CrossChainVerifierFeeQuote is a Record type
+type CrossChainVerifierFeeQuote struct {
+	CcvInstanceId      types.TEXT    `json:"ccvInstanceId"`
+	CcvOwner           types.PARTY   `json:"ccvOwner"`
+	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
+	GasForVerification types.INT64   `json:"gasForVerification"`
+	PayloadSizeBytes   types.INT64   `json:"payloadSizeBytes"`
+}
+
+// ToMap converts CrossChainVerifierFeeQuote to a map for DAML arguments
+func (t CrossChainVerifierFeeQuote) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["ccvInstanceId"] = string(t.CcvInstanceId)
+
+	m["ccvOwner"] = t.CcvOwner.ToMap()
+
+	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["gasForVerification"] = int64(t.GasForVerification)
+
+	m["payloadSizeBytes"] = int64(t.PayloadSizeBytes)
+
+	return m
+}
+
+func (t CrossChainVerifierFeeQuote) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CrossChainVerifierFeeQuote) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CrossChainVerifierFeeQuote to hex string (Canton MCMS format)
+func (t CrossChainVerifierFeeQuote) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CrossChainVerifierFeeQuote from hex string (Canton MCMS format)
+func (t *CrossChainVerifierFeeQuote) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CrossChainVerifierView is a Record type
 type CrossChainVerifierView struct {
 	InstanceId       types.TEXT   `json:"instanceId"`
@@ -1396,6 +1450,45 @@ func (t CrossChainVerifierForwardToVerifier) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CrossChainVerifierForwardToVerifier from hex string (Canton MCMS format)
 func (t *CrossChainVerifierForwardToVerifier) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CrossChainVerifierGetFee is a Record type
+type CrossChainVerifierGetFee struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	Caller            types.PARTY   `json:"caller"`
+}
+
+// ToMap converts CrossChainVerifierGetFee to a map for DAML arguments
+func (t CrossChainVerifierGetFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t CrossChainVerifierGetFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CrossChainVerifierGetFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CrossChainVerifierGetFee to hex string (Canton MCMS format)
+func (t CrossChainVerifierGetFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CrossChainVerifierGetFee from hex string (Canton MCMS format)
+func (t *CrossChainVerifierGetFee) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2499,6 +2592,48 @@ func (t *ExecutorFee) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ExecutorFeeQuote is a Record type
+type ExecutorFeeQuote struct {
+	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
+	ExecutorOwner      types.PARTY   `json:"executorOwner"`
+	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
+}
+
+// ToMap converts ExecutorFeeQuote to a map for DAML arguments
+func (t ExecutorFeeQuote) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["executorInstanceId"] = string(t.ExecutorInstanceId)
+
+	m["executorOwner"] = t.ExecutorOwner.ToMap()
+
+	m["feeUSDCents"] = t.FeeUSDCents
+
+	return m
+}
+
+func (t ExecutorFeeQuote) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutorFeeQuote) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutorFeeQuote to hex string (Canton MCMS format)
+func (t ExecutorFeeQuote) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutorFeeQuote from hex string (Canton MCMS format)
+func (t *ExecutorFeeQuote) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExecutorView is a Record type
 type ExecutorView struct {
 	InstanceId types.TEXT  `json:"instanceId"`
@@ -2591,6 +2726,59 @@ func (t ExecutorCalculateFee) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ExecutorCalculateFee from hex string (Canton MCMS format)
 func (t *ExecutorCalculateFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ExecutorGetFee is a Record type
+type ExecutorGetFee struct {
+	DestChainSelector types.NUMERIC             `json:"destChainSelector"`
+	RequiredCCVs      []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	Caller            types.PARTY               `json:"caller"`
+}
+
+// ToMap converts ExecutorGetFee to a map for DAML arguments
+func (t ExecutorGetFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ExecutorGetFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutorGetFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutorGetFee to hex string (Canton MCMS format)
+func (t ExecutorGetFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutorGetFee from hex string (Canton MCMS format)
+func (t *ExecutorGetFee) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

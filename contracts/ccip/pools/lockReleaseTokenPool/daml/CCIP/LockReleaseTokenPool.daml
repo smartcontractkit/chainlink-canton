@@ -240,6 +240,14 @@ template LockReleaseTokenPool
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
 
+            tokenPool_getFeeImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_GetFee
+                    with
+                        feeQuoterCid = arg.feeQuoterCid
+                        destChainSelector = arg.destChainSelector
+                        tokenInstrumentId = arg.tokenInstrumentId
+                        caller = arg.caller
+
         -- Sets the dynamic configuration for the pool.
         -- 
         -- Params:
@@ -721,6 +729,48 @@ template LockReleaseTokenPool
                         destGasOverhead = destGasOverhead
                         destBytesOverhead = destBytesOverhead
                         caller = poolOwner
+
+        -- Quote fee for outbound token transfer (USD cents only).
+        nonconsuming choice LockReleaseTokenPool_GetFee
+                : CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
+            with
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                destChainSelector : Numeric 0
+                tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                assertMsg "pool: tokenInstrumentId mismatch"
+                    (tokenInstrumentId == instrumentId)
+
+                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+
+                case Map.lookup destChainSelector tokenTransferFeeConfigs of
+                    Some feeConfig | feeConfig.isEnabled ->
+                        pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
+                            poolInstanceId = instanceId
+                            poolOwner = poolOwner
+                            feeUSDCents = feeConfig.feeUSDCents
+                            destGasOverhead = feeConfig.destGasOverhead
+                            destBytesOverhead = feeConfig.destBytesOverhead
+                            tokenFeeBps = feeConfig.feeBps
+                            isEnabled = True
+                    _ -> do
+                        (feeUSDCents, destGasOverhead, destBytesOverhead) <- exercise feeQuoterCid
+                            CCIP.FeeQuoter.GetTokenTransferFee with
+                                destChainSelector = destChainSelector
+                                token = tokenInstrumentId
+                                caller = poolOwner
+                        pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
+                            poolInstanceId = instanceId
+                            poolOwner = poolOwner
+                            feeUSDCents = feeUSDCents
+                            destGasOverhead = destGasOverhead
+                            destBytesOverhead = destBytesOverhead
+                            tokenFeeBps = 0.0
+                            isEnabled = False
 
         -- Lock tokens for outbound transfer and append token send data.
         -- Reads from SendingMessageV1 instead of taking separate params.

@@ -257,6 +257,51 @@ template PerPartyRouter
         observer partyOwner :: customObservers
         ensure assertValidInstanceId instanceId && unique customObservers
 
+        nonconsuming choice GetFee : CCIP.OnRamp.GetFeeFromRouterResult
+            with
+                context : CCIP.Context.CCIPContext
+                destChainSelector : Numeric 0
+                payload : BytesHex
+                ccipReceiveGasLimit : Int
+                quotedCCVFees : [CCIP.SendingMessageV1.CCVFee]
+                quotedTokenSendFee : Optional CCIP.SendingMessageV1.TokenSendFee
+                quotedExecutionMode : CCIP.SendingMessageV1.ExecutionMode
+                quotedExecutorFee : Optional CCIP.SendingMessageV1.ExecutorFee
+                executorArgs : BytesHex
+                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+            controller partyOwner
+            do
+                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
+                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
+                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+
+                onRamp <- fetch onRampCid
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
+                    onRamp.instanceId onRamp.ccipOwner deps.onRamp
+
+                globalConfig <- fetch globalConfigCid
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                feeQuoter <- fetch feeQuoterCid
+                RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+
+                exercise onRampCid CCIP.OnRamp.GetFeeFromRouter with
+                    routerPartyOwner = partyOwner
+                    routerInstanceId = instanceId
+                    globalConfigCid = globalConfigCid
+                    feeQuoterCid = feeQuoterCid
+                    destChainSelector = destChainSelector
+                    payload = payload
+                    ccipReceiveGasLimit = ccipReceiveGasLimit
+                    quotedCCVFees = quotedCCVFees
+                    quotedTokenSendFee = quotedTokenSendFee
+                    quotedExecutionMode = quotedExecutionMode
+                    quotedExecutorFee = quotedExecutorFee
+                    executorArgs = executorArgs
+                    feeToken = feeToken
+
         choice SetDeps : ContractId PerPartyRouter
             with
                 newDeps : SetDepsParams

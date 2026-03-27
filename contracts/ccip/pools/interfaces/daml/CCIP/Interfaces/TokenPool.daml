@@ -29,6 +29,7 @@ interface ITokenPool where
     tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
     tokenPool_calculateFeeImpl : ContractId ITokenPool -> TokenPool_CalculateFee -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
+    tokenPool_getFeeImpl : ContractId ITokenPool -> TokenPool_GetFee -> Update TokenPoolFeeQuote
 
     -- Get required CCV raw instance addresses for a transfer based on direction, amount, finality, etc.
     nonconsuming choice TokenPool_GetRequiredCCVs : [RawInstanceAddress]
@@ -107,6 +108,16 @@ interface ITokenPool where
         controller caller
         do tokenPool_calculateFeeImpl this self arg
 
+    -- Quote-only fee path for outbound token transfers.
+    nonconsuming choice TokenPool_GetFee : TokenPoolFeeQuote
+        with
+            feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+            destChainSelector : Numeric 0
+            tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            caller : Party
+        controller caller
+        do tokenPool_getFeeImpl this self arg
+
 -- View of the TokenPool
 data TokenPoolView = TokenPoolView
     with
@@ -147,4 +158,15 @@ data LockOrBurnResult = LockOrBurnResult
         poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         senderChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+    deriving (Eq, Show)
+
+data TokenPoolFeeQuote = TokenPoolFeeQuote
+    with
+        poolInstanceId : Text
+        poolOwner : Party
+        feeUSDCents : Numeric 0
+        destGasOverhead : Int
+        destBytesOverhead : Int
+        tokenFeeBps : Numeric 0
+        isEnabled : Bool
     deriving (Eq, Show)
