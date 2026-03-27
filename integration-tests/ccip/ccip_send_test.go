@@ -335,7 +335,7 @@ func TestCCIPSend(t *testing.T) {
 		Admin: types.PARTY(partyCCIP),
 		Id:    types.TEXT("link-token"),
 	}
-	usdPerToken := "100000000"
+	usdPerToken := "1.0"
 	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -353,13 +353,13 @@ func TestCCIPSend(t *testing.T) {
 								},
 								{
 									InstrumentId: linkTokenInstrumentId,
-									UsdPerToken:  types.NUMERIC("1500000000"),
+									UsdPerToken:  types.NUMERIC("15.0"),
 								},
 							},
 							GasPriceUpdates: []feequoter.GasPriceUpdate{
 								{
 									DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-									UsdPerUnitGas:     types.NUMERIC("38"),
+									UsdPerUnitGas:     types.NUMERIC("0.0000000038"),
 								},
 							},
 						},
@@ -567,7 +567,7 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("partySender=%q", partySender)
 
 	// Mint 100 whole AMT in local 1e8 units so the sender can cover non-zero fees.
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100.0")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted 100 whole Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 

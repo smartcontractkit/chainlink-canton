@@ -5,10 +5,10 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -334,15 +334,15 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		Admin: types.PARTY(partyCCIP),
 		Id:    types.TEXT("link-token"),
 	}
-	usdPerToken := "100000000"
-	// FeeQuoter uses usdPerUnitGas as USD-8 (8-decimal USD per gas unit).
+	usdPerToken := "1.0"
+	// FeeQuoter uses usdPerUnitGas as Decimal (10-decimal USD per gas unit).
 	// For Canton -> EVM pricing, derive from EVM gas price and native token USD price:
 	//   evmGasPrice = 0.152 gwei => evmGasPriceWei = 0.152 * 1e9 = 152,000,000
 	//   ethUsd = 2500
-	//   usdPerUnitGas(USD-8) = (evmGasPriceWei * ethUsd) / 1e10
-	//                        = (152,000,000 * 2500) / 10,000,000,000
-	//                        = 38
-	destUsdPerUnitGas := "38"
+	//   usdPerUnitGas = (evmGasPriceWei * ethUsd) / 1e20
+	//                 = (152,000,000 * 2500) / 1e20
+	//                 = 0.0000000038
+	destUsdPerUnitGas := "0.0000000038"
 	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.UpdatePrices, ccipDeps, contractops.ChoiceInput[feequoter.UpdatePrices]{
 		ChainSelector:   env.Chain.ChainSelector(),
 		InstanceAddress: feeQuoterInstanceAddress,
@@ -356,7 +356,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					},
 					{
 						InstrumentId: linkTokenInstrumentId,
-						UsdPerToken:  types.NUMERIC("1500000000"),
+						UsdPerToken:  types.NUMERIC("15.0"),
 					},
 				},
 				GasPriceUpdates: []feequoter.GasPriceUpdate{
@@ -370,7 +370,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "failed to update prices")
-	t.Logf("Updated prices: FeeToken=$%s, LINK=$%s, destUsdPerUnitGas=%s", usdPerToken, "1500000000", destUsdPerUnitGas)
+	t.Logf("Updated prices: FeeToken=$%s, LINK=$%s, destUsdPerUnitGas=%s", usdPerToken, "15.0", destUsdPerUnitGas)
 
 	// Setup token pool for outbound token transfer in Send.
 	tokenAdminRegistryRawAddr, err := contracts.RawInstanceAddressFromString(tokenAdminRegistry.Labels.List()[0])
@@ -691,15 +691,15 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	t.Logf("partySender=%q", partySender)
 
-	// Mint 100 whole AMT in local 1e8 units so the sender can cover non-zero fees.
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
+	// Mint 100 whole AMT so the sender can cover non-zero fees.
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100.0")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted 100 whole Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
-	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
+	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100.0")
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
-	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	senderBalanceBefore := getHoldingsBalanceDecimal(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceBefore := getHoldingsBalanceDecimal(t, t.Context(), ccipParticipant)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -846,7 +846,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// - verifier premium: 7 cents from CommitteeVerifierRemoteChainConfig.FeeUSDCents
 	// - executor flat fee: 9 cents from Executor.remoteChainConfigs[remoteSelector].feeUSDCents
 	// - execution gas fee: 19 cents from QuoteGasForExec, priced with
-	//   UpdatePrices.GasPriceUpdates[remoteSelector].UsdPerUnitGas = 38
+	//   UpdatePrices.GasPriceUpdates[remoteSelector].UsdPerUnitGas = 0.0000000038
 	// Total fee-token payment = 10 + 10 + 7 + 9 + 19 = 55 cents.
 	// Separately, pool takes a token amount cut at LockOrBurn:
 	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
@@ -975,53 +975,78 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// 10,000 sent with 5% feeBps => 9,500 bridged.
 	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
 
-	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	senderBalanceAfter := getHoldingsBalanceDecimal(t, t.Context(), senderParticipant)
 	senderDelta := senderBalanceBefore - senderBalanceAfter
-	// Derived from config fields above and converted to local token units.
-	// In this test 1 token == 100,000,000 local units, so 1 US cent == 1,000,000 units.
-	// - CCV fee: CommitteeVerifierRemoteChainConfig.FeeUSDCents = 7 => 7,000,000
-	// - Pool fee: TokenTransferFeeConfigs[remoteSelector].feeUSDCents = 10 => 10,000,000
-	// - Owner residual: quoted 55 cents - 7 CCV - 10 pool = 38 cents => 38,000,000
+	// Fee amounts are Decimal (token units). At $1/token, 1 cent = 0.01 tokens.
+	// - CCV fee: 7 cents = 0.07 tokens
+	// - Pool fee: 10 cents = 0.10 tokens
+	// - Owner residual: 55 total cents - 7 CCV - 10 pool = 38 cents = 0.38 tokens
 	const (
-		quotedFeeLocalUnits     = int64(55_000_000)
-		ccvFeeLocalUnits        = int64(7_000_000)
-		poolFeeLocalUnits       = int64(10_000_000)
-		ownerResidualLocalUnits = int64(38_000_000)
+		ccvFeeTokens        = 0.07
+		poolFeeTokens       = 0.10
+		ownerResidualTokens = 0.38
 	)
-	expectedCCIPOwnerDelta := ccvFeeLocalUnits + ownerResidualLocalUnits
-	expectedSenderDelta := quotedFeeLocalUnits - poolFeeLocalUnits
+	expectedCCIPOwnerDelta := ccvFeeTokens + ownerResidualTokens
+	expectedSenderDelta := expectedCCIPOwnerDelta
 
 	t.Logf(
-		"Sender balance (local units): before=%d after=%d deducted=%d",
+		"Sender balance (tokens): before=%f after=%f deducted=%f",
 		senderBalanceBefore,
 		senderBalanceAfter,
 		senderDelta,
 	)
 	// Sender is also pool owner in this test, so pool fee payout is netted back to sender.
-	// Explicitly verify sender net deduction excludes pool fee payout
-	// and matches non-pool fee allocations (ccv fee + owner residual).
-	require.Equal(t, expectedSenderDelta, senderDelta, "sender net deduction should reflect pool payout netting")
+	require.InDelta(t, expectedSenderDelta, senderDelta, 1e-10, "sender net deduction should reflect pool payout netting")
 
-	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	ccipOwnerBalanceAfter := getHoldingsBalanceDecimal(t, t.Context(), ccipParticipant)
 	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
 	t.Logf(
-		"CCIP owner balance (local units): before=%d after=%d credited=%d",
+		"CCIP owner balance (tokens): before=%f after=%f credited=%f",
 		ccipOwnerBalanceBefore,
 		ccipOwnerBalanceAfter,
 		ccipOwnerDelta,
 	)
 
-	// With payout splitting:
-	// - verifier fee (CCV owner): $0.07 => 7,000,000 local units
-	// - owner residual (network + executor): $0.38 => 38,000,000 local units
-	// => ccipOwner total in this test = 45,000,000 local units. (ccipOwner is the same as ccvOwner here so it's not 38)
-	require.Equal(t, expectedCCIPOwnerDelta, ccipOwnerDelta, "ccipOwner should receive verifier fee + owner residual")
-	require.Equal(t, quotedFeeLocalUnits, ccipOwnerDelta+poolFeeLocalUnits, "quoted fee should split as owner share + pool share")
+	// With payout splitting (ccipOwner == ccvOwner in this test):
+	// - verifier fee: $0.07 = 0.07 tokens
+	// - owner residual (network + executor): $0.38 = 0.38 tokens
+	// => ccipOwner total = 0.45 tokens
+	require.InDelta(t, expectedCCIPOwnerDelta, ccipOwnerDelta, 1e-10, "ccipOwner should receive verifier fee + owner residual")
+	require.InDelta(t, 0.55, ccipOwnerDelta+poolFeeTokens, 1e-10, "fee-token payment should split as owner share + pool share")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 }
+
+func getHoldingsBalanceDecimal(t *testing.T, ctx context.Context, participant canton.Participant) float64 {
+	t.Helper()
+
+	holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
+		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
+	})
+	require.NoError(t, err)
+
+	var total float64
+	for _, h := range holdings {
+		views := h.GetCreatedEvent().GetInterfaceViews()
+		if len(views) == 0 {
+			continue
+		}
+		fields := views[0].GetViewValue().GetFields()
+		if len(fields) < 3 {
+			continue
+		}
+		amountStr := fields[2].GetValue().GetNumeric()
+		bf, _, err := new(big.Float).Parse(amountStr, 10)
+		require.NoErrorf(t, err, "failed to parse Decimal %q", amountStr)
+		f, _ := bf.Float64()
+		total += f
+	}
+
+	return total
+}
+
 
 func dedupeDisclosedContracts(in []*apiv2.DisclosedContract) []*apiv2.DisclosedContract {
 	seen := make(map[string]struct{}, len(in))
