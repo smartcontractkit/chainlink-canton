@@ -12,15 +12,15 @@ data PriceUpdates = PriceUpdates
 data TokenPriceUpdate = TokenPriceUpdate
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId -- SourceToken
-        -- 8-decimal USD price for 1e8 smallest token units.
-        usdPerToken : Numeric 0
+        -- 10-decimal USD price for 1e10 smallest token units, stored as Decimal.
+        usdPerToken : Decimal
     deriving (Eq, Show)
 
 data GasPriceUpdate = GasPriceUpdate
     with
         destChainSelector : Numeric 0
-        -- 8-decimal USD price per gas unit.
-        usdPerUnitGas : Numeric 0
+        -- 10-decimal USD price per gas unit, stored as Decimal.
+        usdPerUnitGas : Decimal
     deriving (Eq, Show)
 
 -- | Arguments for adding fee tokens

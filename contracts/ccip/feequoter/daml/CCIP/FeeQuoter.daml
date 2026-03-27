@@ -12,6 +12,7 @@ import DA.Set qualified as Set
 import Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
+import CCIP.Math qualified
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.SendingMessageV1
@@ -41,7 +42,7 @@ lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
 rawInstanceAddress : FeeQuoter -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress feeQuoter = RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner
 
-gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
+gasCostUsdCents : Decimal -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
     CCIP.SendingMessageV1.gasCostUsdCents usdPerUnitGas gasUnits
 
@@ -58,8 +59,7 @@ template FeeQuoter
         usdPerUnitGasByDestChainSelector : Map.Map (Numeric 0) TimestampedPrice
         usdPerToken : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TimestampedPrice
         linkTokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        -- | Token prices are stored as usd8 integers: 8-decimal USD price for
-        -- | 1e8 local smallest units of the token/gas asset.
+        -- | Token prices are stored as Decimal in the 10-decimal convention.
         -- | List of parties that are authorized to update prices, they'll be observers on the contract.
         priceUpdaters : [Party]
     where
@@ -221,10 +221,9 @@ template FeeQuoter
                     caller
                 let premiumMultiplier =
                         if feeToken == linkTokenInstrumentId
-                        then destChainConfig.linkFeeMultiplierPercent * 1000000.0
-                        else 100000000.0
+                        then CCIP.Math.numeric0ToDecimal (destChainConfig.linkFeeMultiplierPercent * 100000000.0)
+                        else CCIP.Math.numeric0ToDecimal CCIP.Math.premiumIdentity
                 let gasCostUSDCents =
-                        -- Convert usd8 price-per-gas into integer USD cents, rounding up.
                         gasCostUsdCents gasPrice.price totalGas
                 pure QuoteGasForExecResult with
                     totalGas
@@ -360,8 +359,8 @@ data TokenTransferFeeConfig = TokenTransferFeeConfig
 
 data TimestampedPrice = TimestampedPrice
     with
-        -- 8-decimal USD price for 1e8 smallest units of the token/gas asset.
-        price : Numeric 0
+        -- 10-decimal USD price, stored as Decimal.
+        price : Decimal
         timestamp : Time
     deriving (Eq, Show)
 
@@ -369,6 +368,6 @@ data QuoteGasForExecResult = QuoteGasForExecResult
     with
         totalGas : Int
         gasCostUSDCents : Numeric 0
-        feeTokenPrice : Numeric 0
-        premiumMultiplier : Numeric 0
+        feeTokenPrice : Decimal
+        premiumMultiplier : Decimal
     deriving (Eq, Show)

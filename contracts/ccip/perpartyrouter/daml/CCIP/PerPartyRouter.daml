@@ -73,18 +73,18 @@ data SetDepsParams = SetDepsParams
         rmnRemote : Optional RawInstanceAddress
     deriving (Eq, Show)
 
-addFeeForParty : Map.Map Party (Numeric 0) -> Party -> Numeric 0 -> Map.Map Party (Numeric 0)
+addFeeForParty : Map.Map Party Decimal -> Party -> Decimal -> Map.Map Party Decimal
 addFeeForParty allocs recipient amount =
     let existing = fromOptional 0.0 (Map.lookup recipient allocs)
     in Map.insert recipient (existing + amount) allocs
 
-sumAllocatedFees : Map.Map Party (Numeric 0) -> Numeric 0
+sumAllocatedFees : Map.Map Party Decimal -> Decimal
 sumAllocatedFees allocations = foldl (+) 0.0 (map snd (Map.toList allocations))
 
 buildCCVFeeAllocations
     : [CCIP.SendingMessageV1.CCVFee]
-    -> [Numeric 0]
-    -> Map.Map Party (Numeric 0)
+    -> [Decimal]
+    -> Map.Map Party Decimal
 buildCCVFeeAllocations ccvFees ccvAmounts =
     if length ccvFees /= length ccvAmounts
     then error "router: inconsistent CCV fee vectors"
@@ -500,7 +500,7 @@ template PerPartyRouter
                                         Splice.Api.Token.TransferInstructionV1.Transfer with
                                             sender = partyOwner
                                             receiver = recipient
-                                            amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.feeTransfer" amount
+                                            amount = amount
                                             instrumentId = sendingMsg.feeToken
                                             requestedAt = now
                                             executeBefore = maxTime

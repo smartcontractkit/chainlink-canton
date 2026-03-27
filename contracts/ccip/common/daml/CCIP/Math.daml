@@ -38,8 +38,13 @@ module CCIP.Math
   , checkedPow10Numeric0
   , canScaleAmountByPowerOfTen
   , calculateLocalAmountChecked
+  , decimalToNumeric0
+  , numeric0ToDecimal
+  , premiumIdentity
+  , usdPerUsdCent
   ) where
 
+import DA.Numeric qualified as Numeric
 import DA.Text qualified as Text
 
 baseInt : Int
@@ -125,6 +130,18 @@ calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
            else
                let scale = checkedPow10Numeric0 (label <> ": scale-up factor") diff
                in mulDivDown remoteAmount scale 1.0
+
+decimalToNumeric0 : Decimal -> Numeric 0
+decimalToNumeric0 = Numeric.shift @0
+
+numeric0ToDecimal : Numeric 0 -> Decimal
+numeric0ToDecimal = Numeric.shift @10
+
+premiumIdentity : Numeric 0
+premiumIdentity = 10000000000.0
+
+usdPerUsdCent : Numeric 0
+usdPerUsdCent = 100000000.0
 
 -- | Check whether a LINK-denominated fee amount in local LINK smallest units
 -- is within the juels-denominated cap.

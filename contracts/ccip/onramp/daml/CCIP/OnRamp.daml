@@ -831,7 +831,7 @@ assembleReceipts sendingMsg =
                     versionTag = None
                     destGasLimit = fee.destGasOverhead
                     destBytesOverhead = fee.destBytesOverhead
-                    feeTokenAmount = sendingMsg.tokenSendFeeTokenAmount
+                    feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.tokenSendFeeTokenAmount
                     extraArgs = ""]
             _ -> []
 
@@ -852,7 +852,7 @@ assembleReceipts sendingMsg =
                     versionTag = None
                     destGasLimit = sendingMsg.executorDestGasLimit
                     destBytesOverhead = sendingMsg.executorDestBytesOverhead
-                    feeTokenAmount = sendingMsg.executorFeeTokenAmount
+                    feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.executorFeeTokenAmount
                     extraArgs = sendingMsg.executorArgs]
 
         networkReceipt = CCIP.Tickets.Receipt with
@@ -861,14 +861,14 @@ assembleReceipts sendingMsg =
             versionTag = None
             destGasLimit = 0
             destBytesOverhead = 0
-            feeTokenAmount = sendingMsg.networkFeeTokenAmount
+            feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.networkFeeTokenAmount
             extraArgs = ""
 
     in ccvReceipts ++ poolReceipt ++ executorReceipt ++ [networkReceipt]
 
 -- | Finds the matching ccvFee by (ccvInstanceId, ccvOwner) and looks up
 -- the corresponding feeTokenAmount from the parallel ccvFeeTokenAmounts list.
-assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Numeric 0] -> CCIP.SendingMessageV1.VerifierData -> CCIP.Tickets.Receipt
+assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> CCIP.SendingMessageV1.VerifierData -> CCIP.Tickets.Receipt
 assembleCCVReceipt ccvFees ccvFeeTokenAmounts vd =
     let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress vd.ccvInstanceId vd.ccvOwner
         (fee, feeTokenAmt) = findFeeWithAmount ccvFees ccvFeeTokenAmounts
@@ -880,11 +880,11 @@ assembleCCVReceipt ccvFees ccvFeeTokenAmounts vd =
         versionTag = Some vd.versionTag
         destGasLimit = fee.destGasLimit
         destBytesOverhead = fee.destBytesOverhead
-        feeTokenAmount = feeTokenAmt
+        feeTokenAmount = CCIP.Math.decimalToNumeric0 feeTokenAmt
         extraArgs = ""
 
 -- | Find a matching fee entry and its corresponding token amount from parallel lists.
-findFeeWithAmount : [CCIP.SendingMessageV1.CCVFee] -> [Numeric 0] -> (CCIP.SendingMessageV1.CCVFee -> Bool) -> (CCIP.SendingMessageV1.CCVFee, Numeric 0)
+findFeeWithAmount : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> (CCIP.SendingMessageV1.CCVFee -> Bool) -> (CCIP.SendingMessageV1.CCVFee, Decimal)
 findFeeWithAmount [] _ _ = error "missing CCV fee"
 findFeeWithAmount _ [] _ = error "missing CCV fee token amount"
 findFeeWithAmount (f :: fs) (a :: as) pred =
