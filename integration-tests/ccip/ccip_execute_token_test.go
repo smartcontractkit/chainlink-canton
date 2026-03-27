@@ -298,6 +298,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// Keep it enabled but lower-capacity so the test fails if the default-finality limiter
 	// is selected for this FTF transfer instead of the custom-finality limiter.
 	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
+	inboundRateLimiterInstanceAddress := contracts.InstanceID(inboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner)).InstanceAddress()
 	res, err := tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -326,6 +327,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	inboundRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed default inbound RateLimiter: %s", inboundRateLimiterCid)
 	inboundCustomBlockConfirmationsRateLimiterInstanceID := "test-pool-receive-inbound-custom-rl"
+	inboundCustomBlockConfirmationsRateLimiterInstanceAddress := contracts.InstanceID(inboundCustomBlockConfirmationsRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner)).InstanceAddress()
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -354,6 +356,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	inboundCustomBlockConfirmationsRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed custom-finality inbound RateLimiter: %s", inboundCustomBlockConfirmationsRateLimiterCid)
 	outboundRateLimiterInstanceID := "test-pool-receive-outbound-rl"
+	outboundRateLimiterInstanceAddress := contracts.InstanceID(outboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner)).InstanceAddress()
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -582,11 +585,25 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
 					},
 				},
-				PoolOwner: partyTokenPoolOwner,
-				TokenPools: []config.ContractIdentifier{
+				PoolOwner: partyCCIP,
+				TokenPoolContracts: []config.TokenPoolContracts{
 					{
-						PartyID:         partyCCIP,
-						InstanceAddress: lrtpInstanceAddress,
+						TokenPool: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: lrtpInstanceAddress,
+						},
+						InboundRateLimiter: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: inboundRateLimiterInstanceAddress,
+						},
+						InboundCustomBlockConfirmationsRateLimiter: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: inboundCustomBlockConfirmationsRateLimiterInstanceAddress,
+						},
+						OutboundRateLimiter: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: outboundRateLimiterInstanceAddress,
+						},
 					},
 				},
 			},
@@ -669,7 +686,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	t.Log("Configured chain for lanes")
 
 	// wait for EDS to start up
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// Create PerPartyRouter for receiver via EDS
 	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)

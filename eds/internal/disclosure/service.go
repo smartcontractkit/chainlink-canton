@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"maps"
+	"slices"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -32,7 +35,11 @@ type DisclosureServiceConfig struct {
 	RMNRemote             contracts.InstanceAddress
 	FeeQuoter             contracts.InstanceAddress
 	CCVs                  []contracts.InstanceAddress
-	TokenPools            []contracts.InstanceAddress
+
+	TokenPools                                   []contracts.InstanceAddress
+	TokenPoolInboundRateLimiters                 []contracts.InstanceAddress
+	TokenPoolRateLimiterCustomBlockConfirmations []contracts.InstanceAddress
+	TokenPoolOutboundRateLimiters                []contracts.InstanceAddress
 }
 
 // The DisclosureService returns explicit disclosures for CCIP contracts.
@@ -222,7 +229,7 @@ func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, reque
 		ccvs[requestedCCV] = ccv
 	}
 
-	tokenPoolDisclosure, instrumentHoldingDisclosure, err := s.getTokenPoolAndHoldingDisclosure(ctx, request.Message)
+	tokenPoolDisclosure, instrumentHoldingDisclosure, inboundRateLimiterDisclosure, inboundCustomBlockConfirmationsRateLimiterDisclosure, outboundRateLimiterDisclosure, err := s.getTokenPoolRelatedDisclosures(ctx, request.Message)
 	if err != nil {
 		return CCIPExecuteDisclosures{}, fmt.Errorf("can't get token pool and holding disclosure: %w", err)
 	}
@@ -235,13 +242,26 @@ func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, reque
 		CCVs:               ccvs,
 		TokenPool:          tokenPoolDisclosure,
 		TokenPoolHolding:   instrumentHoldingDisclosure,
+		InboundRateLimiter: inboundRateLimiterDisclosure,
+		InboundCustomBlockConfirmationsRateLimiter: inboundCustomBlockConfirmationsRateLimiterDisclosure,
+		OutboundRateLimiter:                        outboundRateLimiterDisclosure,
 	}, nil
 }
 
-func (s *DisclosureService) getTokenPoolAndHoldingDisclosure(ctx context.Context, message *protocol.Message) (tokenPoolDisclosure *apiv2.DisclosedContract, instrumentHoldingDisclosure *apiv2.DisclosedContract, err error) {
+func (s *DisclosureService) getTokenPoolRelatedDisclosures(
+	ctx context.Context,
+	message *protocol.Message,
+) (
+	tokenPoolDisclosure *apiv2.DisclosedContract,
+	instrumentHoldingDisclosure *apiv2.DisclosedContract,
+	inboundRateLimiterDisclosure *apiv2.DisclosedContract,
+	inboundCustomBlockConfirmationsRateLimiterDisclosure *apiv2.DisclosedContract,
+	outboundRateLimiterDisclosure *apiv2.DisclosedContract,
+	err error,
+) {
 	if message == nil {
 		// Nothing to do, can't provide disclosures for token pool and holdings if we don't have message data
-		return nil, nil, nil
+		return nil, nil, nil, nil, nil, nil
 	}
 
 	// To get the token pool, we need to query the token admin registry for the token pool instance address.
@@ -250,11 +270,11 @@ func (s *DisclosureService) getTokenPoolAndHoldingDisclosure(ctx context.Context
 		// get the created event of the token admin registry via the update store.
 		tarActiveContract := s.contractStore.GetContract(ctx, s.tokenAdminRegistry)
 		if tarActiveContract == nil {
-			return nil, nil, fmt.Errorf("can't get tokenAdminRegistry disclosure from update store: %w", err)
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get tokenAdminRegistry disclosure from update store: %w", err)
 		}
 		tarCreatedEvent, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenAdminRegistry](tarActiveContract.GetCreatedEvent())
 		if err != nil {
-			return nil, nil, fmt.Errorf("can't unmarshal tokenAdminRegistry created event: %w", err)
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't unmarshal tokenAdminRegistry created event: %w", err)
 		}
 
 		// get the token pool instance address from the created event.
@@ -262,36 +282,98 @@ func (s *DisclosureService) getTokenPoolAndHoldingDisclosure(ctx context.Context
 		// in the TokenAdminRegistry uses as a key.
 		tokenPoolInstanceAddress, instrumentID, err := getTokenPoolAddressAndInstrumentID(tarCreatedEvent, message.TokenTransfer.DestTokenAddress)
 		if err != nil {
-			return nil, nil, fmt.Errorf("can't get token pool instance address from token admin registry createdEvent: %w", err)
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get token pool instance address from token admin registry createdEvent: %w", err)
 		}
 
 		tokenPoolDisclosure, err = s.GetDisclosure(ctx, tokenPoolInstanceAddress)
 		if err != nil {
-			return nil, nil, fmt.Errorf("can't get token pool disclosure: %w", err)
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get token pool disclosure: %w", err)
 		}
 
 		// TODO: get the rate limiters from the tp created event.
-		// tpActiveContract := s.contractStore.GetContract(ctx, tokenPoolInstanceAddress)
-		// if tpActiveContract == nil {
-		// 	return nil, nil, fmt.Errorf("can't get token pool disclosure from update store: %w", err)
-		// }
+		tpActiveContract := s.contractStore.GetContract(ctx, tokenPoolInstanceAddress)
+		if tpActiveContract == nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get token pool disclosure from update store: %w", err)
+		}
 
-		// tpCreatedEvent, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](tpActiveContract.GetCreatedEvent())
-		// if err != nil {
-		// 	return nil, nil, fmt.Errorf("can't unmarshal token pool created event: %w", err)
-		// }
+		tpCreatedEvent, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](tpActiveContract.GetCreatedEvent())
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't unmarshal token pool created event: %w", err)
+		}
+
+		inboundRateLimiterInstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress, outboundRateLimiterInstanceAddress, err := getRateLimiterInstanceAddresses(
+			uint64(message.SourceChainSelector),
+			tpCreatedEvent,
+			tpCreatedEvent.PoolOwner,
+		)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get rate limiter instance addresses from token pool: %w", err)
+		}
+
+		inboundRateLimiterDisclosure, err = s.GetDisclosure(ctx, inboundRateLimiterInstanceAddress)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get inbound rate limiter disclosure: %w", err)
+		}
+
+		inboundCustomBlockConfirmationsRateLimiterDisclosure, err = s.GetDisclosure(ctx, inboundCustomBlockConfirmationsRateLimiterInstanceAddress)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get inbound custom block confirmations rate limiter disclosure: %w", err)
+		}
+
+		outboundRateLimiterDisclosure, err = s.GetDisclosure(ctx, outboundRateLimiterInstanceAddress)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get outbound rate limiter disclosure: %w", err)
+		}
 
 		// look up the instrument holding disclosure for the instrument id.
 		instrumentHoldingDisclosure, err = s.instrumentHoldingStore.GetInstrumentHolding(ctx, instrumentID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("can't get instrument holding disclosure: %w", err)
+			return nil, nil, nil, nil, nil, fmt.Errorf("can't get instrument holding disclosure: %w", err)
 		}
 
-		return tokenPoolDisclosure, instrumentHoldingDisclosure, nil
+		return tokenPoolDisclosure, instrumentHoldingDisclosure, inboundRateLimiterDisclosure, inboundCustomBlockConfirmationsRateLimiterDisclosure, outboundRateLimiterDisclosure, nil
 	}
 
 	// If a message doesn't have a token transfer there will be no disclosures for either the token pool or the instrument holding.
-	return nil, nil, nil
+	return nil, nil, nil, nil, nil, nil
+}
+
+func getRateLimiterInstanceAddresses(
+	remoteChainSelector uint64,
+	tpCreatedEvent *lockreleasetokenpool.LockReleaseTokenPool,
+	poolOwner types.PARTY,
+) (inboundRateLimiterInstanceAddress contracts.InstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress contracts.InstanceAddress, outboundRateLimiterInstanceAddress contracts.InstanceAddress, err error) {
+	// look up the remote chain config for the remoteChainSelector provided
+	remoteChainConfigAny, ok := tpCreatedEvent.RemoteChainConfigs[fmt.Sprintf("%d.", remoteChainSelector)]
+	if !ok {
+		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf(
+			"remote chain config not found for remote chain selector: %d, keys: %+v", remoteChainSelector, slices.Collect(maps.Keys(tpCreatedEvent.RemoteChainConfigs)))
+	}
+
+	remoteChainConfigMap, ok := remoteChainConfigAny.(map[string]any)
+	if !ok {
+		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("remote chain config is not a map[string]any")
+	}
+
+	// unmarshal the remote chain config using ledger.MapToStruct
+	var remoteChainConfig lockreleasetokenpool.RemoteChainConfig
+	err = ledger.MapToStruct(remoteChainConfigMap, &remoteChainConfig)
+	if err != nil {
+		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to unmarshal remote chain config: %w", err)
+	}
+
+	// Create the instance addresses by combining with the poolOwner
+	inboundRateLimiterInstanceAddress = contracts.InstanceID(remoteChainConfig.InboundRateLimiter.Unpack).
+		RawInstanceAddress(poolOwner).
+		InstanceAddress()
+	inboundCustomBlockConfirmationsRateLimiterInstanceAddress = contracts.InstanceID(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack).
+		RawInstanceAddress(poolOwner).
+		InstanceAddress()
+	outboundRateLimiterInstanceAddress = contracts.InstanceID(remoteChainConfig.OutboundRateLimiter.Unpack).
+		RawInstanceAddress(poolOwner).
+		InstanceAddress()
+
+	return inboundRateLimiterInstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress, outboundRateLimiterInstanceAddress, nil
 }
 
 // TODO: this is really janky, how to properly test this?
@@ -302,6 +384,7 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 	// tokenConfigs : Map.Map BytesHex TokenConfig
 	for hashedInstrumentID, v := range tarCreatedEvent.TokenConfigs {
 		fmt.Printf("processing map: %+v\n", v)
+
 		// check if this instrument ID corresponds to the one we expect.
 		instrumentIDBytes, err := hex.DecodeString(hashedInstrumentID)
 		if err != nil {
@@ -312,75 +395,25 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 			continue
 		}
 
-		configMap, ok := v.(map[string]any)
+		vMap, ok := v.(map[string]any)
 		if !ok {
-			fmt.Printf("configMap is not a map[string]any, skipping\n")
-			continue
-		}
-		// Unmarshalled form may wrap fields in "data"
-		m := configMap
-		if data, ok := configMap["data"].(map[string]any); ok {
-			m = data
-		}
-		tokenPoolRaw, ok := m["tokenPool"]
-		if !ok || tokenPoolRaw == nil {
-			fmt.Printf("tokenPoolRaw is not a map[string]any, skipping\n")
-			continue
-		}
-		// Optional: {"_type": "optional", "value": <PoolRegistration map>}
-		var tokenPoolMap map[string]any
-		if opt, ok := tokenPoolRaw.(map[string]any); ok {
-			if val, has := opt["value"]; has && val != nil {
-				tokenPoolMap, _ = val.(map[string]any)
-			}
-		}
-		if tokenPoolMap == nil {
-			tokenPoolMap, _ = tokenPoolRaw.(map[string]any)
-		}
-		if tokenPoolMap == nil {
-			fmt.Printf("tokenPoolMap is nil, skipping\n")
-			continue
-		}
-		// poolOwner may be under tokenPool.data when unmarshalled
-		tokenPoolData := tokenPoolMap
-		if data, ok := tokenPoolMap["data"].(map[string]any); ok {
-			tokenPoolData = data
-		}
-		poolOwnerStr := optionalStringFromMap(tokenPoolData, "poolOwner")
-		if poolOwnerStr == "" {
-			fmt.Printf("poolOwnerStr is empty, skipping\n")
-			continue
-		}
-		poolInstanceIDStr := optionalStringFromMap(tokenPoolData, "poolInstanceId")
-		if poolInstanceIDStr == "" {
-			fmt.Printf("poolInstanceIDStr is empty, skipping\n")
-			continue
-		}
-		tokenPoolInstanceAddress := contracts.InstanceID(poolInstanceIDStr).RawInstanceAddress(types.PARTY(poolOwnerStr)).InstanceAddress()
-
-		// get the instrument id from the token config as well.
-		instrumentIDAny, ok := m["instrumentId"]
-		if !ok {
-			// this should never happen, but just in case.
-			fmt.Printf("instrumentId not found in token config, skipping\n")
+			fmt.Printf("v is not a map[string]any, skipping\n")
 			continue
 		}
 
-		instrumentIDMap, ok := instrumentIDAny.(map[string]any)
-		if !ok {
-			fmt.Printf("instrumentIDAny is not a map[string]any, skipping\n")
-			continue
-		}
-
-		// Decode the instrumentId using ledger.RecordToStruct.
-		var instrumentID splice_api_token_holding_v1.InstrumentId
-		err = ledger.MapToStruct(instrumentIDMap, &instrumentID)
+		var tokenConfig tokenadminregistry.TokenConfig
+		err = ledger.MapToStruct(vMap, &tokenConfig)
 		if err != nil {
-			fmt.Printf("failed to decode instrumentId: %s, skipping\n", err.Error())
+			fmt.Printf("failed to decode token config: %s, skipping\n", err.Error())
 			continue
 		}
 
-		return tokenPoolInstanceAddress, instrumentID, nil
+		// Construct the pool instance address from the token config.
+		poolInstanceAddress := contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).
+			RawInstanceAddress(tokenConfig.TokenPool.PoolOwner).
+			InstanceAddress()
+
+		return poolInstanceAddress, tokenConfig.InstrumentId, nil
 	}
 
 	return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
@@ -388,26 +421,6 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 		expectedHashedInstrumentID.String(),
 		tarCreatedEvent.TokenConfigs,
 	)
-}
-
-// optionalStringFromMap gets an optional string from a map: either direct string or {"value": "<string>"}.
-func optionalStringFromMap(m map[string]any, key string) string {
-	raw, ok := m[key]
-	if !ok || raw == nil {
-		return ""
-	}
-	if s, ok := raw.(string); ok {
-		return s
-	}
-	if opt, ok := raw.(map[string]any); ok {
-		if v, ok := opt["value"]; ok {
-			if s, ok := v.(string); ok {
-				return s
-			}
-		}
-	}
-
-	return ""
 }
 
 type PerPartyRouterFactoryRequest struct{}

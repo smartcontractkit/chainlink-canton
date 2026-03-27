@@ -107,11 +107,14 @@ var BuildConfig = operations.NewOperation(
 		if len(refs) == 0 {
 			return GenerateEDSConfigOutput{}, fmt.Errorf("no TokenPool contracts found in datastore")
 		}
-		tokenPools := make([]edsConfig.ContractIdentifier, len(refs))
+		tokenPools := make([]edsConfig.TokenPoolContracts, len(refs))
 		for i, ref := range refs {
-			tokenPools[i] = edsConfig.ContractIdentifier{
-				PartyID:         participant.PartyID,
-				InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+			tokenPools[i] = edsConfig.TokenPoolContracts{
+				TokenPool: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+				},
+				// TODO: add rate limiter instance addresses
 			}
 		}
 
@@ -170,9 +173,9 @@ var BuildConfig = operations.NewOperation(
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
-				CCVs:       ccvs,
-				TokenPools: tokenPools,
-				PoolOwner:  participant.PartyID,
+				CCVs:               ccvs,
+				TokenPoolContracts: tokenPools,
+				PoolOwner:          participant.PartyID,
 			},
 		}, nil
 	},

@@ -135,13 +135,22 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		})
 		ccvCids[i] = ccv.InstanceAddress
 	}
-	tokenPoolCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPools))
-	for i, tokenPool := range cfg.Contracts.TokenPools {
+	tokenPoolCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPoolContracts))
+	tokenPoolInboundRateLimiterCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPoolContracts))
+	tokenPoolRateLimiterCustomBlockConfirmationsCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPoolContracts))
+	tokenPoolOutboundRateLimiterCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPoolContracts))
+	for i, tokenPool := range cfg.Contracts.TokenPoolContracts {
 		templates = append(templates, store.RegisteredTemplate{
 			TemplateID: contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{}),
-			PartyID:    tokenPool.PartyID,
+			PartyID:    tokenPool.TokenPool.PartyID,
+		}, store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(common.RateLimiter{}),
+			PartyID:    tokenPool.InboundRateLimiter.PartyID,
 		})
-		tokenPoolCids[i] = tokenPool.InstanceAddress
+		tokenPoolCids[i] = tokenPool.TokenPool.InstanceAddress
+		tokenPoolInboundRateLimiterCids[i] = tokenPool.InboundRateLimiter.InstanceAddress
+		tokenPoolRateLimiterCustomBlockConfirmationsCids[i] = tokenPool.InboundCustomBlockConfirmationsRateLimiter.InstanceAddress
+		tokenPoolOutboundRateLimiterCids[i] = tokenPool.OutboundRateLimiter.InstanceAddress
 	}
 
 	updateStore, err := store.NewUpdateStore(ctx, store.UpdateStoreConfig{
@@ -195,7 +204,11 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		RMNRemote:              cfg.Contracts.RMNRemote.InstanceAddress,
 		FeeQuoter:              cfg.Contracts.FeeQuoter.InstanceAddress,
 		CCVs:                   ccvCids,
-		TokenPools:             tokenPoolCids,
+
+		TokenPools:                   tokenPoolCids,
+		TokenPoolInboundRateLimiters: tokenPoolInboundRateLimiterCids,
+		TokenPoolRateLimiterCustomBlockConfirmations: tokenPoolRateLimiterCustomBlockConfirmationsCids,
+		TokenPoolOutboundRateLimiters:                tokenPoolOutboundRateLimiterCids,
 	})
 
 	server := api.NewServer(logger, disclosureSvc)
