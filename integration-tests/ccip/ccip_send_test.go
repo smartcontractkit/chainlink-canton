@@ -727,8 +727,8 @@ func TestCCIPSend(t *testing.T) {
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
 	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")
 
-	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	senderBalanceBefore := getHoldingsBalanceDecimal(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceBefore := getHoldingsBalanceDecimal(t, t.Context(), ccipParticipant)
 	ccipSendArgs := ledger.MapToValue(sendArgs)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
@@ -786,14 +786,17 @@ func TestCCIPSend(t *testing.T) {
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
 
-	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	senderBalanceAfter := getHoldingsBalanceDecimal(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceAfter := getHoldingsBalanceDecimal(t, t.Context(), ccipParticipant)
 	senderDelta := senderBalanceBefore - senderBalanceAfter
 	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
 
-	// Bound Numeric 0 values come back as strings with a trailing dot, e.g. "43000000.".
-	require.Equal(t, fmt.Sprintf("%d", senderDelta), strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "sender deduction should match GetFee quote")
-	require.Equal(t, fmt.Sprintf("%d", ccipOwnerDelta), strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "ccipOwner should receive the full quoted fee in this no-token flow")
+	// GetFee returns Numeric 0 (E10 smallest units). Convert to Decimal for comparison.
+	feeN0, err := strconv.ParseFloat(strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), 64)
+	require.NoError(t, err)
+	expectedFeeDecimal := feeN0 / 1e10
+	require.InDelta(t, expectedFeeDecimal, senderDelta, 1e-10, "sender deduction should match GetFee quote")
+	require.InDelta(t, expectedFeeDecimal, ccipOwnerDelta, 1e-10, "ccipOwner should receive the full quoted fee in this no-token flow")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
