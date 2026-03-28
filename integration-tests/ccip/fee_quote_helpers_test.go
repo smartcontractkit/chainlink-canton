@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
 
 func quoteCCIPSenderFee(
@@ -76,4 +75,3 @@ func quoteCCIPSenderFee(
 
 	return quote
 }
-

@@ -1040,7 +1040,6 @@ func getHoldingsBalanceDecimal(t *testing.T, ctx context.Context, participant ca
 	return total
 }
 
-
 func dedupeDisclosedContracts(in []*apiv2.DisclosedContract) []*apiv2.DisclosedContract {
 	seen := make(map[string]struct{}, len(in))
 	out := make([]*apiv2.DisclosedContract, 0, len(in))
