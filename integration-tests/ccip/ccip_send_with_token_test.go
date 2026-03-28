@@ -176,8 +176,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		OperationsBundle: bundle,
 	}
 
-	tokenPriceExponentUSDCents := uint64(1e6) // 6 decimals for USDCents
-	tokenPriceExponentUSD := 1e2 * tokenPriceExponentUSDCents
+	tokenPriceExponentUSDCents := uint64(1e6) // 6 decimals for USD cents
+	tokenPriceExponentUSD := 1e2 * tokenPriceExponentUSDCents // Amulet uses 8 local decimals in this test: $1 == 1e8
 
 	// Deploy Chain contracts
 	out, err := changesets.DeployChainContracts{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployChainContractsConfig]{
@@ -392,8 +392,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to create preapproval")
 	t.Log("Created Amulet Preapproval, Cid: ", preapprovalCid)
 
+	// Pool transfer amounts use the token's smallest units; with 8 token decimals,
+	// a transfer amount of 100 means 100 local units and a 5% bps fee floors to 5.
 	tokenTransferFeeUSDCents := 10
-	tokenTransferFeeBps := 500 // 5%
+	tokenTransferFeeBps := 500     // 5%
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
@@ -404,7 +406,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			CcipOwner:    partyCCIP,
 			PoolOwner:    partyCCIP,
 			InstrumentId: nativeInstrumentId,
-			Decimals:     10,
+			Decimals:     8,
 			InstanceID:   poolInstanceID,
 			Qualifier:    "test-pool-send",
 			RemoteChainConfigs: types.GENMAP{
@@ -553,10 +555,11 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	t.Logf("partySender=%q", partySender)
 
-	// Mint 100 whole AMT in local 1e8 units so the sender can cover non-zero fees.
+	// Fund separate holdings for fee payment and token transfer input.
+	// MintAMT uses 1e8 local units per whole Amulet in this test setup.
 	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
-	t.Logf("Minted 100 whole Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
+	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
 	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
