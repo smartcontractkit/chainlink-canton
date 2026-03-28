@@ -1,9 +1,6 @@
 package tests
 
 import (
-	"context"
-	"strconv"
-	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -80,33 +77,3 @@ func quoteCCIPSenderFee(
 	return quote
 }
 
-func getHoldingsBalanceNumeric0(t *testing.T, ctx context.Context, participant canton.Participant) int64 {
-	t.Helper()
-
-	holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
-	require.NoError(t, err)
-
-	var total int64
-	for _, h := range holdings {
-		views := h.GetCreatedEvent().GetInterfaceViews()
-		if len(views) == 0 {
-			continue
-		}
-		fields := views[0].GetViewValue().GetFields()
-		if len(fields) < 3 {
-			continue
-		}
-		amountStr := fields[2].GetValue().GetNumeric()
-		intPart, fracPart, hasFrac := strings.Cut(amountStr, ".")
-		if hasFrac {
-			require.Emptyf(t, strings.Trim(fracPart, "0"), "expected integer Numeric 0, got %q", amountStr)
-		}
-		amt, err := strconv.ParseInt(intPart, 10, 64)
-		require.NoError(t, err)
-		total += amt
-	}
-
-	return total
-}
