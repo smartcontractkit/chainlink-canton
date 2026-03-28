@@ -30,16 +30,19 @@ import CCIP.Codec
   ( encodeInstrumentId
   , decodeInstrumentId
   )
+import CCIP.TokenAdminRegistryCodecGen
+  ( encodePoolRegistration
+  , decodePoolRegistrationAt
+  )
 
 import DA.Crypto.Text (BytesHex)
 import qualified Splice.Api.Token.HoldingV1
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..))
+import CCIP.TokenAdminRegistryTypes (PoolRegistration)
 
 -- ===========================================================================
 -- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
 -- ===========================================================================
 
--- | Decode SetPool params with final offset
 decodeSetPoolParamsWithOffset : BytesHex -> Optional ((Splice.Api.Token.HoldingV1.InstrumentId, Optional PoolRegistration), Int)
 decodeSetPoolParamsWithOffset encoded = do
   (instrumentId, offset1) <- decodeInstrumentId encoded 0
@@ -50,40 +53,33 @@ decodeSetPoolParamsWithOffset encoded = do
       Some ((instrumentId, Some poolReg), finalOffset)
     else Some ((instrumentId, None), offset2)
 
--- | Decode SetPool params (discards final offset)
 decodeSetPoolParams : BytesHex -> Optional (Splice.Api.Token.HoldingV1.InstrumentId, Optional PoolRegistration)
 decodeSetPoolParams encoded = do
   (result, _) <- decodeSetPoolParamsWithOffset encoded
   Some result
 
--- | Decode ProposeAdmin params with final offset
 decodeProposeAdminParamsWithOffset : BytesHex -> Optional ((Splice.Api.Token.HoldingV1.InstrumentId, Party), Int)
 decodeProposeAdminParamsWithOffset encoded = do
   (instrumentId, offset1) <- decodeInstrumentId encoded 0
   (admin, finalOffset) <- decodePartyAt encoded offset1
   Some ((instrumentId, admin), finalOffset)
 
--- | Decode ProposeAdmin params (discards final offset)
 decodeProposeAdminParams : BytesHex -> Optional (Splice.Api.Token.HoldingV1.InstrumentId, Party)
 decodeProposeAdminParams encoded = do
   (result, _) <- decodeProposeAdminParamsWithOffset encoded
   Some result
 
--- | Decode TransferAdmin params with final offset (same as ProposeAdmin)
 decodeTransferAdminParamsWithOffset : BytesHex -> Optional ((Splice.Api.Token.HoldingV1.InstrumentId, Party), Int)
 decodeTransferAdminParamsWithOffset = decodeProposeAdminParamsWithOffset
 
--- | Decode TransferAdmin params (discards final offset)
 decodeTransferAdminParams : BytesHex -> Optional (Splice.Api.Token.HoldingV1.InstrumentId, Party)
 decodeTransferAdminParams = decodeProposeAdminParams
 
--- | Decode AcceptAdmin params with final offset
 decodeAcceptAdminParamsWithOffset : BytesHex -> Optional (Splice.Api.Token.HoldingV1.InstrumentId, Int)
 decodeAcceptAdminParamsWithOffset encoded = do
   (instrumentId, finalOffset) <- decodeInstrumentId encoded 0
   Some (instrumentId, finalOffset)
 
--- | Decode AcceptAdmin params (discards final offset)
 decodeAcceptAdminParams : BytesHex -> Optional Splice.Api.Token.HoldingV1.InstrumentId
 decodeAcceptAdminParams encoded = do
   (result, _) <- decodeAcceptAdminParamsWithOffset encoded
@@ -111,18 +107,3 @@ encodeTransferAdminParams = encodeProposeAdminParams
 
 encodeAcceptAdminParams : Splice.Api.Token.HoldingV1.InstrumentId -> BytesHex
 encodeAcceptAdminParams = encodeInstrumentId
-
--- ===========================================================================
--- POOL REGISTRATION ENCODING/DECODING
--- Format: [party][text]
--- ===========================================================================
-
-encodePoolRegistration : PoolRegistration -> BytesHex
-encodePoolRegistration pr =
-  encodeParty pr.poolOwner <> encodeText pr.poolInstanceId
-
-decodePoolRegistrationAt : BytesHex -> Int -> Optional (PoolRegistration, Int)
-decodePoolRegistrationAt encoded offset = do
-  (poolOwner, offset1) <- decodePartyAt encoded offset
-  (poolInstanceId, offset2) <- decodeTextAt encoded offset1
-  Some (PoolRegistration poolOwner poolInstanceId, offset2)

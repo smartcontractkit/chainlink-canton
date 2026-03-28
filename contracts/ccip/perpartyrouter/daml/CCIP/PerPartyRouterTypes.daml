@@ -1,0 +1,23 @@
+module CCIP.PerPartyRouterTypes where
+
+import MCMS.RawInstanceAddress (RawInstanceAddress)
+
+data PerPartyRouterDeps = PerPartyRouterDeps
+    with
+        onRamp : RawInstanceAddress
+        offRamp : RawInstanceAddress
+        globalConfig : RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress
+        feeQuoter : RawInstanceAddress
+        rmnRemote : RawInstanceAddress
+    deriving (Eq, Show)
+
+data SetDepsParams = SetDepsParams
+    with
+        onRamp : Optional RawInstanceAddress
+        offRamp : Optional RawInstanceAddress
+        globalConfig : Optional RawInstanceAddress
+        tokenAdminRegistry : Optional RawInstanceAddress
+        feeQuoter : Optional RawInstanceAddress
+        rmnRemote : Optional RawInstanceAddress
+    deriving (Eq, Show)

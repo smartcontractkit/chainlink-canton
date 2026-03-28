@@ -20,8 +20,11 @@ import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
+import qualified CCIP.OnRampTypes as CCIP.OnRamp
 import qualified CCIP.OffRamp
+import qualified CCIP.OffRampTypes as CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
+import qualified CCIP.PerPartyRouterTypes as CCIP.PerPartyRouter
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
@@ -30,6 +33,7 @@ import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Executor
+import qualified CCIP.ExecutorTypes as CCIP.Executor
 import qualified CommitteeVerifier.DummyCommitteeVerifier
 
 import qualified Splice.Api.Token.HoldingV1

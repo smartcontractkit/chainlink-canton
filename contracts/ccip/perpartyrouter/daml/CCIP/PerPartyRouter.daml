@@ -28,14 +28,10 @@ import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Internal
 import qualified CCIP.Context
-import CCIP.Codec
-  ( encodeRawInstanceAddress
-  , decodeRawInstanceAddressAt
-  , encodeOptionalRawInstanceAddress
-  , decodeOptionalRawInstanceAddressAt
-  )
 import MCMS.Codec (decodePartyList, encodePartyList)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..))
+import CCIP.PerPartyRouterCodecGen (decodeSetDepsParamsAt)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -52,26 +48,6 @@ maxExecutedMessagesSize : Int
 -- pressure. TODO: benchmark and tune this against a real Canton participant/synchronizer
 -- setup instead of relying on script-runner limits.
 maxExecutedMessagesSize = 25000
-
-data PerPartyRouterDeps = PerPartyRouterDeps
-    with
-        onRamp : RawInstanceAddress
-        offRamp : RawInstanceAddress
-        globalConfig : RawInstanceAddress
-        tokenAdminRegistry : RawInstanceAddress
-        feeQuoter : RawInstanceAddress
-        rmnRemote : RawInstanceAddress
-    deriving (Eq, Show)
-
-data SetDepsParams = SetDepsParams
-    with
-        onRamp : Optional RawInstanceAddress
-        offRamp : Optional RawInstanceAddress
-        globalConfig : Optional RawInstanceAddress
-        tokenAdminRegistry : Optional RawInstanceAddress
-        feeQuoter : Optional RawInstanceAddress
-        rmnRemote : Optional RawInstanceAddress
-    deriving (Eq, Show)
 
 addFeeForParty : Map.Map Party (Numeric 0) -> Party -> Numeric 0 -> Map.Map Party (Numeric 0)
 addFeeForParty allocs recipient amount =
@@ -815,60 +791,21 @@ data ExecuteResult = ExecuteResult
 
 -- ===========================================================================
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
+-- Per-record codecs (encodeSetDepsParams, decodeSetDepsParamsAt,
+-- encodePerPartyRouterDeps, decodePerPartyRouterDepsAt) imported from
+-- PerPartyRouterCodecGen.
 -- ===========================================================================
 
--- | Decode SetDeps params with final offset (Optional fields)
--- Format: [OptRIA onRamp][OptRIA offRamp][OptRIA globalConfig][OptRIA tokenAdminRegistry][OptRIA feeQuoter][OptRIA rmnRemote]
 decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
-decodeSetDepsParamsWithOffset encoded = do
-  (onRamp, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
-  (offRamp, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
-  (globalConfig, offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
-  (tokenAdminRegistry, offset4) <- decodeOptionalRawInstanceAddressAt encoded offset3
-  (feeQuoter, offset5) <- decodeOptionalRawInstanceAddressAt encoded offset4
-  (rmnRemote, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded offset5
-  Some (SetDepsParams onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote, finalOffset)
+decodeSetDepsParamsWithOffset encoded = decodeSetDepsParamsAt encoded 0
 
--- | Decode SetDeps params (discards final offset)
 decodeSetDepsParams : BytesHex -> Optional SetDepsParams
 decodeSetDepsParams encoded = do
-  (result, _) <- decodeSetDepsParamsWithOffset encoded
+  (result, _) <- decodeSetDepsParamsAt encoded 0
   Some result
-
--- | Encode SetDeps params (Optional fields)
-encodeSetDepsParams : SetDepsParams -> BytesHex
-encodeSetDepsParams params =
-  encodeOptionalRawInstanceAddress params.onRamp <>
-  encodeOptionalRawInstanceAddress params.offRamp <>
-  encodeOptionalRawInstanceAddress params.globalConfig <>
-  encodeOptionalRawInstanceAddress params.tokenAdminRegistry <>
-  encodeOptionalRawInstanceAddress params.feeQuoter <>
-  encodeOptionalRawInstanceAddress params.rmnRemote
-
--- | Decode PerPartyRouterDeps at offset (full, non-optional)
--- Format: [RIA onRamp][RIA offRamp][RIA globalConfig][RIA tokenAdminRegistry][RIA feeQuoter][RIA rmnRemote]
-decodePerPartyRouterDepsAt : BytesHex -> Int -> Optional (PerPartyRouterDeps, Int)
-decodePerPartyRouterDepsAt encoded offset = do
-  (onRamp, offset1) <- decodeRawInstanceAddressAt encoded offset
-  (offRamp, offset2) <- decodeRawInstanceAddressAt encoded offset1
-  (globalConfig, offset3) <- decodeRawInstanceAddressAt encoded offset2
-  (tokenAdminRegistry, offset4) <- decodeRawInstanceAddressAt encoded offset3
-  (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
-  (rmnRemote, offset6) <- decodeRawInstanceAddressAt encoded offset5
-  Some (PerPartyRouterDeps onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote, offset6)
 
 encodeAddCustomObserversParams : [Party] -> BytesHex
 encodeAddCustomObserversParams = encodePartyList
 
 encodeRemoveCustomObserversParams : [Party] -> BytesHex
 encodeRemoveCustomObserversParams = encodePartyList
-
--- | Encode PerPartyRouterDeps (full, non-optional)
-encodePerPartyRouterDeps : PerPartyRouterDeps -> BytesHex
-encodePerPartyRouterDeps deps =
-  encodeRawInstanceAddress deps.onRamp <>
-  encodeRawInstanceAddress deps.offRamp <>
-  encodeRawInstanceAddress deps.globalConfig <>
-  encodeRawInstanceAddress deps.tokenAdminRegistry <>
-  encodeRawInstanceAddress deps.feeQuoter <>
-  encodeRawInstanceAddress deps.rmnRemote

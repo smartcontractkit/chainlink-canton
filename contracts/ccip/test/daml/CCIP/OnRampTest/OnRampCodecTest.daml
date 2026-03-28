@@ -4,7 +4,9 @@ module CCIP.OnRampTest.OnRampCodecTest where
 import Daml.Script
 import DA.Assert ((===))
 
-import CCIP.OnRamp
+import CCIP.OnRamp (decodeSetDepsParams, orderedVerifierDataByCCVs)
+import CCIP.OnRampTypes (OnRampDeps(..), SetDepsParams(..))
+import CCIP.OnRampCodecGen (encodeSetDepsParams, encodeOnRampDeps, decodeOnRampDepsAt)
 import MCMS.RawInstanceAddress (RawInstanceAddress(..), make, toInstanceAddress)
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 

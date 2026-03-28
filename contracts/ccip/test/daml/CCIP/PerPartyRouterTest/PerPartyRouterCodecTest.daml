@@ -4,7 +4,9 @@ module CCIP.PerPartyRouterTest.PerPartyRouterCodecTest where
 import Daml.Script
 import DA.Assert ((===))
 
-import CCIP.PerPartyRouter
+import CCIP.PerPartyRouter (decodeSetDepsParams)
+import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..))
+import CCIP.PerPartyRouterCodecGen (encodeSetDepsParams, encodePerPartyRouterDeps, decodePerPartyRouterDepsAt)
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================

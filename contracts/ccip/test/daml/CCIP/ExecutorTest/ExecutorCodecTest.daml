@@ -6,6 +6,7 @@ import DA.Assert ((===))
 import DA.Optional (fromSome)
 
 import CCIP.Executor qualified as Executor
+import CCIP.ExecutorTypes qualified as Executor
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===============================================

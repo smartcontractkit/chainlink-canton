@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "8ca4eb71f258b6bce153f304a268cc038fb43969715c6d75355c1bf2dc3f5419"
+	PackageID   = "604e212d1a0f961daba66b56080af6dd272992271d98223d1600560ccedcbb98"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1288,6 +1288,69 @@ func (t PerPartyRouter) CCIPSendWithPackageID(contractID string, packageID strin
 	}
 }
 
+// Execute exercises the Execute choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) Execute(contractID string, args Execute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "Execute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ExecuteWithPackageID exercises the Execute choice using the provided package ID instead of package name
+func (t PerPartyRouter) ExecuteWithPackageID(contractID string, packageID string, args Execute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "Execute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetExecutionState exercises the GetExecutionState choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) GetExecutionState(contractID string, args GetExecutionState) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "GetExecutionState",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetExecutionStateWithPackageID exercises the GetExecutionState choice using the provided package ID instead of package name
+func (t PerPartyRouter) GetExecutionStateWithPackageID(contractID string, packageID string, args GetExecutionState) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "GetExecutionState",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PrepareExecute exercises the PrepareExecute choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) PrepareExecute(contractID string, args PrepareExecute2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "PrepareExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PrepareExecuteWithPackageID exercises the PrepareExecute choice using the provided package ID instead of package name
+func (t PerPartyRouter) PrepareExecuteWithPackageID(contractID string, packageID string, args PrepareExecute2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "PrepareExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // GetFee exercises the GetFee choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
@@ -1305,27 +1368,6 @@ func (t PerPartyRouter) GetFeeWithPackageID(contractID string, packageID string,
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDeps exercises the SetDeps choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) SetDeps(contractID string, args SetDeps3) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
-func (t PerPartyRouter) SetDepsWithPackageID(contractID string, packageID string, args SetDeps3) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1393,48 +1435,6 @@ func (t PerPartyRouter) GetRequiredCCVsForSendWithPackageID(contractID string, p
 	}
 }
 
-// Execute exercises the Execute choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) Execute(contractID string, args Execute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "Execute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecuteWithPackageID exercises the Execute choice using the provided package ID instead of package name
-func (t PerPartyRouter) ExecuteWithPackageID(contractID string, packageID string, args Execute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "Execute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// PrepareExecute exercises the PrepareExecute choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) PrepareExecute(contractID string, args PrepareExecute2) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "PrepareExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// PrepareExecuteWithPackageID exercises the PrepareExecute choice using the provided package ID instead of package name
-func (t PerPartyRouter) PrepareExecuteWithPackageID(contractID string, packageID string, args PrepareExecute2) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "PrepareExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute2) *model.ExerciseCommand {
@@ -1452,27 +1452,6 @@ func (t PerPartyRouter) GetRequiredCCVsForExecuteWithPackageID(contractID string
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetRequiredCCVsForExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetExecutionState exercises the GetExecutionState choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) GetExecutionState(contractID string, args GetExecutionState) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "GetExecutionState",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetExecutionStateWithPackageID exercises the GetExecutionState choice using the provided package ID instead of package name
-func (t PerPartyRouter) GetExecutionStateWithPackageID(contractID string, packageID string, args GetExecutionState) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "GetExecutionState",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1515,6 +1494,27 @@ func (t PerPartyRouter) GetSequenceNumberWithPackageID(contractID string, packag
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetSequenceNumber",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDeps exercises the SetDeps choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) SetDeps(contractID string, args SetDeps3) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t PerPartyRouter) SetDepsWithPackageID(contractID string, packageID string, args SetDeps3) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1781,27 +1781,6 @@ func (t *PerPartyRouterFactory) UnmarshalHex(data string) error {
 
 // Choice methods for PerPartyRouterFactory
 
-// FactorySetDeps exercises the FactorySetDeps choice on this PerPartyRouterFactory contract
-// This method uses the package name in the template ID
-func (t PerPartyRouterFactory) FactorySetDeps(contractID string, args FactorySetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
-		ContractID: contractID,
-		Choice:     "FactorySetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FactorySetDepsWithPackageID exercises the FactorySetDeps choice using the provided package ID instead of package name
-func (t PerPartyRouterFactory) FactorySetDepsWithPackageID(contractID string, packageID string, args FactorySetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
-		ContractID: contractID,
-		Choice:     "FactorySetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // CreateRouter exercises the CreateRouter choice on this PerPartyRouterFactory contract
 // This method uses the package name in the template ID
 func (t PerPartyRouterFactory) CreateRouter(contractID string, args CreateRouter) *model.ExerciseCommand {
@@ -1861,6 +1840,27 @@ func (t PerPartyRouterFactory) HasRouterWithPackageID(contractID string, package
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
 		ContractID: contractID,
 		Choice:     "HasRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FactorySetDeps exercises the FactorySetDeps choice on this PerPartyRouterFactory contract
+// This method uses the package name in the template ID
+func (t PerPartyRouterFactory) FactorySetDeps(contractID string, args FactorySetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		ContractID: contractID,
+		Choice:     "FactorySetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FactorySetDepsWithPackageID exercises the FactorySetDeps choice using the provided package ID instead of package name
+func (t PerPartyRouterFactory) FactorySetDepsWithPackageID(contractID string, packageID string, args FactorySetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		ContractID: contractID,
+		Choice:     "FactorySetDeps",
 		Arguments:  argsToMap(args),
 	}
 }

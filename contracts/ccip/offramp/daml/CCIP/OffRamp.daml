@@ -12,18 +12,14 @@ import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
-import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
-import CCIP.Codec
-  ( encodeRawInstanceAddress
-  , decodeRawInstanceAddressAt
-  , encodeOptionalRawInstanceAddress
-  , decodeOptionalRawInstanceAddressAt
-  )
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import CCIP.OffRampTypes (OffRampDeps(..), SetDepsParams(..))
+import CCIP.OffRampCodecGen (decodeSetDepsParamsAt)
 
 offRampKey : Text
 offRampKey = "off-ramp"
@@ -33,20 +29,6 @@ lookupOffRampCid ctx = CCIP.Context.getFromContextU ctx offRampKey
 
 rawInstanceAddress : OffRamp -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress offRamp = RawInstanceAddress.make offRamp.instanceId offRamp.ccipOwner
-
-data OffRampDeps = OffRampDeps
-    with
-        globalConfig : RawInstanceAddress
-        rmnRemote : RawInstanceAddress
-        tokenAdminRegistry : RawInstanceAddress
-    deriving (Eq, Show)
-
-data SetDepsParams = SetDepsParams
-    with
-        globalConfig : Optional RawInstanceAddress
-        rmnRemote : Optional RawInstanceAddress
-        tokenAdminRegistry : Optional RawInstanceAddress
-    deriving (Eq, Show)
 
 resolveReceiverExecutionCCVs
     : CCIP.GlobalConfig.SourceChainConfig
@@ -429,42 +411,14 @@ data ExecuteFromRouterResult = ExecuteFromRouterResult
 
 -- ===========================================================================
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
+-- Per-record codecs (encodeSetDepsParams, decodeSetDepsParamsAt,
+-- encodeOffRampDeps, decodeOffRampDepsAt) imported from OffRampCodecGen.
 -- ===========================================================================
 
--- | Decode SetDeps params with final offset (Optional fields)
--- Format: [OptRIA globalConfig][OptRIA rmnRemote][OptRIA tokenAdminRegistry]
 decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
-decodeSetDepsParamsWithOffset encoded = do
-  (globalConfig, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
-  (rmnRemote, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
-  (tokenAdminRegistry, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded offset2
-  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry, finalOffset)
+decodeSetDepsParamsWithOffset encoded = decodeSetDepsParamsAt encoded 0
 
--- | Decode SetDeps params (discards final offset)
 decodeSetDepsParams : BytesHex -> Optional SetDepsParams
 decodeSetDepsParams encoded = do
-  (result, _) <- decodeSetDepsParamsWithOffset encoded
+  (result, _) <- decodeSetDepsParamsAt encoded 0
   Some result
-
--- | Encode SetDeps params (Optional fields)
-encodeSetDepsParams : SetDepsParams -> BytesHex
-encodeSetDepsParams params =
-  encodeOptionalRawInstanceAddress params.globalConfig <>
-  encodeOptionalRawInstanceAddress params.rmnRemote <>
-  encodeOptionalRawInstanceAddress params.tokenAdminRegistry
-
--- | Decode OffRampDeps at offset (full, non-optional)
--- Format: [RIA globalConfig][RIA rmnRemote][RIA tokenAdminRegistry]
-decodeOffRampDepsAt : BytesHex -> Int -> Optional (OffRampDeps, Int)
-decodeOffRampDepsAt encoded offset = do
-  (globalConfig, offset1) <- decodeRawInstanceAddressAt encoded offset
-  (rmnRemote, offset2) <- decodeRawInstanceAddressAt encoded offset1
-  (tokenAdminRegistry, offset3) <- decodeRawInstanceAddressAt encoded offset2
-  Some (OffRampDeps globalConfig rmnRemote tokenAdminRegistry, offset3)
-
--- | Encode OffRampDeps (full, non-optional)
-encodeOffRampDeps : OffRampDeps -> BytesHex
-encodeOffRampDeps deps =
-  encodeRawInstanceAddress deps.globalConfig <>
-  encodeRawInstanceAddress deps.rmnRemote <>
-  encodeRawInstanceAddress deps.tokenAdminRegistry

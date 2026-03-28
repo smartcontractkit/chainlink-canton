@@ -1,0 +1,20 @@
+module CCIP.ExecutorTypes where
+
+data RemoteChainConfig = RemoteChainConfig
+    with
+        feeUSDCents : Numeric 0
+        enabled : Bool
+    deriving (Eq, Show)
+
+data RemoteChainConfigArgs = RemoteChainConfigArgs
+    with
+        destChainSelector : Numeric 0
+        config : RemoteChainConfig
+    deriving (Eq, Show)
+
+data DynamicConfig = DynamicConfig
+    with
+        feeAggregator : Optional Party
+        minBlockConfirmations : Int
+        ccvAllowlistEnabled : Bool
+    deriving (Eq, Show)

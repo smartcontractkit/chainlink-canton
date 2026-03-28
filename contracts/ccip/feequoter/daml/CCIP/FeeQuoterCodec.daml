@@ -12,26 +12,16 @@ module CCIP.FeeQuoterCodec (
     ) where
 
 import DA.Crypto.Text (BytesHex)
-import DA.Optional (fromSome)
 
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FeeQuoterTypes (
-    FeeTokenArgs(..),
-    DestChainConfigArgs(..),
-    DestChainConfig(..),
+    FeeTokenArgs,
+    DestChainConfigArgs,
     PriceUpdates(..),
-    TokenPriceUpdate(..),
-    GasPriceUpdate(..),
     )
 
 import MCMS.Codec (
-    encodeBool,
-    decodeBoolAt,
-    encodeNumeric0,
-    decodeNumeric0At,
-    encodeInt64,
-    decodeInt64At,
     encodeList,
     decodeList,
     encodeParty,
@@ -41,18 +31,24 @@ import CCIP.Codec (
     encodeInstrumentId,
     decodeInstrumentId,
     )
+import CCIP.FeeQuoterCodecGen (
+    encodePriceUpdates,
+    decodePriceUpdatesAt,
+    encodeFeeTokenArgs,
+    decodeFeeTokenArgsAt,
+    encodeDestChainConfigArgs,
+    decodeDestChainConfigArgsAt,
+    )
 
 -- ===============================================
 -- |          ApplyPriceUpdatersUpdate           |
 -- ===============================================
 
--- Encode
 encodeApplyPriceUpdatersUpdateParams : ([Party], [Party]) -> BytesHex
 encodeApplyPriceUpdatersUpdateParams (addedPriceUpdaters, removedPriceUpdaters) =
     encodeList addedPriceUpdaters encodeParty <>
     encodeList removedPriceUpdaters encodeParty
 
--- Decode
 decodeApplyPriceUpdatersUpdateParams : BytesHex -> Optional (([Party], [Party]), Int)
 decodeApplyPriceUpdatersUpdateParams encoded = do
     (addedPriceUpdaters, offset1) <- decodeList encoded 0 decodePartyAt
@@ -63,28 +59,10 @@ decodeApplyPriceUpdatersUpdateParams encoded = do
 -- |                UpdatePrices                 |
 -- ===============================================
 
--- Encode
 encodeUpdatePricesParams : (PriceUpdates, Party) -> BytesHex
 encodeUpdatePricesParams (priceUpdates, caller) =
     encodePriceUpdates priceUpdates <>
     encodeParty caller
-
-encodePriceUpdates : PriceUpdates -> BytesHex
-encodePriceUpdates priceUpdates =
-    encodeList priceUpdates.tokenPriceUpdates encodeTokenPriceUpdate <>
-    encodeList priceUpdates.gasPriceUpdates encodeGasPriceUpdate
-
-encodeTokenPriceUpdate : TokenPriceUpdate -> BytesHex
-encodeTokenPriceUpdate tpu =
-    encodeInstrumentId tpu.instrumentId <>
-    encodeNumeric0 tpu.usdPerToken
-
-encodeGasPriceUpdate : GasPriceUpdate -> BytesHex
-encodeGasPriceUpdate gpu =
-    encodeNumeric0 gpu.destChainSelector <>
-    encodeNumeric0 gpu.usdPerUnitGas
-
--- Decode
 
 decodeUpdatePricesParams : BytesHex -> Optional ((PriceUpdates, Party), Int)
 decodeUpdatePricesParams encoded = do
@@ -92,121 +70,30 @@ decodeUpdatePricesParams encoded = do
     (caller, finalOffset) <- decodePartyAt encoded offset
     Some ((priceUpdates, caller), finalOffset)
 
-decodePriceUpdatesAt : BytesHex -> Int -> Optional (PriceUpdates, Int)
-decodePriceUpdatesAt encoded offset = do
-    (tokenPriceUpdates, offset1) <- decodeList encoded offset decodeTokenPriceUpdateAt
-    (gasPriceUpdates, finalOffset) <- decodeList encoded offset1 decodeGasPriceUpdateAt
-    Some (PriceUpdates with
-            tokenPriceUpdates
-            gasPriceUpdates
-        , finalOffset)
-
-decodeTokenPriceUpdateAt : BytesHex -> Int -> Optional (TokenPriceUpdate, Int)
-decodeTokenPriceUpdateAt encoded offset = do
-    (instrumentId, offset1) <- decodeInstrumentId encoded offset
-    (usdPerToken, finalOffset) <- decodeNumeric0At encoded offset1
-    Some (TokenPriceUpdate with
-            instrumentId
-            usdPerToken
-        , finalOffset)
-
-decodeGasPriceUpdateAt : BytesHex -> Int -> Optional (GasPriceUpdate, Int)
-decodeGasPriceUpdateAt encoded offset = do
-    (destChainSelector, offset1) <- decodeNumeric0At encoded offset
-    (usdPerUnitGas, finalOffset) <- decodeNumeric0At encoded offset1
-    Some (GasPriceUpdate with
-            destChainSelector
-            usdPerUnitGas
-        , finalOffset)
-
 -- ===============================================
 -- |            ApplyFeeTokenUpdates             |
 -- ===============================================
 
--- Encode
 encodeApplyFeeTokenUpdatesParams : ([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs]) -> BytesHex
 encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd) =
     encodeList feeTokensToRemove encodeInstrumentId
     <> encodeList feeTokensToAdd encodeFeeTokenArgs
 
-encodeFeeTokenArgs : FeeTokenArgs -> BytesHex
-encodeFeeTokenArgs fta =
-    encodeInstrumentId fta.instrumentId
-
--- Decode
 decodeApplyFeeTokenUpdatesParams : BytesHex -> Optional (([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs]), Int)
 decodeApplyFeeTokenUpdatesParams encoded = do
     (feeTokensToRemove, offset1) <- decodeList encoded 0 decodeInstrumentId
     (feeTokensToAdd, finalOffset) <- decodeList encoded offset1 decodeFeeTokenArgsAt
     Some ((feeTokensToRemove, feeTokensToAdd), finalOffset)
 
-decodeFeeTokenArgsAt : BytesHex -> Int -> Optional (FeeTokenArgs, Int)
-decodeFeeTokenArgsAt encoded offset = do
-    (instrumentId, finalOffset) <- decodeInstrumentId encoded offset
-    Some (FeeTokenArgs with
-            instrumentId
-        , finalOffset)
-
 -- ===============================================
 -- |         ApplyDestChainConfigUpdates         |
 -- ===============================================
 
--- Encode
 encodeApplyDestChainConfigUpdatesParams : ([DestChainConfigArgs]) -> BytesHex
 encodeApplyDestChainConfigUpdatesParams destChainConfigArgs =
     encodeList destChainConfigArgs encodeDestChainConfigArgs
 
-encodeDestChainConfigArgs : DestChainConfigArgs -> BytesHex
-encodeDestChainConfigArgs dcca =
-    encodeNumeric0 dcca.destChainSelector
-    <> encodeDestChainConfig dcca.destChainConfig
-
-encodeDestChainConfig : DestChainConfig -> BytesHex
-encodeDestChainConfig dcc =
-    encodeBool dcc.isEnabled <>
-    fromSome (encodeInt64 dcc.maxDataBytes) <>
-    fromSome (encodeInt64 dcc.maxPerMsgGasLimit) <>
-    fromSome (encodeInt64 dcc.destGasOverhead) <>
-    fromSome (encodeInt64 dcc.destGasPerPayloadByteBase) <>
-    fromSome (encodeInt64 dcc.defaultTxGasLimit) <>
-    encodeNumeric0 dcc.linkFeeMultiplierPercent <>
-    encodeNumeric0 dcc.defaultTokenFeeUSD <>
-    fromSome (encodeInt64 dcc.defaultTokenDestGasOverhead)
-
--- Decode
 decodeApplyDestChainConfigUpdatesParams : BytesHex -> Optional ([DestChainConfigArgs], Int)
 decodeApplyDestChainConfigUpdatesParams encoded = do
     (destChainConfigArgs, finalOffset) <- decodeList encoded 0 decodeDestChainConfigArgsAt
     Some (destChainConfigArgs, finalOffset)
-
-decodeDestChainConfigArgsAt : BytesHex -> Int -> Optional (DestChainConfigArgs, Int)
-decodeDestChainConfigArgsAt encoded offset = do
-    (destChainSelector, offset1) <- decodeNumeric0At encoded offset
-    (destChainConfig, finalOffset) <- decodeDestChainConfigAt encoded offset1
-    Some (DestChainConfigArgs with
-            destChainSelector
-            destChainConfig
-        , finalOffset)
-
-decodeDestChainConfigAt : BytesHex -> Int -> Optional (DestChainConfig, Int)
-decodeDestChainConfigAt encoded offset = do
-  (isEnabled, offset1) <- decodeBoolAt encoded offset
-  (maxDataBytes, offset2) <- decodeInt64At encoded offset1
-  (maxPerMsgGasLimit, offset3) <- decodeInt64At encoded offset2
-  (destGasOverhead, offset4) <- decodeInt64At encoded offset3
-  (destGasPerPayloadByteBase, offset5) <- decodeInt64At encoded offset4
-  (defaultTxGasLimit, offset6) <- decodeInt64At encoded offset5
-  (linkFeeMultiplierPercent, offset7) <- decodeNumeric0At encoded offset6
-  (defaultTokenFeeUSD, offset8) <- decodeNumeric0At encoded offset7
-  (defaultTokenDestGasOverhead, finalOffset) <- decodeInt64At encoded offset8
-  Some (DestChainConfig with 
-            isEnabled
-            maxDataBytes
-            maxPerMsgGasLimit
-            destGasOverhead
-            destGasPerPayloadByteBase
-            defaultTxGasLimit
-            linkFeeMultiplierPercent
-            defaultTokenFeeUSD
-            defaultTokenDestGasOverhead
-        , finalOffset)
