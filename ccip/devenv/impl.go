@@ -21,10 +21,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
+	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -50,6 +53,8 @@ import (
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	// Side-effect: registers Canton LaneAdapter and other deployment adapters.
+	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -61,11 +66,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-
-	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
 )
 
 var (
@@ -115,10 +115,6 @@ type Chain struct {
 	cfg                           *ccv.Cfg
 }
 
-func (c *Chain) ChainSelector() uint64 {
-	return c.chainDetails.ChainSelector
-}
-
 func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
 	if err != nil {
@@ -139,6 +135,10 @@ func NewEmptyCCIP17Canton(logger zerolog.Logger) *Chain {
 	return &Chain{
 		logger: logger,
 	}
+}
+
+func (c *Chain) ChainSelector() uint64 {
+	return c.chainDetails.ChainSelector
 }
 
 // ChainFamily implements cciptestinterfaces.CCIP17Configuration.
@@ -401,22 +401,6 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	if err != nil {
 		return nil, err
 	}
-
-	// Add token pool refs expected by token transfer configuration.
-	// Keep qualifier/type/version aligned with devenv token combinations (e.g. TEST BurnMintTokenPool 1.6.1).
-	// for i, combo := range devenvcommon.AllTokenCombinations() {
-	// 	addressRef := combo.DestPoolAddressRef()
-	// 	err = runningDS.AddressRefStore.Add(datastore.AddressRef{
-	// 		Address:       contracts.MustNewInstanceID("dst-token-pool-" + strconv.Itoa(i)).RawInstanceAddress(types.PARTY(participant.PartyID)).InstanceAddress().Hex(),
-	// 		Type:          addressRef.Type,
-	// 		Version:       addressRef.Version,
-	// 		Qualifier:     addressRef.Qualifier,
-	// 		ChainSelector: selector,
-	// 	})
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to add dst token pool address ref: %w", err)
-	// 	}
-	// }
 
 	env.DataStore = runningDS.Seal()
 

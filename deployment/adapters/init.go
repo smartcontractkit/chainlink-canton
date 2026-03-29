@@ -4,16 +4,26 @@ import (
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 )
+
+var tokenPoolVersions = []string{
+	"1.6.1",
+	"2.0.0",
+}
 
 func init() {
 	v := semver.MustParse("2.0.0")
 
-	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyCanton, v, &ChainFamilyAdapter{})
-	adapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyCanton, &CantonCommitteeVerifierContractAdapter{})
-	adapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyCanton, &CantonAggregatorConfigAdapter{})
-	adapters.GetIndexerConfigRegistry().Register(chainsel.FamilyCanton, &CantonIndexerConfigAdapter{})
-	adapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyCanton, &CantonVerifierJobConfigAdapter{})
-	adapters.GetExecutorConfigRegistry().Register(chainsel.FamilyCanton, &CantonExecutorConfigAdapter{})
+	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyCanton, v, &CantonLaneAdapter{})
+	ccipadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyCanton, &CantonCommitteeVerifierContractAdapter{})
+	ccipadapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyCanton, &CantonAggregatorConfigAdapter{})
+	ccipadapters.GetIndexerConfigRegistry().Register(chainsel.FamilyCanton, &CantonIndexerConfigAdapter{})
+	ccipadapters.GetVerifierJobConfigRegistry().Register(chainsel.FamilyCanton, &CantonVerifierJobConfigAdapter{})
+	ccipadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyCanton, &CantonExecutorConfigAdapter{})
+	// Register the canton token adapter for the canton family.
+	for _, version := range tokenPoolVersions {
+		tokenscore.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyCanton, semver.MustParse(version), CantonTokenAdapter{})
+	}
 }

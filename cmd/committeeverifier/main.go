@@ -7,14 +7,13 @@ import (
 
 	"github.com/BurntSushi/toml"
 	_ "github.com/lib/pq"
-	"go.uber.org/zap/zapcore"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/bootstrap"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	cmd "github.com/smartcontractkit/chainlink-ccv/verifier/cmd"
 	"github.com/smartcontractkit/chainlink-ccv/verifier/pkg/commit"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/accessors"

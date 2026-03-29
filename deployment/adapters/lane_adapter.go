@@ -18,24 +18,24 @@ import (
 	dsutil "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 )
 
-var _ lanes.LaneAdapter = &ChainFamilyAdapter{}
+var _ lanes.LaneAdapter = &CantonLaneAdapter{}
 
-type ChainFamilyAdapter struct{}
+type CantonLaneAdapter struct{}
 
-func (c ChainFamilyAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (c CantonLaneAdapter) ConfigureLaneLegAsSource() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
 	return sequences.ConfigureLaneLegAsSource
 }
 
-func (c ChainFamilyAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (c CantonLaneAdapter) ConfigureLaneLegAsDest() *operations.Sequence[lanes.UpdateLanesInput, seq_core.OnChainOutput, chain.BlockChains] {
 	return sequences.ConfigureLaneLegAsDest
 }
 
-func (c ChainFamilyAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, chain.BlockChains] {
+func (c CantonLaneAdapter) DisableRemoteChain() *operations.Sequence[lanes.DisableRemoteChainInput, seq_core.OnChainOutput, chain.BlockChains] {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (c ChainFamilyAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+func (c CantonLaneAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	return datastore2.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(onramp.ContractType),
@@ -43,7 +43,7 @@ func (c ChainFamilyAdapter) GetOnRampAddress(ds datastore.DataStore, chainSelect
 	}, chainSelector, dsutil.ToInstanceAddressBytes)
 }
 
-func (c ChainFamilyAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+func (c CantonLaneAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	return datastore2.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(offramp.ContractType),
@@ -51,11 +51,11 @@ func (c ChainFamilyAdapter) GetOffRampAddress(ds datastore.DataStore, chainSelec
 	}, chainSelector, dsutil.ToInstanceAddressBytes)
 }
 
-func (c ChainFamilyAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+func (c CantonLaneAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	return nil, nil
 }
 
-func (c ChainFamilyAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+func (c CantonLaneAdapter) GetFQAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	return datastore2.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(fee_quoter.ContractType),
@@ -63,7 +63,7 @@ func (c ChainFamilyAdapter) GetFQAddress(ds datastore.DataStore, chainSelector u
 	}, chainSelector, dsutil.ToInstanceAddressBytes)
 }
 
-func (c ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
+func (c CantonLaneAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	// TODO update Canton values
 	return lanes.FeeQuoterDestChainConfig{
 		OverrideExistingConfig:      false,
@@ -85,7 +85,7 @@ func (c ChainFamilyAdapter) GetFeeQuoterDestChainConfig() lanes.FeeQuoterDestCha
 	}
 }
 
-func (c ChainFamilyAdapter) GetDefaultGasPrice() *big.Int {
+func (c CantonLaneAdapter) GetDefaultGasPrice() *big.Int {
 	// TODO calculate this
 	return big.NewInt(38)
 }

@@ -9,8 +9,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
@@ -22,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -183,9 +182,6 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 	// Manually execute
 	executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(ctx, message, 0, []protocol.UnknownAddress{result.IndexedVerifications.Results[0].VerifierResult.VerifierDestAddress}, [][]byte{result.IndexedVerifications.Results[0].VerifierResult.CCVData})
-	fmt.Print("\n\n\n")
-	fmt.Println(message)
-	fmt.Print("\n\n\n")
 	require.NoError(t, err, "failed to manually execute message on Canton chain")
 	require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State, "expected message execution to succeed")
 	require.EqualValues(t, srcSelector, executionStateChangedEvent.SourceChainSelector, "expected source chain selector to match")
