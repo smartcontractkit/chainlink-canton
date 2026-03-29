@@ -53,8 +53,6 @@ import (
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	// Side-effect: registers Canton LaneAdapter and other deployment adapters.
-	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -66,6 +64,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+
+	// Side-effect: registers Canton LaneAdapter and other deployment adapters.
+	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 var (
