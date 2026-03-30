@@ -2,6 +2,7 @@ package authorizationcode
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net"
@@ -119,30 +120,94 @@ func newTokenServer(t *testing.T) *httptest.Server {
 			return
 		}
 
-		if r.Form.Get("grant_type") != "authorization_code" {
-			t.Errorf("expected grant_type=authorization_code, got %q", r.Form.Get("grant_type"))
-		}
-		if r.Form.Get("code") == "" {
-			t.Errorf("expected code to be set")
-		}
-		if r.Form.Get("code_verifier") == "" {
-			t.Errorf("expected code_verifier to be set")
-		}
+		switch grantType := r.Form.Get("grant_type"); grantType {
+		case "authorization_code":
+			if r.Form.Get("code") == "" {
+				t.Errorf("expected code to be set")
+			}
+			if r.Form.Get("code_verifier") == "" {
+				t.Errorf("expected code_verifier to be set")
+			}
 
-		payload, err := json.Marshal(map[string]any{
-			"access_token": "auth-code-token",
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-		})
-		if err != nil {
-			t.Errorf("encoding response: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			payload, err := json.Marshal(map[string]any{
+				"access_token": "auth-code-token",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+			if err != nil {
+				t.Errorf("encoding response: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(payload)
+		default:
+			t.Errorf("unexpected grant_type %q", grantType)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+}
+
+func newRefreshingTokenServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("parsing form: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
 
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(payload)
+		switch grantType := r.Form.Get("grant_type"); grantType {
+		case "authorization_code":
+			if r.Form.Get("code") == "" {
+				t.Errorf("expected code to be set")
+			}
+			if r.Form.Get("code_verifier") == "" {
+				t.Errorf("expected code_verifier to be set")
+			}
+
+			payload, err := json.Marshal(map[string]any{
+				"access_token":  "auth-code-token",
+				"refresh_token": "refresh-token",
+				"token_type":    "Bearer",
+				"expires_in":    -1,
+			})
+			if err != nil {
+				t.Errorf("encoding response: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(payload)
+		case "refresh_token":
+			if r.Form.Get("refresh_token") != "refresh-token" {
+				t.Errorf("expected refresh_token to be set")
+			}
+
+			payload, err := json.Marshal(map[string]any{
+				"access_token": "refreshed-token",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+			if err != nil {
+				t.Errorf("encoding response: %v", err)
+				w.WriteHeader(http.StatusInternalServerError)
+
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(payload)
+		default:
+			t.Errorf("unexpected grant_type %q", grantType)
+			w.WriteHeader(http.StatusBadRequest)
+		}
 	}))
 }
 
@@ -278,4 +343,68 @@ func TestNewProvider_FlowCompletes(t *testing.T) {
 	token, err := result.provider.TokenSource().Token()
 	require.NoError(t, err, "requesting token")
 	require.Equal(t, "auth-code-token", token.AccessToken)
+}
+
+func TestNewProvider_RefreshUsesContextWithoutCancel(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	callbackHost := freePort(t)
+
+	tokenServer := newRefreshingTokenServer(t)
+	t.Cleanup(tokenServer.Close)
+
+	output, restore := captureStdout(t)
+	defer restore()
+
+	resultCh := make(chan struct {
+		provider *Provider
+		err      error
+	}, 1)
+
+	go func() {
+		provider, err := NewProvider(
+			ctx,
+			tokenServer.URL+"/auth",
+			tokenServer.URL+"/token",
+			"client-id",
+			WithCallbackURL("http://"+callbackHost+"/callback"),
+			WithOpenBrowser(false),
+			WithTimeout(5*time.Second),
+		)
+		resultCh <- struct {
+			provider *Provider
+			err      error
+		}{provider: provider, err: err}
+	}()
+
+	var authCodeURL string
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		authCodeURL = extractFirstURL(output.String())
+		if authCodeURL != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.NotEmpty(t, authCodeURL, "auth code URL not found in output")
+
+	parsed, err := url.Parse(authCodeURL)
+	require.NoError(t, err, "parsing auth URL")
+	state := parsed.Query().Get("state")
+	require.NotEmpty(t, state, "state not found in auth URL")
+
+	callbackURL := "http://" + callbackHost + "/callback?code=code123&state=" + url.QueryEscape(state)
+	response, err := http.Get(callbackURL) //nolint:gosec,noctx
+	require.NoError(t, err, "requesting callback")
+	require.NoError(t, response.Body.Close())
+
+	result := <-resultCh
+	require.NoError(t, result.err)
+	require.NotNil(t, result.provider)
+
+	cancel()
+
+	refreshedToken, err := result.provider.TokenSource().Token()
+	require.NoError(t, err, "refreshing token after parent context cancellation")
+	require.Equal(t, "refreshed-token", refreshedToken.AccessToken)
 }

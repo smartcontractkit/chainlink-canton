@@ -47,7 +47,7 @@ type authorizationCodeProviderConfig struct {
 
 func defaultAuthorizationCodeProviderConfig() *authorizationCodeProviderConfig {
 	return &authorizationCodeProviderConfig{
-		scopes: []string{"openid", "daml_ledger_api"},
+		scopes: []string{"openid", "daml_ledger_api", "offline_access"},
 		transportCredentials: credentials.NewTLS(
 			&tls.Config{
 				MinVersion: tls.VersionTLS12,
@@ -279,7 +279,8 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 		return nil, fmt.Errorf("callback server error: %w", err)
 	case token := <-callbackChan:
 		fmt.Println("Authentication completed")
-		tokenSource := oauthCfg.TokenSource(ctx, token)
+		refreshCtx := context.WithoutCancel(ctx)
+		tokenSource := oauthCfg.TokenSource(refreshCtx, token)
 
 		return &Provider{
 			tokenSource:          oauth.TokenSource{TokenSource: tokenSource},

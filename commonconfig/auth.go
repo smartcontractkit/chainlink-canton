@@ -96,7 +96,7 @@ func (a *AuthConfig) NewProvider(ctx context.Context) (authentication.Provider, 
 			return nil, fmt.Errorf("authorizationCode auth requires auth_url and client_id")
 		}
 
-		return authorizationcode.NewDiscoveryProvider(ctx, a.AuthURL, a.ClientID)
+		return authorizationcode.NewDiscoveryProvider(ctx, a.AuthURL, a.ClientID, authorizationcode.WithScopes("openid", "daml_ledger_api", "offline_access"))
 
 	default:
 		return nil, fmt.Errorf("unsupported auth type: %q (expected static, insecureStatic, clientCredentials, or authorizationCode)", authType)
