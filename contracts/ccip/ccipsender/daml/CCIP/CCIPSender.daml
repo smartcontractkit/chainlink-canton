@@ -18,6 +18,32 @@ import qualified CCIP.TokenAdminRegistry
 
 import MCMS.RawInstanceAddress (assertValidInstanceId)
 
+data CCVSendInput = CCVSendInput
+    with
+        ccvCid : ContractId ICCV.ICrossChainVerifier
+        ccvExtraContext : CCIP.Context.CCIPContext
+    deriving (Eq, Show)
+
+data FeeTokenInput = FeeTokenInput
+    with
+        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+    deriving (Eq, Show)
+
+data TokenTransferInput = TokenTransferInput
+    with
+        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
+        poolExtraContext : CCIP.Context.CCIPContext
+        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+    deriving (Eq, Show)
+
+data ExecutorInput = ExecutorInput
+    with
+        executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
+        executorExtraContext : CCIP.Context.CCIPContext
+    deriving (Eq, Show)
+
 data GetFeeResult = GetFeeResult
     with
         -- Final amount payable in the selected fee token, including CCV fees,
@@ -41,6 +67,7 @@ template CCIPSender
                 message : CCIP.Client.Canton2AnyMessage
                 context : CCIP.Context.CCIPContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
+                tokenPoolCid : Optional ContractId CCIP.Interfaces.TokenPool.ITokenPool
             controller owner
             do
                 tokenPoolRequiredCCVs <- case message.tokenTransfer of
@@ -68,9 +95,11 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                ccvs : [CCIP.Client.CCVSendInput]
                 context : CCIP.Context.CCIPContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
+                ccvSendInputs : [CCVSendInput]
+                tokenTransferInput : Optional TokenTransferInput
+                executorInput : Optional ExecutorInput
             controller owner
             do
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
@@ -138,9 +167,12 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                ccvs : [CCIP.Client.CCVSendInput]
                 context : CCIP.Context.CCIPContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
+                feeTokenInput : FeeTokenInput
+                ccvSendInputs : [CCVSendInput]
+                tokenTransferInput : Optional TokenTransferInput
+                executorInput : Optional ExecutorInput
             controller owner
             do
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
