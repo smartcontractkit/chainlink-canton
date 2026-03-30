@@ -212,8 +212,7 @@ template Executor
                     (length canonicalCCVs <= maxCCVsPerMsg)
 
                 pure CCIP.Interfaces.Executor.ExecutorFeeQuote with
-                    executorInstanceId = instanceId
-                    executorOwner = owner
+                    executor = RawInstanceAddress.make instanceId owner
                     feeUSDCents = remoteCfg.feeUSDCents
 
         interface instance MCMSReceiver for Executor where

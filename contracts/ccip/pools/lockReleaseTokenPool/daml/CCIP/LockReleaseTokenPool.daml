@@ -748,8 +748,7 @@ template LockReleaseTokenPool
                 case Map.lookup destChainSelector tokenTransferFeeConfigs of
                     Some feeConfig | feeConfig.isEnabled ->
                         pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
-                            poolInstanceId = instanceId
-                            poolOwner = poolOwner
+                            pool = RawInstanceAddress.make instanceId poolOwner
                             feeUSDCents = feeConfig.feeUSDCents
                             destGasOverhead = feeConfig.destGasOverhead
                             destBytesOverhead = feeConfig.destBytesOverhead
@@ -762,8 +761,7 @@ template LockReleaseTokenPool
                                 token = tokenInstrumentId
                                 caller = poolOwner
                         pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
-                            poolInstanceId = instanceId
-                            poolOwner = poolOwner
+                            pool = RawInstanceAddress.make instanceId poolOwner
                             feeUSDCents = feeUSDCents
                             destGasOverhead = destGasOverhead
                             destBytesOverhead = destBytesOverhead

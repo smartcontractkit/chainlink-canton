@@ -16,6 +16,8 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
+import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
+import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
@@ -261,14 +263,11 @@ template PerPartyRouter
             with
                 context : CCIP.Context.CCIPContext
                 destChainSelector : Numeric 0
-                payload : BytesHex
-                ccipReceiveGasLimit : Int
-                quotedCCVFees : [CCIP.SendingMessageV1.CCVFee]
-                quotedTokenSendFee : Optional CCIP.SendingMessageV1.TokenSendFee
-                quotedExecutionMode : CCIP.SendingMessageV1.ExecutionMode
-                quotedExecutorFee : Optional CCIP.SendingMessageV1.ExecutorFee
+                message : CCIP.Client.Canton2AnyMessage
+                ccvFeeQuotes : [ICCV.CrossChainVerifierFeeQuote]
+                tokenPoolFeeQuote : Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
                 executorArgs : BytesHex
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+                executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -287,20 +286,34 @@ template PerPartyRouter
                 RawInstanceAddress.assertEqual "router: feequoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
+                extraArgs <- case message.extraArgs of
+                    CCIP.Client.V3 v3 -> pure v3
+                    _ -> abort "router: unsupported extraArgs version"
+                assertMsg "router: executor quote/args mismatch"
+                    (case executorFeeQuote of
+                        None -> executorArgs == ""
+                        Some _ -> True)
+                assertMsg "router: executor quote inconsistent with extraArgs"
+                    (case extraArgs.executorType of
+                        CCIP.Client.Executor_NoExecutor -> executorFeeQuote == None
+                        CCIP.Client.Executor_UseDefault ->
+                            extraArgs.executor /= None && executorFeeQuote /= None
+                        CCIP.Client.Executor_WithAddress _ ->
+                            extraArgs.executor /= None && executorFeeQuote /= None)
+
                 exercise onRampCid CCIP.OnRamp.GetFeeFromRouter with
                     routerPartyOwner = partyOwner
                     routerInstanceId = instanceId
                     globalConfigCid = globalConfigCid
                     feeQuoterCid = feeQuoterCid
                     destChainSelector = destChainSelector
-                    payload = payload
-                    ccipReceiveGasLimit = ccipReceiveGasLimit
-                    quotedCCVFees = quotedCCVFees
-                    quotedTokenSendFee = quotedTokenSendFee
-                    quotedExecutionMode = quotedExecutionMode
-                    quotedExecutorFee = quotedExecutorFee
+                    feeToken = message.feeToken.token
+                    payload = message.payload
+                    ccipReceiveGasLimit = extraArgs.gasLimit
+                    ccvFeeQuotes = ccvFeeQuotes
+                    tokenPoolFeeQuote = tokenPoolFeeQuote
                     executorArgs = executorArgs
-                    feeToken = feeToken
+                    executorFeeQuote = executorFeeQuote
 
         choice SetDeps : ContractId PerPartyRouter
             with
@@ -713,6 +726,8 @@ template PerPartyRouter
             with
                 context : CCIP.Context.CCIPContext
                 destChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
+                tokenPoolRequiredCCVs : [RawInstanceAddress]
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -726,9 +741,11 @@ template PerPartyRouter
                 RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
-                exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSend with
+                exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSendFromRouter with
                     globalConfigCid = globalConfigCid
                     destChainSelector = destChainSelector
+                    message = message
+                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
 
         -- | Get all required CCV raw instance addresses for executing a message.
         nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]

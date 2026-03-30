@@ -7,6 +7,7 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Internal
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
+import MCMS.RawInstanceAddress (RawInstanceAddress)
 
 useDefaultCCVs = CCIP.Internal.useDefaultCCVs
 
@@ -70,8 +71,7 @@ data CrossChainVerifierView = CrossChainVerifierView
 
 data CrossChainVerifierFeeQuote = CrossChainVerifierFeeQuote
     with
-        ccvInstanceId : Text
-        ccvOwner : Party
+        ccv : RawInstanceAddress
         feeUSDCents : Numeric 0
         gasForVerification : Int
         payloadSizeBytes : Int

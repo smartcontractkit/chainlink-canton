@@ -42,7 +42,6 @@ data ExecutorView = ExecutorView
 
 data ExecutorFeeQuote = ExecutorFeeQuote
     with
-        executorInstanceId : Text
-        executorOwner : Party
+        executor : RawInstanceAddress
         feeUSDCents : Numeric 0
     deriving (Eq, Show)
