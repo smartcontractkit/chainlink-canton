@@ -73,32 +73,25 @@ testApplyUpdatePricesRoundtrip = do
     fst (fromSome (FeeQuoterCodec.decodeUpdatePricesParams encoded)) === args
 
 -- ===============================================
--- |            ApplyFeeTokenUpdates             |
+-- |              RemoveFeeTokens               |
 -- ===============================================
 
-testApplyFeeTokenUpdatesRoundtrip : Script ()
-testApplyFeeTokenUpdatesRoundtrip = do
-    -- Empty lists
-    let args = ([], [])
-    let encoded = FeeQuoterCodec.encodeApplyFeeTokenUpdatesParams args
-    fst (fromSome (FeeQuoterCodec.decodeApplyFeeTokenUpdatesParams encoded)) === args
-    -- Non-empty lists
+testRemoveFeeTokensRoundtrip : Script ()
+testRemoveFeeTokensRoundtrip = do
+    -- Empty list
+    let args = []
+    let encoded = FeeQuoterCodec.encodeRemoveFeeTokensParams args
+    fst (fromSome (FeeQuoterCodec.decodeRemoveFeeTokensParams encoded)) === args
+    -- Non-empty list
     issuer1 <- allocateParty "issuer1"
     issuer2 <- allocateParty "issuer2"
-    let args = (
+    let args =
             [
                 Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC",
                 Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
-            ],
-            [
-                FeeQuoterTypes.FeeTokenArgs with
-                    instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
-                , FeeQuoterTypes.FeeTokenArgs with
-                    instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
             ]
-            )
-    let encoded = FeeQuoterCodec.encodeApplyFeeTokenUpdatesParams args
-    fst (fromSome (FeeQuoterCodec.decodeApplyFeeTokenUpdatesParams encoded)) === args
+    let encoded = FeeQuoterCodec.encodeRemoveFeeTokensParams args
+    fst (fromSome (FeeQuoterCodec.decodeRemoveFeeTokensParams encoded)) === args
 
 -- ===============================================
 -- |         ApplyDestChainConfigUpdates         |
@@ -142,9 +135,9 @@ testApplyDestChainConfigUpdatesRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-    case FeeQuoterCodec.decodeApplyFeeTokenUpdatesParams "" of
+    case FeeQuoterCodec.decodeRemoveFeeTokensParams "" of
         None -> pure ()  -- Expected
-        Some _ -> abort "Expected decodeApplyFeeTokenUpdatesParams to fail on empty data"
+        Some _ -> abort "Expected decodeRemoveFeeTokensParams to fail on empty data"
 
   -- Truncated data should fail
     case FeeQuoterCodec.decodeApplyDestChainConfigUpdatesParams "00" of
