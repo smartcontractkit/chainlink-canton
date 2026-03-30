@@ -374,7 +374,8 @@ template CommitteeVerifier
                         (Map.lookup destChainSelector remoteChainConfigs)
 
                 pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
-                    ccv = RawInstanceAddress.make instanceId owner
+                    ccvInstanceId = instanceId
+                    ccvOwner = owner
                     feeUSDCents = chainConfig.feeUSDCents
                     gasForVerification = chainConfig.gasForVerification
                     payloadSizeBytes = chainConfig.payloadSizeBytes

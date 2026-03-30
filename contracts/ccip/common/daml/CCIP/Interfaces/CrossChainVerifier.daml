@@ -71,7 +71,8 @@ data CrossChainVerifierView = CrossChainVerifierView
 
 data CrossChainVerifierFeeQuote = CrossChainVerifierFeeQuote
     with
-        ccv : RawInstanceAddress
+        ccvInstanceId : Text
+        ccvOwner : Party
         feeUSDCents : Numeric 0
         gasForVerification : Int
         payloadSizeBytes : Int

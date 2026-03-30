@@ -162,7 +162,8 @@ data LockOrBurnResult = LockOrBurnResult
 
 data TokenPoolFeeQuote = TokenPoolFeeQuote
     with
-        pool : RawInstanceAddress
+        poolInstanceId : Text
+        poolOwner : Party
         feeUSDCents : Numeric 0
         destGasOverhead : Int
         destBytesOverhead : Int

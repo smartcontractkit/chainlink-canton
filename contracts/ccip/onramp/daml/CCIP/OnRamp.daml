@@ -585,7 +585,8 @@ template OnRamp
                         ("No price found for " <> sendingMsg.feeToken.id)
                         (Map.lookup sendingMsg.feeToken feeQuoter.usdPerToken)
                 let ccvFeeQuotes = map (\fee -> ICCV.CrossChainVerifierFeeQuote with
-                        ccv = RawInstanceAddress.make fee.ccvInstanceId fee.ccvOwner
+                        ccvInstanceId = fee.ccvInstanceId
+                        ccvOwner = fee.ccvOwner
                         feeUSDCents = fee.feeUSDCents
                         gasForVerification = fee.destGasLimit
                         payloadSizeBytes = fee.destBytesOverhead
@@ -593,7 +594,8 @@ template OnRamp
                 let tokenPoolFeeQuote = case sendingMsg.tokenSendFee of
                         None -> None
                         Some fee -> Some (CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
-                            pool = RawInstanceAddress.make fee.poolInstanceId fee.poolOwner
+                            poolInstanceId = fee.poolInstanceId
+                            poolOwner = fee.poolOwner
                             feeUSDCents = fee.feeUSDCents
                             destGasOverhead = fee.destGasOverhead
                             destBytesOverhead = fee.destBytesOverhead
@@ -604,7 +606,8 @@ template OnRamp
                         _ -> case sendingMsg.executorFee of
                             None -> None
                             Some fee -> Some (CCIP.Interfaces.Executor.ExecutorFeeQuote with
-                                executor = RawInstanceAddress.make fee.executorInstanceId fee.executorOwner
+                                executorInstanceId = fee.executorInstanceId
+                                executorOwner = fee.executorOwner
                                 feeUSDCents = fee.feeUSDCents)
                 feeResult <- calculateFeeResult
                     ccipOwner

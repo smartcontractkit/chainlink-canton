@@ -51,7 +51,8 @@ template DummyCommitteeVerifier
 
             crossChainVerifier_getFeeImpl _self _arg = do
                 pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
-                    ccv = RawInstanceAddress.make instanceId owner
+                    ccvInstanceId = instanceId
+                    ccvOwner = owner
                     feeUSDCents = feeUSDCents
                     gasForVerification = destGasLimit
                     payloadSizeBytes = destBytesOverhead
