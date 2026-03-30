@@ -124,7 +124,7 @@ template OffRamp
                 let defaultCCVs = case sourceConfigOpt of
                         None -> []
                         Some config ->
-                            if null laneMandatedCCVs && null receiverRequiredCCVs
+                            if null receiverRequiredCCVs
                             then config.defaultCCVs
                             else []
 
