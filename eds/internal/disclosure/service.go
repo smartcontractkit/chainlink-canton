@@ -12,7 +12,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
@@ -217,6 +216,15 @@ type CCIPExecuteDisclosures struct {
 	OutboundRateLimiter                        *apiv2.DisclosedContract
 }
 
+// tokenPoolRelatedDisclosures groups optional execute disclosures resolved from a token transfer message.
+type tokenPoolRelatedDisclosures struct {
+	TokenPool                                  *apiv2.DisclosedContract
+	TokenPoolHolding                           *apiv2.DisclosedContract
+	InboundRateLimiter                         *apiv2.DisclosedContract
+	InboundCustomBlockConfirmationsRateLimiter *apiv2.DisclosedContract
+	OutboundRateLimiter                        *apiv2.DisclosedContract
+}
+
 func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, request CCIPExecuteRequest) (CCIPExecuteDisclosures, error) {
 	offRamp, err := s.GetDisclosure(ctx, s.offRamp)
 	if err != nil {
@@ -246,7 +254,7 @@ func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, reque
 		ccvs[requestedCCV] = ccv
 	}
 
-	tokenPoolDisclosure, instrumentHoldingDisclosure, inboundRateLimiterDisclosure, inboundCustomBlockConfirmationsRateLimiterDisclosure, outboundRateLimiterDisclosure, err := s.getTokenPoolRelatedDisclosures(ctx, request.Message)
+	extras, err := s.getTokenPoolRelatedDisclosures(ctx, request.Message)
 	if err != nil {
 		return CCIPExecuteDisclosures{}, fmt.Errorf("can't get token pool and holding disclosure: %w", err)
 	}
@@ -257,6 +265,87 @@ func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, reque
 		TokenAdminRegistry: tokenAdminRegistry,
 		RMNRemote:          rmnRemote,
 		CCVs:               ccvs,
+		TokenPool:          extras.TokenPool,
+		TokenPoolHolding:   extras.TokenPoolHolding,
+		InboundRateLimiter: extras.InboundRateLimiter,
+		InboundCustomBlockConfirmationsRateLimiter: extras.InboundCustomBlockConfirmationsRateLimiter,
+		OutboundRateLimiter:                        extras.OutboundRateLimiter,
+	}, nil
+}
+
+func (s *DisclosureService) getTokenPoolRelatedDisclosures(ctx context.Context, message *protocol.Message) (tokenPoolRelatedDisclosures, error) {
+	if message == nil {
+		// Nothing to do, can't provide disclosures for token pool and holdings if we don't have message data
+		return tokenPoolRelatedDisclosures{}, nil
+	}
+
+	// To get the token pool, we need to query the token admin registry for the token pool instance address.
+	if message.TokenTransfer == nil || len(message.TokenTransfer.DestTokenAddress) == 0 {
+		// If a message doesn't have a token transfer there will be no disclosures for either the token pool or the instrument holding.
+		return tokenPoolRelatedDisclosures{}, nil
+	}
+
+	// get the created event of the token admin registry via the update store.
+	tarActiveContract := s.contractStore.GetContract(ctx, s.tokenAdminRegistry)
+	if tarActiveContract == nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("token admin registry contract not found in update store (instance: %v)", s.tokenAdminRegistry)
+	}
+	tarCreatedEvent, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenAdminRegistry](tarActiveContract.GetCreatedEvent())
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't unmarshal tokenAdminRegistry created event: %w", err)
+	}
+
+	// get the token pool instance address from the created event.
+	// Note that the destTokenAddress is the hashed instrumentId, which is what the mapping
+	// in the TokenAdminRegistry uses as a key.
+	tokenPoolInstanceAddress, instrumentID, err := getTokenPoolAddressAndInstrumentID(tarCreatedEvent, message.TokenTransfer.DestTokenAddress)
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get token pool instance address from token admin registry createdEvent: %w", err)
+	}
+
+	tokenPoolDisclosure, err := s.GetDisclosure(ctx, tokenPoolInstanceAddress)
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get token pool disclosure: %w", err)
+	}
+
+	// TODO: get the rate limiters from the tp created event.
+	tpActiveContract := s.contractStore.GetContract(ctx, tokenPoolInstanceAddress)
+	if tpActiveContract == nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("token pool contract not found in update store (instance: %v)", tokenPoolInstanceAddress)
+	}
+
+	tpCreatedEvent, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](tpActiveContract.GetCreatedEvent())
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't unmarshal token pool created event: %w", err)
+	}
+
+	inboundRateLimiterInstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress, outboundRateLimiterInstanceAddress, err := getRateLimiterInstanceAddresses(uint64(message.SourceChainSelector), tpCreatedEvent)
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get rate limiter instance addresses from token pool: %w", err)
+	}
+
+	inboundRateLimiterDisclosure, err := s.GetDisclosure(ctx, inboundRateLimiterInstanceAddress)
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get inbound rate limiter disclosure: %w", err)
+	}
+
+	inboundCustomBlockConfirmationsRateLimiterDisclosure, err := s.GetDisclosure(ctx, inboundCustomBlockConfirmationsRateLimiterInstanceAddress)
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get inbound custom block confirmations rate limiter disclosure: %w", err)
+	}
+
+	outboundRateLimiterDisclosure, err := s.GetDisclosure(ctx, outboundRateLimiterInstanceAddress)
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get outbound rate limiter disclosure: %w", err)
+	}
+
+	// look up the instrument holding disclosure for the instrument id.
+	instrumentHoldingDisclosure, err := s.instrumentHoldingStore.GetInstrumentHolding(ctx, instrumentID)
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get instrument holding disclosure: %w", err)
+	}
+
+	return tokenPoolRelatedDisclosures{
 		TokenPool:          tokenPoolDisclosure,
 		TokenPoolHolding:   instrumentHoldingDisclosure,
 		InboundRateLimiter: inboundRateLimiterDisclosure,
@@ -265,101 +354,7 @@ func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, reque
 	}, nil
 }
 
-func (s *DisclosureService) getTokenPoolRelatedDisclosures(
-	ctx context.Context,
-	message *protocol.Message,
-) (
-	tokenPoolDisclosure *apiv2.DisclosedContract,
-	instrumentHoldingDisclosure *apiv2.DisclosedContract,
-	inboundRateLimiterDisclosure *apiv2.DisclosedContract,
-	inboundCustomBlockConfirmationsRateLimiterDisclosure *apiv2.DisclosedContract,
-	outboundRateLimiterDisclosure *apiv2.DisclosedContract,
-	err error,
-) {
-	if message == nil {
-		// Nothing to do, can't provide disclosures for token pool and holdings if we don't have message data
-		return nil, nil, nil, nil, nil, nil
-	}
-
-	// To get the token pool, we need to query the token admin registry for the token pool instance address.
-	if message.TokenTransfer != nil &&
-		len(message.TokenTransfer.DestTokenAddress) > 0 {
-		// get the created event of the token admin registry via the update store.
-		tarActiveContract := s.contractStore.GetContract(ctx, s.tokenAdminRegistry)
-		if tarActiveContract == nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get tokenAdminRegistry disclosure from update store: %w", err)
-		}
-		tarCreatedEvent, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenAdminRegistry](tarActiveContract.GetCreatedEvent())
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't unmarshal tokenAdminRegistry created event: %w", err)
-		}
-
-		// get the token pool instance address from the created event.
-		// Note that the destTokenAddress is the hashed instrumentId, which is what the mapping
-		// in the TokenAdminRegistry uses as a key.
-		tokenPoolInstanceAddress, instrumentID, err := getTokenPoolAddressAndInstrumentID(tarCreatedEvent, message.TokenTransfer.DestTokenAddress)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get token pool instance address from token admin registry createdEvent: %w", err)
-		}
-
-		tokenPoolDisclosure, err = s.GetDisclosure(ctx, tokenPoolInstanceAddress)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get token pool disclosure: %w", err)
-		}
-
-		// TODO: get the rate limiters from the tp created event.
-		tpActiveContract := s.contractStore.GetContract(ctx, tokenPoolInstanceAddress)
-		if tpActiveContract == nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get token pool disclosure from update store: %w", err)
-		}
-
-		tpCreatedEvent, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](tpActiveContract.GetCreatedEvent())
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't unmarshal token pool created event: %w", err)
-		}
-
-		inboundRateLimiterInstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress, outboundRateLimiterInstanceAddress, err := getRateLimiterInstanceAddresses(
-			uint64(message.SourceChainSelector),
-			tpCreatedEvent,
-			tpCreatedEvent.PoolOwner,
-		)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get rate limiter instance addresses from token pool: %w", err)
-		}
-
-		inboundRateLimiterDisclosure, err = s.GetDisclosure(ctx, inboundRateLimiterInstanceAddress)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get inbound rate limiter disclosure: %w", err)
-		}
-
-		inboundCustomBlockConfirmationsRateLimiterDisclosure, err = s.GetDisclosure(ctx, inboundCustomBlockConfirmationsRateLimiterInstanceAddress)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get inbound custom block confirmations rate limiter disclosure: %w", err)
-		}
-
-		outboundRateLimiterDisclosure, err = s.GetDisclosure(ctx, outboundRateLimiterInstanceAddress)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get outbound rate limiter disclosure: %w", err)
-		}
-
-		// look up the instrument holding disclosure for the instrument id.
-		instrumentHoldingDisclosure, err = s.instrumentHoldingStore.GetInstrumentHolding(ctx, instrumentID)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("can't get instrument holding disclosure: %w", err)
-		}
-
-		return tokenPoolDisclosure, instrumentHoldingDisclosure, inboundRateLimiterDisclosure, inboundCustomBlockConfirmationsRateLimiterDisclosure, outboundRateLimiterDisclosure, nil
-	}
-
-	// If a message doesn't have a token transfer there will be no disclosures for either the token pool or the instrument holding.
-	return nil, nil, nil, nil, nil, nil
-}
-
-func getRateLimiterInstanceAddresses(
-	remoteChainSelector uint64,
-	tpCreatedEvent *lockreleasetokenpool.LockReleaseTokenPool,
-	poolOwner types.PARTY,
-) (inboundRateLimiterInstanceAddress contracts.InstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress contracts.InstanceAddress, outboundRateLimiterInstanceAddress contracts.InstanceAddress, err error) {
+func getRateLimiterInstanceAddresses(remoteChainSelector uint64, tpCreatedEvent *lockreleasetokenpool.LockReleaseTokenPool) (inboundRateLimiterInstanceAddress contracts.InstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress contracts.InstanceAddress, outboundRateLimiterInstanceAddress contracts.InstanceAddress, err error) {
 	// look up the remote chain config for the remoteChainSelector provided
 	remoteChainConfigAny, ok := tpCreatedEvent.RemoteChainConfigs[fmt.Sprintf("%d.", remoteChainSelector)]
 	if !ok {
@@ -406,7 +401,6 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 	// -- | Maps keccak256(InstrumentId) to token configuration
 	// tokenConfigs : Map.Map BytesHex TokenConfig
 	for hashedInstrumentID, v := range tarCreatedEvent.TokenConfigs {
-
 		// check if this instrument ID corresponds to the one we expect.
 		instrumentIDBytes, err := hex.DecodeString(hashedInstrumentID)
 		if err != nil {
