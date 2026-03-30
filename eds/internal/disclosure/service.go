@@ -1,12 +1,11 @@
 package disclosure
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -398,42 +397,40 @@ func getRateLimiterInstanceAddresses(remoteChainSelector uint64, tpCreatedEvent 
 func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.TokenAdminRegistry, destTokenAddress []byte) (contracts.InstanceAddress, splice_api_token_holding_v1.InstrumentId, error) {
 	expectedHashedInstrumentID := contracts.BytesToInstanceAddress(destTokenAddress)
 
-	// -- | Maps keccak256(InstrumentId) to token configuration
-	// tokenConfigs : Map.Map BytesHex TokenConfig
-	for hashedInstrumentID, v := range tarCreatedEvent.TokenConfigs {
-		// check if this instrument ID corresponds to the one we expect.
-		instrumentIDBytes, err := hex.DecodeString(hashedInstrumentID)
-		if err != nil {
-			continue
-		}
-		if !bytes.Equal(instrumentIDBytes, expectedHashedInstrumentID.Bytes()) {
-			continue
-		}
-
-		vMap, ok := v.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		var tokenConfig tokenadminregistry.TokenConfig
-		err = ledger.MapToStruct(vMap, &tokenConfig)
-		if err != nil {
-			continue
-		}
-
-		// Construct the pool instance address from the token config.
-		poolInstanceAddress := contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).
-			RawInstanceAddress(tokenConfig.TokenPool.PoolOwner).
-			InstanceAddress()
-
-		return poolInstanceAddress, tokenConfig.InstrumentId, nil
+	if len(tarCreatedEvent.TokenConfigs) == 0 {
+		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
+			"token admin registry has no token configs, expected at least one",
+		)
 	}
 
-	return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
-		"token pool instance address not found in token admin registry data (dest token address: %s): %+v",
-		expectedHashedInstrumentID.String(),
-		tarCreatedEvent.TokenConfigs,
-	)
+	// tokenConfigs : Map.Map BytesHex TokenConfig — keys are hex encodings of the same bytes as destTokenAddress.
+	hexNo0x := strings.TrimPrefix(expectedHashedInstrumentID.Hex(), "0x")
+	v, ok := tarCreatedEvent.TokenConfigs[hexNo0x]
+	if !ok {
+		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
+			"token pool instance address not found in token admin registry data (dest token address: %s): %+v",
+			expectedHashedInstrumentID.String(),
+			tarCreatedEvent.TokenConfigs,
+		)
+	}
+
+	vMap, ok := v.(map[string]any)
+	if !ok {
+		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
+			"token config for hashed instrument id %s has unexpected type %T, should be map[string]any", hexNo0x, v)
+	}
+
+	var tokenConfig tokenadminregistry.TokenConfig
+	if err := ledger.MapToStruct(vMap, &tokenConfig); err != nil {
+		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
+			"token config for hashed instrument id %s: %w", hexNo0x, err)
+	}
+
+	poolInstanceAddress := contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).
+		RawInstanceAddress(tokenConfig.TokenPool.PoolOwner).
+		InstanceAddress()
+
+	return poolInstanceAddress, tokenConfig.InstrumentId, nil
 }
 
 type PerPartyRouterFactoryRequest struct{}
