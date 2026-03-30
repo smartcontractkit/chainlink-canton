@@ -131,7 +131,15 @@ template FeeQuoter
                 now <- getTime
                 let newUsdPerToken = foldl (\acc tpu -> Map.insert tpu.instrumentId (TimestampedPrice tpu.usdPerToken now) acc) usdPerToken priceUpdates.tokenPriceUpdates
                 let newUsdPerUnitGasByDestChainSelector = foldl (\acc gpu -> Map.insert gpu.destChainSelector (TimestampedPrice gpu.usdPerUnitGas now) acc) usdPerUnitGasByDestChainSelector priceUpdates.gasPriceUpdates
-                create this with usdPerToken = newUsdPerToken, usdPerUnitGasByDestChainSelector = newUsdPerUnitGasByDestChainSelector
+                let newFeeTokens =
+                        foldl
+                            (\acc tpu -> Set.insert tpu.instrumentId acc)
+                            feeTokens
+                            priceUpdates.tokenPriceUpdates
+                create this with
+                    feeTokens = newFeeTokens
+                    usdPerToken = newUsdPerToken
+                    usdPerUnitGasByDestChainSelector = newUsdPerUnitGasByDestChainSelector
 
         choice AddPriceUpdaters : ContractId FeeQuoter
             with
