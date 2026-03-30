@@ -307,7 +307,6 @@ func (s *DisclosureService) getTokenPoolRelatedDisclosures(ctx context.Context, 
 		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get token pool disclosure: %w", err)
 	}
 
-	// TODO: get the rate limiters from the tp created event.
 	tpActiveContract := s.contractStore.GetContract(ctx, tokenPoolInstanceAddress)
 	if tpActiveContract == nil {
 		return tokenPoolRelatedDisclosures{}, fmt.Errorf("token pool contract not found in update store (instance: %v)", tokenPoolInstanceAddress)
