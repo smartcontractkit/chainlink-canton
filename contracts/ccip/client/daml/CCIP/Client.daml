@@ -2,10 +2,6 @@ module CCIP.Client where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.Context
-import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
-import qualified CCIP.Interfaces.Executor
-import qualified CCIP.Interfaces.TokenPool
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified Splice.Api.Token.HoldingV1
 
