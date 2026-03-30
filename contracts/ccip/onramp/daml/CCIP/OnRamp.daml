@@ -135,6 +135,23 @@ data FeeCalculationResult = FeeCalculationResult
         feeTokenPrice : Decimal
     deriving (Eq, Show)
 
+data FeeCalculationInputs = FeeCalculationInputs
+    with
+        feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+        payload : BytesHex
+        executorArgs : BytesHex
+        hasTokenTransfer : Bool
+        ccipReceiveGasLimit : Int
+        ccvFeeUSDCents : Numeric 0
+        ccvGasSum : Int
+        ccvBytesSum : Int
+        poolFeeUSDCents : Numeric 0
+        poolGas : Int
+        poolBytes : Int
+        executorFeeUSDCents : Numeric 0
+        hasExecutorFee : Bool
+    deriving (Eq, Show)
+
 calculateFeeResult
     : Party
     -> Numeric 0
@@ -142,51 +159,35 @@ calculateFeeResult
     -> Numeric 0
     -> CCIP.GlobalConfig.DestChainConfig
     -> CCIP.FeeQuoter.DestChainConfig
-    -> Splice.Api.Token.HoldingV1.InstrumentId
-    -> BytesHex
-    -> Int
-    -> [ICCV.CrossChainVerifierFeeQuote]
-    -> Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
-    -> BytesHex
-    -> Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
+    -> FeeCalculationInputs
     -> Update FeeCalculationResult
-calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector destConfig feeDestConfig feeToken payload ccipReceiveGasLimit ccvFeeQuotes tokenPoolFeeQuote executorArgs executorFeeQuote = do
-    let executorFlatUSDCents = case executorFeeQuote of
-            None -> 0.0
-            Some q -> q.feeUSDCents
-    let hasTokenTransfer = isSome tokenPoolFeeQuote
-    let ccvFeeUSDCents = foldl (+) 0.0 (map (.feeUSDCents) ccvFeeQuotes)
-    let ccvGasSum = foldl (+) 0 (map (.gasForVerification) ccvFeeQuotes)
-    let ccvBytesSum = foldl (+) 0 (map (.payloadSizeBytes) ccvFeeQuotes)
-    let (poolFeeUSDCents, poolGas, poolBytes) = case tokenPoolFeeQuote of
-            None -> (0.0, 0, 0)
-            Some q -> (q.feeUSDCents, q.destGasOverhead, q.destBytesOverhead)
-    let executorDestGasLimit = destConfig.baseExecutionGasCost + ccipReceiveGasLimit
-    let executorDestBytesOverhead = if hasTokenTransfer
+calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector destConfig feeDestConfig inputs = do
+    let executorDestGasLimit = destConfig.baseExecutionGasCost + inputs.ccipReceiveGasLimit
+    let executorDestBytesOverhead = if inputs.hasTokenTransfer
             then computeExecutorDestBytesOverheadWithToken
                 destConfig.addressBytesLength
-                (byteCount payload)
-                (byteCount executorArgs)
+                (byteCount inputs.payload)
+                (byteCount inputs.executorArgs)
             else computeExecutorDestBytesOverhead
                 destConfig.addressBytesLength
-                (byteCount payload)
-                (byteCount executorArgs)
+                (byteCount inputs.payload)
+                (byteCount inputs.executorArgs)
 
     let nonCalldataGas =
             feeDestConfig.destGasOverhead
-            + ccvGasSum
-            + poolGas
+            + inputs.ccvGasSum
+            + inputs.poolGas
             + executorDestGasLimit
     let calldataSize =
-            byteCount payload
-            + ccvBytesSum
-            + poolBytes
+            byteCount inputs.payload
+            + inputs.ccvBytesSum
+            + inputs.poolBytes
             + executorDestBytesOverhead
     quote <- exercise feeQuoterCid CCIP.FeeQuoter.QuoteGasForExec with
         destChainSelector = destChainSelector
         nonCalldataGas
         calldataSize
-        feeToken = feeToken
+        feeToken = inputs.feeToken
         caller = ccipOwner
 
     -- Apply the premium multiplier to USD-cent fees for the cap check.
@@ -194,20 +195,20 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
     let premiumMultiplierN = CCIP.Math.decimalToNumeric0 quote.premiumMultiplier
     let premiumize feeUSDCents =
             CCIP.Math.mulDivDown feeUSDCents premiumMultiplierN CCIP.Math.premiumIdentity
-    let networkFeeUSDCents = if hasTokenTransfer
+    let networkFeeUSDCents = if inputs.hasTokenTransfer
             then destConfig.tokenNetworkFeeUSDCents
             else destConfig.messageNetworkFeeUSDCents
     let networkPremiumUSDCents = premiumize networkFeeUSDCents
-    let ccvPremiumUSDCents = premiumize ccvFeeUSDCents
-    let poolPremiumUSDCents = premiumize poolFeeUSDCents
-    let executionCostUSDCents = if isSome executorFeeQuote
+    let ccvPremiumUSDCents = premiumize inputs.ccvFeeUSDCents
+    let poolPremiumUSDCents = premiumize inputs.poolFeeUSDCents
+    let executionCostUSDCents = if inputs.hasExecutorFee
             then quote.gasCostUSDCents
             else 0.0
     let totalUSDCents =
             ccvPremiumUSDCents
             + poolPremiumUSDCents
             + networkPremiumUSDCents
-            + executorFlatUSDCents
+            + inputs.executorFeeUSDCents
             + executionCostUSDCents
     assertMsg "onramp: message fee exceeds maxUSDCentsPerMsg"
         (totalUSDCents <= maxUSDCentsPerMsg)
@@ -224,10 +225,10 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
             let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
             in CCIP.Math.mulDivDown feeUsd10 CCIP.Math.premiumIdentity feeTokenPriceN
     let totalFeeTokenAmount =
-            convertWithPremium ccvFeeUSDCents
-            + convertWithPremium poolFeeUSDCents
+            convertWithPremium inputs.ccvFeeUSDCents
+            + convertWithPremium inputs.poolFeeUSDCents
             + convertWithPremium networkFeeUSDCents
-            + convertDirect executorFlatUSDCents
+            + convertDirect inputs.executorFeeUSDCents
             + convertDirect executionCostUSDCents
 
     pure FeeCalculationResult with
@@ -515,6 +516,28 @@ template OnRamp
                         destChainSelector = destChainSelector
                         caller = ccipOwner
 
+                let inputs = FeeCalculationInputs with
+                        feeToken = feeToken
+                        payload = payload
+                        executorArgs = executorArgs
+                        hasTokenTransfer = isSome tokenPoolFeeQuote
+                        ccipReceiveGasLimit = ccipReceiveGasLimit
+                        ccvFeeUSDCents = foldl (+) 0.0 (map (.feeUSDCents) ccvFeeQuotes)
+                        ccvGasSum = foldl (+) 0 (map (.gasForVerification) ccvFeeQuotes)
+                        ccvBytesSum = foldl (+) 0 (map (.payloadSizeBytes) ccvFeeQuotes)
+                        poolFeeUSDCents = case tokenPoolFeeQuote of
+                            None -> 0.0
+                            Some q -> q.feeUSDCents
+                        poolGas = case tokenPoolFeeQuote of
+                            None -> 0
+                            Some q -> q.destGasOverhead
+                        poolBytes = case tokenPoolFeeQuote of
+                            None -> 0
+                            Some q -> q.destBytesOverhead
+                        executorFeeUSDCents = case executorFeeQuote of
+                            None -> 0.0
+                            Some q -> q.feeUSDCents
+                        hasExecutorFee = isSome executorFeeQuote
                 feeResult <- calculateFeeResult
                     ccipOwner
                     maxUSDCentsPerMsg
@@ -522,13 +545,7 @@ template OnRamp
                     destChainSelector
                     destConfig
                     feeDestConfig
-                    feeToken
-                    payload
-                    ccipReceiveGasLimit
-                    ccvFeeQuotes
-                    tokenPoolFeeQuote
-                    executorArgs
-                    executorFeeQuote
+                    inputs
 
                 pure GetFeeFromRouterResult with
                     feeTokenAmount = feeResult.totalFeeTokenAmount
@@ -584,31 +601,38 @@ template OnRamp
                 let tokenPrice = fromSomeNote
                         ("No price found for " <> sendingMsg.feeToken.id)
                         (Map.lookup sendingMsg.feeToken feeQuoter.usdPerToken)
-                let ccvFeeQuotes = map (\fee -> ICCV.CrossChainVerifierFeeQuote with
-                        ccvInstanceId = fee.ccvInstanceId
-                        ccvOwner = fee.ccvOwner
-                        feeUSDCents = fee.feeUSDCents
-                        gasForVerification = fee.destGasLimit
-                        payloadSizeBytes = fee.destBytesOverhead
-                    ) sendingMsg.ccvFees
-                let tokenPoolFeeQuote = case sendingMsg.tokenSendFee of
-                        None -> None
-                        Some fee -> Some (CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
-                            poolInstanceId = fee.poolInstanceId
-                            poolOwner = fee.poolOwner
-                            feeUSDCents = fee.feeUSDCents
-                            destGasOverhead = fee.destGasOverhead
-                            destBytesOverhead = fee.destBytesOverhead
-                            tokenFeeBps = 0.0
-                            isEnabled = True)
-                let executorFeeQuote = case sendingMsg.executionMode of
-                        Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor -> None
+                let hasTokenTransfer = sendingMsg.expectedTokenInstrumentId /= None
+                let ccvGasSum = foldl (\acc fee -> acc + fee.destGasLimit) 0 sendingMsg.ccvFees
+                let ccvBytesSum = foldl (\acc fee -> acc + fee.destBytesOverhead) 0 sendingMsg.ccvFees
+                let poolGas = case sendingMsg.tokenSendFee of
+                        Some fee -> fee.destGasOverhead
+                        None -> 0
+                let poolBytes = case sendingMsg.tokenSendFee of
+                        Some fee -> fee.destBytesOverhead
+                        None -> 0
+                let executorFlatUSDCents = case sendingMsg.executionMode of
+                        Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor -> 0.0
                         _ -> case sendingMsg.executorFee of
-                            None -> None
-                            Some fee -> Some (CCIP.Interfaces.Executor.ExecutorFeeQuote with
-                                executorInstanceId = fee.executorInstanceId
-                                executorOwner = fee.executorOwner
-                                feeUSDCents = fee.feeUSDCents)
+                            Some fee -> fee.feeUSDCents
+                            None -> 0.0
+                let inputs = FeeCalculationInputs with
+                        feeToken = sendingMsg.feeToken
+                        payload = sendingMsg.payload
+                        executorArgs = sendingMsg.executorArgs
+                        hasTokenTransfer = hasTokenTransfer
+                        ccipReceiveGasLimit = sendingMsg.ccipReceiveGasLimit
+                        ccvFeeUSDCents = foldl (\acc fee -> acc + fee.feeUSDCents) 0.0 sendingMsg.ccvFees
+                        ccvGasSum = ccvGasSum
+                        ccvBytesSum = ccvBytesSum
+                        poolFeeUSDCents = case sendingMsg.tokenSendFee of
+                            Some fee -> fee.feeUSDCents
+                            None -> 0.0
+                        poolGas = poolGas
+                        poolBytes = poolBytes
+                        executorFeeUSDCents = executorFlatUSDCents
+                        hasExecutorFee = case sendingMsg.executionMode of
+                            Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor -> False
+                            _ -> isSome sendingMsg.executorFee
                 feeResult <- calculateFeeResult
                     ccipOwner
                     maxUSDCentsPerMsg
@@ -616,13 +640,7 @@ template OnRamp
                     sendingMsg.destChainSelector
                     destConfig
                     feeDestConfig
-                    sendingMsg.feeToken
-                    sendingMsg.payload
-                    sendingMsg.ccipReceiveGasLimit
-                    ccvFeeQuotes
-                    tokenPoolFeeQuote
-                    sendingMsg.executorArgs
-                    executorFeeQuote
+                    inputs
 
                 finalizedCid <- exercise sendingMessageCid
                     CCIP.SendingMessageV1.FinalizeFee with
