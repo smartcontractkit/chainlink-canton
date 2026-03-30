@@ -401,7 +401,7 @@ template OnRamp
                 let (resolvedRequiredExecutor, resolvedExecutorAddress, executionMode) = case extraArgs.executor of
                         CCIP.Client.Executor_UseDefault with
                             executorArgs = _ ->
-                            case destConfig.defaultExecutor of
+                              case destConfig.defaultExecutor of
                                 Some defaultExecutor ->
                                     ( Some defaultExecutor
                                     , RawInstanceAddress.toInstanceAddress defaultExecutor
