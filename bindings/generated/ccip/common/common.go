@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "be361fa10ce02e19fdf9004ecb02d74e438d00d0cb342ea754c8d1b97a63db48"
+	PackageID   = "76bf281d9bec386a93559d25e46cd743e4f0c54e2f4b20acf1eadd8183f069c1"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1566,7 +1566,7 @@ type DestChainConfig struct {
 	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
-	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
+	DefaultExecutor           *mcms.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
 	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
@@ -1587,13 +1587,16 @@ func (t DestChainConfig) ToMap() map[string]any {
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
-	m["defaultExecutor"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DefaultExecutor).(mapper); ok {
-			return m.toMap()
+	if t.DefaultExecutor != nil {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.DefaultExecutor,
 		}
-		return t.DefaultExecutor
-	}()
+	} else {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -1658,7 +1661,7 @@ type DestChainConfigArgs struct {
 	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
-	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
+	DefaultExecutor           *mcms.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
 	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
@@ -1681,13 +1684,16 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
-	m["defaultExecutor"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DefaultExecutor).(mapper); ok {
-			return m.toMap()
+	if t.DefaultExecutor != nil {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.DefaultExecutor,
 		}
-		return t.DefaultExecutor
-	}()
+	} else {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -4250,6 +4256,7 @@ type SendingMessageV1 struct {
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
 	RequiredCCVs              []mcms.RawInstanceAddress                 `json:"requiredCCVs"`
+	RequiredExecutor          *mcms.RawInstanceAddress                  `json:"requiredExecutor" hex:"optional"`
 	ExecutorAddress           types.TEXT                                `json:"executorAddress"`
 	ExecutionMode             *ExecutionMode                            `json:"executionMode" hex:"optional"`
 	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
@@ -4337,6 +4344,17 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 		}
 		return res
 	}()
+
+	if t.RequiredExecutor != nil {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RequiredExecutor,
+		}
+	} else {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["executorAddress"] = string(t.ExecutorAddress)
@@ -4603,6 +4621,17 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 		}
 		return res
 	}()
+
+	if t.RequiredExecutor != nil {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RequiredExecutor,
+		}
+	} else {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["executorAddress"] = string(t.ExecutorAddress)
