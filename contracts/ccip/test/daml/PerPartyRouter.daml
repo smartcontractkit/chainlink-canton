@@ -132,7 +132,7 @@ testCCIPSendFeeSplitLogic = script do
                 destGasLimit = 0
                 destBytesOverhead = 0
           ]
-    let ccvAmounts : [Numeric 0] = [10.0, 20.0, 5.0]
+    let ccvAmounts : [Decimal] = [10.0, 20.0, 5.0]
     let verifierFees = CCIP.PerPartyRouter.buildCCVFeeAllocations ccvFees ccvAmounts
     let withPool = CCIP.PerPartyRouter.addFeeForParty verifierFees poolOwner 7.0
     let ownerResidual = 50.0 - CCIP.PerPartyRouter.sumAllocatedFees withPool

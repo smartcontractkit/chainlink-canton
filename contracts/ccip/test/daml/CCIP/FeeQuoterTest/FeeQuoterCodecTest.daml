@@ -54,18 +54,18 @@ testApplyUpdatePricesRoundtrip = do
                 tokenPriceUpdates = [
                     FeeQuoterTypes.TokenPriceUpdate with
                         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
-                        usdPerToken = usdToCents 1.0
-                    , FeeQuoterTypes.TokenPriceUpdate with  
+                        usdPerToken = 1.0
+                    , FeeQuoterTypes.TokenPriceUpdate with
                         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
-                        usdPerToken = usdToCents 25.0
+                        usdPerToken = 25.0
                     ]
                 gasPriceUpdates = [
                     FeeQuoterTypes.GasPriceUpdate with
                         destChainSelector = 1.0
-                        usdPerUnitGas = usdToCents 0.00000002
+                        usdPerUnitGas = 0.00000002
                     , FeeQuoterTypes.GasPriceUpdate with
                         destChainSelector = 18446744073709551615.0 -- max uint64
-                        usdPerUnitGas = usdToCents 0.00000003
+                        usdPerUnitGas = 0.00000003
                     ]
             ,caller
             )
