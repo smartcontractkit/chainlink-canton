@@ -117,8 +117,8 @@ data FeeCalculationResult = FeeCalculationResult
         executorDestGasLimit : Int
         executorDestBytesOverhead : Int
         totalExecutionGasLimit : Int
-        premiumMultiplier : Numeric 0
-        feeTokenPrice : Numeric 0
+        premiumMultiplier : Decimal
+        feeTokenPrice : Decimal
     deriving (Eq, Show)
 
 calculateFeeResult
@@ -159,8 +159,11 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
         feeToken = inputs.feeToken
         caller = ccipOwner
 
+    -- Apply the premium multiplier to USD-cent fees for the cap check.
+    -- EVM FeeQuoter.sol line 728: premiumFeeUSDWei *= multiplier.
+    let premiumMultiplierN = CCIP.Math.decimalToNumeric0 quote.premiumMultiplier
     let premiumize feeUSDCents =
-            CCIP.Math.mulDivDown feeUSDCents quote.premiumMultiplier 100000000.0
+            CCIP.Math.mulDivDown feeUSDCents premiumMultiplierN CCIP.Math.premiumIdentity
     let networkFeeUSDCents = if inputs.hasTokenTransfer
             then destConfig.tokenNetworkFeeUSDCents
             else destConfig.messageNetworkFeeUSDCents
@@ -179,14 +182,17 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
     assertMsg "onramp: message fee exceeds maxUSDCentsPerMsg"
         (totalUSDCents <= maxUSDCentsPerMsg)
 
-    let promoteUsdCentsToUsd8 feeUSDCents =
-            CCIP.Math.mulDivDown feeUSDCents CCIP.SendingMessageV1.usd8PerUsdCent 1.0
+    -- Convert per-component USD-cent fees into fee token smallest units.
+    -- See SendingMessageV1.FinalizeFee for the detailed EVM mapping.
+    let feeTokenPriceN = CCIP.Math.decimalToNumeric0 quote.feeTokenPrice
+    let promoteUsdCentsToUsd10 feeUSDCents =
+            CCIP.Math.mulDivDown feeUSDCents CCIP.Math.usdPerUsdCent 1.0
     let convertWithPremium feeUSDCents =
-            let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
-            in CCIP.Math.mulDivDown feeUsd8 quote.premiumMultiplier quote.feeTokenPrice
+            let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
+            in CCIP.Math.mulDivDown feeUsd10 premiumMultiplierN feeTokenPriceN
     let convertDirect feeUSDCents =
-            let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
-            in CCIP.Math.mulDivDown feeUsd8 CCIP.SendingMessageV1.premiumIdentity quote.feeTokenPrice
+            let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
+            in CCIP.Math.mulDivDown feeUsd10 CCIP.Math.premiumIdentity feeTokenPriceN
     let totalFeeTokenAmount =
             convertWithPremium inputs.ccvFeeUSDCents
             + convertWithPremium inputs.poolFeeUSDCents
@@ -312,6 +318,13 @@ template OnRamp
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
                 assertValidHex "tokenArgs" extraArgs.tokenArgs
                 assertMsg "onramp: CCVs cannot contain duplicates" (unique extraArgs.ccvs)
+                case extraArgs.executorType of
+                    CCIP.Client.Executor_NoExecutor ->
+                        assertMsg "onramp: executor input must be empty for no-executor mode" (isNone extraArgs.executor)
+                    CCIP.Client.Executor_UseDefault ->
+                        assertMsg "onramp: executor input required for default executor mode" (isSome extraArgs.executor)
+                    CCIP.Client.Executor_WithAddress _ ->
+                        assertMsg "onramp: executor input required for explicit executor mode" (isSome extraArgs.executor)
 
                 case Map.lookup destChainSelector feeQuoter.destChainConfigs of
                     Some feeDestConfig ->
@@ -355,11 +368,23 @@ template OnRamp
                 let initialState = if hasTokenTransfer
                         then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
                         else CCIP.SendingMessageV1.SendingMessageState_Prepared
-                let (resolvedExecutorAddress, executionMode) = case extraArgs.executor of
-                        Some _ ->
-                            ("", Some CCIP.SendingMessageV1.ExecutionMode_Executor)
-                        None ->
-                            (noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+                let (resolvedRequiredExecutor, resolvedExecutorAddress, executionMode) = case extraArgs.executorType of
+                        CCIP.Client.Executor_UseDefault ->
+                            case destConfig.defaultExecutor of
+                                Some defaultExecutor ->
+                                    ( Some defaultExecutor
+                                    , RawInstanceAddress.toInstanceAddress defaultExecutor
+                                    , Some CCIP.SendingMessageV1.ExecutionMode_Executor
+                                    )
+                                None ->
+                                    (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+                        CCIP.Client.Executor_NoExecutor ->
+                            (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+                        CCIP.Client.Executor_WithAddress executorAddress ->
+                            ( Some executorAddress
+                            , RawInstanceAddress.toInstanceAddress executorAddress
+                            , Some CCIP.SendingMessageV1.ExecutionMode_Executor
+                            )
 
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
@@ -374,6 +399,7 @@ template OnRamp
                     destChainSelector
                     sequenceNumber = newSequenceNumber
                     requiredCCVs = resolvedCCVs
+                    requiredExecutor = resolvedRequiredExecutor
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
                     receiver = validateDestChainAddress message.receiver destConfig.addressBytesLength
@@ -809,7 +835,7 @@ assembleReceipts sendingMsg =
                     versionTag = None
                     destGasLimit = fee.destGasOverhead
                     destBytesOverhead = fee.destBytesOverhead
-                    feeTokenAmount = sendingMsg.tokenSendFeeTokenAmount
+                    feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.tokenSendFeeTokenAmount
                     extraArgs = ""]
             _ -> []
 
@@ -830,7 +856,7 @@ assembleReceipts sendingMsg =
                     versionTag = None
                     destGasLimit = sendingMsg.executorDestGasLimit
                     destBytesOverhead = sendingMsg.executorDestBytesOverhead
-                    feeTokenAmount = sendingMsg.executorFeeTokenAmount
+                    feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.executorFeeTokenAmount
                     extraArgs = sendingMsg.executorArgs]
 
         networkReceipt = CCIP.Tickets.Receipt with
@@ -839,14 +865,14 @@ assembleReceipts sendingMsg =
             versionTag = None
             destGasLimit = 0
             destBytesOverhead = 0
-            feeTokenAmount = sendingMsg.networkFeeTokenAmount
+            feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.networkFeeTokenAmount
             extraArgs = ""
 
     in ccvReceipts ++ poolReceipt ++ executorReceipt ++ [networkReceipt]
 
 -- | Finds the matching ccvFee by (ccvInstanceId, ccvOwner) and looks up
 -- the corresponding feeTokenAmount from the parallel ccvFeeTokenAmounts list.
-assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Numeric 0] -> CCIP.SendingMessageV1.VerifierData -> CCIP.Tickets.Receipt
+assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> CCIP.SendingMessageV1.VerifierData -> CCIP.Tickets.Receipt
 assembleCCVReceipt ccvFees ccvFeeTokenAmounts vd =
     let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress vd.ccvInstanceId vd.ccvOwner
         (fee, feeTokenAmt) = findFeeWithAmount ccvFees ccvFeeTokenAmounts
@@ -858,11 +884,11 @@ assembleCCVReceipt ccvFees ccvFeeTokenAmounts vd =
         versionTag = Some vd.versionTag
         destGasLimit = fee.destGasLimit
         destBytesOverhead = fee.destBytesOverhead
-        feeTokenAmount = feeTokenAmt
+        feeTokenAmount = CCIP.Math.decimalToNumeric0 feeTokenAmt
         extraArgs = ""
 
 -- | Find a matching fee entry and its corresponding token amount from parallel lists.
-findFeeWithAmount : [CCIP.SendingMessageV1.CCVFee] -> [Numeric 0] -> (CCIP.SendingMessageV1.CCVFee -> Bool) -> (CCIP.SendingMessageV1.CCVFee, Numeric 0)
+findFeeWithAmount : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> (CCIP.SendingMessageV1.CCVFee -> Bool) -> (CCIP.SendingMessageV1.CCVFee, Decimal)
 findFeeWithAmount [] _ _ = error "missing CCV fee"
 findFeeWithAmount _ [] _ = error "missing CCV fee token amount"
 findFeeWithAmount (f :: fs) (a :: as) pred =

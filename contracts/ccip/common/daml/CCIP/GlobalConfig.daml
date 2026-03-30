@@ -16,7 +16,6 @@ import CCIP.GlobalConfigTypes (
     ApplyDestChainConfigUpdatesParams(..),
     ApplySourceChainConfigUpdatesParams(..),
     validateDefaultAndMandatedCCVs,
-    noExecutionExecutorRawInstanceAddress,
     )
 import CCIP.GlobalConfigCodecGen (decodeApplyDestChainConfigUpdatesParamsAt, decodeApplySourceChainConfigUpdatesParamsAt)
 import MCMS.RawInstanceAddress (assertValidInstanceId)

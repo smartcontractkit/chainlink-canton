@@ -59,10 +59,10 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Parallel()
 
 	runLnRTokenPoolReceiveFlowTest(t, lnrTokenPoolReceiveFlowTestCase{
-		tokenAmount:                   big.NewInt(5),
+		tokenAmount:                   big.NewInt(50_000_000_000),
 		expectedTransferAmount:        5,
-		defaultInboundLimiterCapacity: "1000000",
-		customInboundLimiterCapacity:  "10000000",
+		defaultInboundLimiterCapacity: "1000000000000",
+		customInboundLimiterCapacity:  "10000000000000",
 	})
 }
 
@@ -70,13 +70,13 @@ func TestLnRTokenPool_FullReceiveFlow_DecimalConversion(t *testing.T) {
 	t.Parallel()
 
 	runLnRTokenPoolReceiveFlowTest(t, lnrTokenPoolReceiveFlowTestCase{
-		tokenAmount:                   big.NewInt(7_000_000_000_000),
+		tokenAmount:                   new(big.Int).SetUint64(7_000_000_000_000_000_000),
 		sourcePoolData:                encodeUint256Bytes(18),
 		expectedTransferAmount:        7,
-		defaultInboundLimiterCapacity: "5",
-		customInboundLimiterCapacity:  "10",
-		expectedDefaultLimiterTokens:  "5.",
-		expectedCustomLimiterTokens:   "3.",
+		defaultInboundLimiterCapacity: "50000000000",
+		customInboundLimiterCapacity:  "100000000000",
+		expectedDefaultLimiterTokens:  "50000000000.",
+		expectedCustomLimiterTokens:   "30000000000.",
 	})
 }
 
@@ -495,7 +495,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
 						{Label: "instrumentId", Value: instrumentIdAmt},
-						{Label: "decimals", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 6}}},
+						{Label: "decimals", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 10}}},
 						{Label: "rateLimitAdmin", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}},
 						{Label: "remoteChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
 							Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},

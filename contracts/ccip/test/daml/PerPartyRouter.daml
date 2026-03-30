@@ -87,20 +87,41 @@ basicExtraArgs gasLimit = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
     gasLimit = gasLimit
     blockConfirmations = 0
     ccvs = []
+    executorType = CCIP.Client.Executor_NoExecutor
     executor = None
     tokenReceiver = ""
     tokenArgs = ""
 
-extraArgsWithExecutor
+extraArgsWithDefaultExecutor
     : Int
     -> ContractId CCIP.Interfaces.Executor.IExecutor
     -> BytesHex
     -> CCIP.Client.ExtraArgs
-extraArgsWithExecutor gasLimit executorCid executorArgs =
+extraArgsWithDefaultExecutor gasLimit executorCid executorArgs =
     CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
         gasLimit = gasLimit
         blockConfirmations = 0
         ccvs = []
+        executorType = CCIP.Client.Executor_UseDefault
+        executor = Some (CCIP.Client.ExecutorInput with
+            executorCid = executorCid
+            executorArgs = executorArgs
+            executorExtraContext = CCIP.Context.emptyCCIPContext)
+        tokenReceiver = ""
+        tokenArgs = ""
+
+extraArgsWithExecutor
+    : Int
+    -> RawInstanceAddress.RawInstanceAddress
+    -> ContractId CCIP.Interfaces.Executor.IExecutor
+    -> BytesHex
+    -> CCIP.Client.ExtraArgs
+extraArgsWithExecutor gasLimit requiredExecutor executorCid executorArgs =
+    CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+        gasLimit = gasLimit
+        blockConfirmations = 0
+        ccvs = []
+        executorType = CCIP.Client.Executor_WithAddress with executorAddress = requiredExecutor
         executor = Some (CCIP.Client.ExecutorInput with
             executorCid = executorCid
             executorArgs = executorArgs
@@ -136,7 +157,7 @@ testCCIPSendFeeSplitLogic = script do
                 destGasLimit = 0
                 destBytesOverhead = 0
           ]
-    let ccvAmounts : [Numeric 0] = [10.0, 20.0, 5.0]
+    let ccvAmounts : [Decimal] = [10.0, 20.0, 5.0]
     let verifierFees = CCIP.PerPartyRouter.buildCCVFeeAllocations ccvFees ccvAmounts
     let withPool = CCIP.PerPartyRouter.addFeeForParty verifierFees poolOwner 7.0
     let ownerResidual = 50.0 - CCIP.PerPartyRouter.sumAllocatedFees withPool
@@ -195,7 +216,7 @@ testCCIPSend = script do
                 tokenReceiverAllowed = False
                 baseExecutionGasCost = 12345
                 offRampAddress = "0000000000000000000000000000000000000003"
-                defaultExecutor = RawInstanceAddress.make "test-executor" ccipOwner -- this default executor will be used if no executor is specified as part of the extraArgs
+                defaultExecutor = Some (RawInstanceAddress.make "test-executor" ccipOwner) -- this default executor will be used if Executor_UseDefault is specified
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -324,7 +345,10 @@ testCCIPSend = script do
                 payload = "48656c6c6f20576f726c64"
                 tokenTransfer = None
                 feeToken = basicFeeToken testFeeTokenId feeTokenInput
-                extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
+                extraArgs = extraArgsWithDefaultExecutor
+                    100000
+                    (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+                    ""
 
     -- Executor fee calculation (must happen before FinalizeFee)
     disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
@@ -386,7 +410,10 @@ testCCIPSend = script do
                 payload = "48656c6c6f20576f726c6432"
                 tokenTransfer = None
                 feeToken = basicFeeToken testFeeTokenId feeTokenInput
-                extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
+                extraArgs = extraArgsWithDefaultExecutor
+                    100000
+                    (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+                    ""
 
     -- Executor fee for second message (must happen before FinalizeFee)
     disclosedSm2 <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid2
@@ -621,7 +648,7 @@ testPrepareSendExtraArgs = script do
                     tokenReceiverAllowed = True
                     baseExecutionGasCost = 0
                     offRampAddress = "0000000000000000000000000000000000000003"
-                    defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                    defaultExecutor = Some (RawInstanceAddress.RawInstanceAddress "default-executor@party")
                     laneMandatedCCVs = []
                     defaultCCVs = [defaultCCV]
                     messageNetworkFeeUSDCents = cents 0.0
@@ -632,7 +659,7 @@ testPrepareSendExtraArgs = script do
                     tokenReceiverAllowed = False
                     baseExecutionGasCost = 0
                     offRampAddress = "0000000000000000000000000000000000000003"
-                    defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                    defaultExecutor = Some (RawInstanceAddress.RawInstanceAddress "default-executor@party")
                     laneMandatedCCVs = []
                     defaultCCVs = [defaultCCV]
                     messageNetworkFeeUSDCents = cents 0.0
@@ -767,6 +794,7 @@ testPrepareSendExtraArgs = script do
                     gasLimit = 123
                     blockConfirmations = 0
                     ccvs = [RawInstanceAddress.make "custom-ccv" user]
+                    executorType = CCIP.Client.Executor_NoExecutor
                     executor = None
                     tokenReceiver = ""
                     tokenArgs = ""
@@ -787,6 +815,7 @@ testPrepareSendExtraArgs = script do
                     gasLimit = 0
                     blockConfirmations = 0
                     ccvs = []
+                    executorType = CCIP.Client.Executor_NoExecutor
                     executor = None
                     tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89"
                     tokenArgs = ""
@@ -841,7 +870,7 @@ testPrepareSendRejectsOversizedPayload = script do
                 tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
-                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                defaultExecutor = Some (RawInstanceAddress.RawInstanceAddress "default-executor@party")
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -1274,7 +1303,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                 tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
-                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                defaultExecutor = Some (RawInstanceAddress.RawInstanceAddress "default-executor@party")
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -1381,6 +1410,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                         [ RawInstanceAddress.make "sender-ccv" ccipOwner
                         , RawInstanceAddress.make "sender-ccv" ccipOwner
                         ]
+                    executorType = CCIP.Client.Executor_NoExecutor
                     executor = None
                     tokenReceiver = ""
                     tokenArgs = ""
@@ -1425,7 +1455,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
-                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                defaultExecutor = Some (RawInstanceAddress.RawInstanceAddress "default-executor@party")
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0

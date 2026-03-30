@@ -621,9 +621,7 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal = CCIP.Math.numeric0ToDecimalChecked
-                        "ReleaseFromTicket.localAmount"
-                        localAmount
+                let amountDecimal = CCIP.Math.numeric0ToDecimal localAmount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = poolOwner
                         receiver = ticket.tokenReceiver
@@ -858,9 +856,7 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal : Decimal = CCIP.Math.numeric0ToDecimalChecked
-                        "LockOrBurn.amount"
-                        amount
+                let amountDecimal : Decimal = CCIP.Math.numeric0ToDecimal amount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
                         receiver = poolOwner
