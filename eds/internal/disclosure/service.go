@@ -65,7 +65,15 @@ type DisclosureService struct {
 
 func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *DisclosureService {
 	// Create a map of all instance addresses
-	allContracts := make(map[contracts.InstanceAddress]struct{}, 7+len(config.CCVs)+len(config.TokenPools))
+	allContracts := make(
+		map[contracts.InstanceAddress]struct{},
+		7+ // perPartyRouterFactory, onRamp, offRamp, globalConfig, tokenAdminRegistry, rmnRemote, feeQuoter
+			len(config.CCVs)+
+			len(config.TokenPools)+
+			len(config.TokenPoolInboundRateLimiters)+
+			len(config.TokenPoolRateLimiterCustomBlockConfirmations)+
+			len(config.TokenPoolOutboundRateLimiters),
+	)
 	allContracts[config.PerPartyRouterFactory] = struct{}{}
 	allContracts[config.OnRamp] = struct{}{}
 	allContracts[config.OffRamp] = struct{}{}
@@ -198,10 +206,10 @@ type CCIPExecuteDisclosures struct {
 	GlobalConfig       *apiv2.DisclosedContract
 	TokenAdminRegistry *apiv2.DisclosedContract
 	RMNRemote          *apiv2.DisclosedContract
+	CCVs               map[contracts.InstanceAddress]*apiv2.DisclosedContract
 
 	// These disclosures are optional, only will be returned in the event
 	// there is a token transfer.
-	CCVs                                       map[contracts.InstanceAddress]*apiv2.DisclosedContract
 	TokenPool                                  *apiv2.DisclosedContract
 	TokenPoolHolding                           *apiv2.DisclosedContract
 	InboundRateLimiter                         *apiv2.DisclosedContract
@@ -372,8 +380,6 @@ func getRateLimiterInstanceAddresses(
 	}
 
 	// Create the instance addresses by combining with the poolOwner
-	fmt.Printf("raw rate limiter instance addresses: inboundRateLimiter: %s, inboundCustomBlockConfirmationsRateLimiter: %s, outboundRateLimiter: %s, poolOwner: %s\n",
-		remoteChainConfig.InboundRateLimiter.Unpack, remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack, remoteChainConfig.OutboundRateLimiter.Unpack, poolOwner)
 	// Unpack is already of the form <instance-id>@<party-id>, so we need to parse it as such prior to calculating the instance address.
 	rawInboundRateLimiterInstanceAddress, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.InboundRateLimiter.Unpack))
 	if err != nil {
@@ -391,20 +397,15 @@ func getRateLimiterInstanceAddresses(
 	}
 	outboundRateLimiterInstanceAddress = rawOutboundRateLimiterInstanceAddress.InstanceAddress()
 
-	fmt.Printf("instance addresses: inboundRateLimiter: %s, inboundCustomBlockConfirmationsRateLimiter: %s, outboundRateLimiter: %s\n",
-		inboundRateLimiterInstanceAddress.String(), inboundCustomBlockConfirmationsRateLimiterInstanceAddress.String(), outboundRateLimiterInstanceAddress.String())
-
 	return inboundRateLimiterInstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress, outboundRateLimiterInstanceAddress, nil
 }
 
-// TODO: this is really janky, how to properly test this?
 func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.TokenAdminRegistry, destTokenAddress []byte) (contracts.InstanceAddress, splice_api_token_holding_v1.InstrumentId, error) {
 	expectedHashedInstrumentID := contracts.BytesToInstanceAddress(destTokenAddress)
 
 	// -- | Maps keccak256(InstrumentId) to token configuration
 	// tokenConfigs : Map.Map BytesHex TokenConfig
 	for hashedInstrumentID, v := range tarCreatedEvent.TokenConfigs {
-		fmt.Printf("processing map: %+v\n", v)
 
 		// check if this instrument ID corresponds to the one we expect.
 		instrumentIDBytes, err := hex.DecodeString(hashedInstrumentID)
@@ -412,20 +413,17 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 			continue
 		}
 		if !bytes.Equal(instrumentIDBytes, expectedHashedInstrumentID.Bytes()) {
-			fmt.Printf("expected hashed instrument ID: %s, but got: %s, skipping\n", expectedHashedInstrumentID.String(), hashedInstrumentID)
 			continue
 		}
 
 		vMap, ok := v.(map[string]any)
 		if !ok {
-			fmt.Printf("v is not a map[string]any, skipping\n")
 			continue
 		}
 
 		var tokenConfig tokenadminregistry.TokenConfig
 		err = ledger.MapToStruct(vMap, &tokenConfig)
 		if err != nil {
-			fmt.Printf("failed to decode token config: %s, skipping\n", err.Error())
 			continue
 		}
 
