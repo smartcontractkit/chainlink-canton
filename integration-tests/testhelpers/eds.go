@@ -78,6 +78,7 @@ func GetCCIPExecuteDisclosures(
 	if resp.StatusCode() != 200 {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
 	}
+	fmt.Printf("CCIPExecute response: %+v\n", resp.JSON200)
 
 	// The top-level choice context has the following disclosures:
 	// - OffRamp

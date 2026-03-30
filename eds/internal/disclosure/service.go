@@ -79,6 +79,15 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 	for _, tokenPool := range config.TokenPools {
 		allContracts[tokenPool] = struct{}{}
 	}
+	for _, tokenPoolInboundRateLimiter := range config.TokenPoolInboundRateLimiters {
+		allContracts[tokenPoolInboundRateLimiter] = struct{}{}
+	}
+	for _, tokenPoolRateLimiterCustomBlockConfirmations := range config.TokenPoolRateLimiterCustomBlockConfirmations {
+		allContracts[tokenPoolRateLimiterCustomBlockConfirmations] = struct{}{}
+	}
+	for _, tokenPoolOutboundRateLimiter := range config.TokenPoolOutboundRateLimiters {
+		allContracts[tokenPoolOutboundRateLimiter] = struct{}{}
+	}
 
 	return &DisclosureService{
 		contractStore:          config.ContractStore,
@@ -363,15 +372,27 @@ func getRateLimiterInstanceAddresses(
 	}
 
 	// Create the instance addresses by combining with the poolOwner
-	inboundRateLimiterInstanceAddress = contracts.InstanceID(remoteChainConfig.InboundRateLimiter.Unpack).
-		RawInstanceAddress(poolOwner).
-		InstanceAddress()
-	inboundCustomBlockConfirmationsRateLimiterInstanceAddress = contracts.InstanceID(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack).
-		RawInstanceAddress(poolOwner).
-		InstanceAddress()
-	outboundRateLimiterInstanceAddress = contracts.InstanceID(remoteChainConfig.OutboundRateLimiter.Unpack).
-		RawInstanceAddress(poolOwner).
-		InstanceAddress()
+	fmt.Printf("raw rate limiter instance addresses: inboundRateLimiter: %s, inboundCustomBlockConfirmationsRateLimiter: %s, outboundRateLimiter: %s, poolOwner: %s\n",
+		remoteChainConfig.InboundRateLimiter.Unpack, remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack, remoteChainConfig.OutboundRateLimiter.Unpack, poolOwner)
+	// Unpack is already of the form <instance-id>@<party-id>, so we need to parse it as such prior to calculating the instance address.
+	rawInboundRateLimiterInstanceAddress, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.InboundRateLimiter.Unpack))
+	if err != nil {
+		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to parse inbound rate limiter instance address: %w", err)
+	}
+	inboundRateLimiterInstanceAddress = rawInboundRateLimiterInstanceAddress.InstanceAddress()
+	rawInboundCustomBlockConfirmationsRateLimiterInstanceAddress, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack))
+	if err != nil {
+		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to parse inbound custom block confirmations rate limiter instance address: %w", err)
+	}
+	inboundCustomBlockConfirmationsRateLimiterInstanceAddress = rawInboundCustomBlockConfirmationsRateLimiterInstanceAddress.InstanceAddress()
+	rawOutboundRateLimiterInstanceAddress, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.OutboundRateLimiter.Unpack))
+	if err != nil {
+		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to parse outbound rate limiter instance address: %w", err)
+	}
+	outboundRateLimiterInstanceAddress = rawOutboundRateLimiterInstanceAddress.InstanceAddress()
+
+	fmt.Printf("instance addresses: inboundRateLimiter: %s, inboundCustomBlockConfirmationsRateLimiter: %s, outboundRateLimiter: %s\n",
+		inboundRateLimiterInstanceAddress.String(), inboundCustomBlockConfirmationsRateLimiterInstanceAddress.String(), outboundRateLimiterInstanceAddress.String())
 
 	return inboundRateLimiterInstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress, outboundRateLimiterInstanceAddress, nil
 }

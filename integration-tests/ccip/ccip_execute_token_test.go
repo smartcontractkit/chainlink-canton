@@ -298,7 +298,13 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// Keep it enabled but lower-capacity so the test fails if the default-finality limiter
 	// is selected for this FTF transfer instead of the custom-finality limiter.
 	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
-	inboundRateLimiterInstanceAddress := contracts.InstanceID(inboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner)).InstanceAddress()
+	inboundRateLimiterRawInstanceAddress := contracts.InstanceID(inboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
+	inboundRateLimiterInstanceAddress := inboundRateLimiterRawInstanceAddress.InstanceAddress()
+	t.Logf("inbound rate limiter instance id: %s, raw instance address: %s, instance address: %s, pool owner: %s",
+		inboundRateLimiterInstanceID,
+		inboundRateLimiterRawInstanceAddress.String(),
+		inboundRateLimiterInstanceAddress.String(),
+		partyTokenPoolOwner)
 	res, err := tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -327,7 +333,13 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	inboundRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed default inbound RateLimiter: %s", inboundRateLimiterCid)
 	inboundCustomBlockConfirmationsRateLimiterInstanceID := "test-pool-receive-inbound-custom-rl"
-	inboundCustomBlockConfirmationsRateLimiterInstanceAddress := contracts.InstanceID(inboundCustomBlockConfirmationsRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner)).InstanceAddress()
+	inboundCustomBlockConfirmationsRateLimiterRawInstanceAddress := contracts.InstanceID(inboundCustomBlockConfirmationsRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
+	inboundCustomBlockConfirmationsRateLimiterInstanceAddress := inboundCustomBlockConfirmationsRateLimiterRawInstanceAddress.InstanceAddress()
+	t.Logf("inbound custom block confirmations rate limiter instance id: %s, raw instance address: %s, instance address: %s, pool owner: %s",
+		inboundCustomBlockConfirmationsRateLimiterInstanceID,
+		inboundCustomBlockConfirmationsRateLimiterRawInstanceAddress.String(),
+		inboundCustomBlockConfirmationsRateLimiterInstanceAddress.String(),
+		partyTokenPoolOwner)
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -356,7 +368,13 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	inboundCustomBlockConfirmationsRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed custom-finality inbound RateLimiter: %s", inboundCustomBlockConfirmationsRateLimiterCid)
 	outboundRateLimiterInstanceID := "test-pool-receive-outbound-rl"
-	outboundRateLimiterInstanceAddress := contracts.InstanceID(outboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner)).InstanceAddress()
+	outboundRateLimiterRawInstanceAddress := contracts.InstanceID(outboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
+	outboundRateLimiterInstanceAddress := outboundRateLimiterRawInstanceAddress.InstanceAddress()
+	t.Logf("outbound rate limiter instance id: %s, raw instance address: %s, instance address: %s, pool owner: %s",
+		outboundRateLimiterInstanceID,
+		outboundRateLimiterRawInstanceAddress.String(),
+		outboundRateLimiterInstanceAddress.String(),
+		partyTokenPoolOwner)
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -855,6 +873,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	)
 	require.NoError(t, err)
 	require.Len(t, executeDisclosuresEDS.CCVContractIDs, 1)
+	t.Logf("execute disclosures EDS: %+v", executeDisclosuresEDS)
 
 	executeDisclosures := slices.Concat(
 		executeDisclosuresEDS.DisclosedContracts,
@@ -872,7 +891,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 					ContractId: ccipReceiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: choiceContext},
+						{Label: "context", Value: executeDisclosuresEDS.ChoiceContext},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
