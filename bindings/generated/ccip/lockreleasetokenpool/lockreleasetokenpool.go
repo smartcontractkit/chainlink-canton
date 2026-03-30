@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "9730c99f5f3ecee4080f35765cc9506367986af9c6ec5f68645f4ce3fe5af98a"
+	PackageID   = "5938f70c60595fe06fd9eb621e43492d65307f74c36255c753bf722ab4de5abf"
 	SDKVersion  = "3.4.10"
 )
 
@@ -660,6 +660,27 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFeeWithPackageID(cont
 	}
 }
 
+// LockReleaseTokenPoolGetFee exercises the LockReleaseTokenPool_GetFee choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) LockReleaseTokenPoolGetFee(contractID string, args LockReleaseTokenPoolGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolGetFeeWithPackageID exercises the LockReleaseTokenPool_GetFee choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolGetFeeWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // LockReleaseTokenPoolGetRequiredCCVs exercises the LockReleaseTokenPool_GetRequiredCCVs choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVs(contractID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
@@ -719,6 +740,48 @@ func (t LockReleaseTokenPool) SetDynamicConfigWithPackageID(contractID string, p
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
 		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetPoolReceiveContext exercises the SetPoolReceiveContext choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) SetPoolReceiveContext(contractID string, args SetPoolReceiveContext) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetPoolReceiveContext",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetPoolReceiveContextWithPackageID exercises the SetPoolReceiveContext choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) SetPoolReceiveContextWithPackageID(contractID string, packageID string, args SetPoolReceiveContext) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetPoolReceiveContext",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetTransferTimeout exercises the SetTransferTimeout choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) SetTransferTimeout(contractID string, args SetTransferTimeout) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetTransferTimeout",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetTransferTimeoutWithPackageID exercises the SetTransferTimeout choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) SetTransferTimeoutWithPackageID(contractID string, packageID string, args SetTransferTimeout) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetTransferTimeout",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -866,6 +929,27 @@ func (t LockReleaseTokenPool) TokenPoolCalculateFeeWithPackageID(contractID stri
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "ITokenPool"),
 		ContractID: contractID,
 		Choice:     "TokenPool_CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenPoolGetFee exercises the TokenPool_GetFee choice on this LockReleaseTokenPool contract via the IITokenPool interface
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) TokenPoolGetFee(contractID string, args interfaces.TokenPoolGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "ITokenPool"),
+		ContractID: contractID,
+		Choice:     "TokenPool_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenPoolGetFeeWithPackageID exercises the TokenPool_GetFee choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) TokenPoolGetFeeWithPackageID(contractID string, packageID string, args interfaces.TokenPoolGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "ITokenPool"),
+		ContractID: contractID,
+		Choice:     "TokenPool_GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1035,6 +1119,83 @@ func (t LockReleaseTokenPoolCalculateFeeMCMSParams) MarshalHex() (string, error)
 
 // UnmarshalHex decodes LockReleaseTokenPoolCalculateFeeMCMSParams from hex string.
 func (t *LockReleaseTokenPoolCalculateFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// LockReleaseTokenPoolGetFee is a Record type
+type LockReleaseTokenPoolGetFee struct {
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller            types.PARTY                              `json:"caller"`
+}
+
+// ToMap converts LockReleaseTokenPoolGetFee to a map for DAML arguments
+func (t LockReleaseTokenPoolGetFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["feeQuoterCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["tokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInstrumentId
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t LockReleaseTokenPoolGetFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LockReleaseTokenPoolGetFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LockReleaseTokenPoolGetFee to hex string (Canton MCMS format)
+func (t LockReleaseTokenPoolGetFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolGetFee from hex string (Canton MCMS format)
+func (t *LockReleaseTokenPoolGetFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// LockReleaseTokenPoolGetFeeMCMSParams is LockReleaseTokenPoolGetFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type LockReleaseTokenPoolGetFeeMCMSParams struct {
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+}
+
+// MarshalHex encodes LockReleaseTokenPoolGetFeeMCMSParams to hex string for MCMS operationData.
+func (t LockReleaseTokenPoolGetFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolGetFeeMCMSParams from hex string.
+func (t *LockReleaseTokenPoolGetFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1719,6 +1880,48 @@ func (t *SetDynamicConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetPoolReceiveContext is a Record type
+type SetPoolReceiveContext struct {
+	NewPoolReceiveContext common.CCIPContext `json:"newPoolReceiveContext"`
+}
+
+// ToMap converts SetPoolReceiveContext to a map for DAML arguments
+func (t SetPoolReceiveContext) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newPoolReceiveContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.NewPoolReceiveContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewPoolReceiveContext
+	}()
+
+	return m
+}
+
+func (t SetPoolReceiveContext) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetPoolReceiveContext) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetPoolReceiveContext to hex string (Canton MCMS format)
+func (t SetPoolReceiveContext) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetPoolReceiveContext from hex string (Canton MCMS format)
+func (t *SetPoolReceiveContext) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetRateLimitConfig is a Record type
 type SetRateLimitConfig struct {
 	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
@@ -1783,6 +1986,48 @@ func (t SetRateLimitConfigMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetRateLimitConfigMCMSParams from hex string.
 func (t *SetRateLimitConfigMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetTransferTimeout is a Record type
+type SetTransferTimeout struct {
+	NewTransferTimeout TransferTimeout `json:"newTransferTimeout"`
+}
+
+// ToMap converts SetTransferTimeout to a map for DAML arguments
+func (t SetTransferTimeout) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newTransferTimeout"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.NewTransferTimeout).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewTransferTimeout
+	}()
+
+	return m
+}
+
+func (t SetTransferTimeout) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetTransferTimeout) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetTransferTimeout to hex string (Canton MCMS format)
+func (t SetTransferTimeout) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetTransferTimeout from hex string (Canton MCMS format)
+func (t *SetTransferTimeout) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1953,6 +2198,8 @@ type MCMSEncoder interface {
 	ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalculateFee) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolGetFee(args LockReleaseTokenPoolGetFee) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolGetFeeMCMSParams(args LockReleaseTokenPoolGetFeeMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolGetRequiredCCVs) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetRequiredCCVsMCMSParams(args LockReleaseTokenPoolGetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolLockOrBurn(args LockReleaseTokenPoolLockOrBurn) (*bind.EncodedChoice, error)
@@ -1964,8 +2211,10 @@ type MCMSEncoder interface {
 	LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
+	SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
+	SetTransferTimeout(args SetTransferTimeout) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -2013,6 +2262,16 @@ func (e *encoder) LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalc
 // LockReleaseTokenPoolCalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolCalculateFee choice.
 func (e *encoder) LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolCalculateFee", args)
+}
+
+// LockReleaseTokenPoolGetFee encodes parameters for the LockReleaseTokenPoolGetFee choice.
+func (e *encoder) LockReleaseTokenPoolGetFee(args LockReleaseTokenPoolGetFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetFee", args)
+}
+
+// LockReleaseTokenPoolGetFeeMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolGetFee choice.
+func (e *encoder) LockReleaseTokenPoolGetFeeMCMSParams(args LockReleaseTokenPoolGetFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetFee", args)
 }
 
 // LockReleaseTokenPoolGetRequiredCCVs encodes parameters for the LockReleaseTokenPoolGetRequiredCCVs choice.
@@ -2070,6 +2329,11 @@ func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, 
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
 }
 
+// SetPoolReceiveContext encodes parameters for the SetPoolReceiveContext choice.
+func (e *encoder) SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetPoolReceiveContext", args)
+}
+
 // SetRateLimitConfig encodes parameters for the SetRateLimitConfig choice.
 func (e *encoder) SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetRateLimitConfig", args)
@@ -2078,6 +2342,11 @@ func (e *encoder) SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoi
 // SetRateLimitConfigMCMSParams encodes MCMS parameters (without Caller) for the SetRateLimitConfig choice.
 func (e *encoder) SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetRateLimitConfig", args)
+}
+
+// SetTransferTimeout encodes parameters for the SetTransferTimeout choice.
+func (e *encoder) SetTransferTimeout(args SetTransferTimeout) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetTransferTimeout", args)
 }
 
 // Verify MCMSEncoder interface implementation

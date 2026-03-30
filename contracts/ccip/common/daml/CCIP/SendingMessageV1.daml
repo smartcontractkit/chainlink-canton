@@ -22,7 +22,6 @@ data CCVFee = CCVFee
     with
         ccvInstanceId : Text
         ccvOwner : Party
-        -- Legacy field name retained; value is integer USD cents.
         feeUSDCents : Numeric 0
         destGasLimit : Int
         destBytesOverhead : Int
@@ -32,7 +31,6 @@ data TokenSendFee = TokenSendFee
     with
         poolInstanceId : Text
         poolOwner : Party
-        -- Legacy field name retained; value is integer USD cents.
         feeUSDCents : Numeric 0
         destGasOverhead : Int
         destBytesOverhead : Int
@@ -88,17 +86,11 @@ data SendingMessageState
     | SendingMessageState_FeeFinalized
     deriving (Eq, Show)
 
--- 1e8: the "100%" identity value in the Canton E8 premium convention.
-premiumIdentity : Numeric 0
-premiumIdentity = 100000000.0
-
--- 1e6 converts integer USD cents into the Canton usd8 domain.
-usd8PerUsdCent : Numeric 0
-usd8PerUsdCent = 1000000.0
-
-gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
+-- ceil(gasUnits * usdPerUnitGas / usdPerUsdCent) → integer USD cents.
+-- EVM FeeQuoter.sol line 333: (totalGas * price + (1e16 - 1)) / 1e16.
+gasCostUsdCents : Decimal -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
-    CCIP.Math.mulDivUp (intToNumeric gasUnits) usdPerUnitGas usd8PerUsdCent
+    CCIP.Math.mulDivUp (intToNumeric gasUnits) (CCIP.Math.decimalToNumeric0 usdPerUnitGas) CCIP.Math.usdPerUsdCent
 
 sumExecutionGasLimit : [CCVFee] -> Optional TokenSendFee -> Int -> Int
 sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
@@ -174,6 +166,7 @@ template SendingMessageV1
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+        requiredExecutor : Optional RawInstanceAddress.RawInstanceAddress
         executorAddress : BytesHex
         executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
@@ -204,7 +197,7 @@ template SendingMessageV1
         executorFee : Optional ExecutorFee
         executorDestGasLimit : Int
         executorDestBytesOverhead : Int
-        executorFeeTokenAmount : Numeric 0
+        executorFeeTokenAmount : Decimal
         -- Appended to by AddVerifierData
         -- TODO: also allow AddTokenSend to add their own observers
         observingParties : [Party]
@@ -216,9 +209,9 @@ template SendingMessageV1
 
         -- Populated by FinalizeFee (batch conversion from USD to fee
         -- token units at a single price point)
-        ccvFeeTokenAmounts : [Numeric 0]
-        tokenSendFeeTokenAmount : Numeric 0
-        networkFeeTokenAmount : Numeric 0
+        ccvFeeTokenAmounts : [Decimal]
+        tokenSendFeeTokenAmount : Decimal
+        networkFeeTokenAmount : Decimal
 
         -- Populated by AddTokenSend
         tokenSendData : Optional TokenSendData
@@ -319,14 +312,24 @@ template SendingMessageV1
                 assertMsg "sendingMessage: executor mode already fixed to no executor"
                     (executionMode == Some ExecutionMode_Executor)
 
-                let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
+                requiredExecutor <- case requiredExecutor of
+                    Some executor -> pure executor
+                    None -> abort "sendingMessage: required executor missing"
+                RawInstanceAddress.assertEqual
+                    "sendingMessage: caller is not the required executor"
+                    executorInstanceId
+                    caller
+                    requiredExecutor
+                assertMsg
+                    "sendingMessage: executor address mismatch"
+                    (executorAddress == RawInstanceAddress.toInstanceAddress requiredExecutor)
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId
                         executorOwner = caller
                         feeUSDCents = feeUSDCents
                 create this with
-                    executorAddress = derivedExecutor
+                    executorAddress = RawInstanceAddress.toInstanceAddress requiredExecutor
                     executorArgs = executorArgs
                     executorFee = Some ef
 
@@ -334,8 +337,8 @@ template SendingMessageV1
         -- outbound message is constructed.
         choice FinalizeFee : ContractId SendingMessageV1
             with
-                feeTokenPrice : Numeric 0
-                premiumMultiplier : Numeric 0
+                feeTokenPrice : Decimal
+                premiumMultiplier : Decimal
                 totalExecutionGasLimit : Int
                 executorDestGasLimit : Int
                 executorDestBytesOverhead : Int
@@ -352,14 +355,28 @@ template SendingMessageV1
                 assertMsg "fee token price must be positive" (feeTokenPrice > 0.0)
                 assertMsg "premium multiplier must be positive" (premiumMultiplier > 0.0)
 
-                let promoteUsdCentsToUsd8 feeUSDCents =
-                        CCIP.Math.mulDivDown feeUSDCents usd8PerUsdCent 1.0
+                -- All math in Numeric 0 to avoid Canton's banker's rounding.
+                -- EVM FeeQuoter.sol line 750:
+                --   fee = (totalGas * gasPrice * 1e18 + premiumUSD) / feeTokenPrice
+                -- Canton analog (per-component):
+                --   fee = floor(cents * usdPerUsdCent * multiplier / feeTokenPrice)
+                -- where usdPerUsdCent (1e8) promotes cents back to E10, and
+                -- multiplier/price are both E10-scaled so the ratio preserves units.
+                let feeTokenPriceN = CCIP.Math.decimalToNumeric0 feeTokenPrice
+                let premiumMultiplierN = CCIP.Math.decimalToNumeric0 premiumMultiplier
+                let promoteUsdCentsToUsd10 feeUSDCents =
+                        CCIP.Math.mulDivDown feeUSDCents CCIP.Math.usdPerUsdCent 1.0
+                -- Applies the premium multiplier (e.g. LINK discount) to a
+                -- USD-cents fee and converts to fee token smallest units.
                 let convertWithPremium feeUSDCents =
-                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
-                        in CCIP.Math.mulDivDown feeUsd8 premiumMultiplier feeTokenPrice
+                        let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
+                        in CCIP.Math.numeric0ToDecimal (CCIP.Math.mulDivDown feeUsd10 premiumMultiplierN feeTokenPriceN)
+                -- Identity conversion (no premium): used for gas execution cost
+                -- and executor flat fees, matching EVM where the gas term in the
+                -- numerator uses 1e18 (identity) rather than the multiplier.
                 let convertDirect feeUSDCents =
-                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
-                        in CCIP.Math.mulDivDown feeUsd8 premiumIdentity feeTokenPrice
+                        let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
+                        in CCIP.Math.numeric0ToDecimal (CCIP.Math.mulDivDown feeUsd10 CCIP.Math.premiumIdentity feeTokenPriceN)
                 let executionCostAmount =
                         if executionMode == Some ExecutionMode_NoExecutor
                         then 0.0
@@ -504,7 +521,7 @@ template SendingMessageV1
         -- Total fee in fee token units. Matches EVM where
         -- forwardToVerifier receives the total feeTokenAmount.
         -- Requires FinalizeFee to have been called.
-        nonconsuming choice FeeTokenAmount : Numeric 0
+        nonconsuming choice FeeTokenAmount : Decimal
             with
                 caller : Party
             controller caller

@@ -22,8 +22,8 @@ import DA.Time (time, addRelTime, hours)
 import DA.Foldable (forA_)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.LockReleaseTokenPoolCodec (decodeSetDynamicConfigParams, decodeApplyChainUpdatesParams, decodeApplyTokenTransferFeeConfigUpdatesParams, decodeSetRateLimitConfigParams)
-import CCIP.LockReleaseTokenPoolTypes (TokenTransferFeeConfig(..), RemoteChainConfig(..), ChainUpdate(..), TokenTransferFeeConfigArgs(..), RateLimitConfigArgs(..))
+import CCIP.LockReleaseTokenPoolCodec (decodeSetDynamicConfigParams, decodeApplyChainUpdatesParams, decodeApplyTokenTransferFeeConfigUpdatesParams, decodeSetRateLimitConfigParams, decodeSetPoolReceiveContextParams, decodeSetTransferTimeoutParams)
+import CCIP.LockReleaseTokenPoolTypes (TokenTransferFeeConfig(..), RemoteChainConfig(..), ChainUpdate(..), TokenTransferFeeConfigArgs(..), RateLimitConfigArgs(..), TransferTimeout(..))
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -48,15 +48,6 @@ import qualified CCIP.TokenAdminRegistry
 -- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
-
--- | Transfer timeout configuration for pending TransferInstructions.
--- Some tokens (e.g., Amulet) have expiry constraints and reject transfers with
--- executeBefore times beyond the token's expiry. Use RelativeHours for such tokens.
--- Tokens without expiry (e.g., TestToken) can use Indefinite.
-data TransferTimeout
-    = Indefinite          -- Use maxTime (year 9999) - for tokens without expiry
-    | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
-    deriving (Eq, Show)
 
 data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
     with
@@ -249,6 +240,14 @@ template LockReleaseTokenPool
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
 
+            tokenPool_getFeeImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_GetFee
+                    with
+                        feeQuoterCid = arg.feeQuoterCid
+                        destChainSelector = arg.destChainSelector
+                        tokenInstrumentId = arg.tokenInstrumentId
+                        caller = arg.caller
+
         -- Sets the dynamic configuration for the pool.
         -- 
         -- Params:
@@ -395,6 +394,26 @@ template LockReleaseTokenPool
                         rateLimitConfigArgs
                 create this with
                     remoteChainConfigs = remoteChainConfigsUpdated
+
+        -- Set the pool receive context (for preapproval CIDs in Splice token patterns).
+        -- The context is merged into extraArgs for inbound transfers.
+        --
+        -- Callable by poolOwner
+        choice SetPoolReceiveContext : ContractId LockReleaseTokenPool
+            with
+                newPoolReceiveContext : CCIP.Context.CCIPContext
+            controller poolOwner
+            do create this with poolReceiveContext = newPoolReceiveContext
+
+        -- Set the transfer timeout for pending TransferInstructions.
+        -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
+        --
+        -- Callable by poolOwner
+        choice SetTransferTimeout : ContractId LockReleaseTokenPool
+            with
+                newTransferTimeout : TransferTimeout
+            controller poolOwner
+            do create this with transferTimeout = newTransferTimeout
 
         -- Get required CCV raw instance addresses based on chain and direction.
         nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [RawInstanceAddress]
@@ -583,9 +602,7 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal = CCIP.Math.numeric0ToDecimalChecked
-                        "ReleaseFromTicket.localAmount"
-                        localAmount
+                let amountDecimal = CCIP.Math.numeric0ToDecimal localAmount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = poolOwner
                         receiver = ticket.tokenReceiver
@@ -711,6 +728,48 @@ template LockReleaseTokenPool
                         destBytesOverhead = destBytesOverhead
                         caller = poolOwner
 
+        -- Quote fee for outbound token transfer (USD cents only).
+        nonconsuming choice LockReleaseTokenPool_GetFee
+                : CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
+            with
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                destChainSelector : Numeric 0
+                tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                assertMsg "pool: tokenInstrumentId mismatch"
+                    (tokenInstrumentId == instrumentId)
+
+                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+
+                case Map.lookup destChainSelector tokenTransferFeeConfigs of
+                    Some feeConfig | feeConfig.isEnabled ->
+                        pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
+                            poolInstanceId = instanceId
+                            poolOwner = poolOwner
+                            feeUSDCents = feeConfig.feeUSDCents
+                            destGasOverhead = feeConfig.destGasOverhead
+                            destBytesOverhead = feeConfig.destBytesOverhead
+                            tokenFeeBps = feeConfig.feeBps
+                            isEnabled = True
+                    _ -> do
+                        (feeUSDCents, destGasOverhead, destBytesOverhead) <- exercise feeQuoterCid
+                            CCIP.FeeQuoter.GetTokenTransferFee with
+                                destChainSelector = destChainSelector
+                                token = tokenInstrumentId
+                                caller = poolOwner
+                        pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
+                            poolInstanceId = instanceId
+                            poolOwner = poolOwner
+                            feeUSDCents = feeUSDCents
+                            destGasOverhead = destGasOverhead
+                            destBytesOverhead = destBytesOverhead
+                            tokenFeeBps = 0.0
+                            isEnabled = False
+
         -- Lock tokens for outbound transfer and append token send data.
         -- Reads from SendingMessageV1 instead of taking separate params.
         -- Requires ccvAndExecutorHash to be finalized by the executor step before this runs.
@@ -778,9 +837,7 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal : Decimal = CCIP.Math.numeric0ToDecimalChecked
-                        "LockOrBurn.amount"
-                        amount
+                let amountDecimal : Decimal = CCIP.Math.numeric0ToDecimal amount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
                         receiver = poolOwner
@@ -873,4 +930,20 @@ template LockReleaseTokenPool
                             rateLimitConfigArgs
                             caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetPoolReceiveContext" -> do
+                    case decodeSetPoolReceiveContextParams operationData of
+                        None -> abort "E_INVALID_PARAMS: SetPoolReceiveContext"
+                        Some (newPoolReceiveContext, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetPoolReceiveContext" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetPoolReceiveContext with
+                                newPoolReceiveContext
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetTransferTimeout" -> do
+                    case decodeSetTransferTimeoutParams operationData of
+                        None -> abort "E_INVALID_PARAMS: SetTransferTimeout"
+                        Some (newTransferTimeout, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetTransferTimeout" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetTransferTimeout with
+                                newTransferTimeout
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

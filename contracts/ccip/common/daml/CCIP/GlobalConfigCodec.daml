@@ -27,10 +27,10 @@ import MCMS.Codec (
     decodeList,
     )
 import CCIP.Codec (
-    encodeRawInstanceAddress,
-    decodeRawInstanceAddressAt,
     encodeRawInstanceAddressList,
-    decodeRawInstanceAddressList
+    decodeRawInstanceAddressList,
+    encodeOptionalRawInstanceAddress,
+    decodeOptionalRawInstanceAddressAt
     )
 
 
@@ -50,7 +50,7 @@ encodeDestChainConfigArgs dcc =
     encodeBool dcc.tokenReceiverAllowed <>
     fromSome (encodeInt64 dcc.baseExecutionGasCost) <>
     encodeBytesHex dcc.offRampAddress <>
-    encodeRawInstanceAddress dcc.defaultExecutor <>
+    encodeOptionalRawInstanceAddress dcc.defaultExecutor <>
     encodeRawInstanceAddressList dcc.laneMandatedCCVs <>
     encodeRawInstanceAddressList dcc.defaultCCVs <>
     encodeNumeric0 dcc.messageNetworkFeeUSDCents <>
@@ -69,7 +69,7 @@ decodeDestChainConfigArgsAt encoded offset = do
     (tokenReceiverAllowed, offset4) <- decodeBoolAt encoded offset3
     (baseExecutionGasCost, offset5) <- decodeInt64At encoded offset4
     (offRampAddress, offset6) <- decodeBytesHexAt encoded offset5
-    (defaultExecutor, offset7) <- decodeRawInstanceAddressAt encoded offset6
+    (defaultExecutor, offset7) <- decodeOptionalRawInstanceAddressAt encoded offset6
     (laneMandatedCCVs, offset8) <- decodeRawInstanceAddressList encoded offset7
     (defaultCCVs, offset9) <- decodeRawInstanceAddressList encoded offset8
     (messageNetworkFeeUSDCents, offset10) <- decodeNumeric0At encoded offset9

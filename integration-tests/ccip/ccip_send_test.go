@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -334,7 +335,7 @@ func TestCCIPSend(t *testing.T) {
 		Admin: types.PARTY(partyCCIP),
 		Id:    types.TEXT("link-token"),
 	}
-	usdPerToken := "100000000"
+	usdPerToken := "1.0"
 	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -352,13 +353,13 @@ func TestCCIPSend(t *testing.T) {
 								},
 								{
 									InstrumentId: linkTokenInstrumentId,
-									UsdPerToken:  types.NUMERIC("1500000000"),
+									UsdPerToken:  types.NUMERIC("15.0"),
 								},
 							},
 							GasPriceUpdates: []feequoter.GasPriceUpdate{
 								{
 									DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-									UsdPerUnitGas:     types.NUMERIC("38"),
+									UsdPerUnitGas:     types.NUMERIC("0.0000000038"),
 								},
 							},
 						},
@@ -566,7 +567,7 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("partySender=%q", partySender)
 
 	// Mint 100 whole AMT in local 1e8 units so the sender can cover non-zero fees.
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100.0")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted 100 whole Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 
@@ -690,9 +691,17 @@ func TestCCIPSend(t *testing.T) {
 					Ccvs: []mcmsbindings.RawInstanceAddress{
 						{Unpack: types.TEXT(committeeVerifierRawAddr.String())},
 					},
+					ExecutorType: ccipclient.ExecutorType{
+						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
+							ExecutorAddress: mcmsbindings.RawInstanceAddress{
+								Unpack: types.TEXT("test-executor@" + partyCCIP),
+							},
+						},
+					},
 					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:  types.CONTRACT_ID(executorCid),
-						ExecutorArgs: types.TEXT(""),
+						ExecutorCid:          types.CONTRACT_ID(executorCid),
+						ExecutorArgs:         types.TEXT(""),
+						ExecutorExtraContext: common.CCIPContext{Values: types.TEXTMAP{}},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),
@@ -708,6 +717,26 @@ func TestCCIPSend(t *testing.T) {
 		},
 	}
 
+	sendDisclosures := slices.Concat(
+		[]*apiv2.DisclosedContract{
+			disclosedCCIPSender,
+			disclosedRouter,
+			disclosedOnRamp,
+			disclosedGlobalConfig,
+			disclosedTar,
+			disclosedRmnRemote,
+			disclosedFeeQuoter,
+			disclosedFeeTokenHolding,
+			disclosedCCV,
+			disclosedExecutor,
+		},
+		transferFactoryDisclosures,
+	)
+	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
+	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")
+
+	senderBalanceBefore := getHoldingsBalanceDecimal(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceBefore := getHoldingsBalanceDecimal(t, t.Context(), ccipParticipant)
 	ccipSendArgs := ledger.MapToValue(sendArgs)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
@@ -722,11 +751,8 @@ func TestCCIPSend(t *testing.T) {
 					ChoiceArgument: ccipSendArgs,
 				}},
 			}},
-			ActAs: []string{partySender},
-			DisclosedContracts: slices.Concat(
-				[]*apiv2.DisclosedContract{disclosedCCIPSender, disclosedRouter, disclosedOnRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedFeeQuoter, disclosedFeeTokenHolding, disclosedCCV, disclosedExecutor},
-				transferFactoryDisclosures,
-			),
+			ActAs:              []string{partySender},
+			DisclosedContracts: sendDisclosures,
 		},
 	})
 	require.NoError(t, err)
@@ -767,6 +793,18 @@ func TestCCIPSend(t *testing.T) {
 	}
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
+
+	senderBalanceAfter := getHoldingsBalanceDecimal(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceAfter := getHoldingsBalanceDecimal(t, t.Context(), ccipParticipant)
+	senderDelta := senderBalanceBefore - senderBalanceAfter
+	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
+
+	// GetFee returns Numeric 0 (E10 smallest units). Convert to Decimal for comparison.
+	feeN0, err := strconv.ParseFloat(strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), 64)
+	require.NoError(t, err)
+	expectedFeeDecimal := feeN0 / 1e10
+	require.InDelta(t, expectedFeeDecimal, senderDelta, 1e-10, "sender deduction should match GetFee quote")
+	require.InDelta(t, expectedFeeDecimal, ccipOwnerDelta, 1e-10, "ccipOwner should receive the full quoted fee in this no-token flow")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)

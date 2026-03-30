@@ -2,7 +2,6 @@ module CommitteeVerifier.DummyCommitteeVerifier where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.SendingMessageV1
 import CCIP.Interfaces.CrossChainVerifier
@@ -42,33 +41,27 @@ template DummyCommitteeVerifier
                             versionTag = versionTag
                             caller = owner
 
-            crossChainVerifier_calculateFeeImpl self arg = do
-                exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
-                    DummyCommitteeVerifier_CalculateFee with
-                        sendingMessageCid = arg.sendingMessageCid
-                        extraContext = arg.extraContext
-                        caller = arg.caller
+            crossChainVerifier_calculateFeeImpl _self arg = do
+                exercise arg.sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                    ccvInstanceId = instanceId
+                    feeUSDCents = feeUSDCents
+                    destGasLimit = destGasLimit
+                    destBytesOverhead = destBytesOverhead
+                    caller = owner
+
+            crossChainVerifier_getFeeImpl _self _arg = do
+                pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
+                    ccvInstanceId = instanceId
+                    ccvOwner = owner
+                    feeUSDCents = feeUSDCents
+                    gasForVerification = destGasLimit
+                    payloadSizeBytes = destBytesOverhead
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
                     DummyCommitteeVerifier_ForwardToVerifier with
                         sendingMessageCid = arg.sendingMessageCid
                         caller = arg.caller
-
-        nonconsuming choice DummyCommitteeVerifier_CalculateFee
-                : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            with
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                extraContext : CCIP.Context.CCIPContext
-                caller : Party
-            controller caller
-            do
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
-                    ccvInstanceId = instanceId
-                    feeUSDCents = feeUSDCents
-                    destGasLimit = destGasLimit
-                    destBytesOverhead = destBytesOverhead
-                    caller = owner
 
         nonconsuming choice DummyCommitteeVerifier_ForwardToVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1

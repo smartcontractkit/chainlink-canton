@@ -73,18 +73,18 @@ data SetDepsParams = SetDepsParams
         rmnRemote : Optional RawInstanceAddress
     deriving (Eq, Show)
 
-addFeeForParty : Map.Map Party (Numeric 0) -> Party -> Numeric 0 -> Map.Map Party (Numeric 0)
+addFeeForParty : Map.Map Party Decimal -> Party -> Decimal -> Map.Map Party Decimal
 addFeeForParty allocs recipient amount =
     let existing = fromOptional 0.0 (Map.lookup recipient allocs)
     in Map.insert recipient (existing + amount) allocs
 
-sumAllocatedFees : Map.Map Party (Numeric 0) -> Numeric 0
+sumAllocatedFees : Map.Map Party Decimal -> Decimal
 sumAllocatedFees allocations = foldl (+) 0.0 (map snd (Map.toList allocations))
 
 buildCCVFeeAllocations
     : [CCIP.SendingMessageV1.CCVFee]
-    -> [Numeric 0]
-    -> Map.Map Party (Numeric 0)
+    -> [Decimal]
+    -> Map.Map Party Decimal
 buildCCVFeeAllocations ccvFees ccvAmounts =
     if length ccvFees /= length ccvAmounts
     then error "router: inconsistent CCV fee vectors"
@@ -256,6 +256,51 @@ template PerPartyRouter
         signatory ccipOwner
         observer partyOwner :: customObservers
         ensure assertValidInstanceId instanceId && unique customObservers
+
+        nonconsuming choice GetFee : CCIP.OnRamp.GetFeeFromRouterResult
+            with
+                context : CCIP.Context.CCIPContext
+                destChainSelector : Numeric 0
+                payload : BytesHex
+                ccipReceiveGasLimit : Int
+                quotedCCVFees : [CCIP.SendingMessageV1.CCVFee]
+                quotedTokenSendFee : Optional CCIP.SendingMessageV1.TokenSendFee
+                quotedExecutionMode : CCIP.SendingMessageV1.ExecutionMode
+                quotedExecutorFee : Optional CCIP.SendingMessageV1.ExecutorFee
+                executorArgs : BytesHex
+                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+            controller partyOwner
+            do
+                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
+                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
+                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+
+                onRamp <- fetch onRampCid
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
+                    onRamp.instanceId onRamp.ccipOwner deps.onRamp
+
+                globalConfig <- fetch globalConfigCid
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                feeQuoter <- fetch feeQuoterCid
+                RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+
+                exercise onRampCid CCIP.OnRamp.GetFeeFromRouter with
+                    routerPartyOwner = partyOwner
+                    routerInstanceId = instanceId
+                    globalConfigCid = globalConfigCid
+                    feeQuoterCid = feeQuoterCid
+                    destChainSelector = destChainSelector
+                    payload = payload
+                    ccipReceiveGasLimit = ccipReceiveGasLimit
+                    quotedCCVFees = quotedCCVFees
+                    quotedTokenSendFee = quotedTokenSendFee
+                    quotedExecutionMode = quotedExecutionMode
+                    quotedExecutorFee = quotedExecutorFee
+                    executorArgs = executorArgs
+                    feeToken = feeToken
 
         choice SetDeps : ContractId PerPartyRouter
             with
@@ -455,7 +500,7 @@ template PerPartyRouter
                                         Splice.Api.Token.TransferInstructionV1.Transfer with
                                             sender = partyOwner
                                             receiver = recipient
-                                            amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.feeTransfer" amount
+                                            amount = amount
                                             instrumentId = sendingMsg.feeToken
                                             requestedAt = now
                                             executeBefore = maxTime

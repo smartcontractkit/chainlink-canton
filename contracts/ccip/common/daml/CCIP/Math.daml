@@ -38,8 +38,14 @@ module CCIP.Math
   , checkedPow10Numeric0
   , canScaleAmountByPowerOfTen
   , calculateLocalAmountChecked
+  , decimalToNumeric0
+  , numeric0ToDecimal
+  , premiumIdentity
+  , e10PerPercent
+  , usdPerUsdCent
   ) where
 
+import DA.Numeric qualified as Numeric
 import DA.Text qualified as Text
 
 baseInt : Int
@@ -125,6 +131,28 @@ calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
            else
                let scale = checkedPow10Numeric0 (label <> ": scale-up factor") diff
                in mulDivDown remoteAmount scale 1.0
+
+decimalToNumeric0 : Decimal -> Numeric 0
+decimalToNumeric0 = Numeric.shift @0
+
+numeric0ToDecimal : Numeric 0 -> Decimal
+numeric0ToDecimal = Numeric.shift @10
+
+-- 1e10: identity multiplier (100%) in E10 scale.
+premiumIdentity : Numeric 0
+premiumIdentity = 10000000000.0
+
+-- 1e8: converts a percentage (e.g. 90) to E10 scale (e.g. 9e9).
+-- (`linkFeeMultiplierPercent * 1e16` converts percent → E18).
+e10PerPercent : Numeric 0
+e10PerPercent = 100000000.0
+
+-- 1e8: one USD cent in E10 scale. Dividing an E10 price by this
+-- yields integer USD cents; multiplying cents by this promotes
+-- back to E10.
+-- (`gasCostInUsdCents = ... / 1e16`).
+usdPerUsdCent : Numeric 0
+usdPerUsdCent = 100000000.0
 
 -- | Check whether a LINK-denominated fee amount in local LINK smallest units
 -- is within the juels-denominated cap.
