@@ -31,6 +31,9 @@ import (
 	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
@@ -46,8 +49,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/service"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -300,11 +301,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
 	inboundRateLimiterRawInstanceAddress := contracts.InstanceID(inboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
 	inboundRateLimiterInstanceAddress := inboundRateLimiterRawInstanceAddress.InstanceAddress()
-	t.Logf("inbound rate limiter instance id: %s, raw instance address: %s, instance address: %s, pool owner: %s",
-		inboundRateLimiterInstanceID,
-		inboundRateLimiterRawInstanceAddress.String(),
-		inboundRateLimiterInstanceAddress.String(),
-		partyTokenPoolOwner)
 	res, err := tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -335,11 +331,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	inboundCustomBlockConfirmationsRateLimiterInstanceID := "test-pool-receive-inbound-custom-rl"
 	inboundCustomBlockConfirmationsRateLimiterRawInstanceAddress := contracts.InstanceID(inboundCustomBlockConfirmationsRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
 	inboundCustomBlockConfirmationsRateLimiterInstanceAddress := inboundCustomBlockConfirmationsRateLimiterRawInstanceAddress.InstanceAddress()
-	t.Logf("inbound custom block confirmations rate limiter instance id: %s, raw instance address: %s, instance address: %s, pool owner: %s",
-		inboundCustomBlockConfirmationsRateLimiterInstanceID,
-		inboundCustomBlockConfirmationsRateLimiterRawInstanceAddress.String(),
-		inboundCustomBlockConfirmationsRateLimiterInstanceAddress.String(),
-		partyTokenPoolOwner)
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -370,11 +361,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	outboundRateLimiterInstanceID := "test-pool-receive-outbound-rl"
 	outboundRateLimiterRawInstanceAddress := contracts.InstanceID(outboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
 	outboundRateLimiterInstanceAddress := outboundRateLimiterRawInstanceAddress.InstanceAddress()
-	t.Logf("outbound rate limiter instance id: %s, raw instance address: %s, instance address: %s, pool owner: %s",
-		outboundRateLimiterInstanceID,
-		outboundRateLimiterRawInstanceAddress.String(),
-		outboundRateLimiterInstanceAddress.String(),
-		partyTokenPoolOwner)
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -466,7 +452,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	})
 	require.NoError(t, err)
 	// Step 1: ProposeAdministrator
-	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -815,35 +801,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	require.NotEmpty(t, poolHoldings, "Pool should have holdings")
 
-	// Filter for unlocked holdings only (Amulet tokens may be locked until next mining round)
-	// var poolHoldingCids []*apiv2.Value
-	// var poolHoldingDisclosures []*apiv2.DisclosedContract
-	// var lockedCount, unlockedCount int
-	// for _, h := range poolHoldings {
-	// 	viewFields := h.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()
-	// 	lockField := viewFields[3].GetValue()
-	// 	isLocked := lockField.GetOptional().GetValue() != nil
-
-	// 	if isLocked {
-	// 		lockedCount++
-	// 		continue
-	// 	}
-	// 	unlockedCount++
-
-	// 	poolHoldingCids = append(poolHoldingCids, &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: h.GetCreatedEvent().GetContractId()}})
-	// 	poolHoldingDisclosures = append(poolHoldingDisclosures, &apiv2.DisclosedContract{
-	// 		ContractId:       h.GetCreatedEvent().GetContractId(),
-	// 		TemplateId:       h.GetCreatedEvent().GetTemplateId(),
-	// 		CreatedEventBlob: h.GetCreatedEvent().GetCreatedEventBlob(),
-	// 	})
-	// }
-	// t.Logf("Pool has %d holdings (%d unlocked, %d locked)", len(poolHoldings), unlockedCount, lockedCount)
-
-	// if unlockedCount == 0 {
-	// 	t.Skip("SKIPPING: All pool holdings are locked (Amulet tokens are locked until next mining round). " +
-	// 		"This is expected on fresh localnet. Either wait for mining round to complete, or use TestToken instead of Amulet.")
-	// }
-
 	// Capture receiver's balance before execute
 	receiverHoldingsBefore, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
 		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
@@ -851,18 +808,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
 
-	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
-	// receiver-only; pool/ccip-owned contracts are only supplied via disclosure.
-	// disclosedCCIPReceiver, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
-	// 	PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver",
-	// })
-	// require.NoError(t, err)
-	// disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
-	// 	PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
-	// })
-	// require.NoError(t, err)
-
-	// TODO: EDS call to get execute disclosures
 	executeDisclosuresEDS, err := testhelpers.GetCCIPExecuteDisclosures(
 		t.Context(),
 		encodedMessageHex,
@@ -873,7 +818,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	)
 	require.NoError(t, err)
 	require.Len(t, executeDisclosuresEDS.CCVContractIDs, 1)
-	t.Logf("execute disclosures EDS: %+v", executeDisclosuresEDS)
 
 	executeDisclosures := slices.Concat(
 		executeDisclosuresEDS.DisclosedContracts,

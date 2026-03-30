@@ -37,8 +37,8 @@ type InstrumentHoldingStore interface {
 
 var _ InstrumentHoldingStore = &InstrumentHoldingStoreService{}
 
-// DefaultReconnectBackoff is the delay before reconnecting after the update stream closes (e.g. server closed or error).
-const DefaultReconnectBackoff = 5 * time.Second
+// defaultReconnectBackoff is the delay before reconnecting after the update stream closes (e.g. server closed or error).
+const defaultReconnectBackoff = 5 * time.Second
 
 type InstrumentHoldingStoreConfig struct {
 	Logger           zerolog.Logger
@@ -85,8 +85,9 @@ func NewInstrumentHoldingStore(
 ) *InstrumentHoldingStoreService {
 	backoff := config.ReconnectBackoff
 	if backoff == 0 {
-		backoff = DefaultReconnectBackoff
+		backoff = defaultReconnectBackoff
 	}
+
 	return &InstrumentHoldingStoreService{
 		logger: config.Logger.With().Str("component", "InstrumentHoldingStoreService").Logger(),
 
@@ -270,6 +271,7 @@ func getRelevantInterfaceViewValue(interfaceViews []*apiv2.InterfaceView, expect
 			return interfaceView.GetViewValue(), nil
 		}
 	}
+
 	return nil, fmt.Errorf("no interface view found for interface id: %s", expectedInterfaceId.String())
 }
 

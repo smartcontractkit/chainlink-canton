@@ -18,8 +18,10 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"slices"
 	"strconv"
 	"testing"
+	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -408,6 +410,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			log.Error().Err(err).Msg("EDS server exited with error")
 		}
 	}()
+
+	time.Sleep(10 * time.Second)
+
 	// Create EDS client
 	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create EDS client")
@@ -603,8 +608,11 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					}}}},
 				}},
 			}},
-			ActAs:              []string{partyReceiver},
-			DisclosedContracts: disclosedContracts,
+			ActAs: []string{partyReceiver},
+			DisclosedContracts: slices.Concat(
+				disclosedContracts,
+				executeDisclosuresEDS.DisclosedContracts,
+			),
 		},
 	})
 	require.NoError(t, err)
