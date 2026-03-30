@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-client"
-	PackageID   = "8f607bb2222d938865fb2033198de5b00fb9000ad0dea6fd115216d6f4b70ae6"
+	PackageID   = "edbf7ec996ff4ada4aea3c799671c389aba0b33300c5e9c3ee9c209b0b447b18"
 	SDKVersion  = "3.4.10"
 )
 
@@ -232,6 +232,117 @@ func (t *ExecutorInput) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ExecutorType is a variant/union type
+type ExecutorType struct {
+	ExecutorUseDefault  *types.UNIT          `json:"Executor_UseDefault,omitempty"`
+	ExecutorNoExecutor  *types.UNIT          `json:"Executor_NoExecutor,omitempty"`
+	ExecutorWithAddress *ExecutorWithAddress `json:"Executor_WithAddress,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for ExecutorType
+func (v ExecutorType) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(v)
+}
+
+// UnmarshalJSON implements custom JSON unmarshalling for ExecutorType
+func (v *ExecutorType) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes ExecutorType to hex string (Canton MCMS format)
+func (v ExecutorType) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes ExecutorType from hex string (Canton MCMS format)
+func (v *ExecutorType) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
+}
+
+// GetVariantTag implements types.VARIANT interface
+func (v ExecutorType) GetVariantTag() string {
+
+	if v.ExecutorUseDefault != nil {
+		return "Executor_UseDefault"
+	}
+
+	if v.ExecutorNoExecutor != nil {
+		return "Executor_NoExecutor"
+	}
+
+	if v.ExecutorWithAddress != nil {
+		return "Executor_WithAddress"
+	}
+
+	return ""
+}
+
+// GetVariantValue implements types.VARIANT interface
+func (v ExecutorType) GetVariantValue() any {
+
+	if v.ExecutorUseDefault != nil {
+		return v.ExecutorUseDefault
+	}
+
+	if v.ExecutorNoExecutor != nil {
+		return v.ExecutorNoExecutor
+	}
+
+	if v.ExecutorWithAddress != nil {
+		return v.ExecutorWithAddress
+	}
+
+	return nil
+}
+
+var _ types.VARIANT = (*ExecutorType)(nil)
+
+// ExecutorWithAddress is a Record type
+type ExecutorWithAddress struct {
+	ExecutorAddress mcms.RawInstanceAddress `json:"executorAddress"`
+}
+
+// ToMap converts ExecutorWithAddress to a map for DAML arguments
+func (t ExecutorWithAddress) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["executorAddress"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutorAddress).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutorAddress
+	}()
+
+	return m
+}
+
+func (t ExecutorWithAddress) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutorWithAddress) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutorWithAddress to hex string (Canton MCMS format)
+func (t ExecutorWithAddress) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutorWithAddress from hex string (Canton MCMS format)
+func (t *ExecutorWithAddress) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExtraArgs is a variant/union type
 type ExtraArgs struct {
 	V3 *GenericExtraArgsV3 `json:"V3,omitempty"`
@@ -348,6 +459,7 @@ type GenericExtraArgsV3 struct {
 	GasLimit           types.INT64               `json:"gasLimit"`
 	BlockConfirmations types.INT64               `json:"blockConfirmations"`
 	Ccvs               []mcms.RawInstanceAddress `json:"ccvs"`
+	ExecutorType       ExecutorType              `json:"executorType"`
 	Executor           *ExecutorInput            `json:"executor" hex:"optional"`
 	TokenReceiver      types.TEXT                `json:"tokenReceiver"`
 	TokenArgs          types.TEXT                `json:"tokenArgs"`
@@ -372,6 +484,14 @@ func (t GenericExtraArgsV3) ToMap() map[string]any {
 			}
 		}
 		return res
+	}()
+
+	m["executorType"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutorType).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutorType
 	}()
 
 	if t.Executor != nil {

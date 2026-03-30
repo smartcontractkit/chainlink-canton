@@ -8,12 +8,14 @@ import CCIP.FeeQuoterTypes (PriceUpdates(..), TokenPriceUpdate(..), GasPriceUpda
 
 import MCMS.Codec (
     decodeBoolAt,
+    decodeDecimalAt,
     decodeInt64At,
     decodeList,
     decodeNumeric0At,
     decodePartyAt,
     decodePartyList,
     encodeBool,
+    encodeDecimal,
     encodeInt64,
     encodeList,
     encodeNumeric0,
@@ -47,12 +49,12 @@ decodePriceUpdatesAt encoded offset = do
 encodeTokenPriceUpdate : TokenPriceUpdate -> BytesHex
 encodeTokenPriceUpdate params =
     encodeInstrumentId params.instrumentId
-    <> encodeNumeric0 params.usdPerToken
+    <> encodeDecimal params.usdPerToken
 
 decodeTokenPriceUpdateAt : BytesHex -> Int -> Optional (TokenPriceUpdate, Int)
 decodeTokenPriceUpdateAt encoded offset = do
     (instrumentId, offset) <- decodeInstrumentId encoded offset
-    (usdPerToken, offset) <- decodeNumeric0At encoded offset
+    (usdPerToken, offset) <- decodeDecimalAt encoded offset
     Some (TokenPriceUpdate{..}, offset)
 
 
@@ -63,12 +65,12 @@ decodeTokenPriceUpdateAt encoded offset = do
 encodeGasPriceUpdate : GasPriceUpdate -> BytesHex
 encodeGasPriceUpdate params =
     encodeNumeric0 params.destChainSelector
-    <> encodeNumeric0 params.usdPerUnitGas
+    <> encodeDecimal params.usdPerUnitGas
 
 decodeGasPriceUpdateAt : BytesHex -> Int -> Optional (GasPriceUpdate, Int)
 decodeGasPriceUpdateAt encoded offset = do
     (destChainSelector, offset) <- decodeNumeric0At encoded offset
-    (usdPerUnitGas, offset) <- decodeNumeric0At encoded offset
+    (usdPerUnitGas, offset) <- decodeDecimalAt encoded offset
     Some (GasPriceUpdate{..}, offset)
 
 

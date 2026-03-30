@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "0eb2d326b6842da7f926e068aa490f67144b6a2b3c4f0b677ad4cee22eb53193"
+	PackageID   = "1090cd9163f3eb5ed52c0db313ac6c733465a61aa391ea069ae8f693a21914cc"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1660,7 +1660,7 @@ type DestChainConfig struct {
 	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
-	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
+	DefaultExecutor           *mcms.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
 	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
@@ -1681,13 +1681,16 @@ func (t DestChainConfig) ToMap() map[string]any {
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
-	m["defaultExecutor"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DefaultExecutor).(mapper); ok {
-			return m.toMap()
+	if t.DefaultExecutor != nil {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.DefaultExecutor,
 		}
-		return t.DefaultExecutor
-	}()
+	} else {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -1752,7 +1755,7 @@ type DestChainConfigArgs struct {
 	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
-	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
+	DefaultExecutor           *mcms.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
 	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
@@ -1775,13 +1778,16 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
-	m["defaultExecutor"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DefaultExecutor).(mapper); ok {
-			return m.toMap()
+	if t.DefaultExecutor != nil {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.DefaultExecutor,
 		}
-		return t.DefaultExecutor
-	}()
+	} else {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -4344,6 +4350,7 @@ type SendingMessageV1 struct {
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
 	RequiredCCVs              []mcms.RawInstanceAddress                 `json:"requiredCCVs"`
+	RequiredExecutor          *mcms.RawInstanceAddress                  `json:"requiredExecutor" hex:"optional"`
 	ExecutorAddress           types.TEXT                                `json:"executorAddress"`
 	ExecutionMode             *ExecutionMode                            `json:"executionMode" hex:"optional"`
 	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
@@ -4431,6 +4438,17 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 		}
 		return res
 	}()
+
+	if t.RequiredExecutor != nil {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RequiredExecutor,
+		}
+	} else {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["executorAddress"] = string(t.ExecutorAddress)
@@ -4698,6 +4716,17 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 		return res
 	}()
 
+	if t.RequiredExecutor != nil {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RequiredExecutor,
+		}
+	} else {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["executorAddress"] = string(t.ExecutorAddress)
 
@@ -4947,27 +4976,6 @@ func (t *SendingMessageV1) UnmarshalHex(data string) error {
 
 // Choice methods for SendingMessageV1
 
-// FinalizeFee exercises the FinalizeFee choice on this SendingMessageV1 contract
-// This method uses the package name in the template ID
-func (t SendingMessageV1) FinalizeFee(contractID string, args FinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FinalizeFeeWithPackageID exercises the FinalizeFee choice using the provided package ID instead of package name
-func (t SendingMessageV1) FinalizeFeeWithPackageID(contractID string, packageID string, args FinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
 func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
@@ -5111,6 +5119,27 @@ func (t SendingMessageV1) AddExecutorFeeWithPackageID(contractID string, package
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "AddExecutorFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFee exercises the FinalizeFee choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) FinalizeFee(contractID string, args FinalizeFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "FinalizeFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFeeWithPackageID exercises the FinalizeFee choice using the provided package ID instead of package name
+func (t SendingMessageV1) FinalizeFeeWithPackageID(contractID string, packageID string, args FinalizeFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "FinalizeFee",
 		Arguments:  argsToMap(args),
 	}
 }
