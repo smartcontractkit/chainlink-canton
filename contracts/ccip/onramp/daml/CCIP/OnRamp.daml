@@ -340,6 +340,13 @@ template OnRamp
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
                 assertValidHex "tokenArgs" extraArgs.tokenArgs
                 assertMsg "onramp: CCVs cannot contain duplicates" (unique extraArgs.ccvs)
+                case extraArgs.executorType of
+                    CCIP.Client.Executor_NoExecutor ->
+                        assertMsg "onramp: executor input must be empty for no-executor mode" (isNone extraArgs.executor)
+                    CCIP.Client.Executor_UseDefault ->
+                        assertMsg "onramp: executor input required for default executor mode" (isSome extraArgs.executor)
+                    CCIP.Client.Executor_WithAddress _ ->
+                        assertMsg "onramp: executor input required for explicit executor mode" (isSome extraArgs.executor)
 
                 case Map.lookup destChainSelector feeQuoter.destChainConfigs of
                     Some feeDestConfig ->
@@ -383,11 +390,23 @@ template OnRamp
                 let initialState = if hasTokenTransfer
                         then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
                         else CCIP.SendingMessageV1.SendingMessageState_Prepared
-                let (resolvedExecutorAddress, executionMode) = case extraArgs.executor of
-                        Some _ ->
-                            ("", Some CCIP.SendingMessageV1.ExecutionMode_Executor)
-                        None ->
-                            (noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+                let (resolvedRequiredExecutor, resolvedExecutorAddress, executionMode) = case extraArgs.executorType of
+                        CCIP.Client.Executor_UseDefault ->
+                            case destConfig.defaultExecutor of
+                                Some defaultExecutor ->
+                                    ( Some defaultExecutor
+                                    , RawInstanceAddress.toInstanceAddress defaultExecutor
+                                    , Some CCIP.SendingMessageV1.ExecutionMode_Executor
+                                    )
+                                None ->
+                                    (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+                        CCIP.Client.Executor_NoExecutor ->
+                            (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+                        CCIP.Client.Executor_WithAddress executorAddress ->
+                            ( Some executorAddress
+                            , RawInstanceAddress.toInstanceAddress executorAddress
+                            , Some CCIP.SendingMessageV1.ExecutionMode_Executor
+                            )
 
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
@@ -402,6 +421,7 @@ template OnRamp
                     destChainSelector
                     sequenceNumber = newSequenceNumber
                     requiredCCVs = resolvedCCVs
+                    requiredExecutor = resolvedRequiredExecutor
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
                     receiver = validateDestChainAddress message.receiver destConfig.addressBytesLength

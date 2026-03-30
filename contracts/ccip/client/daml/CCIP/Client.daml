@@ -49,6 +49,13 @@ data ExecutorInput = ExecutorInput
         executorExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
 
+data ExecutorType
+    = Executor_UseDefault
+    | Executor_NoExecutor
+    | Executor_WithAddress with
+        executorAddress : RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
 data ExtraArgs
     = V3 GenericExtraArgsV3
     deriving (Eq, Show)
@@ -76,10 +83,11 @@ data GenericExtraArgsV3 = GenericExtraArgsV3
         -- | Sender-specified CCV addresses for the message.
         -- | May be empty to indicate that the destination chain defaults should be used.
         ccvs : [RawInstanceAddress.RawInstanceAddress]
+        -- | How executor selection should be resolved for the message.
+        executorType : ExecutorType
         -- | Optional executor selection for the message.
-        -- | If present, the executor is responsible for execution on the destination chain once
-        -- | a quorum of CCVs has verified the message. If absent, the message is prepared in
-        -- | no-executor mode.
+        -- | Must be specified for `Executor_UseDefault` and `Executor_WithAddress`, and omitted
+        -- | for `Executor_NoExecutor`.
         executor : Optional ExecutorInput
         -- | Address of the token receiver on the destination chain, in bytes format. If an empty
         -- | bytes array is provided, the receiver address from the message itself is used for

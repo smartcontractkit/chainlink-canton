@@ -129,16 +129,22 @@ gatherQuote owner destinationChainSelector message ccvs context = do
                 , q.tokenFeeBps
                 )
 
-    let (executorCid, executorArgs) = case extraArgs.executor of
-            None -> (None, "")
-            Some e -> (Some e.executorCid, e.executorArgs)
-    (quotedExecutionMode, quotedExecutorFee) <- case executorCid of
-        None -> pure
-            ( CCIP.SendingMessageV1.ExecutionMode_NoExecutor
-            , None
-            )
-        Some ecid -> do
-            q <- exercise ecid CCIP.Interfaces.Executor.Executor_GetFee with
+    let executorArgs = case extraArgs.executor of
+            None -> ""
+            Some executorInput -> executorInput.executorArgs
+    let (resolvedExecutorInput, quotedExecutionModeBase) = case extraArgs.executorType of
+            CCIP.Client.Executor_NoExecutor ->
+                (None, CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+            CCIP.Client.Executor_WithAddress _ ->
+                (extraArgs.executor, CCIP.SendingMessageV1.ExecutionMode_Executor)
+            CCIP.Client.Executor_UseDefault ->
+                case destConfig.defaultExecutor of
+                    Some _ -> (extraArgs.executor, CCIP.SendingMessageV1.ExecutionMode_Executor)
+                    None -> (None, CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+    (quotedExecutionMode, quotedExecutorFee) <- case resolvedExecutorInput of
+        None -> pure (quotedExecutionModeBase, None)
+        Some executorInput -> do
+            q <- exercise executorInput.executorCid CCIP.Interfaces.Executor.Executor_GetFee with
                 destChainSelector = destinationChainSelector
                 requiredCCVs = resolvedCCVs
                 caller = owner
@@ -209,12 +215,20 @@ template CCIPSender
             controller owner
             do
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
                     _ -> abort "sender: unsupported extraArgs version"
+                destConfigOpt <- exercise globalConfigCid
+                    CCIP.GlobalConfig.GetDestChainConfig with
+                        destChainSelector = destinationChainSelector
+                        caller = owner
+                destConfig <- case destConfigOpt of
+                    None -> abort "sender: unknown destination chain"
+                    Some cfg -> pure cfg
 
                 smCid <- exercise routerCid CCIP.PerPartyRouter.PrepareSend with
                     destinationChainSelector = destinationChainSelector
@@ -252,15 +266,31 @@ template CCIPSender
                                 tokenInstrumentId = tt.token
                                 caller = owner
 
-                smCid <- case extraArgs.executor of
-                    None -> pure smCid
-                    Some executorInput ->
-                        exercise executorInput.executorCid
-                            CCIP.Interfaces.Executor.Executor_CalculateFee with
-                                sendingMessageCid = smCid
-                                executorArgs = executorInput.executorArgs
-                                extraContext = executorInput.executorExtraContext
-                                caller = owner
+                smCid <- case extraArgs.executorType of
+                    CCIP.Client.Executor_NoExecutor -> pure smCid
+                    CCIP.Client.Executor_UseDefault ->
+                        case destConfig.defaultExecutor of
+                            None -> pure smCid
+                            Some _ ->
+                                case extraArgs.executor of
+                                    None -> pure smCid
+                                    Some executorInput ->
+                                        exercise executorInput.executorCid
+                                            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                                                sendingMessageCid = smCid
+                                                executorArgs = executorInput.executorArgs
+                                                extraContext = executorInput.executorExtraContext
+                                                caller = owner
+                    CCIP.Client.Executor_WithAddress _ ->
+                        case extraArgs.executor of
+                            None -> pure smCid
+                            Some executorInput ->
+                                exercise executorInput.executorCid
+                                    CCIP.Interfaces.Executor.Executor_CalculateFee with
+                                        sendingMessageCid = smCid
+                                        executorArgs = executorInput.executorArgs
+                                        extraContext = executorInput.executorExtraContext
+                                        caller = owner
 
                 smCid <- exercise routerCid CCIP.PerPartyRouter.FinalizeFee with
                     context
