@@ -114,7 +114,19 @@ var BuildConfig = operations.NewOperation(
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
 				},
-				// TODO: add rate limiter instance addresses
+				// TODO: use real addresses from the datastore, but how to properly get them?
+				InboundRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
+				InboundCustomBlockConfirmationsRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
+				OutboundRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
 			}
 		}
 
