@@ -100,3 +100,19 @@ validateNoEmptyAddresses addresses = do
     emptyAddress :: _ ->
       assertMsg ("ZeroAddressNotAllowed") False
     [] -> pure ()
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- ===========================================================================
+
+-- | Params for ApplyDestChainConfigUpdates choice
+data ApplyDestChainConfigUpdatesParams = ApplyDestChainConfigUpdatesParams
+    with
+        destChainConfigArgs : [DestChainConfigArgs]
+    deriving (Eq, Show)
+
+-- | Params for ApplySourceChainConfigUpdates choice
+data ApplySourceChainConfigUpdatesParams = ApplySourceChainConfigUpdatesParams
+    with
+        sourceChainConfigArgs : [SourceChainConfigArgs]
+    deriving (Eq, Show)

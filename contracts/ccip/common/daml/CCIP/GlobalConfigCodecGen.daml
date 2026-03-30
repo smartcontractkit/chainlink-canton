@@ -4,18 +4,20 @@ module CCIP.GlobalConfigCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), DestChainConfig(..), SourceChainConfigArgs(..), SourceChainConfig(..))
+import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), DestChainConfig(..), SourceChainConfigArgs(..), SourceChainConfig(..), ApplyDestChainConfigUpdatesParams(..), ApplySourceChainConfigUpdatesParams(..))
 
 import MCMS.Codec (
     decodeBoolAt,
     decodeBytesHexAt,
     decodeBytesHexList,
     decodeInt64At,
+    decodeList,
     decodeNumeric0At,
     encodeBool,
     encodeBytesHex,
     encodeBytesHexList,
     encodeInt64,
+    encodeList,
     encodeNumeric0
     )
 
@@ -128,6 +130,34 @@ decodeSourceChainConfigAt encoded offset = do
     (defaultCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (laneMandatedCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     Some (SourceChainConfig{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyDestChainConfigUpdatesParams
+-- ===============================================
+
+encodeApplyDestChainConfigUpdatesParams : ApplyDestChainConfigUpdatesParams -> BytesHex
+encodeApplyDestChainConfigUpdatesParams params =
+    encodeList params.destChainConfigArgs encodeDestChainConfigArgs
+
+decodeApplyDestChainConfigUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyDestChainConfigUpdatesParams, Int)
+decodeApplyDestChainConfigUpdatesParamsAt encoded offset = do
+    (destChainConfigArgs, offset) <- decodeList encoded offset decodeDestChainConfigArgsAt
+    Some (ApplyDestChainConfigUpdatesParams{..}, offset)
+
+
+-- ===============================================
+-- |              ApplySourceChainConfigUpdatesParams
+-- ===============================================
+
+encodeApplySourceChainConfigUpdatesParams : ApplySourceChainConfigUpdatesParams -> BytesHex
+encodeApplySourceChainConfigUpdatesParams params =
+    encodeList params.sourceChainConfigArgs encodeSourceChainConfigArgs
+
+decodeApplySourceChainConfigUpdatesParamsAt : BytesHex -> Int -> Optional (ApplySourceChainConfigUpdatesParams, Int)
+decodeApplySourceChainConfigUpdatesParamsAt encoded offset = do
+    (sourceChainConfigArgs, offset) <- decodeList encoded offset decodeSourceChainConfigArgsAt
+    Some (ApplySourceChainConfigUpdatesParams{..}, offset)
 
 
 

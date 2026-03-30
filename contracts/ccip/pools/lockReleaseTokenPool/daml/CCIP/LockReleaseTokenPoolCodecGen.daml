@@ -4,19 +4,25 @@ module CCIP.LockReleaseTokenPoolCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), TransferTimeout(..))
+import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), TransferTimeout(..))
 
 import MCMS.Codec (
     decodeBoolAt,
     decodeBytesHexAt,
     decodeBytesHexList,
     decodeInt64At,
+    decodeList,
     decodeNumeric0At,
+    decodeOptional,
+    decodePartyAt,
     encodeBool,
     encodeBytesHex,
     encodeBytesHexList,
     encodeInt64,
+    encodeList,
     encodeNumeric0,
+    encodeOptional,
+    encodeParty,
     encodeUint8,
     extractBytes
     )
@@ -146,6 +152,82 @@ decodeRateLimitConfigArgsAt encoded offset = do
     (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     Some (RateLimitConfigArgs{..}, offset)
+
+
+-- ===============================================
+-- |              SetDynamicConfigParams
+-- ===============================================
+
+encodeSetDynamicConfigParams : SetDynamicConfigParams -> BytesHex
+encodeSetDynamicConfigParams params =
+    encodeOptional params.rateLimitAdmin encodeParty
+
+decodeSetDynamicConfigParamsAt : BytesHex -> Int -> Optional (SetDynamicConfigParams, Int)
+decodeSetDynamicConfigParamsAt encoded offset = do
+    (rateLimitAdmin, offset) <- decodeOptional encoded offset decodePartyAt
+    Some (SetDynamicConfigParams{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyChainUpdatesParams
+-- ===============================================
+
+encodeApplyChainUpdatesParams : ApplyChainUpdatesParams -> BytesHex
+encodeApplyChainUpdatesParams params =
+    encodeList params.remoteChainSelectorsToRemove encodeNumeric0
+    <> encodeList params.chainsToAdd encodeChainUpdate
+
+decodeApplyChainUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyChainUpdatesParams, Int)
+decodeApplyChainUpdatesParamsAt encoded offset = do
+    (remoteChainSelectorsToRemove, offset) <- decodeList encoded offset decodeNumeric0At
+    (chainsToAdd, offset) <- decodeList encoded offset decodeChainUpdateAt
+    Some (ApplyChainUpdatesParams{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyTokenTransferFeeConfigUpdatesParams
+-- ===============================================
+
+encodeApplyTokenTransferFeeConfigUpdatesParams : ApplyTokenTransferFeeConfigUpdatesParams -> BytesHex
+encodeApplyTokenTransferFeeConfigUpdatesParams params =
+    encodeList params.tokenTransferFeeConfigArgs encodeTokenTransferFeeConfigArgs
+    <> encodeList params.disableTokenTransferFeeConfigArgs encodeNumeric0
+
+decodeApplyTokenTransferFeeConfigUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyTokenTransferFeeConfigUpdatesParams, Int)
+decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded offset = do
+    (tokenTransferFeeConfigArgs, offset) <- decodeList encoded offset decodeTokenTransferFeeConfigArgsAt
+    (disableTokenTransferFeeConfigArgs, offset) <- decodeList encoded offset decodeNumeric0At
+    Some (ApplyTokenTransferFeeConfigUpdatesParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetRateLimitConfigParams
+-- ===============================================
+
+encodeSetRateLimitConfigParams : SetRateLimitConfigParams -> BytesHex
+encodeSetRateLimitConfigParams params =
+    encodeList params.rateLimitConfigArgs encodeRateLimitConfigArgs
+    <> encodeParty params.caller
+
+decodeSetRateLimitConfigParamsAt : BytesHex -> Int -> Optional (SetRateLimitConfigParams, Int)
+decodeSetRateLimitConfigParamsAt encoded offset = do
+    (rateLimitConfigArgs, offset) <- decodeList encoded offset decodeRateLimitConfigArgsAt
+    (caller, offset) <- decodePartyAt encoded offset
+    Some (SetRateLimitConfigParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetTransferTimeoutParams
+-- ===============================================
+
+encodeSetTransferTimeoutParams : SetTransferTimeoutParams -> BytesHex
+encodeSetTransferTimeoutParams params =
+    encodeTransferTimeout params.transferTimeout
+
+decodeSetTransferTimeoutParamsAt : BytesHex -> Int -> Optional (SetTransferTimeoutParams, Int)
+decodeSetTransferTimeoutParamsAt encoded offset = do
+    (transferTimeout, offset) <- decodeTransferTimeoutAt encoded offset
+    Some (SetTransferTimeoutParams{..}, offset)
 
 
 

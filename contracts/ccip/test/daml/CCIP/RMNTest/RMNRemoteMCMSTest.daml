@@ -9,7 +9,8 @@ import DA.Map qualified as Map
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote
-import CCIP.RMNRemoteCodec
+import CCIP.RMNRemoteCodecGen
+import CCIP.RMNRemoteTypes
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - CURSE
@@ -37,7 +38,7 @@ testRMNRemoteMCMSEntrypoint_Curse = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode Curse params
-  let encoded = encodeCurseParams globalSubject
+  let encoded = encodeCurseParams (CurseParams with subject = globalSubject)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -78,7 +79,7 @@ testRMNRemoteMCMSEntrypoint_Uncurse = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode Uncurse params
-  let encoded = encodeUncurseParams subject
+  let encoded = encodeUncurseParams (UncurseParams with subject)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -121,7 +122,7 @@ testRMNRemoteMCMSEntrypoint_CurseChain = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode CurseChain params
-  let encoded = encodeCurseChainParams chainSelector
+  let encoded = encodeCurseChainParams (CurseChainParams with chainSelector)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -168,7 +169,7 @@ testRMNRemoteMCMSEntrypoint_UncurseChain = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode UncurseChain params
-  let encoded = encodeUncurseChainParams chainSelector
+  let encoded = encodeUncurseChainParams (UncurseChainParams with chainSelector)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -215,7 +216,7 @@ testRMNRemoteMCMSEntrypoint_CurseMultiple = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode CurseMultiple params
-  let encoded = encodeCurseMultipleParams subjects
+  let encoded = encodeCurseMultipleParams (CurseMultipleParams with subjects)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -257,7 +258,7 @@ testRMNRemoteMCMSEntrypoint_UncurseMultiple = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode UncurseMultiple params
-  let encoded = encodeUncurseMultipleParams subjects
+  let encoded = encodeUncurseMultipleParams (UncurseMultipleParams with subjects)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -301,7 +302,7 @@ testRMNRemoteMCMSEntrypoint_AddCustomObservers = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode AddCustomObservers params
-  let encoded = encodeAddCustomObserversParams [observer1, observer2]
+  let encoded = encodeAddCustomObserversParams (AddCustomObserversParams with parties = [observer1, observer2])
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -341,7 +342,7 @@ testRMNRemoteMCMSEntrypoint_RemoveCustomObservers = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode RemoveCustomObservers params (remove observer1)
-  let encoded = encodeRemoveCustomObserversParams [observer1]
+  let encoded = encodeRemoveCustomObserversParams (RemoveCustomObserversParams with parties = [observer1])
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -439,7 +440,7 @@ testRMNRemoteMCMSEntrypoint_MissingSelfCid = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode valid params
-  let encoded = encodeCurseParams "01000000000000000000000000000001"
+  let encoded = encodeCurseParams (CurseParams with subject = "01000000000000000000000000000001")
 
   -- Call with empty contractIds map - should fail
   submitMustFail rmnOwner do

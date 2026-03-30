@@ -1,8 +1,12 @@
 -- | Types module for TokenAdminRegistry
--- Separate module to avoid circular dependencies between TokenAdminRegistry and TokenAdminRegistryCodec
+-- Separate module to enable auto-generated codec via go-daml
 module CCIP.TokenAdminRegistryTypes
   ( PoolRegistration(..)
   , TokenConfig(..)
+  , SetPoolParams(..)
+  , ProposeAdminParams(..)
+  , TransferAdminParams(..)
+  , AcceptAdminParams(..)
   ) where
 
 import qualified Splice.Api.Token.HoldingV1
@@ -20,4 +24,35 @@ data TokenConfig = TokenConfig
         admin : Optional Party
         pendingAdmin : Optional Party
         tokenPool : Optional PoolRegistration
+    deriving (Eq, Show)
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- ===========================================================================
+
+-- | Params for SetPool choice
+data SetPoolParams = SetPoolParams
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        tokenPool : Optional PoolRegistration
+    deriving (Eq, Show)
+
+-- | Params for ProposeAdmin choice
+data ProposeAdminParams = ProposeAdminParams
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        newAdmin : Party
+    deriving (Eq, Show)
+
+-- | Params for TransferAdmin choice (same structure as ProposeAdminParams)
+data TransferAdminParams = TransferAdminParams
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        newAdmin : Party
+    deriving (Eq, Show)
+
+-- | Params for AcceptAdmin choice
+data AcceptAdminParams = AcceptAdminParams
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
     deriving (Eq, Show)

@@ -12,8 +12,8 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.MessageCodecV1
 import CCIP.TokenAdminRegistry
-import CCIP.TokenAdminRegistryCodec
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..))
+import CCIP.TokenAdminRegistryCodecGen (encodeSetPoolParams, encodeProposeAdminParams, encodeTransferAdminParams, encodeAcceptAdminParams)
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - SET POOL
@@ -44,7 +44,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
 
   -- Encode SetPool params
   let poolReg = PoolRegistration poolOwner "pool-v1"
-      encoded = encodeSetPoolParams instrumentId (Some poolReg)
+      encoded = encodeSetPoolParams (SetPoolParams with instrumentId, tokenPool = Some poolReg)
 
   -- Call mcmsEntrypoint directly via MCMSReceiver interface
   newContractIds <- submit owner do
@@ -95,7 +95,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode SetPool params with None (remove pool)
-  let encoded = encodeSetPoolParams instrumentId None
+  let encoded = encodeSetPoolParams (SetPoolParams with instrumentId, tokenPool = None)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit owner do
@@ -141,7 +141,8 @@ testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode ProposeAdministrator params
-  let encoded = encodeProposeAdminParams instrumentId newAdmin
+  let params = ProposeAdminParams with instrumentId, newAdmin
+      encoded = encodeProposeAdminParams params
 
   -- Call mcmsEntrypoint
   newContractIds <- submit owner do
@@ -191,7 +192,8 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode TransferAdminRole params
-  let encoded = encodeTransferAdminParams instrumentId newAdmin
+  let params = TransferAdminParams with instrumentId, newAdmin
+      encoded = encodeTransferAdminParams params
 
   -- Call mcmsEntrypoint
   newContractIds <- submit owner do
@@ -240,7 +242,8 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode AcceptAdminRole params
-  let encoded = encodeAcceptAdminParams instrumentId
+  let params = AcceptAdminParams with instrumentId
+      encoded = encodeAcceptAdminParams params
 
   -- Call mcmsEntrypoint
   newContractIds <- submit owner do
@@ -334,7 +337,8 @@ testTokenAdminRegistryMCMSEntrypoint_MissingSelfCid = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
 
   -- Encode valid params
-  let encoded = encodeAcceptAdminParams instrumentId
+  let params = AcceptAdminParams with instrumentId
+      encoded = encodeAcceptAdminParams params
 
   -- Call with empty contractIds map - should fail
   submitMustFail owner do

@@ -17,11 +17,11 @@ import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec (decodePartyList)
-import CCIP.FeeQuoterCodec (
-    decodeApplyPriceUpdatersUpdateParams,
-    decodeUpdatePricesParams,
-    decodeApplyFeeTokenUpdatesParams,
-    decodeApplyDestChainConfigUpdatesParams,
+import CCIP.FeeQuoterCodecGen (
+    decodeApplyPriceUpdatersUpdateParamsAt,
+    decodeUpdatePricesParamsAt,
+    decodeApplyFeeTokenUpdatesParamsAt,
+    decodeApplyDestChainConfigUpdatesParamsAt,
     )
 import CCIP.FeeQuoterTypes (
     FeeTokenArgs(..),
@@ -30,6 +30,10 @@ import CCIP.FeeQuoterTypes (
     PriceUpdates(..),
     TokenPriceUpdate(..),
     GasPriceUpdate(..),
+    ApplyPriceUpdatersUpdateParams(..),
+    UpdatePricesParams(..),
+    ApplyFeeTokenUpdatesParams(..),
+    ApplyDestChainConfigUpdatesParams(..),
     )
 
 feeQuoterKey : Text
@@ -299,36 +303,36 @@ template FeeQuoter
 
                 case functionName of
                     "ApplyPriceUpdatersUpdate" -> do
-                        case decodeApplyPriceUpdatersUpdateParams operationData of
+                        case decodeApplyPriceUpdatersUpdateParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyPriceUpdatersUpdate"
-                            Some ((addedPriceUpdaters, removedPriceUpdaters), finalOffset) -> do
+                            Some (ApplyPriceUpdatersUpdateParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyPriceUpdatersUpdate" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyPriceUpdatersUpdate with
                                     addedPriceUpdaters
                                     removedPriceUpdaters
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "UpdatePrices" -> do
-                        case decodeUpdatePricesParams operationData of
+                        case decodeUpdatePricesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: UpdatePrices"
-                            Some ((priceUpdates, caller), finalOffset) -> do
+                            Some (UpdatePricesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: UpdatePrices" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid UpdatePrices with
                                     priceUpdates
                                     caller
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "ApplyFeeTokenUpdates" -> do
-                        case decodeApplyFeeTokenUpdatesParams operationData of
+                        case decodeApplyFeeTokenUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyFeeTokenUpdates"
-                            Some ((feeTokensToRemove, feeTokensToAdd), finalOffset) -> do
+                            Some (ApplyFeeTokenUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyFeeTokenUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyFeeTokenUpdates with
                                     feeTokensToRemove
                                     feeTokensToAdd
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "ApplyDestChainConfigUpdates" -> do
-                        case decodeApplyDestChainConfigUpdatesParams operationData of
+                        case decodeApplyDestChainConfigUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
-                            Some ((destChainConfigArgs), finalOffset) -> do
+                            Some (ApplyDestChainConfigUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyDestChainConfigUpdates with
                                     destChainConfigArgs

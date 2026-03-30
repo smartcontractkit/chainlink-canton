@@ -13,10 +13,12 @@ import CCIP.GlobalConfigTypes (
     DestChainConfigArgs(..),
     SourceChainConfig(..),
     SourceChainConfigArgs(..),
+    ApplyDestChainConfigUpdatesParams(..),
+    ApplySourceChainConfigUpdatesParams(..),
     validateDefaultAndMandatedCCVs,
     noExecutionExecutorRawInstanceAddress,
     )
-import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParams, decodeApplySourceChainConfigUpdatesParams)
+import CCIP.GlobalConfigCodecGen (decodeApplyDestChainConfigUpdatesParamsAt, decodeApplySourceChainConfigUpdatesParamsAt)
 import MCMS.RawInstanceAddress (assertValidInstanceId)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -124,20 +126,20 @@ template GlobalConfig
 
                 case functionName of
                     "ApplyDestChainConfigUpdates" -> do
-                        case decodeApplyDestChainConfigUpdatesParams operationData of
+                        case decodeApplyDestChainConfigUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
-                            Some ((destChainConfigUpdates), finalOffset) -> do
+                            Some (ApplyDestChainConfigUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyDestChainConfigUpdates with
-                                    destChainConfigUpdates = destChainConfigUpdates
+                                    destChainConfigUpdates = destChainConfigArgs
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "ApplySourceChainConfigUpdates" -> do
-                        case decodeApplySourceChainConfigUpdatesParams operationData of
+                        case decodeApplySourceChainConfigUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplySourceChainConfigUpdates"
-                            Some ((sourceChainConfigUpdates), finalOffset) -> do
+                            Some (ApplySourceChainConfigUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplySourceChainConfigUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplySourceChainConfigUpdates with
-                                    sourceChainConfigUpdates = sourceChainConfigUpdates
+                                    sourceChainConfigUpdates = sourceChainConfigArgs
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 

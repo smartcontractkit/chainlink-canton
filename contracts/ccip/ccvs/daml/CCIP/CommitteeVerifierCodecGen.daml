@@ -4,23 +4,27 @@ module CCIP.CommitteeVerifierCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.CommitteeVerifierTypes (CommitteeVerifierDeps(..), SetDepsParams(..), DynamicConfig(..), SignatureConfig(..), RemoteChainConfigArgs(..), RemoteChainConfig(..), AllowListConfigArgs(..))
+import CCIP.CommitteeVerifierTypes (CommitteeVerifierDeps(..), SetDepsParams(..), DynamicConfig(..), SignatureConfig(..), RemoteChainConfigArgs(..), RemoteChainConfig(..), AllowListConfigArgs(..), ApplySignatureConfigsParams(..), SetDynamicConfigParams(..), ApplyRemoteChainConfigUpdatesParams(..), ApplyAllowListUpdatesParams(..), TransferStorageLocationsAdminParams(..), UpdateStorageLocationsParams(..))
 
 import MCMS.Codec (
     decodeBoolAt,
     decodeBytesHexList,
     decodeInt64At,
+    decodeList,
     decodeNumeric0At,
     decodeOptional,
     decodePartyAt,
     decodePartyList,
+    decodeTextAt,
     encodeBool,
     encodeBytesHexList,
     encodeInt64,
+    encodeList,
     encodeNumeric0,
     encodeOptional,
     encodeParty,
-    encodePartyList
+    encodePartyList,
+    encodeText
     )
 
 import CCIP.Codec (decodeRawInstanceAddressAt, encodeRawInstanceAddress)
@@ -150,6 +154,94 @@ decodeAllowListConfigArgsAt encoded offset = do
     (addedAllowListedSenders, offset) <- decodePartyList encoded offset
     (removedAllowListedSenders, offset) <- decodePartyList encoded offset
     Some (AllowListConfigArgs{..}, offset)
+
+
+-- ===============================================
+-- |              ApplySignatureConfigsParams
+-- ===============================================
+
+encodeApplySignatureConfigsParams : ApplySignatureConfigsParams -> BytesHex
+encodeApplySignatureConfigsParams params =
+    encodeList params.sourceChainSelectorsToRemove encodeNumeric0
+    <> encodeList params.signatureConfigs encodeSignatureConfig
+
+decodeApplySignatureConfigsParamsAt : BytesHex -> Int -> Optional (ApplySignatureConfigsParams, Int)
+decodeApplySignatureConfigsParamsAt encoded offset = do
+    (sourceChainSelectorsToRemove, offset) <- decodeList encoded offset decodeNumeric0At
+    (signatureConfigs, offset) <- decodeList encoded offset decodeSignatureConfigAt
+    Some (ApplySignatureConfigsParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetDynamicConfigParams
+-- ===============================================
+
+encodeSetDynamicConfigParams : SetDynamicConfigParams -> BytesHex
+encodeSetDynamicConfigParams params =
+    encodeDynamicConfig params.dynamicConfig
+
+decodeSetDynamicConfigParamsAt : BytesHex -> Int -> Optional (SetDynamicConfigParams, Int)
+decodeSetDynamicConfigParamsAt encoded offset = do
+    (dynamicConfig, offset) <- decodeDynamicConfigAt encoded offset
+    Some (SetDynamicConfigParams{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyRemoteChainConfigUpdatesParams
+-- ===============================================
+
+encodeApplyRemoteChainConfigUpdatesParams : ApplyRemoteChainConfigUpdatesParams -> BytesHex
+encodeApplyRemoteChainConfigUpdatesParams params =
+    encodeList params.remoteChainConfigArgs encodeRemoteChainConfigArgs
+
+decodeApplyRemoteChainConfigUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyRemoteChainConfigUpdatesParams, Int)
+decodeApplyRemoteChainConfigUpdatesParamsAt encoded offset = do
+    (remoteChainConfigArgs, offset) <- decodeList encoded offset decodeRemoteChainConfigArgsAt
+    Some (ApplyRemoteChainConfigUpdatesParams{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyAllowListUpdatesParams
+-- ===============================================
+
+encodeApplyAllowListUpdatesParams : ApplyAllowListUpdatesParams -> BytesHex
+encodeApplyAllowListUpdatesParams params =
+    encodeList params.allowListConfigArgs encodeAllowListConfigArgs
+    <> encodeParty params.caller
+
+decodeApplyAllowListUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyAllowListUpdatesParams, Int)
+decodeApplyAllowListUpdatesParamsAt encoded offset = do
+    (allowListConfigArgs, offset) <- decodeList encoded offset decodeAllowListConfigArgsAt
+    (caller, offset) <- decodePartyAt encoded offset
+    Some (ApplyAllowListUpdatesParams{..}, offset)
+
+
+-- ===============================================
+-- |              TransferStorageLocationsAdminParams
+-- ===============================================
+
+encodeTransferStorageLocationsAdminParams : TransferStorageLocationsAdminParams -> BytesHex
+encodeTransferStorageLocationsAdminParams params =
+    encodeParty params.newAdmin
+
+decodeTransferStorageLocationsAdminParamsAt : BytesHex -> Int -> Optional (TransferStorageLocationsAdminParams, Int)
+decodeTransferStorageLocationsAdminParamsAt encoded offset = do
+    (newAdmin, offset) <- decodePartyAt encoded offset
+    Some (TransferStorageLocationsAdminParams{..}, offset)
+
+
+-- ===============================================
+-- |              UpdateStorageLocationsParams
+-- ===============================================
+
+encodeUpdateStorageLocationsParams : UpdateStorageLocationsParams -> BytesHex
+encodeUpdateStorageLocationsParams params =
+    encodeList params.newLocations encodeText
+
+decodeUpdateStorageLocationsParamsAt : BytesHex -> Int -> Optional (UpdateStorageLocationsParams, Int)
+decodeUpdateStorageLocationsParamsAt encoded offset = do
+    (newLocations, offset) <- decodeList encoded offset decodeTextAt
+    Some (UpdateStorageLocationsParams{..}, offset)
 
 
 

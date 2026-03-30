@@ -12,7 +12,17 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.Codec (encodePartyList)
 import CCIP.FeeQuoter
-import CCIP.FeeQuoterCodec
+import CCIP.FeeQuoterCodecGen (
+    encodeApplyFeeTokenUpdatesParams,
+    encodeApplyDestChainConfigUpdatesParams,
+    )
+import CCIP.FeeQuoterTypes (
+    FeeTokenArgs(..),
+    DestChainConfig(..),
+    DestChainConfigArgs(..),
+    ApplyFeeTokenUpdatesParams(..),
+    ApplyDestChainConfigUpdatesParams(..),
+    )
 
 usd : Decimal -> Numeric 0
 usd d = intToNumeric (truncate (d * 100000000.0))
@@ -54,9 +64,9 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Encode ApplyFeeTokenUpdates params: remove USDC, add LINK
-    let feeTokensToRemove = [instrumentId1]
-        feeTokensToAdd = [FeeTokenArgs instrumentId2]
-        encoded = encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd)
+    let encoded = encodeApplyFeeTokenUpdatesParams (ApplyFeeTokenUpdatesParams with
+            feeTokensToRemove = [instrumentId1]
+            feeTokensToAdd = [FeeTokenArgs instrumentId2])
 
     -- Call mcmsEntrypoint
     newContractIds <- submit owner do
@@ -104,13 +114,9 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Add multiple fee tokens
-    let feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId] = []
-        feeTokensToAdd = [
-            FeeTokenArgs instrumentId1,
-            FeeTokenArgs instrumentId2,
-            FeeTokenArgs instrumentId3
-            ]
-        encoded = encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd)
+    let encoded = encodeApplyFeeTokenUpdatesParams (ApplyFeeTokenUpdatesParams with
+            feeTokensToRemove = []
+            feeTokensToAdd = [FeeTokenArgs instrumentId1, FeeTokenArgs instrumentId2, FeeTokenArgs instrumentId3])
 
     -- Call mcmsEntrypoint
     newContractIds <- submit owner do
@@ -170,8 +176,8 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
             defaultTokenFeeUSD = usdToCents 0.5
             defaultTokenDestGasOverhead = 50000
 
-        configArgs = [DestChainConfigArgs 1.0 destConfig]
-        encoded = encodeApplyDestChainConfigUpdatesParams configArgs
+        encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with
+            destChainConfigArgs = [DestChainConfigArgs 1.0 destConfig])
 
     -- Call mcmsEntrypoint
     newContractIds <- submit owner do
@@ -221,12 +227,9 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
     -- Create multiple dest chain configs
     let config1 = DestChainConfig True 65535 3000000 100000 16 200000 100.0 (usdToCents 0.5) 50000
         config2 = DestChainConfig True 32768 1500000 50000 8 100000 90.0 (usdToCents 1.0) 25000
-
-        configArgs = [
-            DestChainConfigArgs 1.0 config1,
-            DestChainConfigArgs 137.0 config2
-            ]
-        encoded = encodeApplyDestChainConfigUpdatesParams configArgs
+        configArgs = [DestChainConfigArgs 1.0 config1, DestChainConfigArgs 137.0 config2]
+        encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with
+            destChainConfigArgs = configArgs)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit owner do
@@ -478,7 +481,8 @@ testFeeQuoterMCMSEntrypoint_MissingSelfCid = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Encode valid params
-    let encoded = encodeApplyDestChainConfigUpdatesParams []
+    let encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with
+            destChainConfigArgs = [])
 
     -- Call with empty contractIds map - should fail
     submitMustFail owner do

@@ -54,3 +54,45 @@ data AllowListConfigArgs = AllowListConfigArgs
         addedAllowListedSenders : [Party]   -- List of parties to add to the allowlist for the destination chain.
         removedAllowListedSenders : [Party] -- List of parties to remove from the allowlist for the destination chain.
     deriving (Eq, Show)
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- ===========================================================================
+
+-- | Params for ApplySignatureConfigs choice
+data ApplySignatureConfigsParams = ApplySignatureConfigsParams
+    with
+        sourceChainSelectorsToRemove : [Numeric 0]
+        signatureConfigs : [SignatureConfig]
+    deriving (Eq, Show)
+
+-- | Params for SetDynamicConfig choice
+data SetDynamicConfigParams = SetDynamicConfigParams
+    with
+        dynamicConfig : DynamicConfig
+    deriving (Eq, Show)
+
+-- | Params for ApplyRemoteChainConfigUpdates choice
+data ApplyRemoteChainConfigUpdatesParams = ApplyRemoteChainConfigUpdatesParams
+    with
+        remoteChainConfigArgs : [RemoteChainConfigArgs]
+    deriving (Eq, Show)
+
+-- | Params for ApplyAllowListUpdates choice
+data ApplyAllowListUpdatesParams = ApplyAllowListUpdatesParams
+    with
+        allowListConfigArgs : [AllowListConfigArgs]
+        caller : Party
+    deriving (Eq, Show)
+
+-- | Params for TransferStorageLocationsAdmin choice
+data TransferStorageLocationsAdminParams = TransferStorageLocationsAdminParams
+    with
+        newAdmin : Party
+    deriving (Eq, Show)
+
+-- | Params for UpdateStorageLocations choice
+data UpdateStorageLocationsParams = UpdateStorageLocationsParams
+    with
+        newLocations : [Text]
+    deriving (Eq, Show)

@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "2ec7329741413aaad428f4e025220280dd84e428351b7fbd59274f4d7b9eb29b"
+	PackageID   = "93f7529e876c55e722762d3a4b465a6e5ee78fcbc1ac607b976eea7869d60c20"
 	SDKVersion  = "3.4.10"
 )
 
@@ -210,6 +210,56 @@ func (t *ApplyAllowListUpdatesMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ApplyAllowListUpdatesParams is a Record type
+type ApplyAllowListUpdatesParams struct {
+	AllowListConfigArgs []AllowListConfigArgs `json:"allowListConfigArgs"`
+	Caller              types.PARTY           `json:"caller"`
+}
+
+// ToMap converts ApplyAllowListUpdatesParams to a map for DAML arguments
+func (t ApplyAllowListUpdatesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["allowListConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.AllowListConfigArgs))
+		for _, e := range t.AllowListConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ApplyAllowListUpdatesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyAllowListUpdatesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyAllowListUpdatesParams to hex string (Canton MCMS format)
+func (t ApplyAllowListUpdatesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyAllowListUpdatesParams from hex string (Canton MCMS format)
+func (t *ApplyAllowListUpdatesParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ApplyRemoteChainConfigUpdates is a Record type
 type ApplyRemoteChainConfigUpdates struct {
 	RemoteChainConfigArgs []RemoteChainConfigArgs `json:"remoteChainConfigArgs"`
@@ -253,6 +303,53 @@ func (t ApplyRemoteChainConfigUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplyRemoteChainConfigUpdates from hex string (Canton MCMS format)
 func (t *ApplyRemoteChainConfigUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplyRemoteChainConfigUpdatesParams is a Record type
+type ApplyRemoteChainConfigUpdatesParams struct {
+	RemoteChainConfigArgs []RemoteChainConfigArgs `json:"remoteChainConfigArgs"`
+}
+
+// ToMap converts ApplyRemoteChainConfigUpdatesParams to a map for DAML arguments
+func (t ApplyRemoteChainConfigUpdatesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["remoteChainConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.RemoteChainConfigArgs))
+		for _, e := range t.RemoteChainConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyRemoteChainConfigUpdatesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyRemoteChainConfigUpdatesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyRemoteChainConfigUpdatesParams to hex string (Canton MCMS format)
+func (t ApplyRemoteChainConfigUpdatesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyRemoteChainConfigUpdatesParams from hex string (Canton MCMS format)
+func (t *ApplyRemoteChainConfigUpdatesParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -309,6 +406,62 @@ func (t ApplySignatureConfigs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplySignatureConfigs from hex string (Canton MCMS format)
 func (t *ApplySignatureConfigs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplySignatureConfigsParams is a Record type
+type ApplySignatureConfigsParams struct {
+	SourceChainSelectorsToRemove []types.NUMERIC   `json:"sourceChainSelectorsToRemove"`
+	SignatureConfigs             []SignatureConfig `json:"signatureConfigs"`
+}
+
+// ToMap converts ApplySignatureConfigsParams to a map for DAML arguments
+func (t ApplySignatureConfigsParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sourceChainSelectorsToRemove"] = func() []any {
+		res := make([]any, 0, len(t.SourceChainSelectorsToRemove))
+		for _, e := range t.SourceChainSelectorsToRemove {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["signatureConfigs"] = func() []any {
+		res := make([]any, 0, len(t.SignatureConfigs))
+		for _, e := range t.SignatureConfigs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplySignatureConfigsParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplySignatureConfigsParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplySignatureConfigsParams to hex string (Canton MCMS format)
+func (t ApplySignatureConfigsParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplySignatureConfigsParams from hex string (Canton MCMS format)
+func (t *ApplySignatureConfigsParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1542,6 +1695,48 @@ func (t *SetDynamicConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetDynamicConfigParams is a Record type
+type SetDynamicConfigParams struct {
+	DynamicConfig DynamicConfig `json:"dynamicConfig"`
+}
+
+// ToMap converts SetDynamicConfigParams to a map for DAML arguments
+func (t SetDynamicConfigParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["dynamicConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DynamicConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DynamicConfig
+	}()
+
+	return m
+}
+
+func (t SetDynamicConfigParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDynamicConfigParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDynamicConfigParams to hex string (Canton MCMS format)
+func (t SetDynamicConfigParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDynamicConfigParams from hex string (Canton MCMS format)
+func (t *SetDynamicConfigParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SignatureConfig is a Record type
 type SignatureConfig struct {
 	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
@@ -1626,6 +1821,42 @@ func (t *TransferStorageLocationsAdmin) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TransferStorageLocationsAdminParams is a Record type
+type TransferStorageLocationsAdminParams struct {
+	NewAdmin types.PARTY `json:"newAdmin"`
+}
+
+// ToMap converts TransferStorageLocationsAdminParams to a map for DAML arguments
+func (t TransferStorageLocationsAdminParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	return m
+}
+
+func (t TransferStorageLocationsAdminParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TransferStorageLocationsAdminParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TransferStorageLocationsAdminParams to hex string (Canton MCMS format)
+func (t TransferStorageLocationsAdminParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferStorageLocationsAdminParams from hex string (Canton MCMS format)
+func (t *TransferStorageLocationsAdminParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // UpdateStorageLocations is a Record type
 type UpdateStorageLocations struct {
 	NewLocations []types.TEXT `json:"newLocations"`
@@ -1668,14 +1899,59 @@ func (t *UpdateStorageLocations) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// UpdateStorageLocationsParams is a Record type
+type UpdateStorageLocationsParams struct {
+	NewLocations []types.TEXT `json:"newLocations"`
+}
+
+// ToMap converts UpdateStorageLocationsParams to a map for DAML arguments
+func (t UpdateStorageLocationsParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newLocations"] = func() []any {
+		res := make([]any, 0, len(t.NewLocations))
+		for _, e := range t.NewLocations {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t UpdateStorageLocationsParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *UpdateStorageLocationsParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes UpdateStorageLocationsParams to hex string (Canton MCMS format)
+func (t UpdateStorageLocationsParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdateStorageLocationsParams from hex string (Canton MCMS format)
+func (t *UpdateStorageLocationsParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	AcceptStorageLocationsAdmin(args AcceptStorageLocationsAdmin) (*bind.EncodedChoice, error)
 	ApplyAllowListUpdates(args ApplyAllowListUpdates) (*bind.EncodedChoice, error)
 	ApplyAllowListUpdatesMCMSParams(args ApplyAllowListUpdatesMCMSParams) (*bind.EncodedChoice, error)
+	ApplyAllowListUpdatesParams(args ApplyAllowListUpdatesParams) (*bind.EncodedChoice, error)
 	ApplyRemoteChainConfigUpdates(args ApplyRemoteChainConfigUpdates) (*bind.EncodedChoice, error)
+	ApplyRemoteChainConfigUpdatesParams(args ApplyRemoteChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	ApplySignatureConfigs(args ApplySignatureConfigs) (*bind.EncodedChoice, error)
+	ApplySignatureConfigsParams(args ApplySignatureConfigsParams) (*bind.EncodedChoice, error)
 	CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error)
 	CommitteeVerifierCalculateFeeMCMSParams(args CommitteeVerifierCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error)
@@ -1687,8 +1963,11 @@ type MCMSEncoder interface {
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
 	SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
+	SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error)
 	TransferStorageLocationsAdmin(args TransferStorageLocationsAdmin) (*bind.EncodedChoice, error)
+	TransferStorageLocationsAdminParams(args TransferStorageLocationsAdminParams) (*bind.EncodedChoice, error)
 	UpdateStorageLocations(args UpdateStorageLocations) (*bind.EncodedChoice, error)
+	UpdateStorageLocationsParams(args UpdateStorageLocationsParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1733,13 +2012,28 @@ func (e *encoder) ApplyAllowListUpdatesMCMSParams(args ApplyAllowListUpdatesMCMS
 	return e.EncodeChoiceArgs("ApplyAllowListUpdates", args)
 }
 
+// ApplyAllowListUpdatesParams encodes parameters for the ApplyAllowListUpdates choice.
+func (e *encoder) ApplyAllowListUpdatesParams(args ApplyAllowListUpdatesParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyAllowListUpdates", args)
+}
+
 // ApplyRemoteChainConfigUpdates encodes parameters for the ApplyRemoteChainConfigUpdates choice.
 func (e *encoder) ApplyRemoteChainConfigUpdates(args ApplyRemoteChainConfigUpdates) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyRemoteChainConfigUpdates", args)
 }
 
+// ApplyRemoteChainConfigUpdatesParams encodes parameters for the ApplyRemoteChainConfigUpdates choice.
+func (e *encoder) ApplyRemoteChainConfigUpdatesParams(args ApplyRemoteChainConfigUpdatesParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyRemoteChainConfigUpdates", args)
+}
+
 // ApplySignatureConfigs encodes parameters for the ApplySignatureConfigs choice.
 func (e *encoder) ApplySignatureConfigs(args ApplySignatureConfigs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplySignatureConfigs", args)
+}
+
+// ApplySignatureConfigsParams encodes parameters for the ApplySignatureConfigs choice.
+func (e *encoder) ApplySignatureConfigsParams(args ApplySignatureConfigsParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplySignatureConfigs", args)
 }
 
@@ -1798,13 +2092,28 @@ func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, 
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
 }
 
+// SetDynamicConfigParams encodes parameters for the SetDynamicConfig choice.
+func (e *encoder) SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDynamicConfig", args)
+}
+
 // TransferStorageLocationsAdmin encodes parameters for the TransferStorageLocationsAdmin choice.
 func (e *encoder) TransferStorageLocationsAdmin(args TransferStorageLocationsAdmin) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("TransferStorageLocationsAdmin", args)
 }
 
+// TransferStorageLocationsAdminParams encodes parameters for the TransferStorageLocationsAdmin choice.
+func (e *encoder) TransferStorageLocationsAdminParams(args TransferStorageLocationsAdminParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("TransferStorageLocationsAdmin", args)
+}
+
 // UpdateStorageLocations encodes parameters for the UpdateStorageLocations choice.
 func (e *encoder) UpdateStorageLocations(args UpdateStorageLocations) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UpdateStorageLocations", args)
+}
+
+// UpdateStorageLocationsParams encodes parameters for the UpdateStorageLocations choice.
+func (e *encoder) UpdateStorageLocationsParams(args UpdateStorageLocationsParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("UpdateStorageLocations", args)
 }
 
