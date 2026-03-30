@@ -88,6 +88,12 @@ func main() {
 			"apGroupQuorums": true, // used in AdminParams.AP_SetConfig
 			"apGroupParents": true, // used in AdminParams.AP_SetConfig
 		},
+		VariantTagByteMap: map[string]map[string]byte{
+			"CCIP.LockReleaseTokenPoolTypes.TransferTimeout": {
+				"Indefinite":    0x00,
+				"RelativeHours": 0x01,
+			},
+		},
 	}
 
 	// Generate bindings for each package

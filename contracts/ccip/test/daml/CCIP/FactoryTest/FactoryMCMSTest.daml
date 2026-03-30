@@ -28,6 +28,8 @@ import CCIP.FactoryTest.FactoryCodecTest
   )
 
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
+import CCIP.Context (emptyCCIPContext)
+import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
 
 -- ===========================================================================
 -- INITIALIZATION & OWNERSHIP TESTS
@@ -580,6 +582,8 @@ testDeployLockReleaseTokenPool_MCMS = script do
         tokenAdminRegistry = RawInstanceAddress.make "tar-1" mcmsParty
         feeQuoter = RawInstanceAddress.make "fq-1" mcmsParty
         rmnRemote = RawInstanceAddress.make "rmn-1" mcmsParty
+        poolReceiveContext = emptyCCIPContext
+        transferTimeout = RelativeHours 24
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   submit mcmsParty do

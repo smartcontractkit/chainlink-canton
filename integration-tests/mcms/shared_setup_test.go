@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
@@ -42,6 +44,15 @@ type SharedTAREnvironment struct {
 	TarPkgID string
 }
 
+// SharedCCIPMCMSEnvironment extends SharedCantonEnvironment with all CCIP + Factory packages.
+// Used for tests that validate MCMS-driven CCIP deployment and configuration.
+type SharedCCIPMCMSEnvironment struct {
+	SharedCantonEnvironment
+	CCIPCommonPkgID string
+	FactoryPkgID    string
+	FactoryEncoder  factory.MCMSEncoder
+}
+
 var (
 	sharedEnv     *SharedCantonEnvironment
 	sharedEnvOnce sync.Once
@@ -54,6 +65,10 @@ var (
 	sharedTAREnv     *SharedTAREnvironment
 	sharedTAREnvOnce sync.Once
 	errSharedTAREnv  error
+
+	sharedCCIPMCMSEnv     *SharedCCIPMCMSEnvironment
+	sharedCCIPMCMSEnvOnce sync.Once
+	errSharedCCIPMCMSEnv  error
 )
 
 // GetSharedEnvironment initializes the shared test environment once and returns it.
@@ -251,4 +266,86 @@ func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
 	require.NotNil(t, sharedTAREnv, "TAR environment is nil")
 
 	return sharedTAREnv
+}
+
+// GetSharedCCIPMCMSEnvironment initializes a shared environment with all CCIP and MCMS packages.
+// Uploads: MCMS, MCMSTest, CCIPCommon, CCIPRMN, CCIPOffRamp, CCIPOnRamp, CCIPFeeQuoter,
+// CCIPTokenAdminRegistry, CCIPCommitteeVerifier, CCIPPerPartyRouter, CCIPLockReleaseTokenPool,
+// CCIPPoolInterfaces, CCIPExecutor, CCIPFactory.
+func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
+	t.Helper()
+
+	sharedCCIPMCMSEnvOnce.Do(func() {
+		env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
+		participant := env.Chain.Participants[0]
+
+		darPackages := []contracts.Package{
+			contracts.MCMS,
+			contracts.MCMSTest,
+			contracts.CCIPCommon,
+			contracts.CCIPRMN,
+			contracts.CCIPOffRamp,
+			contracts.CCIPOnRamp,
+			contracts.CCIPFeeQuoter,
+			contracts.CCIPTokenAdminRegistry,
+			contracts.CCIPCommitteeVerifier,
+			contracts.CCIPPerPartyRouter,
+			contracts.CCIPPoolInterfaces,
+			contracts.CCIPLockReleaseTokenPool,
+			contracts.CCIPExecutor,
+			contracts.CCIPFactory,
+		}
+
+		darBytes := make([][]byte, 0, len(darPackages))
+		for _, pkg := range darPackages {
+			dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+			if err != nil {
+				errSharedCCIPMCMSEnv = err
+				return
+			}
+			darBytes = append(darBytes, dar)
+		}
+
+		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
+		if err != nil {
+			errSharedCCIPMCMSEnv = err
+			return
+		}
+
+		if len(packageIDs) < len(darPackages) {
+			errSharedCCIPMCMSEnv = fmt.Errorf("expected %d package IDs, got %d", len(darPackages), len(packageIDs))
+			return
+		}
+
+		mcmsPkgID := packageIDs[0]
+		mcmsTestPkgID := packageIDs[1]
+		ccipCommonPkgID := packageIDs[2]
+		factoryPkgID := packageIDs[len(packageIDs)-1]
+
+		signers := createSigners(t)
+		sortedSigners := SortSignersByAddress(signers)
+
+		factoryEncoder := factory.NewContract(factoryPkgID, "CCIP.Factory", "CCIPFactory").Encoder()
+
+		sharedCCIPMCMSEnv = &SharedCCIPMCMSEnvironment{
+			SharedCantonEnvironment: SharedCantonEnvironment{
+				Participant:   participant,
+				McmsPkgID:     mcmsPkgID,
+				McmsTestPkgID: mcmsTestPkgID,
+				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+				CcipOwner:     participant.PartyID,
+				Signers:       signers,
+				SortedSigners: sortedSigners,
+				Config:        New2of3Config(signers),
+			},
+			CCIPCommonPkgID: ccipCommonPkgID,
+			FactoryPkgID:    factoryPkgID,
+			FactoryEncoder:  factoryEncoder,
+		}
+	})
+
+	require.NoError(t, errSharedCCIPMCMSEnv, "failed to initialize CCIP MCMS environment")
+	require.NotNil(t, sharedCCIPMCMSEnv, "CCIP MCMS environment is nil")
+
+	return sharedCCIPMCMSEnv
 }

@@ -2191,6 +2191,22 @@ func (v TransferTimeout) GetVariantValue() any {
 
 var _ types.VARIANT = (*TransferTimeout)(nil)
 
+// GetVariantTagByte implements types.VariantWithTagByte interface for MCMS numeric tag encoding
+func (v TransferTimeout) GetVariantTagByte() byte {
+
+	if v.Indefinite != nil {
+		return 0
+	}
+
+	if v.RelativeHours != nil {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown variant
+}
+
+var _ types.VariantWithTagByte = (*TransferTimeout)(nil)
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
