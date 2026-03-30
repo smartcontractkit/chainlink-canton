@@ -691,9 +691,17 @@ func TestCCIPSend(t *testing.T) {
 					Ccvs: []mcmsbindings.RawInstanceAddress{
 						{Unpack: types.TEXT(committeeVerifierRawAddr.String())},
 					},
+					ExecutorType: ccipclient.ExecutorType{
+						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
+							ExecutorAddress: mcmsbindings.RawInstanceAddress{
+								Unpack: types.TEXT("test-executor@" + partyCCIP),
+							},
+						},
+					},
 					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:  types.CONTRACT_ID(executorCid),
-						ExecutorArgs: types.TEXT(""),
+						ExecutorCid:          types.CONTRACT_ID(executorCid),
+						ExecutorArgs:         types.TEXT(""),
+						ExecutorExtraContext: common.CCIPContext{Values: types.TEXTMAP{}},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),

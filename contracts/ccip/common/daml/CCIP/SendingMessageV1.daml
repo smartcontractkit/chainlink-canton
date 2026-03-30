@@ -22,7 +22,6 @@ data CCVFee = CCVFee
     with
         ccvInstanceId : Text
         ccvOwner : Party
-        -- Legacy field name retained; value is integer USD cents.
         feeUSDCents : Numeric 0
         destGasLimit : Int
         destBytesOverhead : Int
@@ -32,7 +31,6 @@ data TokenSendFee = TokenSendFee
     with
         poolInstanceId : Text
         poolOwner : Party
-        -- Legacy field name retained; value is integer USD cents.
         feeUSDCents : Numeric 0
         destGasOverhead : Int
         destBytesOverhead : Int
@@ -168,6 +166,7 @@ template SendingMessageV1
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+        requiredExecutor : Optional RawInstanceAddress.RawInstanceAddress
         executorAddress : BytesHex
         executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
@@ -313,14 +312,24 @@ template SendingMessageV1
                 assertMsg "sendingMessage: executor mode already fixed to no executor"
                     (executionMode == Some ExecutionMode_Executor)
 
-                let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
+                requiredExecutor <- case requiredExecutor of
+                    Some executor -> pure executor
+                    None -> abort "sendingMessage: required executor missing"
+                RawInstanceAddress.assertEqual
+                    "sendingMessage: caller is not the required executor"
+                    executorInstanceId
+                    caller
+                    requiredExecutor
+                assertMsg
+                    "sendingMessage: executor address mismatch"
+                    (executorAddress == RawInstanceAddress.toInstanceAddress requiredExecutor)
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId
                         executorOwner = caller
                         feeUSDCents = feeUSDCents
                 create this with
-                    executorAddress = derivedExecutor
+                    executorAddress = RawInstanceAddress.toInstanceAddress requiredExecutor
                     executorArgs = executorArgs
                     executorFee = Some ef
 
