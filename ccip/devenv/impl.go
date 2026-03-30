@@ -1241,7 +1241,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           types.INT64(opts.ExecutionGasLimit),
 					BlockConfirmations: 0,
-					Ccvs: senderRequiredCCVs,
+					Ccvs:               senderRequiredCCVs,
 					ExecutorType: ccipclient.ExecutorType{
 						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
 							ExecutorAddress: mcmsbindings.RawInstanceAddress{
@@ -1250,8 +1250,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						},
 					},
 					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:         executorCID,
-						ExecutorArgs:        types.TEXT(""),
+						ExecutorCid:          executorCID,
+						ExecutorArgs:         types.TEXT(""),
 						ExecutorExtraContext: common.CCIPContext{Values: types.TEXTMAP{}},
 					},
 					TokenReceiver: types.TEXT(""),
