@@ -119,6 +119,14 @@ func (s *fakeUpdatesStream) RecvMsg(any) error { return nil }
 
 var _ grpc.ServerStreamingClient[apiv2.GetUpdatesResponse] = (*fakeUpdatesStream)(nil)
 
+// stubEmptyActiveContractsBackfill makes GetActiveContracts return an empty stream so backfill completes
+// without blocking. Required for any Run test that passes GetLedgerEnd: unexpected GetActiveContracts
+// from a non-test goroutine triggers mock fail → t.FailNow on wrong goroutine → deadlock on <-done.
+func stubEmptyActiveContractsBackfill(stateClient *mocks.MockStateServiceClient) {
+	stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything).
+		Return(&fakeActiveContractsStream{}, nil).Once()
+}
+
 // holdingCreatedEvent returns a CreatedEvent that UnmarshalCreatedEvent[HoldingView] can parse.
 // owner and instrumentId must match the store's owner and the instrument ID you want to look up.
 func holdingCreatedEvent(contractID string, owner types.PARTY, instrumentID splice_api_token_holding_v1.InstrumentId) *apiv2.CreatedEvent {
@@ -128,21 +136,30 @@ func holdingCreatedEvent(contractID string, owner types.PARTY, instrumentID spli
 		EntityName: "Holding",
 	}
 
+	view := &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: string(owner)}}},
+			{Label: "instrumentId", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+				{Label: "admin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: string(instrumentID.Admin)}}},
+				{Label: "id", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: string(instrumentID.Id)}}},
+			}}}}},
+			{Label: "amount", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+			{Label: "lock", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}},
+			{Label: "meta", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+				{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
+			}}}}},
+		},
+	}
+
 	return &apiv2.CreatedEvent{
-		ContractId: contractID,
-		TemplateId: templateID,
-		CreateArguments: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: string(owner)}}},
-				{Label: "instrumentId", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-					{Label: "admin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: string(instrumentID.Admin)}}},
-					{Label: "id", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: string(instrumentID.Id)}}},
-				}}}}},
-				{Label: "amount", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-				{Label: "lock", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}},
-				{Label: "meta", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-					{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
-				}}}}},
+		ContractId:      contractID,
+		TemplateId:      templateID,
+		CreateArguments: view,
+		InterfaceViews: []*apiv2.InterfaceView{
+			{
+				// getRelevantInterfaceViewValue matches module/entity only (ignores package id).
+				InterfaceId: &apiv2.Identifier{ModuleName: templateID.ModuleName, EntityName: templateID.EntityName},
+				ViewValue:   view,
 			},
 		},
 	}
@@ -156,11 +173,11 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 
 	makeConfig := func(stateClient *mocks.MockStateServiceClient, updateClient *mocks.MockUpdateServiceClient, maxRetries int) InstrumentHoldingStoreConfig {
 		return InstrumentHoldingStoreConfig{
-			Logger:            logger,
-			Owner:             owner,
-			StateService:      stateClient,
-			UpdateService:     updateClient,
-			MaxRetries:        maxRetries,
+			Logger:           logger,
+			Owner:            owner,
+			StateService:     stateClient,
+			UpdateService:    updateClient,
+			MaxRetries:       maxRetries,
 			ReconnectBackoff: time.Millisecond, // short backoff in tests so reconnect tests don't wait
 		}
 	}
@@ -177,6 +194,7 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 5}, nil)
+		stubEmptyActiveContractsBackfill(stateClient)
 
 		tx := &apiv2.Transaction{
 			UpdateId: "test-update-id",
@@ -248,6 +266,7 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
+		stubEmptyActiveContractsBackfill(stateClient)
 		updateClient := mocks.NewMockUpdateServiceClient(t)
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
 			Return((grpc.ServerStreamingClient[apiv2.GetUpdatesResponse])(nil), expectedErr).Times(2)
@@ -266,6 +285,7 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
+		stubEmptyActiveContractsBackfill(stateClient)
 		updateClient := mocks.NewMockUpdateServiceClient(t)
 		// First stream returns recvErr; Run reconnects. Second stream blocks until ctx done.
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
@@ -276,6 +296,9 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0))
 		done := make(chan error, 1)
 		go func() { done <- svc.Run(ctx) }()
+		// Let Run pass backfill and the first (failing) stream before cancelling, otherwise ctx may
+		// still be canceled during backfill and GetUpdates is never called.
+		time.Sleep(50 * time.Millisecond)
 		cancel()
 		require.ErrorIs(t, <-done, context.Canceled)
 	})
@@ -286,9 +309,9 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
+		stubEmptyActiveContractsBackfill(stateClient)
+		// Cancel before Run: backfill observes ctx.Done() and returns before GetUpdates.
 		updateClient := mocks.NewMockUpdateServiceClient(t)
-		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
-			Return(&fakeUpdatesStream{ctx: ctx, blockOnEOF: true}, nil)
 
 		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 1))
 		cancel()
