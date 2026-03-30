@@ -255,7 +255,7 @@ func getHoldingView(expectedOwner types.PARTY, record *apiv2.Record) (*splice_ap
 
 	// At this point we have an active holding contract, we should form the disclosure for it.
 	if holdingView.Owner != expectedOwner {
-		return nil, fmt.Errorf("holding owner does not match expected owner: %w", err)
+		return nil, fmt.Errorf("holding owner %v does not match expected owner %v", holdingView.Owner, expectedOwner)
 	}
 
 	return &holdingView, nil
