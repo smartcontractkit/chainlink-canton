@@ -146,7 +146,8 @@ func NewProvider(ctx context.Context, tokenURL, clientID, clientSecret string, o
 		Scopes:       cfg.scopes,
 	}
 
-	tokenSource := oauthCfg.TokenSource(ctx)
+	refreshCtx := context.WithoutCancel(ctx)
+	tokenSource := oauthCfg.TokenSource(refreshCtx)
 
 	return &Provider{
 		tokenSource:          oauth.TokenSource{TokenSource: tokenSource},
