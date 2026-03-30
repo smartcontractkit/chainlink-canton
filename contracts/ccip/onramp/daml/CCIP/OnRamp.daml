@@ -352,14 +352,16 @@ template OnRamp
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
                 assertValidHex "tokenArgs" extraArgs.tokenArgs
-                assertMsg "onramp: CCVs cannot contain duplicates" (unique extraArgs.ccvs)
-                case extraArgs.executorType of
-                    CCIP.Client.Executor_NoExecutor ->
-                        assertMsg "onramp: executor input must be empty for no-executor mode" (isNone extraArgs.executor)
-                    CCIP.Client.Executor_UseDefault ->
-                        assertMsg "onramp: executor input required for default executor mode" (isSome extraArgs.executor)
-                    CCIP.Client.Executor_WithAddress _ ->
-                        assertMsg "onramp: executor input required for explicit executor mode" (isSome extraArgs.executor)
+                Foldable.forA_ extraArgs.ccvs (\ccvExtraArg ->
+                    assertValidHex "ccvArgs" ccvExtraArg.ccvArgs)
+                assertMsg "onramp: CCVs cannot contain duplicates"
+                    (unique (map (.ccvAddress) extraArgs.ccvs))
+                case extraArgs.executor of
+                    CCIP.Client.Executor_NoExecutor -> pure ()
+                    CCIP.Client.Executor_UseDefault with executorArgs ->
+                        assertValidHex "executorArgs" executorArgs
+                    CCIP.Client.Executor_WithAddress with executorArgs ->
+                        assertValidHex "executorArgs" executorArgs
 
                 case Map.lookup destChainSelector feeQuoter.destChainConfigs of
                     Some feeDestConfig ->
@@ -368,13 +370,18 @@ template OnRamp
                     None -> pure ()
 
                 _ <- exercise feeQuoterCid CCIP.FeeQuoter.GetTokenPrice with
-                    instrumentId = message.feeToken.token
+                    instrumentId = message.feeToken
                     caller = ccipOwner
 
                 let (hasTokenTransfer, tokenInstrumentId) = case message.tokenTransfer of
                         None -> (False, None)
                         Some tt -> (True, Some tt.token)
-                let resolvedCCVs = computeRequiredCCVsForSend destConfig message extraArgs extraArgs.ccvs
+                let resolvedCCVs =
+                        computeRequiredCCVsForSend
+                            destConfig
+                            message
+                            extraArgs
+                            (map (.ccvAddress) extraArgs.ccvs)
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 assertMsg "onramp: sequence number exceeds uint64"
@@ -390,8 +397,9 @@ template OnRamp
                 let initialState = if hasTokenTransfer
                         then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
                         else CCIP.SendingMessageV1.SendingMessageState_Prepared
-                let (resolvedRequiredExecutor, resolvedExecutorAddress, executionMode) = case extraArgs.executorType of
-                        CCIP.Client.Executor_UseDefault ->
+                let (resolvedRequiredExecutor, resolvedExecutorAddress, executionMode) = case extraArgs.executor of
+                        CCIP.Client.Executor_UseDefault with
+                            executorArgs = _ ->
                             case destConfig.defaultExecutor of
                                 Some defaultExecutor ->
                                     ( Some defaultExecutor
@@ -402,7 +410,9 @@ template OnRamp
                                     (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
                         CCIP.Client.Executor_NoExecutor ->
                             (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
-                        CCIP.Client.Executor_WithAddress executorAddress ->
+                        CCIP.Client.Executor_WithAddress with
+                            executorAddress
+                            executorArgs = _ ->
                             ( Some executorAddress
                             , RawInstanceAddress.toInstanceAddress executorAddress
                             , Some CCIP.SendingMessageV1.ExecutionMode_Executor
@@ -436,7 +446,7 @@ template OnRamp
                     message = None
                     encodedMessage = ""
                     messageId = ""
-                    feeToken = message.feeToken.token
+                    feeToken = message.feeToken
                     networkFeeUSDCents = networkFeeUSD
                     expectedTokenInstrumentId = tokenInstrumentId
                     outboundPoolCCVs = None
@@ -587,7 +597,8 @@ template OnRamp
                             feeUSDCents = fee.feeUSDCents
                             destGasOverhead = fee.destGasOverhead
                             destBytesOverhead = fee.destBytesOverhead
-                            tokenFeeBps = 0.0)
+                            tokenFeeBps = 0.0
+                            isEnabled = True)
                 let executorFeeQuote = case sendingMsg.executionMode of
                         Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor -> None
                         _ -> case sendingMsg.executorFee of

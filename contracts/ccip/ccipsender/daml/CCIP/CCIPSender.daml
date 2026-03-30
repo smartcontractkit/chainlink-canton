@@ -4,6 +4,8 @@
 module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
+import DA.Crypto.Text (BytesHex)
+import DA.List (filter)
 
 import qualified CCIP.Client
 import qualified CCIP.Context
@@ -17,6 +19,7 @@ import qualified CCIP.PerPartyRouter
 import qualified CCIP.TokenAdminRegistry
 
 import MCMS.RawInstanceAddress (assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 data CCVSendInput = CCVSendInput
     with
@@ -53,6 +56,16 @@ data GetFeeResult = GetFeeResult
         poolFeeTokenAmount : Numeric 0
     deriving (Eq, Show)
 
+lookupVerifierArgs
+    : [CCIP.Client.CCVExtraArg]
+    -> RawInstanceAddress.RawInstanceAddress
+    -> Update BytesHex
+lookupVerifierArgs ccvExtraArgs ccvAddress =
+    case filter (\arg -> arg.ccvAddress == ccvAddress) ccvExtraArgs of
+        [] -> pure ""
+        [arg] -> pure arg.ccvArgs
+        _ -> abort "sender: duplicate verifier args for CCV"
+
 template CCIPSender
     with
         instanceId : Text
@@ -70,13 +83,17 @@ template CCIPSender
                 tokenPoolCid : Optional ContractId CCIP.Interfaces.TokenPool.ITokenPool
             controller owner
             do
-                tokenPoolRequiredCCVs <- case message.tokenTransfer of
-                    None -> pure []
-                    Some tt -> do
-                        extraArgs <- case message.extraArgs of
-                            CCIP.Client.V3 v3 -> pure v3
-                            _ -> abort "sender: unsupported extraArgs version"
-                        exercise tt.tokenPoolCid
+                extraArgs <- case message.extraArgs of
+                    CCIP.Client.V3 v3 -> pure v3
+                    _ -> abort "sender: unsupported extraArgs version"
+                tokenPoolRequiredCCVs <- case (message.tokenTransfer, tokenPoolCid) of
+                    (None, None) -> pure []
+                    (None, Some _) ->
+                        abort "sender: tokenPoolCid provided without token transfer"
+                    (Some _, None) ->
+                        abort "sender: tokenPoolCid required for token transfer"
+                    (Some tt, Some tokenPoolCid) ->
+                        exercise tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = destinationChainSelector
                                 amount = tt.amount
@@ -103,47 +120,72 @@ template CCIPSender
             controller owner
             do
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
                     _ -> abort "sender: unsupported extraArgs version"
+                destConfigOpt <- exercise globalConfigCid
+                    CCIP.GlobalConfig.GetDestChainConfig with
+                        destChainSelector = destinationChainSelector
+                        caller = owner
+                destConfig <- case destConfigOpt of
+                    None -> abort "sender: unknown destination chain"
+                    Some cfg -> pure cfg
                 requiredCCVs <- exercise self GetRequiredCCVs with
                     destinationChainSelector = destinationChainSelector
                     message = message
                     context = context
                     routerCid = routerCid
+                    tokenPoolCid = case tokenTransferInput of
+                        None -> None
+                        Some input -> Some input.tokenPoolCid
 
                 quotedCCVFees <- foldlA (\fees input -> do
                     q <- exercise input.ccvCid ICCV.CrossChainVerifier_GetFee with
                         destChainSelector = destinationChainSelector
                         caller = owner
                     pure (fees ++ [q])
-                    ) [] ccvs
+                    ) [] ccvSendInputs
 
-                (quotedTokenSendFee, poolFeeBps) <- case message.tokenTransfer of
-                    None -> pure (None, 0.0)
-                    Some tt -> do
-                        q <- exercise tt.tokenPoolCid CCIP.Interfaces.TokenPool.TokenPool_GetFee with
+                (quotedTokenSendFee, poolFeeBps) <- case (message.tokenTransfer, tokenTransferInput) of
+                    (None, None) -> pure (None, 0.0)
+                    (None, Some _) ->
+                        abort "sender: tokenTransferInput provided without token transfer"
+                    (Some _, None) ->
+                        abort "sender: tokenTransferInput required for token transfer"
+                    (Some tt, Some tokenTransferInput) -> do
+                        q <- exercise tokenTransferInput.tokenPoolCid CCIP.Interfaces.TokenPool.TokenPool_GetFee with
                             feeQuoterCid = feeQuoterCid
                             destChainSelector = destinationChainSelector
                             tokenInstrumentId = tt.token
                             caller = owner
                         pure (Some q, q.tokenFeeBps)
-
-                let resolvedExecutorInput = case extraArgs.executorType of
-                        CCIP.Client.Executor_NoExecutor -> None
-                        CCIP.Client.Executor_UseDefault -> extraArgs.executor
-                        CCIP.Client.Executor_WithAddress _ -> extraArgs.executor
-                let executorArgs = case resolvedExecutorInput of
-                        None -> ""
-                        Some executorInput -> executorInput.executorArgs
-                executorFeeQuote <- case resolvedExecutorInput of
-                    None -> pure None
-                    Some executorInput -> do
-                        q <- exercise executorInput.executorCid CCIP.Interfaces.Executor.Executor_GetFee with
-                            destChainSelector = destinationChainSelector
-                            requiredCCVs = requiredCCVs
-                            caller = owner
-                        pure (Some q)
+                (executorArgs, executorFeeQuote) <- case extraArgs.executor of
+                    CCIP.Client.Executor_NoExecutor -> do
+                        assertMsg "sender: executorInput not allowed for no-executor mode"
+                            (executorInput == None)
+                        pure ("", None)
+                    CCIP.Client.Executor_UseDefault with executorArgs -> case destConfig.defaultExecutor of
+                        None -> do
+                            assertMsg "sender: executorInput not allowed when no default executor is configured"
+                                (executorInput == None)
+                            pure ("", None)
+                        Some _ -> case executorInput of
+                            None -> abort "sender: executorInput required for default executor mode"
+                            Some executorInput -> do
+                                q <- exercise executorInput.executorCid CCIP.Interfaces.Executor.Executor_GetFee with
+                                    destChainSelector = destinationChainSelector
+                                    requiredCCVs = requiredCCVs
+                                    caller = owner
+                                pure (executorArgs, Some q)
+                    CCIP.Client.Executor_WithAddress with executorArgs -> case executorInput of
+                        None -> abort "sender: executorInput required for explicit executor mode"
+                        Some executorInput -> do
+                            q <- exercise executorInput.executorCid CCIP.Interfaces.Executor.Executor_GetFee with
+                                destChainSelector = destinationChainSelector
+                                requiredCCVs = requiredCCVs
+                                caller = owner
+                            pure (executorArgs, Some q)
 
                 quote <- exercise routerCid CCIP.PerPartyRouter.GetFee with
                     context = context
@@ -197,12 +239,17 @@ template CCIPSender
                     context
 
                 smCid <- case message.tokenTransfer of
-                    None -> pure smCid
-                    Some tt ->
-                        exercise tt.tokenPoolCid
+                    None -> do
+                        assertMsg "sender: tokenTransferInput provided without token transfer"
+                            (tokenTransferInput == None)
+                        pure smCid
+                    Some tt -> case tokenTransferInput of
+                        None -> abort "sender: tokenTransferInput required for token transfer"
+                        Some tokenTransferInput ->
+                            exercise tokenTransferInput.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_VerifyOutboundCCVs with
                                 tokenAdminRegistryCid = tokenAdminRegistryCid
-                                extraContext = tt.poolExtraContext
+                                extraContext = tokenTransferInput.poolExtraContext
                                 sendingMessageCid = smCid
                                 amount = tt.amount
                                 caller = owner
@@ -213,43 +260,53 @@ template CCIPSender
                             sendingMessageCid = cid
                             extraContext = input.ccvExtraContext
                             caller = owner
-                    ) smCid ccvs
+                    ) smCid ccvSendInputs
 
-                smCid <- case message.tokenTransfer of
-                    None -> pure smCid
-                    Some tt ->
-                        exercise tt.tokenPoolCid
+                smCid <- case (message.tokenTransfer, tokenTransferInput) of
+                    (None, None) -> pure smCid
+                    (None, Some _) ->
+                        abort "sender: tokenTransferInput provided without token transfer"
+                    (Some _, None) ->
+                        abort "sender: tokenTransferInput required for token transfer"
+                    (Some tt, Some tokenTransferInput) ->
+                        exercise tokenTransferInput.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
                                 tokenAdminRegistryCid = tokenAdminRegistryCid
-                                extraContext = tt.poolExtraContext
+                                extraContext = tokenTransferInput.poolExtraContext
                                 sendingMessageCid = smCid
                                 feeQuoterCid = feeQuoterCid
                                 tokenInstrumentId = tt.token
                                 caller = owner
 
-                smCid <- case extraArgs.executorType of
-                    CCIP.Client.Executor_NoExecutor -> pure smCid
-                    CCIP.Client.Executor_UseDefault ->
+                smCid <- case extraArgs.executor of
+                    CCIP.Client.Executor_NoExecutor -> do
+                        assertMsg "sender: executorInput not allowed for no-executor mode"
+                            (executorInput == None)
+                        pure smCid
+                    CCIP.Client.Executor_UseDefault with executorArgs ->
                         case destConfig.defaultExecutor of
-                            None -> pure smCid
+                            None -> do
+                                assertMsg "sender: executorInput not allowed when no default executor is configured"
+                                    (executorInput == None)
+                                pure smCid
                             Some _ ->
-                                case extraArgs.executor of
-                                    None -> pure smCid
+                                case executorInput of
+                                    None -> abort "sender: executorInput required for default executor mode"
                                     Some executorInput ->
                                         exercise executorInput.executorCid
                                             CCIP.Interfaces.Executor.Executor_CalculateFee with
                                                 sendingMessageCid = smCid
-                                                executorArgs = executorInput.executorArgs
+                                                executorArgs = executorArgs
                                                 extraContext = executorInput.executorExtraContext
                                                 caller = owner
-                    CCIP.Client.Executor_WithAddress _ ->
-                        case extraArgs.executor of
-                            None -> pure smCid
+                    CCIP.Client.Executor_WithAddress with executorArgs ->
+                        case executorInput of
+                            None -> abort "sender: executorInput required for explicit executor mode"
                             Some executorInput ->
                                 exercise executorInput.executorCid
                                     CCIP.Interfaces.Executor.Executor_CalculateFee with
                                         sendingMessageCid = smCid
-                                        executorArgs = executorInput.executorArgs
+                                        executorArgs = executorArgs
                                         extraContext = executorInput.executorExtraContext
                                         caller = owner
 
@@ -257,33 +314,40 @@ template CCIPSender
                     context
                     sendingMessageCid = smCid
 
-                smCid <- case message.tokenTransfer of
-                    None -> pure smCid
-                    Some tt -> do
-                        lockResult <- exercise tt.tokenPoolCid
+                smCid <- case (message.tokenTransfer, tokenTransferInput) of
+                    (None, None) -> pure smCid
+                    (None, Some _) ->
+                        abort "sender: tokenTransferInput provided without token transfer"
+                    (Some _, None) ->
+                        abort "sender: tokenTransferInput required for token transfer"
+                    (Some tt, Some tokenTransferInput) -> do
+                        lockResult <- exercise tokenTransferInput.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_LockOrBurn with
                                 tokenAdminRegistryCid = tokenAdminRegistryCid
                                 rmnRemoteCid = rmnRemoteCid
-                                extraContext = tt.poolExtraContext
+                                extraContext = tokenTransferInput.poolExtraContext
                                 sendingMessageCid = smCid
-                                tokenInput = tt.tokenInput
-                                senderInputCids = tt.senderInputCids
+                                tokenInput = tokenTransferInput.tokenInput
+                                senderInputCids = tokenTransferInput.senderInputCids
                                 amount = tt.amount
                                 caller = owner
                         pure lockResult.sendingMessageCid
 
-                smCid <- foldlA (\cid input ->
+                smCid <- foldlA (\cid input -> do
+                    let ccvView = view input.ccvCid
+                    let ccvAddress = RawInstanceAddress.make ccvView.instanceId ccvView.owner
+                    verifierArgs <- lookupVerifierArgs extraArgs.ccvs ccvAddress
                     exercise input.ccvCid
                         ICCV.CrossChainVerifier_ForwardToVerifier with
                             rmnRemoteCid = rmnRemoteCid
                             extraContext = input.ccvExtraContext
                             sendingMessageCid = cid
-                            verifierArgs = input.verifierArgs
+                            verifierArgs = verifierArgs
                             caller = owner
-                    ) smCid ccvs
+                    ) smCid ccvSendInputs
 
                 exercise routerCid CCIP.PerPartyRouter.CCIPSend with
                     context
                     sendingMessageCid = smCid
-                    feeTokenInput = message.feeToken.tokenInput
-                    feeTokenHoldingCids = message.feeToken.senderInputCids
+                    feeTokenInput = feeTokenInput.tokenInput
+                    feeTokenHoldingCids = feeTokenInput.senderInputCids

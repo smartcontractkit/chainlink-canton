@@ -294,12 +294,15 @@ template PerPartyRouter
                         None -> executorArgs == ""
                         Some _ -> True)
                 assertMsg "router: executor quote inconsistent with extraArgs"
-                    (case extraArgs.executorType of
-                        CCIP.Client.Executor_NoExecutor -> executorFeeQuote == None
-                        CCIP.Client.Executor_UseDefault ->
-                            extraArgs.executor /= None && executorFeeQuote /= None
-                        CCIP.Client.Executor_WithAddress _ ->
-                            extraArgs.executor /= None && executorFeeQuote /= None)
+                    (case extraArgs.executor of
+                        CCIP.Client.Executor_NoExecutor ->
+                            executorFeeQuote == None && executorArgs == ""
+                        CCIP.Client.Executor_UseDefault with executorArgs = expectedExecutorArgs ->
+                            case executorFeeQuote of
+                                None -> executorArgs == ""
+                                Some _ -> executorArgs == expectedExecutorArgs
+                        CCIP.Client.Executor_WithAddress with executorArgs = expectedExecutorArgs ->
+                            executorFeeQuote /= None && executorArgs == expectedExecutorArgs)
 
                 exercise onRampCid CCIP.OnRamp.GetFeeFromRouter with
                     routerPartyOwner = partyOwner
@@ -307,7 +310,7 @@ template PerPartyRouter
                     globalConfigCid = globalConfigCid
                     feeQuoterCid = feeQuoterCid
                     destChainSelector = destChainSelector
-                    feeToken = message.feeToken.token
+                    feeToken = message.feeToken
                     payload = message.payload
                     ccipReceiveGasLimit = extraArgs.gasLimit
                     ccvFeeQuotes = ccvFeeQuotes
