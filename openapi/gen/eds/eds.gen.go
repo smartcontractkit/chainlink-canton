@@ -23,8 +23,8 @@ type CCIPExecuteRequest struct {
 	// As part of the response, the explicit disclosures for all CCVs that this EDS knows about will be returned.
 	Ccvs []string `json:"ccvs"`
 
-	// MessageID The message ID of the CCIP message to be executed.
-	MessageID string `json:"messageID"`
+	// EncodedMessage The encoded CCIP message to be executed, in hex format.
+	EncodedMessage string `json:"encodedMessage"`
 }
 
 // CCIPExecuteResponse defines model for CCIPExecuteResponse.
@@ -35,6 +35,18 @@ type CCIPExecuteResponse struct {
 	// Used to retrieve additional CCIP contracts which are referred to via their
 	// contract IDs in the 'choiceContextData'.
 	ChoiceContext ChoiceContext `json:"choiceContext"`
+
+	// PoolExtraContext The additional data to use when exercising the choice for the token pool.
+	// Will be empty if no token transfer is part of the message.
+	PoolExtraContext map[string]interface{} `json:"poolExtraContext"`
+
+	// TokenPool The explicit disclosure for the token pool.
+	// Only present if a token transfer is part of the message.
+	TokenPool *DisclosedContract `json:"tokenPool"`
+
+	// TokenPoolHoldings The explicit disclosures for the token pool holdings.
+	// Only present if a token transfer is part of the message.
+	TokenPoolHoldings *DisclosedContract `json:"tokenPoolHoldings"`
 }
 
 // CCIPPerPartyRouterFactoryRequest defines model for CCIPPerPartyRouterFactoryRequest.

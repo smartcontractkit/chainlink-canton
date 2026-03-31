@@ -438,7 +438,7 @@ template LockReleaseTokenPool
         nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [RawInstanceAddress]
             with
                 remoteChainSelector : Numeric 0
-                amount : Numeric 0
+                amount : Decimal
                 finality : Int
                 extraData : BytesHex
                 direction : CCIP.Interfaces.TokenPool.TransferDirection
@@ -509,7 +509,7 @@ template LockReleaseTokenPool
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 extraContext : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                amount : Numeric 0
+                amount : Decimal
                 caller : Party
             controller caller
             do
@@ -800,11 +800,12 @@ template LockReleaseTokenPool
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-                amount : Numeric 0
+                amount : Decimal
                 caller : Party
             controller caller
             do
                 assertMsg "pool: amount must be positive" (amount > 0.0)
+                let amountNumeric0 = CCIP.Math.decimalToNumeric0 amount
 
                 sendingMsg <- fetch sendingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
@@ -845,7 +846,7 @@ template LockReleaseTokenPool
                     expectedRateLimiter
                     rateLimiter
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
-                    requested = amount
+                    requested = amountNumeric0
 
                 -- Convert pool's CCIPContext to Splice ChoiceContext at TransferFactory boundary.
                 let splicePoolCtx = toSpliceChoiceContext poolReceiveContext
@@ -856,11 +857,10 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal : Decimal = CCIP.Math.numeric0ToDecimal amount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
                         receiver = poolOwner
-                        amount = amountDecimal
+                        amount = amount
                         instrumentId = instrumentId
                         requestedAt = now
                         executeBefore
@@ -878,14 +878,14 @@ template LockReleaseTokenPool
                             completedReceiverCids -> do
                         receivedAmount <- sumHoldingAmounts completedReceiverCids
                         assertMsg "LockOrBurn: receiver holdings amount mismatch"
-                            (receivedAmount == amountDecimal)
+                            (receivedAmount == amount)
                         pure completedReceiverCids
                     _ -> abort "LockOrBurn: transfer did not complete directly"
 
                 let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
                         Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
                         _ -> 0.0
-                let amountAfterFeeBps = amount - calculateFeeFromBps amount tokenFeeBps
+                let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.TokenAdminRegistry_AddTokenSend with

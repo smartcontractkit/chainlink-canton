@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -32,11 +31,6 @@ import (
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
 func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {
-	deps := dependencies.CantonDeps{
-		Chain:       c.chain,
-		Participant: 0,
-	}
-
 	// Create PerPartyRouter (ignore error if it exists already)
 	cantonPerPartyRouterFactoryRef, err := c.e.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(
@@ -55,10 +49,8 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contr
 	// Fixed instance ID for the router, this makes the InstanceAddress deterministic.
 	routerInstanceID := contracts.InstanceID("test-router")
 	// Ignore errors, since the router might already exist if this function is called multiple times for the same party. In that case we just want to return the existing router's address.
-	_, _ = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, deps, contract.ChoiceInput[perpartyrouter.CreateRouter]{
-		ChainSelector:   c.chainDetails.ChainSelector,
+	_, _ = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, c.chain, contract.ChoiceInput[perpartyrouter.CreateRouter]{
 		InstanceAddress: cantonPerPartyRouterFactory,
-		ActAs:           []string{partyId},
 		Args: perpartyrouter.CreateRouter{
 			PartyOwner: types.PARTY(partyId),
 			InstanceId: types.TEXT(routerInstanceID.String()),
@@ -72,10 +64,6 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contr
 func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {
 	// Use only a single participant for now
 	participant := c.chain.Participants[0]
-	deps := dependencies.CantonDeps{
-		Chain:       c.chain,
-		Participant: 0,
-	}
 
 	// Upload the necessary Dar
 	receiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
@@ -91,15 +79,13 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string) (contrac
 	}
 
 	// Deploy receiver contract
-	out, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Deploy, deps, contract.DeployInput[ccipreceiver.CCIPReceiver]{
-		ChainSelector: c.chainDetails.ChainSelector,
-		Qualifier:     nil,
-		ActAs:         []string{participant.PartyID},
+	out, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Deploy, c.chain, contract.DeployInput[ccipreceiver.CCIPReceiver]{
+		Qualifier: nil,
 		Template: ccipreceiver.CCIPReceiver{
-			Owner:        types.PARTY(participant.PartyID),
+			Owner:        types.PARTY(partyId),
 			RequiredCCVs: nil,
 		},
-		OwnerParty: types.PARTY(participant.PartyID),
+		OwnerParty: types.PARTY(partyId),
 	})
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to deploy receiver contract: %w", err)

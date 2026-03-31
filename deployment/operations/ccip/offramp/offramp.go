@@ -14,7 +14,7 @@ import (
 
 var ContractType = deployment.ContractType("OffRamp")
 
-var Version = semver.MustParse("1.7.0")
+var Version = semver.MustParse("2.0.0")
 
 var Deploy = contract.NewDeploy(contract.DeployParams[offramp.OffRamp]{
 	Name:           "canton/ccip/offramp/deploy",

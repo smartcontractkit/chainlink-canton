@@ -7,6 +7,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -16,15 +17,12 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 )
 
 type DeployInput[TT common.Template] struct {
-	ChainSelector uint64      `json:"chainSelector"`
-	Qualifier     *string     `json:"qualifier,omitempty"`
-	ActAs         []string    `json:"act_as"`
-	Template      TT          `json:"createCommand"`
-	OwnerParty    types.PARTY `json:"ownerParty"`
+	Qualifier  *string     `json:"qualifier,omitempty"`
+	Template   TT          `json:"createCommand"`
+	OwnerParty types.PARTY `json:"ownerParty"`
 }
 
 type DeployParams[ARGS any] struct {
@@ -49,12 +47,24 @@ type DeployParams[ARGS any] struct {
 // The template *must* have an InstanceId field of type types.TEXT.
 // If InstanceId is empty, it is generated using the provided prefix and a random suffix.
 // If InstanceId is set by the caller, that value is preserved.
-func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operation[DeployInput[TT], datastore.AddressRef, dependencies.CantonDeps] {
+func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operation[DeployInput[TT], datastore.AddressRef, canton.Chain] {
 	return operations.NewOperation(
 		params.Name,
 		&params.TypeAndVersion.Version,
 		params.Description,
-		func(b operations.Bundle, deps dependencies.CantonDeps, input DeployInput[TT]) (datastore.AddressRef, error) {
+		func(b operations.Bundle, deps canton.Chain, input DeployInput[TT]) (datastore.AddressRef, error) {
+			// Validate
+			if params.Validate != nil {
+				if err := params.Validate(input.Template); err != nil {
+					return datastore.AddressRef{}, fmt.Errorf("validate input: %w", err)
+				}
+			}
+			if input.OwnerParty == "" {
+				return datastore.AddressRef{}, fmt.Errorf("owner party must not be empty")
+			}
+
+			participant := deps.Participants[0]
+
 			instanceID, err := getInstanceID(input.Template)
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to read InstanceID from template: %w", err)
@@ -74,16 +84,6 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 			}
 			rawInstanceAddress := instanceID.RawInstanceAddress(input.OwnerParty)
 
-			// Validate
-			if params.Validate != nil {
-				if err := params.Validate(input.Template); err != nil {
-					return datastore.AddressRef{}, fmt.Errorf("validate input: %w", err)
-				}
-			}
-			if input.ChainSelector != deps.Chain.Selector {
-				return datastore.AddressRef{}, fmt.Errorf("input deps selector %d does not match operation chain selector %d", input.ChainSelector, deps.Chain.Selector)
-			}
-
 			// Convert template struct directly to apiv2.Record using ledger.ConvertToRecord
 			createArgs := ledger.ConvertToRecord(templWithID)
 
@@ -94,10 +94,10 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 				return datastore.AddressRef{}, fmt.Errorf("failed to parse template ID %s: %w", templateID, err)
 			}
 
-			submitResp, err := deps.Chain.Participants[deps.Participant].LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
+			submitResp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{
 					CommandId: uuid.Must(uuid.NewUUID()).String(),
-					ActAs:     input.ActAs,
+					ActAs:     []string{participant.PartyID},
 					Commands: []*apiv2.Command{{
 						Command: &apiv2.Command_Create{
 							Create: &apiv2.CreateCommand{
@@ -119,12 +119,12 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to get deployed contract ID: %w", err)
 			}
-			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", params.TypeAndVersion, deps.Chain), "contractID", contractId, "instanceID", instanceID.String(), "rawInstanceAddress", rawInstanceAddress.String(), "instanceAddress", rawInstanceAddress.InstanceAddress().Hex())
+			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", params.TypeAndVersion, deps), "contractID", contractId, "instanceID", instanceID.String(), "rawInstanceAddress", rawInstanceAddress.String(), "instanceAddress", rawInstanceAddress.InstanceAddress().Hex())
 
 			return datastore.AddressRef{
 				Address:       rawInstanceAddress.InstanceAddress().String(),
 				Labels:        datastore.NewLabelSet(rawInstanceAddress.String()),
-				ChainSelector: input.ChainSelector,
+				ChainSelector: deps.ChainSelector(),
 				Type:          datastore.ContractType(params.TypeAndVersion.Type),
 				Version:       &params.TypeAndVersion.Version,
 				Qualifier:     ptr.ToString(input.Qualifier),

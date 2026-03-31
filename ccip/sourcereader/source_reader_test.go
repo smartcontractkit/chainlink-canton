@@ -111,16 +111,18 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 		}
 
 		blockZero := big.NewInt(0)
+		blockZeroUint64 := blockZero.Uint64()
 		blockFive := big.NewInt(5)
+		blockFiveUint64 := blockFive.Uint64()
 		headers, err := reader.GetBlocksHeaders(ctx, []*big.Int{blockZero, blockFive})
 		require.NoError(t, err)
 		require.Len(t, headers, 2)
-		require.Equal(t, uint64(0), headers[blockZero].Number)
-		require.Equal(t, protocol.Bytes32{}, headers[blockZero].ParentHash)
-		require.Equal(t, intToBytes32(0), headers[blockZero].Hash)
-		require.Equal(t, uint64(5), headers[blockFive].Number)
-		require.Equal(t, intToBytes32(4), headers[blockFive].ParentHash)
-		require.Equal(t, intToBytes32(5), headers[blockFive].Hash)
+		require.Equal(t, uint64(0), headers[blockZeroUint64].Number)
+		require.Equal(t, protocol.Bytes32{}, headers[blockZeroUint64].ParentHash)
+		require.Equal(t, intToBytes32(0), headers[blockZeroUint64].Hash)
+		require.Equal(t, uint64(5), headers[blockFiveUint64].Number)
+		require.Equal(t, intToBytes32(4), headers[blockFiveUint64].ParentHash)
+		require.Equal(t, intToBytes32(5), headers[blockFiveUint64].Hash)
 	})
 
 	t.Run("errors when block exceeds latest offset", func(t *testing.T) {

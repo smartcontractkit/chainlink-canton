@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"context"
+	"math/big"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -11,7 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
+	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
+
+// getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
+// Send.ToMap() for every field the GetFee choice accepts (GetFee has no feeTokenInput).
+func getFeeChoiceArgumentMap(sendArgs ccipsender.Send) map[string]any {
+	m := sendArgs.ToMap()
+	delete(m, "feeTokenInput")
+
+	return m
+}
 
 func quoteCCIPSenderFee(
 	t *testing.T,
@@ -23,8 +35,6 @@ func quoteCCIPSenderFee(
 ) ccipsender.GetFeeResult {
 	t.Helper()
 
-	getFeeArgs := ccipsender.GetFee2(sendArgs)
-
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -33,7 +43,7 @@ func quoteCCIPSenderFee(
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
 					ContractId:     ccipSenderCid,
 					Choice:         "GetFee",
-					ChoiceArgument: ledger.MapToValue(getFeeArgs),
+					ChoiceArgument: ledger.MapToValue(getFeeChoiceArgumentMap(sendArgs)),
 				}},
 			}},
 			ActAs:              []string{partySender},
@@ -74,4 +84,31 @@ func quoteCCIPSenderFee(
 	}
 
 	return quote
+}
+
+func getHoldingsBalanceNumeric(t *testing.T, ctx context.Context, participant canton.Participant) *big.Rat {
+	t.Helper()
+
+	holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
+		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
+	})
+	require.NoError(t, err)
+
+	total := new(big.Rat)
+	for _, h := range holdings {
+		views := h.GetCreatedEvent().GetInterfaceViews()
+		if len(views) == 0 {
+			continue
+		}
+		fields := views[0].GetViewValue().GetFields()
+		if len(fields) < 3 {
+			continue
+		}
+		amountStr := fields[2].GetValue().GetNumeric()
+		amt, ok := new(big.Rat).SetString(amountStr)
+		require.Truef(t, ok, "invalid Numeric value %q", amountStr)
+		total.Add(total, amt)
+	}
+
+	return total
 }

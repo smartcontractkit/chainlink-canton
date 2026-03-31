@@ -8,3 +8,7 @@ packages:
     interfaces:
       StateServiceClient:
       UpdateServiceClient:
+  github.com/smartcontractkit/chainlink-canton/eds/internal/store:
+    interfaces:
+      ContractStore:
+      InstrumentHoldingStore:

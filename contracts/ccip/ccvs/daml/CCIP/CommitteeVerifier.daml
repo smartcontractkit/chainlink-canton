@@ -45,9 +45,9 @@ import qualified CCIP.Interfaces.CrossChainVerifier
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
--- The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0"))
-versionTagV1_7_0 : BytesHex
-versionTagV1_7_0 : BytesHex = "49ff34ed"
+-- The preimage is bytes4(keccak256("CommitteeVerifier 2.0.0"))
+versionTagV2_0_0 : BytesHex
+versionTagV2_0_0 : BytesHex = "e9a05a20"
 
 signature_length : Int
 signature_length : Int = 64
@@ -60,7 +60,7 @@ template CommitteeVerifier
         owner : Party
 
         ccipOwner : Party
-        versionTag : BytesHex -- Version tag for this CCV (e.g., "49ff34ed")
+        versionTag : BytesHex -- Version tag for this CCV (e.g., "e9a05a20")
         
         -- | Dynamic config
         -- Party capable of adding or removing allowed senders

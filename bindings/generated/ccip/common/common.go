@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "1090cd9163f3eb5ed52c0db313ac6c733465a61aa391ea069ae8f693a21914cc"
+	PackageID   = "b3783482a9f8414d525c14e2dd683ebc0aa18971ab42c5e7241a7c8743e531ea"
 	SDKVersion  = "3.4.10"
 )
 
@@ -648,53 +648,6 @@ func (t *ApplyDestChainConfigUpdates) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ApplyDestChainConfigUpdatesParams is a Record type
-type ApplyDestChainConfigUpdatesParams struct {
-	DestChainConfigArgs []DestChainConfigArgs `json:"destChainConfigArgs"`
-}
-
-// ToMap converts ApplyDestChainConfigUpdatesParams to a map for DAML arguments
-func (t ApplyDestChainConfigUpdatesParams) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["destChainConfigArgs"] = func() []any {
-		res := make([]any, 0, len(t.DestChainConfigArgs))
-		for _, e := range t.DestChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t ApplyDestChainConfigUpdatesParams) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ApplyDestChainConfigUpdatesParams) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ApplyDestChainConfigUpdatesParams to hex string (Canton MCMS format)
-func (t ApplyDestChainConfigUpdatesParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ApplyDestChainConfigUpdatesParams from hex string (Canton MCMS format)
-func (t *ApplyDestChainConfigUpdatesParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // ApplySourceChainConfigUpdates is a Record type
 type ApplySourceChainConfigUpdates struct {
 	SourceChainConfigUpdates []SourceChainConfigArgs `json:"sourceChainConfigUpdates"`
@@ -738,53 +691,6 @@ func (t ApplySourceChainConfigUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplySourceChainConfigUpdates from hex string (Canton MCMS format)
 func (t *ApplySourceChainConfigUpdates) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ApplySourceChainConfigUpdatesParams is a Record type
-type ApplySourceChainConfigUpdatesParams struct {
-	SourceChainConfigArgs []SourceChainConfigArgs `json:"sourceChainConfigArgs"`
-}
-
-// ToMap converts ApplySourceChainConfigUpdatesParams to a map for DAML arguments
-func (t ApplySourceChainConfigUpdatesParams) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["sourceChainConfigArgs"] = func() []any {
-		res := make([]any, 0, len(t.SourceChainConfigArgs))
-		for _, e := range t.SourceChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t ApplySourceChainConfigUpdatesParams) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ApplySourceChainConfigUpdatesParams) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ApplySourceChainConfigUpdatesParams to hex string (Canton MCMS format)
-func (t ApplySourceChainConfigUpdatesParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ApplySourceChainConfigUpdatesParams from hex string (Canton MCMS format)
-func (t *ApplySourceChainConfigUpdatesParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -6347,9 +6253,7 @@ type MCMSEncoder interface {
 	AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error)
 	AddVerifierDataMCMSParams(args AddVerifierDataMCMSParams) (*bind.EncodedChoice, error)
 	ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) (*bind.EncodedChoice, error)
-	ApplyDestChainConfigUpdatesParams(args ApplyDestChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error)
-	ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	BuildMessage(args BuildMessage) (*bind.EncodedChoice, error)
 	BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
@@ -6451,18 +6355,8 @@ func (e *encoder) ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) 
 	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates", args)
 }
 
-// ApplyDestChainConfigUpdatesParams encodes parameters for the ApplyDestChainConfigUpdates choice.
-func (e *encoder) ApplyDestChainConfigUpdatesParams(args ApplyDestChainConfigUpdatesParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates", args)
-}
-
 // ApplySourceChainConfigUpdates encodes parameters for the ApplySourceChainConfigUpdates choice.
 func (e *encoder) ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ApplySourceChainConfigUpdates", args)
-}
-
-// ApplySourceChainConfigUpdatesParams encodes parameters for the ApplySourceChainConfigUpdates choice.
-func (e *encoder) ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfigUpdatesParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplySourceChainConfigUpdates", args)
 }
 
