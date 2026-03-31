@@ -30,6 +30,13 @@ type NodeConfig struct {
 	MaxRetries int                     `toml:"max_retries"`
 }
 
+type TokenPoolContracts struct {
+	TokenPool                                  ContractIdentifier `toml:"token_pool" validate:"required"`
+	InboundRateLimiter                         ContractIdentifier `toml:"inbound_rate_limiter" validate:"required"`
+	InboundCustomBlockConfirmationsRateLimiter ContractIdentifier `toml:"inbound_custom_block_confirmations_rate_limiter" validate:"required"`
+	OutboundRateLimiter                        ContractIdentifier `toml:"outbound_rate_limiter" validate:"required"`
+}
+
 type Contracts struct {
 	PerPartyRouterFactory ContractIdentifier   `toml:"per_party_router_factory" validate:"required"`
 	OnRamp                ContractIdentifier   `toml:"on_ramp" validate:"required"`
@@ -39,6 +46,12 @@ type Contracts struct {
 	RMNRemote             ContractIdentifier   `toml:"rmn_remote" validate:"required"`
 	FeeQuoter             ContractIdentifier   `toml:"fee_quoter" validate:"required"`
 	CCVs                  []ContractIdentifier `toml:"ccvs"`
+	TokenPoolContracts    []TokenPoolContracts `toml:"token_pool_contracts"`
+
+	// PoolOwner is the party that owns the token pools.
+	// The instrument holdings of this owner is what will end up getting tracked by EDS,
+	// and we will serve disclosures for them if needed (i.e. for token transfer executions).
+	PoolOwner string `toml:"pool_owner"`
 }
 
 type ContractIdentifier struct {

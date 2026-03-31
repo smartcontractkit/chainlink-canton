@@ -18,8 +18,10 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"slices"
 	"strconv"
 	"testing"
+	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -396,7 +398,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
 				CCVs: []config.ContractIdentifier{
-					config.ContractIdentifier{
+					{
 						PartyID:         partyCCIP,
 						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
 					},
@@ -408,6 +410,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			log.Error().Err(err).Msg("EDS server exited with error")
 		}
 	}()
+
+	time.Sleep(10 * time.Second)
+
 	// Create EDS client
 	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create EDS client")
@@ -574,8 +579,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
 	// receiver-only; ccip-owned dependencies are only provided via disclosure.
-	disclosedContracts, choiceContext, ccvContractIDs, err := testhelpers.GetCCIPExecuteDisclosures(t.Context(), edsClient, []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)})
+	executeDisclosuresEDS, err := testhelpers.GetCCIPExecuteDisclosures(t.Context(), encodedMessageHex, edsClient, []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)})
 	require.NoError(t, err)
+	require.Len(t, executeDisclosuresEDS.CCVContractIDs, 1)
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one
 	// receiver-authored transaction with disclosures for off-ramp dependencies.
@@ -588,13 +594,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					ContractId: ccipReceiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: choiceContext},
+						{Label: "context", Value: executeDisclosuresEDS.ChoiceContext},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
 						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvContractIDs[0]}},
+								{Label: "ccvCid", Value: &apiv2.Value{Sum: executeDisclosuresEDS.CCVContractIDs[0]}},
 								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
 								{Label: "ccvExtraContext", Value: emptyCCIPContext},
 							}}}},
@@ -602,8 +608,11 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					}}}},
 				}},
 			}},
-			ActAs:              []string{partyReceiver},
-			DisclosedContracts: disclosedContracts,
+			ActAs: []string{partyReceiver},
+			DisclosedContracts: slices.Concat(
+				disclosedContracts,
+				executeDisclosuresEDS.DisclosedContracts,
+			),
 		},
 	})
 	require.NoError(t, err)
