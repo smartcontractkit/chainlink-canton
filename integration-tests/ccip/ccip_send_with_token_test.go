@@ -839,7 +839,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
 		},
 	}
-	const tokenTransferAmountProtocolUnits = int64(10000)
 	const tokenTransferAmountDecimal = "0.0000010000"
 	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
 
