@@ -58,11 +58,8 @@ mult m = intToNumeric (truncate (m * 100000000.0))
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
 
-basicFeeToken : Splice.Api.Token.HoldingV1.InstrumentId -> CCIP.Interfaces.TokenPool.TokenInput -> CCIP.Client.FeeTokenInput
-basicFeeToken token tokenInput = CCIP.Client.FeeTokenInput with
-    token = token
-    tokenInput = tokenInput
-    senderInputCids = []
+basicFeeToken : Splice.Api.Token.HoldingV1.InstrumentId -> CCIP.Interfaces.TokenPool.TokenInput -> Splice.Api.Token.HoldingV1.InstrumentId
+basicFeeToken token _tokenInput = token
 
 -- Script-level helper to create a TokenInput for fee collection tests.
 mkTokenInput : Party -> Script (ContractId TestToken.TestTransferFactory, CCIP.Interfaces.TokenPool.TokenInput)
@@ -83,8 +80,7 @@ basicExtraArgs gasLimit = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
     gasLimit = gasLimit
     blockConfirmations = 0
     ccvs = []
-    executorType = CCIP.Client.Executor_NoExecutor
-    executor = None
+    executor = CCIP.Client.Executor_NoExecutor
     tokenReceiver = ""
     tokenArgs = ""
 
@@ -93,16 +89,13 @@ extraArgsWithDefaultExecutor
     -> ContractId CCIP.Interfaces.Executor.IExecutor
     -> BytesHex
     -> CCIP.Client.ExtraArgs
-extraArgsWithDefaultExecutor gasLimit executorCid executorArgs =
+extraArgsWithDefaultExecutor gasLimit _executorCid executorArgs =
     CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
         gasLimit = gasLimit
         blockConfirmations = 0
         ccvs = []
-        executorType = CCIP.Client.Executor_UseDefault
-        executor = Some (CCIP.Client.ExecutorInput with
-            executorCid = executorCid
+        executor = CCIP.Client.Executor_UseDefault with
             executorArgs = executorArgs
-            executorExtraContext = CCIP.Context.emptyCCIPContext)
         tokenReceiver = ""
         tokenArgs = ""
 
@@ -112,16 +105,14 @@ extraArgsWithExecutor
     -> ContractId CCIP.Interfaces.Executor.IExecutor
     -> BytesHex
     -> CCIP.Client.ExtraArgs
-extraArgsWithExecutor gasLimit requiredExecutor executorCid executorArgs =
+extraArgsWithExecutor gasLimit requiredExecutor _executorCid executorArgs =
     CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
         gasLimit = gasLimit
         blockConfirmations = 0
         ccvs = []
-        executorType = CCIP.Client.Executor_WithAddress with executorAddress = requiredExecutor
-        executor = Some (CCIP.Client.ExecutorInput with
-            executorCid = executorCid
+        executor = CCIP.Client.Executor_WithAddress with
+            executorAddress = requiredExecutor
             executorArgs = executorArgs
-            executorExtraContext = CCIP.Context.emptyCCIPContext)
         tokenReceiver = ""
         tokenArgs = ""
 
@@ -789,9 +780,11 @@ testPrepareSendExtraArgs = script do
                 extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 123
                     blockConfirmations = 0
-                    ccvs = [RawInstanceAddress.make "custom-ccv" user]
-                    executorType = CCIP.Client.Executor_NoExecutor
-                    executor = None
+                    ccvs =
+                        [CCIP.Client.CCVExtraArg with
+                            ccvAddress = RawInstanceAddress.make "custom-ccv" user
+                            ccvArgs = ""]
+                    executor = CCIP.Client.Executor_NoExecutor
                     tokenReceiver = ""
                     tokenArgs = ""
 
@@ -811,8 +804,7 @@ testPrepareSendExtraArgs = script do
                     gasLimit = 0
                     blockConfirmations = 0
                     ccvs = []
-                    executorType = CCIP.Client.Executor_NoExecutor
-                    executor = None
+                    executor = CCIP.Client.Executor_NoExecutor
                     tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89"
                     tokenArgs = ""
 
@@ -1403,11 +1395,14 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                     gasLimit = 0
                     blockConfirmations = 0
                     ccvs =
-                        [ RawInstanceAddress.make "sender-ccv" ccipOwner
-                        , RawInstanceAddress.make "sender-ccv" ccipOwner
+                        [ CCIP.Client.CCVExtraArg with
+                            ccvAddress = RawInstanceAddress.make "sender-ccv" ccipOwner
+                            ccvArgs = ""
+                        , CCIP.Client.CCVExtraArg with
+                            ccvAddress = RawInstanceAddress.make "sender-ccv" ccipOwner
+                            ccvArgs = ""
                         ]
-                    executorType = CCIP.Client.Executor_NoExecutor
-                    executor = None
+                    executor = CCIP.Client.Executor_NoExecutor
                     tokenReceiver = ""
                     tokenArgs = ""
 

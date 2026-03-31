@@ -23,7 +23,15 @@ func quoteCCIPSenderFee(
 ) ccipsender.GetFeeResult {
 	t.Helper()
 
-	getFeeArgs := ccipsender.GetFee2(sendArgs)
+	getFeeArgs := ccipsender.GetFee2{
+		DestinationChainSelector: sendArgs.DestinationChainSelector,
+		Message:                  sendArgs.Message,
+		Context:                  sendArgs.Context,
+		RouterCid:                sendArgs.RouterCid,
+		CcvSendInputs:            sendArgs.CcvSendInputs,
+		TokenTransferInput:       sendArgs.TokenTransferInput,
+		ExecutorInput:            sendArgs.ExecutorInput,
+	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{

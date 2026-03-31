@@ -517,8 +517,11 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		if err != nil {
 			return fmt.Errorf("failed to get default executor for source chain %d: %w", selector, err)
 		}
-		// Normalize executor to 32 bytes (left-padded) for Canton config encoding.
-		normalizedSourceExecutor := contracts.HexToInstanceAddress(localExecutorRef.Address).Hex()
+		localExecutorLabels := localExecutorRef.Labels.List()
+		if len(localExecutorLabels) == 0 {
+			return fmt.Errorf("default executor ref for source chain %d is missing raw instance address labels", selector)
+		}
+		defaultExecutorRawAddr := contracts.RawInstanceAddress(localExecutorLabels[0])
 		remoteChainConfig := adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 			AllowTrafficFrom:         true,
 			OnRamps:                  [][]byte{remoteOnRamp},
@@ -527,7 +530,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			LaneMandatedInboundCCVs:  nil,
 			DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 			LaneMandatedOutboundCCVs: nil,
-			DefaultExecutor:          contracts.RawInstanceAddress(normalizedSourceExecutor),
+			DefaultExecutor:          defaultExecutorRawAddr,
 			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
 				IsEnabled:                   true,
 				MaxDataBytes:                50000,
@@ -1132,8 +1135,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	senderRequiredCCVs := make([]mcmsbindings.RawInstanceAddress, 0, len(opts.CCVs))
-	ccvSendInputs := make([]ccipclient.CCVSendInput, 0, len(opts.CCVs))
+	ccvExtraArgs := make([]ccipclient.CCVExtraArg, 0, len(opts.CCVs))
+	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
@@ -1177,12 +1180,14 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("construct verifier raw address: %w", err)
 			}
 		}
-		senderRequiredCCVs = append(senderRequiredCCVs, mcmsbindings.RawInstanceAddress{
-			Unpack: types.TEXT(rawAddr.String()),
+		rawAddrBinding := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(rawAddr.String())}
+		ccvExtraArgs = append(ccvExtraArgs, ccipclient.CCVExtraArg{
+			CcvAddress: rawAddrBinding,
+			CcvArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
 		})
-		ccvSendInputs = append(ccvSendInputs, ccipclient.CCVSendInput{
+		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
+			CcvAddress:      rawAddrBinding,
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
-			VerifierArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
 			CcvExtraContext: common.CCIPContext{},
 		})
 		disclosedVerifierContracts = append(disclosedVerifierContracts, convertToDisclosedContract(activeVerifier))
@@ -1219,47 +1224,44 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
-			FeeToken: ccipclient.FeeTokenInput{
-				Token: feeTokenInstrument,
-				TokenInput: interfaces.TokenInput{
-					// TODO: replace with a real Splice TransferFactory CID from the
-					// transfer-instruction API. Using routerCID is invalid because
-					// CCIPSend is a consuming choice on the router, so exercising
-					// TransferFactory_Transfer on the same CID fails with
-					// CONTRACT_NOT_ACTIVE. This only works today because total fees
-					// are 0 (gas price set to 0 below) so the transfer is skipped.
-					TransferFactory: routerCID,
-					ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-						Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
-						Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
-					},
-					TokenPoolHoldings: nil,
-				},
-				SenderInputCids: nil,
-			},
+			FeeToken: feeTokenInstrument,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           types.INT64(opts.ExecutionGasLimit),
 					BlockConfirmations: 0,
-					Ccvs:               senderRequiredCCVs,
-					ExecutorType: ccipclient.ExecutorType{
-						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
-							ExecutorAddress: mcmsbindings.RawInstanceAddress{
-								Unpack: types.TEXT(executorInstanceID.String() + "@" + party),
-							},
+					Ccvs:               ccvExtraArgs,
+					Executor: ccipclient.ExecutorExtraArg{
+						ExecutorUseDefault: &ccipclient.ExecutorUseDefault{
+							ExecutorArgs: types.TEXT(""),
 						},
-					},
-					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:          executorCID,
-						ExecutorArgs:         types.TEXT(""),
-						ExecutorExtraContext: common.CCIPContext{Values: types.TEXTMAP{}},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),
 				},
 			},
 		},
-		Ccvs: ccvSendInputs,
+		FeeTokenInput: ccipsender.FeeTokenInput{
+			SenderInputCids: nil,
+			TokenInput: interfaces.TokenInput{
+				// TODO: replace with a real Splice TransferFactory CID from the
+				// transfer-instruction API. Using routerCID is invalid because
+				// CCIPSend is a consuming choice on the router, so exercising
+				// TransferFactory_Transfer on the same CID fails with
+				// CONTRACT_NOT_ACTIVE. This only works today because total fees
+				// are 0 (gas price set to 0 below) so the transfer is skipped.
+				TransferFactory: routerCID,
+				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+					Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
+					Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+				},
+				TokenPoolHoldings: nil,
+			},
+		},
+		CcvSendInputs: ccvSendInputs,
+		ExecutorInput: &ccipsender.ExecutorInput{
+			ExecutorCid:          executorCID,
+			ExecutorExtraContext: common.CCIPContext{},
+		},
 	}
 	sendArgsMap := sendArgs.ToMap()
 	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {

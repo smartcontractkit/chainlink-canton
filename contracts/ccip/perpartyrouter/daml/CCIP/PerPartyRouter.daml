@@ -16,6 +16,8 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
+import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
+import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
@@ -261,14 +263,10 @@ template PerPartyRouter
             with
                 context : CCIP.Context.CCIPContext
                 destChainSelector : Numeric 0
-                payload : BytesHex
-                ccipReceiveGasLimit : Int
-                quotedCCVFees : [CCIP.SendingMessageV1.CCVFee]
-                quotedTokenSendFee : Optional CCIP.SendingMessageV1.TokenSendFee
-                quotedExecutionMode : CCIP.SendingMessageV1.ExecutionMode
-                quotedExecutorFee : Optional CCIP.SendingMessageV1.ExecutorFee
-                executorArgs : BytesHex
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+                message : CCIP.Client.Canton2AnyMessage
+                ccvFeeQuotes : [ICCV.CrossChainVerifierFeeQuote]
+                tokenPoolFeeQuote : Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
+                executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -293,14 +291,10 @@ template PerPartyRouter
                     globalConfigCid = globalConfigCid
                     feeQuoterCid = feeQuoterCid
                     destChainSelector = destChainSelector
-                    payload = payload
-                    ccipReceiveGasLimit = ccipReceiveGasLimit
-                    quotedCCVFees = quotedCCVFees
-                    quotedTokenSendFee = quotedTokenSendFee
-                    quotedExecutionMode = quotedExecutionMode
-                    quotedExecutorFee = quotedExecutorFee
-                    executorArgs = executorArgs
-                    feeToken = feeToken
+                    message = message
+                    ccvFeeQuotes = ccvFeeQuotes
+                    tokenPoolFeeQuote = tokenPoolFeeQuote
+                    executorFeeQuote = executorFeeQuote
 
         choice SetDeps : ContractId PerPartyRouter
             with
@@ -713,6 +707,8 @@ template PerPartyRouter
             with
                 context : CCIP.Context.CCIPContext
                 destChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
+                tokenPoolRequiredCCVs : [RawInstanceAddress]
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -726,9 +722,11 @@ template PerPartyRouter
                 RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
-                exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSend with
+                exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSendFromRouter with
                     globalConfigCid = globalConfigCid
                     destChainSelector = destChainSelector
+                    message = message
+                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
 
         -- | Get all required CCV raw instance addresses for executing a message.
         nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]

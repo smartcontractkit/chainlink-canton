@@ -35,7 +35,7 @@ interface ITokenPool where
     nonconsuming choice TokenPool_GetRequiredCCVs : [RawInstanceAddress]
         with
             remoteChainSelector : Numeric 0
-            amount : Numeric 0
+            amount : Decimal
             finality : Int
             extraData : BytesHex
             direction : TransferDirection
@@ -60,7 +60,7 @@ interface ITokenPool where
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            amount : Numeric 0
+            amount : Decimal
             caller : Party
         controller caller
         do tokenPool_verifyOutboundCCVsImpl this self arg
@@ -89,7 +89,7 @@ interface ITokenPool where
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             tokenInput : TokenInput
             senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-            amount : Numeric 0
+            amount : Decimal
             caller : Party
         controller caller
         do tokenPool_lockOrBurnImpl this self arg
