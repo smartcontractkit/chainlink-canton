@@ -3,6 +3,7 @@ package adapters
 import (
 	"fmt"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -27,6 +28,10 @@ func (a *CantonExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, 
 	seen := make(map[uint64]struct{}, len(refs))
 	chains := make([]uint64, 0, len(refs))
 	for _, ref := range refs {
+		family, err := chainsel.GetSelectorFamily(ref.ChainSelector)
+		if err != nil || family != chainsel.FamilyCanton {
+			continue
+		}
 		if _, exists := seen[ref.ChainSelector]; !exists {
 			seen[ref.ChainSelector] = struct{}{}
 			chains = append(chains, ref.ChainSelector)

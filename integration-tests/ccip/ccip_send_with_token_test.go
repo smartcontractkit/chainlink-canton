@@ -706,6 +706,17 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	tokenTransferAmount := int64(100)
 	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
 
+	// Expected fee-token charges (Amulet), mapped to configured fields (CCIP.OnRamp.calculateFeeResult):
+	// - network premium: 10 cents from FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents
+	// - pool premium: 10 cents from TokenTransferFeeConfigs[remoteSelector].feeUSDCents
+	// - verifier premium: 7 cents from CommitteeVerifierRemoteChainConfig.FeeUSDCents
+	// - executor flat fee: 9 cents from Executor.remoteChainConfigs[remoteSelector].feeUSDCents
+	// - execution gas fee: 19 cents from QuoteGasForExec, priced with
+	//   UpdatePrices.GasPriceUpdates[remoteSelector].UsdPerUnitGas = 38
+	// Total fee-token payment = 10 + 10 + 7 + 9 + 19 = 55 cents.
+	// Separately, pool takes a token amount cut at LockOrBurn:
+	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
+	// so 10,000 sent -> 9,500 bridged, with 500 collected by pool.
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
