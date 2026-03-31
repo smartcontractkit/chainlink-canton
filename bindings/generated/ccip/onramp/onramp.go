@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "1f867ef65d2302076fe3bc1c893eab44854a5aa58cb9be80163f3a5dd110dadb"
+	PackageID   = "39e12341cfdf487423abd49a9b0b72afab615ffd49dd50dd3d1312464e7964bb"
 	SDKVersion  = "3.4.10"
 )
 
@@ -783,27 +783,6 @@ func (t OnRamp) PrepareSendFromRouterWithPackageID(contractID string, packageID 
 	}
 }
 
-// GetFeeFromRouter exercises the GetFeeFromRouter choice on this OnRamp contract
-// This method uses the package name in the template ID
-func (t OnRamp) GetFeeFromRouter(contractID string, args GetFeeFromRouter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "GetFeeFromRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetFeeFromRouterWithPackageID exercises the GetFeeFromRouter choice using the provided package ID instead of package name
-func (t OnRamp) GetFeeFromRouterWithPackageID(contractID string, packageID string, args GetFeeFromRouter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "GetFeeFromRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // GetRequiredCCVsForSendFromRouter exercises the GetRequiredCCVsForSendFromRouter choice on this OnRamp contract
 // This method uses the package name in the template ID
 func (t OnRamp) GetRequiredCCVsForSendFromRouter(contractID string, args GetRequiredCCVsForSendFromRouter) *model.ExerciseCommand {
@@ -825,23 +804,23 @@ func (t OnRamp) GetRequiredCCVsForSendFromRouterWithPackageID(contractID string,
 	}
 }
 
-// SetDeps exercises the SetDeps choice on this OnRamp contract
+// GetFeeFromRouter exercises the GetFeeFromRouter choice on this OnRamp contract
 // This method uses the package name in the template ID
-func (t OnRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
+func (t OnRamp) GetFeeFromRouter(contractID string, args GetFeeFromRouter) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
 		ContractID: contractID,
-		Choice:     "SetDeps",
+		Choice:     "GetFeeFromRouter",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
-func (t OnRamp) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
+// GetFeeFromRouterWithPackageID exercises the GetFeeFromRouter choice using the provided package ID instead of package name
+func (t OnRamp) GetFeeFromRouterWithPackageID(contractID string, packageID string, args GetFeeFromRouter) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
 		ContractID: contractID,
-		Choice:     "SetDeps",
+		Choice:     "GetFeeFromRouter",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -864,6 +843,27 @@ func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
+	}
+}
+
+// SetDeps exercises the SetDeps choice on this OnRamp contract
+// This method uses the package name in the template ID
+func (t OnRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t OnRamp) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
 	}
 }
 

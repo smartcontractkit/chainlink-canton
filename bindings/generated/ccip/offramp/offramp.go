@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "2726a05030b0ce7ffeba202f959d4b1b1b34b8d6b4018812b1192418e502bb5f"
+	PackageID   = "0091e0853f7317fab1a665047d53cdc7708bcd9ad34f87fc7c46fcf15ceb7a5a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -389,27 +389,6 @@ func (t OffRamp) PrepareExecuteWithPackageID(contractID string, packageID string
 	}
 }
 
-// SetDeps exercises the SetDeps choice on this OffRamp contract
-// This method uses the package name in the template ID
-func (t OffRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
-func (t OffRamp) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this OffRamp contract
 // This method uses the package name in the template ID
 func (t OffRamp) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
@@ -449,6 +428,27 @@ func (t OffRamp) ArchiveWithPackageID(contractID string, packageID string) *mode
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
+	}
+}
+
+// SetDeps exercises the SetDeps choice on this OffRamp contract
+// This method uses the package name in the template ID
+func (t OffRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t OffRamp) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
 	}
 }
 
