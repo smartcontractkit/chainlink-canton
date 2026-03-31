@@ -853,6 +853,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Separately, pool takes a token amount cut at LockOrBurn:
 	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
 	// so 10,000 sent -> 9,500 bridged, with 500 collected by pool.
+	ccvRawAddr := mcms.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierRawAddr.String())}
+	executorRawAddr := mcms.RawInstanceAddress{Unpack: types.TEXT(fmt.Sprintf("test-executor@%s", partyCCIP))}
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -860,53 +862,56 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			TokenTransfer: &ccipclient.TokenTransferInput{
-				Token:           feeTokenInstrumentId,
-				Amount:          types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
-				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
-				TokenPoolCid:    types.CONTRACT_ID(disclosedPool.ContractId),
-				TokenInput:      tokenTransferInput,
-				PoolExtraContext: common.CCIPContext{
-					Values: types.TEXTMAP{
-						"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterContractID},
-					},
-				},
+			TokenTransfer: &ccipclient.TokenTransfer{
+				Token:  feeTokenInstrumentId,
+				Amount: types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
 			},
-			FeeToken: ccipclient.FeeTokenInput{
-				Token:           feeTokenInstrumentId,
-				TokenInput:      feeTokenInput,
-				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			},
+			FeeToken: feeTokenInstrumentId,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           100_000,
 					BlockConfirmations: 0,
-					Ccvs: []mcms.RawInstanceAddress{
-						{Unpack: types.TEXT(committeeVerifierRawAddr.String())},
-					},
-					ExecutorType: ccipclient.ExecutorType{
-						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
-							ExecutorAddress: mcms.RawInstanceAddress{
-								Unpack: types.TEXT("test-executor@" + partyCCIP),
-							},
+					Ccvs: []ccipclient.CCVExtraArg{
+						{
+							CcvAddress: ccvRawAddr,
+							CcvArgs:    types.TEXT(""),
 						},
 					},
-					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:          types.CONTRACT_ID(executorCid),
-						ExecutorArgs:         types.TEXT(""),
-						ExecutorExtraContext: common.CCIPContext{Values: types.TEXTMAP{}},
+					Executor: ccipclient.ExecutorExtraArg{
+						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
+							ExecutorAddress: executorRawAddr,
+							ExecutorArgs:    types.TEXT(""),
+						},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),
 				},
 			},
 		},
-		Ccvs: []ccipclient.CCVSendInput{
+		FeeTokenInput: ccipsender.FeeTokenInput{
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			TokenInput:      feeTokenInput,
+		},
+		CcvSendInputs: []ccipsender.CCVSendInput{
 			{
+				CcvAddress:      ccvRawAddr,
 				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-				VerifierArgs:    types.TEXT(""),
 				CcvExtraContext: common.CCIPContext{},
 			},
+		},
+		TokenTransferInput: &ccipsender.TokenTransferInput{
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
+			TokenPoolCid:    types.CONTRACT_ID(disclosedPool.ContractId),
+			PoolExtraContext: common.CCIPContext{
+				Values: types.TEXTMAP{
+					"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterContractID},
+				},
+			},
+			TokenInput: tokenTransferInput,
+		},
+		ExecutorInput: &ccipsender.ExecutorInput{
+			ExecutorCid:          types.CONTRACT_ID(executorCid),
+			ExecutorExtraContext: common.CCIPContext{},
 		},
 	}
 
