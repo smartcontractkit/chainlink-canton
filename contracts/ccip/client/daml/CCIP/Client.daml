@@ -2,10 +2,6 @@ module CCIP.Client where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.Context
-import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
-import qualified CCIP.Interfaces.Executor
-import qualified CCIP.Interfaces.TokenPool
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified Splice.Api.Token.HoldingV1
 
@@ -13,47 +9,30 @@ data Canton2AnyMessage = Canton2AnyMessage
     with
         receiver : BytesHex
         payload : BytesHex
-        tokenTransfer : Optional TokenTransferInput
-        feeToken : FeeTokenInput
+        tokenTransfer : Optional TokenTransfer
+        feeToken : Splice.Api.Token.HoldingV1.InstrumentId
         extraArgs : ExtraArgs
     deriving (Eq, Show)
 
-data CCVSendInput = CCVSendInput
-    with
-        ccvCid : ContractId ICCV.ICrossChainVerifier
-        verifierArgs : BytesHex
-        ccvExtraContext : CCIP.Context.CCIPContext
-    deriving (Eq, Show)
-
-data FeeTokenInput = FeeTokenInput
+data TokenTransfer = TokenTransfer
     with
         token : Splice.Api.Token.HoldingV1.InstrumentId
-        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
-        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        amount : Decimal
     deriving (Eq, Show)
 
-data TokenTransferInput = TokenTransferInput
+data CCVExtraArg = CCVExtraArg
     with
-        token : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
-        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-        tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
-        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
-        poolExtraContext : CCIP.Context.CCIPContext
+        ccvAddress : RawInstanceAddress.RawInstanceAddress
+        ccvArgs : BytesHex
     deriving (Eq, Show)
 
-data ExecutorInput = ExecutorInput
-    with
-        executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
+data ExecutorExtraArg
+    = Executor_NoExecutor
+    | Executor_UseDefault with
         executorArgs : BytesHex
-        executorExtraContext : CCIP.Context.CCIPContext
-    deriving (Eq, Show)
-
-data ExecutorType
-    = Executor_UseDefault
-    | Executor_NoExecutor
     | Executor_WithAddress with
         executorAddress : RawInstanceAddress.RawInstanceAddress
+        executorArgs : BytesHex
     deriving (Eq, Show)
 
 data ExtraArgs
@@ -82,13 +61,9 @@ data GenericExtraArgsV3 = GenericExtraArgsV3
         blockConfirmations : Int
         -- | Sender-specified CCV addresses for the message.
         -- | May be empty to indicate that the destination chain defaults should be used.
-        ccvs : [RawInstanceAddress.RawInstanceAddress]
+        ccvs : [CCVExtraArg]
         -- | How executor selection should be resolved for the message.
-        executorType : ExecutorType
-        -- | Optional executor selection for the message.
-        -- | Must be specified for `Executor_UseDefault` and `Executor_WithAddress`, and omitted
-        -- | for `Executor_NoExecutor`.
-        executor : Optional ExecutorInput
+        executor : ExecutorExtraArg
         -- | Address of the token receiver on the destination chain, in bytes format. If an empty
         -- | bytes array is provided, the receiver address from the message itself is used for
         -- | token transfers. This field allows for scenarios where the token receiver is

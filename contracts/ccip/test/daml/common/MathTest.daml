@@ -12,14 +12,6 @@ template MathHarness
   where
     signatory owner
 
-    nonconsuming choice CheckedPow10Numeric0 : Numeric 0
-      with
-        label : Text
-        exponent : Int
-      controller owner
-      do
-        pure (Math.checkedPow10Numeric0 label exponent)
-
     nonconsuming choice CalculateLocalAmountChecked : Numeric 0
       with
         label : Text
@@ -33,8 +25,6 @@ template MathHarness
 usd8 : Decimal -> Numeric 0
 usd8 d = intToNumeric (truncate (d * 100000000.0))
 
--- mulDivDown: basic exactness
-
 testMulDivDown_SmallValues = script do
     Math.mulDivDown 7.0 3.0 2.0 === 10.0
     Math.mulDivDown 5.0 3.0 2.0 === 7.0
@@ -42,7 +32,6 @@ testMulDivDown_SmallValues = script do
     Math.mulDivDown 10.0 10.0 3.0 === 33.0
     Math.mulDivDown 123.0 456.0 1.0 === 56088.0
 
--- E8 fee math: $1 fee at $20/token -> 0.05 token = 5_000_000 local units.
 testMulDivDown_E8Scale = script do
     let oneDollarInCents : Numeric 0 = 100.0
     let usd8PerUsdCent : Numeric 0 = 1000000.0
@@ -51,28 +40,22 @@ testMulDivDown_E8Scale = script do
     feeUsd8 === 100000000.0
     Math.mulDivDown feeUsd8 premiumIdentity (usd8 20.0) === 5000000.0
 
--- Large value regression: E8 pricing should comfortably support a $10,000,000
--- token price without overflowing the exact helper.
 testMulDivDown_LargePrice = script do
-    let feeUsd8 = Math.mulDivDown 250.0 1000000.0 1.0 -- $2.50
+    let feeUsd8 = Math.mulDivDown 250.0 1000000.0 1.0
     let veryLargePrice = usd8 10000000.0
     Math.mulDivDown feeUsd8 100000000.0 veryLargePrice === 25.0
 
--- LINK cap checks now compare local LINK units against a juels cap converted at
--- the boundary: floor(maxFeeJuelsPerMsg / 1e10).
 testNormalizedFeeWithinCapBoundary = script do
-    let feeTokenAmount = 150000000.0 -- 1.5 USDC local units
+    let feeTokenAmount = 150000000.0
         feeTokenPrice = usd8 1.0
         linkTokenPrice = usd8 15.0
-        exactLocalLinkFee = 10000000.0 -- 0.1 LINK local units
+        exactLocalLinkFee = 10000000.0
 
     assert (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice 100000000000000000.0)
     assert (not (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice 99999999999999999.0))
     assert (Math.integerAmountWithinCap exactLocalLinkFee 100000000000000000.0)
     assert (not (Math.integerAmountWithinCap exactLocalLinkFee 99999999999999999.0))
 
--- Exact comparison should not be sensitive to divide-first rounding. This case
--- sits close to the cap boundary and must still pass.
 testNormalizedFeeWithinCap_CloseBoundary = script do
     let feeTokenAmount = 100000001.0
         feeTokenPrice = usd8 1.0
@@ -80,62 +63,25 @@ testNormalizedFeeWithinCap_CloseBoundary = script do
         capJuels = 66666670000000000.0
     assert (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice capJuels)
 
--- Decimal boundary helpers
-
-testCanFitInDecimal = script do
-    assert (Math.canFitInDecimal 0.0)
-    assert (Math.canFitInDecimal 9999999999999999999999999999.0)
-    assert (not (Math.canFitInDecimal 10000000000000000000000000000.0))
-    assert (not (Math.canFitInDecimal (-1.0)))
-
-testNumeric0ToDecimalChecked = script do
-    Math.numeric0ToDecimalChecked "test" 0.0 === 0.0
-    Math.numeric0ToDecimalChecked "test" 100000000.0 === 100000000.0
-    Math.numeric0ToDecimalChecked "test" 9999999999999999999999999999.0 === 9999999999999999999999999999.0
-
-testCheckedPow10Numeric0 = script do
-    Math.checkedPow10Numeric0 "test" 0 === 1.0
-    Math.checkedPow10Numeric0 "test" 12 === 1000000000000.0
-    Math.checkedPow10Numeric0 "test" 37 === 10000000000000000000000000000000000000.0
-
-testCheckedPow10Numeric0_FailsBeyondNumeric0 = script do
-    owner <- allocateParty "pow10-owner"
-    harnessCid <- submit owner do
-        createCmd MathHarness with owner
-
-    submitMustFail owner do
-        exerciseCmd harnessCid CheckedPow10Numeric0 with
-            label = "test"
-            exponent = 38
-
-testCanScaleAmountByPowerOfTen = script do
-    assert (Math.canScaleAmountByPowerOfTen 0.0 12)
-    assert (Math.canScaleAmountByPowerOfTen 99999999999999999999999999.0 12)
-    assert (not (Math.canScaleAmountByPowerOfTen 100000000000000000000000000.0 12))
-    assert (Math.canScaleAmountByPowerOfTen 9.0 37)
-    assert (not (Math.canScaleAmountByPowerOfTen 10.0 37))
-    assert (not (Math.canScaleAmountByPowerOfTen (-1.0) 12))
+testDecimalBoundaryShifts = script do
+    Math.decimalToNumeric0 1.0 === 10000000000.0
+    Math.decimalToNumeric0 0.0000000001 === 1.0
+    Math.numeric0ToDecimal 10000000000.0 === 1.0
+    Math.numeric0ToDecimal 1.0 === 0.0000000001
 
 testCalculateLocalAmountChecked_EqualDecimals = script do
     Math.calculateLocalAmountChecked "test" 123456789.0 18 18 === 123456789.0
     Math.calculateLocalAmountChecked "test" 0.0 6 6 === 0.0
-
-testCalculateLocalAmountChecked_ScaleDown = script do
-    Math.calculateLocalAmountChecked "test" 1000000000000000000.0 18 6 === 1000000.0
-    Math.calculateLocalAmountChecked "test" 1234567890123456789.0 18 6 === 1234567.0
-    Math.calculateLocalAmountChecked "test" 999999999999.0 18 6 === 0.0
 
 testCalculateLocalAmountChecked_ScaleUp = script do
     Math.calculateLocalAmountChecked "test" 1.0 6 18 === 1000000000000.0
     Math.calculateLocalAmountChecked "test" 1000000.0 6 18 === 1000000000000000000.0
     Math.calculateLocalAmountChecked "test" 1.0 0 18 === 1000000000000000000.0
 
-testCalculateLocalAmountChecked_ScaleUpBoundary_6To18 = script do
+testCalculateLocalAmountChecked_ScaleUpBoundary_Succeeds = script do
     let largestPassing : Numeric 0 = 99999999999999999999999999.0
     Math.calculateLocalAmountChecked "test" largestPassing 6 18
         === 99999999999999999999999999000000000000.0
-
-testCalculateLocalAmountChecked_ScaleUpBoundary_0To37 = script do
     Math.calculateLocalAmountChecked "test" 9.0 0 37
         === 90000000000000000000000000000000000000.0
 
@@ -158,7 +104,18 @@ testCalculateLocalAmountChecked_ScaleUpBoundary_Fails = script do
             remoteDecimals = 0
             localDecimals = 37
 
-testCalculateLocalAmountChecked_RejectsNegative = script do
+testCalculateLocalAmountChecked_ScaleDownExact = script do
+    Math.calculateLocalAmountChecked "test" 1000000000000000000.0 18 6 === 1000000.0
+    Math.calculateLocalAmountChecked "test" 1000000000000.0 18 6 === 1.0
+    Math.calculateLocalAmountChecked "test" 5000000000000000000.0 18 0 === 5.0
+
+testCalculateLocalAmountChecked_ScaleDownInexactRoundsDown = script do
+    Math.calculateLocalAmountChecked "test" 1234567890123456789.0 18 6 === 1234567.0
+    Math.calculateLocalAmountChecked "test" 999999999999.0 18 6 === 0.0
+    Math.calculateLocalAmountChecked "test" 1500000000000.0 18 6 === 1.0
+    Math.calculateLocalAmountChecked "test" 1999999999999.0 18 6 === 1.0
+
+testCalculateLocalAmountChecked_RejectsNegativeOrUnsupported = script do
     owner <- allocateParty "negative-owner"
     harnessCid <- submit owner do
         createCmd MathHarness with owner
@@ -168,4 +125,11 @@ testCalculateLocalAmountChecked_RejectsNegative = script do
             label = "test"
             remoteAmount = -1.0
             remoteDecimals = 6
+            localDecimals = 18
+
+    submitMustFail owner do
+        exerciseCmd harnessCid CalculateLocalAmountChecked with
+            label = "test"
+            remoteAmount = 1.0
+            remoteDecimals = 38
             localDecimals = 18

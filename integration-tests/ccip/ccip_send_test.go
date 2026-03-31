@@ -672,6 +672,8 @@ func TestCCIPSend(t *testing.T) {
 		},
 	}
 
+	ccvRawAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierRawAddr.String())}
+	executorRawAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(fmt.Sprintf("test-executor@%s", partyCCIP))}
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -679,41 +681,42 @@ func TestCCIPSend(t *testing.T) {
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			FeeToken: ccipclient.FeeTokenInput{
-				Token:           feeTokenInstrumentId,
-				TokenInput:      feeTokenInput,
-				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			},
+			FeeToken: feeTokenInstrumentId,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           100_000,
 					BlockConfirmations: 0,
-					Ccvs: []mcmsbindings.RawInstanceAddress{
-						{Unpack: types.TEXT(committeeVerifierRawAddr.String())},
-					},
-					ExecutorType: ccipclient.ExecutorType{
-						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
-							ExecutorAddress: mcmsbindings.RawInstanceAddress{
-								Unpack: types.TEXT("test-executor@" + partyCCIP),
-							},
+					Ccvs: []ccipclient.CCVExtraArg{
+						{
+							CcvAddress: ccvRawAddr,
+							CcvArgs:    types.TEXT(""),
 						},
 					},
-					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:          types.CONTRACT_ID(executorCid),
-						ExecutorArgs:         types.TEXT(""),
-						ExecutorExtraContext: common.CCIPContext{Values: types.TEXTMAP{}},
+					Executor: ccipclient.ExecutorExtraArg{
+						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
+							ExecutorAddress: executorRawAddr,
+							ExecutorArgs:    types.TEXT(""),
+						},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),
 				},
 			},
 		},
-		Ccvs: []ccipclient.CCVSendInput{
+		FeeTokenInput: ccipsender.FeeTokenInput{
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			TokenInput:      feeTokenInput,
+		},
+		CcvSendInputs: []ccipsender.CCVSendInput{
 			{
+				CcvAddress:      ccvRawAddr,
 				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-				VerifierArgs:    types.TEXT(""),
 				CcvExtraContext: common.CCIPContext{},
 			},
+		},
+		ExecutorInput: &ccipsender.ExecutorInput{
+			ExecutorCid:          types.CONTRACT_ID(executorCid),
+			ExecutorExtraContext: common.CCIPContext{},
 		},
 	}
 
@@ -799,10 +802,9 @@ func TestCCIPSend(t *testing.T) {
 	senderDelta := senderBalanceBefore - senderBalanceAfter
 	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
 
-	// GetFee returns Numeric 0 (E10 smallest units). Convert to Decimal for comparison.
-	feeN0, err := strconv.ParseFloat(strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), 64)
+	// GetFee now returns Decimal directly in fee-token units.
+	expectedFeeDecimal, err := strconv.ParseFloat(strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), 64)
 	require.NoError(t, err)
-	expectedFeeDecimal := feeN0 / 1e10
 	require.InDelta(t, expectedFeeDecimal, senderDelta, 1e-10, "sender deduction should match GetFee quote")
 	require.InDelta(t, expectedFeeDecimal, ccipOwnerDelta, 1e-10, "ccipOwner should receive the full quoted fee in this no-token flow")
 
