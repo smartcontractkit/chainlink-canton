@@ -28,10 +28,9 @@ import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Internal
 import qualified CCIP.Context
-import MCMS.Codec (decodePartyList, encodePartyList)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..))
-import CCIP.PerPartyRouterCodecGen (decodeSetDepsParamsAt)
+import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..), AddCustomObserversParams(..), RemoveCustomObserversParams(..))
+import CCIP.PerPartyRouterCodecGen (decodeSetDepsParamsAt, decodeAddCustomObserversParamsAt, decodeRemoveCustomObserversParamsAt)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -178,7 +177,7 @@ template PerPartyRouterFactory
 
             case functionName of
               "FactorySetDeps" -> do
-                case decodeSetDepsParamsWithOffset operationData of
+                case decodeSetDepsParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: FactorySetDeps"
                   Some (newDeps, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: FactorySetDeps" $
@@ -743,7 +742,7 @@ template PerPartyRouter
 
             case functionName of
               "SetDeps" -> do
-                case decodeSetDepsParamsWithOffset operationData of
+                case decodeSetDepsParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: SetDeps"
                   Some (newDeps, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: SetDeps" $
@@ -752,18 +751,18 @@ template PerPartyRouter
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "AddCustomObservers" -> do
-                case decodePartyList operationData 0 of
+                case decodeAddCustomObserversParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: AddCustomObservers"
-                  Some (parties, finalOffset) -> do
+                  Some (AddCustomObserversParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: AddCustomObservers" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid AddCustomObservers with parties
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "RemoveCustomObservers" -> do
-                case decodePartyList operationData 0 of
+                case decodeRemoveCustomObserversParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: RemoveCustomObservers"
-                  Some (parties, finalOffset) -> do
+                  Some (RemoveCustomObserversParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: RemoveCustomObservers" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid RemoveCustomObservers with parties
@@ -789,23 +788,3 @@ data ExecuteResult = ExecuteResult
         state : CCIP.Internal.MessageExecutionState
     deriving (Eq, Show)
 
--- ===========================================================================
--- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
--- Per-record codecs (encodeSetDepsParams, decodeSetDepsParamsAt,
--- encodePerPartyRouterDeps, decodePerPartyRouterDepsAt) imported from
--- PerPartyRouterCodecGen.
--- ===========================================================================
-
-decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
-decodeSetDepsParamsWithOffset encoded = decodeSetDepsParamsAt encoded 0
-
-decodeSetDepsParams : BytesHex -> Optional SetDepsParams
-decodeSetDepsParams encoded = do
-  (result, _) <- decodeSetDepsParamsAt encoded 0
-  Some result
-
-encodeAddCustomObserversParams : [Party] -> BytesHex
-encodeAddCustomObserversParams = encodePartyList
-
-encodeRemoveCustomObserversParams : [Party] -> BytesHex
-encodeRemoveCustomObserversParams = encodePartyList

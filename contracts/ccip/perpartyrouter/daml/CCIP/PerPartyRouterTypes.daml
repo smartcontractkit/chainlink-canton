@@ -21,3 +21,13 @@ data SetDepsParams = SetDepsParams
         feeQuoter : Optional RawInstanceAddress
         rmnRemote : Optional RawInstanceAddress
     deriving (Eq, Show)
+
+data AddCustomObserversParams = AddCustomObserversParams
+    with
+        parties : [Party]
+    deriving (Eq, Show)
+
+data RemoveCustomObserversParams = RemoveCustomObserversParams
+    with
+        parties : [Party]
+    deriving (Eq, Show)

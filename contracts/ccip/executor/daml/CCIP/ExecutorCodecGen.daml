@@ -4,21 +4,24 @@ module CCIP.ExecutorCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.ExecutorTypes (RemoteChainConfig(..), RemoteChainConfigArgs(..), DynamicConfig(..))
+import CCIP.ExecutorTypes (RemoteChainConfig(..), RemoteChainConfigArgs(..), DynamicConfig(..), ApplyDestChainUpdatesParams(..), SetDynamicConfigParams(..), ApplyAllowedCCVUpdatesParams(..))
 
 import MCMS.Codec (
     decodeBoolAt,
     decodeInt64At,
+    decodeList,
     decodeNumeric0At,
     decodeOptional,
     decodePartyAt,
     encodeBool,
     encodeInt64,
+    encodeList,
     encodeNumeric0,
     encodeOptional,
     encodeParty
     )
 
+import CCIP.Codec (decodeRawInstanceAddressList, encodeRawInstanceAddressList)
 
 
 -- ===============================================
@@ -69,6 +72,54 @@ decodeDynamicConfigAt encoded offset = do
     (minBlockConfirmations, offset) <- decodeInt64At encoded offset
     (ccvAllowlistEnabled, offset) <- decodeBoolAt encoded offset
     Some (DynamicConfig{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyDestChainUpdatesParams
+-- ===============================================
+
+encodeApplyDestChainUpdatesParams : ApplyDestChainUpdatesParams -> BytesHex
+encodeApplyDestChainUpdatesParams params =
+    encodeList params.destChainSelectorsToRemove encodeNumeric0
+    <> encodeList params.destChainSelectorsToAdd encodeRemoteChainConfigArgs
+
+decodeApplyDestChainUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyDestChainUpdatesParams, Int)
+decodeApplyDestChainUpdatesParamsAt encoded offset = do
+    (destChainSelectorsToRemove, offset) <- decodeList encoded offset decodeNumeric0At
+    (destChainSelectorsToAdd, offset) <- decodeList encoded offset decodeRemoteChainConfigArgsAt
+    Some (ApplyDestChainUpdatesParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetDynamicConfigParams
+-- ===============================================
+
+encodeSetDynamicConfigParams : SetDynamicConfigParams -> BytesHex
+encodeSetDynamicConfigParams params =
+    encodeDynamicConfig params.newDynamicConfig
+
+decodeSetDynamicConfigParamsAt : BytesHex -> Int -> Optional (SetDynamicConfigParams, Int)
+decodeSetDynamicConfigParamsAt encoded offset = do
+    (newDynamicConfig, offset) <- decodeDynamicConfigAt encoded offset
+    Some (SetDynamicConfigParams{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyAllowedCCVUpdatesParams
+-- ===============================================
+
+encodeApplyAllowedCCVUpdatesParams : ApplyAllowedCCVUpdatesParams -> BytesHex
+encodeApplyAllowedCCVUpdatesParams params =
+    encodeRawInstanceAddressList params.ccvsToRemove
+    <> encodeRawInstanceAddressList params.ccvsToAdd
+    <> encodeBool params.ccvAllowlistEnabled
+
+decodeApplyAllowedCCVUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyAllowedCCVUpdatesParams, Int)
+decodeApplyAllowedCCVUpdatesParamsAt encoded offset = do
+    (ccvsToRemove, offset) <- decodeRawInstanceAddressList encoded offset
+    (ccvsToAdd, offset) <- decodeRawInstanceAddressList encoded offset
+    (ccvAllowlistEnabled, offset) <- decodeBoolAt encoded offset
+    Some (ApplyAllowedCCVUpdatesParams{..}, offset)
 
 
 

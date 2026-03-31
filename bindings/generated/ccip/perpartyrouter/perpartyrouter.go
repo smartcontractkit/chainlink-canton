@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "561c5d44830a87591fb08f1ffc6855574873df650f3320489f96ae39bea25013"
+	PackageID   = "d0e276ee8c962b2a82762ff3ad240da1901ca1667877fda684358e6725f92ae4"
 	SDKVersion  = "3.4.10"
 )
 
@@ -94,6 +94,48 @@ func (t AddCustomObservers) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddCustomObservers from hex string (Canton MCMS format)
 func (t *AddCustomObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddCustomObserversParams is a Record type
+type AddCustomObserversParams struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts AddCustomObserversParams to a map for DAML arguments
+func (t AddCustomObserversParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t AddCustomObserversParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddCustomObserversParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddCustomObserversParams to hex string (Canton MCMS format)
+func (t AddCustomObserversParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCustomObserversParams from hex string (Canton MCMS format)
+func (t *AddCustomObserversParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2108,6 +2150,48 @@ func (t *RemoveCustomObservers) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// RemoveCustomObserversParams is a Record type
+type RemoveCustomObserversParams struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts RemoveCustomObserversParams to a map for DAML arguments
+func (t RemoveCustomObserversParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemoveCustomObserversParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoveCustomObserversParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoveCustomObserversParams to hex string (Canton MCMS format)
+func (t RemoveCustomObserversParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoveCustomObserversParams from hex string (Canton MCMS format)
+func (t *RemoveCustomObserversParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetDeps3 is a Record type
 type SetDeps3 struct {
 	NewDeps SetDepsParams3 `json:"newDeps"`
@@ -2259,6 +2343,7 @@ func (t *SetDepsParams3) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error)
+	AddCustomObserversParams(args AddCustomObserversParams) (*bind.EncodedChoice, error)
 	CCIPSend(args CCIPSend) (*bind.EncodedChoice, error)
 	CreateRouter(args CreateRouter) (*bind.EncodedChoice, error)
 	Execute(args Execute) (*bind.EncodedChoice, error)
@@ -2277,6 +2362,7 @@ type MCMSEncoder interface {
 	PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error)
 	PrepareSend(args PrepareSend) (*bind.EncodedChoice, error)
 	RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error)
+	RemoveCustomObserversParams(args RemoveCustomObserversParams) (*bind.EncodedChoice, error)
 	SetDeps3(args SetDeps3) (*bind.EncodedChoice, error)
 }
 
@@ -2309,6 +2395,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 
 // AddCustomObservers encodes parameters for the AddCustomObservers choice.
 func (e *encoder) AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCustomObservers", args)
+}
+
+// AddCustomObserversParams encodes parameters for the AddCustomObservers choice.
+func (e *encoder) AddCustomObserversParams(args AddCustomObserversParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddCustomObservers", args)
 }
 
@@ -2399,6 +2490,11 @@ func (e *encoder) PrepareSend(args PrepareSend) (*bind.EncodedChoice, error) {
 
 // RemoveCustomObservers encodes parameters for the RemoveCustomObservers choice.
 func (e *encoder) RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
+}
+
+// RemoveCustomObserversParams encodes parameters for the RemoveCustomObservers choice.
+func (e *encoder) RemoveCustomObserversParams(args RemoveCustomObserversParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
 }
 
