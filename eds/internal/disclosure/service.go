@@ -55,7 +55,6 @@ type DisclosureService struct {
 	rmnRemote             contracts.InstanceAddress
 	feeQuoter             contracts.InstanceAddress
 	ccvs                  []contracts.InstanceAddress
-	tokenPools            []contracts.InstanceAddress
 
 	// Contains all configured instance addresses, to allow looking up if a requested disclosure should be returned.
 	allContracts map[contracts.InstanceAddress]struct{}
@@ -107,7 +106,6 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 		rmnRemote:             config.RMNRemote,
 		feeQuoter:             config.FeeQuoter,
 		ccvs:                  config.CCVs,
-		tokenPools:            config.TokenPools,
 
 		allContracts: allContracts,
 	}
