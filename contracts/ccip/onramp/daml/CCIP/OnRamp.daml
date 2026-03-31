@@ -475,21 +475,37 @@ template OnRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 destChainSelector : Numeric 0
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-                payload : BytesHex
-                ccipReceiveGasLimit : Int
+                message : CCIP.Client.Canton2AnyMessage
                 ccvFeeQuotes : [ICCV.CrossChainVerifierFeeQuote]
                 tokenPoolFeeQuote : Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
-                executorArgs : BytesHex
                 executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller ccipOwner
             do
-                assertValidHex "payload" payload
+                extraArgs <- case message.extraArgs of
+                    CCIP.Client.V3 v3 -> pure v3
+                    _ -> abort "onramp: unsupported extraArgs version"
+                let executorArgs = case extraArgs.executor of
+                        CCIP.Client.Executor_NoExecutor -> ""
+                        CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
+                            expectedExecutorArgs
+                        CCIP.Client.Executor_WithAddress _ expectedExecutorArgs ->
+                            expectedExecutorArgs
+                assertValidHex "payload" message.payload
                 assertValidHex "executorArgs" executorArgs
                 assertMsg "onramp: executor quote/args mismatch"
                     (case executorFeeQuote of
                         None -> executorArgs == ""
                         Some _ -> True)
+                assertMsg "onramp: executor quote inconsistent with extraArgs"
+                    (case extraArgs.executor of
+                        CCIP.Client.Executor_NoExecutor ->
+                            executorFeeQuote == None && executorArgs == ""
+                        CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
+                            case executorFeeQuote of
+                                None -> executorArgs == ""
+                                Some _ -> executorArgs == expectedExecutorArgs
+                        CCIP.Client.Executor_WithAddress _ expectedExecutorArgs ->
+                            executorFeeQuote /= None && executorArgs == expectedExecutorArgs)
 
                 globalConfig <- fetch globalConfigCid
                 RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
@@ -515,11 +531,11 @@ template OnRamp
                         caller = ccipOwner
 
                 let inputs = FeeCalculationInputs with
-                        feeToken = feeToken
-                        payload = payload
+                        feeToken = message.feeToken
+                        payload = message.payload
                         executorArgs = executorArgs
                         hasTokenTransfer = isSome tokenPoolFeeQuote
-                        ccipReceiveGasLimit = ccipReceiveGasLimit
+                        ccipReceiveGasLimit = extraArgs.gasLimit
                         ccvFeeUSDCents = foldl (+) 0.0 (map (.feeUSDCents) ccvFeeQuotes)
                         ccvGasSum = foldl (+) 0 (map (.gasForVerification) ccvFeeQuotes)
                         ccvBytesSum = foldl (+) 0 (map (.payloadSizeBytes) ccvFeeQuotes)
