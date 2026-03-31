@@ -16,6 +16,15 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
 
+// getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
+// Send.ToMap() for every field the GetFee choice accepts (GetFee has no feeTokenInput).
+func getFeeChoiceArgumentMap(sendArgs ccipsender.Send) map[string]any {
+	m := sendArgs.ToMap()
+	delete(m, "feeTokenInput")
+
+	return m
+}
+
 func quoteCCIPSenderFee(
 	t *testing.T,
 	participant canton.Participant,
@@ -26,16 +35,6 @@ func quoteCCIPSenderFee(
 ) ccipsender.GetFeeResult {
 	t.Helper()
 
-	getFeeArgs := ccipsender.GetFee2{
-		DestinationChainSelector: sendArgs.DestinationChainSelector,
-		Message:                  sendArgs.Message,
-		Context:                  sendArgs.Context,
-		RouterCid:                sendArgs.RouterCid,
-		CcvSendInputs:            sendArgs.CcvSendInputs,
-		TokenTransferInput:       sendArgs.TokenTransferInput,
-		ExecutorInput:            sendArgs.ExecutorInput,
-	}
-
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -44,7 +43,7 @@ func quoteCCIPSenderFee(
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
 					ContractId:     ccipSenderCid,
 					Choice:         "GetFee",
-					ChoiceArgument: ledger.MapToValue(getFeeArgs),
+					ChoiceArgument: ledger.MapToValue(getFeeChoiceArgumentMap(sendArgs)),
 				}},
 			}},
 			ActAs:              []string{partySender},

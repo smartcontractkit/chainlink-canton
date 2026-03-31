@@ -293,8 +293,9 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		DefaultTxGasLimit:           200_000,
 		NetworkFeeUSDCents:          25,
 		V2Params: &lanes.FeeQuoterV2Params{
-			LinkFeeMultiplierPercent: 100,            // Not used, since we're paying in native
-			USDPerUnitGas:            big.NewInt(38), // not used, since exec is disabled
+			LinkFeeMultiplierPercent: 100, // Not used when paying in native
+			// Integer scaled by 1e10 in cantonFeeQuoterUSDPerUnitGas (38 -> 0.0000000038).
+			USDPerUnitGas: big.NewInt(38),
 		},
 	}
 

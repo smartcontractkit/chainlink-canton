@@ -3,29 +3,47 @@ package sequences
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
-
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
+
+// cantonFeeQuoterUSDPerUnitGas formats V2Params.USDPerUnitGas for Canton FeeQuoter UpdatePrices.
+// DAML stores this as Decimal (CCIP.FeeQuoterTypes.GasPriceUpdate). chainlink-ccip models it as *big.Int
+// for cross-family tooling; on Canton that integer is scaled by 1e10 USD per gas unit (integration
+// parity: 38 -> 0.0000000038, matching historical ApplyFeeTokenUpdates+UpdatePrices tests).
+func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
+	if v == nil || v.Sign() == 0 {
+		return types.NUMERIC("0")
+	}
+	const scale int64 = 10_000_000_000 // 1e10
+	r := new(big.Rat).SetFrac(new(big.Int).Set(v), big.NewInt(scale))
+	s := strings.TrimRight(strings.TrimRight(r.FloatString(20), "0"), ".")
+	if s == "" || s == "-" {
+		return types.NUMERIC("0")
+	}
+
+	return types.NUMERIC(s)
+}
 
 var ConfigureLaneLegAsSource = operations.NewSequence(
 	"CantonConfigureLaneLegAsSource",
@@ -150,7 +168,8 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 					GasPriceUpdates: []feequoter.GasPriceUpdate{
 						{
 							DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
-							UsdPerUnitGas:     types.NUMERIC(destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas.String()),
+							UsdPerUnitGas: cantonFeeQuoterUSDPerUnitGas(
+								destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas),
 						},
 					},
 				},
