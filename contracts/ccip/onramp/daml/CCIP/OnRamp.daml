@@ -359,9 +359,9 @@ template OnRamp
                     (unique (map (.ccvAddress) extraArgs.ccvs))
                 case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> pure ()
-                    CCIP.Client.Executor_UseDefault with executorArgs ->
+                    CCIP.Client.Executor_UseDefault executorArgs ->
                         assertValidHex "executorArgs" executorArgs
-                    CCIP.Client.Executor_WithAddress with executorArgs ->
+                    CCIP.Client.Executor_WithAddress _ executorArgs ->
                         assertValidHex "executorArgs" executorArgs
 
                 case Map.lookup destChainSelector feeQuoter.destChainConfigs of
@@ -398,22 +398,20 @@ template OnRamp
                 let initialState = if hasTokenTransfer
                         then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
                         else CCIP.SendingMessageV1.SendingMessageState_Prepared
+                let resolveDefault = case destConfig.defaultExecutor of
+                        Some defaultExecutor ->
+                            ( Some defaultExecutor
+                            , RawInstanceAddress.toInstanceAddress defaultExecutor
+                            , Some CCIP.SendingMessageV1.ExecutionMode_Executor
+                            )
+                        None ->
+                            (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
                 let (resolvedRequiredExecutor, resolvedExecutorAddress, executionMode) = case extraArgs.executor of
-                        CCIP.Client.Executor_UseDefault with
-                            executorArgs = _ ->
-                              case destConfig.defaultExecutor of
-                                Some defaultExecutor ->
-                                    ( Some defaultExecutor
-                                    , RawInstanceAddress.toInstanceAddress defaultExecutor
-                                    , Some CCIP.SendingMessageV1.ExecutionMode_Executor
-                                    )
-                                None ->
-                                    (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+                        CCIP.Client.Executor_UseDefault _ ->
+                            resolveDefault
                         CCIP.Client.Executor_NoExecutor ->
                             (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
-                        CCIP.Client.Executor_WithAddress with
-                            executorAddress
-                            executorArgs = _ ->
+                        CCIP.Client.Executor_WithAddress executorAddress _ ->
                             ( Some executorAddress
                             , RawInstanceAddress.toInstanceAddress executorAddress
                             , Some CCIP.SendingMessageV1.ExecutionMode_Executor

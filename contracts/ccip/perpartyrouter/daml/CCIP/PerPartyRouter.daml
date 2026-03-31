@@ -297,11 +297,11 @@ template PerPartyRouter
                     (case extraArgs.executor of
                         CCIP.Client.Executor_NoExecutor ->
                             executorFeeQuote == None && executorArgs == ""
-                        CCIP.Client.Executor_UseDefault with executorArgs = expectedExecutorArgs ->
+                        CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
                             case executorFeeQuote of
                                 None -> executorArgs == ""
                                 Some _ -> executorArgs == expectedExecutorArgs
-                        CCIP.Client.Executor_WithAddress with executorArgs = expectedExecutorArgs ->
+                        CCIP.Client.Executor_WithAddress _ expectedExecutorArgs ->
                             executorFeeQuote /= None && executorArgs == expectedExecutorArgs)
 
                 exercise onRampCid CCIP.OnRamp.GetFeeFromRouter with

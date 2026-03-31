@@ -17,12 +17,15 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import qualified CCIP.TokenAdminRegistry
+import qualified Splice.Api.Token.HoldingV1
 
 import MCMS.RawInstanceAddress (assertValidInstanceId)
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 data CCVSendInput = CCVSendInput
     with
+        -- Used to match this CCV to its verifier args in the client-provided CCVExtraArgs.
+        ccvAddress : RawInstanceAddress.RawInstanceAddress
         ccvCid : ContractId ICCV.ICrossChainVerifier
         ccvExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
@@ -80,7 +83,7 @@ template CCIPSender
                 message : CCIP.Client.Canton2AnyMessage
                 context : CCIP.Context.CCIPContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
-                tokenPoolCid : Optional ContractId CCIP.Interfaces.TokenPool.ITokenPool
+                tokenPoolCid : Optional (ContractId CCIP.Interfaces.TokenPool.ITokenPool)
             controller owner
             do
                 extraArgs <- case message.extraArgs of
@@ -165,7 +168,8 @@ template CCIPSender
                         assertMsg "sender: executorInput not allowed for no-executor mode"
                             (executorInput == None)
                         pure ("", None)
-                    CCIP.Client.Executor_UseDefault with executorArgs -> case destConfig.defaultExecutor of
+                    CCIP.Client.Executor_UseDefault executorArgs ->
+                      case destConfig.defaultExecutor of
                         None -> do
                             assertMsg "sender: executorInput not allowed when no default executor is configured"
                                 (executorInput == None)
@@ -178,7 +182,8 @@ template CCIPSender
                                     requiredCCVs = requiredCCVs
                                     caller = owner
                                 pure (executorArgs, Some q)
-                    CCIP.Client.Executor_WithAddress with executorArgs -> case executorInput of
+                    CCIP.Client.Executor_WithAddress _ executorArgs ->
+                      case executorInput of
                         None -> abort "sender: executorInput required for explicit executor mode"
                         Some executorInput -> do
                             q <- exercise executorInput.executorCid CCIP.Interfaces.Executor.Executor_GetFee with
@@ -283,32 +288,32 @@ template CCIPSender
                         assertMsg "sender: executorInput not allowed for no-executor mode"
                             (executorInput == None)
                         pure smCid
-                    CCIP.Client.Executor_UseDefault with executorArgs ->
-                        case destConfig.defaultExecutor of
-                            None -> do
-                                assertMsg "sender: executorInput not allowed when no default executor is configured"
-                                    (executorInput == None)
-                                pure smCid
-                            Some _ ->
-                                case executorInput of
-                                    None -> abort "sender: executorInput required for default executor mode"
-                                    Some executorInput ->
-                                        exercise executorInput.executorCid
-                                            CCIP.Interfaces.Executor.Executor_CalculateFee with
-                                                sendingMessageCid = smCid
-                                                executorArgs = executorArgs
-                                                extraContext = executorInput.executorExtraContext
-                                                caller = owner
-                    CCIP.Client.Executor_WithAddress with executorArgs ->
-                        case executorInput of
-                            None -> abort "sender: executorInput required for explicit executor mode"
-                            Some executorInput ->
-                                exercise executorInput.executorCid
-                                    CCIP.Interfaces.Executor.Executor_CalculateFee with
-                                        sendingMessageCid = smCid
-                                        executorArgs = executorArgs
-                                        extraContext = executorInput.executorExtraContext
-                                        caller = owner
+                    CCIP.Client.Executor_UseDefault executorArgs ->
+                      case destConfig.defaultExecutor of
+                        None -> do
+                            assertMsg "sender: executorInput not allowed when no default executor is configured"
+                                (executorInput == None)
+                            pure smCid
+                        Some _ ->
+                            case executorInput of
+                                None -> abort "sender: executorInput required for default executor mode"
+                                Some executorInput ->
+                                    exercise executorInput.executorCid
+                                        CCIP.Interfaces.Executor.Executor_CalculateFee with
+                                            sendingMessageCid = smCid
+                                            executorArgs = executorArgs
+                                            extraContext = executorInput.executorExtraContext
+                                            caller = owner
+                    CCIP.Client.Executor_WithAddress _ executorArgs ->
+                      case executorInput of
+                        None -> abort "sender: executorInput required for explicit executor mode"
+                        Some executorInput ->
+                            exercise executorInput.executorCid
+                                CCIP.Interfaces.Executor.Executor_CalculateFee with
+                                    sendingMessageCid = smCid
+                                    executorArgs = executorArgs
+                                    extraContext = executorInput.executorExtraContext
+                                    caller = owner
 
                 smCid <- exercise routerCid CCIP.PerPartyRouter.FinalizeFee with
                     context
@@ -334,9 +339,7 @@ template CCIPSender
                         pure lockResult.sendingMessageCid
 
                 smCid <- foldlA (\cid input -> do
-                    let ccvView = view input.ccvCid
-                    let ccvAddress = RawInstanceAddress.make ccvView.instanceId ccvView.owner
-                    verifierArgs <- lookupVerifierArgs extraArgs.ccvs ccvAddress
+                    verifierArgs <- lookupVerifierArgs extraArgs.ccvs input.ccvAddress
                     exercise input.ccvCid
                         ICCV.CrossChainVerifier_ForwardToVerifier with
                             rmnRemoteCid = rmnRemoteCid
