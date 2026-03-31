@@ -26,12 +26,12 @@ var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
 			return errors.New("ccip owner cannot be empty")
 		}
 
-		chainSelector, err := strconv.ParseInt(string(template.ChainSelector), 10, 64)
+		chainSelector, err := strconv.ParseUint(string(template.ChainSelector), 10, 64)
 		if err != nil {
 			return err
 		}
 
-		if chainSelector <= 0 {
+		if chainSelector == 0 {
 			return errors.New("chain selector must be greater than zero")
 		}
 
