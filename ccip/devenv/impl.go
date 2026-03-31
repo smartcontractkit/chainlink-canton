@@ -517,8 +517,11 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		if err != nil {
 			return fmt.Errorf("failed to get default executor for source chain %d: %w", selector, err)
 		}
-		// Normalize executor to 32 bytes (left-padded) for Canton config encoding.
-		normalizedSourceExecutor := contracts.HexToInstanceAddress(localExecutorRef.Address).Hex()
+		localExecutorLabels := localExecutorRef.Labels.List()
+		if len(localExecutorLabels) == 0 {
+			return fmt.Errorf("default executor ref for source chain %d is missing raw instance address labels", selector)
+		}
+		defaultExecutorRawAddr := contracts.RawInstanceAddress(localExecutorLabels[0])
 		remoteChainConfig := adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 			AllowTrafficFrom:         true,
 			OnRamps:                  [][]byte{remoteOnRamp},
@@ -527,7 +530,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			LaneMandatedInboundCCVs:  nil,
 			DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 			LaneMandatedOutboundCCVs: nil,
-			DefaultExecutor:          contracts.RawInstanceAddress(normalizedSourceExecutor),
+			DefaultExecutor:          defaultExecutorRawAddr,
 			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
 				IsEnabled:                   true,
 				MaxDataBytes:                50000,
