@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -97,6 +98,38 @@ var BuildConfig = operations.NewOperation(
 			}
 		}
 
+		// token pools
+		refs = env.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(input.ChainSelector),
+			// TODO: this should be lock release token pool, we don't have burn/mint on Canton?
+			datastore.AddressRefByType(datastore.ContractType(burn_mint_token_pool.ContractType)),
+		)
+		if len(refs) == 0 {
+			return GenerateEDSConfigOutput{}, fmt.Errorf("no TokenPool contracts found in datastore")
+		}
+		tokenPools := make([]edsConfig.TokenPoolContracts, len(refs))
+		for i, ref := range refs {
+			tokenPools[i] = edsConfig.TokenPoolContracts{
+				TokenPool: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+				},
+				// TODO: use real addresses from the datastore, but how to properly get them?
+				InboundRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
+				InboundCustomBlockConfirmationsRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
+				OutboundRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
+			}
+		}
+
 		var nodeConfig edsConfig.NodeConfig
 		if participant.InternalEndpoints == nil {
 			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
@@ -152,7 +185,9 @@ var BuildConfig = operations.NewOperation(
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
-				CCVs: ccvs,
+				CCVs:               ccvs,
+				TokenPoolContracts: tokenPools,
+				PoolOwner:          participant.PartyID,
 			},
 		}, nil
 	},

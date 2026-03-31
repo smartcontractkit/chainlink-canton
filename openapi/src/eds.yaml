@@ -151,12 +151,12 @@ components:
     CCIPExecuteRequest:
         type: object
         required:
-          - messageID
+          - encodedMessage
           - ccvs
         properties:
-          messageID:
+          encodedMessage:
             type: string
-            description: The message ID of the CCIP message to be executed.
+            description: The encoded CCIP message to be executed, in hex format.
           ccvs:
             type: array
             items:
@@ -168,14 +168,34 @@ components:
       type: object
       required:
         - choiceContext
+        - poolExtraContext
         - ccvs
       properties:
         choiceContext:
           $ref: '#/components/schemas/ChoiceContext'
+        poolExtraContext:
+          type: object
+          description: |
+            The additional data to use when exercising the choice for the token pool. 
+            Will be empty if no token transfer is part of the message.
         ccvs:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/OptionalDisclosure'
+        tokenPool:
+          allOf:
+            - $ref: '#/components/schemas/DisclosedContract'
+          nullable: true
+          description: |
+            The explicit disclosure for the token pool.
+            Only present if a token transfer is part of the message.
+        tokenPoolHoldings:
+          allOf:
+            - $ref: '#/components/schemas/DisclosedContract'
+          nullable: true
+          description: |
+            The explicit disclosures for the token pool holdings.
+            Only present if a token transfer is part of the message.
 
     CCIPPerPartyRouterFactoryRequest:
       type: object

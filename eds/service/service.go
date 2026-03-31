@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
@@ -133,6 +135,23 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		})
 		ccvCids[i] = ccv.InstanceAddress
 	}
+	tokenPoolCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPoolContracts))
+	tokenPoolInboundRateLimiterCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPoolContracts))
+	tokenPoolRateLimiterCustomBlockConfirmationsCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPoolContracts))
+	tokenPoolOutboundRateLimiterCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPoolContracts))
+	for i, tokenPool := range cfg.Contracts.TokenPoolContracts {
+		templates = append(templates, store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{}),
+			PartyID:    tokenPool.TokenPool.PartyID,
+		}, store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(common.RateLimiter{}),
+			PartyID:    tokenPool.InboundRateLimiter.PartyID,
+		})
+		tokenPoolCids[i] = tokenPool.TokenPool.InstanceAddress
+		tokenPoolInboundRateLimiterCids[i] = tokenPool.InboundRateLimiter.InstanceAddress
+		tokenPoolRateLimiterCustomBlockConfirmationsCids[i] = tokenPool.InboundCustomBlockConfirmationsRateLimiter.InstanceAddress
+		tokenPoolOutboundRateLimiterCids[i] = tokenPool.OutboundRateLimiter.InstanceAddress
+	}
 
 	updateStore, err := store.NewUpdateStore(ctx, store.UpdateStoreConfig{
 		Logger:        logger,
@@ -147,7 +166,15 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		return fmt.Errorf("failed to create store: %w", err)
 	}
 
-	// Run store in the background
+	instrumentHoldingStore := store.NewInstrumentHoldingStore(store.InstrumentHoldingStoreConfig{
+		Logger:        logger,
+		UpdateService: cantonChain.Participants[0].LedgerServices.Update,
+		StateService:  cantonChain.Participants[0].LedgerServices.State,
+		MaxRetries:    cfg.Node.MaxRetries,
+		Owner:         types.PARTY(cfg.Contracts.PoolOwner),
+	})
+
+	// Run update store in the background
 	errChan := make(chan error)
 	go func(errChan chan<- error) {
 		logger.Info().Msg("starting update store")
@@ -157,16 +184,31 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		}
 	}(errChan)
 
+	// Run instrument holding store in the background
+	go func(errChan chan<- error) {
+		logger.Info().Msg("starting instrument holding store")
+		err := instrumentHoldingStore.Run(ctx)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to run instrument holding store: %w", err)
+		}
+	}(errChan)
+
 	disclosureSvc := disclosure.NewDisclosureService(ctx, disclosure.DisclosureServiceConfig{
-		ContractStore:         updateStore,
-		PerPartyRouterFactory: cfg.Contracts.PerPartyRouterFactory.InstanceAddress,
-		OnRamp:                cfg.Contracts.OnRamp.InstanceAddress,
-		OffRamp:               cfg.Contracts.OffRamp.InstanceAddress,
-		GlobalConfig:          cfg.Contracts.GlobalConfig.InstanceAddress,
-		TokenAdminRegistry:    cfg.Contracts.TokenAdminRegistry.InstanceAddress,
-		RMNRemote:             cfg.Contracts.RMNRemote.InstanceAddress,
-		FeeQuoter:             cfg.Contracts.FeeQuoter.InstanceAddress,
-		CCVs:                  ccvCids,
+		ContractStore:          updateStore,
+		InstrumentHoldingStore: instrumentHoldingStore,
+		PerPartyRouterFactory:  cfg.Contracts.PerPartyRouterFactory.InstanceAddress,
+		OnRamp:                 cfg.Contracts.OnRamp.InstanceAddress,
+		OffRamp:                cfg.Contracts.OffRamp.InstanceAddress,
+		GlobalConfig:           cfg.Contracts.GlobalConfig.InstanceAddress,
+		TokenAdminRegistry:     cfg.Contracts.TokenAdminRegistry.InstanceAddress,
+		RMNRemote:              cfg.Contracts.RMNRemote.InstanceAddress,
+		FeeQuoter:              cfg.Contracts.FeeQuoter.InstanceAddress,
+		CCVs:                   ccvCids,
+
+		TokenPools:                   tokenPoolCids,
+		TokenPoolInboundRateLimiters: tokenPoolInboundRateLimiterCids,
+		TokenPoolRateLimiterCustomBlockConfirmations: tokenPoolRateLimiterCustomBlockConfirmationsCids,
+		TokenPoolOutboundRateLimiters:                tokenPoolOutboundRateLimiterCids,
 	})
 
 	server := api.NewServer(logger, disclosureSvc)

@@ -52,8 +52,8 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 
 	// Add the verifier addresses to the request - required for EDS to return explicit disclosures for them
 	request := edsv1.CCIPExecuteRequest{
-		Ccvs:      make([]string, len(verifiers)),
-		MessageID: "", // not used (yet)
+		Ccvs:           make([]string, len(verifiers)),
+		EncodedMessage: "", // not used (yet)
 	}
 	for i, verifier := range verifiers {
 		request.Ccvs[i] = verifier.String()
