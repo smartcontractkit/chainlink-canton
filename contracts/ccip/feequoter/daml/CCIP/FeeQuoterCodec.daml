@@ -5,8 +5,8 @@ module CCIP.FeeQuoterCodec (
     decodeApplyPriceUpdatersUpdateParams,
     encodeUpdatePricesParams,
     decodeUpdatePricesParams,
-    encodeApplyFeeTokenUpdatesParams,
-    decodeApplyFeeTokenUpdatesParams,
+    encodeRemoveFeeTokensParams,
+    decodeRemoveFeeTokensParams,
     encodeApplyDestChainConfigUpdatesParams,
     decodeApplyDestChainConfigUpdatesParams,
     ) where
@@ -17,7 +17,6 @@ import DA.Optional (fromSome)
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FeeQuoterTypes (
-    FeeTokenArgs(..),
     DestChainConfigArgs(..),
     DestChainConfig(..),
     PriceUpdates(..),
@@ -123,32 +122,18 @@ decodeGasPriceUpdateAt encoded offset = do
         , finalOffset)
 
 -- ===============================================
--- |            ApplyFeeTokenUpdates             |
+-- |              RemoveFeeTokens               |
 -- ===============================================
 
 -- Encode
-encodeApplyFeeTokenUpdatesParams : ([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs]) -> BytesHex
-encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd) =
+encodeRemoveFeeTokensParams : [Splice.Api.Token.HoldingV1.InstrumentId] -> BytesHex
+encodeRemoveFeeTokensParams feeTokensToRemove =
     encodeList feeTokensToRemove encodeInstrumentId
-    <> encodeList feeTokensToAdd encodeFeeTokenArgs
-
-encodeFeeTokenArgs : FeeTokenArgs -> BytesHex
-encodeFeeTokenArgs fta =
-    encodeInstrumentId fta.instrumentId
 
 -- Decode
-decodeApplyFeeTokenUpdatesParams : BytesHex -> Optional (([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs]), Int)
-decodeApplyFeeTokenUpdatesParams encoded = do
-    (feeTokensToRemove, offset1) <- decodeList encoded 0 decodeInstrumentId
-    (feeTokensToAdd, finalOffset) <- decodeList encoded offset1 decodeFeeTokenArgsAt
-    Some ((feeTokensToRemove, feeTokensToAdd), finalOffset)
-
-decodeFeeTokenArgsAt : BytesHex -> Int -> Optional (FeeTokenArgs, Int)
-decodeFeeTokenArgsAt encoded offset = do
-    (instrumentId, finalOffset) <- decodeInstrumentId encoded offset
-    Some (FeeTokenArgs with
-            instrumentId
-        , finalOffset)
+decodeRemoveFeeTokensParams : BytesHex -> Optional ([Splice.Api.Token.HoldingV1.InstrumentId], Int)
+decodeRemoveFeeTokensParams encoded = do
+    decodeList encoded 0 decodeInstrumentId
 
 -- ===============================================
 -- |         ApplyDestChainConfigUpdates         |

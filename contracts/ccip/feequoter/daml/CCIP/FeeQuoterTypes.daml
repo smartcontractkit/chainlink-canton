@@ -23,12 +23,6 @@ data GasPriceUpdate = GasPriceUpdate
         usdPerUnitGas : Decimal
     deriving (Eq, Show)
 
--- | Arguments for adding fee tokens
-data FeeTokenArgs = FeeTokenArgs
-    with
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-    deriving (Eq, Show)
-
 -- | Arguments for destination chain config updates
 data DestChainConfigArgs = DestChainConfigArgs
     with
