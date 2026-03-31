@@ -41,6 +41,7 @@ module CCIP.Math
   ) where
 
 import DA.Numeric qualified as Numeric
+import DA.Text qualified as Text
 
 baseInt : Int
 baseInt = 100000000
@@ -67,11 +68,7 @@ calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
                let scale = checkedPow10Numeric0 (label <> ": scale factor") (abs diff)
                in if diff > 0
                   then mulDivDown remoteAmount scale 1.0
-                  else
-                      let quotient = mulDivDown remoteAmount 1.0 scale
-                      in if mulDivDown quotient scale 1.0 == remoteAmount
-                         then quotient
-                         else error (label <> ": inexact scale-down")
+                  else mulDivDown remoteAmount 1.0 scale
 
 checkedPow10Numeric0 : Text -> Int -> Numeric 0
 checkedPow10Numeric0 label exponent

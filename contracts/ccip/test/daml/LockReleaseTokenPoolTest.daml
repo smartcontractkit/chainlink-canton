@@ -341,7 +341,7 @@ testLockOrBurn = script do
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
-            amount = -50000000000.0
+            amount = -5.0
             rmnRemoteCid = rmnRemote
             extraContext = mkRateLimiterContext outboundRateLimiter
             caller = sender
@@ -356,7 +356,7 @@ testLockOrBurn = script do
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
-            amount = 50000000000.0
+            amount = 5.0
             rmnRemoteCid = rmnRemote
             extraContext = mkRateLimiterContext outboundRateLimiter
             caller = sender
@@ -581,7 +581,7 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
-            amount = 50000000000.0
+            amount = 5.0
             rmnRemoteCid = rmnRemote
             extraContext = mkRateLimiterContext outboundRateLimiter
             caller = sender
@@ -794,7 +794,7 @@ testLockOrBurnDeductsFeeBps = script do
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
-            amount = 50000000000.0
+            amount = 5.0
             rmnRemoteCid = rmnRemote
             extraContext = mkRateLimiterContext outboundRateLimiter
             caller = sender
@@ -1781,12 +1781,16 @@ testDecimalConversion_EqualDecimals = script do
     result2 === 42.0
     debug "testDecimalConversion_EqualDecimals: PASSED"
 
--- D-002/D-018: Scale-down (remote=18, local=6) requires exact divisibility.
+-- D-002/D-018: Scale-down (remote=18, local=6) truncates via mulDivDown.
 testDecimalConversion_ScaleDown : Script ()
 testDecimalConversion_ScaleDown = script do
     -- 1e18 in 18 decimals = 1 token -> 1e6 in 6 decimals
     LockReleaseTokenPool.calculateLocalAmount 1000000000000000000.0 18 6
         === 1000000.0
+
+    -- 1234567890123456789 in 18 decimals -> floor(1234567890123456789 / 1e12) = 1234567
+    LockReleaseTokenPool.calculateLocalAmount 1234567890123456789.0 18 6
+        === 1234567.0
 
     -- Large value near Numeric 0 range: 10^37 in 18 decimals -> 10^25 in 6 decimals
     LockReleaseTokenPool.calculateLocalAmount 10000000000000000000000000000000000000.0 18 6
@@ -1794,45 +1798,29 @@ testDecimalConversion_ScaleDown = script do
 
     debug "testDecimalConversion_ScaleDown: PASSED"
 
--- Edge cases: zero, exact boundaries, asymmetric gaps, and inexact failures.
+-- Edge cases: zero, truncation to zero, asymmetric gaps, floor behavior.
 testDecimalConversion_EdgeCases : Script ()
 testDecimalConversion_EdgeCases = script do
-    owner <- allocateParty "calculate-local-edge-owner"
-    harnessCid <- submit owner do
-        createCmd CalculateLocalAmountHarness with owner
-
     -- Zero amount stays zero regardless of decimal difference
     LockReleaseTokenPool.calculateLocalAmount 0.0 6 18 === 0.0
     LockReleaseTokenPool.calculateLocalAmount 0.0 18 6 === 0.0
     LockReleaseTokenPool.calculateLocalAmount 0.0 18 18 === 0.0
 
+    -- Amount smaller than scale factor truncates to zero (floor)
+    -- 999999 in 18 decimals / 1e12 = 0.000000999999, floor = 0
+    LockReleaseTokenPool.calculateLocalAmount 999999.0 18 6 === 0.0
+
     -- Exactly at scale factor boundary: 1e12 in 18 decimals -> 1 in 6 decimals
     LockReleaseTokenPool.calculateLocalAmount 1000000000000.0 18 6 === 1.0
 
-    -- Inexact scale-down fails instead of truncating.
-    submitMustFail owner do
-        exerciseCmd harnessCid CalculateLocalAmount with
-            amount = 999999.0
-            remoteDecimals = 18
-            localDecimals = 6
+    -- One below scale factor: floor(999999999999 / 1e12) = 0
+    LockReleaseTokenPool.calculateLocalAmount 999999999999.0 18 6 === 0.0
 
-    submitMustFail owner do
-        exerciseCmd harnessCid CalculateLocalAmount with
-            amount = 999999999999.0
-            remoteDecimals = 18
-            localDecimals = 6
-
-    submitMustFail owner do
-        exerciseCmd harnessCid CalculateLocalAmount with
-            amount = 1500000000000.0
-            remoteDecimals = 18
-            localDecimals = 6
-
-    submitMustFail owner do
-        exerciseCmd harnessCid CalculateLocalAmount with
-            amount = 1999999999999.0
-            remoteDecimals = 18
-            localDecimals = 6
+    -- Floor behavior: verify no rounding up
+    -- floor(1500000000000 / 1e12) = 1, not 2
+    LockReleaseTokenPool.calculateLocalAmount 1500000000000.0 18 6 === 1.0
+    -- floor(1999999999999 / 1e12) = 1, not 2
+    LockReleaseTokenPool.calculateLocalAmount 1999999999999.0 18 6 === 1.0
 
     -- Large decimal gap (remote=18, local=0): divide by 1e18
     -- 1e18 -> 1
