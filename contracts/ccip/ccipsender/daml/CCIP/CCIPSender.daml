@@ -163,17 +163,17 @@ template CCIPSender
                             tokenInstrumentId = tt.token
                             caller = owner
                         pure (Some q, q.tokenFeeBps)
-                (executorArgs, executorFeeQuote) <- case extraArgs.executor of
+                executorFeeQuote <- case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> do
                         assertMsg "sender: executorInput not allowed for no-executor mode"
                             (executorInput == None)
-                        pure ("", None)
-                    CCIP.Client.Executor_UseDefault executorArgs ->
+                        pure None
+                    CCIP.Client.Executor_UseDefault _executorArgs ->
                       case destConfig.defaultExecutor of
                         None -> do
                             assertMsg "sender: executorInput not allowed when no default executor is configured"
                                 (executorInput == None)
-                            pure ("", None)
+                            pure None
                         Some _ -> case executorInput of
                             None -> abort "sender: executorInput required for default executor mode"
                             Some executorInput -> do
@@ -181,8 +181,8 @@ template CCIPSender
                                     destChainSelector = destinationChainSelector
                                     requiredCCVs = requiredCCVs
                                     caller = owner
-                                pure (executorArgs, Some q)
-                    CCIP.Client.Executor_WithAddress _ executorArgs ->
+                                pure (Some q)
+                    CCIP.Client.Executor_WithAddress _ _executorArgs ->
                       case executorInput of
                         None -> abort "sender: executorInput required for explicit executor mode"
                         Some executorInput -> do
@@ -190,7 +190,7 @@ template CCIPSender
                                 destChainSelector = destinationChainSelector
                                 requiredCCVs = requiredCCVs
                                 caller = owner
-                            pure (executorArgs, Some q)
+                            pure (Some q)
 
                 quote <- exercise routerCid CCIP.PerPartyRouter.GetFee with
                     context = context
@@ -198,7 +198,6 @@ template CCIPSender
                     message = message
                     ccvFeeQuotes = quotedCCVFees
                     tokenPoolFeeQuote = quotedTokenSendFee
-                    executorArgs = executorArgs
                     executorFeeQuote = executorFeeQuote
 
                 let poolFeeTokenAmount = case message.tokenTransfer of

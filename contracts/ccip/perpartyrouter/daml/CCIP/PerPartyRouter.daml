@@ -266,7 +266,6 @@ template PerPartyRouter
                 message : CCIP.Client.Canton2AnyMessage
                 ccvFeeQuotes : [ICCV.CrossChainVerifierFeeQuote]
                 tokenPoolFeeQuote : Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
-                executorArgs : BytesHex
                 executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller partyOwner
             do
@@ -289,6 +288,12 @@ template PerPartyRouter
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
                     _ -> abort "router: unsupported extraArgs version"
+                let executorArgs = case extraArgs.executor of
+                        CCIP.Client.Executor_NoExecutor -> ""
+                        CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
+                            expectedExecutorArgs
+                        CCIP.Client.Executor_WithAddress _ expectedExecutorArgs ->
+                            expectedExecutorArgs
                 assertMsg "router: executor quote/args mismatch"
                     (case executorFeeQuote of
                         None -> executorArgs == ""
