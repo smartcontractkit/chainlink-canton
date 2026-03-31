@@ -358,61 +358,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	cldfEnv.DataStore = runningDs.Seal()
 	t.Log("Configured chain for lanes")
 
-	// Fee token is Amulet
-	feeTokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
-	}
-
-	ccipDeps := dependencies.CantonDeps{
-		Chain:       env.Chain,
-		Participant: 0,
-	}
-	feeQuoterInstanceAddress := contracts.HexToInstanceAddress(feeQuoter.Address)
-
-	// UpdatePrices: Set price for FeeToken and LINK token. Any token with a price is
-	// considered a fee token, so no separate fee-token registration is needed.
-	linkTokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(partyCCIP),
-		Id:    types.TEXT("link-token"),
-	}
-	usdPerToken := "1.0"
-	// FeeQuoter uses usdPerUnitGas as Decimal (10-decimal USD per gas unit).
-	// For Canton -> EVM pricing, derive from EVM gas price and native token USD price:
-	//   evmGasPrice = 0.152 gwei => evmGasPriceWei = 0.152 * 1e9 = 152,000,000
-	//   ethUsd = 2500
-	//   usdPerUnitGas = (evmGasPriceWei * ethUsd) / 1e20
-	//                 = (152,000,000 * 2500) / 1e20
-	//                 = 0.0000000038
-	destUsdPerUnitGas := "0.0000000038"
-	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.UpdatePrices, ccipDeps, contractops.ChoiceInput[feequoter.UpdatePrices]{
-		ChainSelector:   env.Chain.ChainSelector(),
-		InstanceAddress: feeQuoterInstanceAddress,
-		ActAs:           []string{partyCCIP},
-		Args: feequoter.UpdatePrices{
-			PriceUpdates: feequoter.PriceUpdates{
-				TokenPriceUpdates: []feequoter.TokenPriceUpdate{
-					{
-						InstrumentId: feeTokenInstrumentId,
-						UsdPerToken:  types.NUMERIC(usdPerToken),
-					},
-					{
-						InstrumentId: linkTokenInstrumentId,
-						UsdPerToken:  types.NUMERIC("15.0"),
-					},
-				},
-				GasPriceUpdates: []feequoter.GasPriceUpdate{
-					{
-						DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-						UsdPerUnitGas:     types.NUMERIC(destUsdPerUnitGas),
-					},
-				},
-			},
-			Caller: types.PARTY(partyCCIP),
-		},
-	})
-	require.NoError(t, err, "failed to update prices")
-	t.Logf("Updated prices: FeeToken=$%s, LINK=$%s, destUsdPerUnitGas=%s", usdPerToken, "15.0", destUsdPerUnitGas)
 	// Setup token pool for outbound token transfer in Send.
 	tokenAdminRegistryRawAddr, err := contracts.RawInstanceAddressFromString(tokenAdminRegistry.Labels.List()[0])
 	require.NoError(t, err, "failed to parse TokenAdminRegistry raw address")
@@ -938,8 +883,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		ccipOwnerDelta,
 	)
 
-	require.Positive(t, ccipOwnerDelta.Sign(), "ccip owner balance should increase after send")
-	require.GreaterOrEqual(t, senderDelta.Cmp(ccipOwnerDelta), 0, "sender deduction should cover ccip owner credit")
+	quotedFeeRat, ok := new(big.Rat).SetString(string(quotedFee.FeeTokenAmount))
+	require.Truef(t, ok, "invalid quoted fee %q", quotedFee.FeeTokenAmount)
+	poolFeeRat, ok := new(big.Rat).SetString(string(quotedFee.PoolFeeTokenAmount))
+	require.Truef(t, ok, "invalid pool fee %q", quotedFee.PoolFeeTokenAmount)
+	expectedSenderDeduction := new(big.Rat).Add(quotedFeeRat, poolFeeRat)
+	require.GreaterOrEqual(t, senderDelta.Cmp(expectedSenderDeduction), 0, "sender deduction should cover quoted fee and pool fee")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)

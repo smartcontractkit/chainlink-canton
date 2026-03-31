@@ -325,65 +325,8 @@ func TestCCIPSend(t *testing.T) {
 	cldfEnv.DataStore = runningDs.Seal()
 	t.Log("Configured chain for lanes")
 
-	// Fee token is Amulet
-	feeTokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
-	}
-
-	// Get disclosed FeeQuoter contract
-	disclosedFeeQuoterForConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter",
-	})
-	require.NoError(t, err)
-
-	// UpdatePrices: Set price for FeeToken and LINK token. Any token with a price is
-	// considered a fee token, so no separate fee-token registration is needed.
-	linkTokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(partyCCIP),
-		Id:    types.TEXT("link-token"),
-	}
-	usdPerToken := "1.0"
-	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
-					ContractId: disclosedFeeQuoterForConfig.ContractId,
-					Choice:     "UpdatePrices",
-					ChoiceArgument: ledger.MapToValue(feequoter.UpdatePrices{
-						PriceUpdates: feequoter.PriceUpdates{
-							TokenPriceUpdates: []feequoter.TokenPriceUpdate{
-								{
-									InstrumentId: feeTokenInstrumentId,
-									UsdPerToken:  types.NUMERIC(usdPerToken),
-								},
-								{
-									InstrumentId: linkTokenInstrumentId,
-									UsdPerToken:  types.NUMERIC("15.0"),
-								},
-							},
-							GasPriceUpdates: []feequoter.GasPriceUpdate{
-								{
-									DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-									UsdPerUnitGas:     types.NUMERIC("0.0000000038"),
-								},
-							},
-						},
-						Caller: types.PARTY(partyCCIP),
-					}),
-				}},
-			}},
-			ActAs:              []string{partyCCIP},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFeeQuoterForConfig},
-		},
-	})
-	require.NoError(t, err, "failed to update prices")
-	t.Logf("Updated FeeToken price to $%s per token", usdPerToken)
-
 	// Apply FeeQuoter dest chain config (needed by OnRamp.FinalizeFeeFromRouter)
-	disclosedFeeQuoterForConfig, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+	disclosedFeeQuoterForConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter",
 	})
 	require.NoError(t, err)
