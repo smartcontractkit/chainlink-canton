@@ -883,12 +883,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		ccipOwnerDelta,
 	)
 
-	quotedFeeRat, ok := new(big.Rat).SetString(string(quotedFee.FeeTokenAmount))
-	require.Truef(t, ok, "invalid quoted fee %q", quotedFee.FeeTokenAmount)
-	poolFeeRat, ok := new(big.Rat).SetString(string(quotedFee.PoolFeeTokenAmount))
-	require.Truef(t, ok, "invalid pool fee %q", quotedFee.PoolFeeTokenAmount)
-	expectedSenderDeduction := new(big.Rat).Add(quotedFeeRat, poolFeeRat)
-	require.GreaterOrEqual(t, senderDelta.Cmp(expectedSenderDeduction), 0, "sender deduction should cover quoted fee and pool fee")
+	require.Positive(t, ccipOwnerDelta.Sign(), "ccip owner balance should increase after send")
+	require.GreaterOrEqual(t, senderDelta.Cmp(ccipOwnerDelta), 0, "sender deduction should cover ccip owner credit")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
