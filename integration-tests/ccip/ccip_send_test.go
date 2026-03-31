@@ -802,10 +802,9 @@ func TestCCIPSend(t *testing.T) {
 	senderDelta := senderBalanceBefore - senderBalanceAfter
 	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
 
-	// GetFee returns Numeric 0 (E10 smallest units). Convert to Decimal for comparison.
-	feeN0, err := strconv.ParseFloat(strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), 64)
+	// GetFee now returns Decimal directly in fee-token units.
+	expectedFeeDecimal, err := strconv.ParseFloat(strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), 64)
 	require.NoError(t, err)
-	expectedFeeDecimal := feeN0 / 1e10
 	require.InDelta(t, expectedFeeDecimal, senderDelta, 1e-10, "sender deduction should match GetFee quote")
 	require.InDelta(t, expectedFeeDecimal, ccipOwnerDelta, 1e-10, "ccipOwner should receive the full quoted fee in this no-token flow")
 

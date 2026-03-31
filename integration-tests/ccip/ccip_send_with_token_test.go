@@ -839,7 +839,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
 		},
 	}
-	tokenTransferAmount := int64(10000)
+	const tokenTransferAmountProtocolUnits = int64(10000)
+	const tokenTransferAmountDecimal = "0.0000010000"
 	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
 
 	// Expected fee-token charges (Amulet), mapped to configured fields:
@@ -851,8 +852,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	//   UpdatePrices.GasPriceUpdates[remoteSelector].UsdPerUnitGas = 0.0000000038
 	// Total fee-token payment = 10 + 10 + 7 + 9 + 19 = 55 cents.
 	// Separately, pool takes a token amount cut at LockOrBurn:
-	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
-	// so 10,000 sent -> 9,500 bridged, with 500 collected by pool.
+	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%).
+	// The client boundary is now Decimal, so send 0.0000010000 tokens, which
+	// corresponds to 10,000 protocol smallest units. That should encode as
+	// 9,500 bridged units after the 5% pool fee, with 500 units collected by the pool.
 	ccvRawAddr := mcms.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierRawAddr.String())}
 	executorRawAddr := mcms.RawInstanceAddress{Unpack: types.TEXT(fmt.Sprintf("test-executor@%s", partyCCIP))}
 	sendArgs := ccipsender.Send{
@@ -864,7 +867,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Payload:  types.TEXT(testPayloadHex),
 			TokenTransfer: &ccipclient.TokenTransfer{
 				Token:  feeTokenInstrumentId,
-				Amount: types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
+				Amount: types.NUMERIC(tokenTransferAmountDecimal),
 			},
 			FeeToken: feeTokenInstrumentId,
 			ExtraArgs: ccipclient.ExtraArgs{
@@ -988,17 +991,16 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
 
-	// Verify pool feeBps haircut was applied to token transfer amount in encoded message:
-	// 10,000 sent with 5% feeBps => 9,500 bridged.
+	// Verify pool feeBps haircut was applied to the protocol amount:
+	// 10,000 smallest units sent with 5% feeBps => 9,500 bridged.
 	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
 
 	senderBalanceAfter := getHoldingsBalanceDecimal(t, t.Context(), senderParticipant)
 	senderDelta := senderBalanceBefore - senderBalanceAfter
 
-	// Derive expected Decimal fee from the N0 quote (E10 smallest units).
-	totalFeeN0, err := strconv.ParseFloat(feeStr, 64)
+	// GetFee now returns Decimal directly.
+	totalFeeDecimal, err := strconv.ParseFloat(feeStr, 64)
 	require.NoError(t, err)
-	totalFeeDecimal := totalFeeN0 / 1e10
 
 	ccipOwnerBalanceAfter := getHoldingsBalanceDecimal(t, t.Context(), ccipParticipant)
 	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
