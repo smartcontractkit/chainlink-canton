@@ -7,7 +7,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 )
 
@@ -36,11 +35,7 @@ func (d DeployChainContracts) Apply(e cldf.Environment, config CantonCSDeps[Depl
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 
-	deps := dependencies.CantonDeps{
-		Chain: chain,
-	}
-
-	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, deps, config.Config.Params)
+	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployChainContracts, chain, config.Config.Params)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to execute DeployChainContracts sequence: %w", err)
 	}

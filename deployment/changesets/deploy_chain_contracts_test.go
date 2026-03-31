@@ -23,7 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 )
@@ -92,7 +92,7 @@ func TestDeployChainContracts(t *testing.T) {
 		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
 		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
 	}
-	versionTag := "49ff34ed"
+	versionTag := "e9a05a20"
 	_ = ccvSignerPubKeys // The signers are set during lane deployment
 	// ccvID := versionTag + "@" + user.PrimaryParty
 
@@ -129,13 +129,15 @@ func TestDeployChainContracts(t *testing.T) {
 						CursedSubjects: nil,
 					},
 				},
+				NativeInstrumentId: splice_api_token_holding_v1.InstrumentId{
+					Admin: types.PARTY(ccipOwnerParty),
+					Id:    "LINK",
+				},
 			},
 		},
 	}
 
-	deployChainContracts := DeployChainContracts{}
-
-	out, err := deployChainContracts.Apply(*env, config)
+	out, err := DeployChainContracts{}.Apply(*env, config)
 	require.NoError(t, err)
 
 	addresses := out.DataStore.Addresses().Filter()

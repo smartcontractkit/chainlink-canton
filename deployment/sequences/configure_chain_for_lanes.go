@@ -3,201 +3,265 @@ package sequences
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
+	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
-func normalizeConfiguredOnRamp(onRamp []byte) (string, error) {
-	raw := onRamp
-	if len(onRamp) > 0 {
-		maybeHex := strings.TrimPrefix(string(onRamp), "0x")
-		if len(maybeHex)%2 == 0 && maybeHex != "" && strings.IndexFunc(maybeHex, func(r rune) bool {
-			return !strings.ContainsRune("0123456789abcdefABCDEF", r)
-		}) == -1 {
-			decoded, err := hex.DecodeString(maybeHex)
+// cantonFeeQuoterUSDPerUnitGas formats V2Params.USDPerUnitGas for Canton FeeQuoter UpdatePrices.
+// DAML stores this as Decimal (CCIP.FeeQuoterTypes.GasPriceUpdate). chainlink-ccip models it as *big.Int
+// for cross-family tooling; on Canton that integer is scaled by 1e10 USD per gas unit (integration
+// parity: 38 -> 0.0000000038, matching historical ApplyFeeTokenUpdates+UpdatePrices tests).
+func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
+	if v == nil || v.Sign() == 0 {
+		return types.NUMERIC("0")
+	}
+	const scale int64 = 10_000_000_000 // 1e10
+	r := new(big.Rat).SetFrac(new(big.Int).Set(v), big.NewInt(scale))
+	s := strings.TrimRight(strings.TrimRight(r.FloatString(20), "0"), ".")
+	if s == "" || s == "-" {
+		return types.NUMERIC("0")
+	}
+
+	return types.NUMERIC(s)
+}
+
+var ConfigureLaneLegAsSource = operations.NewSequence(
+	"CantonConfigureLaneLegAsSource",
+	semver.MustParse("2.0.0"),
+	"Configures a lane leg as source on CCIP 2.0.0",
+	func(b operations.Bundle, deps chain.BlockChains, input lanes.UpdateLanesInput) (output sequences.OnChainOutput, err error) {
+		b.Logger.Infof("Canton Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
+
+		chain, ok := deps.CantonChains()[input.Source.Selector]
+		if !ok {
+			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.Source.Selector)
+		}
+
+		sourceChain := input.Source
+		destChain := input.Dest
+
+		// GlobalConfig - Dest Chain Config
+		globalConfigAddress := contracts.HexToInstanceAddress(sourceChain.CantonLaneConfig.GlobalConfig.Address)
+		isEnabled := len(destChain.Router) > 0
+		defaultExecutor, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.DefaultExecutor)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("getting default executor: %w", err)
+		}
+		defaultExecutorBinding := defaultExecutor.Binding()
+		laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
+		for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
+			outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 			if err != nil {
-				return "", fmt.Errorf("failed to decode onramp hex bytes %q: %w", string(onRamp), err)
+				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated outbound CCV: %w", err)
 			}
-			raw = decoded
+			laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, outboundCCV.Binding())
 		}
-	}
-	if len(raw) > 32 {
-		return "", fmt.Errorf("onramp address exceeds 32 bytes: %d", len(raw))
-	}
-
-	return hex.EncodeToString(gethcommon.LeftPadBytes(raw, 32)), nil
-}
-
-// TODO should align this with the EVM changesets if possible? Currently, these field are hardcoded
-type ConfigureChainForLanesInput struct {
-	// The selector of the chain being configured.
-	ChainSelector uint64
-	// The GlobalConfig address on the chain being configured.
-	GlobalConfig contracts.InstanceAddress
-	// The FeeQuoter address on the chain being configured.
-	FeeQuoter contracts.InstanceAddress
-	// The OnRamp address on the chain being configured.
-	// Similarly, we assume that all connections will use the same OnRamp.
-	OnRamp contracts.InstanceAddress
-	// The OffRamp address on the chain being configured
-	OffRamp contracts.InstanceAddress
-
-	// The CommitteeVerifiers on the chain being configured.
-	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]
-	// The configuration for each remote chain that we want to connect to.
-	RemoteChains map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]
-}
-
-var ConfigureChainForLanes = operations.NewSequence(
-	"canton/ccip/configure_chain_for_lanes",
-	semver.MustParse("1.7.0"),
-	"Configures a Canton chain as a source & destination for multiple remote chains",
-	// TODO change deps to cldf_chain.BlockChains once clients are added
-	func(b operations.Bundle, deps dependencies.CantonDeps, input ConfigureChainForLanesInput) (sequences.OnChainOutput, error) {
-
-		// Create inputs for each operation
-		globalConfigSourceChainConfigArgs := make([]common.SourceChainConfigArgs, 0, len(input.RemoteChains))
-		globalConfigDestChainConfigArgs := make([]common.DestChainConfigArgs, 0, len(input.RemoteChains))
-		feeQuoterDestChainConfigArgs := make([]feequoter.DestChainConfigArgs2, 0, len(input.RemoteChains))
-
-		for remoteSelector, remoteConfig := range input.RemoteChains {
-			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
-
-			// Inbound / OffRamp
-			defaultInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.DefaultInboundCCVs))
-			for _, ccv := range remoteConfig.DefaultInboundCCVs {
-				defaultInboundCCVs = append(defaultInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+		defaultOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.DefaultOutboundCCVs))
+		for _, ccv := range sourceChain.DefaultOutboundCCVs {
+			outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated outbound CCV: %w", err)
 			}
-			laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedInboundCCVs))
-			for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
-				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
-			}
-			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamps))
-			for _, onRamp := range remoteConfig.OnRamps {
-				// EVM messages encode source addresses as 32-byte left-padded values, so we must
-				// normalize configured remote onramps to that same shape or OffRamp validation will reject them.
-				normalizedOnRamp, err := normalizeConfiguredOnRamp(onRamp)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to normalize onramp for remote chain %d: %w", remoteSelector, err)
-				}
-				onRamps = append(onRamps, types.TEXT(normalizedOnRamp))
-			}
-			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.SourceChainConfigArgs{
-				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
-				IsEnabled:           types.BOOL(remoteConfig.AllowTrafficFrom),
-				OnRampAddresses:     onRamps,
-				LaneMandatedCCVs:    laneMandatedInboundCCVs,
-				DefaultCCVs:         defaultInboundCCVs,
-			})
-
-			defaultOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.DefaultOutboundCCVs))
-			for _, ccv := range remoteConfig.DefaultOutboundCCVs {
-				defaultOutboundCCVs = append(defaultOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
-			}
-			laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedOutboundCCVs))
-			for _, ccv := range remoteConfig.LaneMandatedOutboundCCVs {
-				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
-			}
-			defaultExecutor := mcms.RawInstanceAddress{Unpack: types.TEXT(remoteConfig.DefaultExecutor)}
-
-			// Outbound / OnRamp
-			globalConfigDestChainConfigArgs = append(globalConfigDestChainConfigArgs, common.DestChainConfigArgs{
-				DestChainSelector:         types.NUMERIC(remoteSelectorStr),
-				IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
-				AddressBytesLength:        types.INT64(remoteConfig.AddressBytesLength),
-				TokenReceiverAllowed:      types.BOOL(true), // TODO this is missing from the input
-				BaseExecutionGasCost:      types.INT64(remoteConfig.BaseExecutionGasCost),
-				OffRampAddress:            types.TEXT(hex.EncodeToString(remoteConfig.OffRamp)), // Remote chain off-ramp for outbound execution
-				DefaultExecutor:           &defaultExecutor,
-				LaneMandatedCCVs:          laneMandatedOutboundCCVs,
-				DefaultCCVs:               defaultOutboundCCVs,
-				MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),
-				TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)), // TODO: check if this is accurate
-			})
-
-			fqConfig := remoteConfig.FeeQuoterDestChainConfig
-			feeQuoterDestChainConfigArgs = append(feeQuoterDestChainConfigArgs, feequoter.DestChainConfigArgs2{
-				DestChainSelector: types.NUMERIC(remoteSelectorStr),
-				DestChainConfig: feequoter.DestChainConfig2{
-					IsEnabled:                   types.BOOL(fqConfig.IsEnabled),
-					MaxDataBytes:                types.INT64(fqConfig.MaxDataBytes),
-					MaxPerMsgGasLimit:           types.INT64(fqConfig.MaxPerMsgGasLimit),
-					DestGasOverhead:             types.INT64(fqConfig.DestGasOverhead),
-					DestGasPerPayloadByteBase:   types.INT64(fqConfig.DestGasPerPayloadByteBase),
-					DefaultTxGasLimit:           types.INT64(fqConfig.DefaultTxGasLimit),
-					LinkFeeMultiplierPercent:    types.NUMERIC(strconv.FormatUint(uint64(fqConfig.LinkFeeMultiplierPercent), 10)),
-					DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatUint(uint64(fqConfig.DefaultTokenFeeUSDCents), 10)),
-					DefaultTokenDestGasOverhead: types.INT64(fqConfig.DefaultTokenDestGasOverhead),
+			defaultOutboundCCVs = append(defaultOutboundCCVs, outboundCCV.Binding())
+		}
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("getting global config dest chain config args: %w", err)
+		}
+		_, err = operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[common.ApplyDestChainConfigUpdates]{
+			InstanceAddress: globalConfigAddress,
+			Args: common.ApplyDestChainConfigUpdates{
+				DestChainConfigUpdates: []common.DestChainConfigArgs{
+					{
+						DestChainSelector:         types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
+						IsEnabled:                 types.BOOL(isEnabled),
+						AddressBytesLength:        types.INT64(destChain.AddressBytesLength),
+						TokenReceiverAllowed:      true, // TODO: missing from input
+						BaseExecutionGasCost:      types.INT64(destChain.BaseExecutionGasCost),
+						OffRampAddress:            types.TEXT(hex.EncodeToString(destChain.OffRamp)),
+						DefaultExecutor:           &defaultExecutorBinding,
+						LaneMandatedCCVs:          laneMandatedOutboundCCVs,
+						DefaultCCVs:               defaultOutboundCCVs,
+						MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatUint(uint64(destChain.MessageNetworkFeeUSDCents), 10)),
+						TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatUint(uint64(destChain.TokenNetworkFeeUSDCents), 10)),
+					},
 				},
-			})
-		}
-
-		// Apply SourceChainConfigs to GlobalConfig
-		_, err := operations.ExecuteOperation(b, global_config.ApplySourceChainConfigUpdates, deps, contract.ChoiceInput[common.ApplySourceChainConfigUpdates]{
-			ChainSelector:   deps.Chain.Selector,
-			InstanceAddress: input.GlobalConfig,
-			ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
-			Args: common.ApplySourceChainConfigUpdates{
-				SourceChainConfigUpdates: globalConfigSourceChainConfigArgs,
 			},
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to global config: %w", err)
 		}
 
-		// Apply signature configs to CommitteeVerifiers
-		for _, verifierConfig := range input.CommitteeVerifiers {
-			_, err := operations.ExecuteSequence(b, ConfigureCommitteeVerifierForLanes, deps, ConfigureCommitteeVerifierForLanesInput{
-				ChainSelector:           input.ChainSelector,
+		// Executor - Dest Chain Config
+		executorAddress := contracts.HexToInstanceAddress(sourceChain.DefaultExecutor.Address)
+		_, err = operations.ExecuteOperation(b, executor2.ApplyDestChainUpdates, chain, contract.ChoiceInput[executor.ApplyDestChainUpdates]{
+			InstanceAddress: executorAddress,
+			Args: executor.ApplyDestChainUpdates{
+				DestChainSelectorsToRemove: nil,
+				DestChainSelectorsToAdd: []executor.RemoteChainConfigArgs{
+					{
+						DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
+						Config: executor.RemoteChainConfig{
+							FeeUSDCents: types.NUMERIC(strconv.FormatUint(uint64(destChain.ExecutorDestChainConfig.USDCentsFee), 10)),
+							Enabled:     types.BOOL(destChain.ExecutorDestChainConfig.Enabled),
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to executor: %w", err)
+		}
+
+		// FeeQuoter - Dest Chain Config
+		feeQuoterAddress := contracts.BytesToInstanceAddress(sourceChain.FeeQuoter)
+		_, err = operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
+			InstanceAddress: feeQuoterAddress,
+			Args: feequoter.ApplyDestChainConfigUpdates2{
+				DestChainConfigArgs: []feequoter.DestChainConfigArgs2{
+					{
+						DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
+						DestChainConfig: feequoter.DestChainConfig2{
+							IsEnabled:                   types.BOOL(destChain.FeeQuoterDestChainConfig.IsEnabled),
+							MaxDataBytes:                types.INT64(destChain.FeeQuoterDestChainConfig.MaxDataBytes),
+							MaxPerMsgGasLimit:           types.INT64(destChain.FeeQuoterDestChainConfig.MaxPerMsgGasLimit),
+							DestGasOverhead:             types.INT64(destChain.FeeQuoterDestChainConfig.DestGasOverhead),
+							DestGasPerPayloadByteBase:   types.INT64(destChain.FeeQuoterDestChainConfig.DestGasPerPayloadByteBase),
+							DefaultTxGasLimit:           types.INT64(destChain.FeeQuoterDestChainConfig.DefaultTxGasLimit),
+							LinkFeeMultiplierPercent:    types.NUMERIC(strconv.FormatUint(uint64(destChain.FeeQuoterDestChainConfig.V2Params.LinkFeeMultiplierPercent), 10)),
+							DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatUint(uint64(destChain.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)),
+							DefaultTokenDestGasOverhead: types.INT64(destChain.FeeQuoterDestChainConfig.DefaultTokenDestGasOverhead),
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to fee quoter: %w", err)
+		}
+
+		// FeeQuoter - Update prices (gas prices only, as these are per dest chain)
+		_, err = operations.ExecuteOperation(b, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
+			InstanceAddress: feeQuoterAddress,
+			Args: feequoter.UpdatePrices{
+				PriceUpdates: feequoter.PriceUpdates{
+					TokenPriceUpdates: nil,
+					GasPriceUpdates: []feequoter.GasPriceUpdate{
+						{
+							DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
+							UsdPerUnitGas: cantonFeeQuoterUSDPerUnitGas(
+								destChain.FeeQuoterDestChainConfig.V2Params.USDPerUnitGas),
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("updating gas prices in fee quoter: %w", err)
+		}
+
+		// CommitteeVerifier - Dest Chain Config
+		for _, verifierConfig := range input.Source.CommitteeVerifiers {
+			_, err = operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsSource, deps, ConfigureCommitteeVerifierAsSourceInput{
+				ChainSelector:           chain.Selector,
 				CommitteeVerifierConfig: verifierConfig,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier for lanes: %w", err)
+				return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as source: %w", err)
 			}
 		}
 
-		// Apply DestChainConfigs to GlobalConfig
-		_, err = operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, deps, contract.ChoiceInput[common.ApplyDestChainConfigUpdates]{
-			ChainSelector:   deps.Chain.Selector,
-			InstanceAddress: input.GlobalConfig,
-			ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
-			Args: common.ApplyDestChainConfigUpdates{
-				DestChainConfigUpdates: globalConfigDestChainConfigArgs,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply dest chain config updates: %w", err)
+		return sequences.OnChainOutput{}, nil
+	},
+)
+
+var ConfigureLaneLegAsDest = operations.NewSequence(
+	"CantonConfigureLaneLegAsDest",
+	semver.MustParse("2.0.0"),
+	"Configures a lane lad as dest on CCIP 2.0.0",
+	func(b operations.Bundle, deps chain.BlockChains, input lanes.UpdateLanesInput) (output sequences.OnChainOutput, err error) {
+		b.Logger.Infof("Canton Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
+
+		chain, ok := deps.CantonChains()[input.Dest.Selector]
+		if !ok {
+			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.Source.Selector)
 		}
 
-		// Apply DestChainConfigs to FeeQuoter
-		_, err = operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, deps, contract.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
-			ChainSelector:   deps.Chain.Selector,
-			InstanceAddress: input.FeeQuoter,
-			ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
-			Args: feequoter.ApplyDestChainConfigUpdates2{
-				DestChainConfigArgs: feeQuoterDestChainConfigArgs,
+		sourceChain := input.Source
+		destChain := input.Dest
+
+		// GlobalConfig - Source Chain Config
+		globalConfigAddress := contracts.HexToInstanceAddress(destChain.CantonLaneConfig.GlobalConfig.Address)
+		laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(destChain.LaneMandatedInboundCCVs))
+		for _, ccv := range destChain.LaneMandatedInboundCCVs {
+			inboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated inbound CCV: %w", err)
+			}
+			laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, inboundCCV.Binding())
+		}
+		defaultInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(destChain.DefaultInboundCCVs))
+		for _, ccv := range destChain.DefaultInboundCCVs {
+			inboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated inbound CCV: %w", err)
+			}
+			defaultInboundCCVs = append(defaultInboundCCVs, inboundCCV.Binding())
+		}
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("getting global config dest chain config args: %w", err)
+		}
+		// TODO input doesn't support multiple OnRamps
+		// TODO Must pad EVM addresses to 32 bytes
+		inboundOnRampAddresses := []types.TEXT{
+			types.TEXT(hex.EncodeToString(gethcommon.LeftPadBytes(sourceChain.OnRamp, 32))),
+		}
+		_, err = operations.ExecuteOperation(b, global_config.ApplySourceChainConfigUpdates, chain, contract.ChoiceInput[common.ApplySourceChainConfigUpdates]{
+			InstanceAddress: globalConfigAddress,
+			Args: common.ApplySourceChainConfigUpdates{
+				SourceChainConfigUpdates: []common.SourceChainConfigArgs{
+					{
+						SourceChainSelector: types.NUMERIC(strconv.FormatUint(sourceChain.Selector, 10)),
+						IsEnabled:           types.BOOL(!input.IsDisabled),
+						OnRampAddresses:     inboundOnRampAddresses,
+						DefaultCCVs:         defaultInboundCCVs,
+						LaneMandatedCCVs:    laneMandatedInboundCCVs,
+					},
+				},
 			},
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply fee quoter dest chain config updates: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("applying source chain config updates to global config: %w", err)
+		}
+
+		// CommitteeVerifier - Source Chain Config
+		for _, verifierConfig := range input.Dest.CommitteeVerifiers {
+			_, err = operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsDest, deps, ConfigureCommitteeVerifierAsDestInput{
+				ChainSelector:           chain.Selector,
+				CommitteeVerifierConfig: verifierConfig,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as dest: %w", err)
+			}
 		}
 
 		return sequences.OnChainOutput{}, nil

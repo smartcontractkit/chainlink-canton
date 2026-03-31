@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -22,7 +23,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -37,6 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -57,6 +60,11 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
+
+	// Import to register lane adapters
+	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+
+	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 type lnrTokenPoolReceiveFlowTestCase struct {
@@ -181,6 +189,11 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), tokenMetadataClient)
 	require.NoError(t, err)
 
+	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(registryAdmin),
+		Id:    types.TEXT("Amulet"),
+	}
+
 	// Token Setup
 	// Mint tokens to Token Pool Owner (these will be "locked" in the pool)
 	poolHoldingCid, err := testhelpers.MintAMT(t.Context(), tokenPoolOwnerParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partyTokenPoolOwner, "100.00")
@@ -209,8 +222,8 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
-	versionTag := "49ff34ed"
-	ccvQualifier := "default"
+	versionTag := "e9a05a20"
+	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
@@ -261,6 +274,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 						CursedSubjects: nil,
 					},
 				},
+				NativeInstrumentId: nativeInstrumentId,
 			},
 		},
 	})
@@ -621,72 +635,56 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create EDS client")
 
-	// Deploy and configure lane
-	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
-	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
+	// Deploy and configure lane (CCIP 2.0 lanes sequence, same as ccip_execute_test)
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
-	out, err = changesets.ConfigureChainForLanes{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.ConfigureChainForLanesConfig]{
-		ChainSelector: env.Chain.ChainSelector(),
-		Participant:   0,
-		Config: changesets.ConfigureChainForLanesConfig{
-			Input: sequences.ConfigureChainForLanesInput{
-				ChainSelector: env.Chain.ChainSelector(),
-				GlobalConfig:  contracts.HexToInstanceAddress(globalConfig.Address),
-				FeeQuoter:     contracts.HexToInstanceAddress(feeQuoter.Address),
-				OnRamp:        contracts.HexToInstanceAddress(onRamp.Address),
-				OffRamp:       contracts.HexToInstanceAddress(offRamp.Address),
-				CommitteeVerifiers: []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
-					{
-						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
-							remoteSelector: {
-								AllowlistEnabled:   false,
-								FeeUSDCents:        50,
-								GasForVerification: 50_000,
-								PayloadSizeBytes:   6*64 + 2*32,
-								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
-									Signers:   ccvSignerPubKeys,
-									Threshold: 2,
-								},
+	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
+	require.Truef(t, ok, "failed to get Canton Lane adapter")
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsDest(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
+		Source: &lanes.ChainDefinition{
+			Selector: remoteSelector,
+			OnRamp:   hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+			OffRamp:  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+		},
+		Dest: &lanes.ChainDefinition{
+			Selector: env.Chain.ChainSelector(),
+			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+				{
+					CommitteeVerifier: []datastore.AddressRef{committeeVerifier},
+					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+						remoteSelector: {
+							AllowlistEnabled:          false,
+							AddedAllowlistedSenders:   nil,
+							RemovedAllowlistedSenders: nil,
+							FeeUSDCents:               50,
+							GasForVerification:        50_000,
+							PayloadSizeBytes:          6*64 + 2*32,
+							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+								Signers:   ccvSignerPubKeys,
+								Threshold: 2,
 							},
 						},
 					},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
-					remoteSelector: {
-						AllowTrafficFrom:         true,
-						OnRamps:                  [][]byte{hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd")},
-						OffRamp:                  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
-						DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
-						LaneMandatedInboundCCVs:  nil,
-						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
-						LaneMandatedOutboundCCVs: nil,
-						DefaultExecutor:          "",
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
-							IsEnabled:                   true,
-							MaxDataBytes:                50000,
-							MaxPerMsgGasLimit:           4000000,
-							DestGasOverhead:             300000,
-							DestGasPerPayloadByteBase:   16,
-							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
-							DefaultTxGasLimit:           200000,
-							LinkFeeMultiplierPercent:    90,
-							DefaultTokenFeeUSDCents:     0,
-							DefaultTokenDestGasOverhead: 34000,
-							NetworkFeeUSDCents:          0,
-						},
-						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
-						AddressBytesLength:      20,
-						BaseExecutionGasCost:    0,
-					},
-				},
+			},
+			LaneMandatedInboundCCVs: []datastore.AddressRef{committeeVerifier},
+			DefaultInboundCCVs:      nil,
+			CantonLaneConfig: &lanes.CantonLaneConfig{
+				GlobalConfig: globalConfig,
 			},
 		},
+		IsDisabled:   false,
+		TestRouter:   false,
+		ExtraConfigs: lanes.ExtraConfigs{},
 	})
 	require.NoErrorf(t, err, "Failed to configure chain for lanes")
-	err = out.DataStore.Merge(cldfEnv.DataStore)
-	require.NoError(t, err)
-	cldfEnv.DataStore = out.DataStore.Seal()
+	runningDs := datastore.NewMemoryDataStore()
+	for _, address := range deployLaneLegReport.Output.Addresses {
+		err = runningDs.Addresses().Add(address)
+		require.NoErrorf(t, err, "Failed to add address %s", address.Address)
+	}
+	err = runningDs.Merge(cldfEnv.DataStore)
+	require.NoErrorf(t, err, "Failed to merge datastore")
+	cldfEnv.DataStore = runningDs.Seal()
 	t.Log("Configured chain for lanes")
 
 	// wait for EDS to start up

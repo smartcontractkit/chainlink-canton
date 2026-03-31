@@ -25,7 +25,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -68,14 +67,9 @@ func TestDeployTokenPool(t *testing.T) {
 		logger.Test(t),
 		reporter,
 	)
-	deps := dependencies.CantonDeps{
-		Chain: *cantonChain,
-	}
 
 	// Deploy TAR so we have an instance address for register-with-TAR
-	tarAddrRef, err := cld_ops.ExecuteOperation(bundle, token_admin_registry.Deploy, deps, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
-		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
-		ActAs:         []string{party},
+	tarAddrRef, err := cld_ops.ExecuteOperation(bundle, token_admin_registry.Deploy, *cantonChain, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
 		Template: tokenadminregistry.TokenAdminRegistry{
 			Owner:        types.PARTY(party),
 			InstanceId:   "",

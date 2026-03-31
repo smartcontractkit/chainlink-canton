@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 
@@ -50,6 +52,12 @@ var UpdatePrices = contract.NewExercise(contract.ExerciseParams[feequoter.Update
 	Validate: func(input feequoter.UpdatePrices) error {
 		// TODO add validation
 		return nil
+	},
+	Modifier: func(chain canton.Chain, input feequoter.UpdatePrices) (feequoter.UpdatePrices, error) {
+		// Automatically set the caller
+		input.Caller = types.PARTY(chain.Participants[0].PartyID)
+
+		return input, nil
 	},
 	Template: feequoter.FeeQuoter{},
 	Method:   feequoter.FeeQuoter{}.UpdatePrices,

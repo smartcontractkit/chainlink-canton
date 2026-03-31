@@ -9,10 +9,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -22,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -101,8 +100,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	ref, err := in.CLDF.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(
 			evmDetails.ChainSelector,
-			datastore.ContractType(committee_verifier.ResolverType),
-			semver.MustParse(committee_verifier.Deploy.Version()),
+			datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+			semver.MustParse(versioned_verifier_resolver.Deploy.Version()),
 			common.DefaultCommitteeVerifierQualifier,
 		),
 	)

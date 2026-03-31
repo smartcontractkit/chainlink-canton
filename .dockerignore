@@ -1,0 +1,15 @@
+.git
+.github
+.codex
+
+# Local/editor/runtime artifacts
+.DS_Store
+*.log
+
+# DAML build directories are not needed for the Go committee verifier image build.
+contracts/.daml
+contracts/**/.daml
+
+# Local development environments and test data are extremely large and not needed to build
+# cmd/committeeverifier.
+ccip/devenv

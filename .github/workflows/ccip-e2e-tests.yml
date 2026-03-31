@@ -1,7 +1,7 @@
 name: CCIP E2E Tests
 on:
   push:
-    branches: [ develop, main ]
+    branches: [develop, main]
   pull_request:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -33,7 +33,7 @@ jobs:
         with:
           repository: smartcontractkit/chainlink-ccv
           path: chainlink-ccv
-          ref: a321c061748a578742b98ff4bdcb869c3b01976c
+          ref: 8750badddcc373d7281e92af90572ec9ef91738d
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -65,7 +65,7 @@ jobs:
         working-directory: chainlink-ccv/build/devenv
         run: |
           # Build all dependent services docker images
-          just build-docker
+          just build-docker-dev-ci
         env:
           DOCKER_BUILDKIT: 1
 
@@ -97,7 +97,7 @@ jobs:
           go test -timeout 8m -v -count 1 -run TestCanton2EVM_Basic
         continue-on-error: true
         id: test_run_canton2evm_basic
-      
+
       - name: Run CCIP TestIntegration_SourceReader_CurseDetection test
         working-directory: chainlink-canton/ccip/devenv/tests/integration
         run: |
