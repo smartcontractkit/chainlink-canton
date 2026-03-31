@@ -54,9 +54,9 @@ data GetFeeResult = GetFeeResult
     with
         -- Final amount payable in the selected fee token, including CCV fees,
         -- token-pool fee, CCIP network fee, executor flat fee, and execution gas cost.
-        feeTokenAmount : Numeric 0
+        feeTokenAmount : Decimal
         -- Token amount deducted by the pool's bps fee, if this is a token transfer.
-        poolFeeTokenAmount : Numeric 0
+        poolFeeTokenAmount : Decimal
     deriving (Eq, Show)
 
 lookupVerifierArgs
@@ -203,10 +203,12 @@ template CCIPSender
                 let poolFeeTokenAmount = case message.tokenTransfer of
                         None -> 0.0
                         Some tt ->
-                            CCIP.Math.mulDivDown tt.amount poolFeeBps 10000.0
+                            let amountN0 = CCIP.Math.decimalToNumeric0 tt.amount
+                                feeN0 = CCIP.Math.mulDivDown amountN0 poolFeeBps 10000.0
+                            in CCIP.Math.numeric0ToDecimal feeN0
 
                 pure GetFeeResult with
-                    feeTokenAmount = quote.feeTokenAmount
+                    feeTokenAmount = CCIP.Math.numeric0ToDecimal quote.feeTokenAmount
                     poolFeeTokenAmount = poolFeeTokenAmount
 
         nonconsuming choice Send : CCIP.PerPartyRouter.CCIPSendResult

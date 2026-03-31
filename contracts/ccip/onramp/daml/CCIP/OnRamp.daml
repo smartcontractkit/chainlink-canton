@@ -783,7 +783,7 @@ template OnRamp
                         assertMsg "sourceTokenAddress mismatch"
                             (tt.sourceTokenAddress == expectedTokenAddr)
                         assertMsg "token amount mismatch"
-                            (tt.amount == tsd.amount)
+                            (CCIP.Math.decimalToNumeric0 tt.amount == tsd.amount)
                         let _ = validateDestChainAddress tsd.destTokenAddress destConfig.addressBytesLength
                         pure()
                     (None, None) -> pure ()

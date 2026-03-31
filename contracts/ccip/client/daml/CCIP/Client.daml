@@ -17,8 +17,7 @@ data Canton2AnyMessage = Canton2AnyMessage
 data TokenTransfer = TokenTransfer
     with
         token : Splice.Api.Token.HoldingV1.InstrumentId
-        -- TODO: change to Decimal
-        amount : Numeric 0
+        amount : Decimal
     deriving (Eq, Show)
 
 data CCVExtraArg = CCVExtraArg

@@ -12,6 +12,7 @@ import CCIP.TokenAdminRegistryCodec (decodeSetPoolParamsWithOffset, decodePropos
 import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..))
 
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -397,7 +398,7 @@ template TokenAdminRegistry
                     maybeTicketReceiver = Some ticketReceiver
                     maybeTokenReceiver = Some resolvedTokenReceiver
                     maybeInstrumentId = Some config.instrumentId
-                    maybeAmount = Some tt.amount
+                    maybeAmount = Some (CCIP.Math.decimalToNumeric0 tt.amount)
                     returnData = returnData
 
         interface instance MCMSReceiver for TokenAdminRegistry where
