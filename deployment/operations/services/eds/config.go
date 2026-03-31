@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -14,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -98,15 +98,11 @@ var BuildConfig = operations.NewOperation(
 			}
 		}
 
-		// token pools
+		// Token pools on Canton are LockReleaseTokenPool (not EVM BurnMintTokenPool).
 		refs = env.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
-			// TODO: this should be lock release token pool, we don't have burn/mint on Canton?
-			datastore.AddressRefByType(datastore.ContractType(burn_mint_token_pool.ContractType)),
+			datastore.AddressRefByType(datastore.ContractType(lock_release_token_pool.ContractType)),
 		)
-		if len(refs) == 0 {
-			return GenerateEDSConfigOutput{}, fmt.Errorf("no TokenPool contracts found in datastore")
-		}
 		tokenPools := make([]edsConfig.TokenPoolContracts, len(refs))
 		for i, ref := range refs {
 			tokenPools[i] = edsConfig.TokenPoolContracts{
