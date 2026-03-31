@@ -34,6 +34,7 @@ func (m *multiFlag) Set(v string) error {
 		return fmt.Errorf("value cannot be empty")
 	}
 	*m = append(*m, v)
+
 	return nil
 }
 
@@ -199,6 +200,7 @@ func resolvePrimaryParty(ctx context.Context, timeout time.Duration, userClient 
 	if party == "" {
 		return "", fmt.Errorf("user %s has no primary party", userID)
 	}
+
 	return party, nil
 }
 
@@ -226,6 +228,7 @@ func parseTemplates(inputs []string) ([]contracts.TemplateID, error) {
 		seen[tpl.String()] = struct{}{}
 		out = append(out, tpl)
 	}
+
 	return out, nil
 }
 
@@ -266,6 +269,7 @@ func listActiveContracts(ctx context.Context, timeout time.Duration, stateClient
 			if errors.Is(err, io.EOF) {
 				break
 			}
+
 			return nil, fmt.Errorf("recv active contracts: %w", err)
 		}
 
@@ -289,6 +293,7 @@ func listActiveContracts(ctx context.Context, timeout time.Duration, stateClient
 	slices.SortFunc(matches, func(a, b activeContractMatch) int {
 		return a.CreatedAt.Compare(b.CreatedAt)
 	})
+
 	return matches, nil
 }
 
@@ -299,6 +304,7 @@ func filterByContractID(matches []activeContractMatch, contractIDs map[string]st
 			filtered = append(filtered, match)
 		}
 	}
+
 	return filtered
 }
 
@@ -328,6 +334,7 @@ func archiveContract(ctx context.Context, timeout time.Duration, commandClient a
 	if resp.GetTransaction() == nil {
 		return "", nil
 	}
+
 	return resp.GetTransaction().GetUpdateId(), nil
 }
 
