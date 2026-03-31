@@ -49,6 +49,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("getting default executor: %w", err)
 		}
+		defaultExecutorBinding := defaultExecutor.Binding()
 		laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
 		for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
 			outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
@@ -72,14 +73,14 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			InstanceAddress: globalConfigAddress,
 			Args: common.ApplyDestChainConfigUpdates{
 				DestChainConfigUpdates: []common.DestChainConfigArgs{
-					common.DestChainConfigArgs{
+					{
 						DestChainSelector:         types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
 						IsEnabled:                 types.BOOL(isEnabled),
 						AddressBytesLength:        types.INT64(destChain.AddressBytesLength),
 						TokenReceiverAllowed:      true, // TODO: missing from input
 						BaseExecutionGasCost:      types.INT64(destChain.BaseExecutionGasCost),
 						OffRampAddress:            types.TEXT(hex.EncodeToString(destChain.OffRamp)),
-						DefaultExecutor:           defaultExecutor.Binding(),
+						DefaultExecutor:           &defaultExecutorBinding,
 						LaneMandatedCCVs:          laneMandatedOutboundCCVs,
 						DefaultCCVs:               defaultOutboundCCVs,
 						MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatUint(uint64(destChain.MessageNetworkFeeUSDCents), 10)),
@@ -119,7 +120,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			InstanceAddress: feeQuoterAddress,
 			Args: feequoter.ApplyDestChainConfigUpdates2{
 				DestChainConfigArgs: []feequoter.DestChainConfigArgs2{
-					feequoter.DestChainConfigArgs2{
+					{
 						DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
 						DestChainConfig: feequoter.DestChainConfig2{
 							IsEnabled:                   types.BOOL(destChain.FeeQuoterDestChainConfig.IsEnabled),

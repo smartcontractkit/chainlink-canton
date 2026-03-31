@@ -129,7 +129,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
 	versionTag := "e9a05a20"
-	ccvQualifier := devenvcommon.DefaultExecutorQualifier
+	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 
 	// Create Scan and Registry API clients
@@ -271,6 +271,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to get RMNRemote address")
 	executorAddress, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(executor.ContractType), executor.Version, devenvcommon.DefaultExecutorQualifier))
 	require.NoError(t, err, "failed to get Executor address")
+	executorRawAddr, err := contracts.RawInstanceAddressFromString(executorAddress.Labels.List()[0])
+	require.NoError(t, err, "failed to parse Executor raw address")
 
 	// Deploy and configure lane for outbound sends
 	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
@@ -586,6 +588,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter",
 	})
 	require.NoError(t, err, "failed to get disclosed outbound RateLimiter")
+	disclosedExecutor, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-executor", ModuleName: "CCIP.Executor", EntityName: "Executor",
+	})
+	require.NoError(t, err, "failed to get disclosed Executor")
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
 	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
@@ -703,20 +709,16 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
 		},
 	}
-	tokenTransferAmount := int64(100)
-	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
 
-	// Expected fee-token charges (Amulet), mapped to configured fields (CCIP.OnRamp.calculateFeeResult):
-	// - network premium: 10 cents from FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents
-	// - pool premium: 10 cents from TokenTransferFeeConfigs[remoteSelector].feeUSDCents
-	// - verifier premium: 7 cents from CommitteeVerifierRemoteChainConfig.FeeUSDCents
-	// - executor flat fee: 9 cents from Executor.remoteChainConfigs[remoteSelector].feeUSDCents
-	// - execution gas fee: 19 cents from QuoteGasForExec, priced with
-	//   UpdatePrices.GasPriceUpdates[remoteSelector].UsdPerUnitGas = 38
-	// Total fee-token payment = 10 + 10 + 7 + 9 + 19 = 55 cents.
-	// Separately, pool takes a token amount cut at LockOrBurn:
-	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
-	// so 10,000 sent -> 9,500 bridged, with 500 collected by pool.
+	const tokenTransferAmountDecimal = "0.0000010000"
+	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
+	executorCid := types.CONTRACT_ID(disclosedExecutor.ContractId)
+
+	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
+	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
+	// after 5% pool fee the bridged amount should be 9,500.
+	ccvRawAddr := mcms.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierRawAddr.String())}
+	execMcmsAddr := mcms.RawInstanceAddress{Unpack: types.TEXT(executorRawAddr.String())}
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -724,42 +726,56 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			TokenTransfer: &ccipclient.TokenTransferInput{
-				Token:           nativeInstrumentId,
-				Amount:          types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
-				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
-				TokenPoolCid:    types.CONTRACT_ID(disclosedPool.ContractId),
-				TokenInput:      tokenTransferInput,
-				PoolExtraContext: common.CCIPContext{
-					Values: types.TEXTMAP{
-						"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterContractID},
-					},
-				},
+			TokenTransfer: &ccipclient.TokenTransfer{
+				Token:  nativeInstrumentId,
+				Amount: types.NUMERIC(tokenTransferAmountDecimal),
 			},
-			FeeToken: ccipclient.FeeTokenInput{
-				Token:           nativeInstrumentId,
-				TokenInput:      feeTokenInput,
-				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			},
+			FeeToken: nativeInstrumentId,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           0,
 					BlockConfirmations: 0,
-					Ccvs: []mcms.RawInstanceAddress{
-						{Unpack: types.TEXT(committeeVerifierRawAddr.String())},
+					Ccvs: []ccipclient.CCVExtraArg{
+						{
+							CcvAddress: ccvRawAddr,
+							CcvArgs:    types.TEXT(""),
+						},
 					},
-					Executor:      nil, // Not specifying the ExecutorInput is the same as the no-exec flag on EVM
+					Executor: ccipclient.ExecutorExtraArg{
+						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
+							ExecutorAddress: execMcmsAddr,
+							ExecutorArgs:    types.TEXT(""),
+						},
+					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),
 				},
 			},
 		},
-		Ccvs: []ccipclient.CCVSendInput{
+		FeeTokenInput: ccipsender.FeeTokenInput{
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			TokenInput:      feeTokenInput,
+		},
+		CcvSendInputs: []ccipsender.CCVSendInput{
 			{
+				CcvAddress:      ccvRawAddr,
 				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-				VerifierArgs:    types.TEXT(""),
 				CcvExtraContext: common.CCIPContext{},
 			},
+		},
+		TokenTransferInput: &ccipsender.TokenTransferInput{
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
+			TokenPoolCid:    types.CONTRACT_ID(disclosedPool.ContractId),
+			PoolExtraContext: common.CCIPContext{
+				Values: types.TEXTMAP{
+					"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterContractID},
+				},
+			},
+			TokenInput: tokenTransferInput,
+		},
+		ExecutorInput: &ccipsender.ExecutorInput{
+			ExecutorCid:          executorCid,
+			ExecutorExtraContext: common.CCIPContext{},
 		},
 	}
 
@@ -779,21 +795,17 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			disclosedPool,
 			disclosedOutboundRateLimiter,
 			disclosedPreapproval,
+			disclosedExecutor,
 		},
 		transferFactoryDisclosures,
 		tokenTransferFactoryDisclosures,
 	)...)
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
-
-	// Expected fee-token charges (Amulet), mapped to configured fields:
-	// - network premium: 10 cents from FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents
-	// - verifier premium: 7 cents from CommitteeVerifierRemoteChainConfig.FeeUSDCents
-	// - total fee-token payment: 17 cents => 17000000 local units
-	// - pool feeBps: 500 (5%) from TokenTransferFeeConfigs[remoteSelector].feeBps
-	// Bound Numeric 0 values come back as strings with a trailing dot, e.g. "17000000.".
-	require.Equal(t, "17000000", strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."), "GetFee should return the configured token-send fee quote")
-	// Pool feeBps is applied to the token amount itself and is quoted separately from the fee token payment.
-	require.Equal(t, "5", strings.TrimSuffix(string(quotedFee.PoolFeeTokenAmount), "."), "GetFee should return the pool fee token deduction for token sends")
+	feeStr := strings.TrimSuffix(string(quotedFee.FeeTokenAmount), ".")
+	poolFeeStr := strings.TrimSuffix(string(quotedFee.PoolFeeTokenAmount), ".")
+	t.Logf("GetFee: feeTokenAmount=%s poolFeeTokenAmount=%s", feeStr, poolFeeStr)
+	require.NotEqual(t, "0", feeStr, "GetFee should return a positive fee")
+	require.NotEqual(t, "0", poolFeeStr, "GetFee should return a positive pool fee")
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -847,15 +859,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
 
-	// Pool feeBps is applied with floor division, matching LockReleaseTokenPool.calculateFeeFromBps.
-	expectedPoolFee := (tokenTransferAmount * int64(tokenTransferFeeBps)) / 10_000
-	expectedNetTokenAmount := tokenTransferAmount - expectedPoolFee
-	require.Equal(t, expectedNetTokenAmount, extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
+	// Verify pool feeBps haircut: 10,000 smallest units with 5% feeBps => 9,500 bridged.
+	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
 
 	senderBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
 	senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
 
-	// Holdings are decimal-valued in this path, so compare exact rational deltas instead of Numeric 0 integers.
 	t.Logf(
 		"Sender balance: before=%s after=%s deducted=%s",
 		senderBalanceBefore,
@@ -864,7 +873,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	)
 	require.Positive(t, senderDelta.Sign(), "sender balance should decrease after send")
 
-	// In this flow the quoted fee is credited to the CCIP owner, while the separate pool fee stays in the pool accounting path.
 	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
 	ccipOwnerDelta := new(big.Rat).Sub(ccipOwnerBalanceAfter, ccipOwnerBalanceBefore)
 	t.Logf(

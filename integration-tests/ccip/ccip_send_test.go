@@ -254,6 +254,8 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
 	executorAddress, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(executor.ContractType), executor.Version, devenvcommon.DefaultExecutorQualifier))
 	require.NoError(t, err, "failed to get Executor address")
+	executorRawAddr, err := contracts.RawInstanceAddressFromString(executorAddress.Labels.List()[0])
+	require.NoError(t, err, "failed to parse Executor raw address")
 
 	// Deploy and configure lane for outbound sends
 	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
@@ -440,10 +442,10 @@ func TestCCIPSend(t *testing.T) {
 
 	t.Logf("partySender=%q", partySender)
 
-	// Mint 100 whole AMT in local 1e8 units so the sender can cover non-zero fees.
+	// Mint Amulet so the sender can cover non-zero fees (amount in holdings Numeric units per env).
 	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
-	t.Logf("Minted 100 whole Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
+	t.Logf("Minted Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -547,6 +549,8 @@ func TestCCIPSend(t *testing.T) {
 		},
 	}
 
+	ccvRawAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierRawAddr.String())}
+	execMcmsAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(executorRawAddr.String())}
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -554,33 +558,42 @@ func TestCCIPSend(t *testing.T) {
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			FeeToken: ccipclient.FeeTokenInput{
-				Token:           nativeInstrumentId,
-				TokenInput:      feeTokenInput,
-				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			},
+			FeeToken: nativeInstrumentId,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           100_000,
 					BlockConfirmations: 0,
-					Ccvs: []mcmsbindings.RawInstanceAddress{
-						{Unpack: types.TEXT(committeeVerifierRawAddr.String())},
+					Ccvs: []ccipclient.CCVExtraArg{
+						{
+							CcvAddress: ccvRawAddr,
+							CcvArgs:    types.TEXT(""),
+						},
 					},
-					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:  executorCid,
-						ExecutorArgs: types.TEXT(""),
+					Executor: ccipclient.ExecutorExtraArg{
+						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
+							ExecutorAddress: execMcmsAddr,
+							ExecutorArgs:    types.TEXT(""),
+						},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),
 				},
 			},
 		},
-		Ccvs: []ccipclient.CCVSendInput{
+		FeeTokenInput: ccipsender.FeeTokenInput{
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			TokenInput:      feeTokenInput,
+		},
+		CcvSendInputs: []ccipsender.CCVSendInput{
 			{
+				CcvAddress:      ccvRawAddr,
 				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-				VerifierArgs:    types.TEXT(""),
 				CcvExtraContext: common.CCIPContext{},
 			},
+		},
+		ExecutorInput: &ccipsender.ExecutorInput{
+			ExecutorCid:          executorCid,
+			ExecutorExtraContext: common.CCIPContext{},
 		},
 	}
 

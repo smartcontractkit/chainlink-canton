@@ -41,6 +41,7 @@ import CCIP.Codec (
     encodeInstrumentId,
     decodeInstrumentId,
     )
+import CCIP.Math qualified
 
 -- ===============================================
 -- |          ApplyPriceUpdatersUpdate           |
@@ -77,12 +78,12 @@ encodePriceUpdates priceUpdates =
 encodeTokenPriceUpdate : TokenPriceUpdate -> BytesHex
 encodeTokenPriceUpdate tpu =
     encodeInstrumentId tpu.instrumentId <>
-    encodeNumeric0 tpu.usdPerToken
+    encodeNumeric0 (CCIP.Math.decimalToNumeric0 tpu.usdPerToken)
 
 encodeGasPriceUpdate : GasPriceUpdate -> BytesHex
 encodeGasPriceUpdate gpu =
     encodeNumeric0 gpu.destChainSelector <>
-    encodeNumeric0 gpu.usdPerUnitGas
+    encodeNumeric0 (CCIP.Math.decimalToNumeric0 gpu.usdPerUnitGas)
 
 -- Decode
 
@@ -104,7 +105,8 @@ decodePriceUpdatesAt encoded offset = do
 decodeTokenPriceUpdateAt : BytesHex -> Int -> Optional (TokenPriceUpdate, Int)
 decodeTokenPriceUpdateAt encoded offset = do
     (instrumentId, offset1) <- decodeInstrumentId encoded offset
-    (usdPerToken, finalOffset) <- decodeNumeric0At encoded offset1
+    (usdPerTokenN0, finalOffset) <- decodeNumeric0At encoded offset1
+    let usdPerToken = CCIP.Math.numeric0ToDecimal usdPerTokenN0
     Some (TokenPriceUpdate with
             instrumentId
             usdPerToken
@@ -113,7 +115,8 @@ decodeTokenPriceUpdateAt encoded offset = do
 decodeGasPriceUpdateAt : BytesHex -> Int -> Optional (GasPriceUpdate, Int)
 decodeGasPriceUpdateAt encoded offset = do
     (destChainSelector, offset1) <- decodeNumeric0At encoded offset
-    (usdPerUnitGas, finalOffset) <- decodeNumeric0At encoded offset1
+    (usdPerUnitGasN0, finalOffset) <- decodeNumeric0At encoded offset1
+    let usdPerUnitGas = CCIP.Math.numeric0ToDecimal usdPerUnitGasN0
     Some (GasPriceUpdate with
             destChainSelector
             usdPerUnitGas

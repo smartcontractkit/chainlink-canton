@@ -8,6 +8,7 @@ import (
 
 	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -27,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "fb44b9126e346a1bdb6ccdf839ed16ef05c545934abe47948b8bd58ca714329c"
+	PackageID   = "1f867ef65d2302076fe3bc1c893eab44854a5aa58cb9be80163f3a5dd110dadb"
 	SDKVersion  = "3.4.10"
 )
 
@@ -221,7 +222,7 @@ type FeeCalculationInputs struct {
 	PoolGas             types.INT64                              `json:"poolGas"`
 	PoolBytes           types.INT64                              `json:"poolBytes"`
 	ExecutorFeeUSDCents types.NUMERIC                            `json:"executorFeeUSDCents"`
-	ExecutionMode       common.ExecutionMode                     `json:"executionMode"`
+	HasExecutorFee      types.BOOL                               `json:"hasExecutorFee"`
 }
 
 // ToMap converts FeeCalculationInputs to a map for DAML arguments
@@ -258,13 +259,7 @@ func (t FeeCalculationInputs) ToMap() map[string]any {
 
 	m["executorFeeUSDCents"] = t.ExecutorFeeUSDCents
 
-	m["executionMode"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutionMode).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutionMode
-	}()
+	m["hasExecutorFee"] = bool(t.HasExecutorFee)
 
 	return m
 }
@@ -416,19 +411,15 @@ func (t *FinalizeFeeFromRouter) UnmarshalHex(data string) error {
 
 // GetFeeFromRouter is a Record type
 type GetFeeFromRouter struct {
-	RouterPartyOwner    types.PARTY                              `json:"routerPartyOwner"`
-	RouterInstanceId    types.TEXT                               `json:"routerInstanceId"`
-	GlobalConfigCid     types.CONTRACT_ID                        `json:"globalConfigCid"`
-	FeeQuoterCid        types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	DestChainSelector   types.NUMERIC                            `json:"destChainSelector"`
-	Payload             types.TEXT                               `json:"payload"`
-	CcipReceiveGasLimit types.INT64                              `json:"ccipReceiveGasLimit"`
-	QuotedCCVFees       []common.CCVFee                          `json:"quotedCCVFees"`
-	QuotedTokenSendFee  *common.TokenSendFee                     `json:"quotedTokenSendFee" hex:"optional"`
-	QuotedExecutionMode common.ExecutionMode                     `json:"quotedExecutionMode"`
-	QuotedExecutorFee   *common.ExecutorFee                      `json:"quotedExecutorFee" hex:"optional"`
-	ExecutorArgs        types.TEXT                               `json:"executorArgs"`
-	FeeToken            splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	RouterPartyOwner  types.PARTY                         `json:"routerPartyOwner"`
+	RouterInstanceId  types.TEXT                          `json:"routerInstanceId"`
+	GlobalConfigCid   types.CONTRACT_ID                   `json:"globalConfigCid"`
+	FeeQuoterCid      types.CONTRACT_ID                   `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                       `json:"destChainSelector"`
+	Message           client.Canton2AnyMessage            `json:"message"`
+	CcvFeeQuotes      []common.CrossChainVerifierFeeQuote `json:"ccvFeeQuotes"`
+	TokenPoolFeeQuote *interfaces.TokenPoolFeeQuote       `json:"tokenPoolFeeQuote" hex:"optional"`
+	ExecutorFeeQuote  *common.ExecutorFeeQuote            `json:"executorFeeQuote" hex:"optional"`
 }
 
 // ToMap converts GetFeeFromRouter to a map for DAML arguments
@@ -457,13 +448,17 @@ func (t GetFeeFromRouter) ToMap() map[string]any {
 
 	m["destChainSelector"] = t.DestChainSelector
 
-	m["payload"] = string(t.Payload)
+	m["message"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
 
-	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	m["quotedCCVFees"] = func() []any {
-		res := make([]any, 0, len(t.QuotedCCVFees))
-		for _, e := range t.QuotedCCVFees {
+	m["ccvFeeQuotes"] = func() []any {
+		res := make([]any, 0, len(t.CcvFeeQuotes))
+		for _, e := range t.CcvFeeQuotes {
 			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
@@ -474,45 +469,27 @@ func (t GetFeeFromRouter) ToMap() map[string]any {
 		return res
 	}()
 
-	if t.QuotedTokenSendFee != nil {
-		m["quotedTokenSendFee"] = map[string]any{
+	if t.TokenPoolFeeQuote != nil {
+		m["tokenPoolFeeQuote"] = map[string]any{
 			"_type": "optional",
-			"value": *t.QuotedTokenSendFee,
+			"value": *t.TokenPoolFeeQuote,
 		}
 	} else {
-		m["quotedTokenSendFee"] = map[string]any{
+		m["tokenPoolFeeQuote"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
-	m["quotedExecutionMode"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.QuotedExecutionMode).(mapper); ok {
-			return m.toMap()
-		}
-		return t.QuotedExecutionMode
-	}()
-
-	if t.QuotedExecutorFee != nil {
-		m["quotedExecutorFee"] = map[string]any{
+	if t.ExecutorFeeQuote != nil {
+		m["executorFeeQuote"] = map[string]any{
 			"_type": "optional",
-			"value": *t.QuotedExecutorFee,
+			"value": *t.ExecutorFeeQuote,
 		}
 	} else {
-		m["quotedExecutorFee"] = map[string]any{
+		m["executorFeeQuote"] = map[string]any{
 			"_type": "optional",
 		}
 	}
-
-	m["executorArgs"] = string(t.ExecutorArgs)
-
-	m["feeToken"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeToken
-	}()
 
 	return m
 }
@@ -575,14 +552,16 @@ func (t *GetFeeFromRouterResult) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetRequiredCCVsForSend is a Record type
-type GetRequiredCCVsForSend struct {
-	GlobalConfigCid   types.CONTRACT_ID `json:"globalConfigCid"`
-	DestChainSelector types.NUMERIC     `json:"destChainSelector"`
+// GetRequiredCCVsForSendFromRouter is a Record type
+type GetRequiredCCVsForSendFromRouter struct {
+	GlobalConfigCid       types.CONTRACT_ID         `json:"globalConfigCid"`
+	DestChainSelector     types.NUMERIC             `json:"destChainSelector"`
+	Message               client.Canton2AnyMessage  `json:"message"`
+	TokenPoolRequiredCCVs []mcms.RawInstanceAddress `json:"tokenPoolRequiredCCVs"`
 }
 
-// ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
-func (t GetRequiredCCVsForSend) ToMap() map[string]any {
+// ToMap converts GetRequiredCCVsForSendFromRouter to a map for DAML arguments
+func (t GetRequiredCCVsForSendFromRouter) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["globalConfigCid"] = func() any {
@@ -595,27 +574,48 @@ func (t GetRequiredCCVsForSend) ToMap() map[string]any {
 
 	m["destChainSelector"] = t.DestChainSelector
 
+	m["message"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["tokenPoolRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.TokenPoolRequiredCCVs))
+		for _, e := range t.TokenPoolRequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
 	return m
 }
 
-func (t GetRequiredCCVsForSend) MarshalJSON() ([]byte, error) {
+func (t GetRequiredCCVsForSendFromRouter) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *GetRequiredCCVsForSend) UnmarshalJSON(data []byte) error {
+func (t *GetRequiredCCVsForSendFromRouter) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes GetRequiredCCVsForSend to hex string (Canton MCMS format)
-func (t GetRequiredCCVsForSend) MarshalHex() (string, error) {
+// MarshalHex encodes GetRequiredCCVsForSendFromRouter to hex string (Canton MCMS format)
+func (t GetRequiredCCVsForSendFromRouter) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes GetRequiredCCVsForSend from hex string (Canton MCMS format)
-func (t *GetRequiredCCVsForSend) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetRequiredCCVsForSendFromRouter from hex string (Canton MCMS format)
+func (t *GetRequiredCCVsForSendFromRouter) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -804,6 +804,27 @@ func (t OnRamp) GetFeeFromRouterWithPackageID(contractID string, packageID strin
 	}
 }
 
+// GetRequiredCCVsForSendFromRouter exercises the GetRequiredCCVsForSendFromRouter choice on this OnRamp contract
+// This method uses the package name in the template ID
+func (t OnRamp) GetRequiredCCVsForSendFromRouter(contractID string, args GetRequiredCCVsForSendFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVsForSendFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetRequiredCCVsForSendFromRouterWithPackageID exercises the GetRequiredCCVsForSendFromRouter choice using the provided package ID instead of package name
+func (t OnRamp) GetRequiredCCVsForSendFromRouterWithPackageID(contractID string, packageID string, args GetRequiredCCVsForSendFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVsForSendFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // SetDeps exercises the SetDeps choice on this OnRamp contract
 // This method uses the package name in the template ID
 func (t OnRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
@@ -821,27 +842,6 @@ func (t OnRamp) SetDepsWithPackageID(contractID string, packageID string, args S
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
 		ContractID: contractID,
 		Choice:     "SetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this OnRamp contract
-// This method uses the package name in the template ID
-func (t OnRamp) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "GetRequiredCCVsForSend",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetRequiredCCVsForSendWithPackageID exercises the GetRequiredCCVsForSend choice using the provided package ID instead of package name
-func (t OnRamp) GetRequiredCCVsForSendWithPackageID(contractID string, packageID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "GetRequiredCCVsForSend",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1201,7 +1201,7 @@ type MCMSEncoder interface {
 	CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error)
 	FinalizeFeeFromRouter(args FinalizeFeeFromRouter) (*bind.EncodedChoice, error)
 	GetFeeFromRouter(args GetFeeFromRouter) (*bind.EncodedChoice, error)
-	GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error)
+	GetRequiredCCVsForSendFromRouter(args GetRequiredCCVsForSendFromRouter) (*bind.EncodedChoice, error)
 	PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error)
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
 	SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error)
@@ -1249,9 +1249,9 @@ func (e *encoder) GetFeeFromRouter(args GetFeeFromRouter) (*bind.EncodedChoice, 
 	return e.EncodeChoiceArgs("GetFeeFromRouter", args)
 }
 
-// GetRequiredCCVsForSend encodes parameters for the GetRequiredCCVsForSend choice.
-func (e *encoder) GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetRequiredCCVsForSend", args)
+// GetRequiredCCVsForSendFromRouter encodes parameters for the GetRequiredCCVsForSendFromRouter choice.
+func (e *encoder) GetRequiredCCVsForSendFromRouter(args GetRequiredCCVsForSendFromRouter) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVsForSendFromRouter", args)
 }
 
 // PrepareSendFromRouter encodes parameters for the PrepareSendFromRouter choice.
