@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "53df6801d3850e6c0ca52ebf82013fb8974175ec41aa56e4f9f7fc44ee5d72bd"
+	PackageID   = "496b207defd82a5edd404ef53b43134357e04fb95e33af0ea630fcbd5e9a3737"
 	SDKVersion  = "3.4.10"
 )
 
@@ -51,6 +51,48 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AcceptAdminParams is a Record type
+type AcceptAdminParams struct {
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+}
+
+// ToMap converts AcceptAdminParams to a map for DAML arguments
+func (t AcceptAdminParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	return m
+}
+
+func (t AcceptAdminParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AcceptAdminParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AcceptAdminParams to hex string (Canton MCMS format)
+func (t AcceptAdminParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AcceptAdminParams from hex string (Canton MCMS format)
+func (t *AcceptAdminParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Get2 is a Record type
@@ -141,6 +183,105 @@ func (t PoolRegistration) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes PoolRegistration from hex string (Canton MCMS format)
 func (t *PoolRegistration) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ProposeAdminParams is a Record type
+type ProposeAdminParams struct {
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	NewAdmin     types.PARTY                              `json:"newAdmin"`
+}
+
+// ToMap converts ProposeAdminParams to a map for DAML arguments
+func (t ProposeAdminParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	return m
+}
+
+func (t ProposeAdminParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ProposeAdminParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ProposeAdminParams to hex string (Canton MCMS format)
+func (t ProposeAdminParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ProposeAdminParams from hex string (Canton MCMS format)
+func (t *ProposeAdminParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetPoolParams is a Record type
+type SetPoolParams struct {
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	TokenPool    *PoolRegistration                        `json:"tokenPool" hex:"optional"`
+}
+
+// ToMap converts SetPoolParams to a map for DAML arguments
+func (t SetPoolParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	if t.TokenPool != nil {
+		m["tokenPool"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenPool,
+		}
+	} else {
+		m["tokenPool"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return m
+}
+
+func (t SetPoolParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetPoolParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetPoolParams to hex string (Canton MCMS format)
+func (t SetPoolParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetPoolParams from hex string (Canton MCMS format)
+func (t *SetPoolParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1510,11 +1651,59 @@ func (t *TokenConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TransferAdminParams is a Record type
+type TransferAdminParams struct {
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	NewAdmin     types.PARTY                              `json:"newAdmin"`
+}
+
+// ToMap converts TransferAdminParams to a map for DAML arguments
+func (t TransferAdminParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	return m
+}
+
+func (t TransferAdminParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TransferAdminParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TransferAdminParams to hex string (Canton MCMS format)
+func (t TransferAdminParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferAdminParams from hex string (Canton MCMS format)
+func (t *TransferAdminParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AcceptAdmin(args AcceptAdminParams) (*bind.EncodedChoice, error)
 	Get2(args Get2) (*bind.EncodedChoice, error)
 	Get2MCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error)
+	ProposeAdmin(args ProposeAdminParams) (*bind.EncodedChoice, error)
+	SetPool(args SetPoolParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryAcceptAdminRole(args TokenAdminRegistryAcceptAdminRole) (*bind.EncodedChoice, error)
 	TokenAdminRegistryAcceptAdminRoleMCMSParams(args TokenAdminRegistryAcceptAdminRoleMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryAddTokenSend(args TokenAdminRegistryAddTokenSend) (*bind.EncodedChoice, error)
@@ -1539,6 +1728,7 @@ type MCMSEncoder interface {
 	TokenAdminRegistrySetPoolMCMSParams(args TokenAdminRegistrySetPoolMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryTransferAdminRole(args TokenAdminRegistryTransferAdminRole) (*bind.EncodedChoice, error)
 	TokenAdminRegistryTransferAdminRoleMCMSParams(args TokenAdminRegistryTransferAdminRoleMCMSParams) (*bind.EncodedChoice, error)
+	TransferAdmin(args TransferAdminParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1568,6 +1758,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
+// AcceptAdmin encodes parameters for the AcceptAdmin choice.
+func (e *encoder) AcceptAdmin(args AcceptAdminParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AcceptAdmin", args)
+}
+
 // Get2 encodes parameters for the Get2 choice.
 func (e *encoder) Get2(args Get2) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("Get2", args)
@@ -1576,6 +1771,16 @@ func (e *encoder) Get2(args Get2) (*bind.EncodedChoice, error) {
 // Get2MCMSParams encodes MCMS parameters (without Caller) for the Get2 choice.
 func (e *encoder) Get2MCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("Get2", args)
+}
+
+// ProposeAdmin encodes parameters for the ProposeAdmin choice.
+func (e *encoder) ProposeAdmin(args ProposeAdminParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ProposeAdmin", args)
+}
+
+// SetPool encodes parameters for the SetPool choice.
+func (e *encoder) SetPool(args SetPoolParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetPool", args)
 }
 
 // TokenAdminRegistryAcceptAdminRole encodes parameters for the TokenAdminRegistryAcceptAdminRole choice.
@@ -1696,6 +1901,11 @@ func (e *encoder) TokenAdminRegistryTransferAdminRole(args TokenAdminRegistryTra
 // TokenAdminRegistryTransferAdminRoleMCMSParams encodes MCMS parameters (without Caller) for the TokenAdminRegistryTransferAdminRole choice.
 func (e *encoder) TokenAdminRegistryTransferAdminRoleMCMSParams(args TokenAdminRegistryTransferAdminRoleMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("TokenAdminRegistryTransferAdminRole", args)
+}
+
+// TransferAdmin encodes parameters for the TransferAdmin choice.
+func (e *encoder) TransferAdmin(args TransferAdminParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("TransferAdmin", args)
 }
 
 // Verify MCMSEncoder interface implementation

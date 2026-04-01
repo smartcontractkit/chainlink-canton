@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "c8999a068390bc3a89b87fdb751ea4757ec5d745dbd2bb3cd22e9ae62b2a1d64"
+	PackageID   = "218e24e5e17dd1914bb3a47e148c4fbd55a38e9da6c3964db522ccf723af6546"
 	SDKVersion  = "3.4.10"
 )
 
@@ -142,6 +142,53 @@ func (t *ApplyDestChainConfigUpdates2) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ApplyDestChainConfigUpdatesParams2 is a Record type
+type ApplyDestChainConfigUpdatesParams2 struct {
+	DestChainConfigArgs []DestChainConfigArgs2 `json:"destChainConfigArgs"`
+}
+
+// ToMap converts ApplyDestChainConfigUpdatesParams2 to a map for DAML arguments
+func (t ApplyDestChainConfigUpdatesParams2) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.DestChainConfigArgs))
+		for _, e := range t.DestChainConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyDestChainConfigUpdatesParams2) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyDestChainConfigUpdatesParams2) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyDestChainConfigUpdatesParams2 to hex string (Canton MCMS format)
+func (t ApplyDestChainConfigUpdatesParams2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyDestChainConfigUpdatesParams2 from hex string (Canton MCMS format)
+func (t *ApplyDestChainConfigUpdatesParams2) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ApplyPriceUpdatersUpdate is a Record type
 type ApplyPriceUpdatersUpdate struct {
 	AddedPriceUpdaters   []types.PARTY `json:"addedPriceUpdaters"`
@@ -189,6 +236,57 @@ func (t ApplyPriceUpdatersUpdate) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplyPriceUpdatersUpdate from hex string (Canton MCMS format)
 func (t *ApplyPriceUpdatersUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplyPriceUpdatersUpdateParams is a Record type
+type ApplyPriceUpdatersUpdateParams struct {
+	AddedPriceUpdaters   []types.PARTY `json:"addedPriceUpdaters"`
+	RemovedPriceUpdaters []types.PARTY `json:"removedPriceUpdaters"`
+}
+
+// ToMap converts ApplyPriceUpdatersUpdateParams to a map for DAML arguments
+func (t ApplyPriceUpdatersUpdateParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["addedPriceUpdaters"] = func() []any {
+		res := make([]any, 0, len(t.AddedPriceUpdaters))
+		for _, e := range t.AddedPriceUpdaters {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	m["removedPriceUpdaters"] = func() []any {
+		res := make([]any, 0, len(t.RemovedPriceUpdaters))
+		for _, e := range t.RemovedPriceUpdaters {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyPriceUpdatersUpdateParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyPriceUpdatersUpdateParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyPriceUpdatersUpdateParams to hex string (Canton MCMS format)
+func (t ApplyPriceUpdatersUpdateParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyPriceUpdatersUpdateParams from hex string (Canton MCMS format)
+func (t *ApplyPriceUpdatersUpdateParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1431,6 +1529,53 @@ func (t *RemoveFeeTokens) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// RemoveFeeTokensParams is a Record type
+type RemoveFeeTokensParams struct {
+	FeeTokensToRemove []splice_api_token_holding_v1.InstrumentId `json:"feeTokensToRemove"`
+}
+
+// ToMap converts RemoveFeeTokensParams to a map for DAML arguments
+func (t RemoveFeeTokensParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["feeTokensToRemove"] = func() []any {
+		res := make([]any, 0, len(t.FeeTokensToRemove))
+		for _, e := range t.FeeTokensToRemove {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemoveFeeTokensParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoveFeeTokensParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoveFeeTokensParams to hex string (Canton MCMS format)
+func (t RemoveFeeTokensParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoveFeeTokensParams from hex string (Canton MCMS format)
+func (t *RemoveFeeTokensParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // RemovePriceUpdaters is a Record type
 type RemovePriceUpdaters struct {
 	Parties []types.PARTY `json:"parties"`
@@ -1665,12 +1810,58 @@ func (t *UpdatePricesMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// UpdatePricesParams is a Record type
+type UpdatePricesParams struct {
+	PriceUpdates PriceUpdates `json:"priceUpdates"`
+	Caller       types.PARTY  `json:"caller"`
+}
+
+// ToMap converts UpdatePricesParams to a map for DAML arguments
+func (t UpdatePricesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["priceUpdates"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.PriceUpdates).(mapper); ok {
+			return m.toMap()
+		}
+		return t.PriceUpdates
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t UpdatePricesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *UpdatePricesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes UpdatePricesParams to hex string (Canton MCMS format)
+func (t UpdatePricesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdatePricesParams from hex string (Canton MCMS format)
+func (t *UpdatePricesParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	AddPriceUpdaters(args AddPriceUpdaters) (*bind.EncodedChoice, error)
 	ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error)
 	ApplyPriceUpdatersUpdate(args ApplyPriceUpdatersUpdate) (*bind.EncodedChoice, error)
+	ApplyPriceUpdatersUpdateParams(args ApplyPriceUpdatersUpdateParams) (*bind.EncodedChoice, error)
 	Get(args Get) (*bind.EncodedChoice, error)
 	GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error)
 	GetDestChainConfig2(args GetDestChainConfig2) (*bind.EncodedChoice, error)
@@ -1686,9 +1877,11 @@ type MCMSEncoder interface {
 	QuoteGasForExec(args QuoteGasForExec) (*bind.EncodedChoice, error)
 	QuoteGasForExecMCMSParams(args QuoteGasForExecMCMSParams) (*bind.EncodedChoice, error)
 	RemoveFeeTokens(args RemoveFeeTokens) (*bind.EncodedChoice, error)
+	RemoveFeeTokensParams(args RemoveFeeTokensParams) (*bind.EncodedChoice, error)
 	RemovePriceUpdaters(args RemovePriceUpdaters) (*bind.EncodedChoice, error)
 	UpdatePrices(args UpdatePrices) (*bind.EncodedChoice, error)
 	UpdatePricesMCMSParams(args UpdatePricesMCMSParams) (*bind.EncodedChoice, error)
+	UpdatePricesParams(args UpdatePricesParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1730,6 +1923,11 @@ func (e *encoder) ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2
 
 // ApplyPriceUpdatersUpdate encodes parameters for the ApplyPriceUpdatersUpdate choice.
 func (e *encoder) ApplyPriceUpdatersUpdate(args ApplyPriceUpdatersUpdate) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyPriceUpdatersUpdate", args)
+}
+
+// ApplyPriceUpdatersUpdateParams encodes parameters for the ApplyPriceUpdatersUpdate choice.
+func (e *encoder) ApplyPriceUpdatersUpdateParams(args ApplyPriceUpdatersUpdateParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyPriceUpdatersUpdate", args)
 }
 
@@ -1808,6 +2006,11 @@ func (e *encoder) RemoveFeeTokens(args RemoveFeeTokens) (*bind.EncodedChoice, er
 	return e.EncodeChoiceArgs("RemoveFeeTokens", args)
 }
 
+// RemoveFeeTokensParams encodes parameters for the RemoveFeeTokens choice.
+func (e *encoder) RemoveFeeTokensParams(args RemoveFeeTokensParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemoveFeeTokens", args)
+}
+
 // RemovePriceUpdaters encodes parameters for the RemovePriceUpdaters choice.
 func (e *encoder) RemovePriceUpdaters(args RemovePriceUpdaters) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("RemovePriceUpdaters", args)
@@ -1820,6 +2023,11 @@ func (e *encoder) UpdatePrices(args UpdatePrices) (*bind.EncodedChoice, error) {
 
 // UpdatePricesMCMSParams encodes MCMS parameters (without Caller) for the UpdatePrices choice.
 func (e *encoder) UpdatePricesMCMSParams(args UpdatePricesMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UpdatePrices", args)
+}
+
+// UpdatePricesParams encodes parameters for the UpdatePrices choice.
+func (e *encoder) UpdatePricesParams(args UpdatePricesParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("UpdatePrices", args)
 }
 

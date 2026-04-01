@@ -4,7 +4,9 @@ module CCIP.OnRampTest.OnRampCodecTest where
 import Daml.Script
 import DA.Assert ((===))
 
-import CCIP.OnRamp
+import CCIP.OnRamp (orderedVerifierDataByCCVs)
+import CCIP.OnRampTypes (OnRampDeps(..), SetDepsParams(..))
+import CCIP.OnRampCodecGen (encodeSetDepsParams, decodeSetDepsParamsAt, encodeOnRampDeps, decodeOnRampDepsAt)
 import MCMS.RawInstanceAddress (RawInstanceAddress(..), make, toInstanceAddress)
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
@@ -23,7 +25,7 @@ testSetDepsParamsRoundtrip_AllSome = do
 
       encoded = encodeSetDepsParams params
 
-  case decodeSetDepsParams encoded of
+  case fst <$> decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (all Some)"
     Some decoded -> decoded === params
 
@@ -40,7 +42,7 @@ testSetDepsParamsRoundtrip_AllNone = do
 
       encoded = encodeSetDepsParams params
 
-  case decodeSetDepsParams encoded of
+  case fst <$> decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (all None)"
     Some decoded -> decoded === params
 
@@ -57,7 +59,7 @@ testSetDepsParamsRoundtrip_Mixed = do
 
       encoded = encodeSetDepsParams params
 
-  case decodeSetDepsParams encoded of
+  case fst <$> decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (mixed)"
     Some decoded -> decoded === params
 
@@ -117,13 +119,13 @@ testOnRampDepsSpecialCharacters = do
 
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
-  case decodeSetDepsParams "" of
+  case decodeSetDepsParamsAt "" 0 of
     None -> pure ()
-    Some _ -> abort "Expected decodeSetDepsParams to fail on empty data"
+    Some _ -> abort "Expected decodeSetDepsParamsAt to fail on empty data"
 
-  case decodeSetDepsParams "ff" of
+  case decodeSetDepsParamsAt "ff" 0 of
     None -> pure ()
-    Some _ -> abort "Expected decodeSetDepsParams to fail on invalid tag"
+    Some _ -> abort "Expected decodeSetDepsParamsAt to fail on invalid tag"
 
   pure ()
 

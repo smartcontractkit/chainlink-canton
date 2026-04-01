@@ -44,3 +44,35 @@ data DestChainConfig = DestChainConfig
         defaultTokenFeeUSD : Numeric 0 --       │ Legacy field name retained; value is integer USD cents.
         defaultTokenDestGasOverhead : Int --  ──╯ Default gas charged to execute a token transfer on the destination chain.
     deriving (Eq, Show)
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- These define the full MCMS payload for each choice, enabling auto-generation
+-- of encode/decode functions in FeeQuoterCodecGen.daml
+-- ===========================================================================
+
+-- | Params for ApplyPriceUpdatersUpdate choice (add/remove price updaters)
+data ApplyPriceUpdatersUpdateParams = ApplyPriceUpdatersUpdateParams
+    with
+        addedPriceUpdaters : [Party]
+        removedPriceUpdaters : [Party]
+    deriving (Eq, Show)
+
+-- | Params for UpdatePrices choice
+data UpdatePricesParams = UpdatePricesParams
+    with
+        priceUpdates : PriceUpdates
+        caller : Party
+    deriving (Eq, Show)
+
+-- | Params for RemoveFeeTokens choice
+data RemoveFeeTokensParams = RemoveFeeTokensParams
+    with
+        feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId]
+    deriving (Eq, Show)
+
+-- | Params for ApplyDestChainConfigUpdates choice
+data ApplyDestChainConfigUpdatesParams = ApplyDestChainConfigUpdatesParams
+    with
+        destChainConfigArgs : [DestChainConfigArgs]
+    deriving (Eq, Show)

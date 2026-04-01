@@ -22,8 +22,27 @@ import DA.Time (time, addRelTime, hours)
 import DA.Foldable (forA_)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.LockReleaseTokenPoolCodec (decodeSetDynamicConfigParams, decodeApplyChainUpdatesParams, decodeApplyTokenTransferFeeConfigUpdatesParams, decodeSetRateLimitConfigParams, decodeSetPoolReceiveContextParams, decodeSetTransferTimeoutParams)
-import CCIP.LockReleaseTokenPoolTypes (TokenTransferFeeConfig(..), RemoteChainConfig(..), ChainUpdate(..), TokenTransferFeeConfigArgs(..), RateLimitConfigArgs(..), TransferTimeout(..))
+import CCIP.LockReleaseTokenPoolCodecGen (
+    decodeSetDynamicConfigParamsAt,
+    decodeApplyChainUpdatesParamsAt,
+    decodeApplyTokenTransferFeeConfigUpdatesParamsAt,
+    decodeSetRateLimitConfigParamsAt,
+    decodeSetTransferTimeoutParamsAt,
+    )
+import CCIP.ContextCodec (decodeCCIPContextAt)
+import CCIP.LockReleaseTokenPoolTypes (
+    TokenTransferFeeConfig(..),
+    RemoteChainConfig(..),
+    ChainUpdate(..),
+    TokenTransferFeeConfigArgs(..),
+    RateLimitConfigArgs(..),
+    TransferTimeout(..),
+    SetDynamicConfigParams(..),
+    ApplyChainUpdatesParams(..),
+    ApplyTokenTransferFeeConfigUpdatesParams(..),
+    SetRateLimitConfigParams(..),
+    SetTransferTimeoutParams(..),
+    )
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -908,42 +927,42 @@ template LockReleaseTokenPool
 
             case functionName of
                 "SetDynamicConfig" -> do
-                    case decodeSetDynamicConfigParams operationData of
+                    case decodeSetDynamicConfigParamsAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: SetDynamicConfig"
-                        Some ((rateLimitAdmin), finalOffset) -> do
+                        Some (SetDynamicConfigParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetDynamicConfig" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid SetDynamicConfig with
                                 rateLimitAdmin
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "ApplyChainUpdates" -> do
-                    case decodeApplyChainUpdatesParams operationData of
+                    case decodeApplyChainUpdatesParamsAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: ApplyChainUpdates"
-                        Some ((remoteChainSelectorsToRemove, chainsToAdd), finalOffset) -> do
+                        Some (ApplyChainUpdatesParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: ApplyChainUpdates" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid ApplyChainUpdates with
                                 remoteChainSelectorsToRemove
                                 chainsToAdd
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "ApplyTokenTransferFeeConfigUpdates" -> do
-                    case decodeApplyTokenTransferFeeConfigUpdatesParams operationData of
+                    case decodeApplyTokenTransferFeeConfigUpdatesParamsAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: ApplyTokenTransferFeeConfigUpdates"
-                        Some ((tokenTransferFeeConfigArgs, disableTokenTransferFeeConfigArgs), finalOffset) -> do
+                        Some (ApplyTokenTransferFeeConfigUpdatesParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: ApplyTokenTransferFeeConfigUpdates" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid ApplyTokenTransferFeeConfigUpdates with
                                 tokenTransferFeeConfigArgs
                                 disableTokenTransferFeeConfigArgs
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "SetRateLimitConfig" -> do
-                  case decodeSetRateLimitConfigParams operationData of
+                  case decodeSetRateLimitConfigParamsAt operationData 0 of
                     None -> abort "E_INVALID_PARAMS: SetRateLimitConfig"
-                    Some ((rateLimitConfigArgs, caller), finalOffset) -> do
+                    Some (SetRateLimitConfigParams{..}, finalOffset) -> do
                         assertMsg "E_TRAILING_BYTES: SetRateLimitConfig" (finalOffset == byteCount operationData)
                         newCid <- exercise selfCid SetRateLimitConfig with
                             rateLimitConfigArgs
                             caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "SetPoolReceiveContext" -> do
-                    case decodeSetPoolReceiveContextParams operationData of
+                    case decodeCCIPContextAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: SetPoolReceiveContext"
                         Some (newPoolReceiveContext, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetPoolReceiveContext" (finalOffset == byteCount operationData)
@@ -951,11 +970,11 @@ template LockReleaseTokenPool
                                 newPoolReceiveContext
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "SetTransferTimeout" -> do
-                    case decodeSetTransferTimeoutParams operationData of
+                    case decodeSetTransferTimeoutParamsAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: SetTransferTimeout"
-                        Some (newTransferTimeout, finalOffset) -> do
+                        Some (SetTransferTimeoutParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetTransferTimeout" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid SetTransferTimeout with
-                                newTransferTimeout
+                                newTransferTimeout = transferTimeout
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

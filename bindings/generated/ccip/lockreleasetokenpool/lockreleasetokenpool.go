@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "162cbdaf04e462cfe199ab5fc9b7349926e11b2642f3b1c8bd809ba3d40c016f"
+	PackageID   = "fb1b29312e63c4f09d16c150fb699e56fe42d98c4fe1274914e0e6cd7fcc0478"
 	SDKVersion  = "3.4.10"
 )
 
@@ -111,6 +111,62 @@ func (t *ApplyChainUpdates) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ApplyChainUpdatesParams is a Record type
+type ApplyChainUpdatesParams struct {
+	RemoteChainSelectorsToRemove []types.NUMERIC `json:"remoteChainSelectorsToRemove"`
+	ChainsToAdd                  []ChainUpdate   `json:"chainsToAdd"`
+}
+
+// ToMap converts ApplyChainUpdatesParams to a map for DAML arguments
+func (t ApplyChainUpdatesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["remoteChainSelectorsToRemove"] = func() []any {
+		res := make([]any, 0, len(t.RemoteChainSelectorsToRemove))
+		for _, e := range t.RemoteChainSelectorsToRemove {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["chainsToAdd"] = func() []any {
+		res := make([]any, 0, len(t.ChainsToAdd))
+		for _, e := range t.ChainsToAdd {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyChainUpdatesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyChainUpdatesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyChainUpdatesParams to hex string (Canton MCMS format)
+func (t ApplyChainUpdatesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyChainUpdatesParams from hex string (Canton MCMS format)
+func (t *ApplyChainUpdatesParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ApplyTokenTransferFeeConfigUpdates is a Record type
 type ApplyTokenTransferFeeConfigUpdates struct {
 	TokenTransferFeeConfigArgs        []TokenTransferFeeConfigArgs `json:"tokenTransferFeeConfigArgs"`
@@ -163,6 +219,62 @@ func (t ApplyTokenTransferFeeConfigUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplyTokenTransferFeeConfigUpdates from hex string (Canton MCMS format)
 func (t *ApplyTokenTransferFeeConfigUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplyTokenTransferFeeConfigUpdatesParams is a Record type
+type ApplyTokenTransferFeeConfigUpdatesParams struct {
+	TokenTransferFeeConfigArgs        []TokenTransferFeeConfigArgs `json:"tokenTransferFeeConfigArgs"`
+	DisableTokenTransferFeeConfigArgs []types.NUMERIC              `json:"disableTokenTransferFeeConfigArgs"`
+}
+
+// ToMap converts ApplyTokenTransferFeeConfigUpdatesParams to a map for DAML arguments
+func (t ApplyTokenTransferFeeConfigUpdatesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenTransferFeeConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.TokenTransferFeeConfigArgs))
+		for _, e := range t.TokenTransferFeeConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["disableTokenTransferFeeConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.DisableTokenTransferFeeConfigArgs))
+		for _, e := range t.DisableTokenTransferFeeConfigArgs {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyTokenTransferFeeConfigUpdatesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyTokenTransferFeeConfigUpdatesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyTokenTransferFeeConfigUpdatesParams to hex string (Canton MCMS format)
+func (t ApplyTokenTransferFeeConfigUpdatesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyTokenTransferFeeConfigUpdatesParams from hex string (Canton MCMS format)
+func (t *ApplyTokenTransferFeeConfigUpdatesParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1880,6 +1992,51 @@ func (t *SetDynamicConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetDynamicConfigParams is a Record type
+type SetDynamicConfigParams struct {
+	RateLimitAdmin *types.PARTY `json:"rateLimitAdmin" hex:"optional"`
+}
+
+// ToMap converts SetDynamicConfigParams to a map for DAML arguments
+func (t SetDynamicConfigParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	if t.RateLimitAdmin != nil {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.RateLimitAdmin).ToMap(),
+		}
+	} else {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return m
+}
+
+func (t SetDynamicConfigParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDynamicConfigParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDynamicConfigParams to hex string (Canton MCMS format)
+func (t SetDynamicConfigParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDynamicConfigParams from hex string (Canton MCMS format)
+func (t *SetDynamicConfigParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetPoolReceiveContext is a Record type
 type SetPoolReceiveContext struct {
 	NewPoolReceiveContext common.CCIPContext `json:"newPoolReceiveContext"`
@@ -1990,6 +2147,56 @@ func (t *SetRateLimitConfigMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetRateLimitConfigParams is a Record type
+type SetRateLimitConfigParams struct {
+	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
+	Caller              types.PARTY           `json:"caller"`
+}
+
+// ToMap converts SetRateLimitConfigParams to a map for DAML arguments
+func (t SetRateLimitConfigParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["rateLimitConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.RateLimitConfigArgs))
+		for _, e := range t.RateLimitConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t SetRateLimitConfigParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetRateLimitConfigParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetRateLimitConfigParams to hex string (Canton MCMS format)
+func (t SetRateLimitConfigParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetRateLimitConfigParams from hex string (Canton MCMS format)
+func (t *SetRateLimitConfigParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetTransferTimeout is a Record type
 type SetTransferTimeout struct {
 	NewTransferTimeout TransferTimeout `json:"newTransferTimeout"`
@@ -2028,6 +2235,48 @@ func (t SetTransferTimeout) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetTransferTimeout from hex string (Canton MCMS format)
 func (t *SetTransferTimeout) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetTransferTimeoutParams is a Record type
+type SetTransferTimeoutParams struct {
+	TransferTimeout TransferTimeout `json:"transferTimeout"`
+}
+
+// ToMap converts SetTransferTimeoutParams to a map for DAML arguments
+func (t SetTransferTimeoutParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["transferTimeout"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TransferTimeout).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TransferTimeout
+	}()
+
+	return m
+}
+
+func (t SetTransferTimeoutParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetTransferTimeoutParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetTransferTimeoutParams to hex string (Canton MCMS format)
+func (t SetTransferTimeoutParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetTransferTimeoutParams from hex string (Canton MCMS format)
+func (t *SetTransferTimeoutParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2195,7 +2444,9 @@ var _ types.VARIANT = (*TransferTimeout)(nil)
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice, error)
+	ApplyChainUpdatesParams(args ApplyChainUpdatesParams) (*bind.EncodedChoice, error)
 	ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error)
+	ApplyTokenTransferFeeConfigUpdatesParams(args ApplyTokenTransferFeeConfigUpdatesParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalculateFee) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetFee(args LockReleaseTokenPoolGetFee) (*bind.EncodedChoice, error)
@@ -2211,10 +2462,13 @@ type MCMSEncoder interface {
 	LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
+	SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error)
 	SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
+	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
 	SetTransferTimeout(args SetTransferTimeout) (*bind.EncodedChoice, error)
+	SetTransferTimeoutParams(args SetTransferTimeoutParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -2249,8 +2503,18 @@ func (e *encoder) ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice
 	return e.EncodeChoiceArgs("ApplyChainUpdates", args)
 }
 
+// ApplyChainUpdatesParams encodes parameters for the ApplyChainUpdates choice.
+func (e *encoder) ApplyChainUpdatesParams(args ApplyChainUpdatesParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyChainUpdates", args)
+}
+
 // ApplyTokenTransferFeeConfigUpdates encodes parameters for the ApplyTokenTransferFeeConfigUpdates choice.
 func (e *encoder) ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyTokenTransferFeeConfigUpdates", args)
+}
+
+// ApplyTokenTransferFeeConfigUpdatesParams encodes parameters for the ApplyTokenTransferFeeConfigUpdates choice.
+func (e *encoder) ApplyTokenTransferFeeConfigUpdatesParams(args ApplyTokenTransferFeeConfigUpdatesParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyTokenTransferFeeConfigUpdates", args)
 }
 
@@ -2329,6 +2593,11 @@ func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, 
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
 }
 
+// SetDynamicConfigParams encodes parameters for the SetDynamicConfig choice.
+func (e *encoder) SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDynamicConfig", args)
+}
+
 // SetPoolReceiveContext encodes parameters for the SetPoolReceiveContext choice.
 func (e *encoder) SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetPoolReceiveContext", args)
@@ -2344,8 +2613,18 @@ func (e *encoder) SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams
 	return e.EncodeChoiceArgs("SetRateLimitConfig", args)
 }
 
+// SetRateLimitConfigParams encodes parameters for the SetRateLimitConfig choice.
+func (e *encoder) SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetRateLimitConfig", args)
+}
+
 // SetTransferTimeout encodes parameters for the SetTransferTimeout choice.
 func (e *encoder) SetTransferTimeout(args SetTransferTimeout) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetTransferTimeout", args)
+}
+
+// SetTransferTimeoutParams encodes parameters for the SetTransferTimeout choice.
+func (e *encoder) SetTransferTimeoutParams(args SetTransferTimeoutParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetTransferTimeout", args)
 }
 

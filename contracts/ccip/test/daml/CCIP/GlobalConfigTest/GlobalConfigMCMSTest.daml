@@ -10,7 +10,14 @@ import DA.Map qualified as Map
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.GlobalConfig
-import CCIP.GlobalConfigCodec
+import CCIP.GlobalConfigCodecGen (
+    encodeApplyDestChainConfigUpdatesParams,
+    encodeApplySourceChainConfigUpdatesParams,
+    )
+import CCIP.GlobalConfigTypes (
+    ApplyDestChainConfigUpdatesParams(..),
+    ApplySourceChainConfigUpdatesParams(..),
+    )
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 cents : Decimal -> Numeric 0
@@ -56,7 +63,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
           tokenNetworkFeeUSDCents = 5.0
         ]
 
-      encoded = encodeApplyDestChainConfigUpdatesParams args
+      encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with destChainConfigArgs = args)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit ccipOwner do
@@ -136,7 +143,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
           tokenNetworkFeeUSDCents = 777.0
         ]
 
-      encoded = encodeApplyDestChainConfigUpdatesParams args
+      encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with destChainConfigArgs = args)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit ccipOwner do
@@ -195,7 +202,7 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
           defaultCCVs = [RawInstanceAddress "src-default@party2"]
         ]
 
-      encoded = encodeApplySourceChainConfigUpdatesParams args
+      encoded = encodeApplySourceChainConfigUpdatesParams (ApplySourceChainConfigUpdatesParams with sourceChainConfigArgs = args)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit ccipOwner do
@@ -245,7 +252,7 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
           defaultCCVs = []
         ]
 
-      encoded = encodeApplySourceChainConfigUpdatesParams args
+      encoded = encodeApplySourceChainConfigUpdatesParams (ApplySourceChainConfigUpdatesParams with sourceChainConfigArgs = args)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit ccipOwner do
@@ -362,7 +369,7 @@ testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
           tokenNetworkFeeUSDCents = 5.0
         ]
 
-      encoded = encodeApplyDestChainConfigUpdatesParams args
+      encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with destChainConfigArgs = args)
 
   -- Call with empty contractIds map - should fail
   submitMustFail ccipOwner do

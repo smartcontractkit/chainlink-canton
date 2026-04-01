@@ -9,6 +9,8 @@ import DA.Map qualified as Map
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.OnRamp
+import CCIP.OnRampTypes (OnRampDeps(..), SetDepsParams(..))
+import CCIP.OnRampCodecGen (encodeSetDepsParams)
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
