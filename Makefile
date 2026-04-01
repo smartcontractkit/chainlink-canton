@@ -38,23 +38,31 @@ test-daml-contracts:
 
 # GolangCI-Lint targets
 
-.PHONY: golangci-lint-main golangci-lint-integration-tests
+.PHONY: golangci-lint-main golangci-lint-integration-tests golangci-lint-party-ceremony golangci-lint-party-ceremony-integration-tests
 golangci-lint-main: ## Run golangci-lint on the main module.
 	golangci-lint run
 golangci-lint-integration-tests: ## Run golangci-lint on the integration-tests module.
 	cd integration-tests && golangci-lint run
+golangci-lint-party-ceremony: ## Run golangci-lint on the party-ceremony module.
+	cd party-ceremony && golangci-lint run
+golangci-lint-party-ceremony-integration-tests: ## Run golangci-lint on the party-ceremony/integration-tests module.
+	cd party-ceremony/integration-tests && golangci-lint run
 
 .PHONY: golangci-lint-all
-golangci-lint-all: golangci-lint-main golangci-lint-integration-tests ## Run golangci-lint on all modules.
+golangci-lint-all: golangci-lint-main golangci-lint-integration-tests golangci-lint-party-ceremony golangci-lint-party-ceremony-integration-tests ## Run golangci-lint on all modules.
 
-.PHONY: golangci-lint-fix-main golangci-lint-fix-integration-tests
+.PHONY: golangci-lint-fix-main golangci-lint-fix-integration-tests golangci-lint-fix-party-ceremony golangci-lint-fix-party-ceremony-integration-tests
 golangci-lint-fix-main: ## Run golangci-lint --fix on the main module.
 	golangci-lint run --fix
 golangci-lint-fix-integration-tests: ## Run golangci-lint --fix on the integration-tests module.
 	cd integration-tests && golangci-lint run --fix
+golangci-lint-fix-party-ceremony: ## Run golangci-lint --fix on the party-ceremony module.
+	cd party-ceremony && golangci-lint run --fix
+golangci-lint-fix-party-ceremony-integration-tests: ## Run golangci-lint --fix on the party-ceremony/integration-tests module.
+	cd party-ceremony/integration-tests && golangci-lint run --fix
 
 .PHONY: golangci-lint-fix-all
-golangci-lint-fix-all: golangci-lint-fix-main golangci-lint-fix-integration-tests ## Run golangci-lint --fix on all modules.
+golangci-lint-fix-all: golangci-lint-fix-main golangci-lint-fix-integration-tests golangci-lint-fix-party-ceremony golangci-lint-fix-party-ceremony-integration-tests ## Run golangci-lint --fix on all modules.
 
 ## Run all fix targets.
 ## Compiles contracts, generates bindings, runs all go generates, runs go mod tidy, and runs golangci-lint --fix on all modules.
