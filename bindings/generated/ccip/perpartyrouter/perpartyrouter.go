@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "8c52b8df6eb9b0f4205d9ef137bd8a0b059cf44d7510a5ea48a4ff4c9b3e5f07"
+	PackageID   = "9285e652c93f7a13e84b705793281da78a902ca187be8856ecb5f3813b36d4a4"
 	SDKVersion  = "3.4.10"
 )
 

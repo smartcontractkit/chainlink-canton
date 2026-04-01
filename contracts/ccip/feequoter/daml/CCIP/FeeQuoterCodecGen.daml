@@ -4,7 +4,7 @@ module CCIP.FeeQuoterCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.FeeQuoterTypes (PriceUpdates(..), TokenPriceUpdate(..), GasPriceUpdate(..), FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..), ApplyPriceUpdatersUpdateParams(..), UpdatePricesParams(..), ApplyFeeTokenUpdatesParams(..), ApplyDestChainConfigUpdatesParams(..))
+import CCIP.FeeQuoterTypes (PriceUpdates(..), TokenPriceUpdate(..), GasPriceUpdate(..), DestChainConfigArgs(..), DestChainConfig(..), ApplyPriceUpdatersUpdateParams(..), UpdatePricesParams(..), RemoveFeeTokensParams(..), ApplyDestChainConfigUpdatesParams(..))
 
 import MCMS.Codec (
     decodeBoolAt,
@@ -72,20 +72,6 @@ decodeGasPriceUpdateAt encoded offset = do
     (destChainSelector, offset) <- decodeNumeric0At encoded offset
     (usdPerUnitGas, offset) <- decodeDecimalAt encoded offset
     Some (GasPriceUpdate{..}, offset)
-
-
--- ===============================================
--- |              FeeTokenArgs
--- ===============================================
-
-encodeFeeTokenArgs : FeeTokenArgs -> BytesHex
-encodeFeeTokenArgs params =
-    encodeInstrumentId params.instrumentId
-
-decodeFeeTokenArgsAt : BytesHex -> Int -> Optional (FeeTokenArgs, Int)
-decodeFeeTokenArgsAt encoded offset = do
-    (instrumentId, offset) <- decodeInstrumentId encoded offset
-    Some (FeeTokenArgs{..}, offset)
 
 
 -- ===============================================
@@ -167,19 +153,17 @@ decodeUpdatePricesParamsAt encoded offset = do
 
 
 -- ===============================================
--- |              ApplyFeeTokenUpdatesParams
+-- |              RemoveFeeTokensParams
 -- ===============================================
 
-encodeApplyFeeTokenUpdatesParams : ApplyFeeTokenUpdatesParams -> BytesHex
-encodeApplyFeeTokenUpdatesParams params =
+encodeRemoveFeeTokensParams : RemoveFeeTokensParams -> BytesHex
+encodeRemoveFeeTokensParams params =
     encodeList params.feeTokensToRemove encodeInstrumentId
-    <> encodeList params.feeTokensToAdd encodeFeeTokenArgs
 
-decodeApplyFeeTokenUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyFeeTokenUpdatesParams, Int)
-decodeApplyFeeTokenUpdatesParamsAt encoded offset = do
+decodeRemoveFeeTokensParamsAt : BytesHex -> Int -> Optional (RemoveFeeTokensParams, Int)
+decodeRemoveFeeTokensParamsAt encoded offset = do
     (feeTokensToRemove, offset) <- decodeList encoded offset decodeInstrumentId
-    (feeTokensToAdd, offset) <- decodeList encoded offset decodeFeeTokenArgsAt
-    Some (ApplyFeeTokenUpdatesParams{..}, offset)
+    Some (RemoveFeeTokensParams{..}, offset)
 
 
 -- ===============================================

@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "dd349c29cf1608370b7968858cf288d9f0c9dac29c915ac136cc448c7ab909c9"
+	PackageID   = "fb1b29312e63c4f09d16c150fb699e56fe42d98c4fe1274914e0e6cd7fcc0478"
 	SDKVersion  = "3.4.10"
 )
 
@@ -667,27 +667,6 @@ func (t LockReleaseTokenPool) ApplyTokenTransferFeeConfigUpdatesWithPackageID(co
 	}
 }
 
-// ApplyChainUpdates exercises the ApplyChainUpdates choice on this LockReleaseTokenPool contract
-// This method uses the package name in the template ID
-func (t LockReleaseTokenPool) ApplyChainUpdates(contractID string, args ApplyChainUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
-		ContractID: contractID,
-		Choice:     "ApplyChainUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyChainUpdatesWithPackageID exercises the ApplyChainUpdates choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) ApplyChainUpdatesWithPackageID(contractID string, packageID string, args ApplyChainUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
-		ContractID: contractID,
-		Choice:     "ApplyChainUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // SetRateLimitConfig exercises the SetRateLimitConfig choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) SetRateLimitConfig(contractID string, args SetRateLimitConfig) *model.ExerciseCommand {
@@ -705,6 +684,27 @@ func (t LockReleaseTokenPool) SetRateLimitConfigWithPackageID(contractID string,
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
 		Choice:     "SetRateLimitConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyChainUpdates exercises the ApplyChainUpdates choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) ApplyChainUpdates(contractID string, args ApplyChainUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "ApplyChainUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyChainUpdatesWithPackageID exercises the ApplyChainUpdates choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) ApplyChainUpdatesWithPackageID(contractID string, packageID string, args ApplyChainUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "ApplyChainUpdates",
 		Arguments:  argsToMap(args),
 	}
 }

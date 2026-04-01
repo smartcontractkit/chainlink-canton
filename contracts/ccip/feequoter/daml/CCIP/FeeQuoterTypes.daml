@@ -65,11 +65,10 @@ data UpdatePricesParams = UpdatePricesParams
         caller : Party
     deriving (Eq, Show)
 
--- | Params for ApplyFeeTokenUpdates choice
-data ApplyFeeTokenUpdatesParams = ApplyFeeTokenUpdatesParams
+-- | Params for RemoveFeeTokens choice
+data RemoveFeeTokensParams = RemoveFeeTokensParams
     with
         feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId]
-        feeTokensToAdd : [FeeTokenArgs]
     deriving (Eq, Show)
 
 -- | Params for ApplyDestChainConfigUpdates choice
