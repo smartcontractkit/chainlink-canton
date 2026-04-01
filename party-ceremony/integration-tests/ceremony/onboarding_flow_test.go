@@ -84,6 +84,7 @@ func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter opera
 	require.NoError(t, err, "actor 1 run 7: ceremony should complete successfully")
 
 	s.PartyID = sr.Output.PartyID
+
 	return sr
 }
 
@@ -106,7 +107,6 @@ func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter opera
 //   - Run  7  (actor  1):    actor 1 proposes P2P (3/3) → confirmed → success.
 func (s *OnboardingFlowTestSuite) TestOnboardingFlow() {
 	t := s.T()
-	t.Parallel()
 
 	// Shared reporter: cached operation results are visible to all actors,
 	// including the idempotency re-run (run 8) below.

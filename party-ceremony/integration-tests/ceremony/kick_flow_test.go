@@ -55,7 +55,6 @@ func (s *KickFlowTestSuite) TestOnboardingFlow() {
 //   - Run 4 (p1): P2P proposal (2/2) → P2P confirmed → SUCCESS.
 func (s *KickFlowTestSuite) TestKickFlow() {
 	t := s.T()
-	t.Parallel()
 
 	actors := s.Actors
 	synchronizerID := s.SynchronizerID

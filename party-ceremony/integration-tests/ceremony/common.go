@@ -101,6 +101,7 @@ func (s *CeremonyTestSuite) DiscoverSynchronizerID(p canton.Participant) string 
 
 	syncID := resp.GetConnectedSynchronizers()[0].GetSynchronizerId()
 	t.Logf("Discovered synchronizer ID: %s", syncID)
+
 	return syncID
 }
 
@@ -123,6 +124,7 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 			AdminServices: &adminServices,
 		}
 	}
+
 	return &canton.Chain{
 		Participants: participants,
 	}, nil
@@ -134,6 +136,7 @@ func getParticipantUID(t *testing.T, c client.CantonClient) string {
 	t.Helper()
 	uid, err := c.GetParticipantUID(t.Context())
 	require.NoError(t, err, "GetParticipantUID failed")
+
 	return uid
 }
 
