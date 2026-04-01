@@ -1,6 +1,9 @@
 .idea
 .vscode
 .DS_Store
+.git
+.github
+.codex
 
 */.daml
 .daml
@@ -9,6 +12,15 @@ navigator.log
 
 go.work
 go.work.sum
+
+# EDS does not depend on the Canton CCIP devenv or its test data.
+ccip
+!ccip/committee_verifier.Dockerfile
+
+# Exclude DAML package build directories and heavyweight generated artifacts
+# that are not needed to compile ./eds/cmd/server.
+contracts/.daml
+contracts/**/.daml
 
 **/eds.Dockerfile
 **/eds.Dockerfile.dockerignore

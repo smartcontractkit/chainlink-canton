@@ -65,3 +65,40 @@ data TransferTimeout
     = Indefinite          -- Use maxTime (year 9999) - for tokens without expiry
     | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
     deriving (Eq, Show)
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- ===========================================================================
+
+-- | Params for SetDynamicConfig choice
+data SetDynamicConfigParams = SetDynamicConfigParams
+    with
+        rateLimitAdmin : Optional Party
+    deriving (Eq, Show)
+
+-- | Params for ApplyChainUpdates choice
+data ApplyChainUpdatesParams = ApplyChainUpdatesParams
+    with
+        remoteChainSelectorsToRemove : [Numeric 0]
+        chainsToAdd : [ChainUpdate]
+    deriving (Eq, Show)
+
+-- | Params for ApplyTokenTransferFeeConfigUpdates choice
+data ApplyTokenTransferFeeConfigUpdatesParams = ApplyTokenTransferFeeConfigUpdatesParams
+    with
+        tokenTransferFeeConfigArgs : [TokenTransferFeeConfigArgs]
+        disableTokenTransferFeeConfigArgs : [Numeric 0]
+    deriving (Eq, Show)
+
+-- | Params for SetRateLimitConfig choice
+data SetRateLimitConfigParams = SetRateLimitConfigParams
+    with
+        rateLimitConfigArgs : [RateLimitConfigArgs]
+        caller : Party
+    deriving (Eq, Show)
+
+-- | Params for SetTransferTimeout choice
+data SetTransferTimeoutParams = SetTransferTimeoutParams
+    with
+        transferTimeout : TransferTimeout
+    deriving (Eq, Show)

@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "3791187341ef553b758fbefd23030b062c8d5f104a7b53ec691d6d1369c90cdd"
+	PackageID   = "77c8b1f99605c7ee50432cdcc3cfb1a7364b1eb67127d9594ceae5cbbc97e7f1"
 	SDKVersion  = "3.4.10"
 )
 
@@ -648,6 +648,53 @@ func (t *ApplyDestChainConfigUpdates) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ApplyDestChainConfigUpdatesParams is a Record type
+type ApplyDestChainConfigUpdatesParams struct {
+	DestChainConfigArgs []DestChainConfigArgs `json:"destChainConfigArgs"`
+}
+
+// ToMap converts ApplyDestChainConfigUpdatesParams to a map for DAML arguments
+func (t ApplyDestChainConfigUpdatesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.DestChainConfigArgs))
+		for _, e := range t.DestChainConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyDestChainConfigUpdatesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyDestChainConfigUpdatesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyDestChainConfigUpdatesParams to hex string (Canton MCMS format)
+func (t ApplyDestChainConfigUpdatesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyDestChainConfigUpdatesParams from hex string (Canton MCMS format)
+func (t *ApplyDestChainConfigUpdatesParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ApplySourceChainConfigUpdates is a Record type
 type ApplySourceChainConfigUpdates struct {
 	SourceChainConfigUpdates []SourceChainConfigArgs `json:"sourceChainConfigUpdates"`
@@ -691,6 +738,53 @@ func (t ApplySourceChainConfigUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplySourceChainConfigUpdates from hex string (Canton MCMS format)
 func (t *ApplySourceChainConfigUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplySourceChainConfigUpdatesParams is a Record type
+type ApplySourceChainConfigUpdatesParams struct {
+	SourceChainConfigArgs []SourceChainConfigArgs `json:"sourceChainConfigArgs"`
+}
+
+// ToMap converts ApplySourceChainConfigUpdatesParams to a map for DAML arguments
+func (t ApplySourceChainConfigUpdatesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sourceChainConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.SourceChainConfigArgs))
+		for _, e := range t.SourceChainConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplySourceChainConfigUpdatesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplySourceChainConfigUpdatesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplySourceChainConfigUpdatesParams to hex string (Canton MCMS format)
+func (t ApplySourceChainConfigUpdatesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplySourceChainConfigUpdatesParams from hex string (Canton MCMS format)
+func (t *ApplySourceChainConfigUpdatesParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1566,7 +1660,7 @@ type DestChainConfig struct {
 	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
-	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
+	DefaultExecutor           *mcms.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
 	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
@@ -1587,13 +1681,16 @@ func (t DestChainConfig) ToMap() map[string]any {
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
-	m["defaultExecutor"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DefaultExecutor).(mapper); ok {
-			return m.toMap()
+	if t.DefaultExecutor != nil {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.DefaultExecutor,
 		}
-		return t.DefaultExecutor
-	}()
+	} else {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -1658,7 +1755,7 @@ type DestChainConfigArgs struct {
 	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
-	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
+	DefaultExecutor           *mcms.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
 	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
@@ -1681,13 +1778,16 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
-	m["defaultExecutor"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DefaultExecutor).(mapper); ok {
-			return m.toMap()
+	if t.DefaultExecutor != nil {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.DefaultExecutor,
 		}
-		return t.DefaultExecutor
-	}()
+	} else {
+		m["defaultExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -4250,6 +4350,7 @@ type SendingMessageV1 struct {
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
 	RequiredCCVs              []mcms.RawInstanceAddress                 `json:"requiredCCVs"`
+	RequiredExecutor          *mcms.RawInstanceAddress                  `json:"requiredExecutor" hex:"optional"`
 	ExecutorAddress           types.TEXT                                `json:"executorAddress"`
 	ExecutionMode             *ExecutionMode                            `json:"executionMode" hex:"optional"`
 	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
@@ -4337,6 +4438,17 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 		}
 		return res
 	}()
+
+	if t.RequiredExecutor != nil {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RequiredExecutor,
+		}
+	} else {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["executorAddress"] = string(t.ExecutorAddress)
@@ -4604,6 +4716,17 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 		return res
 	}()
 
+	if t.RequiredExecutor != nil {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RequiredExecutor,
+		}
+	} else {
+		args["requiredExecutor"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["executorAddress"] = string(t.ExecutorAddress)
 
@@ -4853,27 +4976,6 @@ func (t *SendingMessageV1) UnmarshalHex(data string) error {
 
 // Choice methods for SendingMessageV1
 
-// FinalizeFee exercises the FinalizeFee choice on this SendingMessageV1 contract
-// This method uses the package name in the template ID
-func (t SendingMessageV1) FinalizeFee(contractID string, args FinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FinalizeFeeWithPackageID exercises the FinalizeFee choice using the provided package ID instead of package name
-func (t SendingMessageV1) FinalizeFeeWithPackageID(contractID string, packageID string, args FinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
 func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
@@ -5017,6 +5119,27 @@ func (t SendingMessageV1) AddExecutorFeeWithPackageID(contractID string, package
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "AddExecutorFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFee exercises the FinalizeFee choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) FinalizeFee(contractID string, args FinalizeFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "FinalizeFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFeeWithPackageID exercises the FinalizeFee choice using the provided package ID instead of package name
+func (t SendingMessageV1) FinalizeFeeWithPackageID(contractID string, packageID string, args FinalizeFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "FinalizeFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -6224,7 +6347,9 @@ type MCMSEncoder interface {
 	AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error)
 	AddVerifierDataMCMSParams(args AddVerifierDataMCMSParams) (*bind.EncodedChoice, error)
 	ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) (*bind.EncodedChoice, error)
+	ApplyDestChainConfigUpdatesParams(args ApplyDestChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error)
+	ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	BuildMessage(args BuildMessage) (*bind.EncodedChoice, error)
 	BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
@@ -6326,8 +6451,18 @@ func (e *encoder) ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) 
 	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates", args)
 }
 
+// ApplyDestChainConfigUpdatesParams encodes parameters for the ApplyDestChainConfigUpdates choice.
+func (e *encoder) ApplyDestChainConfigUpdatesParams(args ApplyDestChainConfigUpdatesParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates", args)
+}
+
 // ApplySourceChainConfigUpdates encodes parameters for the ApplySourceChainConfigUpdates choice.
 func (e *encoder) ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplySourceChainConfigUpdates", args)
+}
+
+// ApplySourceChainConfigUpdatesParams encodes parameters for the ApplySourceChainConfigUpdates choice.
+func (e *encoder) ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfigUpdatesParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplySourceChainConfigUpdates", args)
 }
 

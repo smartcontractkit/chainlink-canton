@@ -106,7 +106,7 @@ template OffRamp
                 let defaultCCVs = case sourceConfigOpt of
                         None -> []
                         Some config ->
-                            if null laneMandatedCCVs && null receiverRequiredCCVs
+                            if null receiverRequiredCCVs
                             then config.defaultCCVs
                             else []
 
@@ -389,7 +389,7 @@ template OffRamp
 
             case functionName of
               "SetDeps" -> do
-                case decodeSetDepsParamsWithOffset operationData of
+                case decodeSetDepsParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: SetDeps"
                   Some (newDeps, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: SetDeps" $
@@ -409,16 +409,3 @@ data ExecuteFromRouterResult = ExecuteFromRouterResult
         executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
     deriving (Eq, Show)
 
--- ===========================================================================
--- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
--- Per-record codecs (encodeSetDepsParams, decodeSetDepsParamsAt,
--- encodeOffRampDeps, decodeOffRampDepsAt) imported from OffRampCodecGen.
--- ===========================================================================
-
-decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
-decodeSetDepsParamsWithOffset encoded = decodeSetDepsParamsAt encoded 0
-
-decodeSetDepsParams : BytesHex -> Optional SetDepsParams
-decodeSetDepsParams encoded = do
-  (result, _) <- decodeSetDepsParamsAt encoded 0
-  Some result

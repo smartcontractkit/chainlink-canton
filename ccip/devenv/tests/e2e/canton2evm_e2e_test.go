@@ -5,11 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -19,10 +15,13 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 )
 
 //nolint:paralleltest // we won't run this in parallel.
@@ -81,8 +80,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		executorAddr, err := tcapi.GetContractAddress(
 			in,
 			cantonChain.ChainSelector(),
-			datastore.ContractType(executor.ProxyType),
-			executor.DeployProxy.Version(),
+			datastore.ContractType(executor.ContractType),
+			executor.Version.String(),
 			devenvcommon.DefaultExecutorQualifier,
 			"source executor",
 		)

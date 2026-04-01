@@ -12,7 +12,16 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.Codec (encodePartyList)
 import CCIP.FeeQuoter
-import CCIP.FeeQuoterCodec
+import CCIP.FeeQuoterCodecGen (
+    encodeRemoveFeeTokensParams,
+    encodeApplyDestChainConfigUpdatesParams,
+    )
+import CCIP.FeeQuoterTypes (
+    DestChainConfig(..),
+    DestChainConfigArgs(..),
+    RemoveFeeTokensParams(..),
+    ApplyDestChainConfigUpdatesParams(..),
+    )
 
 usd : Decimal -> Numeric 0
 usd d = intToNumeric (truncate (d * 100000000.0))
@@ -24,12 +33,12 @@ mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
 
 -- ========================================================
--- |        MCMS Entrypoint - ApplyFeeTokenUpdates        |
+-- |          MCMS Entrypoint - RemoveFeeTokens           |
 -- ========================================================
 
--- | Test MCMSReceiver entrypoint for ApplyFeeTokenUpdates function
-testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates : Script ()
-testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
+-- | Test MCMSReceiver entrypoint for RemoveFeeTokens function
+testFeeQuoterMCMSEntrypoint_RemoveFeeTokens : Script ()
+testFeeQuoterMCMSEntrypoint_RemoveFeeTokens = script do
     owner <- allocateParty "ccip_owner"
     tokenAdmin <- allocateParty "TokenAdmin"
 
@@ -53,15 +62,14 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
     let instAddr = RawInstanceAddress.makeText instanceId owner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
-    -- Encode ApplyFeeTokenUpdates params: remove USDC, add LINK
-    let feeTokensToRemove = [instrumentId1]
-        feeTokensToAdd = [FeeTokenArgs instrumentId2]
-        encoded = encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd)
+    -- Encode RemoveFeeTokens params: remove USDC
+    let encoded = encodeRemoveFeeTokensParams (RemoveFeeTokensParams with
+            feeTokensToRemove = [instrumentId1])
 
     -- Call mcmsEntrypoint
-    newContractIds <- submit owner do
+    _newContractIds <- submit owner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "ApplyFeeTokenUpdates"
+            functionName = "RemoveFeeTokens"
             operationData = encoded
             contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
@@ -71,14 +79,14 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
         [(_, fq)] -> do
             -- USDC should be removed
             Set.member instrumentId1 fq.feeTokens === False
-            Set.member instrumentId2 fq.feeTokens === True
+            Set.member instrumentId2 fq.feeTokens === False
         _ -> abort "Expected exactly one FeeQuoter contract"
 
     pure ()
 
--- | Test adding multiple fee tokens
-testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple : Script ()
-testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
+-- | Test removing multiple fee tokens
+testFeeQuoterMCMSEntrypoint_RemoveFeeTokens_Multiple : Script ()
+testFeeQuoterMCMSEntrypoint_RemoveFeeTokens_Multiple = script do
     owner <- allocateParty "ccip_owner"
     tokenAdmin <- allocateParty "TokenAdmin"
 
@@ -87,12 +95,12 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
         instrumentId2 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
         instrumentId3 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "WETH"
 
-    -- Create FeeQuoter with no fee tokens
+    -- Create FeeQuoter with multiple fee tokens
     fqCid <- submit owner do
         createCmd FeeQuoter with
             instanceId
             owner
-            feeTokens = Set.empty
+            feeTokens = Set.fromList [instrumentId1, instrumentId2, instrumentId3]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -103,30 +111,25 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
     let instAddr = RawInstanceAddress.makeText instanceId owner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
-    -- Add multiple fee tokens
-    let feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId] = []
-        feeTokensToAdd = [
-            FeeTokenArgs instrumentId1,
-            FeeTokenArgs instrumentId2,
-            FeeTokenArgs instrumentId3
-            ]
-        encoded = encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd)
+    -- Remove multiple fee tokens
+    let encoded = encodeRemoveFeeTokensParams (RemoveFeeTokensParams with
+            feeTokensToRemove = [instrumentId1, instrumentId2, instrumentId3])
 
     -- Call mcmsEntrypoint
-    newContractIds <- submit owner do
+    _newContractIds <- submit owner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "ApplyFeeTokenUpdates"
+            functionName = "RemoveFeeTokens"
             operationData = encoded
             contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
-    -- Verify all tokens added
+    -- Verify all tokens removed
     contracts <- query @FeeQuoter owner
     case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
         [(_, fq)] -> do
-            Set.size fq.feeTokens === 3
-            Set.member instrumentId1 fq.feeTokens === True
-            Set.member instrumentId2 fq.feeTokens === True
-            Set.member instrumentId3 fq.feeTokens === True
+            Set.size fq.feeTokens === 0
+            Set.member instrumentId1 fq.feeTokens === False
+            Set.member instrumentId2 fq.feeTokens === False
+            Set.member instrumentId3 fq.feeTokens === False
         _ -> abort "Expected exactly one FeeQuoter contract"
 
     pure ()
@@ -170,8 +173,8 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
             defaultTokenFeeUSD = usdToCents 0.5
             defaultTokenDestGasOverhead = 50000
 
-        configArgs = [DestChainConfigArgs 1.0 destConfig]
-        encoded = encodeApplyDestChainConfigUpdatesParams configArgs
+        encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with
+            destChainConfigArgs = [DestChainConfigArgs 1.0 destConfig])
 
     -- Call mcmsEntrypoint
     newContractIds <- submit owner do
@@ -221,12 +224,9 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
     -- Create multiple dest chain configs
     let config1 = DestChainConfig True 65535 3000000 100000 16 200000 100.0 (usdToCents 0.5) 50000
         config2 = DestChainConfig True 32768 1500000 50000 8 100000 90.0 (usdToCents 1.0) 25000
-
-        configArgs = [
-            DestChainConfigArgs 1.0 config1,
-            DestChainConfigArgs 137.0 config2
-            ]
-        encoded = encodeApplyDestChainConfigUpdatesParams configArgs
+        configArgs = [DestChainConfigArgs 1.0 config1, DestChainConfigArgs 137.0 config2]
+        encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with
+            destChainConfigArgs = configArgs)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit owner do
@@ -450,7 +450,7 @@ testFeeQuoterMCMSEntrypoint_InvalidParams = script do
     -- Call with invalid operationData - should fail
     submitMustFail owner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "ApplyFeeTokenUpdates"
+            functionName = "RemoveFeeTokens"
             operationData = "invalid"  -- Not valid encoded data
             contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
@@ -478,7 +478,8 @@ testFeeQuoterMCMSEntrypoint_MissingSelfCid = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Encode valid params
-    let encoded = encodeApplyDestChainConfigUpdatesParams []
+    let encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with
+            destChainConfigArgs = [])
 
     -- Call with empty contractIds map - should fail
     submitMustFail owner do

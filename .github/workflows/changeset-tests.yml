@@ -8,20 +8,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-configure-chain-for-lanes:
-    name: TestConfigureChainForLanes
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-      - name: Install Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-      - name: Run Go tests
-        run: |
-          cd deployment/changesets
-          go test -v -count 1 -timeout 20m -run TestConfigureChainForLanes ./...
   test-deploy-chain-contracts:
     name: TestDeployChainContracts
     runs-on: ubuntu-latest

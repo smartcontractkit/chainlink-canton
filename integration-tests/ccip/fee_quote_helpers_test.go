@@ -2,8 +2,7 @@ package tests
 
 import (
 	"context"
-	"strconv"
-	"strings"
+	"math/big"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -17,6 +16,15 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
 
+// getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
+// Send.ToMap() for every field the GetFee choice accepts (GetFee has no feeTokenInput).
+func getFeeChoiceArgumentMap(sendArgs ccipsender.Send) map[string]any {
+	m := sendArgs.ToMap()
+	delete(m, "feeTokenInput")
+
+	return m
+}
+
 func quoteCCIPSenderFee(
 	t *testing.T,
 	participant canton.Participant,
@@ -27,8 +35,6 @@ func quoteCCIPSenderFee(
 ) ccipsender.GetFeeResult {
 	t.Helper()
 
-	getFeeArgs := ccipsender.GetFee2(sendArgs)
-
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -37,7 +43,7 @@ func quoteCCIPSenderFee(
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
 					ContractId:     ccipSenderCid,
 					Choice:         "GetFee",
-					ChoiceArgument: ledger.MapToValue(getFeeArgs),
+					ChoiceArgument: ledger.MapToValue(getFeeChoiceArgumentMap(sendArgs)),
 				}},
 			}},
 			ActAs:              []string{partySender},
@@ -80,7 +86,7 @@ func quoteCCIPSenderFee(
 	return quote
 }
 
-func getHoldingsBalanceNumeric0(t *testing.T, ctx context.Context, participant canton.Participant) int64 {
+func getHoldingsBalanceNumeric(t *testing.T, ctx context.Context, participant canton.Participant) *big.Rat {
 	t.Helper()
 
 	holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
@@ -88,7 +94,7 @@ func getHoldingsBalanceNumeric0(t *testing.T, ctx context.Context, participant c
 	})
 	require.NoError(t, err)
 
-	var total int64
+	total := new(big.Rat)
 	for _, h := range holdings {
 		views := h.GetCreatedEvent().GetInterfaceViews()
 		if len(views) == 0 {
@@ -99,13 +105,9 @@ func getHoldingsBalanceNumeric0(t *testing.T, ctx context.Context, participant c
 			continue
 		}
 		amountStr := fields[2].GetValue().GetNumeric()
-		intPart, fracPart, hasFrac := strings.Cut(amountStr, ".")
-		if hasFrac {
-			require.Emptyf(t, strings.Trim(fracPart, "0"), "expected integer Numeric 0, got %q", amountStr)
-		}
-		amt, err := strconv.ParseInt(intPart, 10, 64)
-		require.NoError(t, err)
-		total += amt
+		amt, ok := new(big.Rat).SetString(amountStr)
+		require.Truef(t, ok, "invalid Numeric value %q", amountStr)
+		total.Add(total, amt)
 	}
 
 	return total

@@ -4,11 +4,13 @@ module CCIP.PerPartyRouterCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..))
+import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..), AddCustomObserversParams(..), RemoveCustomObserversParams(..))
 
 import MCMS.Codec (
     decodeOptional,
-    encodeOptional
+    decodePartyList,
+    encodeOptional,
+    encodePartyList
     )
 
 import CCIP.Codec (decodeRawInstanceAddressAt, encodeRawInstanceAddress)
@@ -60,6 +62,34 @@ decodeSetDepsParamsAt encoded offset = do
     (feeQuoter, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
     (rmnRemote, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
     Some (SetDepsParams{..}, offset)
+
+
+-- ===============================================
+-- |              AddCustomObserversParams
+-- ===============================================
+
+encodeAddCustomObserversParams : AddCustomObserversParams -> BytesHex
+encodeAddCustomObserversParams params =
+    encodePartyList params.parties
+
+decodeAddCustomObserversParamsAt : BytesHex -> Int -> Optional (AddCustomObserversParams, Int)
+decodeAddCustomObserversParamsAt encoded offset = do
+    (parties, offset) <- decodePartyList encoded offset
+    Some (AddCustomObserversParams{..}, offset)
+
+
+-- ===============================================
+-- |              RemoveCustomObserversParams
+-- ===============================================
+
+encodeRemoveCustomObserversParams : RemoveCustomObserversParams -> BytesHex
+encodeRemoveCustomObserversParams params =
+    encodePartyList params.parties
+
+decodeRemoveCustomObserversParamsAt : BytesHex -> Int -> Optional (RemoveCustomObserversParams, Int)
+decodeRemoveCustomObserversParamsAt encoded offset = do
+    (parties, offset) <- decodePartyList encoded offset
+    Some (RemoveCustomObserversParams{..}, offset)
 
 
 

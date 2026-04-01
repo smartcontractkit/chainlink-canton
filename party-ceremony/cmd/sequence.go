@@ -1,0 +1,285 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/chainlink/canton-party-ceremony/ceremony"
+	"github.com/chainlink/canton-party-ceremony/ceremony/example"
+	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
+	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
+	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+)
+
+// executeSequence is the shared execution kernel used by both init and resume.
+// It:
+//  1. Loads any previously persisted reports from <ceremonyDir>/reports.json
+//     (empty on first run).
+//  2. Builds a MemoryReporter seeded with those reports so all previously
+//     successful operations are served from cache without re-execution.
+//  3. Runs OnboardingSequence.
+//  4. Persists the updated report set back to reports.json — even on error so
+//     that partial progress is not lost.
+func executeExampleOnboardingSequence(
+	ctx context.Context,
+	cfg client.ClientConfig,
+	input example.OnboardingInput,
+	stateDir string,
+	workflowId string,
+) error {
+	lggr, err := newCLILogger()
+	if err != nil {
+		return fmt.Errorf("creating logger: %w", err)
+	}
+
+	var previousReports []operations.Report[any, any]
+	if workflowId != "" {
+		ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+		previousReports, err = ceremony.LoadReports(ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("loading previous reports: %w", err)
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("loading reports: %w", err)
+	}
+	// ── Build bundle ──────────────────────────────────────────────────────────
+	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
+	bundle := operations.NewBundle(
+		func() context.Context { return ctx },
+		logger.Nop(), // We don't want default operation logs to be noisy
+		reporter,
+	)
+
+	// ── Build deps ────────────────────────────────────────────────────────────
+	// NewMockCantonClientFromConfig is the injection point: swap this for a real
+	// gRPC client once the Canton admin API integration is ready.
+	client := example.NewMockCantonClientFromConfig(cfg)
+	deps := example.CantonDeps{Client: client, Logger: lggr}
+
+	lggr.Infow("Running onboarding sequence",
+		"ceremony", input.NamespaceName,
+		"participant", cfg.ParticipantID,
+		"participants", input.Participants,
+	)
+
+	// ── Execute sequence ──────────────────────────────────────────────────────
+	sr, seqErr := operations.ExecuteSequence(bundle, example.OnboardingSequence, deps, input)
+
+	// ── Persist reports (always, even on error) ───────────────────────────────
+	if workflowId == "" {
+		workflowId = sr.ID
+	}
+	ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+	if err := os.MkdirAll(ceremonyDir, 0o755); err != nil {
+		lggr.Errorw("Failed to create ceremony directory — progress may be lost on next resume",
+			"dir", ceremonyDir,
+			"err", err,
+		)
+	}
+	allReports, _ := reporter.GetReports()
+	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+		lggr.Errorw("Failed to save reports — progress may be lost on next resume",
+			"err", saveErr)
+	}
+
+	// Store workflow.json on first run so resume can verify the input matches on subsequent runs.
+	state := ceremony.WorkflowState[example.OnboardingInput]{
+		CeremonyID: workflowId,
+		Type:       ceremony.WorkflowTypeExample,
+		Input:      input,
+	}
+	if err := ceremony.SaveWorkflow(ceremonyDir, state); err != nil {
+		lggr.Errorw("Failed to save workflow.json — resume may fail if input cannot be reconstructed",
+			"err", err)
+	}
+
+	if seqErr != nil {
+		// ErrThresholdNotMet is expected when not all signers have acted yet.
+		// Print a friendly message and exit with a non-zero code without a stack trace.
+		if strings.Contains(seqErr.Error(), example.ErrThresholdNotMet.Error()) {
+			fmt.Fprintf(os.Stderr, "ceremony not yet complete: %v\n", seqErr)
+			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have signed.")
+			os.Exit(2) //nolint:gocritic // intentional early exit for UX
+		}
+
+		return seqErr
+	}
+
+	return nil
+}
+
+// executeOnboardingSequence is the execution kernel for the real gRPC-backed
+// onboarding ceremony. It replaces the mock client with a real GRPCCantonClient
+// that connects to the participant's Admin API.
+func executeOnboardingSequence(
+	ctx context.Context,
+	cfg client.ClientConfig,
+	input onboarding.OnboardingInput,
+	stateDir string,
+	workflowId string,
+) error {
+	lggr, err := newCLILogger()
+	if err != nil {
+		return fmt.Errorf("creating logger: %w", err)
+	}
+
+	var previousReports []operations.Report[any, any]
+	if workflowId != "" {
+		ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+		previousReports, err = ceremony.LoadReports(ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("loading previous reports: %w", err)
+		}
+	}
+
+	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
+	bundle := operations.NewBundle(
+		func() context.Context { return ctx },
+		logger.Nop(),
+		reporter,
+	)
+
+	// ── Build real gRPC client ────────────────────────────────────────────
+	conn, err := client.Dial(cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to Canton admin API: %w", err)
+	}
+	defer conn.Close()
+
+	grpcClient := client.NewGRPCClient(conn)
+	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr}
+
+	lggr.Infow("Running onboarding sequence (real)",
+		"ceremony", input.NamespaceName,
+		"participant", cfg.ParticipantID,
+		"participants", input.Participants,
+	)
+
+	sr, seqErr := operations.ExecuteSequence(bundle, onboarding.OnboardingSequence, deps, input)
+
+	// ── Persist reports (always, even on error) ───────────────────────────
+	if workflowId == "" {
+		workflowId = sr.ID
+	}
+	ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
+		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
+	}
+	allReports, _ := reporter.GetReports()
+	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+		lggr.Errorw("Failed to save reports", "err", saveErr)
+	}
+
+	state := ceremony.WorkflowState[onboarding.OnboardingInput]{
+		CeremonyID: workflowId,
+		Type:       ceremony.WorkflowTypeOnboarding,
+		Input:      input,
+	}
+	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	}
+
+	if seqErr != nil {
+		if strings.Contains(seqErr.Error(), onboarding.ErrThresholdNotMet.Error()) {
+			fmt.Fprintf(os.Stderr, "ceremony not yet complete: %v\n", seqErr)
+			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have signed.")
+			os.Exit(2) //nolint:gocritic // intentional early exit for UX
+		}
+
+		return seqErr
+	}
+
+	return nil
+}
+
+func calculateCeremonyDir(stateDir, workflowId string) string {
+	return fmt.Sprintf("%s/%s", stateDir, workflowId)
+}
+
+// executeKickSequence is the execution kernel for the real gRPC-backed kick
+// ceremony. It dials the Canton admin API, runs KickSequence, and persists
+// the ceremony state.
+func executeKickSequence(
+	ctx context.Context,
+	cfg client.ClientConfig,
+	input kick.KickInput,
+	stateDir string,
+	workflowId string,
+) error {
+	lggr, err := newCLILogger()
+	if err != nil {
+		return fmt.Errorf("creating logger: %w", err)
+	}
+
+	var previousReports []operations.Report[any, any]
+	if workflowId != "" {
+		ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+		previousReports, err = ceremony.LoadReports(ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("loading previous reports: %w", err)
+		}
+	}
+
+	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
+	bundle := operations.NewBundle(
+		func() context.Context { return ctx },
+		logger.Nop(),
+		reporter,
+	)
+
+	conn, err := client.Dial(cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to Canton admin API: %w", err)
+	}
+	defer conn.Close()
+
+	grpcClient := client.NewGRPCClient(conn)
+	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr}
+
+	lggr.Infow("Running kick sequence",
+		"party", input.DecentralizedPartyID,
+		"kicked_participant", input.KickedParticipantID,
+		"remaining_count", len(input.RemainingParticipants),
+		"participant", cfg.ParticipantID,
+	)
+
+	sr, seqErr := operations.ExecuteSequence(bundle, kick.KickSequence, deps, input)
+
+	if workflowId == "" {
+		workflowId = sr.ID
+	}
+	ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
+		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
+	}
+	allReports, _ := reporter.GetReports()
+	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+		lggr.Errorw("Failed to save reports", "err", saveErr)
+	}
+
+	state := ceremony.WorkflowState[kick.KickInput]{
+		CeremonyID: workflowId,
+		Type:       ceremony.WorkflowTypeKick,
+		Input:      input,
+	}
+	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	}
+
+	if seqErr != nil {
+		if strings.Contains(seqErr.Error(), kick.ErrThresholdNotMet.Error()) {
+			fmt.Fprintf(os.Stderr, "kick ceremony not yet complete: %v\n", seqErr)
+			fmt.Fprintln(os.Stderr, "Run `resume` again after more remaining participants have acted.")
+			os.Exit(2) //nolint:gocritic // intentional early exit for UX
+		}
+
+		return seqErr
+	}
+
+	return nil
+}

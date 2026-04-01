@@ -4,17 +4,23 @@ module CCIP.FeeQuoterCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.FeeQuoterTypes (PriceUpdates(..), TokenPriceUpdate(..), GasPriceUpdate(..), FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
+import CCIP.FeeQuoterTypes (PriceUpdates(..), TokenPriceUpdate(..), GasPriceUpdate(..), DestChainConfigArgs(..), DestChainConfig(..), ApplyPriceUpdatersUpdateParams(..), UpdatePricesParams(..), RemoveFeeTokensParams(..), ApplyDestChainConfigUpdatesParams(..))
 
 import MCMS.Codec (
     decodeBoolAt,
+    decodeDecimalAt,
     decodeInt64At,
     decodeList,
     decodeNumeric0At,
+    decodePartyAt,
+    decodePartyList,
     encodeBool,
+    encodeDecimal,
     encodeInt64,
     encodeList,
-    encodeNumeric0
+    encodeNumeric0,
+    encodeParty,
+    encodePartyList
     )
 
 import CCIP.Codec (decodeInstrumentId, encodeInstrumentId)
@@ -43,12 +49,12 @@ decodePriceUpdatesAt encoded offset = do
 encodeTokenPriceUpdate : TokenPriceUpdate -> BytesHex
 encodeTokenPriceUpdate params =
     encodeInstrumentId params.instrumentId
-    <> encodeNumeric0 params.usdPerToken
+    <> encodeDecimal params.usdPerToken
 
 decodeTokenPriceUpdateAt : BytesHex -> Int -> Optional (TokenPriceUpdate, Int)
 decodeTokenPriceUpdateAt encoded offset = do
     (instrumentId, offset) <- decodeInstrumentId encoded offset
-    (usdPerToken, offset) <- decodeNumeric0At encoded offset
+    (usdPerToken, offset) <- decodeDecimalAt encoded offset
     Some (TokenPriceUpdate{..}, offset)
 
 
@@ -59,27 +65,13 @@ decodeTokenPriceUpdateAt encoded offset = do
 encodeGasPriceUpdate : GasPriceUpdate -> BytesHex
 encodeGasPriceUpdate params =
     encodeNumeric0 params.destChainSelector
-    <> encodeNumeric0 params.usdPerUnitGas
+    <> encodeDecimal params.usdPerUnitGas
 
 decodeGasPriceUpdateAt : BytesHex -> Int -> Optional (GasPriceUpdate, Int)
 decodeGasPriceUpdateAt encoded offset = do
     (destChainSelector, offset) <- decodeNumeric0At encoded offset
-    (usdPerUnitGas, offset) <- decodeNumeric0At encoded offset
+    (usdPerUnitGas, offset) <- decodeDecimalAt encoded offset
     Some (GasPriceUpdate{..}, offset)
-
-
--- ===============================================
--- |              FeeTokenArgs
--- ===============================================
-
-encodeFeeTokenArgs : FeeTokenArgs -> BytesHex
-encodeFeeTokenArgs params =
-    encodeInstrumentId params.instrumentId
-
-decodeFeeTokenArgsAt : BytesHex -> Int -> Optional (FeeTokenArgs, Int)
-decodeFeeTokenArgsAt encoded offset = do
-    (instrumentId, offset) <- decodeInstrumentId encoded offset
-    Some (FeeTokenArgs{..}, offset)
 
 
 -- ===============================================
@@ -126,6 +118,66 @@ decodeDestChainConfigAt encoded offset = do
     (defaultTokenFeeUSD, offset) <- decodeNumeric0At encoded offset
     (defaultTokenDestGasOverhead, offset) <- decodeInt64At encoded offset
     Some (DestChainConfig{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyPriceUpdatersUpdateParams
+-- ===============================================
+
+encodeApplyPriceUpdatersUpdateParams : ApplyPriceUpdatersUpdateParams -> BytesHex
+encodeApplyPriceUpdatersUpdateParams params =
+    encodePartyList params.addedPriceUpdaters
+    <> encodePartyList params.removedPriceUpdaters
+
+decodeApplyPriceUpdatersUpdateParamsAt : BytesHex -> Int -> Optional (ApplyPriceUpdatersUpdateParams, Int)
+decodeApplyPriceUpdatersUpdateParamsAt encoded offset = do
+    (addedPriceUpdaters, offset) <- decodePartyList encoded offset
+    (removedPriceUpdaters, offset) <- decodePartyList encoded offset
+    Some (ApplyPriceUpdatersUpdateParams{..}, offset)
+
+
+-- ===============================================
+-- |              UpdatePricesParams
+-- ===============================================
+
+encodeUpdatePricesParams : UpdatePricesParams -> BytesHex
+encodeUpdatePricesParams params =
+    encodePriceUpdates params.priceUpdates
+    <> encodeParty params.caller
+
+decodeUpdatePricesParamsAt : BytesHex -> Int -> Optional (UpdatePricesParams, Int)
+decodeUpdatePricesParamsAt encoded offset = do
+    (priceUpdates, offset) <- decodePriceUpdatesAt encoded offset
+    (caller, offset) <- decodePartyAt encoded offset
+    Some (UpdatePricesParams{..}, offset)
+
+
+-- ===============================================
+-- |              RemoveFeeTokensParams
+-- ===============================================
+
+encodeRemoveFeeTokensParams : RemoveFeeTokensParams -> BytesHex
+encodeRemoveFeeTokensParams params =
+    encodeList params.feeTokensToRemove encodeInstrumentId
+
+decodeRemoveFeeTokensParamsAt : BytesHex -> Int -> Optional (RemoveFeeTokensParams, Int)
+decodeRemoveFeeTokensParamsAt encoded offset = do
+    (feeTokensToRemove, offset) <- decodeList encoded offset decodeInstrumentId
+    Some (RemoveFeeTokensParams{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyDestChainConfigUpdatesParams
+-- ===============================================
+
+encodeApplyDestChainConfigUpdatesParams : ApplyDestChainConfigUpdatesParams -> BytesHex
+encodeApplyDestChainConfigUpdatesParams params =
+    encodeList params.destChainConfigArgs encodeDestChainConfigArgs
+
+decodeApplyDestChainConfigUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyDestChainConfigUpdatesParams, Int)
+decodeApplyDestChainConfigUpdatesParamsAt encoded offset = do
+    (destChainConfigArgs, offset) <- decodeList encoded offset decodeDestChainConfigArgsAt
+    Some (ApplyDestChainConfigUpdatesParams{..}, offset)
 
 
 

@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "8050e6115aaeed5c0aafd14fb40438fbd6807c03d2e992b07f80fc8a979108ad"
+	PackageID   = "c582de422bc5a187af1582d7d6d75fcba07dfb87f9a916c7153cc68c63c1d4e5"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1073,8 +1073,6 @@ type DeployLockReleaseTokenPoolParams struct {
 	TokenAdminRegistry mcms.RawInstanceAddress                  `json:"tokenAdminRegistry"`
 	FeeQuoter          mcms.RawInstanceAddress                  `json:"feeQuoter"`
 	RmnRemote          mcms.RawInstanceAddress                  `json:"rmnRemote"`
-	PoolReceiveContext common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout    lockreleasetokenpool.TransferTimeout     `json:"transferTimeout"`
 }
 
 // ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments
@@ -1130,22 +1128,6 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.RmnRemote
-	}()
-
-	m["poolReceiveContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.PoolReceiveContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.PoolReceiveContext
-	}()
-
-	m["transferTimeout"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TransferTimeout).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TransferTimeout
 	}()
 
 	return m

@@ -5,10 +5,21 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Optional (fromSome)
 
-import CCIP.LockReleaseTokenPoolCodec qualified as LockReleaseTokenPoolCodec
-import CCIP.LockReleaseTokenPoolTypes qualified as LockReleaseTokenPoolTypes
+import CCIP.LockReleaseTokenPoolCodecGen qualified as LockReleaseTokenPoolCodec
+import CCIP.LockReleaseTokenPoolTypes (
+    ChainUpdate(..),
+    TokenTransferFeeConfigArgs(..),
+    RateLimitConfigArgs(..),
+    TransferTimeout(..),
+    SetDynamicConfigParams(..),
+    ApplyChainUpdatesParams(..),
+    ApplyTokenTransferFeeConfigUpdatesParams(..),
+    SetRateLimitConfigParams(..),
+    SetTransferTimeoutParams(..),
+    )
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.Context qualified as Context
+import CCIP.ContextCodec (encodeCCIPContext, decodeCCIPContextAt)
 import DA.TextMap qualified as TextMap
 
 -- ===============================================
@@ -19,13 +30,13 @@ testSetDynamicConfigParamsRoundtrip : Script ()
 testSetDynamicConfigParamsRoundtrip = do
     -- Test with rateLimitAdmin set
     rateLimitAdmin <- allocateParty "admin"
-    let args = (Some rateLimitAdmin)
+    let args = SetDynamicConfigParams with rateLimitAdmin = Some rateLimitAdmin
         encoded = LockReleaseTokenPoolCodec.encodeSetDynamicConfigParams args
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetDynamicConfigParams encoded)) === args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetDynamicConfigParamsAt encoded 0)) === args
     -- Test with rateLimitAdmin not set
-    let argsNone = (None)
+    let argsNone = SetDynamicConfigParams with rateLimitAdmin = None
         encodedNone = LockReleaseTokenPoolCodec.encodeSetDynamicConfigParams argsNone
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetDynamicConfigParams encodedNone)) === argsNone
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetDynamicConfigParamsAt encodedNone 0)) === argsNone
 
 
 -- ===============================================
@@ -34,43 +45,43 @@ testSetDynamicConfigParamsRoundtrip = do
 
 testApplyChainUpdatesParamsRoundtrip : Script ()
 testApplyChainUpdatesParamsRoundtrip = do
-    let args = (
-            [2.0, 3.0],  -- remoteChainSelectorsToRemove
-            [ 
-                LockReleaseTokenPoolTypes.ChainUpdate with
-                    remoteChainSelector = 1.0
-                    remotePools = ["1234567890abcdef", "fedcba0987654321"]
-                    remoteTokenAddress = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
-                    inboundCCVs = [RawInstanceAddress.RawInstanceAddress "ccv-inbound@party1", RawInstanceAddress.RawInstanceAddress "ccv-inbound2@party2"]
-                    outboundCCVs = [RawInstanceAddress.RawInstanceAddress "ccv-outbound@party1"]
-                    minBlockConfirmations = 0
-                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
-                ,LockReleaseTokenPoolTypes.ChainUpdate with
-                    remoteChainSelector = 18446744073709551615.0 -- max uint64
-                    remotePools = []
-                    remoteTokenAddress = ""
-                    inboundCCVs = []
-                    outboundCCVs = []
-                    minBlockConfirmations = 7
-                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
-                ,LockReleaseTokenPoolTypes.ChainUpdate with
-                    remoteChainSelector = 0.0
-                    remotePools = []
-                    remoteTokenAddress = "c44879cc487d6ed2fdda5dfbebace4d430bd3f5a"
-                    inboundCCVs = []
-                    outboundCCVs = []
-                    minBlockConfirmations = 3
-                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+    let chainsToAdd = [
+            ChainUpdate with
+                remoteChainSelector = 1.0
+                remotePools = ["1234567890abcdef", "fedcba0987654321"]
+                remoteTokenAddress = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+                inboundCCVs = [RawInstanceAddress.RawInstanceAddress "ccv-inbound@party1", RawInstanceAddress.RawInstanceAddress "ccv-inbound2@party2"]
+                outboundCCVs = [RawInstanceAddress.RawInstanceAddress "ccv-outbound@party1"]
+                minBlockConfirmations = 0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+            , ChainUpdate with
+                remoteChainSelector = 18446744073709551615.0 -- max uint64
+                remotePools = []
+                remoteTokenAddress = ""
+                inboundCCVs = []
+                outboundCCVs = []
+                minBlockConfirmations = 7
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+            , ChainUpdate with
+                remoteChainSelector = 0.0
+                remotePools = []
+                remoteTokenAddress = "c44879cc487d6ed2fdda5dfbebace4d430bd3f5a"
+                inboundCCVs = []
+                outboundCCVs = []
+                minBlockConfirmations = 3
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
             ]
-            )
+        args = ApplyChainUpdatesParams with
+            remoteChainSelectorsToRemove = [2.0, 3.0]
+            chainsToAdd
     let encoded = LockReleaseTokenPoolCodec.encodeApplyChainUpdatesParams args
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeApplyChainUpdatesParams encoded)) === args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeApplyChainUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |     ApplyTokenTransferFeeConfigUpdates      |
@@ -78,15 +89,15 @@ testApplyChainUpdatesParamsRoundtrip = do
 
 testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip : Script ()
 testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
-    let args = (
-            [LockReleaseTokenPoolTypes.TokenTransferFeeConfigArgs with
+    let feeConfigArgs = [
+            TokenTransferFeeConfigArgs with
                 destChainSelector = 1.0
                 isEnabled = True
                 destGasOverhead = 21000
                 destBytesOverhead = 100
                 feeUSDCents = 50.0
                 feeBps = 25.0
-            ,LockReleaseTokenPoolTypes.TokenTransferFeeConfigArgs with
+            , TokenTransferFeeConfigArgs with
                 destChainSelector = 18446744073709551615.0 -- max uint64
                 isEnabled = False
                 destGasOverhead = 30000
@@ -94,10 +105,11 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
                 feeUSDCents = 100.0
                 feeBps = 50.0
             ]
-            , [2.0, 3.0] -- disableTokenTransferFeeConfigArgs
-            )
+        args = ApplyTokenTransferFeeConfigUpdatesParams with
+            tokenTransferFeeConfigArgs = feeConfigArgs
+            disableTokenTransferFeeConfigArgs = [2.0, 3.0]
     let encoded = LockReleaseTokenPoolCodec.encodeApplyTokenTransferFeeConfigUpdatesParams args
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeApplyTokenTransferFeeConfigUpdatesParams encoded)) === args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |             SetRateLimitConfig              |
@@ -106,25 +118,28 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
 testSetRateLimitConfigParamsRoundtrip : Script ()
 testSetRateLimitConfigParamsRoundtrip = do
     caller <- allocateParty "caller"
-    let args = ([
-            LockReleaseTokenPoolTypes.RateLimitConfigArgs with
+    let rateLimitConfigs = [
+            RateLimitConfigArgs with
                 remoteChainSelector = 1.0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
-            ,LockReleaseTokenPoolTypes.RateLimitConfigArgs with
+            , RateLimitConfigArgs with
                 remoteChainSelector = 18446744073709551615.0 -- max uint64
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party2"
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party2"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party2"
-            ,LockReleaseTokenPoolTypes.RateLimitConfigArgs with
+            , RateLimitConfigArgs with
                 remoteChainSelector = 0.0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party3"
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party3"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party3"
-            ], caller)
+            ]
+        args = SetRateLimitConfigParams with
+            rateLimitConfigArgs = rateLimitConfigs
+            caller
     let encoded = LockReleaseTokenPoolCodec.encodeSetRateLimitConfigParams args
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetRateLimitConfigParams encoded)) === args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetRateLimitConfigParamsAt encoded 0)) === args
     pure ()
 
 -- ===============================================
@@ -134,20 +149,20 @@ testSetRateLimitConfigParamsRoundtrip = do
 testTransferTimeoutRoundtrip : Script ()
 testTransferTimeoutRoundtrip = do
     -- Test Indefinite
-    let indefinite = LockReleaseTokenPoolTypes.Indefinite
+    let indefinite = Indefinite
         encodedIndefinite = LockReleaseTokenPoolCodec.encodeTransferTimeout indefinite
     fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedIndefinite 0)) === indefinite
 
     -- Test RelativeHours with various values
-    let relHours24 = LockReleaseTokenPoolTypes.RelativeHours 24
+    let relHours24 = RelativeHours 24
         encodedRelHours24 = LockReleaseTokenPoolCodec.encodeTransferTimeout relHours24
     fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedRelHours24 0)) === relHours24
 
-    let relHours0 = LockReleaseTokenPoolTypes.RelativeHours 0
+    let relHours0 = RelativeHours 0
         encodedRelHours0 = LockReleaseTokenPoolCodec.encodeTransferTimeout relHours0
     fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedRelHours0 0)) === relHours0
 
-    let relHoursLarge = LockReleaseTokenPoolTypes.RelativeHours 8760  -- 1 year in hours
+    let relHoursLarge = RelativeHours 8760  -- 1 year in hours
         encodedRelHoursLarge = LockReleaseTokenPoolCodec.encodeTransferTimeout relHoursLarge
     fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedRelHoursLarge 0)) === relHoursLarge
 
@@ -159,23 +174,23 @@ testSetPoolReceiveContextRoundtrip : Script ()
 testSetPoolReceiveContextRoundtrip = do
     -- Test empty context
     let emptyCtx = Context.emptyCCIPContext
-        encodedEmpty = LockReleaseTokenPoolCodec.encodeSetPoolReceiveContextParams emptyCtx
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetPoolReceiveContextParams encodedEmpty)) === emptyCtx
+        encodedEmpty = encodeCCIPContext emptyCtx
+    fst (fromSome (decodeCCIPContextAt encodedEmpty 0)) === emptyCtx
 
     -- Test context with simple text values
     let ctxWithText = Context.CCIPContext (TextMap.fromList [("key1", Context.AV_Text "value1"), ("key2", Context.AV_Text "value2")])
-        encodedWithText = LockReleaseTokenPoolCodec.encodeSetPoolReceiveContextParams ctxWithText
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetPoolReceiveContextParams encodedWithText)) === ctxWithText
+        encodedWithText = encodeCCIPContext ctxWithText
+    fst (fromSome (decodeCCIPContextAt encodedWithText 0)) === ctxWithText
 
     -- Test context with int values
     let ctxWithInt = Context.CCIPContext (TextMap.fromList [("count", Context.AV_Int 42)])
-        encodedWithInt = LockReleaseTokenPoolCodec.encodeSetPoolReceiveContextParams ctxWithInt
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetPoolReceiveContextParams encodedWithInt)) === ctxWithInt
+        encodedWithInt = encodeCCIPContext ctxWithInt
+    fst (fromSome (decodeCCIPContextAt encodedWithInt 0)) === ctxWithInt
 
     -- Test context with bool values
     let ctxWithBool = Context.CCIPContext (TextMap.fromList [("enabled", Context.AV_Bool True), ("disabled", Context.AV_Bool False)])
-        encodedWithBool = LockReleaseTokenPoolCodec.encodeSetPoolReceiveContextParams ctxWithBool
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetPoolReceiveContextParams encodedWithBool)) === ctxWithBool
+        encodedWithBool = encodeCCIPContext ctxWithBool
+    fst (fromSome (decodeCCIPContextAt encodedWithBool 0)) === ctxWithBool
 
 -- ===============================================
 -- |             SetTransferTimeout              |
@@ -184,9 +199,9 @@ testSetPoolReceiveContextRoundtrip = do
 testSetTransferTimeoutRoundtrip : Script ()
 testSetTransferTimeoutRoundtrip = do
     -- Test using the params wrapper
-    let timeout = LockReleaseTokenPoolTypes.RelativeHours 48
-        encoded = LockReleaseTokenPoolCodec.encodeSetTransferTimeoutParams timeout
-    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetTransferTimeoutParams encoded)) === timeout
+    let args = SetTransferTimeoutParams with transferTimeout = RelativeHours 48
+        encoded = LockReleaseTokenPoolCodec.encodeSetTransferTimeoutParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetTransferTimeoutParamsAt encoded 0)) === args
 
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
@@ -195,7 +210,7 @@ testSetTransferTimeoutRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-  case LockReleaseTokenPoolCodec.decodeApplyChainUpdatesParams "" of
+  case LockReleaseTokenPoolCodec.decodeApplyChainUpdatesParamsAt "" 0 of
     None -> pure ()  -- Expected
     Some _ -> abort "Expected decodeApplyChainUpdatesParams to fail on empty data"
 
@@ -205,4 +220,3 @@ testInvalidDataRejection = do
     Some _ -> abort "Expected decodeTransferTimeoutAt to fail on invalid tag"
 
   pure ()
-

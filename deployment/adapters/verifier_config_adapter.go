@@ -1,0 +1,75 @@
+package adapters
+
+import (
+	"fmt"
+
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
+	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
+)
+
+type CantonVerifierJobConfigAdapter struct{}
+
+var _ ccvadapters.VerifierConfigAdapter = (*CantonVerifierJobConfigAdapter)(nil)
+
+func (a *CantonVerifierJobConfigAdapter) ResolveVerifierContractAddresses(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	committeeQualifier string,
+	executorQualifier string,
+) (*ccvadapters.VerifierContractAddresses, error) {
+	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
+
+	committeeVerifierAddr, err := dsutils.FindAndFormatFirstRef(ds, chainSelector, toAddress,
+		datastore.AddressRef{
+			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+			Qualifier: committeeQualifier,
+		},
+		datastore.AddressRef{
+			Type:      datastore.ContractType(committee_verifier.ContractType),
+			Qualifier: committeeQualifier,
+			Version:   committee_verifier.Version,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get committee verifier address for chain %d: %w", chainSelector, err)
+	}
+
+	onRampAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:    datastore.ContractType(onramp.ContractType),
+		Version: onramp.Version,
+	}, chainSelector, toAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get on ramp address for chain %d: %w", chainSelector, err)
+	}
+
+	executorAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:      datastore.ContractType(executor.ContractType),
+		Qualifier: executorQualifier,
+		Version:   executor.Version,
+	}, chainSelector, toAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get executor address for chain %d: %w", chainSelector, err)
+	}
+
+	rmnRemoteAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:    datastore.ContractType(rmn_remote.ContractType),
+		Version: rmn_remote.Version,
+	}, chainSelector, toAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rmn remote address for chain %d: %w", chainSelector, err)
+	}
+
+	return &ccvadapters.VerifierContractAddresses{
+		CommitteeVerifierAddress: committeeVerifierAddr,
+		OnRampAddress:            onRampAddr,
+		ExecutorProxyAddress:     executorAddr,
+		RMNRemoteAddress:         rmnRemoteAddr,
+	}, nil
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -97,6 +98,34 @@ var BuildConfig = operations.NewOperation(
 			}
 		}
 
+		// Token pools on Canton are LockReleaseTokenPool (not EVM BurnMintTokenPool).
+		refs = env.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(input.ChainSelector),
+			datastore.AddressRefByType(datastore.ContractType(lock_release_token_pool.ContractType)),
+		)
+		tokenPools := make([]edsConfig.TokenPoolContracts, len(refs))
+		for i, ref := range refs {
+			tokenPools[i] = edsConfig.TokenPoolContracts{
+				TokenPool: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+				},
+				// TODO: use real addresses from the datastore, but how to properly get them?
+				InboundRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
+				InboundCustomBlockConfirmationsRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
+				OutboundRateLimiter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
+				},
+			}
+		}
+
 		var nodeConfig edsConfig.NodeConfig
 		if participant.InternalEndpoints == nil {
 			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
@@ -152,7 +181,9 @@ var BuildConfig = operations.NewOperation(
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
-				CCVs: ccvs,
+				CCVs:               ccvs,
+				TokenPoolContracts: tokenPools,
+				PoolOwner:          participant.PartyID,
 			},
 		}, nil
 	},

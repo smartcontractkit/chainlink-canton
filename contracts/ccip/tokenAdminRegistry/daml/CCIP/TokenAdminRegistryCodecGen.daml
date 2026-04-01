@@ -4,7 +4,7 @@ module CCIP.TokenAdminRegistryCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..))
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
 
 import MCMS.Codec (
     decodeOptional,
@@ -52,6 +52,68 @@ decodeTokenConfigAt encoded offset = do
     (pendingAdmin, offset) <- decodeOptional encoded offset decodePartyAt
     (tokenPool, offset) <- decodeOptional encoded offset decodePoolRegistrationAt
     Some (TokenConfig{..}, offset)
+
+
+-- ===============================================
+-- |              SetPoolParams
+-- ===============================================
+
+encodeSetPoolParams : SetPoolParams -> BytesHex
+encodeSetPoolParams params =
+    encodeInstrumentId params.instrumentId
+    <> encodeOptional params.tokenPool encodePoolRegistration
+
+decodeSetPoolParamsAt : BytesHex -> Int -> Optional (SetPoolParams, Int)
+decodeSetPoolParamsAt encoded offset = do
+    (instrumentId, offset) <- decodeInstrumentId encoded offset
+    (tokenPool, offset) <- decodeOptional encoded offset decodePoolRegistrationAt
+    Some (SetPoolParams{..}, offset)
+
+
+-- ===============================================
+-- |              ProposeAdminParams
+-- ===============================================
+
+encodeProposeAdminParams : ProposeAdminParams -> BytesHex
+encodeProposeAdminParams params =
+    encodeInstrumentId params.instrumentId
+    <> encodeParty params.newAdmin
+
+decodeProposeAdminParamsAt : BytesHex -> Int -> Optional (ProposeAdminParams, Int)
+decodeProposeAdminParamsAt encoded offset = do
+    (instrumentId, offset) <- decodeInstrumentId encoded offset
+    (newAdmin, offset) <- decodePartyAt encoded offset
+    Some (ProposeAdminParams{..}, offset)
+
+
+-- ===============================================
+-- |              TransferAdminParams
+-- ===============================================
+
+encodeTransferAdminParams : TransferAdminParams -> BytesHex
+encodeTransferAdminParams params =
+    encodeInstrumentId params.instrumentId
+    <> encodeParty params.newAdmin
+
+decodeTransferAdminParamsAt : BytesHex -> Int -> Optional (TransferAdminParams, Int)
+decodeTransferAdminParamsAt encoded offset = do
+    (instrumentId, offset) <- decodeInstrumentId encoded offset
+    (newAdmin, offset) <- decodePartyAt encoded offset
+    Some (TransferAdminParams{..}, offset)
+
+
+-- ===============================================
+-- |              AcceptAdminParams
+-- ===============================================
+
+encodeAcceptAdminParams : AcceptAdminParams -> BytesHex
+encodeAcceptAdminParams params =
+    encodeInstrumentId params.instrumentId
+
+decodeAcceptAdminParamsAt : BytesHex -> Int -> Optional (AcceptAdminParams, Int)
+decodeAcceptAdminParamsAt encoded offset = do
+    (instrumentId, offset) <- decodeInstrumentId encoded offset
+    Some (AcceptAdminParams{..}, offset)
 
 
 

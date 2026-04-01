@@ -9,6 +9,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -18,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	cantonOps "github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 )
 
 type ExecInfo struct {
@@ -36,10 +36,8 @@ func (o ExerciseOutput) Executed() bool {
 }
 
 type ChoiceInput[ARGS any] struct {
-	ChainSelector uint64 `json:"chainSelector"`
 	// The InstanceAddress this operation is targeting. Will be resolved to an active contract.
 	InstanceAddress contracts.InstanceAddress `json:"instanceAddress"`
-	ActAs           []string                  `json:"act_as"`
 	Args            ARGS                      `json:"args"`
 }
 
@@ -52,6 +50,8 @@ type ExerciseParams[ARGS any] struct {
 	Description string
 	// ContractType is the type of the target contract.
 	ContractType deployment.ContractType
+	// Modifier can be used to modify the argument for this exercise.
+	Modifier func(chain canton.Chain, input ARGS) (ARGS, error)
 	// Validate is an optional function to validate the input arguments.
 	Validate func(input ARGS) error
 
@@ -61,19 +61,28 @@ type ExerciseParams[ARGS any] struct {
 	Method func(contractID string, args ARGS) *model.ExerciseCommand
 }
 
-func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[ChoiceInput[ARGS], ExerciseOutput, cantonOps.CantonDeps] {
+func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[ChoiceInput[ARGS], ExerciseOutput, canton.Chain] {
 	return operations.NewOperation(
 		params.Name,
 		params.Version,
 		params.Description,
-		func(b operations.Bundle, deps cantonOps.CantonDeps, input ChoiceInput[ARGS]) (ExerciseOutput, error) {
+		func(b operations.Bundle, deps canton.Chain, input ChoiceInput[ARGS]) (ExerciseOutput, error) {
+			// Validate
 			if params.Validate != nil {
 				if err := params.Validate(input.Args); err != nil {
 					return ExerciseOutput{}, fmt.Errorf("validate input: %w", err)
 				}
 			}
+			// Modify
+			if params.Modifier != nil {
+				var err error
+				input.Args, err = params.Modifier(deps, input.Args)
+				if err != nil {
+					return ExerciseOutput{}, fmt.Errorf("failed to modify input: %w", err)
+				}
+			}
 
-			participant := deps.Chain.Participants[deps.Participant]
+			participant := deps.Participants[0]
 
 			// Find contract by InstanceAddress
 			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, participant.PartyID, params.Template.GetTemplateID(), input.InstanceAddress)
@@ -96,7 +105,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			submitResp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{
 					CommandId: uuid.Must(uuid.NewUUID()).String(),
-					ActAs:     input.ActAs,
+					ActAs:     []string{participant.PartyID},
 					Commands: []*apiv2.Command{{
 						Command: &apiv2.Command_Exercise{
 							Exercise: &apiv2.ExerciseCommand{
@@ -120,7 +129,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			// Note: apiv2.SubmitAndWaitForTransactionResponse doesn't expose UpdateId directly
 			// The transaction was successfully submitted, which is what matters
 			return ExerciseOutput{
-				ChainSelector: input.ChainSelector,
+				ChainSelector: deps.ChainSelector(),
 				ExecInfo: &ExecInfo{
 					UpdateID: submitResp.GetTransaction().GetUpdateId(),
 				},

@@ -4,19 +4,23 @@ module CCIP.GlobalConfigCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), DestChainConfig(..), SourceChainConfigArgs(..), SourceChainConfig(..))
+import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), DestChainConfig(..), SourceChainConfigArgs(..), SourceChainConfig(..), ApplyDestChainConfigUpdatesParams(..), ApplySourceChainConfigUpdatesParams(..))
 
 import MCMS.Codec (
     decodeBoolAt,
     decodeBytesHexAt,
     decodeBytesHexList,
     decodeInt64At,
+    decodeList,
     decodeNumeric0At,
+    decodeOptional,
     encodeBool,
     encodeBytesHex,
     encodeBytesHexList,
     encodeInt64,
-    encodeNumeric0
+    encodeList,
+    encodeNumeric0,
+    encodeOptional
     )
 
 import CCIP.Codec (decodeRawInstanceAddressAt, decodeRawInstanceAddressList, encodeRawInstanceAddress, encodeRawInstanceAddressList)
@@ -34,7 +38,7 @@ encodeDestChainConfigArgs params =
     <> encodeBool params.tokenReceiverAllowed
     <> fromSome (encodeInt64 params.baseExecutionGasCost)
     <> encodeBytesHex params.offRampAddress
-    <> encodeRawInstanceAddress params.defaultExecutor
+    <> encodeOptional params.defaultExecutor encodeRawInstanceAddress
     <> encodeRawInstanceAddressList params.laneMandatedCCVs
     <> encodeRawInstanceAddressList params.defaultCCVs
     <> encodeNumeric0 params.messageNetworkFeeUSDCents
@@ -48,7 +52,7 @@ decodeDestChainConfigArgsAt encoded offset = do
     (tokenReceiverAllowed, offset) <- decodeBoolAt encoded offset
     (baseExecutionGasCost, offset) <- decodeInt64At encoded offset
     (offRampAddress, offset) <- decodeBytesHexAt encoded offset
-    (defaultExecutor, offset) <- decodeRawInstanceAddressAt encoded offset
+    (defaultExecutor, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
     (laneMandatedCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (defaultCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (messageNetworkFeeUSDCents, offset) <- decodeNumeric0At encoded offset
@@ -67,7 +71,7 @@ encodeDestChainConfig params =
     <> encodeBool params.tokenReceiverAllowed
     <> fromSome (encodeInt64 params.baseExecutionGasCost)
     <> encodeBytesHex params.offRampAddress
-    <> encodeRawInstanceAddress params.defaultExecutor
+    <> encodeOptional params.defaultExecutor encodeRawInstanceAddress
     <> encodeRawInstanceAddressList params.laneMandatedCCVs
     <> encodeRawInstanceAddressList params.defaultCCVs
     <> encodeNumeric0 params.messageNetworkFeeUSDCents
@@ -80,7 +84,7 @@ decodeDestChainConfigAt encoded offset = do
     (tokenReceiverAllowed, offset) <- decodeBoolAt encoded offset
     (baseExecutionGasCost, offset) <- decodeInt64At encoded offset
     (offRampAddress, offset) <- decodeBytesHexAt encoded offset
-    (defaultExecutor, offset) <- decodeRawInstanceAddressAt encoded offset
+    (defaultExecutor, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
     (laneMandatedCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (defaultCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (messageNetworkFeeUSDCents, offset) <- decodeNumeric0At encoded offset
@@ -128,6 +132,34 @@ decodeSourceChainConfigAt encoded offset = do
     (defaultCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (laneMandatedCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     Some (SourceChainConfig{..}, offset)
+
+
+-- ===============================================
+-- |              ApplyDestChainConfigUpdatesParams
+-- ===============================================
+
+encodeApplyDestChainConfigUpdatesParams : ApplyDestChainConfigUpdatesParams -> BytesHex
+encodeApplyDestChainConfigUpdatesParams params =
+    encodeList params.destChainConfigArgs encodeDestChainConfigArgs
+
+decodeApplyDestChainConfigUpdatesParamsAt : BytesHex -> Int -> Optional (ApplyDestChainConfigUpdatesParams, Int)
+decodeApplyDestChainConfigUpdatesParamsAt encoded offset = do
+    (destChainConfigArgs, offset) <- decodeList encoded offset decodeDestChainConfigArgsAt
+    Some (ApplyDestChainConfigUpdatesParams{..}, offset)
+
+
+-- ===============================================
+-- |              ApplySourceChainConfigUpdatesParams
+-- ===============================================
+
+encodeApplySourceChainConfigUpdatesParams : ApplySourceChainConfigUpdatesParams -> BytesHex
+encodeApplySourceChainConfigUpdatesParams params =
+    encodeList params.sourceChainConfigArgs encodeSourceChainConfigArgs
+
+decodeApplySourceChainConfigUpdatesParamsAt : BytesHex -> Int -> Optional (ApplySourceChainConfigUpdatesParams, Int)
+decodeApplySourceChainConfigUpdatesParamsAt encoded offset = do
+    (sourceChainConfigArgs, offset) <- decodeList encoded offset decodeSourceChainConfigArgsAt
+    Some (ApplySourceChainConfigUpdatesParams{..}, offset)
 
 
 

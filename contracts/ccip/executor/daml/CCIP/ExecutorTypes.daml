@@ -1,5 +1,7 @@
 module CCIP.ExecutorTypes where
 
+import MCMS.RawInstanceAddress (RawInstanceAddress)
+
 data RemoteChainConfig = RemoteChainConfig
     with
         feeUSDCents : Numeric 0
@@ -16,5 +18,23 @@ data DynamicConfig = DynamicConfig
     with
         feeAggregator : Optional Party
         minBlockConfirmations : Int
+        ccvAllowlistEnabled : Bool
+    deriving (Eq, Show)
+
+data ApplyDestChainUpdatesParams = ApplyDestChainUpdatesParams
+    with
+        destChainSelectorsToRemove : [Numeric 0]
+        destChainSelectorsToAdd : [RemoteChainConfigArgs]
+    deriving (Eq, Show)
+
+data SetDynamicConfigParams = SetDynamicConfigParams
+    with
+        newDynamicConfig : DynamicConfig
+    deriving (Eq, Show)
+
+data ApplyAllowedCCVUpdatesParams = ApplyAllowedCCVUpdatesParams
+    with
+        ccvsToRemove : [RawInstanceAddress]
+        ccvsToAdd : [RawInstanceAddress]
         ccvAllowlistEnabled : Bool
     deriving (Eq, Show)

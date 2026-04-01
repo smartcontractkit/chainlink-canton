@@ -12,7 +12,19 @@ import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.LockReleaseTokenPool
-import CCIP.LockReleaseTokenPoolCodec
+import CCIP.LockReleaseTokenPoolCodecGen (
+    encodeSetDynamicConfigParams,
+    encodeApplyChainUpdatesParams,
+    encodeSetRateLimitConfigParams,
+    encodeSetTransferTimeoutParams,
+    )
+import CCIP.LockReleaseTokenPoolTypes (
+    SetDynamicConfigParams(..),
+    ApplyChainUpdatesParams(..),
+    SetRateLimitConfigParams(..),
+    SetTransferTimeoutParams(..),
+    )
+import CCIP.ContextCodec (encodeCCIPContext)
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import qualified CCIP.Context
 
@@ -57,7 +69,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetDynamicConfig = script do
     -- Update rate limit admin via mcmsEntrypoint
     rateLimitAdmin <- allocateParty "rate_limit_admin"
     let newRateLimitAdmin = Some rateLimitAdmin
-    let encodedParams = encodeSetDynamicConfigParams (newRateLimitAdmin)
+    let encodedParams = encodeSetDynamicConfigParams (SetDynamicConfigParams with rateLimitAdmin = newRateLimitAdmin)
 
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -118,7 +130,9 @@ testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-new@owner"
             ]
 
-        encoded = encodeApplyChainUpdatesParams ([], args)
+        encoded = encodeApplyChainUpdatesParams (ApplyChainUpdatesParams with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = args)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do
@@ -201,7 +215,9 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-2@owner"
             ]
 
-        encoded = encodeApplyChainUpdatesParams ([123.0], args) -- Remove existing chain (123) and add new ones
+        encoded = encodeApplyChainUpdatesParams (ApplyChainUpdatesParams with
+            remoteChainSelectorsToRemove = [123.0]  -- Remove existing chain (123) and add new ones
+            chainsToAdd = args)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do
@@ -274,7 +290,9 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-updated@owner"
             ]
 
-        encoded = encodeSetRateLimitConfigParams (args, poolOwner)
+        encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
+            rateLimitConfigArgs = args
+            caller = poolOwner)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do
@@ -411,7 +429,9 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-new@owner"
             ]
 
-        encoded = encodeApplyChainUpdatesParams ([123.0], args)
+        encoded = encodeApplyChainUpdatesParams (ApplyChainUpdatesParams with
+            remoteChainSelectorsToRemove = [123.0]
+            chainsToAdd = args)
 
   -- Call with empty contractIds map - should fail
     submitMustFail poolOwner do
@@ -483,7 +503,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext = script do
 
     -- Create new context with text values
     let newContext = CCIP.Context.CCIPContext (TextMap.fromList [("key1", CCIP.Context.AV_Text "value1"), ("key2", CCIP.Context.AV_Int 42)])
-    let encodedParams = encodeSetPoolReceiveContextParams newContext
+    let encodedParams = encodeCCIPContext newContext
 
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -529,7 +549,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext_Empty = script do
 
     -- Reset to empty context
     let emptyContext = CCIP.Context.emptyCCIPContext
-    let encodedParams = encodeSetPoolReceiveContextParams emptyContext
+    let encodedParams = encodeCCIPContext emptyContext
 
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -577,7 +597,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetTransferTimeout_Indefinite = script do
 
     -- Change to Indefinite
     let newTimeout = Indefinite
-    let encodedParams = encodeSetTransferTimeoutParams newTimeout
+    let encodedParams = encodeSetTransferTimeoutParams (SetTransferTimeoutParams with transferTimeout = newTimeout)
 
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -621,7 +641,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetTransferTimeout_RelativeHours = script
 
     -- Change to RelativeHours 48
     let newTimeout = RelativeHours 48
-    let encodedParams = encodeSetTransferTimeoutParams newTimeout
+    let encodedParams = encodeSetTransferTimeoutParams (SetTransferTimeoutParams with transferTimeout = newTimeout)
 
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
