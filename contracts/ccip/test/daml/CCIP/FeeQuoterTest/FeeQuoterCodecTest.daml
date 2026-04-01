@@ -12,12 +12,11 @@ import CCIP.FeeQuoterTypes (
     PriceUpdates(..),
     TokenPriceUpdate(..),
     GasPriceUpdate(..),
-    FeeTokenArgs(..),
     DestChainConfigArgs(..),
     DestChainConfig(..),
     ApplyPriceUpdatersUpdateParams(..),
     UpdatePricesParams(..),
-    ApplyFeeTokenUpdatesParams(..),
+    RemoveFeeTokensParams(..),
     ApplyDestChainConfigUpdatesParams(..),
     )
 
@@ -88,27 +87,26 @@ testApplyUpdatePricesRoundtrip = do
     fst (fromSome (FeeQuoterCodec.decodeUpdatePricesParamsAt encoded 0)) === args
 
 -- ===============================================
--- |            ApplyFeeTokenUpdates             |
+-- |              RemoveFeeTokens               |
 -- ===============================================
 
-testApplyFeeTokenUpdatesRoundtrip : Script ()
-testApplyFeeTokenUpdatesRoundtrip = do
-    -- Empty lists
-    let args = ApplyFeeTokenUpdatesParams with
+testRemoveFeeTokensRoundtrip : Script ()
+testRemoveFeeTokensRoundtrip = do
+    -- Empty list
+    let args = RemoveFeeTokensParams with
             feeTokensToRemove = []
-            feeTokensToAdd = []
-    let encoded = FeeQuoterCodec.encodeApplyFeeTokenUpdatesParams args
-    fst (fromSome (FeeQuoterCodec.decodeApplyFeeTokenUpdatesParamsAt encoded 0)) === args
-    -- Non-empty lists
+    let encoded = FeeQuoterCodec.encodeRemoveFeeTokensParams args
+    fst (fromSome (FeeQuoterCodec.decodeRemoveFeeTokensParamsAt encoded 0)) === args
+    -- Non-empty list
     issuer1 <- allocateParty "issuer1"
     issuer2 <- allocateParty "issuer2"
-    let instrumentId1 = Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
-        instrumentId2 = Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
-        args = ApplyFeeTokenUpdatesParams with
-            feeTokensToRemove = [instrumentId1, instrumentId2]
-            feeTokensToAdd = [FeeTokenArgs instrumentId1, FeeTokenArgs instrumentId2]
-    let encoded = FeeQuoterCodec.encodeApplyFeeTokenUpdatesParams args
-    fst (fromSome (FeeQuoterCodec.decodeApplyFeeTokenUpdatesParamsAt encoded 0)) === args
+    let args = RemoveFeeTokensParams with
+            feeTokensToRemove =
+                [ Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
+                , Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
+                ]
+    let encoded = FeeQuoterCodec.encodeRemoveFeeTokensParams args
+    fst (fromSome (FeeQuoterCodec.decodeRemoveFeeTokensParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |         ApplyDestChainConfigUpdates         |
@@ -132,9 +130,9 @@ testApplyDestChainConfigUpdatesRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-    case FeeQuoterCodec.decodeApplyFeeTokenUpdatesParamsAt "" 0 of
+    case FeeQuoterCodec.decodeRemoveFeeTokensParamsAt "" 0 of
         None -> pure ()  -- Expected
-        Some _ -> abort "Expected decodeApplyFeeTokenUpdatesParams to fail on empty data"
+        Some _ -> abort "Expected decodeRemoveFeeTokensParams to fail on empty data"
 
   -- Truncated data should fail
     case FeeQuoterCodec.decodeApplyDestChainConfigUpdatesParamsAt "00" 0 of

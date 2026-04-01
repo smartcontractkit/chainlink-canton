@@ -830,41 +830,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				Command: &ledgerv2.Command_Exercise{Exercise: &ledgerv2.ExerciseCommand{
 					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
 					ContractId: string(feeQuoterCID),
-					Choice:     "ApplyFeeTokenUpdates",
-					ChoiceArgument: ledger.MapToValue(feequoter.ApplyFeeTokenUpdates{
-						FeeTokensToRemove: []splice_api_token_holding_v1.InstrumentId{},
-						FeeTokensToAdd: []feequoter.FeeTokenArgs{
-							{
-								InstrumentId: feeTokenInstrument,
-							},
-						},
-					}),
-				}},
-			}},
-			ActAs:              []string{party},
-			DisclosedContracts: []*ledgerv2.DisclosedContract{disclosedFeeQuoter},
-		},
-	})
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("apply fee token updates: %w", err)
-	}
-
-	// ApplyFeeTokenUpdates archives/recreates FeeQuoter; refresh CID+disclosure before next exercise.
-	feeQuoterCID, disclosedFeeQuoter, err = resolveDisclosedByAddress(
-		feequoter.FeeQuoter{}.GetTemplateID(),
-		contracts.HexToInstanceAddress(feeQuoterRef.Address),
-	)
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("refresh fee quoter after fee token update: %w", err)
-	}
-
-	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
-		Commands: &ledgerv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*ledgerv2.Command{{
-				Command: &ledgerv2.Command_Exercise{Exercise: &ledgerv2.ExerciseCommand{
-					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
-					ContractId: string(feeQuoterCID),
 					Choice:     "UpdatePrices",
 					ChoiceArgument: ledger.MapToValue(feequoter.UpdatePrices{
 						PriceUpdates: feequoter.PriceUpdates{

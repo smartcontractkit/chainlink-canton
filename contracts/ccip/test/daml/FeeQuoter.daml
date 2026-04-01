@@ -135,6 +135,10 @@ setup = script do
     debug result
     result.price === 0.045
 
+    resultFeeTokens <- submit owner do
+        exerciseCmd fq GetFeeTokens with caller = owner
+    Set.fromList resultFeeTokens === Set.fromList [instrumentIdLINK]
+
     -- Apply prices again, this time for two chains and two instruments
     fq <- submit owner do
         exerciseCmd fq UpdatePrices with
@@ -185,6 +189,10 @@ setup = script do
             caller = owner
     debug result
     result.price === 0.075
+
+    resultFeeTokens <- submit owner do
+        exerciseCmd fq GetFeeTokens with caller = owner
+    Set.fromList resultFeeTokens === Set.fromList [instrumentIdLINK, instrumentIdUSDC]
 
     -- test ApplyDestChainConfigUpdates
     let destChainConfig1 = DestChainConfig with

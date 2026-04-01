@@ -325,6 +325,7 @@ func TestCCIPSend(t *testing.T) {
 	cldfEnv.DataStore = runningDs.Seal()
 	t.Log("Configured chain for lanes")
 
+	// Apply FeeQuoter dest chain config (needed by OnRamp.FinalizeFeeFromRouter)
 	// Create PerPartyRouter for sender
 	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
