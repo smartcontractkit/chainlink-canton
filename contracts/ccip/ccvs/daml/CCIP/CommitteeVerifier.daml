@@ -99,7 +99,7 @@ template CommitteeVerifier
                 storageLocations = storageLocations
 
             crossChainVerifier_verifyMessageImpl self arg = do
-                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
+                exercise (fromInterfaceContractId @CommitteeVerifier self) VerifyMessage
                     with
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
@@ -108,20 +108,20 @@ template CommitteeVerifier
                         caller = arg.caller
 
             crossChainVerifier_calculateFeeImpl self arg = do
-                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_CalculateFee
+                exercise (fromInterfaceContractId @CommitteeVerifier self) CalculateFee
                     with
                         sendingMessageCid = arg.sendingMessageCid
                         extraContext = arg.extraContext
                         caller = arg.caller
 
             crossChainVerifier_getFeeImpl self arg = do
-                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_GetFee
+                exercise (fromInterfaceContractId @CommitteeVerifier self) GetFee
                     with
                         destChainSelector = arg.destChainSelector
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
-                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_ForwardToVerifier
+                exercise (fromInterfaceContractId @CommitteeVerifier self) ForwardToVerifier
                     with
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
@@ -286,7 +286,7 @@ template CommitteeVerifier
         -- | Verify an inbound message and append CCV verification to ExecutingMessageV1.
         -- Fetches ExecutingMessageV1 for decoded message content and re-encodes
         -- for signature verification (encoding is deterministic).
-        nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+        nonconsuming choice VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 extraContext : CCIP.Context.CCIPContext
@@ -347,7 +347,7 @@ template CommitteeVerifier
         -- | Calculate fee for outbound message (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
         -- fee config, appends fee via AddCCVFee.
-        nonconsuming choice CommitteeVerifier_CalculateFee
+        nonconsuming choice CalculateFee
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -369,7 +369,7 @@ template CommitteeVerifier
                     caller = owner
 
         -- | Quote fee for outbound message (USD cents only).
-        nonconsuming choice CommitteeVerifier_GetFee
+        nonconsuming choice GetFee
                 : CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote
             with
                 destChainSelector : Numeric 0
@@ -388,7 +388,7 @@ template CommitteeVerifier
 
         -- | Forward message for verification. Exercises AddVerifierData
         -- directly on SendingMessageV1.
-        nonconsuming choice CommitteeVerifier_ForwardToVerifier
+        nonconsuming choice ForwardToVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote

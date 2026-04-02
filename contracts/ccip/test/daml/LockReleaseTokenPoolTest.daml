@@ -184,20 +184,20 @@ testLockOrBurn = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -340,7 +340,7 @@ testLockOrBurn = script do
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
                       <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+        exerciseCmd tokenPool LockReleaseTokenPool.LockOrBurn with
             tokenAdminRegistryCid = tokenAdminRegistry
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
@@ -355,7 +355,7 @@ testLockOrBurn = script do
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
                       <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+        exerciseCmd tokenPool LockReleaseTokenPool.LockOrBurn with
             tokenAdminRegistryCid = tokenAdminRegistry
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
@@ -370,7 +370,7 @@ testLockOrBurn = script do
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
                       <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+        exerciseCmd tokenPool LockReleaseTokenPool.LockOrBurn with
             tokenAdminRegistryCid = tokenAdminRegistry
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
@@ -440,20 +440,20 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -595,7 +595,7 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
                       <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+        exerciseCmd tokenPool LockReleaseTokenPool.LockOrBurn with
             tokenAdminRegistryCid = tokenAdminRegistry
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
@@ -660,20 +660,20 @@ testLockOrBurnDeductsFeeBps = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -808,7 +808,7 @@ testLockOrBurnDeductsFeeBps = script do
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
                       <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+        exerciseCmd tokenPool LockReleaseTokenPool.LockOrBurn with
             tokenAdminRegistryCid = tokenAdminRegistry
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
@@ -870,20 +870,20 @@ testReleaseFromTicket = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -970,7 +970,7 @@ testReleaseFromTicket = script do
                       <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                       <> disclose disclosedPreapproval <> disclose disclosedRmn
                       <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
@@ -1056,20 +1056,20 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -1150,7 +1150,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
                     <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                     <> disclose disclosedPreapproval <> disclose disclosedRmn
                     <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
@@ -1191,20 +1191,20 @@ testReleaseFromTicketDecimalConversion = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -1296,7 +1296,7 @@ testReleaseFromTicketDecimalConversion = script do
                       <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                       <> disclose disclosedPreapproval <> disclose disclosedRmn
                       <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
@@ -1359,20 +1359,20 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -1464,7 +1464,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
                     <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                     <> disclose disclosedPreapproval <> disclose disclosedRmn
                     <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
@@ -1521,20 +1521,20 @@ testReleaseFromTicketWithAdditionalCCVOwner = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -1624,7 +1624,7 @@ testReleaseFromTicketWithAdditionalCCVOwner = script do
                     <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                     <> disclose disclosedPreapproval <> disclose disclosedRmn
                     <> disclose disclosedRateLimiter) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
@@ -2128,20 +2128,20 @@ testVerifyInboundMessage = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -2230,7 +2230,7 @@ testVerifyInboundMessage = script do
     disclosedEm <- fromSome <$> queryDisclosure ccipOwner executingMessageCid
     newEmCid <- submit (actAs receiver
                         <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedEm) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_VerifyInboundMessage with
+        exerciseCmd tokenPool LockReleaseTokenPool.VerifyInboundMessage with
             tokenAdminRegistryCid = tokenAdminRegistry
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -2403,20 +2403,20 @@ testVerifyInboundMessageInvalidSourcePool = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -2501,7 +2501,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     submitMustFail (actAs poolOwner <> actAs ccipOwner <> actAs receiver
                     <> disclose disclosedTar) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_VerifyInboundMessage with
+        exerciseCmd tokenPool LockReleaseTokenPool.VerifyInboundMessage with
             tokenAdminRegistryCid = tokenAdminRegistry
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -2533,20 +2533,20 @@ testVerifyInboundMessageMissingChainConfig = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -2631,7 +2631,7 @@ testVerifyInboundMessageMissingChainConfig = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     submitMustFail (actAs poolOwner <> actAs ccipOwner <> actAs receiver
                     <> disclose disclosedTar) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_VerifyInboundMessage with
+        exerciseCmd tokenPool LockReleaseTokenPool.VerifyInboundMessage with
             tokenAdminRegistryCid = tokenAdminRegistry
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -2692,20 +2692,20 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -2857,20 +2857,20 @@ testCalculateFeePrefersPoolOverride = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -3027,20 +3027,20 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
