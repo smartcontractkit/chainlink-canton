@@ -44,9 +44,9 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	poolOwnerParty := input.PoolOwnerParty
 
 	// Step 1: ProposeAdministrator (CCIP acts)
-	_, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistryProposeAdministrator]{
+	_, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.ProposeAdministrator]{
 		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
-		Args: tokenadminregistry.TokenAdminRegistryProposeAdministrator{
+		Args: tokenadminregistry.ProposeAdministrator{
 			InstrumentId: instrumentId,
 			NewAdmin:     types.PARTY(poolOwnerParty),
 			Caller:       types.PARTY(ccipParty),
@@ -57,9 +57,9 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	}
 
 	// Step 2: AcceptAdminRole (pool owner acts). Exercise resolves current TAR contract by InstanceAddress.
-	_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistryAcceptAdminRole]{
+	_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.AcceptAdminRole]{
 		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
-		Args: tokenadminregistry.TokenAdminRegistryAcceptAdminRole{
+		Args: tokenadminregistry.AcceptAdminRole{
 			InstrumentId: instrumentId,
 			Caller:       types.PARTY(poolOwnerParty),
 		},
@@ -70,9 +70,9 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 
 	// Step 3: SetPool (pool owner acts)
 	poolOwnerPartyTyped := types.PARTY(poolOwnerParty)
-	_, err = operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistrySetPool]{
+	_, err = operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[tokenadminregistry.SetPool]{
 		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
-		Args: tokenadminregistry.TokenAdminRegistrySetPool{
+		Args: tokenadminregistry.SetPool{
 			InstrumentId: instrumentId,
 			TokenPool: &tokenadminregistry.PoolRegistration{
 				PoolOwner:      poolOwnerPartyTyped,
