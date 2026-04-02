@@ -68,6 +68,9 @@ type CCIPSendRequest struct {
 	// Ccvs The list of InstanceAddresses for all CCVs which should verify the message.
 	// As part of the response, the explicit disclosures for all CCVs that this EDS knows about will be returned.
 	Ccvs []string `json:"ccvs"`
+
+	// DefaultExecutor The explicit disclosure of the default executor.
+	DefaultExecutor interface{} `json:"defaultExecutor,omitempty"`
 }
 
 // CCIPSendResponse defines model for CCIPSendResponse.
@@ -77,7 +80,8 @@ type CCIPSendResponse struct {
 	// ChoiceContext The context required to send/execute a message from/to Canton.
 	// Used to retrieve additional CCIP contracts which are referred to via their
 	// contract IDs in the 'choiceContextData'.
-	ChoiceContext ChoiceContext `json:"choiceContext"`
+	ChoiceContext   ChoiceContext     `json:"choiceContext"`
+	DefaultExecutor DisclosedContract `json:"defaultExecutor"`
 }
 
 // ChoiceContext The context required to send/execute a message from/to Canton.

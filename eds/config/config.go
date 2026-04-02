@@ -45,6 +45,7 @@ type Contracts struct {
 	TokenAdminRegistry    ContractIdentifier   `toml:"token_admin_registry" validate:"required"`
 	RMNRemote             ContractIdentifier   `toml:"rmn_remote" validate:"required"`
 	FeeQuoter             ContractIdentifier   `toml:"fee_quoter" validate:"required"`
+	DefaultExecutor       ContractIdentifier   `toml:"default_executor" validate:"required"`
 	CCVs                  []ContractIdentifier `toml:"ccvs"`
 	TokenPoolContracts    []TokenPoolContracts `toml:"token_pool_contracts"`
 

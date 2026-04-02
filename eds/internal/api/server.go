@@ -230,6 +230,7 @@ func (s Server) CcipSend(c *gin.Context) {
 		convertDisclosedContract(disclosures.TokenAdminRegistry),
 		convertDisclosedContract(disclosures.RMNRemote),
 		convertDisclosedContract(disclosures.FeeQuoter),
+		convertDisclosedContract(disclosures.DefaultExecutor),
 	}
 
 	resp := edsv1.CCIPSendResponse{
@@ -237,7 +238,8 @@ func (s Server) CcipSend(c *gin.Context) {
 			ChoiceContextData:  choiceContextData,
 			DisclosedContracts: disclosedContracts,
 		},
-		Ccvs: make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
+		Ccvs:            make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
+		DefaultExecutor: convertDisclosedContract(disclosures.DefaultExecutor),
 	}
 
 	for address, contract := range disclosures.CCVs {

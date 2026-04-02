@@ -32,6 +32,7 @@ type DisclosureServiceConfig struct {
 	TokenAdminRegistry    contracts.InstanceAddress
 	RMNRemote             contracts.InstanceAddress
 	FeeQuoter             contracts.InstanceAddress
+	DefaultExecutor       contracts.InstanceAddress
 	CCVs                  []contracts.InstanceAddress
 
 	TokenPools                                   []contracts.InstanceAddress
@@ -54,6 +55,7 @@ type DisclosureService struct {
 	tokenAdminRegistry    contracts.InstanceAddress
 	rmnRemote             contracts.InstanceAddress
 	feeQuoter             contracts.InstanceAddress
+	defaultExecutor       contracts.InstanceAddress
 	ccvs                  []contracts.InstanceAddress
 
 	// Contains all configured instance addresses, to allow looking up if a requested disclosure should be returned.
@@ -78,6 +80,7 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 	allContracts[config.TokenAdminRegistry] = struct{}{}
 	allContracts[config.RMNRemote] = struct{}{}
 	allContracts[config.FeeQuoter] = struct{}{}
+	allContracts[config.DefaultExecutor] = struct{}{}
 	for _, ccv := range config.CCVs {
 		allContracts[ccv] = struct{}{}
 	}
@@ -105,6 +108,7 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 		tokenAdminRegistry:    config.TokenAdminRegistry,
 		rmnRemote:             config.RMNRemote,
 		feeQuoter:             config.FeeQuoter,
+		defaultExecutor:       config.DefaultExecutor,
 		ccvs:                  config.CCVs,
 
 		allContracts: allContracts,
@@ -121,6 +125,7 @@ type CCIPSendDisclosures struct {
 	TokenAdminRegistry *apiv2.DisclosedContract
 	RMNRemote          *apiv2.DisclosedContract
 	FeeQuoter          *apiv2.DisclosedContract
+	DefaultExecutor    *apiv2.DisclosedContract
 	CCVs               map[contracts.InstanceAddress]*apiv2.DisclosedContract
 }
 
@@ -164,6 +169,10 @@ func (s *DisclosureService) GetCCIPSendDisclosures(ctx context.Context, request 
 	if err != nil {
 		return CCIPSendDisclosures{}, fmt.Errorf("rmnRemote: %w", err)
 	}
+	defaultExecutor, err := s.GetDisclosure(ctx, s.defaultExecutor)
+	if err != nil {
+		return CCIPSendDisclosures{}, fmt.Errorf("defaultExecutor: %w", err)
+	}
 
 	// CCVs
 	ccvs := make(map[contracts.InstanceAddress]*apiv2.DisclosedContract, len(request.CCVs))
@@ -187,6 +196,7 @@ func (s *DisclosureService) GetCCIPSendDisclosures(ctx context.Context, request 
 		TokenAdminRegistry: tokenAdminRegistry,
 		RMNRemote:          rmnRemote,
 		FeeQuoter:          feeQuoter,
+		DefaultExecutor:    defaultExecutor,
 		CCVs:               ccvs,
 	}, nil
 }
