@@ -23,7 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
-func TestTokenAdminRegistry_SetPoolViaMCMS(t *testing.T) {
+func TestSetPoolViaMCMS(t *testing.T) {
 	t.Parallel()
 
 	// Use shared TAR environment
@@ -64,8 +64,8 @@ func TestTokenAdminRegistry_SetPoolViaMCMS(t *testing.T) {
 		PoolOwner:      types.PARTY(ccipOwner),
 		PoolInstanceId: types.TEXT("test-pool-001"),
 	}
-	encodedSetPool, err := tarContract.Encoder().TokenAdminRegistrySetPoolMCMSParams(
-		tokenadminregistry.TokenAdminRegistrySetPoolMCMSParams{
+	encodedSetPool, err := tarContract.Encoder().SetPoolMCMSParams(
+		tokenadminregistry.SetPoolMCMSParams{
 			InstrumentId: testInstrumentId,
 			TokenPool:    poolReg,
 		},
@@ -169,8 +169,8 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 	tarContract := tokenadminregistry.NewContract(tarPkgID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Clear pool by setting to None via MCMS
-	encodedClearPool, err := tarContract.Encoder().TokenAdminRegistrySetPoolMCMSParams(
-		tokenadminregistry.TokenAdminRegistrySetPoolMCMSParams{
+	encodedClearPool, err := tarContract.Encoder().SetPoolMCMSParams(
+		tokenadminregistry.SetPoolMCMSParams{
 			InstrumentId: testInstrumentId,
 			TokenPool:    nil, // nil = clear pool
 		},
@@ -251,8 +251,8 @@ func TestTokenAdminRegistry_ProposeAdminViaMCMS(t *testing.T) {
 
 	// Propose a new admin via MCMS
 	newAdmin := types.PARTY(ccipOwner) // For simplicity, propose self as admin
-	encodedPropose, err := tarContract.Encoder().TokenAdminRegistryProposeAdministratorMCMSParams(
-		tokenadminregistry.TokenAdminRegistryProposeAdministratorMCMSParams{
+	encodedPropose, err := tarContract.Encoder().ProposeAdministratorMCMSParams(
+		tokenadminregistry.ProposeAdministratorMCMSParams{
 			InstrumentId: testInstrumentId,
 			NewAdmin:     newAdmin,
 		},
@@ -340,7 +340,7 @@ func createTokenAdminRegistryEmpty(
 	return res.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
 }
 
-// exerciseSetPoolDirectly exercises the TokenAdminRegistry_SetPool choice directly (not via MCMS).
+// exerciseSetPoolDirectly exercises the SetPool choice directly (not via MCMS).
 // Used to set up initial state for tests.
 func exerciseSetPoolDirectly(
 	t *testing.T,
@@ -353,7 +353,7 @@ func exerciseSetPoolDirectly(
 ) string {
 	t.Helper()
 
-	setPoolArgs := tokenadminregistry.TokenAdminRegistrySetPool{
+	setPoolArgs := tokenadminregistry.SetPool{
 		InstrumentId: instrumentId,
 		TokenPool:    pool,
 		Caller:       types.PARTY(owner),
@@ -371,7 +371,7 @@ func exerciseSetPoolDirectly(
 							EntityName: "TokenAdminRegistry",
 						},
 						ContractId:     tarCid,
-						Choice:         "TokenAdminRegistry_SetPool",
+						Choice:         "SetPool",
 						ChoiceArgument: ledger.MapToValue(setPoolArgs),
 					},
 				},
@@ -404,7 +404,7 @@ func exerciseProposeAndAcceptAdmin(
 ) string {
 	t.Helper()
 
-	proposeArgs := tokenadminregistry.TokenAdminRegistryProposeAdministrator{
+	proposeArgs := tokenadminregistry.ProposeAdministrator{
 		InstrumentId: instrumentId,
 		NewAdmin:     types.PARTY(owner),
 		Caller:       types.PARTY(owner),
@@ -422,7 +422,7 @@ func exerciseProposeAndAcceptAdmin(
 							EntityName: "TokenAdminRegistry",
 						},
 						ContractId:     tarCid,
-						Choice:         "TokenAdminRegistry_ProposeAdministrator",
+						Choice:         "ProposeAdministrator",
 						ChoiceArgument: ledger.MapToValue(proposeArgs),
 					},
 				},
@@ -440,7 +440,7 @@ func exerciseProposeAndAcceptAdmin(
 	}
 	require.NotEmpty(t, newTarCid, "no TokenAdminRegistry contract created after ProposeAdministrator")
 
-	acceptArgs := tokenadminregistry.TokenAdminRegistryAcceptAdminRole{
+	acceptArgs := tokenadminregistry.AcceptAdminRole{
 		InstrumentId: instrumentId,
 		Caller:       types.PARTY(owner),
 	}
@@ -457,7 +457,7 @@ func exerciseProposeAndAcceptAdmin(
 							EntityName: "TokenAdminRegistry",
 						},
 						ContractId:     newTarCid,
-						Choice:         "TokenAdminRegistry_AcceptAdminRole",
+						Choice:         "AcceptAdminRole",
 						ChoiceArgument: ledger.MapToValue(acceptArgs),
 					},
 				},
