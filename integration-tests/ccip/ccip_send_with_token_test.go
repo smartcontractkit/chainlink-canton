@@ -633,21 +633,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 
 	// Extract transfer factory context values (e.g. amulet-rules) for the fee token input
-	transferFactoryContextValues := make(types.TEXTMAP)
-	if choiceContextRecord := choiceContext.GetRecord(); choiceContextRecord != nil && len(choiceContextRecord.Fields) > 0 {
-		valuesField := choiceContextRecord.Fields[0]
-		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
-			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
-				if v := entry.GetValue().GetVariant(); v != nil {
-					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
-					transferFactoryContextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
-				} else if entry.GetValue().GetText() != "" {
-					txt := types.TEXT(entry.GetValue().GetText())
-					transferFactoryContextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
-				}
-			}
-		}
-	}
+	transferFactoryContextValues := extractChoiceContextValues(choiceContext)
 
 	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
 		Context: splice_api_token_metadata_v1.ChoiceContext{
@@ -666,21 +652,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
 	require.NoError(t, err, "failed to get token transfer factory")
-	tokenTransferContextValues := make(types.TEXTMAP)
-	if tokenCtxRecord := tokenTransferChoiceContext.GetRecord(); tokenCtxRecord != nil && len(tokenCtxRecord.Fields) > 0 {
-		tokenValuesField := tokenCtxRecord.Fields[0]
-		if tokenValuesField.GetLabel() == "values" && tokenValuesField.GetValue().GetTextMap() != nil {
-			for _, entry := range tokenValuesField.GetValue().GetTextMap().GetEntries() {
-				if v := entry.GetValue().GetVariant(); v != nil {
-					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
-					tokenTransferContextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
-				} else if entry.GetValue().GetText() != "" {
-					txt := types.TEXT(entry.GetValue().GetText())
-					tokenTransferContextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
-				}
-			}
-		}
-	}
+	tokenTransferContextValues := extractChoiceContextValues(tokenTransferChoiceContext)
 
 	// This transfer preapproval must be specified for transfer to the pool's owner to be automatically be accepted.
 	// The pool's EDS must also provide explicit disclosures for this preapproval contract, else the send will fail.
@@ -780,7 +752,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		},
 	}
 
-	ccipSendArgs := ledger.MapToValue(sendArgs)
 	sendDisclosures := testhelpers.DeduplicateDisclosedContracts(slices.Concat(
 		[]*apiv2.DisclosedContract{
 			disclosedCCIPSender,
@@ -807,6 +778,59 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("GetFee: feeTokenAmount=%s poolFeeTokenAmount=%s", feeStr, poolFeeStr)
 	require.NotEqual(t, "0", feeStr, "GetFee should return a positive fee")
 	require.NotEqual(t, "0", poolFeeStr, "GetFee should return a positive pool fee")
+
+	// Re-fetch volatile Splice contracts (AmuletRules, transfer factories, preapproval)
+	// to avoid INACTIVE_CONTRACTS race from Splice background automation (round advancement)
+	// archiving and recreating system contracts between the initial fetch and Send submission.
+	transferFactoryCid, transferFactoryDisclosures, choiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
+	require.NoError(t, err, "failed to re-fetch fee transfer factory")
+	feeTokenInput = interfaces.TokenInput{
+		TransferFactory: types.CONTRACT_ID(transferFactoryCid),
+		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+			Context: splice_api_token_metadata_v1.ChoiceContext{Values: extractChoiceContextValues(choiceContext)},
+			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+		},
+		TokenPoolHoldings: []types.CONTRACT_ID{},
+	}
+	sendArgs.FeeTokenInput.TokenInput = feeTokenInput
+
+	tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
+	require.NoError(t, err, "failed to re-fetch token transfer factory")
+	disclosedPreapproval, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#splice-amulet", ModuleName: "Splice.AmuletRules", EntityName: "TransferPreapproval"})
+	require.NoError(t, err, "failed to re-fetch disclosed TransferPreapproval")
+	tokenTransferContextValues = extractChoiceContextValues(tokenTransferChoiceContext)
+	preapprovalCid = types.CONTRACT_ID(disclosedPreapproval.ContractId)
+	tokenTransferContextValues["transfer-preapproval"] = splice_api_token_metadata_v1.AnyValue{AVContractId: &preapprovalCid}
+	sendArgs.TokenTransferInput.TokenInput = interfaces.TokenInput{
+		TransferFactory: types.CONTRACT_ID(tokenTransferFactoryCid),
+		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+			Context: splice_api_token_metadata_v1.ChoiceContext{Values: tokenTransferContextValues},
+			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+		},
+		TokenPoolHoldings: []types.CONTRACT_ID{},
+	}
+
+	sendDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(
+		[]*apiv2.DisclosedContract{
+			disclosedCCIPSender,
+			disclosedRouter,
+			disclosedOnRamp,
+			disclosedGlobalConfig,
+			disclosedTar,
+			disclosedRmnRemote,
+			disclosedFeeQuoter,
+			disclosedFeeTokenHolding,
+			disclosedTokenTransferHolding,
+			disclosedCCV,
+			disclosedPool,
+			disclosedOutboundRateLimiter,
+			disclosedPreapproval,
+			disclosedExecutor,
+		},
+		transferFactoryDisclosures,
+		tokenTransferFactoryDisclosures,
+	)...)
+	ccipSendArgs := ledger.MapToValue(sendArgs)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -889,6 +913,28 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
+}
+
+// extractChoiceContextValues converts a Splice ChoiceContext proto value into a TEXTMAP
+// suitable for use as TokenInput.ExtraArgs.Context.Values.
+func extractChoiceContextValues(choiceContext *apiv2.Value) types.TEXTMAP {
+	contextValues := make(types.TEXTMAP)
+	if rec := choiceContext.GetRecord(); rec != nil && len(rec.Fields) > 0 {
+		valuesField := rec.Fields[0]
+		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
+			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
+				if v := entry.GetValue().GetVariant(); v != nil {
+					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
+				} else if entry.GetValue().GetText() != "" {
+					txt := types.TEXT(entry.GetValue().GetText())
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
+				}
+			}
+		}
+	}
+
+	return contextValues
 }
 
 // extractTokenTransferAmountFromEncodedMessageHex decodes encodedMessage and returns
