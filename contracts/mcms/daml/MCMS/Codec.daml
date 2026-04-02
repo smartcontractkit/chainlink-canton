@@ -658,11 +658,13 @@ decodeDecimalAt encoded offset = do
   Some (dec, newOffset)
 
 -- | Parse decimal from text (handles "123.456" format)
+-- Check sign from original text to handle negative decimals correctly (e.g. "-0.3")
 parseDecimal : Text -> Optional Decimal
 parseDecimal text =
   if Text.length text == 0 then None
   else
-    let parts = Text.splitOn "." text
+    let isNegative = Text.take 1 text == "-"
+        parts = Text.splitOn "." text
     in case parts of
       [intPart] -> do
         intVal <- parseIntSafe intPart
@@ -675,7 +677,9 @@ parseDecimal text =
             let fracLen = Text.length fracPart
                 fracVal = parseDigitsUnsafe fracPart 0
                 divisor = pow10 fracLen
-            in Some (intToDecimal intVal + (intToDecimal fracVal / intToDecimal divisor))
+                frac = intToDecimal fracVal / intToDecimal divisor
+            in Some (if isNegative then intToDecimal intVal - frac
+                     else intToDecimal intVal + frac)
       _ -> None
 
 -- | Safe integer parsing - returns None on invalid input
