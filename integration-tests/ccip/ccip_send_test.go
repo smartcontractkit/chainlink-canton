@@ -637,7 +637,7 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	// TODO: not clear what is duplicated here yet
-	allDisclosures := testhelpers.DeduplicateDisclosedContracts(slices.Concat(
+	allDisclosures := slices.Concat(
 		[]*apiv2.DisclosedContract{
 			disclosedCCIPSender,      // not from EDS
 			disclosedRouter,          // not from EDS
@@ -645,7 +645,7 @@ func TestCCIPSend(t *testing.T) {
 		},
 		sendDisclosures.DisclosedContracts,
 		transferFactoryDisclosures,
-	)...)
+	)
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, allDisclosures)
 	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")
 
