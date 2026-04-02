@@ -17,6 +17,7 @@ import DA.Map qualified as Map
 import DA.List ((!!), dedup)
 import DA.Action (unless)
 import DA.Foldable (forA_)
+import DA.Text qualified as Text
 import DA.Time (RelTime, seconds, addRelTime, time)
 import DA.Date (date, Month(..))
 import DA.Crypto.Text (BytesHex)
@@ -98,9 +99,13 @@ validateMultisigConfig config = do
   let signerAddrs = map (\s -> s.signerAddress) config.signers
   assertMsg "mcms: duplicate signer addresses" $
     length (dedup signerAddrs) == length signerAddrs
-  -- Validate signer addresses are valid hex
-  forA_ config.signers $ \signer ->
+  -- Validate signer addresses are valid hex, correct length, and lowercase
+  forA_ config.signers $ \signer -> do
     assertValidHex "signerAddress" signer.signerAddress
+    assertMsg ("mcms: signerAddress must be 20 bytes, got " <> show (byteCount signer.signerAddress)) $
+      byteCount signer.signerAddress == 20
+    assertMsg "mcms: signerAddress must be lowercase" $
+      signer.signerAddress == Text.asciiToLower signer.signerAddress
 
 template MCMS
   with
