@@ -27,7 +27,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/icza/gox v0.2.6
 	github.com/jpillora/backoff v1.0.0
-	github.com/lib/pq v1.12.0
+	github.com/lib/pq v1.12.2
 	github.com/oapi-codegen/runtime v1.3.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.34.0
