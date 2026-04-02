@@ -1,0 +1,344 @@
+module ReceiveRequiredCCVs where
+
+import Daml.Script
+
+import DA.Assert
+import DA.List (sort)
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+import DA.Set qualified as Set
+import qualified DA.TextMap as TextMap
+
+import qualified CCIP.CCIPReceiver
+import qualified CCIP.Context
+import qualified CCIP.GlobalConfig
+import qualified CCIP.Internal
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.OffRamp
+import qualified CCIP.OffRampTypes
+import qualified CCIP.PerPartyRouter
+import qualified CCIP.PerPartyRouterTypes
+import qualified CCIP.RMNRemote
+import qualified CCIP.TokenAdminRegistry
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+
+mkContext
+    : ContractId CCIP.RMNRemote.RMNRemote
+    -> ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+    -> ContractId CCIP.GlobalConfig.GlobalConfig
+    -> ContractId CCIP.OffRamp.OffRamp
+    -> CCIP.Context.CCIPContext
+mkContext rmnRemoteCid tokenAdminRegistryCid globalConfigCid offRampCid =
+    CCIP.Context.CCIPContext with
+        values = TextMap.fromList
+            [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId (coerceContractId rmnRemoteCid))
+            , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId (coerceContractId tokenAdminRegistryCid))
+            , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId (coerceContractId globalConfigCid))
+            , (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId (coerceContractId offRampCid))
+            ]
+
+testReceiverGetRequiredCCVsMatchesPrepareExecute : Script ()
+testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
+    ccipOwner <- allocateParty "ccip-owner-rrc"
+    rmnOwner <- allocateParty "rmn-owner-rrc"
+    receiver <- allocateParty "receiver-rrc"
+    receiverCcvOwner <- allocateParty "receiver-ccv-owner-rrc"
+    laneCcvOwner <- allocateParty "lane-ccv-owner-rrc"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+    let globalConfigInstanceId = "test-globalconfig-rrc"
+    let rmnInstanceId = "test-rmn-rrc"
+    let tokenAdminRegistryInstanceId = "test-tar-rrc"
+    let offRampInstanceId = "test-offramp-rrc"
+    let routerInstanceId = "test-router-rrc"
+    let receiverInstanceId = "test-ccipreceiver-rrc"
+    let laneCcv = RawInstanceAddress.make "lane-ccv-rrc" laneCcvOwner
+    let receiverCcv = RawInstanceAddress.make "receiver-ccv-rrc" receiverCcvOwner
+
+    globalConfigCid <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList
+                [ (sourceChainSelector, CCIP.GlobalConfig.SourceChainConfig with
+                    isEnabled = True
+                    onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
+                    laneMandatedCCVs = [laneCcv]
+                    defaultCCVs = []
+                  )
+                ]
+
+    rmnRemoteCid <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistryCid <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    let globalConfigAddr = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteAddr = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryAddr = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let offRampAddr = RawInstanceAddress.make offRampInstanceId ccipOwner
+
+    offRampCid <- submit ccipOwner do
+        createCmd CCIP.OffRamp.OffRamp with
+            instanceId = offRampInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.OffRampTypes.OffRampDeps with
+                globalConfig = globalConfigAddr
+                rmnRemote = rmnRemoteAddr
+                tokenAdminRegistry = tokenAdminRegistryAddr
+
+    routerCid <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = routerInstanceId
+            ccipOwner = ccipOwner
+            partyOwner = receiver
+            deps = CCIP.PerPartyRouterTypes.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.make "unused-onramp-rrc" ccipOwner
+                offRamp = offRampAddr
+                globalConfig = globalConfigAddr
+                tokenAdminRegistry = tokenAdminRegistryAddr
+                feeQuoter = RawInstanceAddress.make "unused-feequoter-rrc" ccipOwner
+                rmnRemote = rmnRemoteAddr
+            outboundSequenceNumbers = Map.empty
+            executedMessages = Set.empty
+            archivedExecutionContractIds = []
+            customObservers = []
+
+    receiverCid <- submit receiver do
+        createCmd CCIP.CCIPReceiver.CCIPReceiver with
+            instanceId = receiverInstanceId
+            owner = receiver
+            requiredCCVs = [receiverCcv]
+            optionalCCVs = []
+            optionalThreshold = 0
+            minBlockConfirmations = 0
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 0
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = RawInstanceAddress.toInstanceAddress offRampAddr
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "48656c6c6f20576f726c64"
+    let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 message
+    let context = mkContext rmnRemoteCid tokenAdminRegistryCid globalConfigCid offRampCid
+
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRampCid
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfigCid
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemoteCid
+
+    helperRequired <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig) do
+        exerciseCmd receiverCid CCIP.CCIPReceiver.GetRequiredCCVs with
+            context = context
+            routerCid = routerCid
+            encodedMessage = encodedMessage
+            tokenPoolCid = None
+
+    executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd routerCid CCIP.PerPartyRouter.PrepareExecute with
+            context = context
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = [receiverCcv]
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 0
+            caller = receiver
+
+    executingMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
+    sort helperRequired === sort executingMessage.requiredCCVs
+
+testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly : Script ()
+testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
+    ccipOwner <- allocateParty "ccip-owner-rrc-defaults"
+    rmnOwner <- allocateParty "rmn-owner-rrc-defaults"
+    receiver <- allocateParty "receiver-rrc-defaults"
+    receiverCcvOwner <- allocateParty "receiver-ccv-owner-rrc-defaults"
+    defaultCcvOwner <- allocateParty "default-ccv-owner-rrc-defaults"
+    laneCcvOwner <- allocateParty "lane-ccv-owner-rrc-defaults"
+
+    let sourceChainSelector : Numeric 0 = 321.0
+    let destChainSelector : Numeric 0 = 654.0
+    let globalConfigInstanceId = "test-globalconfig-rrc-defaults"
+    let rmnInstanceId = "test-rmn-rrc-defaults"
+    let tokenAdminRegistryInstanceId = "test-tar-rrc-defaults"
+    let offRampInstanceId = "test-offramp-rrc-defaults"
+    let routerInstanceId = "test-router-rrc-defaults"
+    let receiverInstanceId = "test-ccipreceiver-rrc-defaults"
+    let receiverCcv = RawInstanceAddress.make "receiver-ccv-rrc-defaults" receiverCcvOwner
+    let defaultCcv = RawInstanceAddress.make "default-ccv-rrc-defaults" defaultCcvOwner
+    let laneCcv = RawInstanceAddress.make "lane-ccv-rrc-defaults" laneCcvOwner
+
+    globalConfigCid <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList
+                [ (sourceChainSelector, CCIP.GlobalConfig.SourceChainConfig with
+                    isEnabled = True
+                    onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
+                    laneMandatedCCVs = [laneCcv]
+                    defaultCCVs = [defaultCcv]
+                  )
+                ]
+
+    rmnRemoteCid <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistryCid <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    let globalConfigAddr = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteAddr = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryAddr = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let offRampAddr = RawInstanceAddress.make offRampInstanceId ccipOwner
+
+    offRampCid <- submit ccipOwner do
+        createCmd CCIP.OffRamp.OffRamp with
+            instanceId = offRampInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.OffRampTypes.OffRampDeps with
+                globalConfig = globalConfigAddr
+                rmnRemote = rmnRemoteAddr
+                tokenAdminRegistry = tokenAdminRegistryAddr
+
+    routerCid <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = routerInstanceId
+            ccipOwner = ccipOwner
+            partyOwner = receiver
+            deps = CCIP.PerPartyRouterTypes.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.make "unused-onramp-rrc-defaults" ccipOwner
+                offRamp = offRampAddr
+                globalConfig = globalConfigAddr
+                tokenAdminRegistry = tokenAdminRegistryAddr
+                feeQuoter = RawInstanceAddress.make "unused-feequoter-rrc-defaults" ccipOwner
+                rmnRemote = rmnRemoteAddr
+            outboundSequenceNumbers = Map.empty
+            executedMessages = Set.empty
+            archivedExecutionContractIds = []
+            customObservers = []
+
+    receiverCid <- submit receiver do
+        createCmd CCIP.CCIPReceiver.CCIPReceiver with
+            instanceId = receiverInstanceId
+            owner = receiver
+            requiredCCVs = [receiverCcv]
+            optionalCCVs = []
+            optionalThreshold = 0
+            minBlockConfirmations = 0
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 0
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = RawInstanceAddress.toInstanceAddress offRampAddr
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "48656c6c6f20576f726c64"
+    let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 message
+    let context = mkContext rmnRemoteCid tokenAdminRegistryCid globalConfigCid offRampCid
+
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRampCid
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfigCid
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemoteCid
+
+    helperRequired <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig) do
+        exerciseCmd receiverCid CCIP.CCIPReceiver.GetRequiredCCVs with
+            context = context
+            routerCid = routerCid
+            encodedMessage = encodedMessage
+            tokenPoolCid = None
+
+    executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd routerCid CCIP.PerPartyRouter.PrepareExecute with
+            context = context
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = [receiverCcv]
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 0
+            caller = receiver
+
+    executingMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
+    sort helperRequired === sort executingMessage.requiredCCVs
+    sort helperRequired === sort [receiverCcv, laneCcv]
+
+testMergeInboundPoolCCVsUsesDefaultsForEmpty : Script ()
+testMergeInboundPoolCCVsUsesDefaultsForEmpty = script do
+    ownerA <- allocateParty "merge-default-owner-a"
+    ownerB <- allocateParty "merge-default-owner-b"
+    let default1 = RawInstanceAddress.make "default-1" ownerA
+    let default2 = RawInstanceAddress.make "default-2" ownerB
+    let required0 = [RawInstanceAddress.make "required-0" ownerA]
+    let optional0 = [default1, RawInstanceAddress.make "optional-1" ownerB]
+    let (required1, optional1, threshold1) =
+            CCIP.Internal.mergeInboundPoolCCVs
+                [default1, default2]
+                required0
+                optional0
+                1
+                []
+    sort required1 === sort (required0 ++ [default1, default2])
+    sort optional1 === sort [RawInstanceAddress.make "optional-1" ownerB]
+    threshold1 === 0
+
+testMergeInboundPoolCCVsExpandsSentinel : Script ()
+testMergeInboundPoolCCVsExpandsSentinel = script do
+    ownerA <- allocateParty "merge-sentinel-owner-a"
+    ownerB <- allocateParty "merge-sentinel-owner-b"
+    let default1 = RawInstanceAddress.make "default-s-1" ownerA
+    let explicitPool = RawInstanceAddress.make "pool-explicit" ownerB
+    let required0 = [RawInstanceAddress.make "required-s-0" ownerA]
+    let (required1, optional1, threshold1) =
+            CCIP.Internal.mergeInboundPoolCCVs
+                [default1]
+                required0
+                []
+                0
+                [CCIP.Internal.useDefaultCCVs, explicitPool]
+    sort required1 === sort (required0 ++ [default1, explicitPool])
+    optional1 === []
+    threshold1 === 0

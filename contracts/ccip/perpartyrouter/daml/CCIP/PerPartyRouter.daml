@@ -707,8 +707,11 @@ template PerPartyRouter
         nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]
             with
                 context : CCIP.Context.CCIPContext
+                message : CCIP.MessageCodecV1.MessageV1
                 receiverRequiredCCVs : [RawInstanceAddress]
-                sourceChainSelector : Numeric 0
+                receiverOptionalCCVs : [RawInstanceAddress]
+                receiverOptionalThreshold : Int
+                tokenPoolRequiredCCVs : [RawInstanceAddress]
             controller partyOwner
             do
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
@@ -722,10 +725,13 @@ template PerPartyRouter
                 RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
-                exercise offRampCid CCIP.OffRamp.GetRequiredCCVsForExecute with
+                exercise offRampCid CCIP.OffRamp.GetRequiredCCVsForExecuteFromRouter with
                     globalConfigCid = globalConfigCid
+                    message = message
                     receiverRequiredCCVs = receiverRequiredCCVs
-                    sourceChainSelector = sourceChainSelector
+                    receiverOptionalCCVs = receiverOptionalCCVs
+                    receiverOptionalThreshold = receiverOptionalThreshold
+                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
 
         interface instance MCMSReceiver for PerPartyRouter where
           view = MCMSReceiverView with
@@ -785,4 +791,3 @@ data ExecuteResult = ExecuteResult
         message : CCIP.MessageCodecV1.MessageV1
         state : CCIP.Internal.MessageExecutionState
     deriving (Eq, Show)
-

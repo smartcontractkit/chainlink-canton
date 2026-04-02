@@ -44,14 +44,13 @@ verifySignatures messageHash sigs =
 -- | Convert uncompressed public key to Ethereum address
 publicKeyToAddress : BytesHex -> BytesHex
 publicKeyToAddress pubKey =
-  let
-    keyData = if T.take 2 pubKey == "04"
-              then T.drop 2 pubKey
-              else pubKey
-    fullHash = keccak256 keyData
-    hashLen = T.length fullHash
-  in
-    T.drop (hashLen - 40) fullHash
+  if T.take 2 pubKey /= "04" || T.length pubKey /= 130
+    then error "publicKeyToAddress: key must be 65-byte uncompressed (04-prefixed)"
+    else
+      let keyData = T.drop 2 pubKey
+          fullHash = keccak256 keyData
+          hashLen = T.length fullHash
+      in T.drop (hashLen - 40) fullHash
 
 -- ===========================================================================
 -- DER ENCODING

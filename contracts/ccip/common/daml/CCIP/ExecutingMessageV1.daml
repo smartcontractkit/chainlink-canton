@@ -129,15 +129,13 @@ template ExecutingMessageV1
                     (isSome tokenReceiver)
                 assertMsg "SetInboundPoolCCVs: already set" (isNone inboundPoolCCVs)
                 assertMsg "SetInboundPoolCCVs: duplicate CCVs not allowed" (unique poolCCVs)
-                let resolvedPoolCCVs = case poolCCVs of
-                        [] -> sourceDefaultCCVs
-                        _ -> CCIP.Internal.resolveDefaultCCVs
+                let (mergedRequiredCCVs, mergedOptionalCCVs, mergedOptionalCCVThreshold) =
+                        CCIP.Internal.mergeInboundPoolCCVs
                             sourceDefaultCCVs
-                            CCIP.Internal.useDefaultCCVs
+                            requiredCCVs
+                            optionalCCVs
+                            optionalCCVThreshold
                             poolCCVs
-                let mergedRequiredCCVs = dedup (requiredCCVs ++ resolvedPoolCCVs)
-                let (mergedOptionalCCVs, mergedOptionalCCVThreshold) =
-                        CCIP.Internal.resolveOptionalCCVs resolvedPoolCCVs optionalCCVs optionalCCVThreshold
                 create this with
                     requiredCCVs = mergedRequiredCCVs
                     optionalCCVs = mergedOptionalCCVs
