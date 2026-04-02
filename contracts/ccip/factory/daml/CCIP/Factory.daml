@@ -191,8 +191,10 @@ template CCIPFactory
 
         -- | One-time ownership handover from bootstrap owner to MCMS party.
         -- This is consuming because signatory changes.
+        -- Both owner and mcmsParty must authorize: owner gives up ownership,
+        -- mcmsParty consents to become the new signatory.
         choice SetOwnerToMCMS : ContractId CCIPFactory
-            controller owner
+            controller [owner, mcmsParty]
             do
                 assertMsg "factory already MCMS controlled" (owner /= mcmsParty)
                 create this with
