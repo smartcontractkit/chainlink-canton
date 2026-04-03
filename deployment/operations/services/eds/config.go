@@ -82,7 +82,7 @@ var BuildConfig = operations.NewOperation(
 		if err != nil {
 			return GenerateEDSConfigOutput{}, fmt.Errorf("failed to get FeeQuoter address: %w", err)
 		}
-		executor, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(input.ChainSelector, datastore.ContractType(executor.ContractType), executor.Version, ""))
+		executor, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(input.ChainSelector, datastore.ContractType(executor.ContractType), executor.Version, "default"))
 		if err != nil {
 			return GenerateEDSConfigOutput{}, fmt.Errorf("failed to get Executor address: %w", err)
 		}
