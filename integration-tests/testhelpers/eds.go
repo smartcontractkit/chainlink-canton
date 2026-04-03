@@ -8,10 +8,11 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 func GetPerPartyRouterFactoryDisclosures(ctx context.Context, edsClient *edsv1.ClientWithResponses) (string, []*apiv2.DisclosedContract, error) {
