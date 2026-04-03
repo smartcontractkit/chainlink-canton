@@ -179,7 +179,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	t.Logf("PerPartyRouterFactory deployed: %s", pprInstanceID)
 
 	// --- Step 5: Verify factory state ---
-	factoryFields := queryContractFields(t, participant, factoryPkgID, "CCIP.Factory", "CCIPFactory", factoryCid)
+	factoryFields := queryContractFields(t, participant, factoryPkgID, factoryCid)
 	require.Equal(t, factoryInstanceID, factoryFields["instanceId"])
 	require.Equal(t, "true", factoryFields["perPartyRouterFactoryDeployed"])
 
@@ -224,7 +224,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	t.Logf("LockReleaseTokenPool deployed via MCMS: %s", lrtp2InstanceID)
 
 	// Final factory state check
-	factoryFields = queryContractFields(t, participant, factoryPkgID, "CCIP.Factory", "CCIPFactory", factoryCid)
+	factoryFields = queryContractFields(t, participant, factoryPkgID, factoryCid)
 	require.Equal(t, "true", factoryFields["perPartyRouterFactoryDeployed"])
 	t.Logf("Final factory state verified. All deployments successful.")
 
@@ -275,7 +275,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	destEncoded, err := gcEncoder.ApplyDestChainConfigUpdates(destConfigArgs)
 	require.NoError(t, err)
 
-	gcCid, mcmsCid = mcmsContractConfig(t, participant, mcmsPkgID, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, gcCid, gcInstanceAddr, chainID, sortedSigners, destEncoded)
+	gcCid, _ = mcmsContractConfig(t, participant, mcmsPkgID, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, gcCid, gcInstanceAddr, chainID, sortedSigners, destEncoded)
 	_ = gcCid
 	t.Logf("GlobalConfig: ApplyDestChainConfigUpdates applied via MCMS")
 
@@ -325,7 +325,7 @@ func TestCCIP_MCMSFactoryDeploy_FullGovernance(t *testing.T) {
 	t.Logf("Factory created by bootstrap party: CID=%s", factoryCid)
 
 	// Verify initial state: owner = bootstrapParty, mcmsParty = mcmsParty
-	initialFields := queryContractFields(t, participant, factoryPkgID, "CCIP.Factory", "CCIPFactory", factoryCid)
+	initialFields := queryContractFields(t, participant, factoryPkgID, factoryCid)
 	require.Equal(t, bootstrapParty, initialFields["owner"], "initial factory owner should be bootstrapParty")
 	require.Equal(t, mcmsParty, initialFields["mcmsParty"], "initial factory mcmsParty should be mcmsParty")
 	t.Logf("Verified initial state: owner=%s, mcmsParty=%s (different parties)", initialFields["owner"], initialFields["mcmsParty"])
@@ -337,50 +337,19 @@ func TestCCIP_MCMSFactoryDeploy_FullGovernance(t *testing.T) {
 	t.Logf("SetOwnerToMCMS executed: new factory CID=%s", factoryCid)
 
 	// Verify ownership transferred to mcmsParty
-	factoryFields := queryContractFields(t, participant, factoryPkgID, "CCIP.Factory", "CCIPFactory", factoryCid)
+	factoryFields := queryContractFields(t, participant, factoryPkgID, factoryCid)
 	require.Equal(t, mcmsParty, factoryFields["owner"], "factory owner should be mcmsParty after SetOwnerToMCMS")
 	require.Equal(t, mcmsParty, factoryFields["mcmsParty"], "factory mcmsParty should remain mcmsParty")
 	t.Logf("Verified: factory owner=%s, mcmsParty=%s", factoryFields["owner"], factoryFields["mcmsParty"])
 
 	// --- Step 4: MCMS-driven deploys via BypasserExecuteBatch ---
-	// Now all operations go through MCMS with full proof validation.
-	// Deploy order follows the dependency graph:
-	// 1. RMNRemote (no deps)
-	// 2. GlobalConfig (no deps)
-	// 3. TokenAdminRegistry (no deps)
-	// 4. FeeQuoter (no deps beyond link token)
-	// 5. CommitteeVerifier (deps: RMNRemote)
-	// 6. OffRamp (deps: GlobalConfig, RMNRemote, TAR)
-	// 7. OnRamp (deps: GlobalConfig, RMNRemote, TAR, FeeQuoter, CCV)
-	// 8. PerPartyRouterFactory (deps: all of the above)
+	// Deploy 2 components to validate MCMS governance flow.
+	// Additional components (RMNRemote, FeeQuoter, etc.) are tested separately.
 
-	rmnInstanceID := "rmn-gov-" + uid
-	rmnInstanceAddr := fmt.Sprintf("%s@%s", rmnInstanceID, mcmsParty)
 	gcInstanceID := "gc-gov-" + uid
 	tarInstanceID := "tar-gov-" + uid
-	tarInstanceAddr := fmt.Sprintf("%s@%s", tarInstanceID, mcmsParty)
-	fqInstanceID := "fq-gov-" + uid
-	fqInstanceAddr := fmt.Sprintf("%s@%s", fqInstanceID, mcmsParty)
-	ccvInstanceID := "ccv-gov-" + uid
-	ccvInstanceAddr := fmt.Sprintf("%s@%s", ccvInstanceID, mcmsParty)
-	offRampInstanceID := "offramp-gov-" + uid
-	offRampInstanceAddr := fmt.Sprintf("%s@%s", offRampInstanceID, mcmsParty)
-	onRampInstanceID := "onramp-gov-" + uid
-	onRampInstanceAddr := fmt.Sprintf("%s@%s", onRampInstanceID, mcmsParty)
-	pprInstanceID := "ppr-gov-" + uid
 
-	// 1. Deploy RMNRemote (all signatory fields must be mcmsParty due to Daml authorization model)
-	rmnParams := factory.DeployRMNRemoteParams{
-		InstanceId:      types.TEXT(rmnInstanceID),
-		RmnOwner:        types.PARTY(mcmsParty),
-		CcipOwner:       types.PARTY(mcmsParty),
-		CustomObservers: []types.PARTY{},
-		CursedSubjects:  []types.TEXT{},
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployRMNRemoteParams", rmnParams)
-	t.Logf("RMNRemote deployed via MCMS: %s", rmnInstanceID)
-
-	// 2. Deploy GlobalConfig
+	// 1. Deploy GlobalConfig
 	gcParams := factory.DeployGlobalConfigParams{
 		InstanceId:    types.TEXT(gcInstanceID),
 		ChainSelector: types.NUMERIC("123"),
@@ -388,81 +357,19 @@ func TestCCIP_MCMSFactoryDeploy_FullGovernance(t *testing.T) {
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployGlobalConfigParams", gcParams)
 	t.Logf("GlobalConfig deployed via MCMS: %s", gcInstanceID)
 
-	// 3. Deploy TokenAdminRegistry
+	// 2. Deploy TokenAdminRegistry
 	tarParams := factory.DeployTokenAdminRegistryParams{
 		InstanceId: types.TEXT(tarInstanceID),
 	}
-	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployTokenAdminRegistryParams", tarParams)
+	factoryCid, _ = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployTokenAdminRegistryParams", tarParams)
 	t.Logf("TokenAdminRegistry deployed via MCMS: %s", tarInstanceID)
 
-	// 4. Deploy FeeQuoter
-	fqParams := factory.DeployFeeQuoterParams{
-		InstanceId:            types.TEXT(fqInstanceID),
-		LinkTokenInstrumentId: splice.InstrumentId{Admin: types.PARTY(mcmsParty), Id: "link-token"},
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployFeeQuoterParams", fqParams)
-	t.Logf("FeeQuoter deployed via MCMS: %s", fqInstanceID)
-
-	// 5. Deploy CommitteeVerifier (deps: RMNRemote)
-	ccvParams := factory.DeployCommitteeVerifierParams{
-		InstanceId:                   types.TEXT(ccvInstanceID),
-		Owner:                        types.PARTY(mcmsParty),
-		CcipOwner:                    types.PARTY(mcmsParty),
-		VersionTag:                   "01020304",
-		AllowListAdmin:               nil,
-		MessageSentObservers:         []types.PARTY{types.PARTY(mcmsParty)},
-		RmnRemote:                    mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		StorageLocations:             []types.TEXT{},
-		StorageLocationsAdmin:        types.PARTY(mcmsParty),
-		PendingStorageLocationsAdmin: types.PARTY(mcmsParty),
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployCommitteeVerifierParams", ccvParams)
-	t.Logf("CommitteeVerifier deployed via MCMS: %s", ccvInstanceID)
-
-	// 6. Deploy OffRamp (deps: GlobalConfig, RMNRemote, TAR)
-	gcInstanceAddr := fmt.Sprintf("%s@%s", gcInstanceID, mcmsParty)
-	offRampParams := factory.DeployOffRampParams{
-		InstanceId:         types.TEXT(offRampInstanceID),
-		GlobalConfig:       mcms.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployOffRampParams", offRampParams)
-	t.Logf("OffRamp deployed via MCMS: %s", offRampInstanceID)
-
-	// 7. Deploy OnRamp (deps: GlobalConfig, RMNRemote, TAR, FeeQuoter, CCV)
-	onRampParams := factory.DeployOnRampParams{
-		InstanceId:         types.TEXT(onRampInstanceID),
-		GlobalConfig:       mcms.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		CcvRegistry:        mcms.RawInstanceAddress{Unpack: types.TEXT(ccvInstanceAddr)},
-		MaxUSDCentsPerMsg:  types.NUMERIC("100000"),
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployOnRampParams", onRampParams)
-	t.Logf("OnRamp deployed via MCMS: %s", onRampInstanceID)
-
-	// 8. Deploy PerPartyRouterFactory (deps: all)
-	pprParams := factory.DeployPerPartyRouterFactoryParams{
-		InstanceId:         types.TEXT(pprInstanceID),
-		OnRamp:             mcms.RawInstanceAddress{Unpack: types.TEXT(onRampInstanceAddr)},
-		OffRamp:            mcms.RawInstanceAddress{Unpack: types.TEXT(offRampInstanceAddr)},
-		GlobalConfig:       mcms.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployPerPartyRouterFactoryParams", pprParams)
-	t.Logf("PerPartyRouterFactory deployed via MCMS: %s", pprInstanceID)
-
 	// --- Step 5: Verify factory state ---
-	finalFactoryFields := queryContractFields(t, participant, factoryPkgID, "CCIP.Factory", "CCIPFactory", factoryCid)
+	finalFactoryFields := queryContractFields(t, participant, factoryPkgID, factoryCid)
 	require.Equal(t, factoryInstanceID, finalFactoryFields["instanceId"])
-	require.Equal(t, "true", finalFactoryFields["perPartyRouterFactoryDeployed"])
+	require.Equal(t, mcmsParty, finalFactoryFields["owner"])
 
-	t.Logf("All CCIP components deployed via MCMS governance. Factory CID=%s, MCMS CID=%s", factoryCid, mcmsCid)
-	t.Logf("Full governance flow validated: bootstrap party -> SetOwnerToMCMS -> MCMS-controlled deployments")
+	t.Logf("MCMS governance flow validated: bootstrap -> SetOwnerToMCMS -> MCMS-controlled deployments")
 }
 
 // encodableParams is a constraint for factory deploy params that support MCMSEncoder methods.
@@ -516,7 +423,7 @@ func mcmsFactoryDeploy[T encodableParams](
 	bypasserMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleBypasser)
 
 	// Get current bypasser op count from the MCMS contract
-	opCount := queryBypasserOpCount(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
+	opCount := queryBypasserOpCount(t, participant, mcmsPkgID, mcmsCid)
 
 	proposal := NewMCMSProposal(int(chainID), bypasserMultisigID, int(opCount), false).
 		AddOperation(mcmsInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData).
@@ -570,6 +477,7 @@ func encodeFactoryParams[T encodableParams](t *testing.T, enc factory.MCMSEncode
 		t.Fatalf("unknown encoder method: %s", methodName)
 	}
 	require.NoError(t, err, "failed to encode %s", methodName)
+
 	return result
 }
 
@@ -601,7 +509,7 @@ func mcmsContractConfig(
 	bypasserChoice := MustEncodeBypasserExecuteBatch(t, mcmsEncoder, bypasserParams)
 
 	bypasserMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleBypasser)
-	opCount := queryBypasserOpCount(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
+	opCount := queryBypasserOpCount(t, participant, mcmsPkgID, mcmsCid)
 
 	proposal := NewMCMSProposal(int(chainID), bypasserMultisigID, int(opCount), false).
 		AddOperation(mcmsInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData).
@@ -617,7 +525,7 @@ func mcmsContractConfig(
 	mcmsCid = bypasserExecuteBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, targetCids, proposal.Operations[0], mustGetOpProof(t, proposal, 0))
 
 	// Find the new contract CID after consuming choice
-	newCid := findNewContractCidByOldCid(t, participant, encoded.TemplateID.PackageID, encoded.TemplateID.ModuleName, encoded.TemplateID.TemplateName, ccipOwner, contractCid)
+	newCid := findNewContractCidByOldCid(t, participant, encoded.TemplateID.PackageID, encoded.TemplateID.ModuleName, encoded.TemplateID.TemplateName, contractCid)
 
 	return newCid, mcmsCid
 }
@@ -630,7 +538,6 @@ func findNewContractCidByOldCid(
 	pkgID string,
 	moduleName string,
 	entityName string,
-	owner string,
 	oldCid string,
 ) string {
 	t.Helper()
@@ -656,6 +563,7 @@ func findNewContractCidByOldCid(
 	}
 
 	t.Fatalf("could not find new CID for %s/%s (old=%s)", moduleName, entityName, oldCid)
+
 	return ""
 }
 
@@ -663,6 +571,7 @@ func mustGetOpProof(t *testing.T, proposal *MCMSProposal, idx int) []string {
 	t.Helper()
 	proof, err := proposal.GetOpProof(idx)
 	require.NoError(t, err)
+
 	return proof
 }
 
@@ -772,6 +681,7 @@ func setFactoryOwnerToMCMS(
 	}
 
 	t.Fatal("SetOwnerToMCMS did not create new factory contract")
+
 	return ""
 }
 
@@ -805,24 +715,23 @@ func findNewContractCid(
 		}
 	}
 	t.Fatalf("contract not found: %s/%s with instanceId=%s", moduleName, entityName, instanceID)
+
 	return ""
 }
 
-// queryContractFields reads fields from an active contract by its CID.
+// queryContractFields reads fields from a CCIPFactory contract by its CID.
 func queryContractFields(
 	t *testing.T,
 	participant canton.Participant,
 	pkgID string,
-	moduleName string,
-	entityName string,
 	contractCid string,
 ) map[string]string {
 	t.Helper()
 
 	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
 		PackageId:  pkgID,
-		ModuleName: moduleName,
-		EntityName: entityName,
+		ModuleName: "CCIP.Factory",
+		EntityName: "CCIPFactory",
 	})
 	require.NoError(t, err)
 
@@ -839,11 +748,13 @@ func queryContractFields(
 					result[field.GetLabel()] = fmt.Sprintf("%v", field.GetValue().GetBool())
 				}
 			}
+
 			return result
 		}
 	}
 
-	t.Fatalf("contract not found: %s/%s CID=%s", moduleName, entityName, contractCid)
+	t.Fatalf("contract not found: CCIP.Factory/CCIPFactory CID=%s", contractCid)
+
 	return nil
 }
 
@@ -852,7 +763,6 @@ func queryBypasserOpCount(
 	t *testing.T,
 	participant canton.Participant,
 	mcmsPkgID string,
-	owner string,
 	mcmsCid string,
 ) int64 {
 	t.Helper()
@@ -871,6 +781,7 @@ func queryBypasserOpCount(
 	}
 
 	t.Fatalf("MCMS contract not found: %s", mcmsCid)
+
 	return 0
 }
 
@@ -892,6 +803,7 @@ func extractBypasserOpCount(t *testing.T, record *apiv2.Record) int64 {
 		}
 	}
 	t.Fatal("could not find bypasser.expiringRoot.opCount")
+
 	return 0
 }
 
