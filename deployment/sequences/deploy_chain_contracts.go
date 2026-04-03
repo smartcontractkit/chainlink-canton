@@ -162,23 +162,8 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse FeeQuoter raw instance address: %w", err)
 		}
 
-		// Add native as a fee token on the FeeQuoter
-		_, err = operations.ExecuteOperation(b, fee_quoter.ApplyFeeTokenUpdates, deps, contract.ChoiceInput[feequoter.ApplyFeeTokenUpdates]{
-			InstanceAddress: feeQuoterRawInstanceAddress.InstanceAddress(),
-			Args: feequoter.ApplyFeeTokenUpdates{
-				FeeTokensToRemove: nil,
-				FeeTokensToAdd: []feequoter.FeeTokenArgs{
-					{
-						InstrumentId: input.NativeInstrumentId,
-					},
-				},
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to add native as a fee token on FeeQuoter: %w", err)
-		}
-
-		// Update the native token price if specified
+		// Any token with a price is treated as a fee token, so pushing the native
+		// token price is sufficient to register it as usable for fees.
 		if input.FeeQuoterConfig.USDPerNative != nil {
 			_, err = operations.ExecuteOperation(b, fee_quoter.UpdatePrices, deps, contract.ChoiceInput[feequoter.UpdatePrices]{
 				InstanceAddress: feeQuoterRawInstanceAddress.InstanceAddress(),

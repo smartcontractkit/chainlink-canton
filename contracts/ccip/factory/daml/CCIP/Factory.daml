@@ -31,8 +31,11 @@ import qualified CCIP.GlobalConfig
 import qualified CCIP.FeeQuoter
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.OnRamp
+import qualified CCIP.OnRampTypes as CCIP.OnRamp
 import qualified CCIP.OffRamp
+import qualified CCIP.OffRampTypes as CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
+import qualified CCIP.PerPartyRouterTypes as CCIP.PerPartyRouter
 import qualified CCIP.LockReleaseTokenPool
 import qualified CCIP.CommitteeVerifier
 import qualified CCIP.RMNRemote

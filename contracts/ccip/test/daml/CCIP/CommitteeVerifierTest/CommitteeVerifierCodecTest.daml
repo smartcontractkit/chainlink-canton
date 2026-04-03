@@ -4,8 +4,20 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Optional (fromSome)
 
-import CCIP.CommitteeVerifierCodec qualified as CommitteeVerifierCodec
-import CCIP.CommitteeVerifierTypes qualified as CommitteeVerifierTypes
+import CCIP.CommitteeVerifierCodecGen qualified as CommitteeVerifierCodec
+import CCIP.CommitteeVerifierTypes (
+    SignatureConfig(..),
+    DynamicConfig(..),
+    RemoteChainConfigArgs(..),
+    AllowListConfigArgs(..),
+    SetDepsParams(..),
+    ApplySignatureConfigsParams(..),
+    SetDynamicConfigParams(..),
+    ApplyRemoteChainConfigUpdatesParams(..),
+    ApplyAllowListUpdatesParams(..),
+    TransferStorageLocationsAdminParams(..),
+    UpdateStorageLocationsParams(..),
+    )
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 -- ===============================================
@@ -15,24 +27,25 @@ import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 testApplySignatureConfigsParamsRoudtrip : Script ()
 testApplySignatureConfigsParamsRoudtrip = do
     -- empty args
-    let args = ([], [])
+    let args = ApplySignatureConfigsParams with
+            sourceChainSelectorsToRemove = []
+            signatureConfigs = []
         encoded = CommitteeVerifierCodec.encodeApplySignatureConfigsParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeApplySignatureConfigsParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeApplySignatureConfigsParamsAt encoded 0)) === args
     -- non-empty args
-    let args = (
-            [123.0, 456.0],
-            [
-                CommitteeVerifierTypes.SignatureConfig with
+    let args = ApplySignatureConfigsParams with
+            sourceChainSelectorsToRemove = [123.0, 456.0]
+            signatureConfigs = [
+                SignatureConfig with
                     sourceChainSelector = 123.0
                     threshold = 2
                     signerKeys = [
                         "04dad4b7ce38da4a4fe111e52962630239320768d1c4387fb7870643912862179396666e725aeb69684822268683dd3bd9eea922a8ee26dc38cf4a88857a24aece",
                         "04287e7216a7255c06a5c1b03569a164d57300ed63a64ce974956b977f295970ea34f65c996b9a15cad4c1c307e7c04627ea3926dc5a4cc1b6216a3b3f798b2440"
                         ]
-            ]
-            )
+                ]
         encoded = CommitteeVerifierCodec.encodeApplySignatureConfigsParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeApplySignatureConfigsParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeApplySignatureConfigsParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |              SetDynamicConfig               |
@@ -44,12 +57,12 @@ testSetDynamicConfigParamsRoundtrip = do
     observer1 <- allocateParty "observer1"
     observer2 <- allocateParty "observer2"
 
-    let args = (CommitteeVerifierTypes.DynamicConfig with
-                    allowListAdmin = Some allowListAdmin
-                    messageSentObservers = [observer1, observer2]
-                )
+    let args = SetDynamicConfigParams with
+            dynamicConfig = DynamicConfig with
+                allowListAdmin = Some allowListAdmin
+                messageSentObservers = [observer1, observer2]
         encoded = CommitteeVerifierCodec.encodeSetDynamicConfigParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeSetDynamicConfigParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeSetDynamicConfigParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |       ApplyRemoteChainConfigUpdates         |
@@ -58,26 +71,27 @@ testSetDynamicConfigParamsRoundtrip = do
 testApplyRemoteChainConfigUpdatesParamsRoundtrip : Script ()
 testApplyRemoteChainConfigUpdatesParamsRoundtrip = do
     -- empty args
-    let args = ([])
+    let args = ApplyRemoteChainConfigUpdatesParams with remoteChainConfigArgs = []
         encoded = CommitteeVerifierCodec.encodeApplyRemoteChainConfigUpdatesParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeApplyRemoteChainConfigUpdatesParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeApplyRemoteChainConfigUpdatesParamsAt encoded 0)) === args
     -- non-empty args
-    let args = ([
-            CommitteeVerifierTypes.RemoteChainConfigArgs with
+    let remoteChainConfigs = [
+            RemoteChainConfigArgs with
                 remoteChainSelector = 123.0
                 feeUSDCents = 100.0
                 gasForVerification = 50000
                 payloadSizeBytes = 256
                 allowListEnabled = True
-            ,CommitteeVerifierTypes.RemoteChainConfigArgs with
+            ,RemoteChainConfigArgs with
                 remoteChainSelector = 456.0
                 feeUSDCents = 200.0
                 gasForVerification = 100000
                 payloadSizeBytes = 512
                 allowListEnabled = False
-            ])
+            ]
+        args = ApplyRemoteChainConfigUpdatesParams with remoteChainConfigArgs = remoteChainConfigs
         encoded = CommitteeVerifierCodec.encodeApplyRemoteChainConfigUpdatesParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeApplyRemoteChainConfigUpdatesParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeApplyRemoteChainConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |           ApplyAllowListUpdates             |
@@ -87,28 +101,32 @@ testApplyAllowListUpdatesParamsRoundtrip : Script ()
 testApplyAllowListUpdatesParamsRoundtrip = do
     -- empty args
     caller <- allocateParty "caller"
-    let args = ([], caller)
+    let args = ApplyAllowListUpdatesParams with
+            allowListConfigArgs = []
+            caller
         encoded = CommitteeVerifierCodec.encodeApplyAllowListUpdatesParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeApplyAllowListUpdatesParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeApplyAllowListUpdatesParamsAt encoded 0)) === args
     -- non-empty args
     addedSender1 <- allocateParty "added_sender1"
     addedSender2 <- allocateParty "added_sender2"
     removedSender1 <- allocateParty "removed_sender1"
     removedSender2 <- allocateParty "removed_sender2"
-    let args = ([
-            CommitteeVerifierTypes.AllowListConfigArgs with
-                destChainSelector = 123.0
-                allowListEnabled = True
-                addedAllowListedSenders = [addedSender1, addedSender2]
-                removedAllowListedSenders = [removedSender1, removedSender2]
-            ,CommitteeVerifierTypes.AllowListConfigArgs with
-                destChainSelector = 456.0
-                allowListEnabled = False
-                addedAllowListedSenders = [addedSender1]
-                removedAllowListedSenders = [removedSender1]
-            ], caller)
+    let args = ApplyAllowListUpdatesParams with
+            allowListConfigArgs = [
+                AllowListConfigArgs with
+                    destChainSelector = 123.0
+                    allowListEnabled = True
+                    addedAllowListedSenders = [addedSender1, addedSender2]
+                    removedAllowListedSenders = [removedSender1, removedSender2]
+                ,AllowListConfigArgs with
+                    destChainSelector = 456.0
+                    allowListEnabled = False
+                    addedAllowListedSenders = [addedSender1]
+                    removedAllowListedSenders = [removedSender1]
+                ]
+            caller
         encoded = CommitteeVerifierCodec.encodeApplyAllowListUpdatesParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeApplyAllowListUpdatesParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeApplyAllowListUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |       TransferStorageLocationsAdmin         |
@@ -117,10 +135,10 @@ testApplyAllowListUpdatesParamsRoundtrip = do
 testTransferStorageLocationsAdminParamsRoundtrip : Script ()
 testTransferStorageLocationsAdminParamsRoundtrip = do
     -- non-empty args
-    newAdmin <- allocateParty "new_admin"
-    let args = (newAdmin)
+    newAdminParty <- allocateParty "new_admin"
+    let args = TransferStorageLocationsAdminParams with newAdmin = newAdminParty
         encoded = CommitteeVerifierCodec.encodeTransferStorageLocationsAdminParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeTransferStorageLocationsAdminParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeTransferStorageLocationsAdminParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |           UpdateStorageLocations            |
@@ -129,13 +147,13 @@ testTransferStorageLocationsAdminParamsRoundtrip = do
 testUpdateStorageLocationsParamsRoundtrip : Script ()
 testUpdateStorageLocationsParamsRoundtrip = do
     -- empty args
-    let args = ([])
+    let args = UpdateStorageLocationsParams with newLocations = []
         encoded = CommitteeVerifierCodec.encodeUpdateStorageLocationsParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeUpdateStorageLocationsParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeUpdateStorageLocationsParamsAt encoded 0)) === args
     -- non-empty args
-    let args = (["ipfs://location1", "ipfs://location2"])
+    let args = UpdateStorageLocationsParams with newLocations = ["ipfs://location1", "ipfs://location2"]
         encoded = CommitteeVerifierCodec.encodeUpdateStorageLocationsParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeUpdateStorageLocationsParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeUpdateStorageLocationsParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |                  SetDeps                    |
@@ -144,10 +162,10 @@ testUpdateStorageLocationsParamsRoundtrip = do
 testSetDepsParamsRoundtrip : Script ()
 testSetDepsParamsRoundtrip = do
     -- empty args
-    let args = (CommitteeVerifierTypes.SetDepsParams with rmnRemote = None)
+    let args = SetDepsParams with rmnRemote = None
         encoded = CommitteeVerifierCodec.encodeSetDepsParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeSetDepsParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeSetDepsParamsAt encoded 0)) === args
     -- non-empty args
-    let args = (CommitteeVerifierTypes.SetDepsParams with rmnRemote = Some (RawInstanceAddress.RawInstanceAddress "0x1234567890abcdef"))
+    let args = SetDepsParams with rmnRemote = Some (RawInstanceAddress.RawInstanceAddress "0x1234567890abcdef")
         encoded = CommitteeVerifierCodec.encodeSetDepsParams args
-    fst (fromSome (CommitteeVerifierCodec.decodeSetDepsParams encoded)) === args
+    fst (fromSome (CommitteeVerifierCodec.decodeSetDepsParamsAt encoded 0)) === args

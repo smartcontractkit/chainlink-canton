@@ -3133,7 +3133,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                 outboundCCVs = []
                 minBlockConfirmations = 0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
             ,LockReleaseTokenPool.ChainUpdate with
                 remoteChainSelector = 456.0
@@ -3226,6 +3226,31 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
         Some config -> assertChainUpdateEqual config (chainsToAdd2 !! 1) -- unchanged from Test 2
 
     -- | ======== Test 4 ========
+    -- | Empty custom-finality rate limiter is allowed when minBlockConfirmations = 0
+    -- | ========================
+    tokenPoolCid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 123.0
+                    remotePools = []
+                    remoteTokenAddress = "f43dc4783082e7f5ceb0f5e3bdff4a9acc3b0ace"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockConfirmations = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-no-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-no-custom@owner"
+                ]
+    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
+    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 123.0" False
+        Some config ->
+            assertMsg "Expected empty custom-finality rate limiter when minBlockConfirmations = 0"
+                (config.inboundCustomBlockConfirmationsRateLimiter == RawInstanceAddress.empty)
+
+    -- | ======== Test 5 ========
     -- | Test invalid updates
     -- | ========================
     -- Attempt to remove a non-existent chain config 
@@ -3346,6 +3371,22 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
                 ]
+    -- Attempt to add an invalid chain config (empty custom-finality rate limiter when minBlockConfirmations > 0)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockConfirmations = 7
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
     -- Attempt to add an invalid chain config (duplicate remote pool addresses)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
@@ -3407,14 +3448,14 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     outboundCCVs = []
                     minBlockConfirmations = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner")
                 ,(456.0, LockReleaseTokenPool.RemoteChainConfig with
                     remotePools = ["11111111"]
                     remoteTokenAddress = "cf383e3c65a8f8ec69b3a4fbdf0ceed7de4cd6a2cdf1ff6f82fa2eb3addf7b2e960f"
                     inboundCCVs = []
                     outboundCCVs = []
-                    minBlockConfirmations = 0
+                    minBlockConfirmations = 12
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
@@ -3503,6 +3544,25 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
         Some config -> assertRateLimitConfigArgsEqual config (head rateLimitConfigArgs3)
     
     -- | ========= Test 4 ========
+    -- | Empty custom-finality rate limiter is allowed when minBlockConfirmations = 0
+    -- | ========================
+    let rateLimitConfigArgs4 = [
+            LockReleaseTokenPool.RateLimitConfigArgs with
+                remoteChainSelector = 123.0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-no-custom@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-no-custom@owner"
+            ]
+    tokenPoolCid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+            rateLimitConfigArgs = rateLimitConfigArgs4
+            caller = owner
+    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
+    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 123.0" False
+        Some config -> assertRateLimitConfigArgsEqual config (head rateLimitConfigArgs4)
+
+    -- | ========= Test 5 ========
     -- | Invalid updates
     -- | ========================
     -- Attempt to update rate limiters for a non-existent chain config
@@ -3558,6 +3618,17 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner" -- invalid
+                ]
+            caller = owner
+    -- Attempt to update a chain that requires custom finality with an empty custom rate limiter
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+            rateLimitConfigArgs = [
+                LockReleaseTokenPool.RateLimitConfigArgs with
+                    remoteChainSelector = 456.0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
             caller = owner
 

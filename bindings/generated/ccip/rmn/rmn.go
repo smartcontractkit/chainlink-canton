@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "c7c8e5552428471434714406429cc0b8e0e23742e22a11f39a47f2c790acc1ab"
+	PackageID   = "60d7876833854dc278dd529aa09ce8bd0cc9cbcf360a8dc59e1e9d957c712356"
 	SDKVersion  = "3.4.10"
 )
 
@@ -90,6 +90,48 @@ func (t AddCustomObservers) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddCustomObservers from hex string (Canton MCMS format)
 func (t *AddCustomObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddCustomObserversParams is a Record type
+type AddCustomObserversParams struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts AddCustomObserversParams to a map for DAML arguments
+func (t AddCustomObserversParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t AddCustomObserversParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddCustomObserversParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddCustomObserversParams to hex string (Canton MCMS format)
+func (t AddCustomObserversParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCustomObserversParams from hex string (Canton MCMS format)
+func (t *AddCustomObserversParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -166,6 +208,42 @@ func (t *CurseChain) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// CurseChainParams is a Record type
+type CurseChainParams struct {
+	ChainSelector types.NUMERIC `json:"chainSelector"`
+}
+
+// ToMap converts CurseChainParams to a map for DAML arguments
+func (t CurseChainParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["chainSelector"] = t.ChainSelector
+
+	return m
+}
+
+func (t CurseChainParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CurseChainParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CurseChainParams to hex string (Canton MCMS format)
+func (t CurseChainParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CurseChainParams from hex string (Canton MCMS format)
+func (t *CurseChainParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CurseGlobal is a Record type
 type CurseGlobal struct {
 }
@@ -236,6 +314,84 @@ func (t CurseMultiple) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CurseMultiple from hex string (Canton MCMS format)
 func (t *CurseMultiple) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CurseMultipleParams is a Record type
+type CurseMultipleParams struct {
+	Subjects []types.TEXT `json:"subjects"`
+}
+
+// ToMap converts CurseMultipleParams to a map for DAML arguments
+func (t CurseMultipleParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["subjects"] = func() []any {
+		res := make([]any, 0, len(t.Subjects))
+		for _, e := range t.Subjects {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t CurseMultipleParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CurseMultipleParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CurseMultipleParams to hex string (Canton MCMS format)
+func (t CurseMultipleParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CurseMultipleParams from hex string (Canton MCMS format)
+func (t *CurseMultipleParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CurseParams is a Record type
+type CurseParams struct {
+	Subject types.TEXT `json:"subject"`
+}
+
+// ToMap converts CurseParams to a map for DAML arguments
+func (t CurseParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["subject"] = string(t.Subject)
+
+	return m
+}
+
+func (t CurseParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CurseParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CurseParams to hex string (Canton MCMS format)
+func (t CurseParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CurseParams from hex string (Canton MCMS format)
+func (t *CurseParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -976,6 +1132,48 @@ func (t *RemoveCustomObservers) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// RemoveCustomObserversParams is a Record type
+type RemoveCustomObserversParams struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts RemoveCustomObserversParams to a map for DAML arguments
+func (t RemoveCustomObserversParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemoveCustomObserversParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoveCustomObserversParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoveCustomObserversParams to hex string (Canton MCMS format)
+func (t RemoveCustomObserversParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoveCustomObserversParams from hex string (Canton MCMS format)
+func (t *RemoveCustomObserversParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Uncurse is a Record type
 type Uncurse struct {
 	Subject types.TEXT `json:"subject"`
@@ -1044,6 +1242,42 @@ func (t UncurseChain) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes UncurseChain from hex string (Canton MCMS format)
 func (t *UncurseChain) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// UncurseChainParams is a Record type
+type UncurseChainParams struct {
+	ChainSelector types.NUMERIC `json:"chainSelector"`
+}
+
+// ToMap converts UncurseChainParams to a map for DAML arguments
+func (t UncurseChainParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["chainSelector"] = t.ChainSelector
+
+	return m
+}
+
+func (t UncurseChainParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *UncurseChainParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes UncurseChainParams to hex string (Canton MCMS format)
+func (t UncurseChainParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UncurseChainParams from hex string (Canton MCMS format)
+func (t *UncurseChainParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1122,6 +1356,84 @@ func (t *UncurseMultiple) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// UncurseMultipleParams is a Record type
+type UncurseMultipleParams struct {
+	Subjects []types.TEXT `json:"subjects"`
+}
+
+// ToMap converts UncurseMultipleParams to a map for DAML arguments
+func (t UncurseMultipleParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["subjects"] = func() []any {
+		res := make([]any, 0, len(t.Subjects))
+		for _, e := range t.Subjects {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t UncurseMultipleParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *UncurseMultipleParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes UncurseMultipleParams to hex string (Canton MCMS format)
+func (t UncurseMultipleParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UncurseMultipleParams from hex string (Canton MCMS format)
+func (t *UncurseMultipleParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// UncurseParams is a Record type
+type UncurseParams struct {
+	Subject types.TEXT `json:"subject"`
+}
+
+// ToMap converts UncurseParams to a map for DAML arguments
+func (t UncurseParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["subject"] = string(t.Subject)
+
+	return m
+}
+
+func (t UncurseParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *UncurseParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes UncurseParams to hex string (Canton MCMS format)
+func (t UncurseParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UncurseParams from hex string (Canton MCMS format)
+func (t *UncurseParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // UpdateCCIPOwner is a Record type
 type UpdateCCIPOwner struct {
 	NewCCIPOwner types.PARTY `json:"newCCIPOwner"`
@@ -1162,10 +1474,14 @@ func (t *UpdateCCIPOwner) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error)
+	AddCustomObserversParams(args AddCustomObserversParams) (*bind.EncodedChoice, error)
 	Curse(args Curse) (*bind.EncodedChoice, error)
 	CurseChain(args CurseChain) (*bind.EncodedChoice, error)
+	CurseChainParams(args CurseChainParams) (*bind.EncodedChoice, error)
 	CurseGlobal(args CurseGlobal) (*bind.EncodedChoice, error)
 	CurseMultiple(args CurseMultiple) (*bind.EncodedChoice, error)
+	CurseMultipleParams(args CurseMultipleParams) (*bind.EncodedChoice, error)
+	CurseParams(args CurseParams) (*bind.EncodedChoice, error)
 	Get(args Get) (*bind.EncodedChoice, error)
 	GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error)
 	GetCursedSubjects(args GetCursedSubjects) (*bind.EncodedChoice, error)
@@ -1175,10 +1491,14 @@ type MCMSEncoder interface {
 	IsCursedForChain(args IsCursedForChain) (*bind.EncodedChoice, error)
 	IsCursedForChainMCMSParams(args IsCursedForChainMCMSParams) (*bind.EncodedChoice, error)
 	RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error)
+	RemoveCustomObserversParams(args RemoveCustomObserversParams) (*bind.EncodedChoice, error)
 	Uncurse(args Uncurse) (*bind.EncodedChoice, error)
 	UncurseChain(args UncurseChain) (*bind.EncodedChoice, error)
+	UncurseChainParams(args UncurseChainParams) (*bind.EncodedChoice, error)
 	UncurseGlobal(args UncurseGlobal) (*bind.EncodedChoice, error)
 	UncurseMultiple(args UncurseMultiple) (*bind.EncodedChoice, error)
+	UncurseMultipleParams(args UncurseMultipleParams) (*bind.EncodedChoice, error)
+	UncurseParams(args UncurseParams) (*bind.EncodedChoice, error)
 	UpdateCCIPOwner(args UpdateCCIPOwner) (*bind.EncodedChoice, error)
 }
 
@@ -1214,6 +1534,11 @@ func (e *encoder) AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoi
 	return e.EncodeChoiceArgs("AddCustomObservers", args)
 }
 
+// AddCustomObserversParams encodes parameters for the AddCustomObservers choice.
+func (e *encoder) AddCustomObserversParams(args AddCustomObserversParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCustomObservers", args)
+}
+
 // Curse encodes parameters for the Curse choice.
 func (e *encoder) Curse(args Curse) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("Curse", args)
@@ -1221,6 +1546,11 @@ func (e *encoder) Curse(args Curse) (*bind.EncodedChoice, error) {
 
 // CurseChain encodes parameters for the CurseChain choice.
 func (e *encoder) CurseChain(args CurseChain) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CurseChain", args)
+}
+
+// CurseChainParams encodes parameters for the CurseChain choice.
+func (e *encoder) CurseChainParams(args CurseChainParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CurseChain", args)
 }
 
@@ -1232,6 +1562,16 @@ func (e *encoder) CurseGlobal(args CurseGlobal) (*bind.EncodedChoice, error) {
 // CurseMultiple encodes parameters for the CurseMultiple choice.
 func (e *encoder) CurseMultiple(args CurseMultiple) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CurseMultiple", args)
+}
+
+// CurseMultipleParams encodes parameters for the CurseMultiple choice.
+func (e *encoder) CurseMultipleParams(args CurseMultipleParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CurseMultiple", args)
+}
+
+// CurseParams encodes parameters for the Curse choice.
+func (e *encoder) CurseParams(args CurseParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Curse", args)
 }
 
 // Get encodes parameters for the Get choice.
@@ -1279,6 +1619,11 @@ func (e *encoder) RemoveCustomObservers(args RemoveCustomObservers) (*bind.Encod
 	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
 }
 
+// RemoveCustomObserversParams encodes parameters for the RemoveCustomObservers choice.
+func (e *encoder) RemoveCustomObserversParams(args RemoveCustomObserversParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
+}
+
 // Uncurse encodes parameters for the Uncurse choice.
 func (e *encoder) Uncurse(args Uncurse) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("Uncurse", args)
@@ -1286,6 +1631,11 @@ func (e *encoder) Uncurse(args Uncurse) (*bind.EncodedChoice, error) {
 
 // UncurseChain encodes parameters for the UncurseChain choice.
 func (e *encoder) UncurseChain(args UncurseChain) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UncurseChain", args)
+}
+
+// UncurseChainParams encodes parameters for the UncurseChain choice.
+func (e *encoder) UncurseChainParams(args UncurseChainParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("UncurseChain", args)
 }
 
@@ -1297,6 +1647,16 @@ func (e *encoder) UncurseGlobal(args UncurseGlobal) (*bind.EncodedChoice, error)
 // UncurseMultiple encodes parameters for the UncurseMultiple choice.
 func (e *encoder) UncurseMultiple(args UncurseMultiple) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("UncurseMultiple", args)
+}
+
+// UncurseMultipleParams encodes parameters for the UncurseMultiple choice.
+func (e *encoder) UncurseMultipleParams(args UncurseMultipleParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UncurseMultiple", args)
+}
+
+// UncurseParams encodes parameters for the Uncurse choice.
+func (e *encoder) UncurseParams(args UncurseParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Uncurse", args)
 }
 
 // UpdateCCIPOwner encodes parameters for the UpdateCCIPOwner choice.

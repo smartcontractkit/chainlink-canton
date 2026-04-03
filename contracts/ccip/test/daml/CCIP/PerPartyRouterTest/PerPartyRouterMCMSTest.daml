@@ -10,6 +10,8 @@ import DA.Set qualified as Set
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.PerPartyRouter
+import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..))
+import CCIP.PerPartyRouterCodecGen (encodeSetDepsParams)
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================

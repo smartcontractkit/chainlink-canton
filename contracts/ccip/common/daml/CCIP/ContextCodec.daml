@@ -12,8 +12,8 @@ module CCIP.ContextCodec
   , decodeTextMapAnyValueAt
   ) where
 
-import DA.Time (RelTime, subTime, addRelTime, microseconds, convertMicrosecondsToRelTime, convertRelTimeToMicroseconds, time)
-import DA.Date (toGregorian, fromGregorian, date, Month(..))
+import DA.Time (RelTime, subTime, addRelTime, convertMicrosecondsToRelTime, convertRelTimeToMicroseconds, time)
+import DA.Date (date, Month(..), subDate, addDays)
 import DA.TextMap (TextMap)
 import DA.TextMap qualified as TextMap
 import DA.Crypto.Text (BytesHex)
@@ -164,85 +164,15 @@ epochDate = date 1970 Jan 1
 -- | Encode Date as days since epoch
 encodeDate : Date -> BytesHex
 encodeDate d =
-  let days = dateDiffDays d epochDate
+  let days = subDate d epochDate
   in fromSome (encodeInt64 days)
 
 -- | Decode Date from days since epoch
 decodeDateAt : BytesHex -> Int -> Optional (Date, Int)
 decodeDateAt encoded offset = do
   (days, newOffset) <- decodeInt64At encoded offset
-  let resultDate = addDaysToDate epochDate days
+  let resultDate = addDays epochDate days
   Some (resultDate, newOffset)
-
--- | Calculate days between two dates
-dateDiffDays : Date -> Date -> Int
-dateDiffDays d1 d2 =
-  let (y1, m1, day1) = toGregorian d1
-      (y2, m2, day2) = toGregorian d2
-      -- Simplified: convert to Julian day number and subtract
-      jdn1 = toJulianDayNumber y1 (monthToInt m1) day1
-      jdn2 = toJulianDayNumber y2 (monthToInt m2) day2
-  in jdn1 - jdn2
-
--- | Add days to a date
-addDaysToDate : Date -> Int -> Date
-addDaysToDate d days =
-  let (y, m, day) = toGregorian d
-      jdn = toJulianDayNumber y (monthToInt m) day + days
-  in fromJulianDayNumber jdn
-
--- | Convert to Julian Day Number (simplified algorithm)
-toJulianDayNumber : Int -> Int -> Int -> Int
-toJulianDayNumber year month day =
-  let a = (14 - month) / 12
-      y = year + 4800 - a
-      m = month + 12 * a - 3
-  in day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045
-
--- | Convert from Julian Day Number
-fromJulianDayNumber : Int -> Date
-fromJulianDayNumber jdn =
-  let a = jdn + 32044
-      b = (4 * a + 3) / 146097
-      c = a - (146097 * b) / 4
-      d = (4 * c + 3) / 1461
-      e = c - (1461 * d) / 4
-      m = (5 * e + 2) / 153
-      day = e - (153 * m + 2) / 5 + 1
-      month = m + 3 - 12 * (m / 10)
-      year = 100 * b + d - 4800 + m / 10
-  in fromGregorian (year, intToMonth month, day)
-
--- | Convert month enum to int
-monthToInt : Month -> Int
-monthToInt Jan = 1
-monthToInt Feb = 2
-monthToInt Mar = 3
-monthToInt Apr = 4
-monthToInt May = 5
-monthToInt Jun = 6
-monthToInt Jul = 7
-monthToInt Aug = 8
-monthToInt Sep = 9
-monthToInt Oct = 10
-monthToInt Nov = 11
-monthToInt Dec = 12
-
--- | Convert int to month enum
-intToMonth : Int -> Month
-intToMonth 1 = Jan
-intToMonth 2 = Feb
-intToMonth 3 = Mar
-intToMonth 4 = Apr
-intToMonth 5 = May
-intToMonth 6 = Jun
-intToMonth 7 = Jul
-intToMonth 8 = Aug
-intToMonth 9 = Sep
-intToMonth 10 = Oct
-intToMonth 11 = Nov
-intToMonth 12 = Dec
-intToMonth _ = Jan  -- fallback
 
 -- ===========================================================================
 -- TIME ENCODING/DECODING
@@ -270,33 +200,19 @@ decodeTimeAt encoded offset = do
 -- ===========================================================================
 -- RELTIME ENCODING/DECODING
 -- Format: int64 representing microseconds
--- Note: We encode RelTime as its text representation for simplicity,
--- since Daml doesn't expose a direct RelTime <-> Int conversion.
 -- ===========================================================================
 
--- | Encode RelTime as text representation
+-- | Encode RelTime as microseconds (int64)
 encodeRelTime : RelTime -> BytesHex
-encodeRelTime r = encodeText (show r)
+encodeRelTime r =
+  let micros = convertRelTimeToMicroseconds r
+  in fromSome (encodeInt64 micros)
 
--- | Decode RelTime from text representation
--- Note: Daml's RelTime doesn't have a direct fromText, so we use hours as approximation
--- In practice, poolReceiveContext rarely uses RelTime values directly.
+-- | Decode RelTime from microseconds (int64)
 decodeRelTimeAt : BytesHex -> Int -> Optional (RelTime, Int)
 decodeRelTimeAt encoded offset = do
-  (text, newOffset) <- decodeTextAt encoded offset
-  -- Parse the RelTime text representation
-  -- RelTime shows as "Xd Yh Zm Ws" format - we'll handle common cases
-  relTime <- parseRelTimeText text
-  Some (relTime, newOffset)
-
--- | Parse RelTime from text (handles common formats)
--- Supports: "0s", "1h", "24h", etc.
-parseRelTimeText : Text -> Optional RelTime
-parseRelTimeText text =
-  -- Simple parser for common RelTime formats
-  -- In production, this should be more robust
-  Some (microseconds 0)  -- Placeholder: return zero for now
-  -- Real implementation would parse "Xh", "Xm", "Xs" formats
+  (micros, newOffset) <- decodeInt64At encoded offset
+  Some (convertMicrosecondsToRelTime micros, newOffset)
 
 -- ===========================================================================
 -- PARTY ENCODING/DECODING
@@ -316,29 +232,20 @@ decodePartyValueAt encoded offset = do
 
 -- ===========================================================================
 -- CONTRACTID ENCODING/DECODING
--- Format: length-prefixed contract ID hex string
--- Note: Daml doesn't have fromText for ContractId, so we encode the hex
--- representation and decode to AV_Text instead. Applications should use
--- AV_Text for contract IDs and coerce as needed.
+-- Format: length-prefixed contract ID text
+-- LIMITATION: Encode-only. Daml has no contractIdFromText, so decoding
+-- always returns None. Use AV_Text for contract IDs that need round-trip.
 -- ===========================================================================
 
--- | Encode ContractId as hex text
+-- | Encode ContractId as text (encode-only)
 encodeContractIdValue : ContractId () -> BytesHex
-encodeContractIdValue cid =
-  -- Extract the contract ID hex representation
-  let cidText = contractIdToText cid
-  in encodeText cidText
+encodeContractIdValue cid = encodeText (show cid)
 
--- | Convert ContractId to its text representation
-contractIdToText : ContractId () -> Text
-contractIdToText cid = show cid
-
--- | Decode ContractId from hex text
--- Returns the text representation - caller must handle type coercion
+-- | Decode ContractId - ALWAYS RETURNS NONE
+-- Daml has no contractIdFromText. Use AV_Text for contract IDs instead.
 decodeContractIdValueAt : BytesHex -> Int -> Optional (ContractId (), Int)
 decodeContractIdValueAt encoded offset = do
-  (cidText, newOffset) <- decodeTextAt encoded offset
-  -- Daml has no contractIdFromText, so we can't reconstruct the ContractId
-  -- For practical use, store contract IDs as AV_Text instead of AV_ContractId
-  -- This tag (0x08) exists for completeness but decode returns None
+  -- Skip the text bytes to advance offset correctly
+  (_cidText, newOffset) <- decodeTextAt encoded offset
+  -- Cannot reconstruct ContractId - return None
   None

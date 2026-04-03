@@ -18,19 +18,22 @@ import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec (decodePartyList)
-import CCIP.FeeQuoterCodec (
-    decodeApplyPriceUpdatersUpdateParams,
-    decodeUpdatePricesParams,
-    decodeApplyFeeTokenUpdatesParams,
-    decodeApplyDestChainConfigUpdatesParams,
+import CCIP.FeeQuoterCodecGen (
+    decodeApplyPriceUpdatersUpdateParamsAt,
+    decodeUpdatePricesParamsAt,
+    decodeRemoveFeeTokensParamsAt,
+    decodeApplyDestChainConfigUpdatesParamsAt,
     )
 import CCIP.FeeQuoterTypes (
-    FeeTokenArgs(..),
     DestChainConfigArgs(..),
     DestChainConfig(..),
     PriceUpdates(..),
     TokenPriceUpdate(..),
     GasPriceUpdate(..),
+    ApplyPriceUpdatersUpdateParams(..),
+    UpdatePricesParams(..),
+    RemoveFeeTokensParams(..),
+    ApplyDestChainConfigUpdatesParams(..),
     )
 
 feeQuoterKey : Text
@@ -131,7 +134,15 @@ template FeeQuoter
                 now <- getTime
                 let newUsdPerToken = foldl (\acc tpu -> Map.insert tpu.instrumentId (TimestampedPrice tpu.usdPerToken now) acc) usdPerToken priceUpdates.tokenPriceUpdates
                 let newUsdPerUnitGasByDestChainSelector = foldl (\acc gpu -> Map.insert gpu.destChainSelector (TimestampedPrice gpu.usdPerUnitGas now) acc) usdPerUnitGasByDestChainSelector priceUpdates.gasPriceUpdates
-                create this with usdPerToken = newUsdPerToken, usdPerUnitGasByDestChainSelector = newUsdPerUnitGasByDestChainSelector
+                let newFeeTokens =
+                        foldl
+                            (\acc tpu -> Set.insert tpu.instrumentId acc)
+                            feeTokens
+                            priceUpdates.tokenPriceUpdates
+                create this with
+                    feeTokens = newFeeTokens
+                    usdPerToken = newUsdPerToken
+                    usdPerUnitGasByDestChainSelector = newUsdPerUnitGasByDestChainSelector
 
         choice AddPriceUpdaters : ContractId FeeQuoter
             with
@@ -245,18 +256,16 @@ template FeeQuoter
             do
                 return (Set.toList feeTokens)
 
-        choice ApplyFeeTokenUpdates : ContractId FeeQuoter
+        choice RemoveFeeTokens : ContractId FeeQuoter
             with
                 feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId]
-                feeTokensToAdd : [FeeTokenArgs]
             controller owner
             do
-                let newFeeTokens =
-                        foldl
-                            (\acc ft -> Set.insert ft.instrumentId acc)
-                            (foldl (\acc tk -> Set.delete tk acc) feeTokens feeTokensToRemove)
-                            feeTokensToAdd
-                create this with feeTokens = newFeeTokens
+                let newFeeTokens = foldl (\acc tk -> Set.delete tk acc) feeTokens feeTokensToRemove
+                let newUsdPerToken = foldl (\acc tk -> Map.delete tk acc) usdPerToken feeTokensToRemove
+                create this with
+                    feeTokens = newFeeTokens
+                    usdPerToken = newUsdPerToken
 
         -- ================================================================
         -- │                           Configs                            │
@@ -300,36 +309,35 @@ template FeeQuoter
 
                 case functionName of
                     "ApplyPriceUpdatersUpdate" -> do
-                        case decodeApplyPriceUpdatersUpdateParams operationData of
+                        case decodeApplyPriceUpdatersUpdateParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyPriceUpdatersUpdate"
-                            Some ((addedPriceUpdaters, removedPriceUpdaters), finalOffset) -> do
+                            Some (ApplyPriceUpdatersUpdateParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyPriceUpdatersUpdate" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyPriceUpdatersUpdate with
                                     addedPriceUpdaters
                                     removedPriceUpdaters
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "UpdatePrices" -> do
-                        case decodeUpdatePricesParams operationData of
+                        case decodeUpdatePricesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: UpdatePrices"
-                            Some ((priceUpdates, caller), finalOffset) -> do
+                            Some (UpdatePricesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: UpdatePrices" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid UpdatePrices with
                                     priceUpdates
                                     caller
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-                    "ApplyFeeTokenUpdates" -> do
-                        case decodeApplyFeeTokenUpdatesParams operationData of
-                            None -> abort "E_INVALID_PARAMS: ApplyFeeTokenUpdates"
-                            Some ((feeTokensToRemove, feeTokensToAdd), finalOffset) -> do
-                                assertMsg "E_TRAILING_BYTES: ApplyFeeTokenUpdates" (finalOffset == byteCount operationData)
-                                newCid <- exercise selfCid ApplyFeeTokenUpdates with
+                    "RemoveFeeTokens" -> do
+                        case decodeRemoveFeeTokensParamsAt operationData 0 of
+                            None -> abort "E_INVALID_PARAMS: RemoveFeeTokens"
+                            Some (RemoveFeeTokensParams{..}, finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: RemoveFeeTokens" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid RemoveFeeTokens with
                                     feeTokensToRemove
-                                    feeTokensToAdd
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "ApplyDestChainConfigUpdates" -> do
-                        case decodeApplyDestChainConfigUpdatesParams operationData of
+                        case decodeApplyDestChainConfigUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
-                            Some ((destChainConfigArgs), finalOffset) -> do
+                            Some (ApplyDestChainConfigUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyDestChainConfigUpdates with
                                     destChainConfigArgs

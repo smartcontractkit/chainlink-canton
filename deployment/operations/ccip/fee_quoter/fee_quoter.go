@@ -63,17 +63,17 @@ var UpdatePrices = contract.NewExercise(contract.ExerciseParams[feequoter.Update
 	Method:   feequoter.FeeQuoter{}.UpdatePrices,
 })
 
-var ApplyFeeTokenUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyFeeTokenUpdates]{
-	Name:         "canton/ccip/fee_quoter/apply_fee_token_updates",
+var RemoveFeeTokens = contract.NewExercise(contract.ExerciseParams[feequoter.RemoveFeeTokens]{
+	Name:         "canton/ccip/fee_quoter/remove_fee_tokens",
 	Version:      Version,
-	Description:  "Applies fee token updates to the FeeQuoter",
+	Description:  "Removes fee tokens from the FeeQuoter and clears their prices",
 	ContractType: ContractType,
-	Validate: func(input feequoter.ApplyFeeTokenUpdates) error {
+	Validate: func(input feequoter.RemoveFeeTokens) error {
 		// TODO add validation
 		return nil
 	},
 	Template: feequoter.FeeQuoter{},
-	Method:   feequoter.FeeQuoter{}.ApplyFeeTokenUpdates,
+	Method:   feequoter.FeeQuoter{}.RemoveFeeTokens,
 })
 
 var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyDestChainConfigUpdates2]{

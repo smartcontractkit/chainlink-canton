@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "783da9bf2164ea41892d09c14d0b1e75aa794e4db12f860bdead355229441f6d"
+	PackageID   = "52bfeb2e62d0535c6de1785531bd0f41d8d116dc4ecb78158d485837c37dc80d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -93,6 +93,48 @@ func (t AddCustomObservers) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddCustomObservers from hex string (Canton MCMS format)
 func (t *AddCustomObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddCustomObserversParams is a Record type
+type AddCustomObserversParams struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts AddCustomObserversParams to a map for DAML arguments
+func (t AddCustomObserversParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t AddCustomObserversParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddCustomObserversParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddCustomObserversParams to hex string (Canton MCMS format)
+func (t AddCustomObserversParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCustomObserversParams from hex string (Canton MCMS format)
+func (t *AddCustomObserversParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -843,15 +885,18 @@ func (t *GetFee) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetRequiredCCVsForExecute2 is a Record type
-type GetRequiredCCVsForExecute2 struct {
-	Context              common.CCIPContext        `json:"context"`
-	ReceiverRequiredCCVs []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	SourceChainSelector  types.NUMERIC             `json:"sourceChainSelector"`
+// GetRequiredCCVsForExecute is a Record type
+type GetRequiredCCVsForExecute struct {
+	Context                   common.CCIPContext        `json:"context"`
+	Message                   common.MessageV1          `json:"message"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
+	TokenPoolRequiredCCVs     []mcms.RawInstanceAddress `json:"tokenPoolRequiredCCVs"`
 }
 
-// ToMap converts GetRequiredCCVsForExecute2 to a map for DAML arguments
-func (t GetRequiredCCVsForExecute2) ToMap() map[string]any {
+// ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
+func (t GetRequiredCCVsForExecute) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["context"] = func() any {
@@ -860,6 +905,14 @@ func (t GetRequiredCCVsForExecute2) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.Context
+	}()
+
+	m["message"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
 	}()
 
 	m["receiverRequiredCCVs"] = func() []any {
@@ -875,29 +928,55 @@ func (t GetRequiredCCVsForExecute2) ToMap() map[string]any {
 		return res
 	}()
 
-	m["sourceChainSelector"] = t.SourceChainSelector
+	m["receiverOptionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
+		for _, e := range t.ReceiverOptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
+
+	m["tokenPoolRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.TokenPoolRequiredCCVs))
+		for _, e := range t.TokenPoolRequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
 
 	return m
 }
 
-func (t GetRequiredCCVsForExecute2) MarshalJSON() ([]byte, error) {
+func (t GetRequiredCCVsForExecute) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *GetRequiredCCVsForExecute2) UnmarshalJSON(data []byte) error {
+func (t *GetRequiredCCVsForExecute) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes GetRequiredCCVsForExecute2 to hex string (Canton MCMS format)
-func (t GetRequiredCCVsForExecute2) MarshalHex() (string, error) {
+// MarshalHex encodes GetRequiredCCVsForExecute to hex string (Canton MCMS format)
+func (t GetRequiredCCVsForExecute) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes GetRequiredCCVsForExecute2 from hex string (Canton MCMS format)
-func (t *GetRequiredCCVsForExecute2) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetRequiredCCVsForExecute from hex string (Canton MCMS format)
+func (t *GetRequiredCCVsForExecute) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1292,6 +1371,69 @@ func (t PerPartyRouter) CCIPSendWithPackageID(contractID string, packageID strin
 	}
 }
 
+// Execute exercises the Execute choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) Execute(contractID string, args Execute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "Execute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ExecuteWithPackageID exercises the Execute choice using the provided package ID instead of package name
+func (t PerPartyRouter) ExecuteWithPackageID(contractID string, packageID string, args Execute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "Execute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetExecutionState exercises the GetExecutionState choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) GetExecutionState(contractID string, args GetExecutionState) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "GetExecutionState",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetExecutionStateWithPackageID exercises the GetExecutionState choice using the provided package ID instead of package name
+func (t PerPartyRouter) GetExecutionStateWithPackageID(contractID string, packageID string, args GetExecutionState) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "GetExecutionState",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PrepareExecute exercises the PrepareExecute choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) PrepareExecute(contractID string, args PrepareExecute2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "PrepareExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PrepareExecuteWithPackageID exercises the PrepareExecute choice using the provided package ID instead of package name
+func (t PerPartyRouter) PrepareExecuteWithPackageID(contractID string, packageID string, args PrepareExecute2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "PrepareExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // GetFee exercises the GetFee choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
@@ -1309,27 +1451,6 @@ func (t PerPartyRouter) GetFeeWithPackageID(contractID string, packageID string,
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDeps exercises the SetDeps choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) SetDeps(contractID string, args SetDeps3) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
-func (t PerPartyRouter) SetDepsWithPackageID(contractID string, packageID string, args SetDeps3) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1397,51 +1518,9 @@ func (t PerPartyRouter) GetRequiredCCVsForSendWithPackageID(contractID string, p
 	}
 }
 
-// Execute exercises the Execute choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) Execute(contractID string, args Execute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "Execute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecuteWithPackageID exercises the Execute choice using the provided package ID instead of package name
-func (t PerPartyRouter) ExecuteWithPackageID(contractID string, packageID string, args Execute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "Execute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// PrepareExecute exercises the PrepareExecute choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) PrepareExecute(contractID string, args PrepareExecute2) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "PrepareExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// PrepareExecuteWithPackageID exercises the PrepareExecute choice using the provided package ID instead of package name
-func (t PerPartyRouter) PrepareExecuteWithPackageID(contractID string, packageID string, args PrepareExecute2) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "PrepareExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
-func (t PerPartyRouter) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute2) *model.ExerciseCommand {
+func (t PerPartyRouter) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -1451,32 +1530,11 @@ func (t PerPartyRouter) GetRequiredCCVsForExecute(contractID string, args GetReq
 }
 
 // GetRequiredCCVsForExecuteWithPackageID exercises the GetRequiredCCVsForExecute choice using the provided package ID instead of package name
-func (t PerPartyRouter) GetRequiredCCVsForExecuteWithPackageID(contractID string, packageID string, args GetRequiredCCVsForExecute2) *model.ExerciseCommand {
+func (t PerPartyRouter) GetRequiredCCVsForExecuteWithPackageID(contractID string, packageID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetRequiredCCVsForExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetExecutionState exercises the GetExecutionState choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) GetExecutionState(contractID string, args GetExecutionState) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "GetExecutionState",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetExecutionStateWithPackageID exercises the GetExecutionState choice using the provided package ID instead of package name
-func (t PerPartyRouter) GetExecutionStateWithPackageID(contractID string, packageID string, args GetExecutionState) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "GetExecutionState",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1519,6 +1577,27 @@ func (t PerPartyRouter) GetSequenceNumberWithPackageID(contractID string, packag
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetSequenceNumber",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDeps exercises the SetDeps choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) SetDeps(contractID string, args SetDeps3) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t PerPartyRouter) SetDepsWithPackageID(contractID string, packageID string, args SetDeps3) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1785,27 +1864,6 @@ func (t *PerPartyRouterFactory) UnmarshalHex(data string) error {
 
 // Choice methods for PerPartyRouterFactory
 
-// FactorySetDeps exercises the FactorySetDeps choice on this PerPartyRouterFactory contract
-// This method uses the package name in the template ID
-func (t PerPartyRouterFactory) FactorySetDeps(contractID string, args FactorySetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
-		ContractID: contractID,
-		Choice:     "FactorySetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FactorySetDepsWithPackageID exercises the FactorySetDeps choice using the provided package ID instead of package name
-func (t PerPartyRouterFactory) FactorySetDepsWithPackageID(contractID string, packageID string, args FactorySetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
-		ContractID: contractID,
-		Choice:     "FactorySetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // CreateRouter exercises the CreateRouter choice on this PerPartyRouterFactory contract
 // This method uses the package name in the template ID
 func (t PerPartyRouterFactory) CreateRouter(contractID string, args CreateRouter) *model.ExerciseCommand {
@@ -1865,6 +1923,27 @@ func (t PerPartyRouterFactory) HasRouterWithPackageID(contractID string, package
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
 		ContractID: contractID,
 		Choice:     "HasRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FactorySetDeps exercises the FactorySetDeps choice on this PerPartyRouterFactory contract
+// This method uses the package name in the template ID
+func (t PerPartyRouterFactory) FactorySetDeps(contractID string, args FactorySetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		ContractID: contractID,
+		Choice:     "FactorySetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FactorySetDepsWithPackageID exercises the FactorySetDeps choice using the provided package ID instead of package name
+func (t PerPartyRouterFactory) FactorySetDepsWithPackageID(contractID string, packageID string, args FactorySetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		ContractID: contractID,
+		Choice:     "FactorySetDeps",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -2112,6 +2191,48 @@ func (t *RemoveCustomObservers) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// RemoveCustomObserversParams is a Record type
+type RemoveCustomObserversParams struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts RemoveCustomObserversParams to a map for DAML arguments
+func (t RemoveCustomObserversParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemoveCustomObserversParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoveCustomObserversParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoveCustomObserversParams to hex string (Canton MCMS format)
+func (t RemoveCustomObserversParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoveCustomObserversParams from hex string (Canton MCMS format)
+func (t *RemoveCustomObserversParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetDeps3 is a Record type
 type SetDeps3 struct {
 	NewDeps SetDepsParams3 `json:"newDeps"`
@@ -2263,6 +2384,7 @@ func (t *SetDepsParams3) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error)
+	AddCustomObserversParams(args AddCustomObserversParams) (*bind.EncodedChoice, error)
 	CCIPSend(args CCIPSend) (*bind.EncodedChoice, error)
 	CreateRouter(args CreateRouter) (*bind.EncodedChoice, error)
 	Execute(args Execute) (*bind.EncodedChoice, error)
@@ -2271,7 +2393,7 @@ type MCMSEncoder interface {
 	GetExecutionState(args GetExecutionState) (*bind.EncodedChoice, error)
 	GetExecutionStateMCMSParams(args GetExecutionStateMCMSParams) (*bind.EncodedChoice, error)
 	GetFee(args GetFee) (*bind.EncodedChoice, error)
-	GetRequiredCCVsForExecute2(args GetRequiredCCVsForExecute2) (*bind.EncodedChoice, error)
+	GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error)
 	GetSequenceNumber(args GetSequenceNumber) (*bind.EncodedChoice, error)
 	HasRouter(args HasRouter) (*bind.EncodedChoice, error)
@@ -2281,6 +2403,7 @@ type MCMSEncoder interface {
 	PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error)
 	PrepareSend(args PrepareSend) (*bind.EncodedChoice, error)
 	RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error)
+	RemoveCustomObserversParams(args RemoveCustomObserversParams) (*bind.EncodedChoice, error)
 	SetDeps3(args SetDeps3) (*bind.EncodedChoice, error)
 }
 
@@ -2313,6 +2436,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 
 // AddCustomObservers encodes parameters for the AddCustomObservers choice.
 func (e *encoder) AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCustomObservers", args)
+}
+
+// AddCustomObserversParams encodes parameters for the AddCustomObservers choice.
+func (e *encoder) AddCustomObserversParams(args AddCustomObserversParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddCustomObservers", args)
 }
 
@@ -2356,9 +2484,9 @@ func (e *encoder) GetFee(args GetFee) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetFee", args)
 }
 
-// GetRequiredCCVsForExecute2 encodes parameters for the GetRequiredCCVsForExecute2 choice.
-func (e *encoder) GetRequiredCCVsForExecute2(args GetRequiredCCVsForExecute2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetRequiredCCVsForExecute2", args)
+// GetRequiredCCVsForExecute encodes parameters for the GetRequiredCCVsForExecute choice.
+func (e *encoder) GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVsForExecute", args)
 }
 
 // GetRequiredCCVsForSend encodes parameters for the GetRequiredCCVsForSend choice.
@@ -2403,6 +2531,11 @@ func (e *encoder) PrepareSend(args PrepareSend) (*bind.EncodedChoice, error) {
 
 // RemoveCustomObservers encodes parameters for the RemoveCustomObservers choice.
 func (e *encoder) RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
+}
+
+// RemoveCustomObserversParams encodes parameters for the RemoveCustomObservers choice.
+func (e *encoder) RemoveCustomObserversParams(args RemoveCustomObserversParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
 }
 

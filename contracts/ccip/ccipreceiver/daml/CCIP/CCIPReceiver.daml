@@ -10,10 +10,12 @@ module CCIP.CCIPReceiver where
 import DA.Crypto.Text (BytesHex)
 import DA.Action (foldlA)
 import DA.List (unique)
+import DA.Optional (fromSomeNote)
 
 import qualified CCIP.Context
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
+import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.PerPartyRouter
 import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
@@ -56,14 +58,46 @@ template CCIPReceiver
         -- Ensure that requiredCCVs are unique
         ensure assertValidInstanceId instanceId && unique requiredCCVs
 
-        -- | Query the receiver's CCV requirements. Off-chain code calls this
-        -- to discover which CCVs need verification inputs before calling
-        -- Execute. Analogous to IAny2EVMMessageReceiverV2.getCCVs().
+        -- | Query the final required CCVs for executing an inbound message.
+        -- Aggregates receiver policy with token-pool requirements and delegates
+        -- protocol-level resolution to PerPartyRouter/OffRamp.
         nonconsuming choice GetRequiredCCVs : [RawInstanceAddress]
             with
-                caller : Party
-            controller caller
-            do pure requiredCCVs
+                context : CCIP.Context.CCIPContext
+                routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
+                encodedMessage : BytesHex
+                tokenPoolCid : Optional (ContractId CCIP.Interfaces.TokenPool.ITokenPool)
+            controller owner
+            do
+                let message = fromSomeNote "receiver: failed to decode message"
+                        (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
+
+                tokenPoolRequiredCCVs <- case (message.tokenTransfer, tokenPoolCid) of
+                    (None, None) -> pure []
+                    (None, Some _) ->
+                        abort "receiver: tokenPoolCid provided without token transfer"
+                    (Some _, None) ->
+                        abort "receiver: tokenPoolCid required for token transfer"
+                    (Some tt, Some poolCid) ->
+                        let tokenAmount : Decimal = CCIP.Math.numeric0ToDecimal tt.amount
+                            tokenExtraData : BytesHex = tt.extraData
+                        in
+                        exercise poolCid
+                            CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
+                                remoteChainSelector = message.sourceChainSelector
+                                amount = tokenAmount
+                                finality = message.finality
+                                extraData = tokenExtraData
+                                direction = CCIP.Interfaces.TokenPool.Inbound
+                                caller = owner
+
+                exercise routerCid CCIP.PerPartyRouter.GetRequiredCCVsForExecute with
+                    context = context
+                    message = message
+                    receiverRequiredCCVs = requiredCCVs
+                    receiverOptionalCCVs = optionalCCVs
+                    receiverOptionalThreshold = optionalThreshold
+                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
 
         -- | Update CCV requirements.
         choice UpdateRequiredCCVs : ContractId CCIPReceiver
