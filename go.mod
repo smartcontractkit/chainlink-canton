@@ -39,7 +39,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260326213859-8750badddcc3
 	github.com/smartcontractkit/chainlink-common v0.11.1
 	github.com/smartcontractkit/chainlink-deployments-framework v0.93.0
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.8
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.13
 	github.com/smartcontractkit/go-daml v0.0.0-20260331185746-126b4945e013
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
