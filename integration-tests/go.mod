@@ -25,7 +25,7 @@ require (
 	github.com/smartcontractkit/go-daml v0.0.0-20260331185746-126b4945e013
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
-	google.golang.org/grpc v1.79.3
+	google.golang.org/grpc v1.80.0
 )
 
 require (
