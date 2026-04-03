@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
@@ -80,6 +81,10 @@ var BuildConfig = operations.NewOperation(
 		feeQuoter, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(input.ChainSelector, datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
 		if err != nil {
 			return GenerateEDSConfigOutput{}, fmt.Errorf("failed to get FeeQuoter address: %w", err)
+		}
+		executor, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(input.ChainSelector, datastore.ContractType(executor.ContractType), executor.Version, ""))
+		if err != nil {
+			return GenerateEDSConfigOutput{}, fmt.Errorf("failed to get Executor address: %w", err)
 		}
 
 		// CCVs
@@ -180,6 +185,10 @@ var BuildConfig = operations.NewOperation(
 				FeeQuoter: edsConfig.ContractIdentifier{
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
+				},
+				DefaultExecutor: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
 				},
 				CCVs:               ccvs,
 				TokenPoolContracts: tokenPools,
