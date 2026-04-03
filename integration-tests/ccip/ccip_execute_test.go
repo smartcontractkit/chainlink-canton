@@ -249,8 +249,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err)
 	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
 	require.NoError(t, err)
+	executorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
+	require.NoError(t, err)
 
-	dars := [][]byte{rmnDar, commonDar, tokenAdminRegistryDar, offRampDar, onRampDar, feeQuoterDar, committeeVerifierDar, perPartyRouterDar, ccipReceiverDar}
+	dars := [][]byte{rmnDar, commonDar, tokenAdminRegistryDar, offRampDar, onRampDar, feeQuoterDar, committeeVerifierDar, perPartyRouterDar, ccipReceiverDar, executorDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
