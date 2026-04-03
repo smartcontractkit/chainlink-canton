@@ -571,8 +571,8 @@ github.com/smartcontractkit/chainlink-common v0.10.1-0.20260217160002-b56cb5356c
 github.com/smartcontractkit/chainlink-common v0.10.1-0.20260217160002-b56cb5356cc7/go.mod h1:HXgSKzmZ/bhSx8nHU7hHW6dR+BHSXkdcpFv2T8qJcS8=
 github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 h1:FJAFgXS9oqASnkS03RE1HQwYQQxrO4l46O5JSzxqLgg=
 github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10/go.mod h1:oiDa54M0FwxevWwyAX773lwdWvFYYlYHHQV1LQ5HpWY=
-github.com/smartcontractkit/chainlink-deployments-framework v0.88.1 h1:x6bXI6BgO8yjG+7sNc5ChGql4LpFex7aq/i0xRunJjQ=
-github.com/smartcontractkit/chainlink-deployments-framework v0.88.1/go.mod h1:oalqMz/O0fdvff3+i2F2F3oi4rgGoQetE9jNUZX9484=
+github.com/smartcontractkit/chainlink-deployments-framework v0.93.1 h1:LgFk8hzxoOnHq37KSY/5lL/k2QZFIhLs2gskUZHpL4o=
+github.com/smartcontractkit/chainlink-deployments-framework v0.93.1/go.mod h1:J0ITsNrymaQzLYXHr1mbS7cS0nBD7lJI6bCLVa3j4Po=
 github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260226130359-963f935e0396 h1:03tbcwjyIEjvHba1IWOj1sfThwebm2XNzyFHSuZtlWc=
 github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260226130359-963f935e0396/go.mod h1:Jqt53s27Tr0jDl8mdBXg1xhu6F8Fci8JOuq43tgHOM8=
 github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b h1:QuI6SmQFK/zyUlVWEf0GMkiUYBPY4lssn26nKSd/bOM=
@@ -581,8 +581,8 @@ github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260205130626
 github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260205130626-db2a2aab956b/go.mod h1:dkR2uYg9XYJuT1JASkPzWE51jjFkVb86P7a/yXe5/GM=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20260205175622-33e65031f9a9 h1:KyPROV+v7P8VdiU7JhVuGLcDlEBsURSpQmSCgNBTY+s=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20260205175622-33e65031f9a9/go.mod h1:KpEWZJMLwbdMHeHQz9rbkES0vRrx4nk6OQXyhlHb9/8=
-github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.6 h1:xl1COIJYJZvH69tXBLla02y5Bcv7rytMzPobLsCDye4=
-github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.6/go.mod h1:BALK9cj8sk12e15UF6uDhifHgIApa+6N11TcQfInEro=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.13 h1:quHuZ/2I7XZ8pdRw5UAwKW/idsPchHN7KnQ69YWzxS4=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.13/go.mod h1:BALK9cj8sk12e15UF6uDhifHgIApa+6N11TcQfInEro=
 github.com/smartcontractkit/chainlink-ton v0.0.0-20260219201907-054376f21418 h1:7f92q/Tz/Ns+gjChmWg5mEonrYutZV33k/1x+Xxsb4I=
 github.com/smartcontractkit/chainlink-ton v0.0.0-20260219201907-054376f21418/go.mod h1:FDDjLuc4vrfclu3JHkMaREg0XZz7Lw1MK47Z4jJ4U5Q=
 github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 h1:7Ut0g+Pdm+gcu2J/Xv8OpQOVf7uLGErMX8yhC4b4tIA=
@@ -595,8 +595,8 @@ github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12i
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20251212213002-0a5e2f907dda h1:OjM+79FRuVZlj0Qd4y+q8Xmz/tEn5y8npqmiQiMMj+w=
 github.com/smartcontractkit/libocr v0.0.0-20251212213002-0a5e2f907dda/go.mod h1:oJkBKVn8zoBQm7Feah9CiuEHyCqAhnp1LJBzrvloQtM=
-github.com/smartcontractkit/mcms v0.37.0 h1:h3tqQhVdLezyHOuPsGcknPFLlZlXpOHTchwlfO3D9s8=
-github.com/smartcontractkit/mcms v0.37.0/go.mod h1:7YqJPR8w9GiO1L/JjjTrwlSwAZ7i3J7cgOcu88PqtvU=
+github.com/smartcontractkit/mcms v0.39.0 h1:ORIpFZnNj24FQUZCktnZCNMUpNmd4kz15/Vddrk/LXc=
+github.com/smartcontractkit/mcms v0.39.0/go.mod h1:7YqJPR8w9GiO1L/JjjTrwlSwAZ7i3J7cgOcu88PqtvU=
 github.com/spf13/cast v1.10.0 h1:h2x0u2shc1QuLHfxi+cTJvs30+ZAHOGRic8uyGTDWxY=
 github.com/spf13/cast v1.10.0/go.mod h1:jNfB8QC9IA6ZuY2ZjDp0KtFO2LZZlg4S/7bzP6qqeHo=
 github.com/spf13/pflag v1.0.10 h1:4EBh2KAYBwaONj6b2Ye1GiHfwjqyROoF4RwYO+vPwFk=
@@ -841,8 +841,8 @@ google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57 h1:
 google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57/go.mod h1:kSJwQxqmFXeo79zOmbrALdflXQeAYcUbgS7PbpMknCY=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20260311181403-84a4fc48630c h1:xgCzyF2LFIO/0X2UAoVRiXKU5Xg6VjToG4i2/ecSswk=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20260311181403-84a4fc48630c/go.mod h1:4Hqkh8ycfw05ld/3BWL7rJOSfebL2Q+DVDeRgYgxUU8=
-google.golang.org/grpc v1.79.2 h1:fRMD94s2tITpyJGtBBn7MkMseNpOZU8ZxgC3MMBaXRU=
-google.golang.org/grpc v1.79.2/go.mod h1:KmT0Kjez+0dde/v2j9vzwoAScgEPx/Bw1CYChhHLrHQ=
+google.golang.org/grpc v1.80.0 h1:Xr6m2WmWZLETvUNvIUmeD5OAagMw3FiKmMlTdViWsHM=
+google.golang.org/grpc v1.80.0/go.mod h1:ho/dLnxwi3EDJA4Zghp7k2Ec1+c2jqup0bFkw07bwF4=
 google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd/go.mod h1:DFci5gLYBciE7Vtevhsrf46CRTquxDuWsQurQQe4oz8=
 google.golang.org/protobuf v0.0.0-20200221191635-4d8936d0db64/go.mod h1:kwYJMbMJ01Woi6D6+Kah6886xMZcty6N08ah7+eCXa0=
 google.golang.org/protobuf v0.0.0-20200228230310-ab0ca4ff8a60/go.mod h1:cfTl7dwQJ+fmap5saPgwCLgHXTUD7jkjRqWcaiX5VyM=
