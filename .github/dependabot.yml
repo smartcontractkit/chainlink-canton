@@ -6,10 +6,11 @@ updates:
   - package-ecosystem: "gomod"
     directories:
       - "/"
-      - "/eds"
       - "/integration-tests"
+      - "/party-ceremony"
+      - "/party-ceremony/integration-tests"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 20
     labels:
       - 'dependencies-go'
