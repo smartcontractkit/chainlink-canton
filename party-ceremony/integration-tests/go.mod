@@ -10,7 +10,7 @@ require (
 	github.com/chainlink/canton-party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-deployments-framework v0.88.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.93.1
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0
 )
@@ -136,7 +136,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260217160002-b56cb5356cc7 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.6 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.13 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20260219201907-054376f21418 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
