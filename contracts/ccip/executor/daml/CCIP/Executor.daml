@@ -3,56 +3,16 @@ module CCIP.Executor where
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (fromSome, fromSomeNote, fromOptional)
+import DA.Optional (fromOptional, fromSome, fromSomeNote)
 import qualified DA.Map as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
-import MCMS.Codec (
-    encodeNumeric0,
-    decodeNumeric0At,
-    encodeBool,
-    decodeBoolAt,
-    encodeUint16,
-    decodeUint16At,
-    encodeOptional,
-    decodeOptional,
-    encodeList,
-    decodeList,
-    encodeParty,
-    decodePartyAt,
-    )
-
 import qualified CCIP.Context
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.SendingMessageV1
-import CCIP.Codec( 
-    encodeRawInstanceAddress,
-    decodeRawInstanceAddressAt,
-    )
-
--- Per-destination-chain executor fee config.
--- Mirrors EVM Executor.RemoteChainConfig.
-data RemoteChainConfig = RemoteChainConfig
-    with
-        feeUSDCents : Numeric 0
-        enabled : Bool
-    deriving (Eq, Show)
-
-data RemoteChainConfigArgs = RemoteChainConfigArgs
-    with
-        destChainSelector : Numeric 0
-        config : RemoteChainConfig
-    deriving (Eq, Show)
-
--- Dynamic executor settings.
--- feeAggregator is retained for parity but not yet used on Canton.
-data DynamicConfig = DynamicConfig
-    with
-        feeAggregator : Optional Party
-        minBlockConfirmations : Int
-        ccvAllowlistEnabled : Bool
-    deriving (Eq, Show)
+import CCIP.ExecutorTypes (RemoteChainConfig(..), RemoteChainConfigArgs(..), DynamicConfig(..), ApplyDestChainUpdatesParams(..), SetDynamicConfigParams(..), ApplyAllowedCCVUpdatesParams(..))
+import CCIP.ExecutorCodecGen (decodeApplyDestChainUpdatesParamsAt, decodeSetDynamicConfigParamsAt, decodeApplyAllowedCCVUpdatesParamsAt)
 
 template Executor
     with
@@ -76,6 +36,12 @@ template Executor
                     sendingMessageCid = arg.sendingMessageCid
                     executorArgs = arg.executorArgs
                     extraContext = arg.extraContext
+                    caller = arg.caller
+
+            executor_getFeeImpl self arg = do
+                exercise (fromInterfaceContractId @Executor self) Executor_GetFee with
+                    destChainSelector = arg.destChainSelector
+                    requiredCCVs = arg.requiredCCVs
                     caller = arg.caller
 
         choice ApplyDestChainUpdates : ContractId Executor
@@ -182,6 +148,34 @@ template Executor
                     feeUSDCents = remoteCfg.feeUSDCents
                     caller = owner
 
+        -- Quote-only fee path for executor.
+        nonconsuming choice Executor_GetFee : CCIP.Interfaces.Executor.ExecutorFeeQuote
+            with
+                destChainSelector : Numeric 0
+                requiredCCVs : [RawInstanceAddress]
+                caller : Party
+            controller caller
+            do
+                let remoteCfg = fromSomeNote "executor: unsupported destination chain"
+                        (Map.lookup destChainSelector remoteChainConfigs)
+                assertMsg "executor: destination chain disabled" remoteCfg.enabled
+
+                let canonicalCCVs = dedup requiredCCVs
+
+                if dynamicConfig.ccvAllowlistEnabled
+                    then Foldable.forA_ canonicalCCVs (\ccv ->
+                        assertMsg "executor: CCV not allowed" (ccv `elem` allowedCCVs)
+                        )
+                    else pure ()
+
+                assertMsg "executor: too many CCVs in message"
+                    (length canonicalCCVs <= maxCCVsPerMsg)
+
+                pure CCIP.Interfaces.Executor.ExecutorFeeQuote with
+                    executorInstanceId = instanceId
+                    executorOwner = owner
+                    feeUSDCents = remoteCfg.feeUSDCents
+
         interface instance MCMSReceiver for Executor where
             view = MCMSReceiverView with
                 mcmsController = owner
@@ -194,118 +188,31 @@ template Executor
                 
                 case functionName of
                     "ApplyDestChainUpdates" -> do
-                        case decodeApplyDestChainConfigUpdatesParams operationData of
+                        case decodeApplyDestChainUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyDestChainUpdates"
-                            Some ((destChainSelectorsToRemove, destChainSelectorsToAdd), finalOffset) -> do
+                            Some (ApplyDestChainUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyDestChainUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyDestChainUpdates with
-                                    destChainSelectorsToRemove = destChainSelectorsToRemove
-                                    destChainSelectorsToAdd = destChainSelectorsToAdd
+                                    destChainSelectorsToRemove
+                                    destChainSelectorsToAdd
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "SetDynamicConfig" -> do
-                        case decodeSetDynamicConfigParams operationData of
+                        case decodeSetDynamicConfigParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: SetDynamicConfig"
-                            Some ((newDynamicConfig), finalOffset) -> do
+                            Some (SetDynamicConfigParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: SetDynamicConfig" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid SetDynamicConfig with
-                                    newDynamicConfig = newDynamicConfig
+                                    newDynamicConfig
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "ApplyAllowedCCVUpdates" -> do
-                        case decodeApplyAllowedCCVUpdatesParams operationData of
+                        case decodeApplyAllowedCCVUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyAllowedCCVUpdates"
-                            Some ((ccvsToRemove, ccvsToAdd, ccvAllowlistEnabled), finalOffset) -> do
+                            Some (ApplyAllowedCCVUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyAllowedCCVUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyAllowedCCVUpdates with
-                                    ccvsToRemove = ccvsToRemove
-                                    ccvsToAdd = ccvsToAdd
-                                    ccvAllowlistEnabled = ccvAllowlistEnabled
+                                    ccvsToRemove
+                                    ccvsToAdd
+                                    ccvAllowlistEnabled
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
--- ===============================================
--- |          MCMS Encoding / Decoding           |
--- ===============================================
-
--- ApplyDestChainUpdates
-
-encodeApplyDestChainUpdatesParams : ([Numeric 0], [RemoteChainConfigArgs]) -> BytesHex
-encodeApplyDestChainUpdatesParams (destChainSelectorsToRemove, destChainSelectorsToAdd) =
-    encodeList destChainSelectorsToRemove encodeNumeric0
-    <> encodeList destChainSelectorsToAdd encodeRemoteChainConfigArgs
-
-encodeRemoteChainConfigArgs : RemoteChainConfigArgs -> BytesHex
-encodeRemoteChainConfigArgs config =
-    encodeNumeric0 config.destChainSelector
-    <> encodeRemoteChainConfig config.config
-
-encodeRemoteChainConfig : RemoteChainConfig -> BytesHex
-encodeRemoteChainConfig config =
-    encodeNumeric0 config.feeUSDCents
-    <> encodeBool config.enabled
-
-decodeApplyDestChainConfigUpdatesParams : BytesHex -> Optional (([Numeric 0], [RemoteChainConfigArgs]), Int)
-decodeApplyDestChainConfigUpdatesParams encoded = do
-    (destChainSelectorsToRemove, offset) <- decodeList encoded 0 decodeNumeric0At
-    (destChainSelectorsToAdd, offset) <- decodeList encoded offset decodeRemoteChainConfigArgs
-    Some ((destChainSelectorsToRemove, destChainSelectorsToAdd), offset)
-
-decodeRemoteChainConfigArgs : BytesHex -> Int -> Optional (RemoteChainConfigArgs, Int)
-decodeRemoteChainConfigArgs encoded offset = do
-    (destChainSelector, offset) <- decodeNumeric0At encoded offset
-    (config, offset) <- decodeRemoteChainConfig encoded offset
-    Some (RemoteChainConfigArgs with
-            destChainSelector = destChainSelector
-            config = config
-        , offset)
-
-decodeRemoteChainConfig : BytesHex -> Int -> Optional (RemoteChainConfig, Int)
-decodeRemoteChainConfig encoded offset = do
-    (feeUSDCents, offset) <- decodeNumeric0At encoded offset
-    (enabled, offset) <- decodeBoolAt encoded offset
-    Some (RemoteChainConfig with
-            feeUSDCents = feeUSDCents
-            enabled = enabled
-        , offset)
-
--- SetDynamicConfig
-
-encodeSetDynamicConfigParams : (DynamicConfig) -> BytesHex
-encodeSetDynamicConfigParams newDynamicConfig =
-    encodeDynamicConfig newDynamicConfig
-
-encodeDynamicConfig : DynamicConfig -> BytesHex
-encodeDynamicConfig dynamicConfig =
-    encodeOptional dynamicConfig.feeAggregator encodeParty
-    <> fromSome (encodeUint16 dynamicConfig.minBlockConfirmations)
-    <> encodeBool dynamicConfig.ccvAllowlistEnabled
-
-decodeSetDynamicConfigParams : BytesHex -> Optional ((DynamicConfig), Int)
-decodeSetDynamicConfigParams encoded = do
-    (dynamicConfig, offset) <- decodeDynamicConfigAt encoded 0
-    Some ((dynamicConfig), offset)
-
-decodeDynamicConfigAt : BytesHex -> Int -> Optional (DynamicConfig, Int)
-decodeDynamicConfigAt encoded offset = do
-    (feeAggregator, offset) <- decodeOptional encoded offset decodePartyAt
-    (minBlockConfirmations, offset) <- decodeUint16At encoded offset
-    (ccvAllowlistEnabled, offset) <- decodeBoolAt encoded offset
-    Some (DynamicConfig with
-            feeAggregator = feeAggregator
-            minBlockConfirmations = minBlockConfirmations
-            ccvAllowlistEnabled = ccvAllowlistEnabled
-        , offset)
-
--- ApplyAllowedCCVUpdates
-
-encodeApplyAllowedCCVUpdatesParams : ([RawInstanceAddress], [RawInstanceAddress], Bool) -> BytesHex
-encodeApplyAllowedCCVUpdatesParams (ccvsToRemove, ccvsToAdd, ccvAllowlistEnabled) =
-    encodeList ccvsToRemove encodeRawInstanceAddress
-    <> encodeList ccvsToAdd encodeRawInstanceAddress
-    <> encodeBool ccvAllowlistEnabled
-
-decodeApplyAllowedCCVUpdatesParams : BytesHex -> Optional (([RawInstanceAddress], [RawInstanceAddress], Bool), Int)
-decodeApplyAllowedCCVUpdatesParams encoded = do
-    (ccvsToRemove, offset) <- decodeList encoded 0 decodeRawInstanceAddressAt
-    (ccvsToAdd, offset) <- decodeList encoded offset decodeRawInstanceAddressAt
-    (ccvAllowlistEnabled, offset) <- decodeBoolAt encoded offset
-    Some ((ccvsToRemove, ccvsToAdd, ccvAllowlistEnabled), offset)

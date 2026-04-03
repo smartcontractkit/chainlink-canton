@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -27,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-client"
-	PackageID   = "d58844c7d88783a24b2a5fcf01d41337cf6465e9fb324a84a7cc610a6337d43a"
+	PackageID   = "3672967483622a071dcc02fd361e03570428c36f067a2080c6e0d09f39b08e3a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -55,67 +53,58 @@ func argsToMap(args any) map[string]any {
 	return map[string]any{"args": args}
 }
 
-// CCVSendInput is a Record type
-type CCVSendInput struct {
-	CcvCid          types.CONTRACT_ID  `json:"ccvCid"`
-	VerifierArgs    types.TEXT         `json:"verifierArgs"`
-	CcvExtraContext common.CCIPContext `json:"ccvExtraContext"`
+// CCVExtraArg is a Record type
+type CCVExtraArg struct {
+	CcvAddress mcms.RawInstanceAddress `json:"ccvAddress"`
+	CcvArgs    types.TEXT              `json:"ccvArgs"`
 }
 
-// ToMap converts CCVSendInput to a map for DAML arguments
-func (t CCVSendInput) ToMap() map[string]any {
+// ToMap converts CCVExtraArg to a map for DAML arguments
+func (t CCVExtraArg) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["ccvCid"] = func() any {
+	m["ccvAddress"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.CcvCid).(mapper); ok {
+		if m, ok := any(t.CcvAddress).(mapper); ok {
 			return m.toMap()
 		}
-		return t.CcvCid
+		return t.CcvAddress
 	}()
 
-	m["verifierArgs"] = string(t.VerifierArgs)
-
-	m["ccvExtraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.CcvExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.CcvExtraContext
-	}()
+	m["ccvArgs"] = string(t.CcvArgs)
 
 	return m
 }
 
-func (t CCVSendInput) MarshalJSON() ([]byte, error) {
+func (t CCVExtraArg) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *CCVSendInput) UnmarshalJSON(data []byte) error {
+func (t *CCVExtraArg) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes CCVSendInput to hex string (Canton MCMS format)
-func (t CCVSendInput) MarshalHex() (string, error) {
+// MarshalHex encodes CCVExtraArg to hex string (Canton MCMS format)
+func (t CCVExtraArg) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes CCVSendInput from hex string (Canton MCMS format)
-func (t *CCVSendInput) UnmarshalHex(data string) error {
+// UnmarshalHex decodes CCVExtraArg from hex string (Canton MCMS format)
+func (t *CCVExtraArg) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
 // Canton2AnyMessage is a Record type
 type Canton2AnyMessage struct {
-	Receiver      types.TEXT          `json:"receiver"`
-	Payload       types.TEXT          `json:"payload"`
-	TokenTransfer *TokenTransferInput `json:"tokenTransfer" hex:"optional"`
-	FeeToken      FeeTokenInput       `json:"feeToken"`
-	ExtraArgs     ExtraArgs           `json:"extraArgs"`
+	Receiver      types.TEXT                               `json:"receiver"`
+	Payload       types.TEXT                               `json:"payload"`
+	TokenTransfer *TokenTransfer                           `json:"tokenTransfer" hex:"optional"`
+	FeeToken      splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	ExtraArgs     ExtraArgs                                `json:"extraArgs"`
 }
 
 // ToMap converts Canton2AnyMessage to a map for DAML arguments
@@ -178,56 +167,152 @@ func (t *Canton2AnyMessage) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ExecutorInput is a Record type
-type ExecutorInput struct {
-	ExecutorCid          types.CONTRACT_ID  `json:"executorCid"`
-	ExecutorArgs         types.TEXT         `json:"executorArgs"`
-	ExecutorExtraContext common.CCIPContext `json:"executorExtraContext"`
+// ExecutorExtraArg is a variant/union type
+type ExecutorExtraArg struct {
+	ExecutorNoExecutor  *types.UNIT          `json:"Executor_NoExecutor,omitempty"`
+	ExecutorUseDefault  *ExecutorUseDefault  `json:"Executor_UseDefault,omitempty"`
+	ExecutorWithAddress *ExecutorWithAddress `json:"Executor_WithAddress,omitempty"`
 }
 
-// ToMap converts ExecutorInput to a map for DAML arguments
-func (t ExecutorInput) ToMap() map[string]any {
+// MarshalJSON implements custom JSON marshaling for ExecutorExtraArg
+func (v ExecutorExtraArg) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(v)
+}
+
+// UnmarshalJSON implements custom JSON unmarshalling for ExecutorExtraArg
+func (v *ExecutorExtraArg) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes ExecutorExtraArg to hex string (Canton MCMS format)
+func (v ExecutorExtraArg) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes ExecutorExtraArg from hex string (Canton MCMS format)
+func (v *ExecutorExtraArg) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
+}
+
+// GetVariantTag implements types.VARIANT interface
+func (v ExecutorExtraArg) GetVariantTag() string {
+
+	if v.ExecutorNoExecutor != nil {
+		return "Executor_NoExecutor"
+	}
+
+	if v.ExecutorUseDefault != nil {
+		return "Executor_UseDefault"
+	}
+
+	if v.ExecutorWithAddress != nil {
+		return "Executor_WithAddress"
+	}
+
+	return ""
+}
+
+// GetVariantValue implements types.VARIANT interface
+func (v ExecutorExtraArg) GetVariantValue() any {
+
+	if v.ExecutorNoExecutor != nil {
+		return v.ExecutorNoExecutor
+	}
+
+	if v.ExecutorUseDefault != nil {
+		return v.ExecutorUseDefault
+	}
+
+	if v.ExecutorWithAddress != nil {
+		return v.ExecutorWithAddress
+	}
+
+	return nil
+}
+
+var _ types.VARIANT = (*ExecutorExtraArg)(nil)
+
+// ExecutorUseDefault is a Record type
+type ExecutorUseDefault struct {
+	ExecutorArgs types.TEXT `json:"executorArgs"`
+}
+
+// ToMap converts ExecutorUseDefault to a map for DAML arguments
+func (t ExecutorUseDefault) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["executorCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutorCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutorCid
-	}()
-
 	m["executorArgs"] = string(t.ExecutorArgs)
-
-	m["executorExtraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutorExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutorExtraContext
-	}()
 
 	return m
 }
 
-func (t ExecutorInput) MarshalJSON() ([]byte, error) {
+func (t ExecutorUseDefault) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ExecutorInput) UnmarshalJSON(data []byte) error {
+func (t *ExecutorUseDefault) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ExecutorInput to hex string (Canton MCMS format)
-func (t ExecutorInput) MarshalHex() (string, error) {
+// MarshalHex encodes ExecutorUseDefault to hex string (Canton MCMS format)
+func (t ExecutorUseDefault) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ExecutorInput from hex string (Canton MCMS format)
-func (t *ExecutorInput) UnmarshalHex(data string) error {
+// UnmarshalHex decodes ExecutorUseDefault from hex string (Canton MCMS format)
+func (t *ExecutorUseDefault) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ExecutorWithAddress is a Record type
+type ExecutorWithAddress struct {
+	ExecutorAddress mcms.RawInstanceAddress `json:"executorAddress"`
+	ExecutorArgs    types.TEXT              `json:"executorArgs"`
+}
+
+// ToMap converts ExecutorWithAddress to a map for DAML arguments
+func (t ExecutorWithAddress) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["executorAddress"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutorAddress).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutorAddress
+	}()
+
+	m["executorArgs"] = string(t.ExecutorArgs)
+
+	return m
+}
+
+func (t ExecutorWithAddress) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutorWithAddress) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutorWithAddress to hex string (Canton MCMS format)
+func (t ExecutorWithAddress) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutorWithAddress from hex string (Canton MCMS format)
+func (t *ExecutorWithAddress) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -283,74 +368,14 @@ func (v ExtraArgs) GetVariantValue() any {
 
 var _ types.VARIANT = (*ExtraArgs)(nil)
 
-// FeeTokenInput is a Record type
-type FeeTokenInput struct {
-	Token           splice_api_token_holding_v1.InstrumentId `json:"token"`
-	TokenInput      interfaces.TokenInput                    `json:"tokenInput"`
-	SenderInputCids []types.CONTRACT_ID                      `json:"senderInputCids"`
-}
-
-// ToMap converts FeeTokenInput to a map for DAML arguments
-func (t FeeTokenInput) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["token"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Token).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Token
-	}()
-
-	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInput
-	}()
-
-	m["senderInputCids"] = func() []any {
-		res := make([]any, 0, len(t.SenderInputCids))
-		for _, e := range t.SenderInputCids {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t FeeTokenInput) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *FeeTokenInput) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes FeeTokenInput to hex string (Canton MCMS format)
-func (t FeeTokenInput) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes FeeTokenInput from hex string (Canton MCMS format)
-func (t *FeeTokenInput) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // GenericExtraArgsV3 is a Record type
 type GenericExtraArgsV3 struct {
-	GasLimit           types.INT64               `json:"gasLimit"`
-	BlockConfirmations types.INT64               `json:"blockConfirmations"`
-	Ccvs               []mcms.RawInstanceAddress `json:"ccvs"`
-	Executor           *ExecutorInput            `json:"executor" hex:"optional"`
-	TokenReceiver      types.TEXT                `json:"tokenReceiver"`
-	TokenArgs          types.TEXT                `json:"tokenArgs"`
+	GasLimit           types.INT64      `json:"gasLimit"`
+	BlockConfirmations types.INT64      `json:"blockConfirmations"`
+	Ccvs               []CCVExtraArg    `json:"ccvs"`
+	Executor           ExecutorExtraArg `json:"executor"`
+	TokenReceiver      types.TEXT       `json:"tokenReceiver"`
+	TokenArgs          types.TEXT       `json:"tokenArgs"`
 }
 
 // ToMap converts GenericExtraArgsV3 to a map for DAML arguments
@@ -374,16 +399,13 @@ func (t GenericExtraArgsV3) ToMap() map[string]any {
 		return res
 	}()
 
-	if t.Executor != nil {
-		m["executor"] = map[string]any{
-			"_type": "optional",
-			"value": *t.Executor,
+	m["executor"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Executor).(mapper); ok {
+			return m.toMap()
 		}
-	} else {
-		m["executor"] = map[string]any{
-			"_type": "optional",
-		}
-	}
+		return t.Executor
+	}()
 
 	m["tokenReceiver"] = string(t.TokenReceiver)
 
@@ -414,18 +436,14 @@ func (t *GenericExtraArgsV3) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TokenTransferInput is a Record type
-type TokenTransferInput struct {
-	Token            splice_api_token_holding_v1.InstrumentId `json:"token"`
-	Amount           types.NUMERIC                            `json:"amount"`
-	SenderInputCids  []types.CONTRACT_ID                      `json:"senderInputCids"`
-	TokenPoolCid     types.CONTRACT_ID                        `json:"tokenPoolCid"`
-	TokenInput       interfaces.TokenInput                    `json:"tokenInput"`
-	PoolExtraContext common.CCIPContext                       `json:"poolExtraContext"`
+// TokenTransfer is a Record type
+type TokenTransfer struct {
+	Token  splice_api_token_holding_v1.InstrumentId `json:"token"`
+	Amount types.NUMERIC                            `json:"amount"`
 }
 
-// ToMap converts TokenTransferInput to a map for DAML arguments
-func (t TokenTransferInput) ToMap() map[string]any {
+// ToMap converts TokenTransfer to a map for DAML arguments
+func (t TokenTransfer) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["token"] = func() any {
@@ -438,59 +456,27 @@ func (t TokenTransferInput) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["senderInputCids"] = func() []any {
-		res := make([]any, 0, len(t.SenderInputCids))
-		for _, e := range t.SenderInputCids {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	m["tokenPoolCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenPoolCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenPoolCid
-	}()
-
-	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInput
-	}()
-
-	m["poolExtraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.PoolExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.PoolExtraContext
-	}()
-
 	return m
 }
 
-func (t TokenTransferInput) MarshalJSON() ([]byte, error) {
+func (t TokenTransfer) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *TokenTransferInput) UnmarshalJSON(data []byte) error {
+func (t *TokenTransfer) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes TokenTransferInput to hex string (Canton MCMS format)
-func (t TokenTransferInput) MarshalHex() (string, error) {
+// MarshalHex encodes TokenTransfer to hex string (Canton MCMS format)
+func (t TokenTransfer) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes TokenTransferInput from hex string (Canton MCMS format)
-func (t *TokenTransferInput) UnmarshalHex(data string) error {
+// UnmarshalHex decodes TokenTransfer from hex string (Canton MCMS format)
+func (t *TokenTransfer) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

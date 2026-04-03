@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
@@ -51,9 +50,6 @@ func TestMCMSOps(t *testing.T) {
 		logger.Test(t),
 		reporter,
 	)
-	deps := dependencies.CantonDeps{
-		Chain: *cantonChain,
-	}
 
 	chainID := int64(1)
 	mcmsID := "test-mcms-1"
@@ -101,9 +97,7 @@ func TestMCMSOps(t *testing.T) {
 
 	var mcmsInstanceAddress contracts.InstanceAddress
 	t.Run("Deploy", func(t *testing.T) {
-		result, err := cld_ops.ExecuteOperation(bundle, Deploy, deps, contract.DeployInput[mcms.MCMS]{
-			ChainSelector: cantonChain.Selector,
-			ActAs:         []string{primaryParty},
+		result, err := cld_ops.ExecuteOperation(bundle, Deploy, *cantonChain, contract.DeployInput[mcms.MCMS]{
 			Template: mcms.MCMS{
 				Owner:              types.PARTY(primaryParty),
 				InstanceId:         types.TEXT(mcmsID),
@@ -151,10 +145,8 @@ func TestMCMSOps(t *testing.T) {
 		newGroupQuorums := make([]types.INT64, 32)
 		newGroupQuorums[0] = types.INT64(3) // 3-of-4 for group 0
 
-		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, deps, contract.ChoiceInput[mcms.SetConfig]{
-			ChainSelector:   cantonChain.Selector,
+		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, *cantonChain, contract.ChoiceInput[mcms.SetConfig]{
 			InstanceAddress: mcmsInstanceAddress,
-			ActAs:           []string{primaryParty},
 			Args: mcms.SetConfig{
 				TargetRole:      mcms.RoleProposer, // Target the proposer role
 				NewSigners:      newSigners,

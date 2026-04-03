@@ -6,10 +6,6 @@ import DA.List qualified as List
 
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
--- set the DestChainConfig to this value to disable the default executor.
-noExecutionExecutorRawInstanceAddress : RawInstanceAddress
-noExecutionExecutorRawInstanceAddress = RawInstanceAddress "no-execution-executor"
-
 data DestChainConfigArgs = DestChainConfigArgs
     with
         destChainSelector : Numeric 0           -- Destination chain selector of the config to update.
@@ -18,7 +14,7 @@ data DestChainConfigArgs = DestChainConfigArgs
         tokenReceiverAllowed : Bool             -- Whether specifying `tokenReceiver` in extraArgs is allowed. Must be set to false for all EVM chains.
         baseExecutionGasCost : Int              -- Base destination-chain gas cost added to ccipReceiveGasLimit for execution pricing.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
-        defaultExecutor : RawInstanceAddress    -- Default executor to use for messages to this destination chain.
+        defaultExecutor : Optional RawInstanceAddress -- Default executor to use for messages to this destination chain. `None` means no executor.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
         messageNetworkFeeUSDCents : Numeric 0   -- Network fee in USD cents for messages without token transfers.
@@ -33,7 +29,7 @@ data DestChainConfig = DestChainConfig
         tokenReceiverAllowed : Bool             -- Whether specifying `tokenReceiver` in extraArgs is allowed. Must be set to false for all EVM chains.
         baseExecutionGasCost : Int              -- Base destination-chain gas cost added to ccipReceiveGasLimit for execution pricing.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
-        defaultExecutor : RawInstanceAddress    -- Default executor to use for messages to this destination chain.
+        defaultExecutor : Optional RawInstanceAddress -- Default executor to use for messages to this destination chain. `None` means no executor.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
         messageNetworkFeeUSDCents : Numeric 0   -- Network fee in USD cents for messages without token transfers.
@@ -100,3 +96,19 @@ validateNoEmptyAddresses addresses = do
     emptyAddress :: _ ->
       assertMsg ("ZeroAddressNotAllowed") False
     [] -> pure ()
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- ===========================================================================
+
+-- | Params for ApplyDestChainConfigUpdates choice
+data ApplyDestChainConfigUpdatesParams = ApplyDestChainConfigUpdatesParams
+    with
+        destChainConfigArgs : [DestChainConfigArgs]
+    deriving (Eq, Show)
+
+-- | Params for ApplySourceChainConfigUpdates choice
+data ApplySourceChainConfigUpdatesParams = ApplySourceChainConfigUpdatesParams
+    with
+        sourceChainConfigArgs : [SourceChainConfigArgs]
+    deriving (Eq, Show)

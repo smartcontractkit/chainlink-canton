@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -67,11 +66,6 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 
-	deps := dependencies.CantonDeps{
-		Chain:       chain,
-		Participant: config.Participant,
-	}
-
 	cfg := config.Config
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
@@ -109,12 +103,10 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		qualifier = nil
 	}
 
-	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, lock_release_token_pool.Deploy, deps, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
-		ChainSelector: config.ChainSelector,
-		Qualifier:     qualifier,
-		ActAs:         []string{cfg.PoolOwner},
-		Template:      template,
-		OwnerParty:    types.PARTY(cfg.PoolOwner),
+	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, lock_release_token_pool.Deploy, chain, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
+		Qualifier:  qualifier,
+		Template:   template,
+		OwnerParty: types.PARTY(cfg.PoolOwner),
 	})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to apply DeployTokenPool operation: %w", err)
@@ -127,15 +119,12 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {
 		regInput := sequences.RegisterTokenPoolInput{
 			TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
-			InstrumentId: splice_api_token_holding_v1.InstrumentId{
-				Admin: cfg.InstrumentId.Admin,
-				Id:    cfg.InstrumentId.Id,
-			},
-			CcipParty:      cfg.CcipOwner,
-			PoolOwnerParty: cfg.PoolOwner,
-			PoolInstanceID: out.Output.Address,
+			InstrumentId:                      cfg.InstrumentId,
+			CcipParty:                         cfg.CcipOwner,
+			PoolOwnerParty:                    cfg.PoolOwner,
+			PoolInstanceID:                    cfg.InstanceID,
 		}
-		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, deps, regInput)
+		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
 		}

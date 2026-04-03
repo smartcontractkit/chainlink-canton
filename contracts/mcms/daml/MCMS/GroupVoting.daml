@@ -113,20 +113,3 @@ incrementAt idx lst =
 -- | Sort addresses in increasing order
 sortAddresses : [Text] -> [Text]
 sortAddresses = sort
-
--- | Check if a set of signers can meet the quorum
-canMeetQuorum : [Text] -> MultisigConfig -> Bool
-canMeetQuorum signerAddrs config =
-  case verifyGroupVoting (sortAddresses signerAddrs) config of
-    Left _ -> False
-    Right () -> True
-
--- | Count how many valid signatures are in a set
-countValidSignatures : [Text] -> MultisigConfig -> Int
-countValidSignatures addrs config =
-  length $ filter (\addr -> isValidSignerAddr addr config) addrs
-
--- | Check if address is a valid signer
-isValidSignerAddr : Text -> MultisigConfig -> Bool
-isValidSignerAddr addr config =
-  any (\s -> s.signerAddress == addr) config.signers

@@ -9,14 +9,14 @@ import DA.Foldable (forA_)
 import DA.List (dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote)
-import CCIP.CommitteeVerifierCodec (
-    decodeApplySignatureConfigsParams,
-    decodeSetDynamicConfigParams,
-    decodeApplyRemoteChainConfigUpdatesParams,
-    decodeApplyAllowListUpdatesParams,
-    decodeTransferStorageLocationsAdminParams,
-    decodeUpdateStorageLocationsParams,
-    decodeSetDepsParams,
+import CCIP.CommitteeVerifierCodecGen (
+    decodeApplySignatureConfigsParamsAt,
+    decodeSetDynamicConfigParamsAt,
+    decodeApplyRemoteChainConfigUpdatesParamsAt,
+    decodeApplyAllowListUpdatesParamsAt,
+    decodeTransferStorageLocationsAdminParamsAt,
+    decodeUpdateStorageLocationsParamsAt,
+    decodeSetDepsParamsAt,
     )
 import CCIP.CommitteeVerifierTypes (
     DynamicConfig(..),
@@ -26,6 +26,12 @@ import CCIP.CommitteeVerifierTypes (
     SetDepsParams(..),
     SignatureConfig(..),
     AllowListConfigArgs(..),
+    ApplySignatureConfigsParams(..),
+    SetDynamicConfigParams(..),
+    ApplyRemoteChainConfigUpdatesParams(..),
+    ApplyAllowListUpdatesParams(..),
+    TransferStorageLocationsAdminParams(..),
+    UpdateStorageLocationsParams(..),
     )
 import qualified CCIP.Context
 import qualified CCIP.Crypto.DerEncoding
@@ -39,9 +45,9 @@ import qualified CCIP.Interfaces.CrossChainVerifier
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
--- The preimage is bytes4(keccak256("CommitteeVerifier 1.7.0"))
-versionTagV1_7_0 : BytesHex
-versionTagV1_7_0 : BytesHex = "49ff34ed"
+-- The preimage is bytes4(keccak256("CommitteeVerifier 2.0.0"))
+versionTagV2_0_0 : BytesHex
+versionTagV2_0_0 : BytesHex = "e9a05a20"
 
 signature_length : Int
 signature_length : Int = 64
@@ -54,7 +60,7 @@ template CommitteeVerifier
         owner : Party
 
         ccipOwner : Party
-        versionTag : BytesHex -- Version tag for this CCV (e.g., "49ff34ed")
+        versionTag : BytesHex -- Version tag for this CCV (e.g., "e9a05a20")
         
         -- | Dynamic config
         -- Party capable of adding or removing allowed senders
@@ -106,6 +112,12 @@ template CommitteeVerifier
                     with
                         sendingMessageCid = arg.sendingMessageCid
                         extraContext = arg.extraContext
+                        caller = arg.caller
+
+            crossChainVerifier_getFeeImpl self arg = do
+                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_GetFee
+                    with
+                        destChainSelector = arg.destChainSelector
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
@@ -356,6 +368,24 @@ template CommitteeVerifier
                     destBytesOverhead = chainConfig.payloadSizeBytes
                     caller = owner
 
+        -- | Quote fee for outbound message (USD cents only).
+        nonconsuming choice CommitteeVerifier_GetFee
+                : CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote
+            with
+                destChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do
+                let chainConfig = fromSomeNote "no fee config for dest chain"
+                        (Map.lookup destChainSelector remoteChainConfigs)
+
+                pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
+                    ccvInstanceId = instanceId
+                    ccvOwner = owner
+                    feeUSDCents = chainConfig.feeUSDCents
+                    gasForVerification = chainConfig.gasForVerification
+                    payloadSizeBytes = chainConfig.payloadSizeBytes
+
         -- | Forward message for verification. Exercises AddVerifierData
         -- directly on SendingMessageV1.
         nonconsuming choice CommitteeVerifier_ForwardToVerifier
@@ -414,51 +444,51 @@ template CommitteeVerifier
 
                 case functionName of
                     "ApplySignatureConfigs" -> do
-                        case decodeApplySignatureConfigsParams operationData of
+                        case decodeApplySignatureConfigsParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplySignatureConfigs"
-                            Some ((selectorsToRemove, signatureConfigs), finalOffset) -> do
+                            Some (ApplySignatureConfigsParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplySignatureConfigs" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplySignatureConfigs with
-                                    sourceChainSelectorsToRemove = selectorsToRemove
+                                    sourceChainSelectorsToRemove = sourceChainSelectorsToRemove
                                     signatureConfigs = signatureConfigs
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "SetDynamicConfig" -> do
-                        case decodeSetDynamicConfigParams operationData of
+                        case decodeSetDynamicConfigParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: SetDynamicConfig"
-                            Some ((dynamicConfig), finalOffset) -> do
+                            Some (SetDynamicConfigParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: SetDynamicConfig" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid SetDynamicConfig with
                                     dynamicConfig = dynamicConfig
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "ApplyRemoteChainConfigUpdates" -> do
-                        case decodeApplyRemoteChainConfigUpdatesParams operationData of
+                        case decodeApplyRemoteChainConfigUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyRemoteChainConfigUpdates"
-                            Some ((remoteChainConfigArgs), finalOffset) -> do
+                            Some (ApplyRemoteChainConfigUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyRemoteChainConfigUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyRemoteChainConfigUpdates with
                                     remoteChainConfigArgs = remoteChainConfigArgs
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "SetDeps" -> do
-                        case decodeSetDepsParams operationData of
+                        case decodeSetDepsParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: SetDeps"
-                            Some ((newDeps), finalOffset) -> do
+                            Some (newDeps, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: SetDeps" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid SetDeps with
                                     newDeps = newDeps
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "ApplyAllowListUpdates" -> do
-                        case decodeApplyAllowListUpdatesParams operationData of
+                        case decodeApplyAllowListUpdatesParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: ApplyAllowListUpdates"
-                            Some ((allowListConfigArgsItems, caller), finalOffset) -> do
+                            Some (ApplyAllowListUpdatesParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: ApplyAllowListUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyAllowListUpdates with
-                                    allowListConfigArgsItems = allowListConfigArgsItems
+                                    allowListConfigArgsItems = allowListConfigArgs
                                     caller = caller
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "TransferStorageLocationsAdmin" -> do
-                        case decodeTransferStorageLocationsAdminParams operationData of
+                        case decodeTransferStorageLocationsAdminParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: TransferStorageLocationsAdmin"
-                            Some ((newAdmin), finalOffset) -> do
+                            Some (TransferStorageLocationsAdminParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: TransferStorageLocationsAdmin" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid TransferStorageLocationsAdmin with
                                     newAdmin = newAdmin
@@ -468,9 +498,9 @@ template CommitteeVerifier
                         newCid <- exercise selfCid AcceptStorageLocationsAdmin with
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     "UpdateStorageLocations" -> do
-                        case decodeUpdateStorageLocationsParams operationData of
+                        case decodeUpdateStorageLocationsParamsAt operationData 0 of
                             None -> abort "E_INVALID_PARAMS: UpdateStorageLocations"
-                            Some ((newLocations), finalOffset) -> do
+                            Some (UpdateStorageLocationsParams{..}, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: UpdateStorageLocations" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid UpdateStorageLocations with
                                     newLocations = newLocations

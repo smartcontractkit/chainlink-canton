@@ -11,16 +11,26 @@ import DA.Text qualified as Text
 import MCMS.RawInstanceAddress (assertValidInstanceId)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import DA.Crypto.Text (byteCount)
-import CCIP.RMNRemoteCodec
-  ( decodeCurseParamsWithOffset
-  , decodeUncurseParamsWithOffset
-  , decodeCurseChainParamsWithOffset
-  , decodeUncurseChainParamsWithOffset
-  , decodeCurseMultipleParamsWithOffset
-  , decodeUncurseMultipleParamsWithOffset
-  , decodeAddCustomObserversParamsWithOffset
-  , decodeRemoveCustomObserversParamsWithOffset
-  )
+import CCIP.RMNRemoteCodecGen (
+    decodeCurseParamsAt,
+    decodeUncurseParamsAt,
+    decodeCurseChainParamsAt,
+    decodeUncurseChainParamsAt,
+    decodeCurseMultipleParamsAt,
+    decodeUncurseMultipleParamsAt,
+    decodeAddCustomObserversParamsAt,
+    decodeRemoveCustomObserversParamsAt,
+    )
+import CCIP.RMNRemoteTypes (
+    CurseParams(..),
+    UncurseParams(..),
+    CurseChainParams(..),
+    UncurseChainParams(..),
+    CurseMultipleParams(..),
+    UncurseMultipleParams(..),
+    AddCustomObserversParams(..),
+    RemoveCustomObserversParams(..),
+    )
 
 -- Global curse subject matching EVM: bytes16(uint128(0x01000000000000000000000000000001))
 globalCurseSubject : BytesHex
@@ -281,72 +291,72 @@ template RMNRemote
 
             case functionName of
               "Curse" -> do
-                case decodeCurseParamsWithOffset operationData of
+                case decodeCurseParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: Curse"
-                  Some (subject, finalOffset) -> do
+                  Some (CurseParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: Curse" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid Curse with subject
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "Uncurse" -> do
-                case decodeUncurseParamsWithOffset operationData of
+                case decodeUncurseParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: Uncurse"
-                  Some (subject, finalOffset) -> do
+                  Some (UncurseParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: Uncurse" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid Uncurse with subject
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "CurseChain" -> do
-                case decodeCurseChainParamsWithOffset operationData of
+                case decodeCurseChainParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: CurseChain"
-                  Some (chainSelector, finalOffset) -> do
+                  Some (CurseChainParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: CurseChain" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid CurseChain with chainSelector
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "UncurseChain" -> do
-                case decodeUncurseChainParamsWithOffset operationData of
+                case decodeUncurseChainParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: UncurseChain"
-                  Some (chainSelector, finalOffset) -> do
+                  Some (UncurseChainParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: UncurseChain" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid UncurseChain with chainSelector
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "CurseMultiple" -> do
-                case decodeCurseMultipleParamsWithOffset operationData of
+                case decodeCurseMultipleParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: CurseMultiple"
-                  Some (subjects, finalOffset) -> do
+                  Some (CurseMultipleParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: CurseMultiple" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid CurseMultiple with subjects
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "UncurseMultiple" -> do
-                case decodeUncurseMultipleParamsWithOffset operationData of
+                case decodeUncurseMultipleParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: UncurseMultiple"
-                  Some (subjects, finalOffset) -> do
+                  Some (UncurseMultipleParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: UncurseMultiple" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid UncurseMultiple with subjects
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "AddCustomObservers" -> do
-                case decodeAddCustomObserversParamsWithOffset operationData of
+                case decodeAddCustomObserversParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: AddCustomObservers"
-                  Some (parties, finalOffset) -> do
+                  Some (AddCustomObserversParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: AddCustomObservers" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid AddCustomObservers with parties
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "RemoveCustomObservers" -> do
-                case decodeRemoveCustomObserversParamsWithOffset operationData of
+                case decodeRemoveCustomObserversParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: RemoveCustomObservers"
-                  Some (parties, finalOffset) -> do
+                  Some (RemoveCustomObserversParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: RemoveCustomObservers" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfCid RemoveCustomObservers with parties

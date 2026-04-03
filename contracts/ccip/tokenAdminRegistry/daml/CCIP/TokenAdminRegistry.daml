@@ -8,10 +8,23 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import DA.Crypto.Text (byteCount)
-import CCIP.TokenAdminRegistryCodec (decodeSetPoolParamsWithOffset, decodeProposeAdminParamsWithOffset, decodeTransferAdminParamsWithOffset, decodeAcceptAdminParamsWithOffset)
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..))
+import CCIP.TokenAdminRegistryCodecGen (
+    decodeSetPoolParamsAt,
+    decodeProposeAdminParamsAt,
+    decodeTransferAdminParamsAt,
+    decodeAcceptAdminParamsAt,
+    )
+import CCIP.TokenAdminRegistryTypes (
+    PoolRegistration(..),
+    TokenConfig(..),
+    SetPoolParams(..),
+    ProposeAdminParams(..),
+    TransferAdminParams(..),
+    AcceptAdminParams(..),
+    )
 
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -413,21 +426,21 @@ template TokenAdminRegistry
 
             case functionName of
               "SetPool" -> do
-                case decodeSetPoolParamsWithOffset operationData of
+                case decodeSetPoolParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: SetPool"
-                  Some ((instrumentId, optPool), finalOffset) -> do
+                  Some (SetPoolParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: SetPool" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfTarCid TokenAdminRegistry_SetPool with
                       instrumentId
-                      tokenPool = optPool
+                      tokenPool
                       caller = owner
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "ProposeAdministrator" -> do
-                case decodeProposeAdminParamsWithOffset operationData of
+                case decodeProposeAdminParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: ProposeAdministrator"
-                  Some ((instrumentId, newAdmin), finalOffset) -> do
+                  Some (ProposeAdminParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: ProposeAdministrator" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfTarCid TokenAdminRegistry_ProposeAdministrator with
@@ -437,9 +450,9 @@ template TokenAdminRegistry
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "TransferAdminRole" -> do
-                case decodeTransferAdminParamsWithOffset operationData of
+                case decodeTransferAdminParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: TransferAdminRole"
-                  Some ((instrumentId, newAdmin), finalOffset) -> do
+                  Some (TransferAdminParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: TransferAdminRole" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfTarCid TokenAdminRegistry_TransferAdminRole with
@@ -449,9 +462,9 @@ template TokenAdminRegistry
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "AcceptAdminRole" -> do
-                case decodeAcceptAdminParamsWithOffset operationData of
+                case decodeAcceptAdminParamsAt operationData 0 of
                   None -> abort "E_INVALID_PARAMS: AcceptAdminRole"
-                  Some (instrumentId, finalOffset) -> do
+                  Some (AcceptAdminParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: AcceptAdminRole" $
                       finalOffset == byteCount operationData
                     newCid <- exercise selfTarCid TokenAdminRegistry_AcceptAdminRole with

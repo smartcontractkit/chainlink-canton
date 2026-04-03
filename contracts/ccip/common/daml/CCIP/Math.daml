@@ -25,21 +25,22 @@
 -- - exact multiplication/division stays fast enough on-ledger.
 --
 -- This module is intentionally narrow. It exists to support CCIP's exact fee
--- conversion and checked Numeric0 -> Decimal boundaries, not as a general math
--- library.
+-- arithmetic, Decimal/Numeric0 boundary shifts, and protocol-side amount
+-- normalization, not as a general math library.
 module CCIP.Math
   ( integerAmountWithinCap
   , normalizedFeeWithinCap
   , mulDivDown
   , mulDivUp
-  , maxDecimalIntegerValue
-  , canFitInDecimal
-  , numeric0ToDecimalChecked
-  , checkedPow10Numeric0
-  , canScaleAmountByPowerOfTen
   , calculateLocalAmountChecked
+  , decimalToNumeric0
+  , numeric0ToDecimal
+  , premiumIdentity
+  , e10PerPercent
+  , usdPerUsdCent
   ) where
 
+import DA.Numeric qualified as Numeric
 import DA.Text qualified as Text
 
 baseInt : Int
@@ -51,23 +52,23 @@ baseNumeric = 100000000.0
 juelsPerLocalLink : Numeric 0
 juelsPerLocalLink = 10000000000.0
 
--- Approximate Decimal max, off by < 1. This is sufficient for converting
--- integer-valued Numeric 0 amounts into Decimal at Splice boundaries.
-maxDecimalIntegerValue : Numeric 0
-maxDecimalIntegerValue = 9999999999999999999999999999.0
-
-canFitInDecimal : Numeric 0 -> Bool
-canFitInDecimal n = n >= 0.0 && n <= maxDecimalIntegerValue
-
--- | Convert a Numeric 0 integer to Decimal, failing if out of range.
-numeric0ToDecimalChecked : Text -> Numeric 0 -> Decimal
-numeric0ToDecimalChecked label n =
-    if n < 0.0 then error (label <> ": negative amount")
-    else if not (canFitInDecimal n) then error (label <> ": amount exceeds Decimal range")
-    else foldl
-        (\acc limb -> acc * 100000000.0 + intToDecimal limb)
-        0.0
-        (reverse (toLimbs label n))
+calculateLocalAmountChecked : Text -> Numeric 0 -> Int -> Int -> Numeric 0
+calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
+    if remoteAmount < 0.0 then error (label <> ": negative remote amount")
+    else
+        let validateDecimals fieldName decimals =
+                if decimals < 0 || decimals > 37
+                then error (label <> ": unsupported " <> fieldName)
+                else decimals
+            remoteDecimals' = validateDecimals "remote decimals" remoteDecimals
+            localDecimals' = validateDecimals "local decimals" localDecimals
+            diff = localDecimals' - remoteDecimals'
+        in if diff == 0 then remoteAmount
+           else
+               let scale = checkedPow10Numeric0 (label <> ": scale factor") (abs diff)
+               in if diff > 0
+                  then mulDivDown remoteAmount scale 1.0
+                  else mulDivDown remoteAmount 1.0 scale
 
 checkedPow10Numeric0 : Text -> Int -> Numeric 0
 checkedPow10Numeric0 label exponent
@@ -80,51 +81,27 @@ checkedPow10Numeric0Go remaining acc =
     if remaining == 0 then acc
     else checkedPow10Numeric0Go (remaining - 1) (acc * 10.0)
 
-maxNumeric0IntegerText : Text
-maxNumeric0IntegerText = "99999999999999999999999999999999999999"
+decimalToNumeric0 : Decimal -> Numeric 0
+decimalToNumeric0 = Numeric.shift @0
 
-appendZeros : Text -> Int -> Text
-appendZeros text count =
-    if count <= 0 then text
-    else appendZeros (text <> "0") (count - 1)
+numeric0ToDecimal : Numeric 0 -> Decimal
+numeric0ToDecimal = Numeric.shift @10
 
-stripLeadingZeros : Text -> Text
-stripLeadingZeros str =
-    if Text.length str == 0 then ""
-    else if Text.take 1 str == "0" then stripLeadingZeros (Text.drop 1 str)
-    else str
+-- 1e10: identity multiplier (100%) in E10 scale.
+premiumIdentity : Numeric 0
+premiumIdentity = 10000000000.0
 
-decimalTextWithinNumeric0 : Text -> Bool
-decimalTextWithinNumeric0 str =
-    let stripped = stripLeadingZeros str
-        normalized = if Text.length stripped == 0 then "0" else stripped
-        normalizedLength = Text.length normalized
-        maxLength = Text.length maxNumeric0IntegerText
-    in normalizedLength < maxLength
-        || (normalizedLength == maxLength && normalized <= maxNumeric0IntegerText)
+-- 1e8: converts a percentage (e.g. 90) to E10 scale (e.g. 9e9).
+-- (`linkFeeMultiplierPercent * 1e16` converts percent → E18).
+e10PerPercent : Numeric 0
+e10PerPercent = 100000000.0
 
-canScaleAmountByPowerOfTen : Numeric 0 -> Int -> Bool
-canScaleAmountByPowerOfTen amount exponent =
-    if amount < 0.0 || exponent < 0 then False
-    else
-        let amountDigits = numeric0IntegerText "canScaleAmountByPowerOfTen.amount" amount
-        in decimalTextWithinNumeric0 (appendZeros amountDigits exponent)
-
-calculateLocalAmountChecked : Text -> Numeric 0 -> Int -> Int -> Numeric 0
-calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
-    if remoteAmount < 0.0 then error (label <> ": negative remote amount")
-    else if remoteDecimals == localDecimals then remoteAmount
-    else if remoteDecimals > localDecimals then
-        let diff = remoteDecimals - localDecimals
-            scale = checkedPow10Numeric0 (label <> ": scale-down factor") diff
-        in mulDivDown remoteAmount 1.0 scale
-    else
-        let diff = localDecimals - remoteDecimals
-        in if not (canScaleAmountByPowerOfTen remoteAmount diff)
-           then error (label <> ": local amount exceeds Numeric 0 range")
-           else
-               let scale = checkedPow10Numeric0 (label <> ": scale-up factor") diff
-               in mulDivDown remoteAmount scale 1.0
+-- 1e8: one USD cent in E10 scale. Dividing an E10 price by this
+-- yields integer USD cents; multiplying cents by this promotes
+-- back to E10.
+-- (`gasCostInUsdCents = ... / 1e16`).
+usdPerUsdCent : Numeric 0
+usdPerUsdCent = 100000000.0
 
 -- | Check whether a LINK-denominated fee amount in local LINK smallest units
 -- is within the juels-denominated cap.

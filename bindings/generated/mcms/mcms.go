@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "ad208c28475d3a37dfbd211070714718e35fc8a53eb7db23c87b403dc15549c7"
+	PackageID   = "51bac4445d23eb06eba1bcbfde63a1a5b9ede0d88d27c32a6f19d99455b3f076"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1223,6 +1223,27 @@ func (t MCMS) ExecuteScheduledBatchWithPackageID(contractID string, packageID st
 	}
 }
 
+// SetConfig exercises the SetConfig choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
+func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // SetRoot exercises the SetRoot choice on this MCMS contract
 // This method uses the package name in the template ID
 func (t MCMS) SetRoot(contractID string, args SetRoot) *model.ExerciseCommand {
@@ -1282,27 +1303,6 @@ func (t MCMS) GetStateWithPackageID(contractID string, packageID string, args Ge
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "GetState",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetConfig exercises the SetConfig choice on this MCMS contract
-// This method uses the package name in the template ID
-func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
-func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
 		Arguments:  argsToMap(args),
 	}
 }

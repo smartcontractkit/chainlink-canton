@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+	"golang.org/x/exp/maps"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -207,7 +209,7 @@ func MintAMT(
 	}
 
 	// Get AmuletRules Contract
-	amuletRulesCid, amuletRulesId, err := GetAmuletRulesContract(ctx, scanProxyClient)
+	_, amuletRulesContract, err := GetAmuletRulesContract(ctx, scanProxyClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to get amulet rules contract: %w", err)
 	}
@@ -219,7 +221,7 @@ func MintAMT(
 	}
 
 	// Get open mining round
-	openMiningRoundCid, err := GetFirstOpenMiningRound(ctx, scanProxyClient)
+	openMiningRoundContract, err := GetFirstOpenMiningRound(ctx, scanProxyClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to get open mining round: %w", err)
 	}
@@ -227,13 +229,13 @@ func MintAMT(
 	// Mint AMT
 	response, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: amuletRulesId,
-							ContractId: amuletRulesCid,
+							TemplateId: amuletRulesContract.TemplateId,
+							ContractId: amuletRulesContract.ContractId,
 							Choice:     "AmuletRules_DevNet_Tap",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{
@@ -244,7 +246,7 @@ func MintAMT(
 									Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: amount}},
 								}, {
 									Label: "openRound",
-									Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: openMiningRoundCid}},
+									Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: openMiningRoundContract.ContractId}},
 								},
 							}}}},
 						},
@@ -252,7 +254,7 @@ func MintAMT(
 				},
 			},
 			ActAs:              []string{toParty},
-			DisclosedContracts: disclosedContracts,
+			DisclosedContracts: DeduplicateDisclosedContracts(append(disclosedContracts, amuletRulesContract, openMiningRoundContract)...),
 		},
 		TransactionFormat: nil,
 	})
@@ -268,4 +270,110 @@ func MintAMT(
 	}
 
 	return tokenHoldingCid, nil
+}
+
+// CreateTransferPreapproval creates an AmuletRules TransferPreapproval for the specified party as a receiver.
+// It returns the ContractId of the Preapproval contract at the time of creation. Due to Amulets implementation
+// of preapprovals, the contract ID is not long-lived and should not be used directly. When interacting/using
+// the preapproval, always look it up using the ACS.
+func CreateTransferPreapproval(
+	ctx context.Context,
+	participant canton.Participant,
+	scanProxyClient scanProxy.ClientWithResponsesInterface,
+	party string,
+	holdingCid string,
+) (types.CONTRACT_ID, error) {
+	dsoPartyId, amuletRulesContract, err := GetAmuletRulesContract(ctx, scanProxyClient)
+	if err != nil {
+		return "", fmt.Errorf("failed to get DSO info: %w", err)
+	}
+	// Get open mining round
+	openMiningRoundContract, err := GetFirstOpenMiningRound(ctx, scanProxyClient)
+	if err != nil {
+		return "", fmt.Errorf("failed to get open mining round: %w", err)
+	}
+
+	response, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.NewString(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Exercise{
+						Exercise: &apiv2.ExerciseCommand{
+							TemplateId: amuletRulesContract.TemplateId,
+							ContractId: amuletRulesContract.ContractId,
+							Choice:     "AmuletRules_CreateTransferPreapproval",
+							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{
+									Label: "context",
+									Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+										{
+											Label: "amuletRules",
+											Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: amuletRulesContract.ContractId}},
+										}, {
+											Label: "context",
+											Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+												{Label: "openMiningRound", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: openMiningRoundContract.ContractId}}},
+												{Label: "issuingMiningRounds", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+												{Label: "validatorRights", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+												{Label: "featuredAppRight", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
+											}}}},
+										},
+									}}}},
+								}, {
+									Label: "inputs",
+									Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+										{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
+											Constructor: "InputAmulet",
+											Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: holdingCid}},
+										}}},
+									}}}},
+								}, {
+									Label: "receiver",
+									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: party}},
+								}, {
+									Label: "provider",
+									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: party}},
+								}, {
+									Label: "expiresAt",
+									Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().Add(time.Hour * 24).UnixMicro()}},
+								}, {
+									Label: "expectedDso",
+									Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: dsoPartyId}}}}},
+								},
+							}}}},
+						},
+					},
+				},
+			},
+			ActAs:              []string{party},
+			DisclosedContracts: []*apiv2.DisclosedContract{amuletRulesContract, openMiningRoundContract},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to create TransferPreapproval: %w", err)
+	}
+
+	preapprovalCid := ""
+	for _, event := range response.GetTransaction().GetEvents() {
+		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+			if e.Created.TemplateId.EntityName == "TransferPreapproval" {
+				preapprovalCid = e.Created.ContractId
+			}
+		}
+	}
+	if preapprovalCid == "" {
+		return "", fmt.Errorf("failed to find preapproval")
+	}
+
+	return types.CONTRACT_ID(preapprovalCid), nil
+}
+
+func DeduplicateDisclosedContracts(disclosedContracts ...*apiv2.DisclosedContract) []*apiv2.DisclosedContract {
+	m := make(map[string]*apiv2.DisclosedContract)
+	for _, contract := range disclosedContracts {
+		m[contract.ContractId] = contract
+	}
+
+	return maps.Values(m)
 }

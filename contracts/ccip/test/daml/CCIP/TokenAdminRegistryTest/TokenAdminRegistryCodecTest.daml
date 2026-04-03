@@ -3,10 +3,29 @@ module CCIP.TokenAdminRegistryTest.TokenAdminRegistryCodecTest where
 
 import Daml.Script
 import DA.Assert ((===))
+import DA.Optional (fromSome)
 
 import qualified Splice.Api.Token.HoldingV1
-import CCIP.TokenAdminRegistryCodec
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..))
+import CCIP.TokenAdminRegistryCodecGen (
+    encodePoolRegistration,
+    decodePoolRegistrationAt,
+    encodeSetPoolParams,
+    decodeSetPoolParamsAt,
+    encodeProposeAdminParams,
+    decodeProposeAdminParamsAt,
+    encodeTransferAdminParams,
+    decodeTransferAdminParamsAt,
+    encodeAcceptAdminParams,
+    decodeAcceptAdminParamsAt,
+    )
+import CCIP.TokenAdminRegistryTypes (
+    PoolRegistration(..),
+    SetPoolParams(..),
+    ProposeAdminParams(..),
+    TransferAdminParams(..),
+    AcceptAdminParams(..),
+    )
+import MCMS.Codec (encodeText, decodeTextAt)
 
 -- ===========================================================================
 -- TEXT ENCODING/DECODING TESTS
@@ -90,14 +109,14 @@ testSetPoolParamsWithPool = do
       poolReg = PoolRegistration with
         poolOwner = alice
         poolInstanceId = "lock-release-pool-v1"
+      params = SetPoolParams with instrumentId, tokenPool = Some poolReg
+      encoded = encodeSetPoolParams params
 
-      encoded = encodeSetPoolParams instrumentId (Some poolReg)
-
-  case decodeSetPoolParams encoded of
+  case decodeSetPoolParamsAt encoded 0 of
     None -> abort "Failed to decode set_pool params with pool"
-    Some (decodedInstrumentId, decodedPool) -> do
-      decodedInstrumentId === instrumentId
-      case decodedPool of
+    Some (decoded, _) -> do
+      decoded.instrumentId === instrumentId
+      case decoded.tokenPool of
         None -> abort "Expected Some pool, got None"
         Some p -> do
           p.poolOwner === poolReg.poolOwner
@@ -110,13 +129,14 @@ testSetPoolParamsNoPool = do
   tokenAdmin <- allocateParty "TokenAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-      encoded = encodeSetPoolParams instrumentId None
+      params = SetPoolParams with instrumentId, tokenPool = None
+      encoded = encodeSetPoolParams params
 
-  case decodeSetPoolParams encoded of
+  case decodeSetPoolParamsAt encoded 0 of
     None -> abort "Failed to decode set_pool params without pool"
-    Some (decodedInstrumentId, decodedPool) -> do
-      decodedInstrumentId === instrumentId
-      decodedPool === None
+    Some (decoded, _) -> do
+      decoded.instrumentId === instrumentId
+      decoded.tokenPool === None
 
   pure ()
 
@@ -130,13 +150,14 @@ testProposeAdminParamsRoundtrip = do
   newAdmin <- allocateParty "NewAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
-      encoded = encodeProposeAdminParams instrumentId newAdmin
+      params = ProposeAdminParams with instrumentId, newAdmin
+      encoded = encodeProposeAdminParams params
 
-  case decodeProposeAdminParams encoded of
+  case decodeProposeAdminParamsAt encoded 0 of
     None -> abort "Failed to decode propose_admin params"
-    Some (decodedInstrumentId, decodedAdmin) -> do
-      decodedInstrumentId === instrumentId
-      decodedAdmin === newAdmin
+    Some (decoded, _) -> do
+      decoded.instrumentId === instrumentId
+      decoded.newAdmin === newAdmin
 
   pure ()
 
@@ -150,13 +171,14 @@ testTransferAdminParamsRoundtrip = do
   newAdmin <- allocateParty "NewAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
-      encoded = encodeTransferAdminParams instrumentId newAdmin
+      params = TransferAdminParams with instrumentId, newAdmin
+      encoded = encodeTransferAdminParams params
 
-  case decodeTransferAdminParams encoded of
+  case decodeTransferAdminParamsAt encoded 0 of
     None -> abort "Failed to decode transfer_admin params"
-    Some (decodedInstrumentId, decodedAdmin) -> do
-      decodedInstrumentId === instrumentId
-      decodedAdmin === newAdmin
+    Some (decoded, _) -> do
+      decoded.instrumentId === instrumentId
+      decoded.newAdmin === newAdmin
 
   pure ()
 
@@ -169,12 +191,13 @@ testAcceptAdminParamsRoundtrip = do
   tokenAdmin <- allocateParty "TokenAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
-      encoded = encodeAcceptAdminParams instrumentId
+      params = AcceptAdminParams with instrumentId
+      encoded = encodeAcceptAdminParams params
 
-  case decodeAcceptAdminParams encoded of
+  case decodeAcceptAdminParamsAt encoded 0 of
     None -> abort "Failed to decode accept_admin params"
-    Some decodedInstrumentId ->
-      decodedInstrumentId === instrumentId
+    Some (decoded, _) ->
+      decoded.instrumentId === instrumentId
 
   pure ()
 
@@ -185,25 +208,26 @@ testAcceptAdminParamsRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-  case decodeSetPoolParams "" of
+  case decodeSetPoolParamsAt "" 0 of
     None -> pure ()  -- Expected
-    Some _ -> abort "Expected decodeSetPoolParams to fail on empty data"
+    Some _ -> abort "Expected decodeSetPoolParamsAt to fail on empty data"
 
   -- Truncated data should fail
-  case decodeSetPoolParams "00" of
+  case decodeSetPoolParamsAt "00" 0 of
     None -> pure ()  -- Expected
-    Some _ -> abort "Expected decodeSetPoolParams to fail on truncated data"
+    Some _ -> abort "Expected decodeSetPoolParamsAt to fail on truncated data"
 
   -- Invalid bool value should fail (neither 00 nor 01)
   -- First need valid instrumentId, then invalid bool
   tokenAdmin <- allocateParty "TokenAdmin"
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "T"
-      validInstrumentIdEncoded = encodeAcceptAdminParams instrumentId
+      validParams = AcceptAdminParams with instrumentId
+      validInstrumentIdEncoded = encodeAcceptAdminParams validParams
       -- Append invalid bool (02 instead of 00 or 01)
       invalidData = validInstrumentIdEncoded <> "02"
 
-  case decodeSetPoolParams invalidData of
+  case decodeSetPoolParamsAt invalidData 0 of
     None -> pure ()  -- Expected - should fail on invalid bool
-    Some _ -> abort "Expected decodeSetPoolParams to fail on invalid bool"
+    Some _ -> abort "Expected decodeSetPoolParamsAt to fail on invalid bool"
 
   pure ()

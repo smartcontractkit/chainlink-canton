@@ -2,12 +2,15 @@ package api
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
@@ -47,8 +50,24 @@ func (s Server) CcipExecute(c *gin.Context) {
 		ccvs[i] = instanceAddress
 	}
 
+	// Decode the CCIP encoded message
+	var message *protocol.Message
+	if req.EncodedMessage != "" {
+		messageBytes, err := hex.DecodeString(req.EncodedMessage)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, edsv1.ErrorResponse{Error: fmt.Sprintf("invalid encoded message: %s", err.Error())})
+			return
+		}
+		message, err = protocol.DecodeMessage(messageBytes)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, edsv1.ErrorResponse{Error: fmt.Sprintf("invalid encoded message: %s", err.Error())})
+			return
+		}
+	}
+
 	disclosures, err := s.disclosureSvc.GetCCIPExecuteDisclosures(c.Request.Context(), disclosure.CCIPExecuteRequest{
-		CCVs: ccvs,
+		Message: message,
+		CCVs:    ccvs,
 	})
 	if err != nil {
 		s.logger.Err(err).Msg("failed to get disclosures for CCIP execute")
@@ -87,12 +106,50 @@ func (s Server) CcipExecute(c *gin.Context) {
 		convertDisclosedContract(disclosures.RMNRemote),
 	}
 
+	var (
+		poolExtraContext  = make(map[string]any)
+		tokenPool         *edsv1.DisclosedContract
+		tokenPoolHoldings *edsv1.DisclosedContract
+	)
+	if disclosures.TokenPool != nil {
+		// If TokenPool is not nil then all of these should be non-nil as well.
+		tokenPoolDisclosure := convertDisclosedContract(disclosures.TokenPool)
+		tokenPoolHoldingsDisclosure := convertDisclosedContract(disclosures.TokenPoolHolding)
+		disclosedContracts = append(disclosedContracts,
+			tokenPoolDisclosure,
+			tokenPoolHoldingsDisclosure,
+			convertDisclosedContract(disclosures.InboundRateLimiter),
+			convertDisclosedContract(disclosures.InboundCustomBlockConfirmationsRateLimiter),
+			convertDisclosedContract(disclosures.OutboundRateLimiter),
+		)
+
+		// update the poolExtraContext with the relevant data.
+		poolExtraContext = map[string]any{
+			"values": map[string]any{
+				"rate-limiter": map[string]any{
+					"tag":   "AV_ContractId",
+					"value": disclosures.InboundRateLimiter.GetContractId(),
+				},
+				"inbound-custom-block-confirmations-rate-limiter": map[string]any{
+					"tag":   "AV_ContractId",
+					"value": disclosures.InboundCustomBlockConfirmationsRateLimiter.GetContractId(),
+				},
+				// TODO: outbound rate limiter not needed?
+			},
+		}
+		tokenPool = &tokenPoolDisclosure
+		tokenPoolHoldings = &tokenPoolHoldingsDisclosure
+	}
+
 	resp := edsv1.CCIPExecuteResponse{
 		ChoiceContext: edsv1.ChoiceContext{
 			ChoiceContextData:  choiceContextData,
 			DisclosedContracts: disclosedContracts,
 		},
-		Ccvs: make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
+		Ccvs:              make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
+		PoolExtraContext:  poolExtraContext,
+		TokenPool:         tokenPool,
+		TokenPoolHoldings: tokenPoolHoldings,
 	}
 
 	for address, contract := range disclosures.CCVs {

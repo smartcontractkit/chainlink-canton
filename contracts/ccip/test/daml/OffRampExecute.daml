@@ -19,7 +19,9 @@ import CCIP.Internal qualified as Internal
 import CCIP.Interfaces.CrossChainVerifier qualified as CrossChainVerifier
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.OffRamp qualified as OffRamp
+import CCIP.OffRampTypes qualified as OffRamp
 import CCIP.PerPartyRouter qualified as PerPartyRouter
+import CCIP.PerPartyRouterTypes qualified as PerPartyRouter
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
@@ -53,7 +55,7 @@ testExecuteWithCCVVerification = script do
     let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance address
-    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvVersionTag = CommitteeVerifier.versionTagV2_0_0
     let ccvInstanceId = "test-ccv-committee"
     let ccvRawAddress = RawInstanceAddress.make ccvInstanceId receiver
 
@@ -384,7 +386,7 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
     let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance addresses
-    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvVersionTag = CommitteeVerifier.versionTagV2_0_0
     let ccvInstanceId = "test-ccv-committee"
     let ccv1RawAddress = RawInstanceAddress.make ccvInstanceId ccv1Owner
     let ccv2RawAddress = RawInstanceAddress.make ccvInstanceId ccv2Owner
@@ -562,7 +564,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
     let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance addresses
-    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvVersionTag = CommitteeVerifier.versionTagV2_0_0
     let ccvInstanceId = "test-ccv-committee"
     let ccv1RawAddress = RawInstanceAddress.make ccvInstanceId ccv1Owner
     let ccv2RawAddress = RawInstanceAddress.make ccvInstanceId ccv2Owner
@@ -744,7 +746,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
     let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance addresses
-    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvVersionTag = CommitteeVerifier.versionTagV2_0_0
     let ccvInstanceId = "test-ccv-committee"
     let ccv1RawAddress = RawInstanceAddress.make ccvInstanceId ccv1Owner
     let ccv2RawAddress = RawInstanceAddress.make ccvInstanceId ccv2Owner
