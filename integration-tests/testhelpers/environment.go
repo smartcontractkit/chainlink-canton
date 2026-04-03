@@ -23,7 +23,7 @@ import (
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
 
 // SpliceVersion overrides the default version specified by CTF
-const SpliceVersion = "0.5.16"
+const SpliceVersion = "0.5.17"
 
 type TestEnvironment struct {
 	Logger zerolog.Logger
