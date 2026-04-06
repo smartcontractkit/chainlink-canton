@@ -172,3 +172,50 @@ func NewTestEnvironment(t *testing.T, options ...TestOption) TestEnvironment {
 
 	return env
 }
+
+// AllocateParty allocates a new party on the given participant and grants the
+// participant's user CanActAs rights for the new party.
+// Returns the new party ID.
+func AllocateParty(t *testing.T, participant canton.Participant, partyHint string) string {
+	t.Helper()
+
+	resp, err := participant.LedgerServices.Admin.PartyManagement.AllocateParty(t.Context(), &adminv2.AllocatePartyRequest{
+		PartyIdHint: partyHint,
+	})
+	require.NoError(t, err, "Failed to allocate party with hint %s", partyHint)
+
+	partyID := resp.GetPartyDetails().GetParty()
+
+	// Grant CanActAs rights to the participant's user for the new party
+	_, err = participant.LedgerServices.Admin.UserManagement.GrantUserRights(t.Context(), &adminv2.GrantUserRightsRequest{
+		UserId: participant.UserID,
+		Rights: []*adminv2.Right{{
+			Kind: &adminv2.Right_CanActAs_{
+				CanActAs: &adminv2.Right_CanActAs{
+					Party: partyID,
+				},
+			},
+		}},
+	})
+	require.NoError(t, err, "Failed to grant CanActAs rights for party %s to user %s", partyID, participant.UserID)
+
+	return partyID
+}
+
+// GrantCanActAs grants CanActAs rights for the given party to the participant's user.
+// This is useful for multi-party submissions where the user needs to act as multiple parties.
+func GrantCanActAs(t *testing.T, participant canton.Participant, partyID string) {
+	t.Helper()
+
+	_, err := participant.LedgerServices.Admin.UserManagement.GrantUserRights(t.Context(), &adminv2.GrantUserRightsRequest{
+		UserId: participant.UserID,
+		Rights: []*adminv2.Right{{
+			Kind: &adminv2.Right_CanActAs_{
+				CanActAs: &adminv2.Right_CanActAs{
+					Party: partyID,
+				},
+			},
+		}},
+	})
+	require.NoError(t, err, "Failed to grant CanActAs rights for party %s to user %s", partyID, participant.UserID)
+}

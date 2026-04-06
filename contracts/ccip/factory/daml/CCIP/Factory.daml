@@ -42,6 +42,9 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.RateLimiter
 import qualified CCIP.CCIPSender
 import qualified CCIP.CCIPReceiver
+import CCIP.ContextCodec (decodeCCIPContextAt)
+import CCIP.LockReleaseTokenPoolCodecGen (decodeTransferTimeoutAt)
+import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
 
 -- | Stable contract for CCIP system deployment orchestration.
 --
@@ -188,8 +191,10 @@ template CCIPFactory
 
         -- | One-time ownership handover from bootstrap owner to MCMS party.
         -- This is consuming because signatory changes.
+        -- Both owner and mcmsParty must authorize: owner gives up ownership,
+        -- mcmsParty consents to become the new signatory.
         choice SetOwnerToMCMS : ContractId CCIPFactory
-            controller owner
+            controller [owner, mcmsParty]
             do
                 assertMsg "factory already MCMS controlled" (owner /= mcmsParty)
                 create this with
@@ -528,6 +533,8 @@ data DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams
         tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
         feeQuoter : RawInstanceAddress.RawInstanceAddress
         rmnRemote : RawInstanceAddress.RawInstanceAddress
+        poolReceiveContext : CCIP.Context.CCIPContext
+        transferTimeout : TransferTimeout
     deriving (Eq, Show)
 
 data DeployRateLimiterParams = DeployRateLimiterParams
@@ -659,8 +666,8 @@ mkLockReleaseTokenPoolContract params = CCIP.LockReleaseTokenPool.LockReleaseTok
     rateLimitAdmin = params.rateLimitAdmin
     remoteChainConfigs = Map.empty
     tokenTransferFeeConfigs = Map.empty
-    poolReceiveContext = CCIP.Context.emptyCCIPContext
-    transferTimeout = CCIP.LockReleaseTokenPool.Indefinite
+    poolReceiveContext = params.poolReceiveContext
+    transferTimeout = params.transferTimeout
     deps = CCIP.LockReleaseTokenPool.LockReleaseTokenPoolDeps with
         tokenAdminRegistry = params.tokenAdminRegistry
         rmnRemote = params.rmnRemote
@@ -826,7 +833,9 @@ decodeDeployLockReleaseTokenPoolParams encoded = do
     (rateLimitAdmin, offset6) <- decodeOptional encoded offset5 decodePartyAt
     (tokenAdminRegistry, offset7) <- decodeRawInstanceAddressAt encoded offset6
     (feeQuoter, offset8) <- decodeRawInstanceAddressAt encoded offset7
-    (rmnRemote, finalOffset) <- decodeRawInstanceAddressAt encoded offset8
+    (rmnRemote, offset9) <- decodeRawInstanceAddressAt encoded offset8
+    (poolReceiveContext, offset10) <- decodeCCIPContextAt encoded offset9
+    (transferTimeout, finalOffset) <- decodeTransferTimeoutAt encoded offset10
     assertOffset finalOffset (byteCount encoded)
     Some DeployLockReleaseTokenPoolParams with
         instanceId
@@ -838,6 +847,8 @@ decodeDeployLockReleaseTokenPoolParams encoded = do
         tokenAdminRegistry
         feeQuoter
         rmnRemote
+        poolReceiveContext
+        transferTimeout
 
 decodeRateLimitDirectionAt : BytesHex -> Int -> Optional (CCIP.RateLimiter.RateLimitDirection, Int)
 decodeRateLimitDirectionAt encoded offset = do

@@ -30,6 +30,10 @@ import CCIP.Factory
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
+import CCIP.ContextCodec (encodeCCIPContext)
+import CCIP.LockReleaseTokenPoolCodecGen (encodeTransferTimeout)
+import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
+import CCIP.Context (emptyCCIPContext)
 
 -- ===========================================================================
 -- ENCODER FUNCTIONS FOR DEPLOY PARAMS
@@ -108,6 +112,8 @@ encodeDeployLockReleaseTokenPoolParams params =
   <> encodeRawInstanceAddress params.tokenAdminRegistry
   <> encodeRawInstanceAddress params.feeQuoter
   <> encodeRawInstanceAddress params.rmnRemote
+  <> encodeCCIPContext params.poolReceiveContext
+  <> encodeTransferTimeout params.transferTimeout
 
 encodeRateLimitDirection : RateLimitDirection -> BytesHex
 encodeRateLimitDirection RateLimitDirection_Outbound = fromSome (encodeUint8 0)
@@ -408,6 +414,8 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
         tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
         feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
         rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = emptyCCIPContext
+        transferTimeout = RelativeHours 24
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   case decodeDeployLockReleaseTokenPoolParams encoded of
@@ -422,6 +430,39 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
       decoded.tokenAdminRegistry === params.tokenAdminRegistry
       decoded.feeQuoter === params.feeQuoter
       decoded.rmnRemote === params.rmnRemote
+      decoded.poolReceiveContext === params.poolReceiveContext
+      decoded.transferTimeout === params.transferTimeout
+
+  pure ()
+
+testDecodeDeployLockReleaseTokenPoolParams_Indefinite : Script ()
+testDecodeDeployLockReleaseTokenPoolParams_Indefinite = script do
+  poolOwner <- allocateParty "pool_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "token_admin"
+  feeOwner <- allocateParty "fee_owner"
+  rmnOwner <- allocateParty "rmn_owner"
+
+  let params = DeployLockReleaseTokenPoolParams with
+        instanceId = "lrtp-indefinite"
+        poolOwner
+        ccipOwner
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+        decimals = 18
+        rateLimitAdmin = None
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = emptyCCIPContext
+        transferTimeout = Indefinite
+      encoded = encodeDeployLockReleaseTokenPoolParams params
+
+  case decodeDeployLockReleaseTokenPoolParams encoded of
+    None -> abort "Failed to decode DeployLockReleaseTokenPoolParams with Indefinite"
+    Some decoded -> do
+      decoded.transferTimeout === Indefinite
+      decoded.poolReceiveContext === emptyCCIPContext
+      decoded.rateLimitAdmin === None
 
   pure ()
 
