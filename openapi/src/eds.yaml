@@ -135,11 +135,14 @@ components:
           description: |
             The list of InstanceAddresses for all CCVs which should verify the message.
             As part of the response, the explicit disclosures for all CCVs that this EDS knows about will be returned.
+        defaultExecutor:
+          description: The explicit disclosure of the default executor. 
     CCIPSendResponse:
       type: object
       required:
         - choiceContext
         - ccvs
+        - defaultExecutor
       properties:
         choiceContext:
           $ref: '#/components/schemas/ChoiceContext'
@@ -147,6 +150,8 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/OptionalDisclosure'
+        defaultExecutor:
+          $ref: '#/components/schemas/DisclosedContract'
 
     CCIPExecuteRequest:
         type: object

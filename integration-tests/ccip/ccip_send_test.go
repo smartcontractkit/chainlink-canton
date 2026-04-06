@@ -7,19 +7,30 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	"github.com/smartcontractkit/freeport"
 
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/service"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -53,6 +64,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
@@ -242,8 +254,14 @@ func TestCCIPSend(t *testing.T) {
 	// Resolve contracts
 	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(global_config.ContractType), global_config.Version, ""))
 	require.NoError(t, err, "failed to get GlobalConfig address")
+	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
+	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
 	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
 	require.NoError(t, err, "failed to get FeeQuoter address")
+	tokenAdminRegistry, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(token_admin_registry.ContractType), token_admin_registry.Version, ""))
+	require.NoError(t, err, "failed to get TokenAdminRegistry address")
+	rmnRemote, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	require.NoError(t, err, "failed to get RMNRemote address")
 	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(onramp.ContractType), onramp.Version, ""))
 	require.NoError(t, err, "failed to get OnRamp address")
 	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(offramp.ContractType), offramp.Version, ""))
@@ -325,11 +343,84 @@ func TestCCIPSend(t *testing.T) {
 	cldfEnv.DataStore = runningDs.Seal()
 	t.Log("Configured chain for lanes")
 
+	// Run EDS
+	edsParticipant := env.Chain.Participants[0]
+	edsToken, _ := edsParticipant.TokenSource.Token()
+	edsPort := freeport.GetOne(t)
+	go func() {
+		log.Info().Msg("Running EDS...")
+		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
+			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
+			Server: config.ServerConfig{
+				Host: "0.0.0.0",
+				Port: uint16(edsPort), //nolint:gosec // this is a port number
+			},
+			Node: config.NodeConfig{
+				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   commonconfig.AuthTypeInsecureStatic,
+					UserID: edsParticipant.UserID,
+					JWT:    edsToken.AccessToken,
+				},
+				MaxRetries: 0,
+			},
+			Contracts: config.Contracts{
+				PerPartyRouterFactory: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
+				},
+				OnRamp: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(onRamp.Address),
+				},
+				OffRamp: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(offRamp.Address),
+				},
+				GlobalConfig: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(globalConfig.Address),
+				},
+				TokenAdminRegistry: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
+				},
+				RMNRemote: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
+				},
+				FeeQuoter: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
+				},
+				CCVs: []config.ContractIdentifier{
+					{
+						PartyID:         partyCCIP,
+						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+					},
+				},
+				DefaultExecutor: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(executorAddress.Address),
+				},
+				PoolOwner: partyCCIP,
+			},
+		})
+		log.Info().Msg("EDS terminated")
+		if err != nil {
+			log.Error().Err(err).Msg("EDS server exited with error")
+		}
+	}()
+
+	time.Sleep(10 * time.Second)
+
+	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "failed to create EDS client")
+
 	// Apply FeeQuoter dest chain config (needed by OnRamp.FinalizeFeeFromRouter)
 	// Create PerPartyRouter for sender
-	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
-	})
+	// Create PerPartyRouter for receiver
+	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)
 	require.NoError(t, err)
 
 	// TODO use operation to deploy PerPartyRouter
@@ -339,7 +430,7 @@ func TestCCIPSend(t *testing.T) {
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: disclosedFactory.ContractId,
+					ContractId: perPartyRouterFactoryCid,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partySender),
@@ -348,7 +439,7 @@ func TestCCIPSend(t *testing.T) {
 				}},
 			}},
 			ActAs:              []string{partySender},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFactory},
+			DisclosedContracts: disclosedContracts,
 		},
 	})
 	require.NoError(t, err)
@@ -398,48 +489,16 @@ func TestCCIPSend(t *testing.T) {
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
 	require.NoError(t, err)
-	disclosedOnRamp, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-onramp", ModuleName: "CCIP.OnRamp", EntityName: "OnRamp",
-	})
-	require.NoError(t, err)
-	disclosedGlobalConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-common", ModuleName: "CCIP.GlobalConfig", EntityName: "GlobalConfig",
-	})
-	require.NoError(t, err)
-	disclosedTar, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
-	})
-	require.NoError(t, err)
-	disclosedRmnRemote, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-rmn", ModuleName: "CCIP.RMNRemote", EntityName: "RMNRemote",
-	})
-	require.NoError(t, err)
-	disclosedFeeQuoter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter",
-	})
-	require.NoError(t, err)
 
 	// Prepare receiver address (destination party encoded as keccak256)
 	receiver := hexutil.MustDecode("0xcf8def9adfe3dd90b3dffe42c8eabbf7cd4ee6ca")
 	receiverHex := hex.EncodeToString(receiver)
-
-	require.NotEmpty(t, disclosedOnRamp.ContractId, "OnRamp disclosure missing/empty")
-	require.NotEmpty(t, disclosedGlobalConfig.ContractId, "GlobalConfig disclosure missing/empty")
-	require.NotEmpty(t, disclosedTar.ContractId, "TAR disclosure missing/empty")
-	require.NotEmpty(t, disclosedRmnRemote.ContractId, "RMNRemote disclosure missing/empty")
-	require.NotEmpty(t, disclosedFeeQuoter.ContractId, "FeeQuoter disclosure missing/empty")
 
 	require.NotEmpty(t, disclosedCCIPSender.ContractId, "CCIPSender disclosure missing/empty")
 	require.NotEmpty(t, disclosedRouter.ContractId, "Router disclosure missing/empty")
 
 	t.Logf("disclosedCCIPSender.ContractId=%q", disclosedCCIPSender.ContractId)
 	t.Logf("disclosedRouter.ContractId=%q", disclosedRouter.ContractId)
-
-	t.Logf("disclosedOnRamp.ContractId=%q", disclosedOnRamp.ContractId)
-	t.Logf("disclosedGlobalConfig.ContractId=%q", disclosedGlobalConfig.ContractId)
-	t.Logf("disclosedTar.ContractId=%q", disclosedTar.ContractId)
-	t.Logf("disclosedRmnRemote.ContractId=%q", disclosedRmnRemote.ContractId)
-	t.Logf("disclosedFeeQuoter.ContractId=%q", disclosedFeeQuoter.ContractId)
 
 	t.Logf("partySender=%q", partySender)
 
@@ -451,17 +510,6 @@ func TestCCIPSend(t *testing.T) {
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
 	require.NoError(t, err, "failed to get disclosed contract for fee token holding")
-
-	// Get disclosed CommitteeVerifier contract for CCV send inputs
-	disclosedCCV, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier",
-	})
-	require.NoError(t, err, "failed to get disclosed CommitteeVerifier")
-
-	disclosedExecutor, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-executor", ModuleName: "CCIP.Executor", EntityName: "Executor",
-	})
-	require.NoError(t, err, "failed to get disclosed Executor")
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
 	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
@@ -533,27 +581,17 @@ func TestCCIPSend(t *testing.T) {
 		TokenPoolHoldings: []types.CONTRACT_ID{},
 	}
 
-	// Build the main Send context with CCIP contract IDs (matching execute test pattern)
-	onRampCid := types.CONTRACT_ID(disclosedOnRamp.ContractId)
-	globalConfigCid := types.CONTRACT_ID(disclosedGlobalConfig.ContractId)
-	tarCid := types.CONTRACT_ID(disclosedTar.ContractId)
-	feeQuoterCid := types.CONTRACT_ID(disclosedFeeQuoter.ContractId)
-	rmnRemoteCid := types.CONTRACT_ID(disclosedRmnRemote.ContractId)
-	executorCid := types.CONTRACT_ID(disclosedExecutor.ContractId)
-	sendContext := common.CCIPContext{
-		Values: types.TEXTMAP{
-			"on-ramp":              common.AnyValue{AVContractId: &onRampCid},
-			"global-config":        common.AnyValue{AVContractId: &globalConfigCid},
-			"token-admin-registry": common.AnyValue{AVContractId: &tarCid},
-			"fee-quoter":           common.AnyValue{AVContractId: &feeQuoterCid},
-			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
-		},
-	}
+	sendDisclosures, err := testhelpers.GetCCIPSendDisclosures(
+		t.Context(),
+		edsClient,
+		[]contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
+	)
+	require.NoError(t, err)
 
 	ccvRawAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierRawAddr.String())}
 	execMcmsAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(executorRawAddr.String())}
 	sendArgs := ccipsender.Send{
-		Context:                  sendContext,
+		Context:                  sendDisclosures.SendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 		Message: ccipclient.Canton2AnyMessage{
@@ -588,32 +626,27 @@ func TestCCIPSend(t *testing.T) {
 		CcvSendInputs: []ccipsender.CCVSendInput{
 			{
 				CcvAddress:      ccvRawAddr,
-				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+				CcvCid:          types.CONTRACT_ID(sendDisclosures.CCVContractIDs[0].ContractId),
 				CcvExtraContext: common.CCIPContext{},
 			},
 		},
 		ExecutorInput: &ccipsender.ExecutorInput{
-			ExecutorCid:          executorCid,
+			ExecutorCid:          types.CONTRACT_ID(sendDisclosures.ExecutorContractID.ContractId),
 			ExecutorExtraContext: common.CCIPContext{},
 		},
 	}
 
-	sendDisclosures := slices.Concat(
+	// TODO: not clear what is duplicated here yet
+	allDisclosures := slices.Concat(
 		[]*apiv2.DisclosedContract{
-			disclosedCCIPSender,
-			disclosedRouter,
-			disclosedOnRamp,
-			disclosedGlobalConfig,
-			disclosedTar,
-			disclosedRmnRemote,
-			disclosedFeeQuoter,
-			disclosedFeeTokenHolding,
-			disclosedCCV,
-			disclosedExecutor,
+			disclosedCCIPSender,      // not from EDS
+			disclosedRouter,          // not from EDS
+			disclosedFeeTokenHolding, // not from EDS
 		},
+		sendDisclosures.DisclosedContracts,
 		transferFactoryDisclosures,
 	)
-	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
+	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, allDisclosures)
 	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")
 
 	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
@@ -633,7 +666,7 @@ func TestCCIPSend(t *testing.T) {
 				}},
 			}},
 			ActAs:              []string{partySender},
-			DisclosedContracts: sendDisclosures,
+			DisclosedContracts: allDisclosures,
 		},
 	})
 	require.NoError(t, err)

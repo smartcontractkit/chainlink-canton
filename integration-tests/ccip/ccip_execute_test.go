@@ -48,6 +48,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
@@ -55,6 +56,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
@@ -247,8 +249,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err)
 	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
 	require.NoError(t, err)
+	executorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
+	require.NoError(t, err)
 
-	dars := [][]byte{rmnDar, commonDar, tokenAdminRegistryDar, offRampDar, onRampDar, feeQuoterDar, committeeVerifierDar, perPartyRouterDar, ccipReceiverDar}
+	dars := [][]byte{rmnDar, commonDar, tokenAdminRegistryDar, offRampDar, onRampDar, feeQuoterDar, committeeVerifierDar, perPartyRouterDar, ccipReceiverDar, executorDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -335,6 +339,21 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						},
 					},
 				},
+				Executors: []sequences.ExecutorParams{
+					{
+						Qualifier: devenvcommon.DefaultExecutorQualifier,
+						Template: executorBinding.Executor{
+							Owner:         types.PARTY(partyCCIP),
+							MaxCCVsPerMsg: 10,
+							DynamicConfig: executorBinding.DynamicConfig{
+								FeeAggregator:         nil,
+								MinBlockConfirmations: 0,
+								CcvAllowlistEnabled:   false,
+							},
+							AllowedCCVs: nil,
+						},
+					},
+				},
 				GlobalConfig: sequences.GlobalConfigParams{
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
@@ -381,6 +400,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err, "failed to get RMNRemote address")
 	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+	executorAddress, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(executor.ContractType), executor.Version, devenvcommon.DefaultExecutorQualifier))
+	require.NoError(t, err, "failed to get Executor address")
 
 	// Run EDS
 	edsParticipant := env.Chain.Participants[0]
@@ -431,6 +452,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				FeeQuoter: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
+				},
+				DefaultExecutor: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(executorAddress.Address),
 				},
 				CCVs: []config.ContractIdentifier{
 					{

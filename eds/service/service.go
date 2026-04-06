@@ -21,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
@@ -126,6 +127,10 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			TemplateID: contracts.TemplateIDFromBinding(feequoter.FeeQuoter{}),
 			PartyID:    cfg.Contracts.FeeQuoter.PartyID,
 		},
+		{
+			TemplateID: contracts.TemplateIDFromBinding(executor.Executor{}),
+			PartyID:    cfg.Contracts.DefaultExecutor.PartyID,
+		},
 	}
 	ccvCids := make([]contracts.InstanceAddress, len(cfg.Contracts.CCVs))
 	for i, ccv := range cfg.Contracts.CCVs {
@@ -203,6 +208,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		TokenAdminRegistry:     cfg.Contracts.TokenAdminRegistry.InstanceAddress,
 		RMNRemote:              cfg.Contracts.RMNRemote.InstanceAddress,
 		FeeQuoter:              cfg.Contracts.FeeQuoter.InstanceAddress,
+		DefaultExecutor:        cfg.Contracts.DefaultExecutor.InstanceAddress,
 		CCVs:                   ccvCids,
 
 		TokenPools:                   tokenPoolCids,
