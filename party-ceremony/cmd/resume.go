@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/chainlink/canton-party-ceremony/ceremony"
+	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
 	"github.com/chainlink/canton-party-ceremony/ceremony/example"
 	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
 	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
@@ -104,9 +105,17 @@ func runResume(cmd *cobra.Command, args []string) error {
 
 		return executeKickSequence(cmd.Context(), cfg, state.Input, stateDir, workflowId)
 
+	case ceremony.WorkflowTypeContractDeploy:
+		state, err := ceremony.LoadWorkflow[contractdeploy.ContractDeployInput](ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("ceremony %q: loading workflow: %w", workflowId, err)
+		}
+
+		return executeContractDeploySequence(cmd.Context(), cfg, state.Input, stateDir, workflowId)
+
 	default:
-		return fmt.Errorf("ceremony %q: unknown workflow type %q; supported types: %s, %s, %s",
+		return fmt.Errorf("ceremony %q: unknown workflow type %q; supported types: %s, %s, %s, %s",
 			workflowId, workflowType,
-			ceremony.WorkflowTypeOnboarding, ceremony.WorkflowTypeExample, ceremony.WorkflowTypeKick)
+			ceremony.WorkflowTypeOnboarding, ceremony.WorkflowTypeExample, ceremony.WorkflowTypeKick, ceremony.WorkflowTypeContractDeploy)
 	}
 }

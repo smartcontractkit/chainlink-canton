@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	integrationtests "github.com/chainlink/canton-party-ceremony/integration-tests"
 	"github.com/chainlink/canton-party-ceremony/internal/client"
+	interactivepb "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
@@ -24,6 +24,7 @@ type Actor struct {
 type CeremonyTestSuite struct {
 	suite.Suite
 
+	chain          *canton.Chain
 	SynchronizerID string
 	ParticipantIDs []string
 	Actors         []Actor
@@ -33,12 +34,13 @@ func (s *CeremonyTestSuite) SetupSuite() {
 	t := s.T()
 
 	// Uncomment to use local Canton environment for faster test runs (requires local setup).
-	// chain, err := s.NewLocalEnv()
-	// require.NoError(t, err, "failed to create local environment")
+	chain, err := s.NewLocalEnv()
+	require.NoError(t, err, "failed to create local environment")
 
-	chain, err := integrationtests.LoadChainWithCTF(t, 3)
-	require.NoError(t, err, "failed to load chain with CTF")
-	require.Len(t, chain.Participants, 3, "expected 3 participants")
+	// chain, err := integrationtests.LoadChainWithCTF(t, 3)
+	// require.NoError(t, err, "failed to load chain with CTF")
+	// require.Len(t, chain.Participants, 3, "expected 3 participants")
+	s.chain = chain
 
 	// Build CantonClients for each participant.
 	actors := make([]Actor, 3)
@@ -108,20 +110,28 @@ func (s *CeremonyTestSuite) DiscoverSynchronizerID(p canton.Participant) string 
 func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 	t := s.T()
 	t.Helper()
-	adminports := []int{1201, 1202, 1203}
-	participants := make([]canton.Participant, len(adminports))
-	for i, port := range adminports {
-		adminURL := fmt.Sprintf("localhost:%d", port)
+	// Participant ports follow the localnet compose convention:
+	// admin: 1201, 1202, 1203 — ledger: 1301, 1302, 1303
+	type localPorts struct{ admin, ledger int }
+	ports := []localPorts{{1201, 1301}, {1202, 1302}, {1203, 1303}}
+	participants := make([]canton.Participant, len(ports))
+	for i, p := range ports {
+		adminURL := fmt.Sprintf("localhost:%d", p.admin)
+		ledgerURL := fmt.Sprintf("localhost:%d", p.ledger)
 		conn, err := grpc.NewClient(adminURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to dial admin API for participant %d", i+1)
 		t.Cleanup(func() { _ = conn.Close() })
 		adminServices := canton.CreateAdminServiceClients(conn)
+		// UserID matches the additional-admin-user-id in simple-topology.conf.
+		userID := fmt.Sprintf("user-participant%d", i+1)
 		participants[i] = canton.Participant{
 			Name: fmt.Sprintf("participant%c", 'A'+i),
 			Endpoints: canton.ParticipantEndpoints{
-				AdminAPIURL: adminURL,
+				AdminAPIURL:      adminURL,
+				GRPCLedgerAPIURL: ledgerURL,
 			},
 			AdminServices: &adminServices,
+			UserID:        userID,
 		}
 	}
 
@@ -152,4 +162,48 @@ func jwtStream(token string) grpc.StreamClientInterceptor {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 		return streamer(metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token), desc, cc, method, opts...)
 	}
+}
+
+// userIDInterceptor injects a user_id into PrepareSubmissionRequests when
+// the Canton node runs without authentication (no JWT subject claim).
+func userIDInterceptor(userID string) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		if r, ok := req.(*interactivepb.PrepareSubmissionRequest); ok && r.UserId == "" {
+			r.UserId = userID
+		}
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
+// NewLedgerClient creates a GRPCLedgerClient from a canton.Participant by
+// dialling the participant's gRPC Ledger API endpoint. The caller must close
+// the returned connection when done.
+func (s *CeremonyTestSuite) NewLedgerClient(p canton.Participant) (client.LedgerClient, *grpc.ClientConn) {
+	t := s.T()
+	require.NotEmpty(t, p.Endpoints.GRPCLedgerAPIURL,
+		"participant %q has no gRPC Ledger API URL", p.Name)
+
+	var dialOpts []grpc.DialOption
+	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if p.TokenSource != nil {
+		tok, err := p.TokenSource.Token()
+		require.NoError(t, err, "failed to get JWT for participant %s", p.Name)
+		if tok.AccessToken != "" {
+			dialOpts = append(dialOpts,
+				grpc.WithUnaryInterceptor(jwtUnary(tok.AccessToken)),
+				grpc.WithStreamInterceptor(jwtStream(tok.AccessToken)),
+			)
+		}
+	}
+	// When the participant has a UserID set and no JWT carries a subject claim
+	// (local no-auth Canton), inject the user_id field into PrepareSubmission
+	// requests so Canton can resolve the acting user.
+	if p.UserID != "" && p.TokenSource == nil {
+		dialOpts = append(dialOpts, grpc.WithUnaryInterceptor(userIDInterceptor(p.UserID)))
+	}
+
+	conn, err := grpc.NewClient(p.Endpoints.GRPCLedgerAPIURL, dialOpts...)
+	require.NoError(t, err, "failed to dial ledger API for participant %s", p.Name)
+
+	return client.NewGRPCLedgerClient(conn), conn
 }

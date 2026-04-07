@@ -211,6 +211,10 @@ func (m *mockCantonClient) ListDecentralizedNamespaces(_ context.Context, _ stri
 	}, nil
 }
 
+func (m *mockCantonClient) UploadDar(_ context.Context, _ []byte) (string, error) {
+	return "mock-package-id", nil
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 // newDeps creates a CantonDeps without shared state — suitable for single-run
