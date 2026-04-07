@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -110,21 +111,24 @@ func (c *GRPCLedgerClient) GetActiveContractsByTemplate(
 ) ([]*apiv2.CreatedEvent, error) {
 	stream, err := c.state.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
 		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				partyID: {
-					Cumulative: []*apiv2.CumulativeFilter{{
-						IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-							TemplateFilter: &apiv2.TemplateFilter{
-								TemplateId: &apiv2.Identifier{
-									PackageId:  packageID,
-									ModuleName: moduleName,
-									EntityName: entityName,
-								},
-								IncludeCreatedEventBlob: true,
+			// FiltersForAnyParty returns contracts visible to any party the
+			// participant hosts that match the template. Using this instead of
+			// FiltersByParty because decentralized-namespace parties may not
+			// be listed in the participant's local party registry even though
+			// they are hosted via the P2P topology mapping.
+			FiltersForAnyParty: &apiv2.Filters{
+				Cumulative: []*apiv2.CumulativeFilter{{
+					IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+						TemplateFilter: &apiv2.TemplateFilter{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  packageID,
+								ModuleName: moduleName,
+								EntityName: entityName,
 							},
+							IncludeCreatedEventBlob: true,
 						},
-					}},
-				},
+					},
+				}},
 			},
 		},
 	})
@@ -135,7 +139,7 @@ func (c *GRPCLedgerClient) GetActiveContractsByTemplate(
 	var contracts []*apiv2.CreatedEvent
 	for {
 		resp, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -149,4 +153,32 @@ func (c *GRPCLedgerClient) GetActiveContractsByTemplate(
 	}
 
 	return contracts, nil
+}
+
+// ExecuteSubmission calls InteractiveSubmissionService.ExecuteSubmissionAndWaitForTransaction
+// to submit the prepared transaction and block until it is committed to the ledger.
+// Returns the contract ID of the first created contract in the committed transaction.
+func (c *GRPCLedgerClient) ExecuteSubmission(
+	ctx context.Context,
+	preparedTx *interactive.PreparedTransaction,
+	partySignatures *interactive.PartySignatures,
+	hashingSchemeVersion interactive.HashingSchemeVersion,
+) (string, error) {
+	resp, err := c.interactive.ExecuteSubmissionAndWaitForTransaction(ctx, &interactive.ExecuteSubmissionAndWaitForTransactionRequest{
+		PreparedTransaction:  preparedTx,
+		PartySignatures:      partySignatures,
+		HashingSchemeVersion: hashingSchemeVersion,
+		SubmissionId:         uuid.New().String(),
+	})
+	if err != nil {
+		return "", fmt.Errorf("ExecuteSubmission: %w", err)
+	}
+	// Extract the first created contract ID from the committed transaction.
+	for _, event := range resp.GetTransaction().GetEvents() {
+		if ce := event.GetCreated(); ce != nil && ce.GetContractId() != "" {
+			return ce.GetContractId(), nil
+		}
+	}
+
+	return "", nil
 }

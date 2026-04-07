@@ -110,17 +110,39 @@ func (m *mockLedgerClient) PrepareSubmission(
 	}, nil
 }
 
+func (m *mockLedgerClient) ExecuteSubmission(
+	_ context.Context,
+	_ *interactive.PreparedTransaction,
+	_ *interactive.PartySignatures,
+	_ interactive.HashingSchemeVersion,
+) (string, error) {
+	return "fake-contract-0xdeadbeef", nil
+}
+
 func (m *mockLedgerClient) GetActiveContractsByTemplate(
 	_ context.Context, _ string, _ string, _ string, _ string,
 ) ([]*apiv2.CreatedEvent, error) {
-	return nil, nil
+	return []*apiv2.CreatedEvent{{ContractId: "fake-contract-0xdeadbeef"}}, nil
+}
+
+// ── Mock Signer ──────────────────────────────────────────────────────────────
+
+type mockSigner struct{}
+
+func (m *mockSigner) Sign(_ context.Context, hash []byte) (*apiv2.Signature, error) {
+	return &apiv2.Signature{
+		Format:               apiv2.SignatureFormat_SIGNATURE_FORMAT_RAW,
+		Signature:            hash, // echo hash as deterministic fake signature
+		SignedBy:             "mock-key-fp",
+		SigningAlgorithmSpec: apiv2.SigningAlgorithmSpec_SIGNING_ALGORITHM_SPEC_ED25519,
+	}, nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 func fakeDARLoader() contractdeploy.DARLoader {
 	return func(name, version string) ([]byte, error) {
-		return []byte(fmt.Sprintf("fake-dar-%s-%s", name, version)), nil
+		return fmt.Appendf(nil, "fake-dar-%s-%s", name, version), nil
 	}
 }
 
@@ -129,6 +151,7 @@ func newDeps(participantID string, partyExists bool) contractdeploy.ContractDepl
 		AdminClient:  newMockAdminClient(participantID),
 		LedgerClient: &mockLedgerClient{partyExists: partyExists},
 		DARLoader:    fakeDARLoader(),
+		Signer:       &mockSigner{},
 		Logger:       logger.Nop(),
 	}
 }
@@ -167,7 +190,7 @@ func TestContractDeploySequence_ThresholdNotMet(t *testing.T) {
 	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error())
 }
 
-func TestContractDeploySequence_SigningNotImplemented(t *testing.T) {
+func TestContractDeploySequence_FullFlow(t *testing.T) {
 	t.Parallel()
 
 	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
@@ -186,15 +209,25 @@ func TestContractDeploySequence_SigningNotImplemented(t *testing.T) {
 	)
 	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error())
 
-	// Run 2: p2 uploads DARs -> all uploaded, verifies party, prepares,
-	// then hits signing not implemented
+	// Run 2: p2 uploads DARs — all DARs done; p2 signs (1/2) → threshold not met for signing
 	_, err = operations.ExecuteSequence(
 		newBundle(),
 		contractdeploy.ContractDeploySequence,
 		newDeps("p2", true),
 		input,
 	)
-	require.ErrorContains(t, err, contractdeploy.ErrSigningNotImplemented.Error())
+	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error(), "run 2: p2 signed, p1 pending")
+
+	// Run 3: p1 signs (2/2) → execute → verify
+	sr, err := operations.ExecuteSequence(
+		newBundle(),
+		contractdeploy.ContractDeploySequence,
+		newDeps("p1", true),
+		input,
+	)
+	require.NoError(t, err)
+	assert.NotEmpty(t, sr.Output.ContractID, "contract ID should be set on full completion")
+	assert.NotEmpty(t, sr.Output.PackageIDs)
 }
 
 func TestContractDeploySequence_Idempotent(t *testing.T) {
@@ -207,17 +240,23 @@ func TestContractDeploySequence_Idempotent(t *testing.T) {
 		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter)
 	}
 
-	// Complete through preparation (will stop at signing)
+	// Run 1: p1 uploads DARs only — threshold not met
 	_, err1 := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
 	require.ErrorContains(t, err1, contractdeploy.ErrThresholdNotMet.Error())
 
+	// Run 2: p2 uploads DARs — all DARs done; p2 signs (1/2) → threshold not met for signing
 	_, err2 := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p2", true), input)
-	require.ErrorContains(t, err2, contractdeploy.ErrSigningNotImplemented.Error())
+	require.ErrorContains(t, err2, contractdeploy.ErrThresholdNotMet.Error(), "run 2: p2 signed, p1 pending")
 
-	// Run 3: idempotent same reporter, returns same cached result
-	sr3, err3 := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
-	require.ErrorContains(t, err3, contractdeploy.ErrSigningNotImplemented.Error())
+	// Run 3: p1 signs (2/2) → execute → verify → success
+	sr2, err3 := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
+	require.NoError(t, err3)
+	assert.NotEmpty(t, sr2.Output.ContractID)
 
+	// Run 4: idempotent — same shared reporter, returns cached complete result
+	sr3, err4 := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
+	require.NoError(t, err4)
+	assert.Equal(t, sr2.Output.ContractID, sr3.Output.ContractID, "cached contract ID should match")
 	assert.NotEmpty(t, sr3.Output.PackageIDs, "package IDs should be populated")
 	assert.NotEmpty(t, sr3.Output.PreparedTransactionHash, "prepared transaction hash should be populated")
 }
@@ -259,14 +298,20 @@ func TestContractDeploySequence_MultipleDARs(t *testing.T) {
 		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter)
 	}
 
-	// Both participants upload both DARs
+	// Run 1: p1 uploads both DARs → 1/2 → threshold not met
 	_, err := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
 	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error())
 
-	sr, err := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p2", true), input)
-	require.ErrorContains(t, err, contractdeploy.ErrSigningNotImplemented.Error())
+	// Run 2: p2 uploads both DARs — all done; p2 signs (1/2) → threshold not met for signing
+	_, err = operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p2", true), input)
+	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error())
+
+	// Run 3: p1 signs (2/2) → execute → verify
+	sr, err := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
+	require.NoError(t, err)
 
 	assert.Len(t, sr.Output.PackageIDs, 2, "should have uploaded 2 DARs")
+	assert.NotEmpty(t, sr.Output.ContractID)
 }
 
 // ── Interface compliance ────────────────────────────────────────────────────

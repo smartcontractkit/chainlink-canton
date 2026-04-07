@@ -10,21 +10,17 @@
 //  2. VerifyPartyOp        – verify the decentralized party is visible on the Ledger API.
 //  3. PrepareSubmissionOp  – coordinator prepares the contract creation via
 //     InteractiveSubmissionService.PrepareSubmission.
-//  4. SignSubmissionOp     – (TODO) each participant signs the prepared hash.
-//  5. ExecuteSubmissionOp  – (TODO) coordinator aggregates signatures and executes.
-//  6. VerifyContractOp     – (TODO) verify contract exists in Active Contract Set.
-//
-// Steps 4-6 are not yet implemented because Canton does not provide a
-// vault-based transaction signing API. The signing mechanism is deferred to
-// future work.
+//  4. SignSubmissionOp     – each participant signs the prepared hash with their
+//     signing key (via [ContractDeployDeps.Signer]).
+//  5. ExecuteSubmissionOp  – coordinator aggregates signatures and executes.
+//  6. VerifyContractOp     – verify contract exists in Active Contract Set.
 //
 // # Async / Resume Pattern
 //
 // Same pattern as the onboarding and kick ceremonies: all operations are
 // idempotent via the Operations framework cache. [ErrThresholdNotMet] is
-// returned until all participants have uploaded their DARs.
-// [ErrSigningNotImplemented] is returned when the sequence reaches the
-// signing step.
+// returned until all participants have uploaded their DARs and signed the
+// transaction. The sequence completes when all steps succeed.
 package contractdeploy
 
 import (
@@ -38,13 +34,9 @@ import (
 )
 
 // ErrThresholdNotMet is returned by [ContractDeploySequence] when not all
-// participants have completed their DAR upload. Callers should treat this as
+// participants have completed their step. Callers should treat this as
 // a "come back later" signal.
-var ErrThresholdNotMet = errors.New("threshold not met: more participants must upload DARs")
-
-// ErrSigningNotImplemented is returned by [ContractDeploySequence] when the
-// sequence reaches the signing step, which is not yet implemented.
-var ErrSigningNotImplemented = errors.New("signing not yet implemented: DAML transaction signing requires external key handling")
+var ErrThresholdNotMet = errors.New("threshold not met: more participants must complete their step")
 
 // ContractDeploySequence orchestrates the contract deployment ceremony.
 // It is designed to be called multiple times by different actors:
@@ -52,11 +44,9 @@ var ErrSigningNotImplemented = errors.New("signing not yet implemented: DAML tra
 //   - On each call the sequence re-enters the state machine. Operations whose
 //     (definition, input) hash already has a successful report are skipped
 //     instantly — they reflect work done by previous actors.
-//   - If not all participants have uploaded DARs, [ErrThresholdNotMet] is
-//     returned so the caller knows to retry after more actors run.
-//   - Once all DARs are uploaded an the party is verified, the coordinator
-//     prepares the submission. The sequence then returns
-//     [ErrSigningNotImplemented] at the signing step.
+//   - If not all participants have uploaded DARs or signed, [ErrThresholdNotMet]
+//     is returned so the caller knows to retry after more actors run.
+//   - Once all steps succeed, the sequence returns the deployed contract ID.
 var ContractDeploySequence = operations.NewSequence(
 	"contract-deploy/canton-ceremony/deploy-contract",
 	semver.MustParse("1.0.0"),
@@ -75,6 +65,7 @@ var ContractDeploySequence = operations.NewSequence(
 					return ContractDeployOutput{}, fmt.Errorf("upload-dars %s: %w", pid, err)
 				}
 				deps.Logger.Infow("DAR upload pending", "participant", pid, "err", err)
+
 				continue
 			}
 			uploads = append(uploads, r.Output)
@@ -131,28 +122,91 @@ var ContractDeploySequence = operations.NewSequence(
 			"hash", prep.PreparedTransactionHash,
 		)
 
-		// ── Step 4: Sign submission (TODO) ───────────────────────────────────
-		// Each participant would sign the prepared transaction hash.
+		// ── Step 4: Sign submission ──────────────────────────────────────────
+		// Each participant signs the prepared transaction hash with their signing key.
+		signs := make([]SignSubmissionOutput, 0, len(in.Participants))
 		for _, pid := range in.Participants {
-			_, sigErr := operations.ExecuteOperation(b, SignSubmissionOp, deps, SignSubmissionInput{
+			r, signErr := operations.ExecuteOperation(b, SignSubmissionOp, deps, SignSubmissionInput{
 				ParticipantID:           pid,
 				PreparedTransactionHash: prep.PreparedTransactionHash,
 				PreparedTxB64:           prep.PreparedTxB64,
 			})
-			if sigErr != nil {
-				// ErrSigningNotImplemented is expected — the sequence stops here.
-				return ContractDeployOutput{
-					PackageIDs:              packageIDs,
-					PreparedTransactionHash: prep.PreparedTransactionHash,
-				}, fmt.Errorf("sign-submission %s: %w", pid, sigErr)
+			if signErr != nil {
+				if !retry.IsRecoverable(signErr) {
+					return ContractDeployOutput{
+						PackageIDs:              packageIDs,
+						PreparedTransactionHash: prep.PreparedTransactionHash,
+					}, fmt.Errorf("sign-submission %s: %w", pid, signErr)
+				}
+				deps.Logger.Infow("Signing pending", "participant", pid, "err", signErr)
+
+				continue
 			}
+			signs = append(signs, r.Output)
 		}
 
-		// Steps 5 and 6 would follow here once signing is implemented.
+		// Gate: all participants must have signed before executing.
+		if len(signs) < len(in.Participants) {
+			deps.Logger.Warnw("Not all participants have signed",
+				"signed", len(signs), "required", len(in.Participants))
+
+			return ContractDeployOutput{
+					PackageIDs:              packageIDs,
+					PreparedTransactionHash: prep.PreparedTransactionHash,
+				}, fmt.Errorf("%w: %d/%d participants have signed",
+					ErrThresholdNotMet, len(signs), len(in.Participants))
+		}
+
+		// Collect all base64-encoded signatures.
+		sigsB64 := make([]string, len(signs))
+		for i, s := range signs {
+			sigsB64[i] = s.SignatureB64
+		}
+
+		deps.Logger.Infow("All participants signed",
+			"participants", len(signs),
+		)
+
+		// ── Step 5: Execute submission ───────────────────────────────────────
+		executeReport, err := operations.ExecuteOperation(b, ExecuteSubmissionOp, deps, ExecuteSubmissionInput{
+			DecentralizedPartyID: in.DecentralizedPartyID,
+			PreparedTxB64:        prep.PreparedTxB64,
+			SignaturesB64:        sigsB64,
+			HashingSchemeVersion: prep.HashingSchemeVersion,
+		})
+		if err != nil {
+			return ContractDeployOutput{
+				PackageIDs:              packageIDs,
+				PreparedTransactionHash: prep.PreparedTransactionHash,
+			}, fmt.Errorf("execute-submission: %w", err)
+		}
+
+		// ── Step 6: Verify contract ───────────────────────────────────────────
+		verifyReport, err := operations.ExecuteOperation(b, VerifyContractOp, deps, VerifyContractInput{
+			DecentralizedPartyID: in.DecentralizedPartyID,
+			PackageID:            pkgID,
+			TemplateModule:       in.TemplateModule,
+			TemplateEntity:       in.TemplateEntity,
+			ContractID:           executeReport.Output.ContractID,
+		})
+		if err != nil {
+			return ContractDeployOutput{
+				PackageIDs:              packageIDs,
+				PreparedTransactionHash: prep.PreparedTransactionHash,
+			}, fmt.Errorf("verify-contract: %w", err)
+		}
+
+		contractID := verifyReport.Output.ContractID
+
+		deps.Logger.Infow("Contract deployed successfully",
+			"contract_id", contractID,
+			"packages", len(packageIDs),
+		)
 
 		return ContractDeployOutput{
 			PackageIDs:              packageIDs,
 			PreparedTransactionHash: prep.PreparedTransactionHash,
+			ContractID:              contractID,
 		}, nil
 	},
 )

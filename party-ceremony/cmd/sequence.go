@@ -378,12 +378,6 @@ func executeContractDeploySequence(
 			os.Exit(2) //nolint:gocritic // intentional early exit for UX
 		}
 
-		if strings.Contains(seqErr.Error(), contractdeploy.ErrSigningNotImplemented.Error()) {
-			fmt.Fprintf(os.Stderr, "contract-deploy ceremony paused: %v\n", seqErr)
-			fmt.Fprintln(os.Stderr, "Signing is not yet implemented. DARs uploaded and submission prepared successfully.")
-			os.Exit(2) //nolint:gocritic // intentional early exit for UX
-		}
-
 		return seqErr
 	}
 

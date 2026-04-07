@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	integrationtests "github.com/chainlink/canton-party-ceremony/integration-tests"
 	"github.com/chainlink/canton-party-ceremony/internal/client"
 	interactivepb "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
@@ -34,12 +35,12 @@ func (s *CeremonyTestSuite) SetupSuite() {
 	t := s.T()
 
 	// Uncomment to use local Canton environment for faster test runs (requires local setup).
-	chain, err := s.NewLocalEnv()
-	require.NoError(t, err, "failed to create local environment")
+	// chain, err := s.NewLocalEnv()
+	// require.NoError(t, err, "failed to create local environment")
 
-	// chain, err := integrationtests.LoadChainWithCTF(t, 3)
-	// require.NoError(t, err, "failed to load chain with CTF")
-	// require.Len(t, chain.Participants, 3, "expected 3 participants")
+	chain, err := integrationtests.LoadChainWithCTF(t, 3)
+	require.NoError(t, err, "failed to load chain with CTF")
+	require.Len(t, chain.Participants, 3, "expected 3 participants")
 	s.chain = chain
 
 	// Build CantonClients for each participant.
@@ -164,13 +165,21 @@ func jwtStream(token string) grpc.StreamClientInterceptor {
 	}
 }
 
-// userIDInterceptor injects a user_id into PrepareSubmissionRequests when
-// the Canton node runs without authentication (no JWT subject claim).
+// userIDInterceptor injects a user_id into PrepareSubmissionRequests and
+// ExecuteSubmissionRequests when the Canton node runs without authentication
+// (no JWT subject claim).
 func userIDInterceptor(userID string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		if r, ok := req.(*interactivepb.PrepareSubmissionRequest); ok && r.UserId == "" {
 			r.UserId = userID
 		}
+		if r, ok := req.(*interactivepb.ExecuteSubmissionRequest); ok && r.UserId == "" {
+			r.UserId = userID
+		}
+		if r, ok := req.(*interactivepb.ExecuteSubmissionAndWaitForTransactionRequest); ok && r.UserId == "" {
+			r.UserId = userID
+		}
+
 		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 }

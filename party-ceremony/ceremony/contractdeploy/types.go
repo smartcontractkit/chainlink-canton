@@ -87,8 +87,11 @@ type PrepareSubmissionInput struct {
 type PrepareSubmissionOutput struct {
 	PreparedTransactionHash string `json:"prepared_transaction_hash"`
 	// PreparedTxB64 is the base64-encoded serialized PreparedTransaction proto.
-	// Needed by the future signing and execution steps.
+	// Needed by the signing and execution steps.
 	PreparedTxB64 string `json:"prepared_tx_b64"`
+	// HashingSchemeVersion is forwarded from PrepareSubmissionResponse and must
+	// be passed as-is to ExecuteSubmissionRequest.
+	HashingSchemeVersion int32 `json:"hashing_scheme_version"`
 }
 
 // SignSubmissionInput is the input to [SignSubmissionOp].
@@ -100,14 +103,17 @@ type SignSubmissionInput struct {
 
 // SignSubmissionOutput is the output of [SignSubmissionOp].
 type SignSubmissionOutput struct {
-	ParticipantID string `json:"participant_id"`
-	SignatureB64  string `json:"signature_b64"`
+	ParticipantID  string `json:"participant_id"`
+	SignatureB64   string `json:"signature_b64"`   // base64-encoded serialised v2.Signature proto
+	KeyFingerprint string `json:"key_fingerprint"` // Canton key fingerprint used to sign
 }
 
 // ExecuteSubmissionInput is the input to [ExecuteSubmissionOp].
 type ExecuteSubmissionInput struct {
-	PreparedTxB64 string   `json:"prepared_tx_b64"`
-	SignaturesB64 []string `json:"signatures_b64"`
+	DecentralizedPartyID string   `json:"decentralized_party_id"`
+	PreparedTxB64        string   `json:"prepared_tx_b64"`
+	SignaturesB64        []string `json:"signatures_b64"` // one per participant
+	HashingSchemeVersion int32    `json:"hashing_scheme_version"`
 }
 
 // ExecuteSubmissionOutput is the output of [ExecuteSubmissionOp].
@@ -126,5 +132,6 @@ type VerifyContractInput struct {
 
 // VerifyContractOutput is the output of [VerifyContractOp].
 type VerifyContractOutput struct {
-	Verified bool `json:"verified"`
+	Verified   bool   `json:"verified"`
+	ContractID string `json:"contract_id"`
 }

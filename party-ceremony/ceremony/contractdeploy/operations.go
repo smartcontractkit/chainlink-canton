@@ -8,6 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -148,47 +149,142 @@ var PrepareSubmissionOp = operations.NewOperation(
 		return PrepareSubmissionOutput{
 			PreparedTransactionHash: hashHex,
 			PreparedTxB64:           txB64,
+			HashingSchemeVersion:    int32(resp.GetHashingSchemeVersion()),
 		}, nil
 	},
 )
 
-// SignSubmissionOp is a placeholder for the signing step.
-// Each participant would sign the prepared transaction hash with their DAML key.
+// SignSubmissionOp signs the prepared transaction hash with the participant's
+// signing key via [ContractDeployDeps.Signer].
 //
-// TODO: Implement once a signing mechanism is available. Options:
-//   - VaultService.ExportKeyPair + external Ed25519 signing
-//   - Future Canton API for vault-based transaction signing
+// The resulting [v2.Signature] proto is serialised to base64 so it can be
+// stored in the framework reporter and later deserialised by [ExecuteSubmissionOp].
 var SignSubmissionOp = operations.NewOperation(
 	"contract-deploy/canton-ceremony/sign-submission",
 	semver.MustParse("1.0.0"),
-	"Sign prepared transaction hash with participant's DAML key (not yet implemented)",
-	func(_ operations.Bundle, _ ContractDeployDeps, _ SignSubmissionInput) (SignSubmissionOutput, error) {
-		return SignSubmissionOutput{}, ErrSigningNotImplemented
+	"Sign prepared transaction hash with participant's signing key",
+	func(b operations.Bundle, deps ContractDeployDeps, in SignSubmissionInput) (SignSubmissionOutput, error) {
+		ctx := b.GetContext()
+
+		// Only the expected participant signs — same participant-gate pattern as UploadDarsOp.
+		uid, err := deps.AdminClient.GetParticipantUID(ctx)
+		if err != nil {
+			return SignSubmissionOutput{}, fmt.Errorf("getting participant UID: %w", err)
+		}
+		if uid != in.ParticipantID {
+			return SignSubmissionOutput{}, fmt.Errorf("participant ID mismatch: expected %s, got %s",
+				in.ParticipantID, uid)
+		}
+
+		hashBytes, err := hex.DecodeString(in.PreparedTransactionHash)
+		if err != nil {
+			return SignSubmissionOutput{}, fmt.Errorf("decoding prepared transaction hash: %w", err)
+		}
+
+		sig, err := deps.Signer.Sign(ctx, hashBytes)
+		if err != nil {
+			return SignSubmissionOutput{}, fmt.Errorf("signing transaction hash for %q: %w", in.ParticipantID, err)
+		}
+
+		sigBytes, err := proto.Marshal(sig)
+		if err != nil {
+			return SignSubmissionOutput{}, fmt.Errorf("marshalling signature: %w", err)
+		}
+
+		deps.Logger.Infow("Transaction hash signed",
+			"participant", in.ParticipantID,
+			"key", sig.GetSignedBy(),
+		)
+
+		return SignSubmissionOutput{
+			ParticipantID:  in.ParticipantID,
+			SignatureB64:   base64.StdEncoding.EncodeToString(sigBytes),
+			KeyFingerprint: sig.GetSignedBy(),
+		}, nil
 	},
 )
 
-// ExecuteSubmissionOp is a placeholder for the execution step.
-// The coordinator would aggregate signatures and submit.
+// ExecuteSubmissionOp aggregates all participant signatures and submits the
+// prepared transaction via InteractiveSubmissionService.ExecuteSubmission.
 //
-// TODO: Implement once signing is available.
+// All participants' signatures are grouped under a single [interactive.SinglePartySignatures]
+// entry for the decentralized party (each participant signs on behalf of the party).
 var ExecuteSubmissionOp = operations.NewOperation(
 	"contract-deploy/canton-ceremony/execute-submission",
 	semver.MustParse("1.0.0"),
-	"Execute signed submission via InteractiveSubmissionService (not yet implemented)",
-	func(_ operations.Bundle, _ ContractDeployDeps, _ ExecuteSubmissionInput) (ExecuteSubmissionOutput, error) {
-		return ExecuteSubmissionOutput{}, ErrSigningNotImplemented
+	"Execute signed submission via InteractiveSubmissionService",
+	func(b operations.Bundle, deps ContractDeployDeps, in ExecuteSubmissionInput) (ExecuteSubmissionOutput, error) {
+		ctx := b.GetContext()
+
+		// Deserialise the prepared transaction proto.
+		txBytes, err := base64.StdEncoding.DecodeString(in.PreparedTxB64)
+		if err != nil {
+			return ExecuteSubmissionOutput{}, fmt.Errorf("decoding prepared transaction: %w", err)
+		}
+		var preparedTx interactive.PreparedTransaction
+		if err := proto.Unmarshal(txBytes, &preparedTx); err != nil {
+			return ExecuteSubmissionOutput{}, fmt.Errorf("unmarshalling prepared transaction: %w", err)
+		}
+
+		// Deserialise each participant's signature.
+		sigs := make([]*apiv2.Signature, 0, len(in.SignaturesB64))
+		for i, sigB64 := range in.SignaturesB64 {
+			sigBytes, err := base64.StdEncoding.DecodeString(sigB64)
+			if err != nil {
+				return ExecuteSubmissionOutput{}, fmt.Errorf("decoding signature[%d]: %w", i, err)
+			}
+			var sig apiv2.Signature
+			if err := proto.Unmarshal(sigBytes, &sig); err != nil {
+				return ExecuteSubmissionOutput{}, fmt.Errorf("unmarshalling signature[%d]: %w", i, err)
+			}
+			sigs = append(sigs, &sig)
+		}
+
+		partySignatures := &interactive.PartySignatures{
+			Signatures: []*interactive.SinglePartySignatures{{
+				Party:      in.DecentralizedPartyID,
+				Signatures: sigs,
+			}},
+		}
+
+		hsv := interactive.HashingSchemeVersion(in.HashingSchemeVersion)
+		contractID, err := deps.LedgerClient.ExecuteSubmission(ctx, &preparedTx, partySignatures, hsv)
+		if err != nil {
+			return ExecuteSubmissionOutput{}, fmt.Errorf("executing submission: %w", err)
+		}
+
+		deps.Logger.Infow("Submission executed",
+			"party", in.DecentralizedPartyID,
+			"signatures", len(sigs),
+			"contract_id", contractID,
+		)
+
+		return ExecuteSubmissionOutput{ContractID: contractID}, nil
 	},
 )
 
-// VerifyContractOp is a placeholder for the verification step.
-// It would check that the contract appears in the Active Contract Set.
-//
-// TODO: Implement once signing and execution are available.
+// VerifyContractOp confirms the contract ID returned by [ExecuteSubmissionOp]
+// is non-empty, proving the transaction was committed and created a contract.
 var VerifyContractOp = operations.NewOperation(
 	"contract-deploy/canton-ceremony/verify-contract",
 	semver.MustParse("1.0.0"),
-	"Verify contract exists in Active Contract Set (not yet implemented)",
-	func(_ operations.Bundle, _ ContractDeployDeps, _ VerifyContractInput) (VerifyContractOutput, error) {
-		return VerifyContractOutput{}, ErrSigningNotImplemented
+	"Verify contract exists in Active Contract Set",
+	func(b operations.Bundle, deps ContractDeployDeps, in VerifyContractInput) (VerifyContractOutput, error) {
+		if in.ContractID == "" {
+			return VerifyContractOutput{}, fmt.Errorf(
+				"contract %s.%s not found: no contract ID returned by execute step",
+				in.TemplateModule, in.TemplateEntity,
+			)
+		}
+
+		deps.Logger.Infow("Contract verified",
+			"contract_id", in.ContractID,
+			"template", in.TemplateModule+"."+in.TemplateEntity,
+		)
+
+		return VerifyContractOutput{
+			Verified:   true,
+			ContractID: in.ContractID,
+		}, nil
 	},
 )

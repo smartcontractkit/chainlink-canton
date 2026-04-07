@@ -41,4 +41,15 @@ type LedgerClient interface {
 		moduleName string,
 		entityName string,
 	) ([]*apiv2.CreatedEvent, error)
+
+	// ExecuteSubmission calls InteractiveSubmissionService.ExecuteSubmission
+	// to submit a prepared DAML transaction with its party signatures.
+	// Returns the contract ID of the first created contract in the committed
+	// transaction, or an empty string if no contracts were created.
+	ExecuteSubmission(
+		ctx context.Context,
+		preparedTx *interactive.PreparedTransaction,
+		partySignatures *interactive.PartySignatures,
+		hashingSchemeVersion interactive.HashingSchemeVersion,
+	) (string, error)
 }

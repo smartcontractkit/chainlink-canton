@@ -20,10 +20,11 @@ type DARLoader func(packageName, version string) ([]byte, error)
 func FileDARLoader(dir string) DARLoader {
 	return func(packageName, version string) ([]byte, error) {
 		path := filepath.Join(dir, fmt.Sprintf("%s-%s.dar", packageName, version))
-		data, err := os.ReadFile(path) //nolint:gosec // path is constructed from known package name/version
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("reading DAR %q: %w", path, err)
 		}
+
 		return data, nil
 	}
 }
@@ -37,5 +38,7 @@ type ContractDeployDeps struct {
 	// DARLoader resolves package references to DAR bytes.
 	// Wire contracts.GetDar for production usage.
 	DARLoader DARLoader
-	Logger    logger.Logger
+	// Signer signs prepared transaction hashes for the interactive submission.
+	Signer client.TransactionSigner
+	Logger logger.Logger
 }

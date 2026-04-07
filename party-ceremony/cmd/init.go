@@ -379,7 +379,7 @@ func runInitContractDeploy(cmd *cobra.Command, _ []string) error {
 
 // readFileBytes reads a file and returns its contents as a byte slice.
 func readFileBytes(path string) ([]byte, error) {
-	return os.ReadFile(path) //nolint:gosec // path comes from CLI flag, not user-controlled input
+	return os.ReadFile(path)
 }
 
 // applyContractDefaults fills in templateModule, entity, and argsFile from the
@@ -405,6 +405,7 @@ func applyContractDefaults(
 		if argsFile == "" {
 			argsFile = profile.argsFile
 		}
+
 		return module, entity, argsFile, nil
 	}
 
@@ -415,6 +416,7 @@ func applyContractDefaults(
 			primary,
 		)
 	}
+
 	return module, entity, argsFile, nil
 }
 
@@ -434,5 +436,6 @@ func parsePackageRefs(raw string) ([]contractdeploy.PackageRef, error) {
 			Version: p[idx+1:],
 		})
 	}
+
 	return refs, nil
 }
