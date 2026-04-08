@@ -877,7 +877,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	ccvExtraArgs := make([]mcmsbindings.RawInstanceAddress, 0, len(opts.CCVs))
+	ccvExtraArgs := make([]ccipclient.CCVExtraArg, 0, len(opts.CCVs))
 	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
@@ -923,7 +923,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			}
 		}
 		rawAddrBinding := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(rawAddr.String())}
-		ccvExtraArgs = append(ccvExtraArgs, rawAddrBinding)
+		ccvExtraArgs = append(ccvExtraArgs, ccipclient.CCVExtraArg{
+			CcvAddress: rawAddrBinding,
+			CcvArgs:    types.TEXT(""),
+		})
 		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
 			CcvAddress:      rawAddrBinding,
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
@@ -978,23 +981,16 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
-			FeeToken: ccipclient.FeeTokenInput{
-				Token:           feeTokenInstrument,
-				TokenInput:      feeTokenInput,
-				SenderInputCids: nil,
-			},
+			FeeToken: feeTokenInstrument,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           types.INT64(opts.ExecutionGasLimit),
 					BlockConfirmations: 0,
 					Ccvs:               ccvExtraArgs,
-					ExecutorType: ccipclient.ExecutorType{
-						ExecutorUseDefault: &types.UNIT{},
-					},
-					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:          executorCID,
-						ExecutorArgs:         types.TEXT(""),
-						ExecutorExtraContext: common.CCIPContext{},
+					Executor: ccipclient.ExecutorExtraArg{
+						ExecutorUseDefault: &ccipclient.ExecutorUseDefault{
+							ExecutorArgs: types.TEXT(""),
+						},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),

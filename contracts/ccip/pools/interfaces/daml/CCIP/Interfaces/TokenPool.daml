@@ -36,7 +36,7 @@ interface ITokenPool where
         with
             remoteChainSelector : Numeric 0
             amount : Decimal
-            finality : Int
+            finality : BytesHex
             extraData : BytesHex
             direction : TransferDirection
             caller : Party

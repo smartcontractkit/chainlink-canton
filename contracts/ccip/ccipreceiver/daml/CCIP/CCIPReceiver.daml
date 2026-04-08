@@ -91,7 +91,7 @@ template CCIPReceiver
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = message.sourceChainSelector
                                 amount = tokenAmount
-                                finality = message.finality
+                                finality = message.finality.raw
                                 extraData = tokenExtraData
                                 direction = CCIP.Interfaces.TokenPool.Inbound
                                 caller = owner

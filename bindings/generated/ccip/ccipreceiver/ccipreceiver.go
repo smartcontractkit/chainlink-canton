@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "7e30f8353e125895584d994d1ae86d419f6d8b9fae9ab7e50d230fd45ab5762c"
+	PackageID   = "946561106b4a571bf4704b3aaee201bf26bc9f1f6a1232f472ea5e4ecf4c4d89"
 	SDKVersion  = "3.4.10"
 )
 
@@ -572,14 +572,44 @@ func (t *Execute2) UnmarshalHex(data string) error {
 
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
-	Caller types.PARTY `json:"caller"`
+	Context        common.CCIPContext `json:"context"`
+	RouterCid      types.CONTRACT_ID  `json:"routerCid"`
+	EncodedMessage types.TEXT         `json:"encodedMessage"`
+	TokenPoolCid   *types.CONTRACT_ID `json:"tokenPoolCid" hex:"optional"`
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
 func (t GetRequiredCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["caller"] = t.Caller.ToMap()
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
+
+	m["routerCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RouterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RouterCid
+	}()
+
+	m["encodedMessage"] = string(t.EncodedMessage)
+
+	if t.TokenPoolCid != nil {
+		m["tokenPoolCid"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenPoolCid,
+		}
+	} else {
+		m["tokenPoolCid"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	return m
 }
@@ -602,23 +632,6 @@ func (t GetRequiredCCVs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetRequiredCCVs from hex string (Canton MCMS format)
 func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GetRequiredCCVsMCMSParams is GetRequiredCCVs without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type GetRequiredCCVsMCMSParams struct {
-}
-
-// MarshalHex encodes GetRequiredCCVsMCMSParams to hex string for MCMS operationData.
-func (t GetRequiredCCVsMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetRequiredCCVsMCMSParams from hex string.
-func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -738,7 +751,6 @@ func (t *UpdateRequiredCCVs) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	Execute2(args Execute2) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
-	GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
 	UpdateRequiredCCVs(args UpdateRequiredCCVs) (*bind.EncodedChoice, error)
 }
 
@@ -776,11 +788,6 @@ func (e *encoder) Execute2(args Execute2) (*bind.EncodedChoice, error) {
 
 // GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.
 func (e *encoder) GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
-}
-
-// GetRequiredCCVsMCMSParams encodes MCMS parameters (without Caller) for the GetRequiredCCVs choice.
-func (e *encoder) GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
 }
 

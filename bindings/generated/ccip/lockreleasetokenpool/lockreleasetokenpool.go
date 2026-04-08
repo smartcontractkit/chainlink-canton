@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "3eb67415bf425e2e72d6ff13ec3f6c06071845b5a7a757328f1272961a14d485"
+	PackageID   = "fdb540a55fa63fbab786e188c2164884db4756381a3ba7ec3789caa325f99348"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1316,7 +1316,7 @@ func (t *LockReleaseTokenPoolGetFeeMCMSParams) UnmarshalHex(data string) error {
 type LockReleaseTokenPoolGetRequiredCCVs struct {
 	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
 	Amount              types.NUMERIC                `json:"amount"`
-	Finality            types.INT64                  `json:"finality"`
+	Finality            types.TEXT                   `json:"finality"`
 	ExtraData           types.TEXT                   `json:"extraData"`
 	Direction           interfaces.TransferDirection `json:"direction"`
 	Caller              types.PARTY                  `json:"caller"`
@@ -1330,7 +1330,7 @@ func (t LockReleaseTokenPoolGetRequiredCCVs) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["finality"] = int64(t.Finality)
+	m["finality"] = string(t.Finality)
 
 	m["extraData"] = string(t.ExtraData)
 
@@ -1374,7 +1374,7 @@ func (t *LockReleaseTokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 type LockReleaseTokenPoolGetRequiredCCVsMCMSParams struct {
 	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
 	Amount              types.NUMERIC                `json:"amount"`
-	Finality            types.INT64                  `json:"finality"`
+	Finality            types.TEXT                   `json:"finality"`
 	ExtraData           types.TEXT                   `json:"extraData"`
 	Direction           interfaces.TransferDirection `json:"direction"`
 }
@@ -2439,6 +2439,22 @@ func (v TransferTimeout) GetVariantValue() any {
 }
 
 var _ types.VARIANT = (*TransferTimeout)(nil)
+
+// GetVariantTagByte implements types.VariantWithTagByte interface for MCMS numeric tag encoding
+func (v TransferTimeout) GetVariantTagByte() byte {
+
+	if v.Indefinite != nil {
+		return 0
+	}
+
+	if v.RelativeHours != nil {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown variant
+}
+
+var _ types.VariantWithTagByte = (*TransferTimeout)(nil)
 
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.

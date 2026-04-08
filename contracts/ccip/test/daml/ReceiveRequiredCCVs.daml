@@ -11,6 +11,7 @@ import qualified DA.TextMap as TextMap
 
 import qualified CCIP.CCIPReceiver
 import qualified CCIP.Context
+import qualified CCIP.FinalityCodec
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
@@ -123,7 +124,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
             requiredCCVs = [receiverCcv]
             optionalCCVs = []
             optionalThreshold = 0
-            minBlockConfirmations = 0
+            receiverFinalityConfig = CCIP.FinalityCodec.waitForFinalityConfig
 
     let message = CCIP.MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
@@ -131,7 +132,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 0
+            finality = CCIP.FinalityCodec.waitForFinalityDecoded
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress offRampAddr
@@ -164,7 +165,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
             receiverRequiredCCVs = [receiverCcv]
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 0
+            receiverFinalityConfig = CCIP.FinalityCodec.waitForFinalityConfig
             caller = receiver
 
     executingMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
@@ -258,7 +259,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
             requiredCCVs = [receiverCcv]
             optionalCCVs = []
             optionalThreshold = 0
-            minBlockConfirmations = 0
+            receiverFinalityConfig = CCIP.FinalityCodec.waitForFinalityConfig
 
     let message = CCIP.MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
@@ -266,7 +267,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 0
+            finality = CCIP.FinalityCodec.waitForFinalityDecoded
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress offRampAddr
@@ -299,7 +300,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
             receiverRequiredCCVs = [receiverCcv]
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 0
+            receiverFinalityConfig = CCIP.FinalityCodec.waitForFinalityConfig
             caller = receiver
 
     executingMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid

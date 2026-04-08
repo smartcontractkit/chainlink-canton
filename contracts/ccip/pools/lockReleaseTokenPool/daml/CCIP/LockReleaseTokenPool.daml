@@ -455,7 +455,7 @@ template LockReleaseTokenPool
             with
                 remoteChainSelector : Numeric 0
                 amount : Decimal
-                finality : Int
+                finality : BytesHex
                 extraData : BytesHex
                 direction : CCIP.Interfaces.TokenPool.TransferDirection
                 caller : Party

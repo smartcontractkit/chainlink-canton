@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "523de2a58cf5b92e94f97c374d400e1269ee64ee2c4a2c0e66d9728b8a62643f"
+	PackageID   = "8d670682a5731adfd3241b425e581cf00712f4933b0c6ce5a47ec409dc89ae0d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -650,7 +650,7 @@ func (t *TokenPoolGetFee) UnmarshalHex(data string) error {
 type TokenPoolGetRequiredCCVs struct {
 	RemoteChainSelector types.NUMERIC     `json:"remoteChainSelector"`
 	Amount              types.NUMERIC     `json:"amount"`
-	Finality            types.INT64       `json:"finality"`
+	Finality            types.TEXT        `json:"finality"`
 	ExtraData           types.TEXT        `json:"extraData"`
 	Direction           TransferDirection `json:"direction"`
 	Caller              types.PARTY       `json:"caller"`
@@ -664,7 +664,7 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["finality"] = int64(t.Finality)
+	m["finality"] = string(t.Finality)
 
 	m["extraData"] = string(t.ExtraData)
 
