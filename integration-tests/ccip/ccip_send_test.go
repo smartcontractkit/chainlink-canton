@@ -597,22 +597,25 @@ func TestCCIPSend(t *testing.T) {
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			FeeToken: nativeInstrumentId,
+			FeeToken: ccipclient.FeeTokenInput{
+				Token:           nativeInstrumentId,
+				TokenInput:      feeTokenInput,
+				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			},
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           100_000,
 					BlockConfirmations: 0,
-					Ccvs: []ccipclient.CCVExtraArg{
-						{
-							CcvAddress: ccvRawAddr,
-							CcvArgs:    types.TEXT(""),
-						},
-					},
-					Executor: ccipclient.ExecutorExtraArg{
+					Ccvs:               []mcmsbindings.RawInstanceAddress{ccvRawAddr},
+					ExecutorType: ccipclient.ExecutorType{
 						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
 							ExecutorAddress: execMcmsAddr,
-							ExecutorArgs:    types.TEXT(""),
 						},
+					},
+					Executor: &ccipclient.ExecutorInput{
+						ExecutorCid:          types.CONTRACT_ID(sendDisclosures.ExecutorContractID.ContractId),
+						ExecutorArgs:         types.TEXT(""),
+						ExecutorExtraContext: common.CCIPContext{},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),
