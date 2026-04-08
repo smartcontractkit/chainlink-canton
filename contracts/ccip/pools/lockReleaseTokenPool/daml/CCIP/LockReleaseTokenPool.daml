@@ -51,6 +51,7 @@ import qualified Splice.Api.Token.TransferInstructionV1
 import qualified CCIP.Context
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FinalityCodec
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
@@ -152,8 +153,9 @@ bpsDenominator = 10000.0
 calculateFeeFromBps : Numeric 0 -> Numeric 0 -> Numeric 0
 calculateFeeFromBps amount feeBps = CCIP.Math.mulDivDown amount feeBps bpsDenominator
 
-customFinalityRateLimiterRequired : Int -> Bool
-customFinalityRateLimiterRequired minBlockConfirmations = minBlockConfirmations > 0
+customFinalityRateLimiterRequired : BytesHex -> Bool
+customFinalityRateLimiterRequired finalityConfig =
+    CCIP.FinalityCodec.customFinalityRateLimiterRequired finalityConfig
 
 -- | Lock/release token pool with dynamic CCV requirements per chain.
 template LockReleaseTokenPool
@@ -309,16 +311,19 @@ template LockReleaseTokenPool
                         remoteChainSelectorsToRemove
 
                 -- Validate
-                forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockConfirmations, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
+                forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, finalityConfig, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
                     assertMsg "ApplyChainUpdates: invalid chain selector" (remoteChainSelector > 0.0)
                     assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
-                    assertMsg "ApplyChainUpdates: minBlockConfirmations cannot be negative" (minBlockConfirmations >= 0)
+                    -- Match EVM behavior: accept any bytes4 allowed finality policy here
+                    -- and enforce semantics later when requested finality is checked.
+                    assertMsg "ApplyChainUpdates: finalityConfig must be bytes4"
+                        (byteCount finalityConfig == CCIP.FinalityCodec.finalityConfigByteLength)
                     -- If the chain already exists, the update should first remove it.
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
                     -- Validate rate limiters
                     assertMsg "ApplyChainUpdates: inbound/outbound rate limiters cannot be empty" (inboundRateLimiter /= RawInstanceAddress.empty && outboundRateLimiter /= RawInstanceAddress.empty)
-                    when (customFinalityRateLimiterRequired minBlockConfirmations) $
-                        assertMsg "ApplyChainUpdates: custom finality inbound rate limiter cannot be empty when minBlockConfirmations > 0"
+                    when (customFinalityRateLimiterRequired finalityConfig) $
+                        assertMsg "ApplyChainUpdates: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
                             (inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
                     assertMsg "ApplyChainUpdates: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
                     -- Validate remote pools
@@ -333,7 +338,7 @@ template LockReleaseTokenPool
                                     remoteTokenAddress = chainToAdd.remoteTokenAddress
                                     inboundCCVs = chainToAdd.inboundCCVs
                                     outboundCCVs = chainToAdd.outboundCCVs
-                                    minBlockConfirmations = chainToAdd.minBlockConfirmations
+                                    finalityConfig = chainToAdd.finalityConfig
                                     inboundRateLimiter = chainToAdd.inboundRateLimiter
                                     inboundCustomBlockConfirmationsRateLimiter = chainToAdd.inboundCustomBlockConfirmationsRateLimiter
                                     outboundRateLimiter = chainToAdd.outboundRateLimiter
@@ -407,8 +412,8 @@ template LockReleaseTokenPool
                     cfg <- case Map.lookup arg.remoteChainSelector remoteChainConfigs of
                         None -> abort ("SetRateLimitConfig: unsupported chain selector: " <> show arg.remoteChainSelector)
                         Some cfg -> pure cfg
-                    when (customFinalityRateLimiterRequired cfg.minBlockConfirmations) $
-                        assertMsg "SetRateLimitConfig: custom finality inbound rate limiter cannot be empty when minBlockConfirmations > 0"
+                    when (customFinalityRateLimiterRequired cfg.finalityConfig) $
+                        assertMsg "SetRateLimitConfig: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
                             (arg.inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
 
                 -- Update
@@ -495,13 +500,8 @@ template LockReleaseTokenPool
                     None -> abort "pool: unsupported source chain"
                     Some cfg -> pure cfg
 
-                if message.finality /= 0
-                    then do
-                        assertMsg "pool: finalized-only pool rejects FTF messages"
-                            (remoteChainCfg.minBlockConfirmations /= 0)
-                        assertMsg "pool: message finality below pool minBlockConfirmations"
-                            (message.finality >= remoteChainCfg.minBlockConfirmations)
-                    else pure ()
+                assertMsg "pool: message finality not allowed by pool finality config"
+                    (CCIP.FinalityCodec.requestedFinalityAllowed message.finality.raw remoteChainCfg.finalityConfig)
 
                 assertMsg "pool: invalid sourcePoolAddress"
                     (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)
@@ -593,8 +593,9 @@ template LockReleaseTokenPool
                     assertMsg ("ReleaseFromTicket: missing required pool CCV " <> show requiredCCV)
                         (requiredCCV `elem` ticket.verifiedCCVs)
 
-                let isFTF = ticket.finality > 0
-                let useCustomFinalityRateLimiter = isFTF && customFinalityRateLimiterRequired remoteChainCfg.minBlockConfirmations
+                let useCustomFinalityRateLimiter =
+                        ticket.finality /= CCIP.FinalityCodec.waitForFinalityFlag
+                        && CCIP.FinalityCodec.customFinalityRateLimiterRequired remoteChainCfg.finalityConfig
                 let expectedRateLimitMode = if useCustomFinalityRateLimiter
                         then CCIP.RateLimiter.RateLimitMode_CustomFinality
                         else CCIP.RateLimiter.RateLimitMode_DefaultFinality

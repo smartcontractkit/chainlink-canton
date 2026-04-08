@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "6863066822268aff38eebca1c5f0695bd70f6ecf95b79394f6ecec49bcb956ec"
+	PackageID   = "6dcfab2c5c3980ab058de27cd6a0d3beedc9e84277df8bbe182db9365cd96c22"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1653,6 +1653,51 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// DecodedFinality is a Record type
+type DecodedFinality struct {
+	Raw       types.TEXT        `json:"raw"`
+	Requested RequestedFinality `json:"requested"`
+}
+
+// ToMap converts DecodedFinality to a map for DAML arguments
+func (t DecodedFinality) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["raw"] = string(t.Raw)
+
+	m["requested"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Requested).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Requested
+	}()
+
+	return m
+}
+
+func (t DecodedFinality) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DecodedFinality) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DecodedFinality to hex string (Canton MCMS format)
+func (t DecodedFinality) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DecodedFinality from hex string (Canton MCMS format)
+func (t *DecodedFinality) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // DestChainConfig is a Record type
 type DestChainConfig struct {
 	IsEnabled                 types.BOOL                `json:"isEnabled"`
@@ -1959,23 +2004,23 @@ var _ types.ENUM = ExecutingMessageState("")
 
 // ExecutingMessageV1 is a Template type
 type ExecutingMessageV1 struct {
-	CcipOwner                     types.PARTY                `json:"ccipOwner"`
-	Message                       MessageV1                  `json:"message"`
-	MessageId                     types.TEXT                 `json:"messageId"`
-	Receiver                      types.PARTY                `json:"receiver"`
-	TokenReceiver                 *types.PARTY               `json:"tokenReceiver" hex:"optional"`
-	Executor                      types.PARTY                `json:"executor"`
-	ObservingParties              []types.PARTY              `json:"observingParties"`
-	CcvVerifications              []CCVVerification          `json:"ccvVerifications"`
-	CcvOwners                     []types.PARTY              `json:"ccvOwners"`
-	RequiredCCVs                  []mcms.RawInstanceAddress  `json:"requiredCCVs"`
-	OptionalCCVs                  []mcms.RawInstanceAddress  `json:"optionalCCVs"`
-	OptionalCCVThreshold          types.INT64                `json:"optionalCCVThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                `json:"receiverMinBlockConfirmations"`
-	SourceDefaultCCVs             []mcms.RawInstanceAddress  `json:"sourceDefaultCCVs"`
-	InboundPoolCCVs               *[]mcms.RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
-	Deps                          ExecutingMessageDeps       `json:"deps"`
-	State                         ExecutingMessageState      `json:"state"`
+	CcipOwner              types.PARTY                `json:"ccipOwner"`
+	Message                MessageV1                  `json:"message"`
+	MessageId              types.TEXT                 `json:"messageId"`
+	Receiver               types.PARTY                `json:"receiver"`
+	TokenReceiver          *types.PARTY               `json:"tokenReceiver" hex:"optional"`
+	Executor               types.PARTY                `json:"executor"`
+	ObservingParties       []types.PARTY              `json:"observingParties"`
+	CcvVerifications       []CCVVerification          `json:"ccvVerifications"`
+	CcvOwners              []types.PARTY              `json:"ccvOwners"`
+	RequiredCCVs           []mcms.RawInstanceAddress  `json:"requiredCCVs"`
+	OptionalCCVs           []mcms.RawInstanceAddress  `json:"optionalCCVs"`
+	OptionalCCVThreshold   types.INT64                `json:"optionalCCVThreshold"`
+	ReceiverFinalityConfig types.TEXT                 `json:"receiverFinalityConfig"`
+	SourceDefaultCCVs      []mcms.RawInstanceAddress  `json:"sourceDefaultCCVs"`
+	InboundPoolCCVs        *[]mcms.RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
+	Deps                   ExecutingMessageDeps       `json:"deps"`
+	State                  ExecutingMessageState      `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -2088,7 +2133,7 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 	args["optionalCCVThreshold"] = int64(t.OptionalCCVThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+	args["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["sourceDefaultCCVs"] = func() []any {
@@ -2240,7 +2285,7 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 	args["optionalCCVThreshold"] = int64(t.OptionalCCVThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+	args["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["sourceDefaultCCVs"] = func() []any {
@@ -3712,7 +3757,7 @@ type MessageV1 struct {
 	SequenceNumber      types.NUMERIC    `json:"sequenceNumber"`
 	ExecutionGasLimit   types.INT64      `json:"executionGasLimit"`
 	CcipReceiveGasLimit types.INT64      `json:"ccipReceiveGasLimit"`
-	Finality            types.INT64      `json:"finality"`
+	Finality            DecodedFinality  `json:"finality"`
 	CcvAndExecutorHash  types.TEXT       `json:"ccvAndExecutorHash"`
 	OnRampAddress       types.TEXT       `json:"onRampAddress"`
 	OffRampAddress      types.TEXT       `json:"offRampAddress"`
@@ -3737,7 +3782,13 @@ func (t MessageV1) ToMap() map[string]any {
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
 
-	m["finality"] = int64(t.Finality)
+	m["finality"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Finality).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Finality
+	}()
 
 	m["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
 
@@ -4204,6 +4255,75 @@ func (t *Receipt) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
+
+// RequestedFinality is a variant/union type
+type RequestedFinality struct {
+	WaitForFinality *types.UNIT  `json:"WaitForFinality,omitempty"`
+	WaitForSafe     *types.UNIT  `json:"WaitForSafe,omitempty"`
+	BlockDepth      *types.INT64 `json:"BlockDepth,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for RequestedFinality
+func (v RequestedFinality) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(v)
+}
+
+// UnmarshalJSON implements custom JSON unmarshalling for RequestedFinality
+func (v *RequestedFinality) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes RequestedFinality to hex string (Canton MCMS format)
+func (v RequestedFinality) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes RequestedFinality from hex string (Canton MCMS format)
+func (v *RequestedFinality) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
+}
+
+// GetVariantTag implements types.VARIANT interface
+func (v RequestedFinality) GetVariantTag() string {
+
+	if v.WaitForFinality != nil {
+		return "WaitForFinality"
+	}
+
+	if v.WaitForSafe != nil {
+		return "WaitForSafe"
+	}
+
+	if v.BlockDepth != nil {
+		return "BlockDepth"
+	}
+
+	return ""
+}
+
+// GetVariantValue implements types.VARIANT interface
+func (v RequestedFinality) GetVariantValue() any {
+
+	if v.WaitForFinality != nil {
+		return v.WaitForFinality
+	}
+
+	if v.WaitForSafe != nil {
+		return v.WaitForSafe
+	}
+
+	if v.BlockDepth != nil {
+		return v.BlockDepth
+	}
+
+	return nil
+}
+
+var _ types.VARIANT = (*RequestedFinality)(nil)
 
 // SendingMessageDeps is a Record type
 type SendingMessageDeps struct {
@@ -5506,7 +5626,7 @@ type TokenReceiveTicket struct {
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageId                    types.TEXT                               `json:"messageId"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
-	Finality                     types.INT64                              `json:"finality"`
+	Finality                     types.TEXT                               `json:"finality"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -5585,7 +5705,7 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["finality"] = int64(t.Finality)
+	args["finality"] = string(t.Finality)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -5659,7 +5779,7 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["finality"] = int64(t.Finality)
+	args["finality"] = string(t.Finality)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -5885,7 +6005,7 @@ type TokenReceiveTicketClaimedEvent struct {
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageId                    types.TEXT                               `json:"messageId"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
-	Finality                     types.INT64                              `json:"finality"`
+	Finality                     types.TEXT                               `json:"finality"`
 	Output                       TokenReceiveTicketClaimedOutput          `json:"output"`
 }
 
@@ -5924,7 +6044,7 @@ func (t TokenReceiveTicketClaimedEvent) ToMap() map[string]any {
 
 	m["sourceChainSelector"] = t.SourceChainSelector
 
-	m["finality"] = int64(t.Finality)
+	m["finality"] = string(t.Finality)
 
 	m["output"] = func() any {
 		type mapper interface{ toMap() map[string]any }

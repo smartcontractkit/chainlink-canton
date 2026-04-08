@@ -53,11 +53,8 @@ data GenericExtraArgsV3 = GenericExtraArgsV3
         -- | callback on the destination chain, depending on the chain family. Please refer to
         -- | the documentation for each chain for more details.
         gasLimit : Int
-        -- | The number of block confirmations to wait for.
-        -- | 0 means the default finality that the CCV considers final. Any non-zero value means
-        -- | a block depth. CCVs, pools, and the executor may all reject this value if they do
-        -- | not want to take on the risk of the block confirmations specified.
-        -- | May be zero to indicate waiting for finality is desired.
+        -- | Number of block confirmations required before considering a message final.
+        -- | Canton currently only supports the default value 0 on the sending path.
         blockConfirmations : Int
         -- | Sender-specified CCV addresses for the message.
         -- | May be empty to indicate that the destination chain defaults should be used.

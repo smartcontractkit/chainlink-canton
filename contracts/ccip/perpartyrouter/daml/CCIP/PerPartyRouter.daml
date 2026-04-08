@@ -537,7 +537,7 @@ template PerPartyRouter
                 receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
-                receiverMinBlockConfirmations : Int
+                receiverFinalityConfig : BytesHex
                 caller : Party
             controller partyOwner
             do
@@ -577,7 +577,7 @@ template PerPartyRouter
                     receiverRequiredCCVs = receiverRequiredCCVs
                     receiverOptionalCCVs = receiverOptionalCCVs
                     receiverOptionalThreshold = receiverOptionalThreshold
-                    receiverMinBlockConfirmations = receiverMinBlockConfirmations
+                    receiverFinalityConfig = receiverFinalityConfig
                     rmnRemoteCid = rmnRemoteCid
                     receiverParty = receiverParty
                     tokenReceiverParty = tokenReceiverParty

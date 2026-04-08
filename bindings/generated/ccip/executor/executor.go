@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "00d37722a896251499af3c744650a62eb16d1e16c301c3b5966e1b8f8bce4596"
+	PackageID   = "af375c167aab9bd526977aabbca1eb6380f58b625fce401d3014f8271a26686c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -373,7 +373,7 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 // DynamicConfig is a Record type
 type DynamicConfig struct {
 	FeeAggregator         *types.PARTY `json:"feeAggregator" hex:"optional"`
-	MinBlockConfirmations types.INT64  `json:"minBlockConfirmations"`
+	AllowedFinalityConfig types.TEXT   `json:"allowedFinalityConfig"`
 	CcvAllowlistEnabled   types.BOOL   `json:"ccvAllowlistEnabled"`
 }
 
@@ -392,7 +392,7 @@ func (t DynamicConfig) ToMap() map[string]any {
 		}
 	}
 
-	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	m["allowedFinalityConfig"] = string(t.AllowedFinalityConfig)
 
 	m["ccvAllowlistEnabled"] = bool(t.CcvAllowlistEnabled)
 
@@ -733,23 +733,23 @@ func (t Executor) GetMaxCCVsPerMessageWithPackageID(contractID string, packageID
 	}
 }
 
-// GetMinBlockConfirmations exercises the GetMinBlockConfirmations choice on this Executor contract
+// GetAllowedFinalityConfig exercises the GetAllowedFinalityConfig choice on this Executor contract
 // This method uses the package name in the template ID
-func (t Executor) GetMinBlockConfirmations(contractID string, args GetMinBlockConfirmations) *model.ExerciseCommand {
+func (t Executor) GetAllowedFinalityConfig(contractID string, args GetAllowedFinalityConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "GetMinBlockConfirmations",
+		Choice:     "GetAllowedFinalityConfig",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// GetMinBlockConfirmationsWithPackageID exercises the GetMinBlockConfirmations choice using the provided package ID instead of package name
-func (t Executor) GetMinBlockConfirmationsWithPackageID(contractID string, packageID string, args GetMinBlockConfirmations) *model.ExerciseCommand {
+// GetAllowedFinalityConfigWithPackageID exercises the GetAllowedFinalityConfig choice using the provided package ID instead of package name
+func (t Executor) GetAllowedFinalityConfigWithPackageID(contractID string, packageID string, args GetAllowedFinalityConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "GetMinBlockConfirmations",
+		Choice:     "GetAllowedFinalityConfig",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -950,6 +950,59 @@ func (t *GetAllowedCCVsMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetAllowedFinalityConfig is a Record type
+type GetAllowedFinalityConfig struct {
+	Caller types.PARTY `json:"caller"`
+}
+
+// ToMap converts GetAllowedFinalityConfig to a map for DAML arguments
+func (t GetAllowedFinalityConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t GetAllowedFinalityConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetAllowedFinalityConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetAllowedFinalityConfig to hex string (Canton MCMS format)
+func (t GetAllowedFinalityConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetAllowedFinalityConfig from hex string (Canton MCMS format)
+func (t *GetAllowedFinalityConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetAllowedFinalityConfigMCMSParams is GetAllowedFinalityConfig without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetAllowedFinalityConfigMCMSParams struct {
+}
+
+// MarshalHex encodes GetAllowedFinalityConfigMCMSParams to hex string for MCMS operationData.
+func (t GetAllowedFinalityConfigMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetAllowedFinalityConfigMCMSParams from hex string.
+func (t *GetAllowedFinalityConfigMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetDestChains is a Record type
 type GetDestChains struct {
 	Caller types.PARTY `json:"caller"`
@@ -1105,59 +1158,6 @@ func (t GetMaxCCVsPerMessageMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetMaxCCVsPerMessageMCMSParams from hex string.
 func (t *GetMaxCCVsPerMessageMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GetMinBlockConfirmations is a Record type
-type GetMinBlockConfirmations struct {
-	Caller types.PARTY `json:"caller"`
-}
-
-// ToMap converts GetMinBlockConfirmations to a map for DAML arguments
-func (t GetMinBlockConfirmations) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t GetMinBlockConfirmations) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *GetMinBlockConfirmations) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes GetMinBlockConfirmations to hex string (Canton MCMS format)
-func (t GetMinBlockConfirmations) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetMinBlockConfirmations from hex string (Canton MCMS format)
-func (t *GetMinBlockConfirmations) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GetMinBlockConfirmationsMCMSParams is GetMinBlockConfirmations without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type GetMinBlockConfirmationsMCMSParams struct {
-}
-
-// MarshalHex encodes GetMinBlockConfirmationsMCMSParams to hex string for MCMS operationData.
-func (t GetMinBlockConfirmationsMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetMinBlockConfirmationsMCMSParams from hex string.
-func (t *GetMinBlockConfirmationsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1341,14 +1341,14 @@ type MCMSEncoder interface {
 	CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	GetAllowedCCVs(args GetAllowedCCVs) (*bind.EncodedChoice, error)
 	GetAllowedCCVsMCMSParams(args GetAllowedCCVsMCMSParams) (*bind.EncodedChoice, error)
+	GetAllowedFinalityConfig(args GetAllowedFinalityConfig) (*bind.EncodedChoice, error)
+	GetAllowedFinalityConfigMCMSParams(args GetAllowedFinalityConfigMCMSParams) (*bind.EncodedChoice, error)
 	GetDestChains(args GetDestChains) (*bind.EncodedChoice, error)
 	GetDestChainsMCMSParams(args GetDestChainsMCMSParams) (*bind.EncodedChoice, error)
 	GetDynamicConfig(args GetDynamicConfig) (*bind.EncodedChoice, error)
 	GetDynamicConfigMCMSParams(args GetDynamicConfigMCMSParams) (*bind.EncodedChoice, error)
 	GetMaxCCVsPerMessage(args GetMaxCCVsPerMessage) (*bind.EncodedChoice, error)
 	GetMaxCCVsPerMessageMCMSParams(args GetMaxCCVsPerMessageMCMSParams) (*bind.EncodedChoice, error)
-	GetMinBlockConfirmations(args GetMinBlockConfirmations) (*bind.EncodedChoice, error)
-	GetMinBlockConfirmationsMCMSParams(args GetMinBlockConfirmationsMCMSParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
 	SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error)
 }
@@ -1420,6 +1420,16 @@ func (e *encoder) GetAllowedCCVsMCMSParams(args GetAllowedCCVsMCMSParams) (*bind
 	return e.EncodeChoiceArgs("GetAllowedCCVs", args)
 }
 
+// GetAllowedFinalityConfig encodes parameters for the GetAllowedFinalityConfig choice.
+func (e *encoder) GetAllowedFinalityConfig(args GetAllowedFinalityConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetAllowedFinalityConfig", args)
+}
+
+// GetAllowedFinalityConfigMCMSParams encodes MCMS parameters (without Caller) for the GetAllowedFinalityConfig choice.
+func (e *encoder) GetAllowedFinalityConfigMCMSParams(args GetAllowedFinalityConfigMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetAllowedFinalityConfig", args)
+}
+
 // GetDestChains encodes parameters for the GetDestChains choice.
 func (e *encoder) GetDestChains(args GetDestChains) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetDestChains", args)
@@ -1448,16 +1458,6 @@ func (e *encoder) GetMaxCCVsPerMessage(args GetMaxCCVsPerMessage) (*bind.Encoded
 // GetMaxCCVsPerMessageMCMSParams encodes MCMS parameters (without Caller) for the GetMaxCCVsPerMessage choice.
 func (e *encoder) GetMaxCCVsPerMessageMCMSParams(args GetMaxCCVsPerMessageMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetMaxCCVsPerMessage", args)
-}
-
-// GetMinBlockConfirmations encodes parameters for the GetMinBlockConfirmations choice.
-func (e *encoder) GetMinBlockConfirmations(args GetMinBlockConfirmations) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetMinBlockConfirmations", args)
-}
-
-// GetMinBlockConfirmationsMCMSParams encodes MCMS parameters (without Caller) for the GetMinBlockConfirmations choice.
-func (e *encoder) GetMinBlockConfirmationsMCMSParams(args GetMinBlockConfirmationsMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetMinBlockConfirmations", args)
 }
 
 // SetDynamicConfig encodes parameters for the SetDynamicConfig choice.

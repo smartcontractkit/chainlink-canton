@@ -361,7 +361,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								MinBlockConfirmations: 0,
+								AllowedFinalityConfig: receiverWaitForFinalityConfig,
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -877,7 +877,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	ccvExtraArgs := make([]ccipclient.CCVExtraArg, 0, len(opts.CCVs))
+	ccvExtraArgs := make([]mcmsbindings.RawInstanceAddress, 0, len(opts.CCVs))
 	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
@@ -923,10 +923,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			}
 		}
 		rawAddrBinding := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(rawAddr.String())}
-		ccvExtraArgs = append(ccvExtraArgs, ccipclient.CCVExtraArg{
-			CcvAddress: rawAddrBinding,
-			CcvArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
-		})
+		ccvExtraArgs = append(ccvExtraArgs, rawAddrBinding)
 		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
 			CcvAddress:      rawAddrBinding,
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
@@ -959,6 +956,21 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		},
 	}
 
+	feeTokenInput := interfaces.TokenInput{
+		// TODO: replace with a real Splice TransferFactory CID from the
+		// transfer-instruction API. Using routerCID is invalid because
+		// CCIPSend is a consuming choice on the router, so exercising
+		// TransferFactory_Transfer on the same CID fails with
+		// CONTRACT_NOT_ACTIVE. This only works today because total fees
+		// are 0 (gas price set to 0 below) so the transfer is skipped.
+		TransferFactory: routerCID,
+		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+			Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
+			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+		},
+		TokenPoolHoldings: nil,
+	}
+
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                routerCID,
@@ -966,16 +978,23 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
-			FeeToken: feeTokenInstrument,
+			FeeToken: ccipclient.FeeTokenInput{
+				Token:           feeTokenInstrument,
+				TokenInput:      feeTokenInput,
+				SenderInputCids: nil,
+			},
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           types.INT64(opts.ExecutionGasLimit),
 					BlockConfirmations: 0,
 					Ccvs:               ccvExtraArgs,
-					Executor: ccipclient.ExecutorExtraArg{
-						ExecutorUseDefault: &ccipclient.ExecutorUseDefault{
-							ExecutorArgs: types.TEXT(""),
-						},
+					ExecutorType: ccipclient.ExecutorType{
+						ExecutorUseDefault: &types.UNIT{},
+					},
+					Executor: &ccipclient.ExecutorInput{
+						ExecutorCid:          executorCID,
+						ExecutorArgs:         types.TEXT(""),
+						ExecutorExtraContext: common.CCIPContext{},
 					},
 					TokenReceiver: types.TEXT(""),
 					TokenArgs:     types.TEXT(""),
@@ -984,20 +1003,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
 			SenderInputCids: nil,
-			TokenInput: interfaces.TokenInput{
-				// TODO: replace with a real Splice TransferFactory CID from the
-				// transfer-instruction API. Using routerCID is invalid because
-				// CCIPSend is a consuming choice on the router, so exercising
-				// TransferFactory_Transfer on the same CID fails with
-				// CONTRACT_NOT_ACTIVE. This only works today because total fees
-				// are 0 (gas price set to 0 below) so the transfer is skipped.
-				TransferFactory: routerCID,
-				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
-					Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
-				},
-				TokenPoolHoldings: nil,
-			},
+			TokenInput:      feeTokenInput,
 		},
 		CcvSendInputs: ccvSendInputs,
 		ExecutorInput: &ccipsender.ExecutorInput{

@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "8102ea8ad56cad76558b4c8ae3ca2a9afe4d389b368500f7ed7f7b62c318202c"
+	PackageID   = "3eb67415bf425e2e72d6ff13ec3f6c06071845b5a7a757328f1272961a14d485"
 	SDKVersion  = "3.4.10"
 )
 
@@ -286,7 +286,7 @@ type ChainUpdate struct {
 	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
 	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockConfirmations                      types.INT64               `json:"minBlockConfirmations"`
+	FinalityConfig                             types.TEXT                `json:"finalityConfig"`
 	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
@@ -334,7 +334,7 @@ func (t ChainUpdate) ToMap() map[string]any {
 		return res
 	}()
 
-	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	m["finalityConfig"] = string(t.FinalityConfig)
 
 	m["inboundRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1850,7 +1850,7 @@ type RemoteChainConfig struct {
 	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
 	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockConfirmations                      types.INT64               `json:"minBlockConfirmations"`
+	FinalityConfig                             types.TEXT                `json:"finalityConfig"`
 	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
@@ -1896,7 +1896,7 @@ func (t RemoteChainConfig) ToMap() map[string]any {
 		return res
 	}()
 
-	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	m["finalityConfig"] = string(t.FinalityConfig)
 
 	m["inboundRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -2439,22 +2439,6 @@ func (v TransferTimeout) GetVariantValue() any {
 }
 
 var _ types.VARIANT = (*TransferTimeout)(nil)
-
-// GetVariantTagByte implements types.VariantWithTagByte interface for MCMS numeric tag encoding
-func (v TransferTimeout) GetVariantTagByte() byte {
-
-	if v.Indefinite != nil {
-		return 0
-	}
-
-	if v.RelativeHours != nil {
-		return 1
-	}
-
-	return 0xFF // Invalid/unknown variant
-}
-
-var _ types.VariantWithTagByte = (*TransferTimeout)(nil)
 
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.

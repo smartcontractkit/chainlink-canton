@@ -8,6 +8,7 @@ import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FinalityCodec
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
@@ -110,7 +111,7 @@ template OffRamp
                 receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
-                receiverMinBlockConfirmations : Int
+                receiverFinalityConfig : BytesHex
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
@@ -172,13 +173,9 @@ template OffRamp
                         && isSome message.tokenTransfer
                 if isTokenOnlyTransfer
                     then pure ()
-                    else if message.finality /= 0
-                        then do
-                            assertMsg "prepareExecute: finalized-only receiver rejects FTF messages"
-                                (receiverMinBlockConfirmations /= 0)
-                            assertMsg "prepareExecute: message finality below receiver minBlockConfirmations"
-                                (message.finality >= receiverMinBlockConfirmations)
-                        else pure ()
+                    else
+                        assertMsg "prepareExecute: message finality not allowed by receiver finality config"
+                            (CCIP.FinalityCodec.requestedFinalityAllowed message.finality.raw receiverFinalityConfig)
 
                 (baseRequiredCCVs, baseOptionalCCVs, baseOptionalCCVThreshold) <-
                     CCIP.Internal.computeExecuteCCVs
@@ -210,7 +207,7 @@ template OffRamp
                     requiredCCVs = baseRequiredCCVs
                     optionalCCVs = baseOptionalCCVs
                     optionalCCVThreshold = baseOptionalCCVThreshold
-                    receiverMinBlockConfirmations = receiverMinBlockConfirmations
+                    receiverFinalityConfig = receiverFinalityConfig
                     sourceDefaultCCVs = sourceConfig.defaultCCVs
                     inboundPoolCCVs = None
                     deps = CCIP.ExecutingMessageV1.ExecutingMessageDeps with

@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "9d4505b9bf1f04aa50340cad02a6e888e805123f5a7eee7efa8ff72e2132bb8f"
+	PackageID   = "6b9a47172e52e4b7c56deea47fd9e4b36d2e4ed49072d5112c7106ff3fb696a5"
 	SDKVersion  = "3.4.10"
 )
 
@@ -197,18 +197,15 @@ func (t *ExecuteFromRouterResult) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetRequiredCCVsForExecuteFromRouter is a Record type
-type GetRequiredCCVsForExecuteFromRouter struct {
-	GlobalConfigCid           types.CONTRACT_ID         `json:"globalConfigCid"`
-	Message                   common.MessageV1          `json:"message"`
-	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	TokenPoolRequiredCCVs     []mcms.RawInstanceAddress `json:"tokenPoolRequiredCCVs"`
+// GetRequiredCCVsForExecute is a Record type
+type GetRequiredCCVsForExecute struct {
+	GlobalConfigCid      types.CONTRACT_ID         `json:"globalConfigCid"`
+	ReceiverRequiredCCVs []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	SourceChainSelector  types.NUMERIC             `json:"sourceChainSelector"`
 }
 
-// ToMap converts GetRequiredCCVsForExecuteFromRouter to a map for DAML arguments
-func (t GetRequiredCCVsForExecuteFromRouter) ToMap() map[string]any {
+// ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
+func (t GetRequiredCCVsForExecute) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["globalConfigCid"] = func() any {
@@ -217,14 +214,6 @@ func (t GetRequiredCCVsForExecuteFromRouter) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.GlobalConfigCid
-	}()
-
-	m["message"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Message
 	}()
 
 	m["receiverRequiredCCVs"] = func() []any {
@@ -240,55 +229,29 @@ func (t GetRequiredCCVsForExecuteFromRouter) ToMap() map[string]any {
 		return res
 	}()
 
-	m["receiverOptionalCCVs"] = func() []any {
-		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
-		for _, e := range t.ReceiverOptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
-
-	m["tokenPoolRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.TokenPoolRequiredCCVs))
-		for _, e := range t.TokenPoolRequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	return m
 }
 
-func (t GetRequiredCCVsForExecuteFromRouter) MarshalJSON() ([]byte, error) {
+func (t GetRequiredCCVsForExecute) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *GetRequiredCCVsForExecuteFromRouter) UnmarshalJSON(data []byte) error {
+func (t *GetRequiredCCVsForExecute) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes GetRequiredCCVsForExecuteFromRouter to hex string (Canton MCMS format)
-func (t GetRequiredCCVsForExecuteFromRouter) MarshalHex() (string, error) {
+// MarshalHex encodes GetRequiredCCVsForExecute to hex string (Canton MCMS format)
+func (t GetRequiredCCVsForExecute) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes GetRequiredCCVsForExecuteFromRouter from hex string (Canton MCMS format)
-func (t *GetRequiredCCVsForExecuteFromRouter) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetRequiredCCVsForExecute from hex string (Canton MCMS format)
+func (t *GetRequiredCCVsForExecute) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -426,23 +389,23 @@ func (t OffRamp) PrepareExecuteWithPackageID(contractID string, packageID string
 	}
 }
 
-// GetRequiredCCVsForExecuteFromRouter exercises the GetRequiredCCVsForExecuteFromRouter choice on this OffRamp contract
+// GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this OffRamp contract
 // This method uses the package name in the template ID
-func (t OffRamp) GetRequiredCCVsForExecuteFromRouter(contractID string, args GetRequiredCCVsForExecuteFromRouter) *model.ExerciseCommand {
+func (t OffRamp) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
 		ContractID: contractID,
-		Choice:     "GetRequiredCCVsForExecuteFromRouter",
+		Choice:     "GetRequiredCCVsForExecute",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// GetRequiredCCVsForExecuteFromRouterWithPackageID exercises the GetRequiredCCVsForExecuteFromRouter choice using the provided package ID instead of package name
-func (t OffRamp) GetRequiredCCVsForExecuteFromRouterWithPackageID(contractID string, packageID string, args GetRequiredCCVsForExecuteFromRouter) *model.ExerciseCommand {
+// GetRequiredCCVsForExecuteWithPackageID exercises the GetRequiredCCVsForExecute choice using the provided package ID instead of package name
+func (t OffRamp) GetRequiredCCVsForExecuteWithPackageID(contractID string, packageID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
 		ContractID: contractID,
-		Choice:     "GetRequiredCCVsForExecuteFromRouter",
+		Choice:     "GetRequiredCCVsForExecute",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -576,17 +539,17 @@ func (t *OffRampDeps) UnmarshalHex(data string) error {
 
 // PrepareExecute is a Record type
 type PrepareExecute struct {
-	EncodedMessage                types.TEXT                `json:"encodedMessage"`
-	GlobalConfigCid               types.CONTRACT_ID         `json:"globalConfigCid"`
-	TokenAdminRegistryCid         types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
-	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
-	RmnRemoteCid                  types.CONTRACT_ID         `json:"rmnRemoteCid"`
-	ReceiverParty                 types.PARTY               `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
-	Caller                        types.PARTY               `json:"caller"`
+	EncodedMessage            types.TEXT                `json:"encodedMessage"`
+	GlobalConfigCid           types.CONTRACT_ID         `json:"globalConfigCid"`
+	TokenAdminRegistryCid     types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverFinalityConfig    types.TEXT                `json:"receiverFinalityConfig"`
+	RmnRemoteCid              types.CONTRACT_ID         `json:"rmnRemoteCid"`
+	ReceiverParty             types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	Caller                    types.PARTY               `json:"caller"`
 }
 
 // ToMap converts PrepareExecute to a map for DAML arguments
@@ -639,7 +602,7 @@ func (t PrepareExecute) ToMap() map[string]any {
 
 	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
 
-	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+	m["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
 
 	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -692,16 +655,16 @@ func (t *PrepareExecute) UnmarshalHex(data string) error {
 // PrepareExecuteMCMSParams is PrepareExecute without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecuteMCMSParams struct {
-	EncodedMessage                types.TEXT                `json:"encodedMessage"`
-	GlobalConfigCid               types.CONTRACT_ID         `json:"globalConfigCid"`
-	TokenAdminRegistryCid         types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
-	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
-	RmnRemoteCid                  types.CONTRACT_ID         `json:"rmnRemoteCid"`
-	ReceiverParty                 types.PARTY               `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	EncodedMessage            types.TEXT                `json:"encodedMessage"`
+	GlobalConfigCid           types.CONTRACT_ID         `json:"globalConfigCid"`
+	TokenAdminRegistryCid     types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverFinalityConfig    types.TEXT                `json:"receiverFinalityConfig"`
+	RmnRemoteCid              types.CONTRACT_ID         `json:"rmnRemoteCid"`
+	ReceiverParty             types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
 }
 
 // MarshalHex encodes PrepareExecuteMCMSParams to hex string for MCMS operationData.
@@ -831,7 +794,7 @@ func (t *SetDepsParams) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	ExecuteFromRouter(args ExecuteFromRouter) (*bind.EncodedChoice, error)
-	GetRequiredCCVsForExecuteFromRouter(args GetRequiredCCVsForExecuteFromRouter) (*bind.EncodedChoice, error)
+	GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error)
 	PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, error)
 	PrepareExecuteMCMSParams(args PrepareExecuteMCMSParams) (*bind.EncodedChoice, error)
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
@@ -870,9 +833,9 @@ func (e *encoder) ExecuteFromRouter(args ExecuteFromRouter) (*bind.EncodedChoice
 	return e.EncodeChoiceArgs("ExecuteFromRouter", args)
 }
 
-// GetRequiredCCVsForExecuteFromRouter encodes parameters for the GetRequiredCCVsForExecuteFromRouter choice.
-func (e *encoder) GetRequiredCCVsForExecuteFromRouter(args GetRequiredCCVsForExecuteFromRouter) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetRequiredCCVsForExecuteFromRouter", args)
+// GetRequiredCCVsForExecute encodes parameters for the GetRequiredCCVsForExecute choice.
+func (e *encoder) GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVsForExecute", args)
 }
 
 // PrepareExecute encodes parameters for the PrepareExecute choice.

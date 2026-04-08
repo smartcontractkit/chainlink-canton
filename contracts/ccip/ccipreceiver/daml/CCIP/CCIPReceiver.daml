@@ -7,12 +7,13 @@
 -- because ccipOwner is not a party on this contract.
 module CCIP.CCIPReceiver where
 
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Action (foldlA)
 import DA.List (unique)
 import DA.Optional (fromSomeNote)
 
 import qualified CCIP.Context
+import qualified CCIP.FinalityCodec
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
@@ -50,13 +51,17 @@ template CCIPReceiver
         requiredCCVs : [RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress]
         optionalThreshold : Int
-        -- Minimum source-chain block confirmations this receiver will accept for FTF messages.
-        -- A value of 0 means finalized-only and rejects FTF.
-        minBlockConfirmations : Int
+        -- Raw bytes4 allowed finality config for inbound execution.
+        -- "00000000" means finalized-only.
+        -- Any bytes4 value is accepted here; FinalityCodec semantics are enforced
+        -- later when requested finality is checked against this policy.
+        receiverFinalityConfig : BytesHex
     where
         signatory owner
         -- Ensure that requiredCCVs are unique
-        ensure assertValidInstanceId instanceId && unique requiredCCVs
+        ensure assertValidInstanceId instanceId
+            && unique requiredCCVs
+            && byteCount receiverFinalityConfig == CCIP.FinalityCodec.finalityConfigByteLength
 
         -- | Query the final required CCVs for executing an inbound message.
         -- Aggregates receiver policy with token-pool requirements and delegates
@@ -142,7 +147,7 @@ template CCIPReceiver
                     receiverRequiredCCVs = requiredCCVs
                     receiverOptionalCCVs = optionalCCVs
                     receiverOptionalThreshold = optionalThreshold
-                    receiverMinBlockConfirmations = minBlockConfirmations
+                    receiverFinalityConfig = receiverFinalityConfig
                     caller = owner
 
                 -- Token transfers must resolve pool CCVs before any CCV can contribute.

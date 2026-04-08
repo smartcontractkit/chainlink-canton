@@ -563,7 +563,7 @@ data DeployCCIPReceiverParams = DeployCCIPReceiverParams
         requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalThreshold : Int
-        minBlockConfirmations : Int
+        receiverFinalityConfig : BytesHex
     deriving (Eq, Show)
 
 requireDecoded : Text -> Optional a -> Update a
@@ -702,7 +702,7 @@ mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
     requiredCCVs = params.requiredCCVs
     optionalCCVs = params.optionalCCVs
     optionalThreshold = params.optionalThreshold
-    minBlockConfirmations = params.minBlockConfirmations
+    receiverFinalityConfig = params.receiverFinalityConfig
 
 -- | Helper to assert that all bytes have been consumed (no trailing bytes)
 assertOffset : Int -> Int -> Optional ()
@@ -907,7 +907,7 @@ decodeDeployCCIPReceiverParams encoded = do
     (requiredCCVs, offset3) <- decodeList encoded offset2 decodeRawInstanceAddressAt
     (optionalCCVs, offset4) <- decodeList encoded offset3 decodeRawInstanceAddressAt
     (optionalThreshold, offset5) <- decodeInt64At encoded offset4
-    (minBlockConfirmations, finalOffset) <- decodeInt64At encoded offset5
+    (receiverFinalityConfig, finalOffset) <- decodeBytesHexAt encoded offset5
     assertOffset finalOffset (byteCount encoded)
     Some DeployCCIPReceiverParams with
         instanceId
@@ -915,7 +915,7 @@ decodeDeployCCIPReceiverParams encoded = do
         requiredCCVs
         optionalCCVs
         optionalThreshold
-        minBlockConfirmations
+        receiverFinalityConfig
 
 assertFactoryIsMCMSControlled : CCIPFactory -> Update ()
 assertFactoryIsMCMSControlled factory =

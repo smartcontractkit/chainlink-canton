@@ -15,6 +15,7 @@ import qualified DA.TextMap as TextMap
 import qualified CCIP.Client
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FinalityCodec
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
@@ -40,6 +41,16 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 
 import qualified TestToken
+
+finalityConfig n =
+    if n == 0
+    then CCIP.FinalityCodec.waitForFinalityConfig
+    else fromSome do
+        flagsHex <- CCIP.MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- CCIP.MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)
+
+messageFinality n = CCIP.FinalityCodec.unsafeDecodeRequestedFinality (finalityConfig n)
 
 seedExecutedMessages : Int -> [BytesHex]
 seedExecutedMessages n =
@@ -279,7 +290,7 @@ testCCIPSend = script do
             maxCCVsPerMsg = 10
             dynamicConfig = CCIP.Executor.DynamicConfig with
                 feeAggregator = None
-                minBlockConfirmations = 0
+                allowedFinalityConfig = finalityConfig 0
                 ccvAllowlistEnabled = False
             allowedCCVs = []
             remoteChainConfigs = Map.fromList [(destChainSelector, CCIP.Executor.RemoteChainConfig with
@@ -537,7 +548,7 @@ testCCIPExecute = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
@@ -569,7 +580,7 @@ testCCIPExecute = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Add CCV verification
@@ -1141,7 +1152,7 @@ testExecuteRollsOverExecutedMessages = script do
             sequenceNumber = 7.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
@@ -1173,7 +1184,7 @@ testExecuteRollsOverExecutedMessages = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
@@ -1253,7 +1264,7 @@ testExecuteRollsOverExecutedMessages = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     debug "testExecuteRollsOverExecutedMessages: PASSED"

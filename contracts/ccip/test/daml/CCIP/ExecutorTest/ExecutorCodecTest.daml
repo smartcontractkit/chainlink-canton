@@ -5,6 +5,8 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Optional (fromSome)
 
+import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.ExecutorCodecGen qualified as ExecutorCodecGen
 import CCIP.ExecutorTypes (
     RemoteChainConfig(..),
@@ -15,6 +17,14 @@ import CCIP.ExecutorTypes (
     ApplyAllowedCCVUpdatesParams(..),
     )
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+
+finalityConfig n =
+    if n == 0
+    then FinalityCodec.waitForFinalityConfig
+    else fromSome do
+        flagsHex <- MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)
 
 -- ===============================================
 -- |            ApplyDestChainUpdates            |
@@ -61,7 +71,7 @@ testSetDynamicConfigParamsRoundtrip = do
     let args = SetDynamicConfigParams with
             newDynamicConfig = DynamicConfig with
                 feeAggregator = None
-                minBlockConfirmations = 0
+                allowedFinalityConfig = finalityConfig 0
                 ccvAllowlistEnabled = False
         encoded = ExecutorCodecGen.encodeSetDynamicConfigParams args
     fst (fromSome (ExecutorCodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args
@@ -70,7 +80,7 @@ testSetDynamicConfigParamsRoundtrip = do
     let args = SetDynamicConfigParams with
             newDynamicConfig = DynamicConfig with
                 feeAggregator = Some feeAgg
-                minBlockConfirmations = 7
+                allowedFinalityConfig = finalityConfig 7
                 ccvAllowlistEnabled = True
         encoded = ExecutorCodecGen.encodeSetDynamicConfigParams args
     fst (fromSome (ExecutorCodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args

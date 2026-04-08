@@ -71,7 +71,7 @@ data TokenReceiveTicketClaimedEvent = TokenReceiveTicketClaimedEvent
         sourcePoolData : BytesHex
         messageId : BytesHex
         sourceChainSelector : Numeric 0
-        finality : Int
+        finality : BytesHex
         output : TokenReceiveTicketClaimed_Output
     deriving (Eq, Show)
 

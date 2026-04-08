@@ -11,6 +11,8 @@ import DA.Set qualified as Set
 import DA.Time (time)
 
 import CCIP.FeeQuoter
+import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
@@ -27,6 +29,14 @@ usdToCents d = intToNumeric (truncate (d * 100.0))
 
 mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
+
+finalityConfig n =
+    if n == 0
+    then FinalityCodec.waitForFinalityConfig
+    else fromSome do
+        flagsHex <- MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)
 
 testDestChainConfig : DestChainConfig
 testDestChainConfig = DestChainConfig with

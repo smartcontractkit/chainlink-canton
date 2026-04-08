@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "039ced81bded813a0529a08df3c236d8ae229861b305564c4ec27f72dfcde9a5"
+	PackageID   = "7e30f8353e125895584d994d1ae86d419f6d8b9fae9ab7e50d230fd45ab5762c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -210,12 +210,12 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	InstanceId            types.TEXT                `json:"instanceId"`
-	Owner                 types.PARTY               `json:"owner"`
-	RequiredCCVs          []mcms.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs          []mcms.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold     types.INT64               `json:"optionalThreshold"`
-	MinBlockConfirmations types.INT64               `json:"minBlockConfirmations"`
+	InstanceId             types.TEXT                `json:"instanceId"`
+	Owner                  types.PARTY               `json:"owner"`
+	RequiredCCVs           []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs           []mcms.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold      types.INT64               `json:"optionalThreshold"`
+	ReceiverFinalityConfig types.TEXT                `json:"receiverFinalityConfig"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -270,7 +270,7 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	args["optionalThreshold"] = int64(t.OptionalThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	args["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -320,7 +320,7 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 	args["optionalThreshold"] = int64(t.OptionalThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	args["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -572,44 +572,14 @@ func (t *Execute2) UnmarshalHex(data string) error {
 
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
-	Context        common.CCIPContext `json:"context"`
-	RouterCid      types.CONTRACT_ID  `json:"routerCid"`
-	EncodedMessage types.TEXT         `json:"encodedMessage"`
-	TokenPoolCid   *types.CONTRACT_ID `json:"tokenPoolCid" hex:"optional"`
+	Caller types.PARTY `json:"caller"`
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
 func (t GetRequiredCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Context
-	}()
-
-	m["routerCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RouterCid
-	}()
-
-	m["encodedMessage"] = string(t.EncodedMessage)
-
-	if t.TokenPoolCid != nil {
-		m["tokenPoolCid"] = map[string]any{
-			"_type": "optional",
-			"value": *t.TokenPoolCid,
-		}
-	} else {
-		m["tokenPoolCid"] = map[string]any{
-			"_type": "optional",
-		}
-	}
+	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -632,6 +602,23 @@ func (t GetRequiredCCVs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetRequiredCCVs from hex string (Canton MCMS format)
 func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetRequiredCCVsMCMSParams is GetRequiredCCVs without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetRequiredCCVsMCMSParams struct {
+}
+
+// MarshalHex encodes GetRequiredCCVsMCMSParams to hex string for MCMS operationData.
+func (t GetRequiredCCVsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVsMCMSParams from hex string.
+func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -751,6 +738,7 @@ func (t *UpdateRequiredCCVs) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	Execute2(args Execute2) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
+	GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
 	UpdateRequiredCCVs(args UpdateRequiredCCVs) (*bind.EncodedChoice, error)
 }
 
@@ -788,6 +776,11 @@ func (e *encoder) Execute2(args Execute2) (*bind.EncodedChoice, error) {
 
 // GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.
 func (e *encoder) GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
+}
+
+// GetRequiredCCVsMCMSParams encodes MCMS parameters (without Caller) for the GetRequiredCCVs choice.
+func (e *encoder) GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
 }
 

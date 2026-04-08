@@ -27,16 +27,17 @@ import DA.Crypto.Text
 import qualified DA.Text as Text
 import DA.Optional (fromSome)
 
+import qualified CCIP.FinalityCodec
 import qualified Splice.Api.Token.HoldingV1
 
 -- | MessageV1 struct matching EVM MessageV1Codec.sol exactly.
 -- The encoding order is critical for cross-chain messageId compatibility:
 --   messageId = keccak256(encodedMessage)
 --
--- Static length section (67 bytes):
+-- Static length section (69 bytes):
 --   version (1 byte) + sourceChainSelector (8) + destChainSelector (8) +
 --   sequenceNumber (8) + executionGasLimit (4) + ccipReceiveGasLimit (4) +
---   finality (2) + ccvAndExecutorHash (32)
+--   finality (4) + ccvAndExecutorHash (32)
 --
 -- Variable length section:
 --   onRampAddress, offRampAddress, sender, receiver, destBlob, tokenTransfer, messageData
@@ -48,7 +49,7 @@ data MessageV1 = MessageV1
         sequenceNumber : Numeric 0        -- uint64 (called messageNumber in EVM)
         executionGasLimit : Int           -- uint32
         ccipReceiveGasLimit : Int         -- uint32 (gas limit for user callback)
-        finality : Int                    -- uint16
+        finality : CCIP.FinalityCodec.DecodedFinality -- bytes4 finality config
         ccvAndExecutorHash : BytesHex     -- bytes32 (hash of CCVs and executor)
         -- Variable length fields (must be in this exact order for encoding)
         onRampAddress : BytesHex          -- bytes (length-prefixed)
@@ -93,7 +94,7 @@ encodeMessageV1 message =
             None -> ""
             Some tt -> encodeTokenTransferV1 tt
 
-        -- Static length section (67 bytes total) - MUST match EVM order exactly
+        -- Static length section (69 bytes total) - MUST match EVM order exactly
         staticSection =
             fromSome (encodeUint8 1)                                -- version (1 byte)
             <> fromSome (encodeUint64 message.sourceChainSelector)  -- sourceChainSelector (8 bytes)
@@ -101,7 +102,9 @@ encodeMessageV1 message =
             <> fromSome (encodeUint64 message.sequenceNumber)       -- messageNumber (8 bytes)
             <> fromSome (encodeUint32 message.executionGasLimit)    -- executionGasLimit (4 bytes)
             <> fromSome (encodeUint32 message.ccipReceiveGasLimit)  -- ccipReceiveGasLimit (4 bytes)
-            <> fromSome (encodeUint16 message.finality)             -- finality (2 bytes)
+            <> (if byteCount message.finality.raw == 4
+                then message.finality.raw
+                else error "MessageCodecV1.encodeMessageV1: finality must be 4 bytes")
             <> padLeft 64 "0" message.ccvAndExecutorHash            -- ccvAndExecutorHash (32 bytes = 64 hex chars)
 
         -- Variable length section - MUST match EVM order exactly
@@ -674,14 +677,14 @@ parseDecimalUnchecked str =
             digit + 10.0 * parseDecimalUnchecked rest
 
 -- | Decode MessageV1 from bytes matching EVM MessageV1Codec._decodeMessageV1 exactly.
--- Static section (67 bytes):
+-- Static section (69 bytes):
 --   version (1) + sourceChainSelector (8) + destChainSelector (8) + sequenceNumber (8) +
---   executionGasLimit (4) + ccipReceiveGasLimit (4) + finality (2) + ccvAndExecutorHash (32)
--- Variable section starts at offset 67.
+--   executionGasLimit (4) + ccipReceiveGasLimit (4) + finality (4) + ccvAndExecutorHash (32)
+-- Variable section starts at offset 69.
 decodeMessageV1 : BytesHex -> Optional MessageV1
 decodeMessageV1 encoded =
         do
-            -- === STATIC LENGTH SECTION (67 bytes) ===
+            -- === STATIC LENGTH SECTION (69 bytes) ===
 
             -- Extract version (1 byte, offset 0)
             versionHex <- extractBytes encoded 0 1
@@ -709,24 +712,24 @@ decodeMessageV1 encoded =
                 ccipReceiveGasLimitHex <- extractBytes encoded 29 4
                 ccipRecvGasLimit <- decodeUint32 ccipReceiveGasLimitHex
 
-                -- Extract finality (2 bytes, offset 33)
-                finalityHex <- extractBytes encoded 33 2
-                finality <- decodeUint16 finalityHex
+                -- Extract finality config (4 bytes, offset 33)
+                finalityHex <- extractBytes encoded 33 4
+                finality <- CCIP.FinalityCodec.decodeRequestedFinality finalityHex
 
-                -- Extract ccvAndExecutorHash (32 bytes, offset 35)
-                ccvHashHex <- extractBytes encoded 35 32
+                -- Extract ccvAndExecutorHash (32 bytes, offset 37)
+                ccvHashHex <- extractBytes encoded 37 32
 
-                -- === VARIABLE LENGTH SECTION (starts at offset 67) ===
+                -- === VARIABLE LENGTH SECTION (starts at offset 69) ===
 
-                -- Extract onRamp address length (1 byte, offset 67)
-                onRampLenHex <- extractBytes encoded 67 1
+                -- Extract onRamp address length (1 byte, offset 69)
+                onRampLenHex <- extractBytes encoded 69 1
                 onRampLen <- decodeUint8 onRampLenHex
 
                 -- Extract onRamp address
-                onRampHex <- extractBytes encoded 68 onRampLen
+                onRampHex <- extractBytes encoded 70 onRampLen
 
                 -- Extract offRamp address length (1 byte)
-                let offRampLenOffset = 68 + onRampLen
+                let offRampLenOffset = 70 + onRampLen
                 offRampLenHex <- extractBytes encoded offRampLenOffset 1
                 offRampLen <- decodeUint8 offRampLenHex
 

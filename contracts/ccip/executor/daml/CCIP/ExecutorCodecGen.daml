@@ -8,13 +8,13 @@ import CCIP.ExecutorTypes (RemoteChainConfig(..), RemoteChainConfigArgs(..), Dyn
 
 import MCMS.Codec (
     decodeBoolAt,
-    decodeInt64At,
+    decodeBytesHexAt,
     decodeList,
     decodeNumeric0At,
     decodeOptional,
     decodePartyAt,
     encodeBool,
-    encodeInt64,
+    encodeBytesHex,
     encodeList,
     encodeNumeric0,
     encodeOptional,
@@ -63,13 +63,13 @@ decodeRemoteChainConfigArgsAt encoded offset = do
 encodeDynamicConfig : DynamicConfig -> BytesHex
 encodeDynamicConfig params =
     encodeOptional params.feeAggregator encodeParty
-    <> fromSome (encodeInt64 params.minBlockConfirmations)
+    <> encodeBytesHex params.allowedFinalityConfig
     <> encodeBool params.ccvAllowlistEnabled
 
 decodeDynamicConfigAt : BytesHex -> Int -> Optional (DynamicConfig, Int)
 decodeDynamicConfigAt encoded offset = do
     (feeAggregator, offset) <- decodeOptional encoded offset decodePartyAt
-    (minBlockConfirmations, offset) <- decodeInt64At encoded offset
+    (allowedFinalityConfig, offset) <- decodeBytesHexAt encoded offset
     (ccvAllowlistEnabled, offset) <- decodeBoolAt encoded offset
     Some (DynamicConfig{..}, offset)
 

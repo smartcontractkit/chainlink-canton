@@ -209,7 +209,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								MinBlockConfirmations: 0,
+								AllowedFinalityConfig: types.TEXT("00000000"),
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -415,12 +415,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Qualifier:    "test-pool-send",
 			RemoteChainConfigs: types.GENMAP{
 				strconv.FormatUint(remoteSelector, 10): lockreleasetokenpool.RemoteChainConfig{
-					RemotePools:           []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
-					RemoteTokenAddress:    types.TEXT(hex.EncodeToString(remoteTokenAddress)),
-					InboundCCVs:           []mcms.RawInstanceAddress{},
-					OutboundCCVs:          []mcms.RawInstanceAddress{},
-					MinBlockConfirmations: types.INT64(0),
-					InboundRateLimiter:    outboundRateLimiterAddr.Binding(),
+					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
+					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
+					InboundCCVs:        []mcms.RawInstanceAddress{},
+					OutboundCCVs:       []mcms.RawInstanceAddress{},
+					FinalityConfig:     types.TEXT("00000000"),
+					InboundRateLimiter: outboundRateLimiterAddr.Binding(),
 					InboundCustomBlockConfirmationsRateLimiter: outboundRateLimiterAddr.Binding(),
 					OutboundRateLimiter:                        outboundRateLimiterAddr.Binding(),
 				},
@@ -947,7 +947,7 @@ func extractTokenTransferAmountFromEncodedMessageHex(t *testing.T, encodedMessag
 	b, err := hex.DecodeString(encodedMessageHex)
 	require.NoError(t, err, "decode encodedMessage")
 
-	i := 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32
+	i := 1 + 8 + 8 + 8 + 4 + 4 + 4 + 32
 	for range 4 {
 		i += 1 + int(b[i])
 	}

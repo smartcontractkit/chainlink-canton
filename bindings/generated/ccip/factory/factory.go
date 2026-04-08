@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "a4224fee53e9b8a60e2940f7cda504fa3e3ad6fb2ce9c43542306ea32bc090cd"
+	PackageID   = "fd71a2657309ab47158c6e065859635783ff2d04bda7f601f99138a545e1b3af"
 	SDKVersion  = "3.4.10"
 )
 
@@ -568,12 +568,12 @@ func (t *DeployCCIPReceiver) UnmarshalHex(data string) error {
 
 // DeployCCIPReceiverParams is a Record type
 type DeployCCIPReceiverParams struct {
-	InstanceId            types.TEXT                `json:"instanceId"`
-	Owner                 types.PARTY               `json:"owner"`
-	RequiredCCVs          []mcms.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs          []mcms.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold     types.INT64               `json:"optionalThreshold"`
-	MinBlockConfirmations types.INT64               `json:"minBlockConfirmations"`
+	InstanceId             types.TEXT                `json:"instanceId"`
+	Owner                  types.PARTY               `json:"owner"`
+	RequiredCCVs           []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs           []mcms.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold      types.INT64               `json:"optionalThreshold"`
+	ReceiverFinalityConfig types.TEXT                `json:"receiverFinalityConfig"`
 }
 
 // ToMap converts DeployCCIPReceiverParams to a map for DAML arguments
@@ -612,7 +612,7 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 
 	m["optionalThreshold"] = int64(t.OptionalThreshold)
 
-	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	m["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
 
 	return m
 }
@@ -1073,8 +1073,6 @@ type DeployLockReleaseTokenPoolParams struct {
 	TokenAdminRegistry mcms.RawInstanceAddress                  `json:"tokenAdminRegistry"`
 	FeeQuoter          mcms.RawInstanceAddress                  `json:"feeQuoter"`
 	RmnRemote          mcms.RawInstanceAddress                  `json:"rmnRemote"`
-	PoolReceiveContext common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout    lockreleasetokenpool.TransferTimeout     `json:"transferTimeout"`
 }
 
 // ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments
@@ -1130,22 +1128,6 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.RmnRemote
-	}()
-
-	m["poolReceiveContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.PoolReceiveContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.PoolReceiveContext
-	}()
-
-	m["transferTimeout"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TransferTimeout).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TransferTimeout
 	}()
 
 	return m
