@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "615748f950fefdf585adb334aa8f7809215511f5b956587fefa155c9d793da74"
+	PackageID   = "42a28b596daf2bdbd3a7a2a4fee797685cd070c78ffecff2afcf3507839c6a91"
 	SDKVersion  = "3.4.10"
 )
 
@@ -372,9 +372,9 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 
 // DynamicConfig is a Record type
 type DynamicConfig struct {
-	FeeAggregator         *types.PARTY `json:"feeAggregator" hex:"optional"`
-	AllowedFinalityConfig types.TEXT   `json:"allowedFinalityConfig"`
-	CcvAllowlistEnabled   types.BOOL   `json:"ccvAllowlistEnabled"`
+	FeeAggregator         *types.PARTY             `json:"feeAggregator" hex:"optional"`
+	AllowedFinalityConfig common.RequestedFinality `json:"allowedFinalityConfig"`
+	CcvAllowlistEnabled   types.BOOL               `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts DynamicConfig to a map for DAML arguments
@@ -392,7 +392,13 @@ func (t DynamicConfig) ToMap() map[string]any {
 		}
 	}
 
-	m["allowedFinalityConfig"] = string(t.AllowedFinalityConfig)
+	m["allowedFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.AllowedFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.AllowedFinalityConfig
+	}()
 
 	m["ccvAllowlistEnabled"] = bool(t.CcvAllowlistEnabled)
 
@@ -564,27 +570,6 @@ func (t *Executor) UnmarshalHex(data string) error {
 }
 
 // Choice methods for Executor
-
-// SetDynamicConfig exercises the SetDynamicConfig choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "SetDynamicConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
-func (t Executor) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "SetDynamicConfig",
-		Arguments:  argsToMap(args),
-	}
-}
 
 // CalculateFee exercises the CalculateFee choice on this Executor contract
 // This method uses the package name in the template ID
@@ -771,6 +756,27 @@ func (t Executor) ApplyDestChainUpdatesWithPackageID(contractID string, packageI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
 		Choice:     "ApplyDestChainUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDynamicConfig exercises the SetDynamicConfig choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
+func (t Executor) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
 		Arguments:  argsToMap(args),
 	}
 }

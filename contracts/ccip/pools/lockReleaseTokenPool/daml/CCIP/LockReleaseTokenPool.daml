@@ -153,7 +153,7 @@ bpsDenominator = 10000.0
 calculateFeeFromBps : Numeric 0 -> Numeric 0 -> Numeric 0
 calculateFeeFromBps amount feeBps = CCIP.Math.mulDivDown amount feeBps bpsDenominator
 
-customFinalityRateLimiterRequired : BytesHex -> Bool
+customFinalityRateLimiterRequired : CCIP.FinalityCodec.RequestedFinality -> Bool
 customFinalityRateLimiterRequired finalityConfig =
     CCIP.FinalityCodec.customFinalityRateLimiterRequired finalityConfig
 
@@ -314,10 +314,6 @@ template LockReleaseTokenPool
                 forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, finalityConfig, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
                     assertMsg "ApplyChainUpdates: invalid chain selector" (remoteChainSelector > 0.0)
                     assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
-                    -- Match EVM behavior: accept any bytes4 allowed finality policy here
-                    -- and enforce semantics later when requested finality is checked.
-                    assertMsg "ApplyChainUpdates: finalityConfig must be bytes4"
-                        (byteCount finalityConfig == CCIP.FinalityCodec.finalityConfigByteLength)
                     -- If the chain already exists, the update should first remove it.
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
                     -- Validate rate limiters
@@ -455,7 +451,7 @@ template LockReleaseTokenPool
             with
                 remoteChainSelector : Numeric 0
                 amount : Decimal
-                finality : BytesHex
+                finality : CCIP.FinalityCodec.RequestedFinality
                 extraData : BytesHex
                 direction : CCIP.Interfaces.TokenPool.TransferDirection
                 caller : Party
@@ -499,9 +495,8 @@ template LockReleaseTokenPool
                 remoteChainCfg <- case Map.lookup message.sourceChainSelector remoteChainConfigs of
                     None -> abort "pool: unsupported source chain"
                     Some cfg -> pure cfg
-
                 assertMsg "pool: message finality not allowed by pool finality config"
-                    (CCIP.FinalityCodec.requestedFinalityAllowed message.finality.raw remoteChainCfg.finalityConfig)
+                    (CCIP.FinalityCodec.requestedFinalityAllowed message.finality.requested remoteChainCfg.finalityConfig)
 
                 assertMsg "pool: invalid sourcePoolAddress"
                     (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)

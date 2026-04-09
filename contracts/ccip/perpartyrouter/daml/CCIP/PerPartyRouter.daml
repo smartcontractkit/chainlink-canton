@@ -15,6 +15,7 @@ import qualified CCIP.Client
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
+import qualified CCIP.FinalityCodec
 import qualified CCIP.GlobalConfig
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
@@ -537,7 +538,7 @@ template PerPartyRouter
                 receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
-                receiverFinalityConfig : BytesHex
+                receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
                 caller : Party
             controller partyOwner
             do

@@ -42,6 +42,7 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.RateLimiter
 import qualified CCIP.CCIPSender
 import qualified CCIP.CCIPReceiver
+import qualified CCIP.FinalityCodec
 import CCIP.ContextCodec (decodeCCIPContextAt)
 import CCIP.LockReleaseTokenPoolCodecGen (decodeTransferTimeoutAt)
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
@@ -563,7 +564,7 @@ data DeployCCIPReceiverParams = DeployCCIPReceiverParams
         requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalThreshold : Int
-        receiverFinalityConfig : BytesHex
+        receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
     deriving (Eq, Show)
 
 requireDecoded : Text -> Optional a -> Update a
@@ -703,6 +704,16 @@ mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
     optionalCCVs = params.optionalCCVs
     optionalThreshold = params.optionalThreshold
     receiverFinalityConfig = params.receiverFinalityConfig
+
+decodeRequestedFinalityAt : BytesHex -> Int -> Optional (CCIP.FinalityCodec.RequestedFinality, Int)
+decodeRequestedFinalityAt encoded offset = do
+    tagHex <- extractBytes encoded offset 1
+    if tagHex == "00" then Some (CCIP.FinalityCodec.WaitForFinality, offset + 1)
+    else if tagHex == "01" then Some (CCIP.FinalityCodec.WaitForSafe, offset + 1)
+    else if tagHex == "02" then do
+        (payload, newOffset) <- decodeInt64At encoded (offset + 1)
+        Some (CCIP.FinalityCodec.BlockDepth payload, newOffset)
+    else None
 
 -- | Helper to assert that all bytes have been consumed (no trailing bytes)
 assertOffset : Int -> Int -> Optional ()
@@ -907,7 +918,7 @@ decodeDeployCCIPReceiverParams encoded = do
     (requiredCCVs, offset3) <- decodeList encoded offset2 decodeRawInstanceAddressAt
     (optionalCCVs, offset4) <- decodeList encoded offset3 decodeRawInstanceAddressAt
     (optionalThreshold, offset5) <- decodeInt64At encoded offset4
-    (receiverFinalityConfig, finalOffset) <- decodeBytesHexAt encoded offset5
+    (receiverFinalityConfig, finalOffset) <- decodeRequestedFinalityAt encoded offset5
     assertOffset finalOffset (byteCount encoded)
     Some DeployCCIPReceiverParams with
         instanceId

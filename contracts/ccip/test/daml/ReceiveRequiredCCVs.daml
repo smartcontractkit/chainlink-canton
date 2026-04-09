@@ -124,7 +124,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
             requiredCCVs = [receiverCcv]
             optionalCCVs = []
             optionalThreshold = 0
-            receiverFinalityConfig = CCIP.FinalityCodec.waitForFinalityConfig
+            receiverFinalityConfig = CCIP.FinalityCodec.WaitForFinality
 
     let message = CCIP.MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
@@ -165,7 +165,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
             receiverRequiredCCVs = [receiverCcv]
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverFinalityConfig = CCIP.FinalityCodec.waitForFinalityConfig
+            receiverFinalityConfig = CCIP.FinalityCodec.WaitForFinality
             caller = receiver
 
     executingMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
@@ -259,7 +259,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
             requiredCCVs = [receiverCcv]
             optionalCCVs = []
             optionalThreshold = 0
-            receiverFinalityConfig = CCIP.FinalityCodec.waitForFinalityConfig
+            receiverFinalityConfig = CCIP.FinalityCodec.WaitForFinality
 
     let message = CCIP.MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
@@ -300,7 +300,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
             receiverRequiredCCVs = [receiverCcv]
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverFinalityConfig = CCIP.FinalityCodec.waitForFinalityConfig
+            receiverFinalityConfig = CCIP.FinalityCodec.WaitForFinality
             caller = receiver
 
     executingMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid

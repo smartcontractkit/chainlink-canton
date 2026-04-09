@@ -32,7 +32,7 @@ mult m = intToNumeric (truncate (m * 100000000.0))
 
 finalityConfig n =
     if n == 0
-    then FinalityCodec.waitForFinalityConfig
+    then FinalityCodec.waitForFinalityFlag
     else fromSome do
         flagsHex <- MessageCodecV1.encodeUint16 0
         blockConfirmationsHex <- MessageCodecV1.encodeUint16 n

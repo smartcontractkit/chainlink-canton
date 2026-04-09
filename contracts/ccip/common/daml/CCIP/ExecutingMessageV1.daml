@@ -64,7 +64,7 @@ template ExecutingMessageV1
         requiredCCVs : [RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress]
         optionalCCVThreshold : Int
-        receiverFinalityConfig : BytesHex
+        receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
         sourceDefaultCCVs : [RawInstanceAddress]
         -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
         -- None = pool hasn't been called; Some [] = called, no requirements.

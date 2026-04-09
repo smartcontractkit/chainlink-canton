@@ -1,6 +1,6 @@
 module CCIP.ExecutorTypes where
 
-import DA.Crypto.Text (BytesHex)
+import qualified CCIP.FinalityCodec
 import MCMS.RawInstanceAddress (RawInstanceAddress)
 
 data RemoteChainConfig = RemoteChainConfig
@@ -18,7 +18,7 @@ data RemoteChainConfigArgs = RemoteChainConfigArgs
 data DynamicConfig = DynamicConfig
     with
         feeAggregator : Optional Party
-        allowedFinalityConfig : BytesHex -- Raw bytes4 finality config, aligned with EVM Executor.DynamicConfig.
+        allowedFinalityConfig : CCIP.FinalityCodec.RequestedFinality
         ccvAllowlistEnabled : Bool
     deriving (Eq, Show)
 

@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "f7cb3c771c64f96e70a898c38e23e7c8b3213b6a15a329c86077c033bf467d9f"
+	PackageID   = "ff65475595e2463a42a3bda8ae7f12612e2223d29c2e593237c522f1e3e25397"
 	SDKVersion  = "3.4.10"
 )
 
@@ -215,7 +215,7 @@ type CCIPReceiver struct {
 	RequiredCCVs           []mcms.RawInstanceAddress `json:"requiredCCVs"`
 	OptionalCCVs           []mcms.RawInstanceAddress `json:"optionalCCVs"`
 	OptionalThreshold      types.INT64               `json:"optionalThreshold"`
-	ReceiverFinalityConfig types.TEXT                `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig common.RequestedFinality  `json:"receiverFinalityConfig"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -270,7 +270,13 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	args["optionalThreshold"] = int64(t.OptionalThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
+	args["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -320,7 +326,13 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 	args["optionalThreshold"] = int64(t.OptionalThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
+	args["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),

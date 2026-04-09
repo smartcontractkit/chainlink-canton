@@ -2,7 +2,6 @@ package adapters
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -34,8 +33,6 @@ import (
 )
 
 var _ ccipadapters.DeployChainContractsAdapter = (*CantonDeployChainContractsAdapter)(nil)
-
-const receiverWaitForFinalityConfig types.TEXT = "00000000"
 
 type CantonDeployChainContractsAdapter struct{}
 
@@ -218,7 +215,7 @@ func executorParams(ownerParty string, executors []ccipadapters.ExecutorDeployPa
 				MaxCCVsPerMsg: types.INT64(maxCCVs),
 				DynamicConfig: executorbindings.DynamicConfig{
 					FeeAggregator:         nil,
-					AllowedFinalityConfig: finalityConfig(exec.DynamicConfig.AllowedFinalityConfig),
+					AllowedFinalityConfig: requestedFinality(exec.DynamicConfig.AllowedFinalityConfig),
 					CcvAllowlistEnabled:   types.BOOL(exec.DynamicConfig.CcvAllowlistEnabled),
 				},
 				AllowedCCVs: nil,
@@ -237,7 +234,7 @@ func defaultExecutorParams(ownerParty string) sequences.ExecutorParams {
 			MaxCCVsPerMsg: types.INT64(10),
 			DynamicConfig: executorbindings.DynamicConfig{
 				FeeAggregator:         nil,
-				AllowedFinalityConfig: receiverWaitForFinalityConfig,
+				AllowedFinalityConfig: waitForFinalityRequested(),
 				CcvAllowlistEnabled:   types.BOOL(false),
 			},
 			AllowedCCVs: nil,
@@ -245,13 +242,30 @@ func defaultExecutorParams(ownerParty string) sequences.ExecutorParams {
 	}
 }
 
-func finalityConfig(cfg finality.Config) types.TEXT {
+func requestedFinality(cfg finality.Config) common.RequestedFinality {
 	if cfg.IsZero() || cfg.WaitForFinality {
-		return receiverWaitForFinalityConfig
+		return waitForFinalityRequested()
 	}
-	raw := cfg.Raw()
+	if cfg.WaitForSafe && cfg.BlockDepth > 0 {
+		panic(fmt.Sprintf("unsupported combined finality config: waitForSafe=true blockDepth=%d", cfg.BlockDepth))
+	}
+	if cfg.WaitForSafe {
+		return waitForSafeRequested()
+	}
+	if cfg.BlockDepth > 0 {
+		depth := types.INT64(cfg.BlockDepth)
+		return common.RequestedFinality{BlockDepth: &depth}
+	}
 
-	return types.TEXT(hex.EncodeToString(raw[:]))
+	return waitForFinalityRequested()
+}
+
+func waitForFinalityRequested() common.RequestedFinality {
+	return common.RequestedFinality{WaitForFinality: &types.UNIT{}}
+}
+
+func waitForSafeRequested() common.RequestedFinality {
+	return common.RequestedFinality{WaitForSafe: &types.UNIT{}}
 }
 
 func datastoreToOnChainOutput(ds datastore.DataStore) (seqcore.OnChainOutput, error) {

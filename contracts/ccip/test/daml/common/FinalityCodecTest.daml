@@ -4,6 +4,7 @@ import Daml.Script
 
 import DA.Assert
 import DA.Optional
+import DA.Crypto.Text (byteCount)
 
 import CCIP.FinalityCodec qualified as FinalityCodec
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
@@ -20,20 +21,36 @@ decodedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
         (FinalityCodec.decodeRequestedFinality finalityConfig)
 
+decodeFlags : Text -> Optional Int
+decodeFlags finalityConfig = do
+    if byteCount finalityConfig /= 4 then None else do
+        flagsHex <- MessageCodecV1.extractBytes finalityConfig 0 2
+        MessageCodecV1.decodeUint16 flagsHex
+
+decodeBlockConfirmations : Text -> Optional Int
+decodeBlockConfirmations finalityConfig = do
+    if byteCount finalityConfig /= 4 then None else do
+        blockConfirmationsHex <- MessageCodecV1.extractBytes finalityConfig 2 2
+        MessageCodecV1.decodeUint16 blockConfirmationsHex
+
+validateRequestedFinality : Text -> Bool
+validateRequestedFinality finalityConfig =
+    isSome (FinalityCodec.decodeRequestedFinality finalityConfig)
+
 testDecodeKnownEncodings : Script ()
 testDecodeKnownEncodings = do
     let finalizedOnly = "00000000"
     let safe = "00010000"
     let depth2000 = "000007d0"
 
-    FinalityCodec.decodeFlags finalizedOnly === Some 0
-    FinalityCodec.decodeBlockConfirmations finalizedOnly === Some 0
+    decodeFlags finalizedOnly === Some 0
+    decodeBlockConfirmations finalizedOnly === Some 0
 
-    FinalityCodec.decodeFlags safe === Some 1
-    FinalityCodec.decodeBlockConfirmations safe === Some 0
+    decodeFlags safe === Some 1
+    decodeBlockConfirmations safe === Some 0
 
-    FinalityCodec.decodeFlags depth2000 === Some 0
-    FinalityCodec.decodeBlockConfirmations depth2000 === Some 2000
+    decodeFlags depth2000 === Some 0
+    decodeBlockConfirmations depth2000 === Some 2000
 
 testValidateRequestedFinalityModes : Script ()
 testValidateRequestedFinalityModes = do
@@ -44,15 +61,15 @@ testValidateRequestedFinalityModes = do
     let multipleFlags = "00030000"
 
     assertMsg "finalized-only should be a valid requested mode"
-        (FinalityCodec.validateRequestedFinality finalizedOnly)
+        (validateRequestedFinality finalizedOnly)
     assertMsg "safe should be a valid single requested mode"
-        (FinalityCodec.validateRequestedFinality safe)
+        (validateRequestedFinality safe)
     assertMsg "block-depth should be a valid single requested mode"
-        (FinalityCodec.validateRequestedFinality depth2000)
+        (validateRequestedFinality depth2000)
     assertMsg "safe + block depth should be rejected"
-        (not (FinalityCodec.validateRequestedFinality mixedSafeAndDepth))
+        (not (validateRequestedFinality mixedSafeAndDepth))
     assertMsg "multiple flag bits should be rejected"
-        (not (FinalityCodec.validateRequestedFinality multipleFlags))
+        (not (validateRequestedFinality multipleFlags))
 
     FinalityCodec.decodeRequestedFinality finalizedOnly === Some (decodedFinality finalizedOnly)
     FinalityCodec.decodeRequestedFinality safe === Some (decodedFinality safe)
@@ -66,28 +83,27 @@ testRequestedFinalityAllowed = do
     let safe = "00010000"
     let depth12 = mkFinalityConfig 0 12
     let depth2000 = "000007d0"
-    let mixedSafeAndDepth = "0001000c"
+    let requested = (.requested) . decodedFinality
 
     assertMsg "finalized-only requests are always allowed"
-        (FinalityCodec.requestedFinalityAllowed finalizedOnly safe)
+        (FinalityCodec.requestedFinalityAllowed (requested finalizedOnly) (requested safe))
     assertMsg "safe requested should be allowed when safe is allowed"
-        (FinalityCodec.requestedFinalityAllowed safe safe)
+        (FinalityCodec.requestedFinalityAllowed (requested safe) (requested safe))
     assertMsg "deeper block depth should satisfy a lower allowed depth"
-        (FinalityCodec.requestedFinalityAllowed depth2000 depth12)
+        (FinalityCodec.requestedFinalityAllowed (requested depth2000) (requested depth12))
     assertMsg "safe requested should not satisfy a block-depth-only config"
-        (not (FinalityCodec.requestedFinalityAllowed safe depth12))
-    assertMsg "mixed requested finality should be rejected"
-        (not (FinalityCodec.requestedFinalityAllowed mixedSafeAndDepth safe))
+        (not (FinalityCodec.requestedFinalityAllowed (requested safe) (requested depth12)))
 
 testCustomFinalityRateLimiterRequired : Script ()
 testCustomFinalityRateLimiterRequired = do
     let finalizedOnly = "00000000"
     let safe = "00010000"
     let depth2000 = "000007d0"
+    let requested = (.requested) . decodedFinality
 
     assertMsg "finalized-only should use the default limiter path"
-        (not (FinalityCodec.customFinalityRateLimiterRequired finalizedOnly))
+        (not (FinalityCodec.customFinalityRateLimiterRequired (requested finalizedOnly)))
     assertMsg "safe should require the custom finality limiter path"
-        (FinalityCodec.customFinalityRateLimiterRequired safe)
+        (FinalityCodec.customFinalityRateLimiterRequired (requested safe))
     assertMsg "block-depth should require the custom finality limiter path"
-        (FinalityCodec.customFinalityRateLimiterRequired depth2000)
+        (FinalityCodec.customFinalityRateLimiterRequired (requested depth2000))

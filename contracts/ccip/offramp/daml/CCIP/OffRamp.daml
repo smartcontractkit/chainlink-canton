@@ -111,7 +111,7 @@ template OffRamp
                 receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
-                receiverFinalityConfig : BytesHex
+                receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
@@ -175,7 +175,7 @@ template OffRamp
                     then pure ()
                     else
                         assertMsg "prepareExecute: message finality not allowed by receiver finality config"
-                            (CCIP.FinalityCodec.requestedFinalityAllowed message.finality.raw receiverFinalityConfig)
+                            (CCIP.FinalityCodec.requestedFinalityAllowed message.finality.requested receiverFinalityConfig)
 
                 (baseRequiredCCVs, baseOptionalCCVs, baseOptionalCCVThreshold) <-
                     CCIP.Internal.computeExecuteCCVs

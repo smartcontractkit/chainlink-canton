@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "85919093934dc97e9d6621b8739bcb8fc90403e2c50cd9b0484a4d4d7bd7f6c5"
+	PackageID   = "eeead743f8ed016a54717ba35f41e5fe7eba5227dfea34d86d4bb7cc475e1779"
 	SDKVersion  = "3.4.10"
 )
 
@@ -582,7 +582,7 @@ type PrepareExecute struct {
 	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    types.TEXT                `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    common.RequestedFinality  `json:"receiverFinalityConfig"`
 	RmnRemoteCid              types.CONTRACT_ID         `json:"rmnRemoteCid"`
 	ReceiverParty             types.PARTY               `json:"receiverParty"`
 	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
@@ -639,7 +639,13 @@ func (t PrepareExecute) ToMap() map[string]any {
 
 	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
 
-	m["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
+	m["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -698,7 +704,7 @@ type PrepareExecuteMCMSParams struct {
 	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    types.TEXT                `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    common.RequestedFinality  `json:"receiverFinalityConfig"`
 	RmnRemoteCid              types.CONTRACT_ID         `json:"rmnRemoteCid"`
 	ReceiverParty             types.PARTY               `json:"receiverParty"`
 	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`

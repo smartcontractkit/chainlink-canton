@@ -101,7 +101,7 @@ template CCIPSender
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = destinationChainSelector
                                 amount = tt.amount
-                                finality = CCIP.FinalityCodec.waitForFinalityConfig
+                                finality = CCIP.FinalityCodec.WaitForFinality
                                 extraData = extraArgs.tokenArgs
                                 direction = CCIP.Interfaces.TokenPool.Outbound
                                 caller = owner

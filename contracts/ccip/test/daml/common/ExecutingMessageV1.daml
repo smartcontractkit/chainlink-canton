@@ -11,7 +11,12 @@ import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 finalityConfig n =
     if n == 0
-    then FinalityCodec.waitForFinalityConfig
+    then FinalityCodec.WaitForFinality
+    else FinalityCodec.BlockDepth n
+
+rawFinalityConfig n =
+    if n == 0
+    then FinalityCodec.waitForFinalityFlag
     else fromSome do
         flagsHex <- CCIP.MessageCodecV1.encodeUint16 0
         blockConfirmationsHex <- CCIP.MessageCodecV1.encodeUint16 n
@@ -21,7 +26,7 @@ unsafeDecodeRequestedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
         (FinalityCodec.decodeRequestedFinality finalityConfig)
 
-messageFinality n = unsafeDecodeRequestedFinality (finalityConfig n)
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
 testAddCCVVerification : Script ()
 testAddCCVVerification = do

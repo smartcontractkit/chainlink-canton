@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "4b34fbcabb8f1d1b147888298e04a4330e8591c3f47d904d367e8b747c660705"
+	PackageID   = "b9a3a0a3a7f4566832eb308d2672b068d129f8c871478399f0ca5d24f00c21c8"
 	SDKVersion  = "3.4.10"
 )
 
@@ -286,7 +286,7 @@ type ChainUpdate struct {
 	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
 	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
-	FinalityConfig                             types.TEXT                `json:"finalityConfig"`
+	FinalityConfig                             common.RequestedFinality  `json:"finalityConfig"`
 	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
@@ -334,7 +334,13 @@ func (t ChainUpdate) ToMap() map[string]any {
 		return res
 	}()
 
-	m["finalityConfig"] = string(t.FinalityConfig)
+	m["finalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FinalityConfig
+	}()
 
 	m["inboundRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1316,7 +1322,7 @@ func (t *LockReleaseTokenPoolGetFeeMCMSParams) UnmarshalHex(data string) error {
 type LockReleaseTokenPoolGetRequiredCCVs struct {
 	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
 	Amount              types.NUMERIC                `json:"amount"`
-	Finality            types.TEXT                   `json:"finality"`
+	Finality            common.RequestedFinality     `json:"finality"`
 	ExtraData           types.TEXT                   `json:"extraData"`
 	Direction           interfaces.TransferDirection `json:"direction"`
 	Caller              types.PARTY                  `json:"caller"`
@@ -1330,7 +1336,13 @@ func (t LockReleaseTokenPoolGetRequiredCCVs) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["finality"] = string(t.Finality)
+	m["finality"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Finality).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Finality
+	}()
 
 	m["extraData"] = string(t.ExtraData)
 
@@ -1374,7 +1386,7 @@ func (t *LockReleaseTokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 type LockReleaseTokenPoolGetRequiredCCVsMCMSParams struct {
 	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
 	Amount              types.NUMERIC                `json:"amount"`
-	Finality            types.TEXT                   `json:"finality"`
+	Finality            common.RequestedFinality     `json:"finality"`
 	ExtraData           types.TEXT                   `json:"extraData"`
 	Direction           interfaces.TransferDirection `json:"direction"`
 }
@@ -1850,7 +1862,7 @@ type RemoteChainConfig struct {
 	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
 	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
-	FinalityConfig                             types.TEXT                `json:"finalityConfig"`
+	FinalityConfig                             common.RequestedFinality  `json:"finalityConfig"`
 	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
@@ -1896,7 +1908,13 @@ func (t RemoteChainConfig) ToMap() map[string]any {
 		return res
 	}()
 
-	m["finalityConfig"] = string(t.FinalityConfig)
+	m["finalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FinalityConfig
+	}()
 
 	m["inboundRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }

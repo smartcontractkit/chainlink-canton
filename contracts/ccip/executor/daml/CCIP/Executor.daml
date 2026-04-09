@@ -3,7 +3,7 @@ module CCIP.Executor where
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (fromOptional, fromSome, fromSomeNote)
+import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.Map as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -27,7 +27,6 @@ template Executor
         signatory owner
         ensure assertValidInstanceId instanceId
             && maxCCVsPerMsg > 0
-            && byteCount dynamicConfig.allowedFinalityConfig == CCIP.FinalityCodec.finalityConfigByteLength
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where
             view = CCIP.Interfaces.Executor.ExecutorView with
@@ -63,10 +62,6 @@ template Executor
                 newDynamicConfig : DynamicConfig
             controller owner
             do
-                -- Match EVM behavior: store any bytes4 allowedFinalityConfig and
-                -- enforce its semantics later during requested-finality checks.
-                assertMsg "executor: allowedFinalityConfig must be bytes4"
-                    (byteCount newDynamicConfig.allowedFinalityConfig == CCIP.FinalityCodec.finalityConfigByteLength)
                 create this with dynamicConfig = newDynamicConfig
 
         choice ApplyAllowedCCVUpdates : ContractId Executor
@@ -114,7 +109,7 @@ template Executor
             do
                 pure maxCCVsPerMsg
 
-        nonconsuming choice GetAllowedFinalityConfig : BytesHex
+        nonconsuming choice GetAllowedFinalityConfig : CCIP.FinalityCodec.RequestedFinality
             with
                 caller : Party
             controller caller

@@ -5,14 +5,12 @@ module CCIP.FactoryTest.FactoryMCMSTest where
 import Daml.Script
 import DA.Assert ((===))
 import DA.Map qualified as Map
-import DA.Optional (fromSome)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.Factory
 import CCIP.FinalityCodec qualified as FinalityCodec
-import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FactoryTest.FactoryCodecTest
@@ -36,11 +34,8 @@ import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
 
 finalityConfig n =
   if n == 0
-  then FinalityCodec.waitForFinalityConfig
-  else fromSome do
-    flagsHex <- MessageCodecV1.encodeUint16 0
-    blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
-    pure (flagsHex <> blockConfirmationsHex)
+  then FinalityCodec.WaitForFinality
+  else FinalityCodec.BlockDepth n
 
 -- ===========================================================================
 -- INITIALIZATION & OWNERSHIP TESTS

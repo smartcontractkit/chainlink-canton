@@ -5,8 +5,6 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Optional (fromSome)
 
-import CCIP.FinalityCodec qualified as FinalityCodec
-import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.LockReleaseTokenPoolCodecGen qualified as LockReleaseTokenPoolCodec
 import CCIP.LockReleaseTokenPoolTypes (
     ChainUpdate(..),
@@ -24,13 +22,12 @@ import CCIP.Context qualified as Context
 import CCIP.ContextCodec (encodeCCIPContext, decodeCCIPContextAt)
 import DA.TextMap qualified as TextMap
 
+import CCIP.FinalityCodec qualified as FinalityCodec
+
 mkFinalityConfig n =
     if n == 0
-    then FinalityCodec.waitForFinalityConfig
-    else fromSome do
-        flagsHex <- MessageCodecV1.encodeUint16 0
-        blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
-        pure (flagsHex <> blockConfirmationsHex)
+    then FinalityCodec.WaitForFinality
+    else FinalityCodec.BlockDepth n
 
 -- ===============================================
 -- |              SetDynamicConfig               |

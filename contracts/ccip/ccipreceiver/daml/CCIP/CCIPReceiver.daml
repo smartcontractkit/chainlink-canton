@@ -7,7 +7,7 @@
 -- because ccipOwner is not a party on this contract.
 module CCIP.CCIPReceiver where
 
-import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Crypto.Text (BytesHex)
 import DA.Action (foldlA)
 import DA.List (unique)
 import DA.Optional (fromSomeNote)
@@ -51,17 +51,13 @@ template CCIPReceiver
         requiredCCVs : [RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress]
         optionalThreshold : Int
-        -- Raw bytes4 allowed finality config for inbound execution.
-        -- "00000000" means finalized-only.
-        -- Any bytes4 value is accepted here; FinalityCodec semantics are enforced
-        -- later when requested finality is checked against this policy.
-        receiverFinalityConfig : BytesHex
+        -- Allowed finality policy for inbound execution.
+        receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
     where
         signatory owner
         -- Ensure that requiredCCVs are unique
         ensure assertValidInstanceId instanceId
             && unique requiredCCVs
-            && byteCount receiverFinalityConfig == CCIP.FinalityCodec.finalityConfigByteLength
 
         -- | Query the final required CCVs for executing an inbound message.
         -- Aggregates receiver policy with token-pool requirements and delegates
@@ -91,7 +87,7 @@ template CCIPReceiver
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = message.sourceChainSelector
                                 amount = tokenAmount
-                                finality = message.finality.raw
+                                finality = message.finality.requested
                                 extraData = tokenExtraData
                                 direction = CCIP.Interfaces.TokenPool.Inbound
                                 caller = owner

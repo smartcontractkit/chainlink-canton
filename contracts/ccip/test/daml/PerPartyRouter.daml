@@ -43,7 +43,12 @@ import qualified TestToken
 
 finalityConfig n =
     if n == 0
-    then CCIP.FinalityCodec.waitForFinalityConfig
+    then CCIP.FinalityCodec.WaitForFinality
+    else CCIP.FinalityCodec.BlockDepth n
+
+rawFinalityConfig n =
+    if n == 0
+    then CCIP.FinalityCodec.waitForFinalityFlag
     else fromSome do
         flagsHex <- CCIP.MessageCodecV1.encodeUint16 0
         blockConfirmationsHex <- CCIP.MessageCodecV1.encodeUint16 n
@@ -53,7 +58,7 @@ unsafeDecodeRequestedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
         (CCIP.FinalityCodec.decodeRequestedFinality finalityConfig)
 
-messageFinality n = unsafeDecodeRequestedFinality (finalityConfig n)
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
 seedExecutedMessages : Int -> [BytesHex]
 seedExecutedMessages n =

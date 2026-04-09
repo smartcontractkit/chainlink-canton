@@ -1,4 +1,13 @@
-module CCIP.FinalityCodec where
+module CCIP.FinalityCodec
+  ( RequestedFinality(..)
+  , DecodedFinality(..)
+  , waitForFinalityFlag
+  , waitForFinalityDecoded
+  , extractBytes
+  , decodeRequestedFinality
+  , requestedFinalityAllowed
+  , customFinalityRateLimiterRequired
+  ) where
 
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Optional (fromSomeNote)
@@ -23,30 +32,11 @@ finalityConfigByteLength = 4
 -- EVM-compatible layout:
 --   bytes 0-1 = flags (upper 16 bits)
 --   bytes 2-3 = block depth (lower 16 bits)
-waitForFinalityFlagBits : Int
-waitForFinalityFlagBits = 0
-
--- Raw flag bits stored in the upper 16-bit flag field on the wire.
-waitForSafeFlagBits : Int
-waitForSafeFlagBits = 1
-
 waitForFinalityFlag : BytesHex
 waitForFinalityFlag = "00000000"
 
-waitForSafeFlag : BytesHex
-waitForSafeFlag = "00010000"
-
-waitForFinalityConfig : BytesHex
-waitForFinalityConfig = waitForFinalityFlag
-
-waitForSafeConfig : BytesHex
-waitForSafeConfig = waitForSafeFlag
-
 waitForFinalityDecoded : DecodedFinality
-waitForFinalityDecoded = fromSomeNote "waitForFinalityDecoded: invalid config" (decodeRequestedFinality waitForFinalityConfig)
-
-waitForSafeDecoded : DecodedFinality
-waitForSafeDecoded = fromSomeNote "waitForSafeDecoded: invalid config" (decodeRequestedFinality waitForSafeConfig)
+waitForFinalityDecoded = fromSomeNote "waitForFinalityDecoded: invalid config" (decodeRequestedFinality waitForFinalityFlag)
 
 extractBytes : BytesHex -> Int -> Int -> Optional BytesHex
 extractBytes bs start len =
@@ -84,15 +74,6 @@ countSetBits n =
     if n <= 0 then 0
     else (if isOdd n then 1 else 0) + countSetBits (n / 2)
 
--- Walk both flag bitsets from lowest bit to highest bit and return True
--- as soon as the same flag bit is set in both values.
-flagsOverlap : Int -> Int -> Bool
-flagsOverlap requestedFlags allowedFlags =
-    let noBitsLeft = requestedFlags <= 0 || allowedFlags <= 0
-        currentBitMatches = isOdd requestedFlags && isOdd allowedFlags
-    in if noBitsLeft then False
-       else currentBitMatches || flagsOverlap (requestedFlags / 2) (allowedFlags / 2)
-
 -- A requested finality must choose exactly one mode:
 --   * finalized-only, or
 --   * one flag like safe, or
@@ -123,7 +104,7 @@ decodeRequestedFinality finalityConfig =
             (Some 0, Some 0) ->
                 Some (DecodedFinality with raw = finalityConfig, requested = WaitForFinality)
             (Some flags, Some 0) ->
-                if flags == waitForSafeFlagBits
+                if flags == 1
                 then Some (DecodedFinality with raw = finalityConfig, requested = WaitForSafe)
                 else None
             (Some 0, Some blockDepth) ->
@@ -132,26 +113,17 @@ decodeRequestedFinality finalityConfig =
                 None
 
 -- Check whether a requested finality is allowed by a receiver/pool config.
--- Rules:
---   * finalized-only is always allowed
---   * flag modes require at least one matching allowed flag
---   * block-depth mode requires requestedDepth >= allowedDepth
-requestedFinalityAllowed : BytesHex -> BytesHex -> Bool
-requestedFinalityAllowed requestedFinalityConfig allowedFinalityConfig =
-    if requestedFinalityConfig == waitForFinalityFlag then True else
-        if not (validateRequestedFinality requestedFinalityConfig) then False else
-            case
-                ( decodeFlags requestedFinalityConfig
-                , decodeBlockConfirmations requestedFinalityConfig
-                , decodeFlags allowedFinalityConfig
-                , decodeBlockConfirmations allowedFinalityConfig
-                ) of
-                (Some requestedFlags, Some requestedBlockDepth, Some allowedFlags, Some allowedBlockDepth) ->
-                    if flagsOverlap requestedFlags allowedFlags
-                    then requestedBlockDepth == 0
-                    else allowedBlockDepth > 0 && requestedBlockDepth >= allowedBlockDepth
-                _ -> False
+-- Both values are already decoded, so normal contract logic can compare the
+-- structured meaning directly instead of re-decoding raw bytes.
+requestedFinalityAllowed : RequestedFinality -> RequestedFinality -> Bool
+requestedFinalityAllowed requestedFinality allowedFinality =
+    case (requestedFinality, allowedFinality) of
+        (WaitForFinality, _) -> True
+        (WaitForSafe, WaitForSafe) -> True
+        (BlockDepth requestedDepth, BlockDepth allowedDepth) -> requestedDepth >= allowedDepth
+        _ -> False
 
 -- Any config other than finalized-only needs the custom-finality limiter path.
-customFinalityRateLimiterRequired : BytesHex -> Bool
-customFinalityRateLimiterRequired allowedFinalityConfig = allowedFinalityConfig /= waitForFinalityFlag
+customFinalityRateLimiterRequired : RequestedFinality -> Bool
+customFinalityRateLimiterRequired allowedFinalityConfig =
+    allowedFinalityConfig /= WaitForFinality

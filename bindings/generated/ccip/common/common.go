@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "4a69b37d73123709ab99f5b713fa09079f22a656313a1aa067aca579cb081266"
+	PackageID   = "c894aeb46569fd5c7c289f40c40d38d9926b64ff7b121c92a96306c1c14b6117"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2016,7 +2016,7 @@ type ExecutingMessageV1 struct {
 	RequiredCCVs           []mcms.RawInstanceAddress  `json:"requiredCCVs"`
 	OptionalCCVs           []mcms.RawInstanceAddress  `json:"optionalCCVs"`
 	OptionalCCVThreshold   types.INT64                `json:"optionalCCVThreshold"`
-	ReceiverFinalityConfig types.TEXT                 `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig RequestedFinality          `json:"receiverFinalityConfig"`
 	SourceDefaultCCVs      []mcms.RawInstanceAddress  `json:"sourceDefaultCCVs"`
 	InboundPoolCCVs        *[]mcms.RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
 	Deps                   ExecutingMessageDeps       `json:"deps"`
@@ -2133,7 +2133,13 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 	args["optionalCCVThreshold"] = int64(t.OptionalCCVThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
+	args["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["sourceDefaultCCVs"] = func() []any {
@@ -2285,7 +2291,13 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 	args["optionalCCVThreshold"] = int64(t.OptionalCCVThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
+	args["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["sourceDefaultCCVs"] = func() []any {

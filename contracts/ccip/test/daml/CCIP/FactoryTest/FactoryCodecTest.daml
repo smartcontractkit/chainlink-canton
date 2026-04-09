@@ -27,7 +27,6 @@ import CCIP.Codec
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FinalityCodec qualified as FinalityCodec
-import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.Factory
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -39,11 +38,16 @@ import CCIP.Context (emptyCCIPContext)
 
 finalityConfig n =
   if n == 0
-  then FinalityCodec.waitForFinalityConfig
-  else fromSome do
-    flagsHex <- MessageCodecV1.encodeUint16 0
-    blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
-    pure (flagsHex <> blockConfirmationsHex)
+  then FinalityCodec.WaitForFinality
+  else FinalityCodec.BlockDepth n
+
+encodeRequestedFinality : FinalityCodec.RequestedFinality -> BytesHex
+encodeRequestedFinality requestedFinality =
+  case requestedFinality of
+    FinalityCodec.WaitForFinality -> fromSome (encodeUint8 0)
+    FinalityCodec.WaitForSafe -> fromSome (encodeUint8 1)
+    FinalityCodec.BlockDepth depth ->
+      fromSome (encodeUint8 2) <> fromSome (encodeInt64 depth)
 
 -- ===========================================================================
 -- ENCODER FUNCTIONS FOR DEPLOY PARAMS
@@ -157,7 +161,7 @@ encodeDeployCCIPReceiverParams params =
   <> encodeRawInstanceAddressList params.requiredCCVs
   <> encodeRawInstanceAddressList params.optionalCCVs
   <> fromSome (encodeInt64 params.optionalThreshold)
-  <> encodeBytesHex params.receiverFinalityConfig
+  <> encodeRequestedFinality params.receiverFinalityConfig
 
 -- ===========================================================================
 -- ROUND-TRIP TESTS

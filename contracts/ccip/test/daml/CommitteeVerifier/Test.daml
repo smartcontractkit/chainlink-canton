@@ -13,7 +13,6 @@ import qualified CCIP.Context
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
 import CCIP.FinalityCodec qualified as FinalityCodec
-import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 
@@ -21,11 +20,8 @@ import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
 
 finalityConfig n =
     if n == 0
-    then FinalityCodec.waitForFinalityConfig
-    else fromSome do
-        flagsHex <- MessageCodecV1.encodeUint16 0
-        blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
-        pure (flagsHex <> blockConfirmationsHex)
+    then FinalityCodec.WaitForFinality
+    else FinalityCodec.BlockDepth n
 
 -- | Helper to create a fresh ExecutingMessageV1 for each test.
 -- AddCCVVerification is a consuming choice, so each successful verify

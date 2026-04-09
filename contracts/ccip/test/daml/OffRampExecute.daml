@@ -27,9 +27,15 @@ import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
+
 finalityConfig n =
     if n == 0
-    then FinalityCodec.waitForFinalityConfig
+    then FinalityCodec.WaitForFinality
+    else FinalityCodec.BlockDepth n
+
+rawFinalityConfig n =
+    if n == 0
+    then FinalityCodec.waitForFinalityFlag
     else fromSome do
         flagsHex <- MessageCodecV1.encodeUint16 0
         blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
@@ -39,7 +45,7 @@ unsafeDecodeRequestedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
         (FinalityCodec.decodeRequestedFinality finalityConfig)
 
-messageFinality n = unsafeDecodeRequestedFinality (finalityConfig n)
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
 -- | Test execute with CCV verification via collecting contract pattern.
 --
@@ -1135,14 +1141,14 @@ testPrepareExecuteAllowsSafeFinalityConfig = script do
             instanceId = "test-router-safe"
     let router = createResult.router
 
-    let safeFinality = FinalityCodec.waitForSafeFlag
+    let safeFinality = FinalityCodec.WaitForSafe
     let message = MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = FinalityCodec.waitForSafeDecoded
+            finality = fromSomeNote "safe finality must decode" (FinalityCodec.decodeRequestedFinality "00010000")
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)

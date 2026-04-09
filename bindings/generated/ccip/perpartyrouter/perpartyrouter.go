@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "0948b436954cb8d2f81dc96c5f442025dd26ddc2356498509c0d83bd97d7bec2"
+	PackageID   = "d68d66bfe322a12e3abce8b26bcff6a2e008d7775bc0b7aa08e5f1d1649f8607"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1982,7 +1982,7 @@ type PrepareExecute2 struct {
 	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    types.TEXT                `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    common.RequestedFinality  `json:"receiverFinalityConfig"`
 	Caller                    types.PARTY               `json:"caller"`
 }
 
@@ -2041,7 +2041,13 @@ func (t PrepareExecute2) ToMap() map[string]any {
 
 	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
 
-	m["receiverFinalityConfig"] = string(t.ReceiverFinalityConfig)
+	m["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -2080,7 +2086,7 @@ type PrepareExecute2MCMSParams struct {
 	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    types.TEXT                `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    common.RequestedFinality  `json:"receiverFinalityConfig"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.

@@ -46,7 +46,12 @@ mult m = intToNumeric (truncate (m * 100000000.0))
 
 finalityConfig n =
     if n == 0
-    then FinalityCodec.waitForFinalityConfig
+    then FinalityCodec.WaitForFinality
+    else FinalityCodec.BlockDepth n
+
+rawFinalityConfig n =
+    if n == 0
+    then FinalityCodec.waitForFinalityFlag
     else fromSome do
         flagsHex <- MessageCodecV1.encodeUint16 0
         blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
@@ -56,7 +61,7 @@ unsafeDecodeRequestedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
         (FinalityCodec.decodeRequestedFinality finalityConfig)
 
-messageFinality n = unsafeDecodeRequestedFinality (finalityConfig n)
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
 mkInboundRateLimiterContext : ContractId RateLimiter.RateLimiter -> ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
 mkInboundRateLimiterContext inboundRateLimiterCid inboundCustomBlockConfirmationsRateLimiterCid = CCIP.Context.CCIPContext with
@@ -941,7 +946,7 @@ testReleaseFromTicket = script do
             sourcePoolData = ""
             messageId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
             sourceChainSelector = sourceChainSelector
-            finality = finalityConfig 0
+            finality = rawFinalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -1124,7 +1129,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             sourcePoolData = ""
             messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             sourceChainSelector = sourceChainSelector
-            finality = finalityConfig 0
+            finality = rawFinalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -1270,7 +1275,7 @@ testReleaseFromTicketDecimalConversion = script do
             sourcePoolData = sourcePoolData
             messageId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
             sourceChainSelector = sourceChainSelector
-            finality = finalityConfig 0
+            finality = rawFinalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -1438,7 +1443,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
             sourcePoolData = sourcePoolData
             messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             sourceChainSelector = sourceChainSelector
-            finality = finalityConfig 0
+            finality = rawFinalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -1598,7 +1603,7 @@ testReleaseFromTicketWithAdditionalCCVOwner = script do
             sourcePoolData = ""
             messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             sourceChainSelector = sourceChainSelector
-            finality = finalityConfig 0
+            finality = rawFinalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -2249,7 +2254,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
     let destChainSelector : Numeric 0 = 456.0
     let tokenAdminRegistryInstanceId = "test-tar-verify-safe"
     let allowedSourcePool = "000000000000000000000000aaaaaaaaaaaaaaaa"
-    let safeFinality = FinalityCodec.waitForSafeFlag
+    let safeFinality = FinalityCodec.WaitForSafe
 
     let testInstrumentId = HoldingV1.InstrumentId with
             admin = ccipOwner
@@ -2313,7 +2318,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = FinalityCodec.waitForSafeDecoded
+            finality = fromSomeNote "safe finality must decode" (FinalityCodec.decodeRequestedFinality "00010000")
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
