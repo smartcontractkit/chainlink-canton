@@ -1,13 +1,4 @@
-module CCIP.FinalityCodec
-  ( FinalityConfig(..)
-  , DecodedFinality(..)
-  , waitForFinalityFlag
-  , waitForFinalityDecoded
-  , extractBytes
-  , decodeRequestedFinality
-  , requestedFinalityAllowed
-  , customFinalityRateLimiterRequired
-  ) where
+module CCIP.FinalityCodec where
 
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Optional (fromSomeNote)
