@@ -104,7 +104,11 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 				if err != nil {
 					return ExerciseOutput{}, fmt.Errorf("failed to encode choice args for MCMS: %w", err)
 				}
-				mcmsTx := NewCantonTransaction(input.RawInstanceAddress, input.InstanceAddress, encodedChoice, params.ContractType)
+				mcmsTx, err := NewCantonTransaction(input.RawInstanceAddress, input.InstanceAddress, encodedChoice, params.ContractType)
+				if err != nil {
+					return ExerciseOutput{}, fmt.Errorf("failed to build MCMS transaction: %w", err)
+				}
+
 				return ExerciseOutput{
 					ChainSelector: deps.ChainSelector(),
 					Tx:            mcmsTx,

@@ -16,6 +16,7 @@ import (
 )
 
 func TestNewCantonTransaction(t *testing.T) {
+	t.Parallel()
 	rawAddr := "globalconfig-abc12@party::somehash"
 	instanceAddr := contracts.HexToInstanceAddress("0xdeadbeef")
 	encodedChoice := &bind.EncodedChoice{
@@ -29,7 +30,8 @@ func TestNewCantonTransaction(t *testing.T) {
 	}
 	contractType := deployment.ContractType("CantonGlobalConfig")
 
-	tx := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, contractType)
+	tx, err := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, contractType)
+	require.NoError(t, err)
 
 	assert.Equal(t, instanceAddr.Hex(), tx.To)
 	assert.Equal(t, string(contractType), tx.ContractType)
@@ -45,6 +47,7 @@ func TestNewCantonTransaction(t *testing.T) {
 }
 
 func TestNewCantonTransaction_RawAddressNotHex(t *testing.T) {
+	t.Parallel()
 	rawAddr := "globalconfig-abc12@party::somehash"
 	instanceAddr := contracts.HexToInstanceAddress("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
 	encodedChoice := &bind.EncodedChoice{
@@ -52,7 +55,8 @@ func TestNewCantonTransaction_RawAddressNotHex(t *testing.T) {
 		OperationData: "ff",
 	}
 
-	tx := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, "TestType")
+	tx, err := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, "TestType")
+	require.NoError(t, err)
 
 	var af cantonsdk.AdditionalFields
 	require.NoError(t, json.Unmarshal(tx.AdditionalFields, &af))
@@ -61,13 +65,16 @@ func TestNewCantonTransaction_RawAddressNotHex(t *testing.T) {
 }
 
 func TestNewBatchOperationFromExercises(t *testing.T) {
+	t.Parallel()
 	t.Run("empty slice returns empty batch", func(t *testing.T) {
+		t.Parallel()
 		batch, err := NewBatchOperationFromExercises(nil)
 		require.NoError(t, err)
 		assert.Empty(t, batch.Transactions)
 	})
 
 	t.Run("filters out executed outputs", func(t *testing.T) {
+		t.Parallel()
 		outs := []ExerciseOutput{
 			{
 				ChainSelector: 100,
@@ -87,6 +94,7 @@ func TestNewBatchOperationFromExercises(t *testing.T) {
 	})
 
 	t.Run("all executed returns empty batch", func(t *testing.T) {
+		t.Parallel()
 		outs := []ExerciseOutput{
 			{
 				ChainSelector: 100,
@@ -100,6 +108,7 @@ func TestNewBatchOperationFromExercises(t *testing.T) {
 	})
 
 	t.Run("multiple unexecuted on same chain", func(t *testing.T) {
+		t.Parallel()
 		outs := []ExerciseOutput{
 			{ChainSelector: 42, Tx: mcms_types.Transaction{To: "0xA"}},
 			{ChainSelector: 42, Tx: mcms_types.Transaction{To: "0xB"}},
@@ -112,6 +121,7 @@ func TestNewBatchOperationFromExercises(t *testing.T) {
 	})
 
 	t.Run("error on multiple chains", func(t *testing.T) {
+		t.Parallel()
 		outs := []ExerciseOutput{
 			{ChainSelector: 1, Tx: mcms_types.Transaction{To: "0xA"}},
 			{ChainSelector: 2, Tx: mcms_types.Transaction{To: "0xB"}},
@@ -123,19 +133,24 @@ func TestNewBatchOperationFromExercises(t *testing.T) {
 }
 
 func TestExerciseOutput_Executed(t *testing.T) {
+	t.Parallel()
 	t.Run("not executed when ExecInfo is nil", func(t *testing.T) {
+		t.Parallel()
 		out := ExerciseOutput{}
 		assert.False(t, out.Executed())
 	})
 
 	t.Run("executed when ExecInfo is set", func(t *testing.T) {
+		t.Parallel()
 		out := ExerciseOutput{ExecInfo: &ExecInfo{UpdateID: "123"}}
 		assert.True(t, out.Executed())
 	})
 }
 
 func TestValidateCantonAdditionalFields(t *testing.T) {
+	t.Parallel()
 	t.Run("valid fields with raw address", func(t *testing.T) {
+		t.Parallel()
 		af := cantonsdk.AdditionalFields{
 			TargetInstanceAddress: "globalconfig-abc12@party::somehash",
 			FunctionName:          "SetConfig",
@@ -146,6 +161,7 @@ func TestValidateCantonAdditionalFields(t *testing.T) {
 	})
 
 	t.Run("missing target instance address", func(t *testing.T) {
+		t.Parallel()
 		af := cantonsdk.AdditionalFields{
 			FunctionName:  "SetConfig",
 			OperationData: "abcdef",
@@ -157,6 +173,7 @@ func TestValidateCantonAdditionalFields(t *testing.T) {
 	})
 
 	t.Run("missing function name", func(t *testing.T) {
+		t.Parallel()
 		af := cantonsdk.AdditionalFields{
 			TargetInstanceAddress: "globalconfig-abc12@party::somehash",
 			OperationData:         "abcdef",
@@ -168,6 +185,7 @@ func TestValidateCantonAdditionalFields(t *testing.T) {
 	})
 
 	t.Run("missing operation data", func(t *testing.T) {
+		t.Parallel()
 		af := cantonsdk.AdditionalFields{
 			TargetInstanceAddress: "globalconfig-abc12@party::somehash",
 			FunctionName:          "SetConfig",
@@ -179,6 +197,7 @@ func TestValidateCantonAdditionalFields(t *testing.T) {
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
+		t.Parallel()
 		err := ValidateCantonAdditionalFields(json.RawMessage(`{invalid`))
 		require.Error(t, err)
 	})

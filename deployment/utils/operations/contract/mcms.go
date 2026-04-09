@@ -23,12 +23,15 @@ func NewCantonTransaction(
 	instanceAddress contracts.InstanceAddress,
 	encodedChoice *bind.EncodedChoice,
 	contractType deployment.ContractType,
-) mcms_types.Transaction {
-	af, _ := json.Marshal(cantonsdk.AdditionalFields{
+) (mcms_types.Transaction, error) {
+	af, err := json.Marshal(cantonsdk.AdditionalFields{
 		TargetInstanceAddress: rawInstanceAddress,
 		FunctionName:          encodedChoice.Choice,
 		OperationData:         encodedChoice.OperationData,
 	})
+	if err != nil {
+		return mcms_types.Transaction{}, fmt.Errorf("failed to marshal canton additional fields: %w", err)
+	}
 
 	opData, _ := hex.DecodeString(encodedChoice.OperationData)
 
@@ -39,7 +42,7 @@ func NewCantonTransaction(
 		To:               instanceAddress.Hex(),
 		Data:             opData,
 		AdditionalFields: af,
-	}
+	}, nil
 }
 
 // NewBatchOperationFromExercises constructs an MCMS BatchOperation from a slice of ExerciseOutputs.
@@ -62,6 +65,7 @@ func NewBatchOperationFromExercises(outs []ExerciseOutput) (mcms_types.BatchOper
 		if len(txs) == 0 {
 			chainSelector = out.ChainSelector
 			txs = append(txs, out.Tx)
+
 			continue
 		}
 		if out.ChainSelector != chainSelector {
@@ -96,5 +100,6 @@ func ValidateCantonAdditionalFields(raw json.RawMessage) error {
 	if af.OperationData == "" {
 		return errors.New("operationData is required")
 	}
+
 	return nil
 }

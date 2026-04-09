@@ -12,6 +12,7 @@ import (
 )
 
 func TestMakeMultisigId(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		instanceId string
@@ -44,6 +45,7 @@ func TestMakeMultisigId(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := makeMultisigId(tt.instanceId, tt.party, tt.role)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -51,11 +53,14 @@ func TestMakeMultisigId(t *testing.T) {
 }
 
 func TestCountTransactions(t *testing.T) {
+	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
 		assert.Equal(t, uint64(0), countTransactions(nil))
 	})
 
 	t.Run("single batch", func(t *testing.T) {
+		t.Parallel()
 		bops := []mcms_types.BatchOperation{
 			{Transactions: []mcms_types.Transaction{{}, {}, {}}},
 		}
@@ -63,6 +68,7 @@ func TestCountTransactions(t *testing.T) {
 	})
 
 	t.Run("multiple batches", func(t *testing.T) {
+		t.Parallel()
 		bops := []mcms_types.BatchOperation{
 			{Transactions: []mcms_types.Transaction{{}, {}}},
 			{Transactions: []mcms_types.Transaction{{}}},
@@ -72,7 +78,9 @@ func TestCountTransactions(t *testing.T) {
 }
 
 func TestBuildBatchFromOutputs(t *testing.T) {
+	t.Parallel()
 	t.Run("filters executed", func(t *testing.T) {
+		t.Parallel()
 		outputs := []opcontract.ExerciseOutput{
 			{ChainSelector: 42, Tx: mcms_types.Transaction{To: "0xA"}},
 			{ChainSelector: 42, Tx: mcms_types.Transaction{To: "0xB"}, ExecInfo: &opcontract.ExecInfo{UpdateID: "done"}},

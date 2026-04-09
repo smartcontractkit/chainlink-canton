@@ -92,7 +92,12 @@ func GenerateTimelockProposal(
 
 	validUntil := config.ValidUntil
 	if validUntil == 0 {
-		validUntil = uint32(time.Now().Add(time.Duration(DefaultTimelockExpirationHours) * time.Hour).Unix())
+		const maxUint32 int64 = 1<<32 - 1
+		unixTS := time.Now().Add(time.Duration(DefaultTimelockExpirationHours) * time.Hour).Unix()
+		if unixTS < 0 || unixTS > maxUint32 {
+			return nil, fmt.Errorf("computed validUntil timestamp %d overflows uint32", unixTS)
+		}
+		validUntil = uint32(unixTS)
 	}
 
 	timelockAddr := config.TimelockAddress
@@ -136,5 +141,6 @@ func countTransactions(batchOps []mcms_types.BatchOperation) uint64 {
 	for _, bop := range batchOps {
 		count += uint64(len(bop.Transactions))
 	}
+
 	return count
 }
