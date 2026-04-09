@@ -7,6 +7,13 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
+replace (
+	// Use canton-main branch which includes sdk/canton/ (not yet in tagged releases)
+	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260408025748-900d559752a2
+// // Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
+// github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
+)
+
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/Masterminds/semver/v3 v3.4.0
@@ -15,14 +22,14 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-canton v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-canton v0.0.0-20260406090817-ed7fd0be9763
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260326202712-36375e64a88a
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260326202712-36375e64a88a
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260326213859-8750badddcc3
 	github.com/smartcontractkit/chainlink-common v0.11.1
 	github.com/smartcontractkit/chainlink-deployments-framework v0.93.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
-	github.com/smartcontractkit/go-daml v0.0.0-20260331185746-126b4945e013
+	github.com/smartcontractkit/go-daml v0.6.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	google.golang.org/grpc v1.80.0

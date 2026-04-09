@@ -8,6 +8,8 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 replace (
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
+	// Use canton-main branch which includes sdk/canton/ (not yet in tagged releases)
+	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260408025748-900d559752a2
 	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
 	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )
@@ -40,7 +42,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.11.1
 	github.com/smartcontractkit/chainlink-deployments-framework v0.93.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.13
-	github.com/smartcontractkit/go-daml v0.0.0-20260331185746-126b4945e013
+	github.com/smartcontractkit/go-daml v0.6.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
 	go.opentelemetry.io/otel v1.43.0
@@ -404,7 +406,7 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20251212213002-0a5e2f907dda // indirect
-	github.com/smartcontractkit/mcms v0.39.0 // indirect
+	github.com/smartcontractkit/mcms v0.39.0
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect
 	github.com/sony/gobreaker/v2 v2.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect

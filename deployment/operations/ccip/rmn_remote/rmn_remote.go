@@ -16,6 +16,8 @@ var ContractType = deployment.ContractType("RMNRemote")
 
 var Version = semver.MustParse("1.6.0")
 
+var rmnEncoder = rmn.NewContract("", "CCIP.RMNRemote", "RMNRemote").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[rmn.RMNRemote]{
 	Name:           "canton/ccip/rmn_remote/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -43,8 +45,9 @@ var Curse = contract.NewExercise(contract.ExerciseParams[rmn.Curse]{
 
 		return nil
 	},
-	Template: rmn.RMNRemote{},
-	Method:   rmn.RMNRemote{}.Curse,
+	Template:     rmn.RMNRemote{},
+	Method:       rmn.RMNRemote{}.Curse,
+	EncodeMethod: rmnEncoder.Curse,
 })
 
 var Uncurse = contract.NewExercise(contract.ExerciseParams[rmn.Uncurse]{
@@ -59,6 +62,7 @@ var Uncurse = contract.NewExercise(contract.ExerciseParams[rmn.Uncurse]{
 
 		return nil
 	},
-	Template: rmn.RMNRemote{},
-	Method:   rmn.RMNRemote{}.Uncurse,
+	Template:     rmn.RMNRemote{},
+	Method:       rmn.RMNRemote{}.Uncurse,
+	EncodeMethod: rmnEncoder.Uncurse,
 })

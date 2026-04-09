@@ -12,9 +12,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 
@@ -27,8 +29,9 @@ type ExecInfo struct {
 }
 
 type ExerciseOutput struct {
-	ChainSelector uint64    `json:"chainSelector"`
-	ExecInfo      *ExecInfo `json:"exec_info"`
+	ChainSelector uint64                 `json:"chainSelector"`
+	Tx            mcms_types.Transaction `json:"tx"`
+	ExecInfo      *ExecInfo              `json:"execInfo,omitempty"`
 }
 
 func (o ExerciseOutput) Executed() bool {
@@ -38,7 +41,11 @@ func (o ExerciseOutput) Executed() bool {
 type ChoiceInput[ARGS any] struct {
 	// The InstanceAddress this operation is targeting. Will be resolved to an active contract.
 	InstanceAddress contracts.InstanceAddress `json:"instanceAddress"`
-	Args            ARGS                      `json:"args"`
+	// RawInstanceAddress is the "instanceId@partyId" format required by the Canton MCMS SDK
+	// for AdditionalFields.TargetInstanceAddress. Must be set when MCMSEnabled is true.
+	RawInstanceAddress string `json:"rawInstanceAddress,omitempty"`
+	Args               ARGS   `json:"args"`
+	MCMSEnabled        bool   `json:"mcmsEnabled,omitempty"`
 }
 
 type ExerciseParams[ARGS any] struct {
@@ -59,6 +66,11 @@ type ExerciseParams[ARGS any] struct {
 	Template common.Template
 	// Method is the bindings method to call the choice.
 	Method func(contractID string, args ARGS) *model.ExerciseCommand
+
+	// EncodeMethod encodes the choice args to hex for MCMS proposals.
+	// Uses the binding's Encoder (e.g., globalConfig.Encoder().ApplyDestChainConfigUpdates).
+	// When nil, MCMS encoding is not available for this operation.
+	EncodeMethod func(args ARGS) (*bind.EncodedChoice, error)
 }
 
 func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[ChoiceInput[ARGS], ExerciseOutput, canton.Chain] {
@@ -67,13 +79,11 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 		params.Version,
 		params.Description,
 		func(b operations.Bundle, deps canton.Chain, input ChoiceInput[ARGS]) (ExerciseOutput, error) {
-			// Validate
 			if params.Validate != nil {
 				if err := params.Validate(input.Args); err != nil {
 					return ExerciseOutput{}, fmt.Errorf("validate input: %w", err)
 				}
 			}
-			// Modify
 			if params.Modifier != nil {
 				var err error
 				input.Args, err = params.Modifier(deps, input.Args)
@@ -82,24 +92,40 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 				}
 			}
 
+			// If MCMS enabled, encode and return without executing on-chain
+			if input.MCMSEnabled {
+				if params.EncodeMethod == nil {
+					return ExerciseOutput{}, fmt.Errorf("MCMSEnabled is true but no EncodeMethod is defined for operation %s", params.Name)
+				}
+				if input.RawInstanceAddress == "" {
+					return ExerciseOutput{}, fmt.Errorf("MCMSEnabled is true but RawInstanceAddress is empty for operation %s", params.Name)
+				}
+				encodedChoice, err := params.EncodeMethod(input.Args)
+				if err != nil {
+					return ExerciseOutput{}, fmt.Errorf("failed to encode choice args for MCMS: %w", err)
+				}
+				mcmsTx := NewCantonTransaction(input.RawInstanceAddress, input.InstanceAddress, encodedChoice, params.ContractType)
+				return ExerciseOutput{
+					ChainSelector: deps.ChainSelector(),
+					Tx:            mcmsTx,
+				}, nil
+			}
+
+			// Direct execution path
 			participant := deps.Participants[0]
 
-			// Find contract by InstanceAddress
 			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, participant.PartyID, params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
 			}
 
-			// Get template ID and choice name from the method
 			exerciseCommand := params.Method(contractID, input.Args)
 
-			// Parse template ID to get package ID, module name, and entity name
 			packageID, moduleName, entityName, err := contracts.ParseTemplateIDFromString(exerciseCommand.TemplateID)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to parse template ID %s: %w", exerciseCommand.TemplateID, err)
 			}
 
-			// Convert args struct to ledger.MapToValue for ChoiceArgument
 			choiceArgument := ledger.MapToValue(input.Args)
 
 			submitResp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -126,8 +152,6 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 				return ExerciseOutput{}, fmt.Errorf("failed to submit exercise command: %w", err)
 			}
 
-			// Note: apiv2.SubmitAndWaitForTransactionResponse doesn't expose UpdateId directly
-			// The transaction was successfully submitted, which is what matters
 			return ExerciseOutput{
 				ChainSelector: deps.ChainSelector(),
 				ExecInfo: &ExecInfo{

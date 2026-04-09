@@ -17,6 +17,8 @@ var ContractType = deployment.ContractType("CantonGlobalConfig")
 
 var Version = semver.MustParse("0.1.0")
 
+var globalConfigEncoder = common.NewContract("", "CCIP.GlobalConfig", "GlobalConfig").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
 	Name:           "canton/ccip/global_config/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -50,8 +52,9 @@ var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[c
 		// TODO add validation
 		return nil
 	},
-	Template: common.GlobalConfig{},
-	Method:   common.GlobalConfig{}.ApplyDestChainConfigUpdates,
+	Template:     common.GlobalConfig{},
+	Method:       common.GlobalConfig{}.ApplyDestChainConfigUpdates,
+	EncodeMethod: globalConfigEncoder.ApplyDestChainConfigUpdates,
 })
 
 var ApplySourceChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[common.ApplySourceChainConfigUpdates]{
@@ -63,6 +66,7 @@ var ApplySourceChainConfigUpdates = contract.NewExercise(contract.ExerciseParams
 		// TODO add validation
 		return nil
 	},
-	Template: common.GlobalConfig{},
-	Method:   common.GlobalConfig{}.ApplySourceChainConfigUpdates,
+	Template:     common.GlobalConfig{},
+	Method:       common.GlobalConfig{}.ApplySourceChainConfigUpdates,
+	EncodeMethod: globalConfigEncoder.ApplySourceChainConfigUpdates,
 })
