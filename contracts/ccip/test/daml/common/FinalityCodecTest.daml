@@ -16,7 +16,9 @@ mkFinalityConfig flags blockConfirmations =
         pure (flagsHex <> blockConfirmationsHex)
 
 decodedFinality : Text -> FinalityCodec.DecodedFinality
-decodedFinality = FinalityCodec.unsafeDecodeRequestedFinality
+decodedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityCodec.decodeRequestedFinality finalityConfig)
 
 testDecodeKnownEncodings : Script ()
 testDecodeKnownEncodings = do

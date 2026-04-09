@@ -27,7 +27,6 @@ import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
-
 finalityConfig n =
     if n == 0
     then FinalityCodec.waitForFinalityConfig
@@ -36,7 +35,11 @@ finalityConfig n =
         blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex)
 
-messageFinality n = FinalityCodec.unsafeDecodeRequestedFinality (finalityConfig n)
+unsafeDecodeRequestedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityCodec.decodeRequestedFinality finalityConfig)
+
+messageFinality n = unsafeDecodeRequestedFinality (finalityConfig n)
 
 -- | Test execute with CCV verification via collecting contract pattern.
 --

@@ -30,7 +30,6 @@ import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
-
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Executor
@@ -50,7 +49,11 @@ finalityConfig n =
         blockConfirmationsHex <- CCIP.MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex)
 
-messageFinality n = CCIP.FinalityCodec.unsafeDecodeRequestedFinality (finalityConfig n)
+unsafeDecodeRequestedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (CCIP.FinalityCodec.decodeRequestedFinality finalityConfig)
+
+messageFinality n = unsafeDecodeRequestedFinality (finalityConfig n)
 
 seedExecutedMessages : Int -> [BytesHex]
 seedExecutedMessages n =

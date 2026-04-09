@@ -17,10 +17,11 @@ import CCIP.OnRamp qualified as OnRamp
 finalityConfig n =
     if n == 0
     then FinalityCodec.waitForFinalityDecoded
-    else FinalityCodec.unsafeDecodeRequestedFinality (fromSome do
+    else fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityCodec.decodeRequestedFinality (fromSome do
         flagsHex <- MessageCodecV1.encodeUint16 0
         blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
-        pure (flagsHex <> blockConfirmationsHex))
+        pure (flagsHex <> blockConfirmationsHex)))
 
 setup = script do
 

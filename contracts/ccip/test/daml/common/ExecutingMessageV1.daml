@@ -1,7 +1,7 @@
 module ExecutingMessageV1 where
 
 import Daml.Script
-import DA.Optional (fromSome)
+import DA.Optional (fromSome, fromSomeNote)
 import DA.Assert
 
 import CCIP.ExecutingMessageV1
@@ -17,7 +17,11 @@ finalityConfig n =
         blockConfirmationsHex <- CCIP.MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex)
 
-messageFinality n = FinalityCodec.unsafeDecodeRequestedFinality (finalityConfig n)
+unsafeDecodeRequestedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityCodec.decodeRequestedFinality finalityConfig)
+
+messageFinality n = unsafeDecodeRequestedFinality (finalityConfig n)
 
 testAddCCVVerification : Script ()
 testAddCCVVerification = do

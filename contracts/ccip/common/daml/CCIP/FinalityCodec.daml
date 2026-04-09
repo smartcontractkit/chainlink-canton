@@ -111,6 +111,10 @@ validateRequestedFinality finalityConfig =
         _ -> False
 
 -- Decode only well-formed requested finality values.
+-- Mapping:
+--   * flags 0, block depth 0 -> WaitForFinality
+--   * flags = safe bit, block depth 0 -> WaitForSafe
+--   * flags 0, block depth > 0 -> BlockDepth n
 -- Invalid combinations are rejected with None.
 decodeRequestedFinality : BytesHex -> Optional DecodedFinality
 decodeRequestedFinality finalityConfig =
@@ -126,10 +130,6 @@ decodeRequestedFinality finalityConfig =
                 Some (DecodedFinality with raw = finalityConfig, requested = BlockDepth blockDepth)
             _ ->
                 None
-
-unsafeDecodeRequestedFinality : BytesHex -> DecodedFinality
-unsafeDecodeRequestedFinality finalityConfig =
-    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config" (decodeRequestedFinality finalityConfig)
 
 -- Check whether a requested finality is allowed by a receiver/pool config.
 -- Rules:

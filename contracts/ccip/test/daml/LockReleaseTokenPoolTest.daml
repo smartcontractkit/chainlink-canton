@@ -27,7 +27,6 @@ import CCIP.SendingMessageV1 qualified as SendingMessageV1
 import CCIP.Tickets qualified as Tickets
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
-
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
@@ -53,7 +52,11 @@ finalityConfig n =
         blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex)
 
-messageFinality n = FinalityCodec.unsafeDecodeRequestedFinality (finalityConfig n)
+unsafeDecodeRequestedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityCodec.decodeRequestedFinality finalityConfig)
+
+messageFinality n = unsafeDecodeRequestedFinality (finalityConfig n)
 
 mkInboundRateLimiterContext : ContractId RateLimiter.RateLimiter -> ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
 mkInboundRateLimiterContext inboundRateLimiterCid inboundCustomBlockConfirmationsRateLimiterCid = CCIP.Context.CCIPContext with
