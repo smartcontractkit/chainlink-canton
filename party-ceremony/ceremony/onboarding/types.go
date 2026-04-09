@@ -38,6 +38,12 @@ type CreateMemberKeyOutput struct {
 	// returned by GenerateSigningKey. It preserves the exact Format, Scheme,
 	// KeySpec, and Usage fields that Canton assigned, avoiding reconstruction errors.
 	SigningKeyB64 string `json:"signing_key_b64"`
+	// DamlKeyB64 is the base64-encoded proto-marshalled PROTOCOL SigningPublicKey
+	// (SigningKeyUsage_PROTOCOL). This key is registered in
+	// PartyToParticipant.PartySigningKeys and is used to authorise DAML
+	// transactions submitted via InteractiveSubmissionService.
+	DamlKeyB64         string `json:"daml_key_b64"`
+	DamlKeyFingerprint string `json:"daml_key_fingerprint"`
 }
 
 // ProposeNSDInput is the input to [ProposeNamespaceDelegationOp].
