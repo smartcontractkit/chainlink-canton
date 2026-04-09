@@ -3,6 +3,7 @@ module CCIP.Events where
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
+import qualified CCIP.FinalityCodec
 import qualified CCIP.Internal
 import qualified CCIP.Tickets
 import qualified Splice.Api.Token.HoldingV1
@@ -71,7 +72,7 @@ data TokenReceiveTicketClaimedEvent = TokenReceiveTicketClaimedEvent
         sourcePoolData : BytesHex
         messageId : BytesHex
         sourceChainSelector : Numeric 0
-        finality : BytesHex
+        finality : CCIP.FinalityCodec.FinalityConfig
         output : TokenReceiveTicketClaimed_Output
     deriving (Eq, Show)
 

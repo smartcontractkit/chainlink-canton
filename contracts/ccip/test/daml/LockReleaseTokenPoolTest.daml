@@ -946,7 +946,7 @@ testReleaseFromTicket = script do
             sourcePoolData = ""
             messageId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
             sourceChainSelector = sourceChainSelector
-            finality = rawFinalityConfig 0
+            finality = finalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -1129,7 +1129,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             sourcePoolData = ""
             messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             sourceChainSelector = sourceChainSelector
-            finality = rawFinalityConfig 0
+            finality = finalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -1275,7 +1275,7 @@ testReleaseFromTicketDecimalConversion = script do
             sourcePoolData = sourcePoolData
             messageId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
             sourceChainSelector = sourceChainSelector
-            finality = rawFinalityConfig 0
+            finality = finalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -1443,7 +1443,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
             sourcePoolData = sourcePoolData
             messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             sourceChainSelector = sourceChainSelector
-            finality = rawFinalityConfig 0
+            finality = finalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -1603,7 +1603,7 @@ testReleaseFromTicketWithAdditionalCCVOwner = script do
             sourcePoolData = ""
             messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             sourceChainSelector = sourceChainSelector
-            finality = rawFinalityConfig 0
+            finality = finalityConfig 0
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory

@@ -589,7 +589,7 @@ template LockReleaseTokenPool
                         (requiredCCV `elem` ticket.verifiedCCVs)
 
                 let useCustomFinalityRateLimiter =
-                        ticket.finality /= CCIP.FinalityCodec.waitForFinalityFlag
+                        ticket.finality /= CCIP.FinalityCodec.WaitForFinality
                         && CCIP.FinalityCodec.customFinalityRateLimiterRequired remoteChainCfg.finalityConfig
                 let expectedRateLimitMode = if useCustomFinalityRateLimiter
                         then CCIP.RateLimiter.RateLimitMode_CustomFinality

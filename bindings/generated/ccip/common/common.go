@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "2f322d4f938b30d0954e3fd3dc612b4608eeeb1a9184f7e4d58818d798800888"
+	PackageID   = "d529d95ac3812453143e498aeb6aaed634194ebbc590c3f048f016dc55f198ee"
 	SDKVersion  = "3.4.10"
 )
 
@@ -5638,7 +5638,7 @@ type TokenReceiveTicket struct {
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageId                    types.TEXT                               `json:"messageId"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
-	Finality                     types.TEXT                               `json:"finality"`
+	Finality                     FinalityConfig                           `json:"finality"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -5717,7 +5717,13 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["finality"] = string(t.Finality)
+	args["finality"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Finality).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Finality
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -5791,7 +5797,13 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["finality"] = string(t.Finality)
+	args["finality"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Finality).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Finality
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -6017,7 +6029,7 @@ type TokenReceiveTicketClaimedEvent struct {
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageId                    types.TEXT                               `json:"messageId"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
-	Finality                     types.TEXT                               `json:"finality"`
+	Finality                     FinalityConfig                           `json:"finality"`
 	Output                       TokenReceiveTicketClaimedOutput          `json:"output"`
 }
 
@@ -6056,7 +6068,13 @@ func (t TokenReceiveTicketClaimedEvent) ToMap() map[string]any {
 
 	m["sourceChainSelector"] = t.SourceChainSelector
 
-	m["finality"] = string(t.Finality)
+	m["finality"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Finality).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Finality
+	}()
 
 	m["output"] = func() any {
 		type mapper interface{ toMap() map[string]any }
