@@ -22,6 +22,9 @@ const (
 
 	// WorkflowTypeKick identifies a real gRPC-backed kick (participant removal) ceremony.
 	WorkflowTypeKick = "kick"
+
+	// WorkflowTypeContractDeploy identifies a contract deployment ceremony.
+	WorkflowTypeContractDeploy = "contract-deploy"
 )
 
 // WorkflowState is persisted to workflow.json inside the ceremony directory.
