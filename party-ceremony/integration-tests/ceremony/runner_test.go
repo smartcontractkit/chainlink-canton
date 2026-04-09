@@ -33,4 +33,12 @@ func TestCeremonies(t *testing.T) {
 		s.chain = chain
 		suite.Run(t, s)
 	})
+
+	t.Run("CantonContractDeployFlowTestSuite", func(t *testing.T) {
+		suite.Run(t, new(ContractDeployFlowTestSuite))
+	})
+
+	t.Run("CantonAddParticipantFlowTestSuite", func(t *testing.T) {
+		suite.Run(t, new(AddParticipantFlowTestSuite))
+	})
 }

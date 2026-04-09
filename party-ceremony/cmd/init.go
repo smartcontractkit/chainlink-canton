@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
 	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
 	"github.com/chainlink/canton-party-ceremony/ceremony/example"
 	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
@@ -239,6 +240,86 @@ func runInitKick(cmd *cobra.Command, _ []string) error {
 	}
 
 	return executeKickSequence(cmd.Context(), cfg, input, stateDir, "")
+}
+
+// initAddParticipantCmd initialises an add-participant ceremony.
+//
+// Usage:
+//
+//	canton-party-ceremony init add-participant \
+//	  --decentralized-party-id "prefix::namespace" \
+//	  --new-participant-id "PAR::newnode::fp" \
+//	  --existing-participants "PAR::p1::fp1,PAR::p2::fp2" \
+//	  --namespace-name "add-2026" \
+//	  --synchronizer-id global \
+//	  --config ./participant-config.json
+var initAddParticipantCmd = &cobra.Command{
+	Use:   "add-participant",
+	Short: "Initialise a new add-participant ceremony",
+	Long: `Create the ceremony directory, write workflow.json, and run the first
+sequence step. The add-participant ceremony adds a new participant to an
+existing decentralized party by updating both the DecentralizedNamespaceDefinition
+and the PartyToParticipant topology mappings.`,
+	RunE: runInitAddParticipant,
+}
+
+func init() {
+	f := initAddParticipantCmd.Flags()
+
+	f.String("decentralized-party-id", "", "Full party ID in the format <prefix>::<namespace> (required)")
+	f.String("new-participant-id", "", "Canton UID of the participant to add (required)")
+	f.String("existing-participants", "", "Comma-separated Canton UIDs of current members (required)")
+	f.String("namespace-name", "", "Label for the new participant's key generation (required)")
+	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
+	f.Int("new-threshold", 0, "Signing threshold after the addition. 0 = keep current")
+	f.String("config", "participant-config.json", "Path to participant config JSON file")
+	f.String("state-dir", "ceremonies", "Root directory under which ceremony state is stored")
+
+	_ = initAddParticipantCmd.MarkFlagRequired("decentralized-party-id")
+	_ = initAddParticipantCmd.MarkFlagRequired("new-participant-id")
+	_ = initAddParticipantCmd.MarkFlagRequired("existing-participants")
+	_ = initAddParticipantCmd.MarkFlagRequired("namespace-name")
+	_ = initAddParticipantCmd.MarkFlagRequired("synchronizer-id")
+
+	initCmd.AddCommand(initAddParticipantCmd)
+}
+
+func runInitAddParticipant(cmd *cobra.Command, _ []string) error {
+	f := cmd.Flags()
+
+	partyID, _ := f.GetString("decentralized-party-id")
+	newUID, _ := f.GetString("new-participant-id")
+	existingRaw, _ := f.GetString("existing-participants")
+	namespaceName, _ := f.GetString("namespace-name")
+	synchronizerID, _ := f.GetString("synchronizer-id")
+	newThreshold, _ := f.GetInt("new-threshold")
+	configPath, _ := f.GetString("config")
+	stateDir, _ := f.GetString("state-dir")
+
+	cfg, err := client.LoadConfig(configPath)
+	if err != nil {
+		return err
+	}
+
+	existing := splitParticipants(existingRaw)
+	if len(existing) < 2 {
+		return fmt.Errorf("--existing-participants must list at least 2 participants")
+	}
+
+	if slices.Contains(existing, newUID) {
+		return fmt.Errorf("new participant %q must not appear in --existing-participants", newUID)
+	}
+
+	input := addparticipant.AddParticipantInput{
+		DecentralizedPartyID: partyID,
+		NewParticipantID:     newUID,
+		ExistingParticipants: existing,
+		NamespaceName:        namespaceName,
+		SynchronizerID:       synchronizerID,
+		NewThreshold:         newThreshold,
+	}
+
+	return executeAddParticipantSequence(cmd.Context(), cfg, input, stateDir, "")
 }
 
 // splitParticipants splits a comma-separated participant string, trimming
