@@ -678,7 +678,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			Commands: []*ledgerv2.Command{{
 				Command: &ledgerv2.Command_Exercise{Exercise: &ledgerv2.ExerciseCommand{
 					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
-					ContractId: string(activeFeeQuoterContract.GetCreatedEvent().GetContractId()),
+					ContractId: activeFeeQuoterContract.GetCreatedEvent().GetContractId(),
 					Choice:     "UpdatePrices",
 					ChoiceArgument: ledger.MapToValue(feequoter.UpdatePrices{
 						PriceUpdates: feequoter.PriceUpdates{
@@ -720,7 +720,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active fee quoter contract: %w", err)
 	}
-	disclosedFeeQuoter = convertToDisclosedContract(activeFeeQuoterContract)
 
 	// collect ccv instance addresses so we can request their disclosures from EDS.
 	var ccvInstanceAddresses []contracts.InstanceAddress
@@ -823,10 +822,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 	sendArgsMap := sendArgs.ToMap()
 
-	disclosedContracts := []*ledgerv2.DisclosedContract{
-		disclosedCCIPSender,
-		disclosedRouter,
-	}
+	// sender, router + all other disclosed contracts
+	disclosedContracts := make([]*ledgerv2.DisclosedContract, 0, 2+len(sendDisclosures.DisclosedContracts))
+	disclosedContracts = append(disclosedContracts, disclosedCCIPSender, disclosedRouter)
 	disclosedContracts = append(disclosedContracts, sendDisclosures.DisclosedContracts...)
 	for _, dc := range disclosedContracts {
 		if dc != nil && dc.GetContractId() == "" {
@@ -948,6 +946,7 @@ func getByAddress(ds datastore.DataStore, address string) (datastore.AddressRef,
 			return addr, nil
 		}
 	}
+
 	return datastore.AddressRef{}, fmt.Errorf("address %s not found", address)
 }
 
