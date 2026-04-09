@@ -54,6 +54,18 @@ var CreateMemberKeyOp = operations.NewOperation(
 			return CreateMemberKeyOutput{}, fmt.Errorf("generating namespace key: %w", err)
 		}
 
+		// Also generate a PROTOCOL (DAML) signing key for the participant.
+		// This key is registered in PartyToParticipant.PartySigningKeys and is
+		// used to authorise DAML transactions submitted via
+		// InteractiveSubmissionService — distinct from the namespace key used
+		// for topology operations.
+		damlKey, err := deps.Client.GenerateSigningKey(ctx, in.NamespaceName+"-protocol", []cryptov30.SigningKeyUsage{
+			cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_PROTOCOL,
+		})
+		if err != nil {
+			return CreateMemberKeyOutput{}, fmt.Errorf("generating protocol (DAML) signing key: %w", err)
+		}
+
 		uid, err := deps.Client.GetParticipantUID(ctx)
 		if err != nil {
 			return CreateMemberKeyOutput{}, fmt.Errorf("fetching participant UID: %w", err)
@@ -62,6 +74,11 @@ var CreateMemberKeyOp = operations.NewOperation(
 		fingerprint, err := helpers.GetPublicKeyFingerprint(key.GetPublicKey())
 		if err != nil {
 			return CreateMemberKeyOutput{}, fmt.Errorf("computing public key fingerprint: %w", err)
+		}
+
+		damlFingerprint, err := helpers.GetPublicKeyFingerprint(damlKey.GetPublicKey())
+		if err != nil {
+			return CreateMemberKeyOutput{}, fmt.Errorf("computing DAML key fingerprint: %w", err)
 		}
 
 		// Preserve the complete SigningPublicKey proto (Format, Scheme, KeySpec,
@@ -73,11 +90,19 @@ var CreateMemberKeyOp = operations.NewOperation(
 		}
 		keyB64 := base64.StdEncoding.EncodeToString(keyProtoBytes)
 
+		damlKeyProtoBytes, err := proto.Marshal(damlKey)
+		if err != nil {
+			return CreateMemberKeyOutput{}, fmt.Errorf("marshalling DAML signing public key proto: %w", err)
+		}
+		damlKeyB64 := base64.StdEncoding.EncodeToString(damlKeyProtoBytes)
+
 		return CreateMemberKeyOutput{
 			ParticipantID:        in.ParticipantID,
 			ParticipantUID:       uid,
 			NamespaceFingerprint: fingerprint,
 			SigningKeyB64:        keyB64,
+			DamlKeyB64:           damlKeyB64,
+			DamlKeyFingerprint:   damlFingerprint,
 		}, nil
 	},
 )
@@ -429,12 +454,34 @@ var ProposeP2POp = operations.NewOperation(
 			}
 		}
 
+		// Collect each member's PROTOCOL (DAML) signing key so Canton can
+		// verify transaction signatures submitted via InteractiveSubmissionService.
+		damlKeys := make([]*cryptov30.SigningPublicKey, 0, len(in.Members))
+		for _, m := range in.Members {
+			if m.DamlKeyB64 == "" {
+				continue
+			}
+			damlKeyBytes, decErr := base64.StdEncoding.DecodeString(m.DamlKeyB64)
+			if decErr != nil {
+				return ProposeP2POutput{}, fmt.Errorf("decoding DAML key for %s: %w", m.ParticipantID, decErr)
+			}
+			var damlKey cryptov30.SigningPublicKey
+			if unmErr := proto.Unmarshal(damlKeyBytes, &damlKey); unmErr != nil {
+				return ProposeP2POutput{}, fmt.Errorf("unmarshalling DAML key for %s: %w", m.ParticipantID, unmErr)
+			}
+			damlKeys = append(damlKeys, &damlKey)
+		}
+
 		mapping := &protov30.TopologyMapping{
 			Mapping: &protov30.TopologyMapping_PartyToParticipant{
 				PartyToParticipant: &protov30.PartyToParticipant{
 					Party:        in.PartyID,
 					Threshold:    uint32(threshold),
 					Participants: hostingParticipants,
+					PartySigningKeys: &cryptov30.SigningKeysWithThreshold{
+						Keys:      damlKeys,
+						Threshold: uint32(threshold),
+					},
 				},
 			},
 		}

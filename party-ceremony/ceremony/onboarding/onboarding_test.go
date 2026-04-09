@@ -100,6 +100,10 @@ func (m *mockCantonClient) ListDecentralizedNamespaces(_ context.Context, _ stri
 	return []*client.DNSState{}, nil
 }
 
+func (m *mockCantonClient) UploadDar(_ context.Context, _ []byte) (string, error) {
+	return "mock-package-id", nil
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 func newDeps(participantID string) ceremony.CantonDeps {
