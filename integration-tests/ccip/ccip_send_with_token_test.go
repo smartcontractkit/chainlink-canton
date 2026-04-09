@@ -209,7 +209,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: types.TEXT("00000000"),
+								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -419,7 +419,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
 					InboundCCVs:        []mcms.RawInstanceAddress{},
 					OutboundCCVs:       []mcms.RawInstanceAddress{},
-					FinalityConfig:     types.TEXT("00000000"),
+					FinalityConfig:     common.FinalityConfig{WaitForFinality: &types.UNIT{}},
 					InboundRateLimiter: outboundRateLimiterAddr.Binding(),
 					InboundCustomBlockConfirmationsRateLimiter: outboundRateLimiterAddr.Binding(),
 					OutboundRateLimiter:                        outboundRateLimiterAddr.Binding(),

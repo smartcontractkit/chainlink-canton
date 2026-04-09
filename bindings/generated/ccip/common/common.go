@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "c894aeb46569fd5c7c289f40c40d38d9926b64ff7b121c92a96306c1c14b6117"
+	PackageID   = "2f322d4f938b30d0954e3fd3dc612b4608eeeb1a9184f7e4d58818d798800888"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1655,8 +1655,8 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 
 // DecodedFinality is a Record type
 type DecodedFinality struct {
-	Raw       types.TEXT        `json:"raw"`
-	Requested RequestedFinality `json:"requested"`
+	Raw       types.TEXT     `json:"raw"`
+	Requested FinalityConfig `json:"requested"`
 }
 
 // ToMap converts DecodedFinality to a map for DAML arguments
@@ -2016,7 +2016,7 @@ type ExecutingMessageV1 struct {
 	RequiredCCVs           []mcms.RawInstanceAddress  `json:"requiredCCVs"`
 	OptionalCCVs           []mcms.RawInstanceAddress  `json:"optionalCCVs"`
 	OptionalCCVThreshold   types.INT64                `json:"optionalCCVThreshold"`
-	ReceiverFinalityConfig RequestedFinality          `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig FinalityConfig             `json:"receiverFinalityConfig"`
 	SourceDefaultCCVs      []mcms.RawInstanceAddress  `json:"sourceDefaultCCVs"`
 	InboundPoolCCVs        *[]mcms.RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
 	Deps                   ExecutingMessageDeps       `json:"deps"`
@@ -2992,6 +2992,75 @@ func (t *FeeTokenAmountMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
+
+// FinalityConfig is a variant/union type
+type FinalityConfig struct {
+	WaitForFinality *types.UNIT  `json:"WaitForFinality,omitempty"`
+	WaitForSafe     *types.UNIT  `json:"WaitForSafe,omitempty"`
+	BlockDepth      *types.INT64 `json:"BlockDepth,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for FinalityConfig
+func (v FinalityConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(v)
+}
+
+// UnmarshalJSON implements custom JSON unmarshalling for FinalityConfig
+func (v *FinalityConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes FinalityConfig to hex string (Canton MCMS format)
+func (v FinalityConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes FinalityConfig from hex string (Canton MCMS format)
+func (v *FinalityConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
+}
+
+// GetVariantTag implements types.VARIANT interface
+func (v FinalityConfig) GetVariantTag() string {
+
+	if v.WaitForFinality != nil {
+		return "WaitForFinality"
+	}
+
+	if v.WaitForSafe != nil {
+		return "WaitForSafe"
+	}
+
+	if v.BlockDepth != nil {
+		return "BlockDepth"
+	}
+
+	return ""
+}
+
+// GetVariantValue implements types.VARIANT interface
+func (v FinalityConfig) GetVariantValue() any {
+
+	if v.WaitForFinality != nil {
+		return v.WaitForFinality
+	}
+
+	if v.WaitForSafe != nil {
+		return v.WaitForSafe
+	}
+
+	if v.BlockDepth != nil {
+		return v.BlockDepth
+	}
+
+	return nil
+}
+
+var _ types.VARIANT = (*FinalityConfig)(nil)
 
 // FinalizeExecute is a Record type
 type FinalizeExecute struct {
@@ -4267,75 +4336,6 @@ func (t *Receipt) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
-
-// RequestedFinality is a variant/union type
-type RequestedFinality struct {
-	WaitForFinality *types.UNIT  `json:"WaitForFinality,omitempty"`
-	WaitForSafe     *types.UNIT  `json:"WaitForSafe,omitempty"`
-	BlockDepth      *types.INT64 `json:"BlockDepth,omitempty"`
-}
-
-// MarshalJSON implements custom JSON marshaling for RequestedFinality
-func (v RequestedFinality) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(v)
-}
-
-// UnmarshalJSON implements custom JSON unmarshalling for RequestedFinality
-func (v *RequestedFinality) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, v)
-}
-
-// MarshalHex encodes RequestedFinality to hex string (Canton MCMS format)
-func (v RequestedFinality) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(v)
-}
-
-// UnmarshalHex decodes RequestedFinality from hex string (Canton MCMS format)
-func (v *RequestedFinality) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, v)
-}
-
-// GetVariantTag implements types.VARIANT interface
-func (v RequestedFinality) GetVariantTag() string {
-
-	if v.WaitForFinality != nil {
-		return "WaitForFinality"
-	}
-
-	if v.WaitForSafe != nil {
-		return "WaitForSafe"
-	}
-
-	if v.BlockDepth != nil {
-		return "BlockDepth"
-	}
-
-	return ""
-}
-
-// GetVariantValue implements types.VARIANT interface
-func (v RequestedFinality) GetVariantValue() any {
-
-	if v.WaitForFinality != nil {
-		return v.WaitForFinality
-	}
-
-	if v.WaitForSafe != nil {
-		return v.WaitForSafe
-	}
-
-	if v.BlockDepth != nil {
-		return v.BlockDepth
-	}
-
-	return nil
-}
-
-var _ types.VARIANT = (*RequestedFinality)(nil)
 
 // SendingMessageDeps is a Record type
 type SendingMessageDeps struct {

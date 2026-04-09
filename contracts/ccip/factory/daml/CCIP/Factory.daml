@@ -564,7 +564,7 @@ data DeployCCIPReceiverParams = DeployCCIPReceiverParams
         requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalThreshold : Int
-        receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
+        receiverFinalityConfig : CCIP.FinalityCodec.FinalityConfig
     deriving (Eq, Show)
 
 requireDecoded : Text -> Optional a -> Update a
@@ -705,7 +705,7 @@ mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
     optionalThreshold = params.optionalThreshold
     receiverFinalityConfig = params.receiverFinalityConfig
 
-decodeRequestedFinalityAt : BytesHex -> Int -> Optional (CCIP.FinalityCodec.RequestedFinality, Int)
+decodeRequestedFinalityAt : BytesHex -> Int -> Optional (CCIP.FinalityCodec.FinalityConfig, Int)
 decodeRequestedFinalityAt encoded offset = do
     tagHex <- extractBytes encoded offset 1
     if tagHex == "00" then Some (CCIP.FinalityCodec.WaitForFinality, offset + 1)

@@ -242,7 +242,7 @@ func defaultExecutorParams(ownerParty string) sequences.ExecutorParams {
 	}
 }
 
-func requestedFinality(cfg finality.Config) common.RequestedFinality {
+func requestedFinality(cfg finality.Config) common.FinalityConfig {
 	if cfg.IsZero() || cfg.WaitForFinality {
 		return waitForFinalityRequested()
 	}
@@ -254,18 +254,18 @@ func requestedFinality(cfg finality.Config) common.RequestedFinality {
 	}
 	if cfg.BlockDepth > 0 {
 		depth := types.INT64(cfg.BlockDepth)
-		return common.RequestedFinality{BlockDepth: &depth}
+		return common.FinalityConfig{BlockDepth: &depth}
 	}
 
 	return waitForFinalityRequested()
 }
 
-func waitForFinalityRequested() common.RequestedFinality {
-	return common.RequestedFinality{WaitForFinality: &types.UNIT{}}
+func waitForFinalityRequested() common.FinalityConfig {
+	return common.FinalityConfig{WaitForFinality: &types.UNIT{}}
 }
 
-func waitForSafeRequested() common.RequestedFinality {
-	return common.RequestedFinality{WaitForSafe: &types.UNIT{}}
+func waitForSafeRequested() common.FinalityConfig {
+	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
 }
 
 func datastoreToOnChainOutput(ds datastore.DataStore) (seqcore.OnChainOutput, error) {

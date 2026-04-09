@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "3194855dac5aa5314f60eec8ba22e89fde8ae429f6675f710bfc19e38580cba2"
+	PackageID   = "db4ad8b7a9d874e1b1021ebe81dac44e74411d9d838f969ff7ed261752569544"
 	SDKVersion  = "3.4.10"
 )
 
@@ -573,7 +573,7 @@ type DeployCCIPReceiverParams struct {
 	RequiredCCVs           []mcms.RawInstanceAddress `json:"requiredCCVs"`
 	OptionalCCVs           []mcms.RawInstanceAddress `json:"optionalCCVs"`
 	OptionalThreshold      types.INT64               `json:"optionalThreshold"`
-	ReceiverFinalityConfig common.RequestedFinality  `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig common.FinalityConfig     `json:"receiverFinalityConfig"`
 }
 
 // ToMap converts DeployCCIPReceiverParams to a map for DAML arguments

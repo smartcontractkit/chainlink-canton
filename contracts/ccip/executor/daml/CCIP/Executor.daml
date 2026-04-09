@@ -109,7 +109,7 @@ template Executor
             do
                 pure maxCCVsPerMsg
 
-        nonconsuming choice GetAllowedFinalityConfig : CCIP.FinalityCodec.RequestedFinality
+        nonconsuming choice GetAllowedFinalityConfig : CCIP.FinalityCodec.FinalityConfig
             with
                 caller : Party
             controller caller

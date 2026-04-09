@@ -43,7 +43,7 @@ var customCodecs = map[string]damltemplate.CustomCodec{
 		EncodeListFunc: "encodeBytesHexList",
 		DecodeListFunc: "decodeBytesHexList",
 	},
-	"RequestedFinality": {
+	"FinalityConfig": {
 		EncodeFunc:   "encodeRequestedFinality",
 		DecodeFunc:   "decodeRequestedFinalityAt",
 		ImportModule: "CCIP.Codec",

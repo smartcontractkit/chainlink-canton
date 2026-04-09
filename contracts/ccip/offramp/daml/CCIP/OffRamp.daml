@@ -111,7 +111,7 @@ template OffRamp
                 receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
-                receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
+                receiverFinalityConfig : CCIP.FinalityCodec.FinalityConfig
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 receiverParty : Party
                 tokenReceiverParty : Optional Party

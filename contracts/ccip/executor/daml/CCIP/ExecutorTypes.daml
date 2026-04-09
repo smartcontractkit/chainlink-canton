@@ -18,7 +18,7 @@ data RemoteChainConfigArgs = RemoteChainConfigArgs
 data DynamicConfig = DynamicConfig
     with
         feeAggregator : Optional Party
-        allowedFinalityConfig : CCIP.FinalityCodec.RequestedFinality
+        allowedFinalityConfig : CCIP.FinalityCodec.FinalityConfig
         ccvAllowlistEnabled : Bool
     deriving (Eq, Show)
 

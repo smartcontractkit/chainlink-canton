@@ -279,7 +279,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: types.TEXT("00000000"),
+								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,

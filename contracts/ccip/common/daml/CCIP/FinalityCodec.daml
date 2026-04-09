@@ -1,5 +1,5 @@
 module CCIP.FinalityCodec
-  ( RequestedFinality(..)
+  ( FinalityConfig(..)
   , DecodedFinality(..)
   , waitForFinalityFlag
   , waitForFinalityDecoded
@@ -14,7 +14,7 @@ import DA.Optional (fromSomeNote)
 import qualified DA.Crypto.Text
 import qualified DA.Text as Text
 
-data RequestedFinality
+data FinalityConfig
     = WaitForFinality
     | WaitForSafe
     | BlockDepth Int
@@ -23,7 +23,7 @@ data RequestedFinality
 data DecodedFinality = DecodedFinality
     with
         raw : BytesHex
-        requested : RequestedFinality
+        requested : FinalityConfig
     deriving (Eq, Show)
 
 finalityConfigByteLength : Int
@@ -115,7 +115,7 @@ decodeRequestedFinality finalityConfig =
 -- Check whether a requested finality is allowed by a receiver/pool config.
 -- Both values are already decoded, so normal contract logic can compare the
 -- structured meaning directly instead of re-decoding raw bytes.
-requestedFinalityAllowed : RequestedFinality -> RequestedFinality -> Bool
+requestedFinalityAllowed : FinalityConfig -> FinalityConfig -> Bool
 requestedFinalityAllowed requestedFinality allowedFinality =
     case (requestedFinality, allowedFinality) of
         (WaitForFinality, _) -> True
@@ -124,6 +124,6 @@ requestedFinalityAllowed requestedFinality allowedFinality =
         _ -> False
 
 -- Any config other than finalized-only needs the custom-finality limiter path.
-customFinalityRateLimiterRequired : RequestedFinality -> Bool
+customFinalityRateLimiterRequired : FinalityConfig -> Bool
 customFinalityRateLimiterRequired allowedFinalityConfig =
     allowedFinalityConfig /= WaitForFinality

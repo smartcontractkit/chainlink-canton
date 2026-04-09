@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "d68d66bfe322a12e3abce8b26bcff6a2e008d7775bc0b7aa08e5f1d1649f8607"
+	PackageID   = "36e0c9faa3ff45f86596b13c3997c67431a0ffd1172aa1ea2f6db934851fdd41"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1982,7 +1982,7 @@ type PrepareExecute2 struct {
 	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    common.RequestedFinality  `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
 	Caller                    types.PARTY               `json:"caller"`
 }
 
@@ -2086,7 +2086,7 @@ type PrepareExecute2MCMSParams struct {
 	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    common.RequestedFinality  `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.

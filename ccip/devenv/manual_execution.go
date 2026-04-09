@@ -28,27 +28,27 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 )
 
-func receiverWaitForFinalityConfig() common.RequestedFinality {
-	return common.RequestedFinality{WaitForFinality: &types.UNIT{}}
+func receiverWaitForFinalityConfig() common.FinalityConfig {
+	return common.FinalityConfig{WaitForFinality: &types.UNIT{}}
 }
 
-func receiverWaitForSafeConfig() common.RequestedFinality {
-	return common.RequestedFinality{WaitForSafe: &types.UNIT{}}
+func receiverWaitForSafeConfig() common.FinalityConfig {
+	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
 }
 
-func encodeReceiverFinalityConfig(finality int64) (common.RequestedFinality, error) {
+func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error) {
 	switch {
 	case finality < 0:
-		return common.RequestedFinality{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
+		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
 	case finality == 0:
 		return receiverWaitForFinalityConfig(), nil
 	case finality == 0x00010000:
 		return receiverWaitForSafeConfig(), nil
 	case finality > 0xFFFF:
-		return common.RequestedFinality{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
+		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
 	default:
 		depth := types.INT64(finality)
-		return common.RequestedFinality{BlockDepth: &depth}, nil
+		return common.FinalityConfig{BlockDepth: &depth}, nil
 	}
 }
 

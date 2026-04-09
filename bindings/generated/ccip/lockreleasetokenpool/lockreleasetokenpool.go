@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "b9a3a0a3a7f4566832eb308d2672b068d129f8c871478399f0ca5d24f00c21c8"
+	PackageID   = "94bf24504447f8e02d77ba25338a8fab546c2dd02b19fdef8e81ce49e2dae3c6"
 	SDKVersion  = "3.4.10"
 )
 
@@ -286,7 +286,7 @@ type ChainUpdate struct {
 	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
 	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
-	FinalityConfig                             common.RequestedFinality  `json:"finalityConfig"`
+	FinalityConfig                             common.FinalityConfig     `json:"finalityConfig"`
 	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
@@ -1322,7 +1322,7 @@ func (t *LockReleaseTokenPoolGetFeeMCMSParams) UnmarshalHex(data string) error {
 type LockReleaseTokenPoolGetRequiredCCVs struct {
 	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
 	Amount              types.NUMERIC                `json:"amount"`
-	Finality            common.RequestedFinality     `json:"finality"`
+	Finality            common.FinalityConfig        `json:"finality"`
 	ExtraData           types.TEXT                   `json:"extraData"`
 	Direction           interfaces.TransferDirection `json:"direction"`
 	Caller              types.PARTY                  `json:"caller"`
@@ -1386,7 +1386,7 @@ func (t *LockReleaseTokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 type LockReleaseTokenPoolGetRequiredCCVsMCMSParams struct {
 	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
 	Amount              types.NUMERIC                `json:"amount"`
-	Finality            common.RequestedFinality     `json:"finality"`
+	Finality            common.FinalityConfig        `json:"finality"`
 	ExtraData           types.TEXT                   `json:"extraData"`
 	Direction           interfaces.TransferDirection `json:"direction"`
 }
@@ -1862,7 +1862,7 @@ type RemoteChainConfig struct {
 	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
 	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
-	FinalityConfig                             common.RequestedFinality  `json:"finalityConfig"`
+	FinalityConfig                             common.FinalityConfig     `json:"finalityConfig"`
 	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`

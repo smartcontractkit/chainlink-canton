@@ -52,7 +52,7 @@ template CCIPReceiver
         optionalCCVs : [RawInstanceAddress]
         optionalThreshold : Int
         -- Allowed finality policy for inbound execution.
-        receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
+        receiverFinalityConfig : CCIP.FinalityCodec.FinalityConfig
     where
         signatory owner
         -- Ensure that requiredCCVs are unique

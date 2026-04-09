@@ -37,7 +37,7 @@ interface ITokenPool where
         with
             remoteChainSelector : Numeric 0
             amount : Decimal
-            finality : CCIP.FinalityCodec.RequestedFinality
+            finality : CCIP.FinalityCodec.FinalityConfig
             extraData : BytesHex
             direction : TransferDirection
             caller : Party

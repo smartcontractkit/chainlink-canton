@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "42a28b596daf2bdbd3a7a2a4fee797685cd070c78ffecff2afcf3507839c6a91"
+	PackageID   = "6c7325b427e645c373b328e685d50fac4180489878c216b977d986c0cc143afb"
 	SDKVersion  = "3.4.10"
 )
 
@@ -372,9 +372,9 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 
 // DynamicConfig is a Record type
 type DynamicConfig struct {
-	FeeAggregator         *types.PARTY             `json:"feeAggregator" hex:"optional"`
-	AllowedFinalityConfig common.RequestedFinality `json:"allowedFinalityConfig"`
-	CcvAllowlistEnabled   types.BOOL               `json:"ccvAllowlistEnabled"`
+	FeeAggregator         *types.PARTY          `json:"feeAggregator" hex:"optional"`
+	AllowedFinalityConfig common.FinalityConfig `json:"allowedFinalityConfig"`
+	CcvAllowlistEnabled   types.BOOL            `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts DynamicConfig to a map for DAML arguments

@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "ff65475595e2463a42a3bda8ae7f12612e2223d29c2e593237c522f1e3e25397"
+	PackageID   = "79653afcd3023f8af7f51da0922fd5ab346949ecd2c0e4b82e84c369363735db"
 	SDKVersion  = "3.4.10"
 )
 
@@ -215,7 +215,7 @@ type CCIPReceiver struct {
 	RequiredCCVs           []mcms.RawInstanceAddress `json:"requiredCCVs"`
 	OptionalCCVs           []mcms.RawInstanceAddress `json:"optionalCCVs"`
 	OptionalThreshold      types.INT64               `json:"optionalThreshold"`
-	ReceiverFinalityConfig common.RequestedFinality  `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig common.FinalityConfig     `json:"receiverFinalityConfig"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

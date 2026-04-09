@@ -538,7 +538,7 @@ template PerPartyRouter
                 receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
-                receiverFinalityConfig : CCIP.FinalityCodec.RequestedFinality
+                receiverFinalityConfig : CCIP.FinalityCodec.FinalityConfig
                 caller : Party
             controller partyOwner
             do

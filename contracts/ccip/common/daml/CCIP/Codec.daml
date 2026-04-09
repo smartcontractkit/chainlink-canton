@@ -12,7 +12,7 @@ module CCIP.Codec
   , decodeRawInstanceAddressAt
   , encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
-  -- RequestedFinality encoding for MCMS/config codecs
+  -- FinalityConfig encoding for MCMS/config codecs
   , encodeRequestedFinality
   , decodeRequestedFinalityAt
   -- Optional RawInstanceAddress encoding
@@ -131,7 +131,7 @@ decodeRawInstanceAddressListHelper encoded offset remaining acc = do
 --   2 = BlockDepth
 -- ===========================================================================
 
-encodeRequestedFinality : FinalityCodec.RequestedFinality -> BytesHex
+encodeRequestedFinality : FinalityCodec.FinalityConfig -> BytesHex
 encodeRequestedFinality requestedFinality =
   case requestedFinality of
     FinalityCodec.WaitForFinality -> fromSome (encodeUint8 0)
@@ -139,7 +139,7 @@ encodeRequestedFinality requestedFinality =
     FinalityCodec.BlockDepth depth ->
       fromSome (encodeUint8 2) <> fromSome (encodeInt64 depth)
 
-decodeRequestedFinalityAt : BytesHex -> Int -> Optional (FinalityCodec.RequestedFinality, Int)
+decodeRequestedFinalityAt : BytesHex -> Int -> Optional (FinalityCodec.FinalityConfig, Int)
 decodeRequestedFinalityAt encoded offset = do
   tagHex <- extractBytes encoded offset 1
   tag <- decodeUint8 tagHex

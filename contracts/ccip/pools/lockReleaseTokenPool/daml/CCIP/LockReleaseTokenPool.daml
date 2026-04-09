@@ -153,7 +153,7 @@ bpsDenominator = 10000.0
 calculateFeeFromBps : Numeric 0 -> Numeric 0 -> Numeric 0
 calculateFeeFromBps amount feeBps = CCIP.Math.mulDivDown amount feeBps bpsDenominator
 
-customFinalityRateLimiterRequired : CCIP.FinalityCodec.RequestedFinality -> Bool
+customFinalityRateLimiterRequired : CCIP.FinalityCodec.FinalityConfig -> Bool
 customFinalityRateLimiterRequired finalityConfig =
     CCIP.FinalityCodec.customFinalityRateLimiterRequired finalityConfig
 
@@ -451,7 +451,7 @@ template LockReleaseTokenPool
             with
                 remoteChainSelector : Numeric 0
                 amount : Decimal
-                finality : CCIP.FinalityCodec.RequestedFinality
+                finality : CCIP.FinalityCodec.FinalityConfig
                 extraData : BytesHex
                 direction : CCIP.Interfaces.TokenPool.TransferDirection
                 caller : Party

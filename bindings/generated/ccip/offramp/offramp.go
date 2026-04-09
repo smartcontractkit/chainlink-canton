@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "eeead743f8ed016a54717ba35f41e5fe7eba5227dfea34d86d4bb7cc475e1779"
+	PackageID   = "ad6cb12500da0943724c9451db7704069ffc984e268e5431e95187bdc5b0d102"
 	SDKVersion  = "3.4.10"
 )
 
@@ -582,7 +582,7 @@ type PrepareExecute struct {
 	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    common.RequestedFinality  `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
 	RmnRemoteCid              types.CONTRACT_ID         `json:"rmnRemoteCid"`
 	ReceiverParty             types.PARTY               `json:"receiverParty"`
 	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
@@ -704,7 +704,7 @@ type PrepareExecuteMCMSParams struct {
 	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    common.RequestedFinality  `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
 	RmnRemoteCid              types.CONTRACT_ID         `json:"rmnRemoteCid"`
 	ReceiverParty             types.PARTY               `json:"receiverParty"`
 	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`

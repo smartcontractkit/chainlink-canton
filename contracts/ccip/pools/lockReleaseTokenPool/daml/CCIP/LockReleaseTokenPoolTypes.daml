@@ -13,7 +13,7 @@ data ChainUpdate = ChainUpdate
         remoteTokenAddress : BytesHex                                   -- The token address on the remote chain
         inboundCCVs : [RawInstanceAddress]                              -- Required CCVs for incoming transfers
         outboundCCVs : [RawInstanceAddress]                             -- Required CCVs for outgoing transfers
-        finalityConfig : CCIP.FinalityCodec.RequestedFinality           -- Allowed finality policy, "WaitForFinality" means finalized-only
+        finalityConfig : CCIP.FinalityCodec.FinalityConfig             -- Allowed finality policy, "WaitForFinality" means finalized-only
         inboundRateLimiter : RawInstanceAddress                         -- Required rate limiter for incoming transfers
         inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
         outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
@@ -25,7 +25,7 @@ data RemoteChainConfig = RemoteChainConfig
         remoteTokenAddress : BytesHex                                   -- The token address on the remote chain
         inboundCCVs : [RawInstanceAddress]                              -- Required CCVs for incoming transfers
         outboundCCVs : [RawInstanceAddress]                             -- Required CCVs for outgoing transfers
-        finalityConfig : CCIP.FinalityCodec.RequestedFinality           -- Allowed finality policy, "WaitForFinality" means finalized-only
+        finalityConfig : CCIP.FinalityCodec.FinalityConfig             -- Allowed finality policy, "WaitForFinality" means finalized-only
         inboundRateLimiter : RawInstanceAddress                         -- Required rate limiter for incoming transfers
         inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
         outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
