@@ -76,7 +76,12 @@ func (m *mockAdminClient) GetDNS(_ context.Context, _ string, _ string) (*client
 }
 
 func (m *mockAdminClient) GetP2P(_ context.Context, _ string, _ string) (*client.P2PState, error) {
-	return &client.P2PState{}, nil
+	return &client.P2PState{
+		Participants: []client.P2PParticipantInfo{
+			{ParticipantUID: "p1"},
+			{ParticipantUID: "p2"},
+		},
+	}, nil
 }
 
 func (m *mockAdminClient) ListDecentralizedNamespaces(_ context.Context, _ string) ([]*client.DNSState, error) {
@@ -160,7 +165,6 @@ func baseInput(pkgs []contractdeploy.PackageRef) contractdeploy.ContractDeployIn
 	return contractdeploy.ContractDeployInput{
 		DecentralizedPartyID: "test-party::1220abcdef",
 		SynchronizerID:       "global",
-		Participants:         []string{"p1", "p2"},
 		Packages:             pkgs,
 		TemplateModule:       "MCMS.Main",
 		TemplateEntity:       "MCMS",
@@ -267,7 +271,6 @@ func TestContractDeploySequence_PartyNotFound(t *testing.T) {
 	input := contractdeploy.ContractDeployInput{
 		DecentralizedPartyID: "test-party::1220abcdef",
 		SynchronizerID:       "global",
-		Participants:         []string{"p1"},
 		Packages:             []contractdeploy.PackageRef{{Name: "mcms", Version: "current"}},
 		TemplateModule:       "MCMS.Main",
 		TemplateEntity:       "MCMS",

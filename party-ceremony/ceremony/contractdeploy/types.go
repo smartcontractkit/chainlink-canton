@@ -17,9 +17,6 @@ type ContractDeployInput struct {
 	// SynchronizerID is the Canton synchronizer to target.
 	SynchronizerID string `json:"synchronizer_id"`
 
-	// Participants lists the participant IDs that will each upload DARs.
-	Participants []string `json:"participants"`
-
 	// Packages lists the DAML packages to upload by name and version.
 	// Each entry resolves to a DAR via the DARLoader in [ContractDeployDeps].
 	Packages []PackageRef `json:"packages"`
@@ -49,6 +46,19 @@ type ContractDeployOutput struct {
 }
 
 // ── Per-operation I/O types ──────────────────────────────────────────────────
+
+// FetchParticipantsInput is the input to [FetchParticipantsOp].
+type FetchParticipantsInput struct {
+	DecentralizedPartyID string `json:"decentralized_party_id"`
+	SynchronizerID       string `json:"synchronizer_id"`
+}
+
+// FetchParticipantsOutput is the output of [FetchParticipantsOp].
+type FetchParticipantsOutput struct {
+	// Participants is the list of participant UIDs hosting the decentralized party
+	// (e.g. "PAR::name::fingerprint").
+	Participants []string `json:"participants"`
+}
 
 // UploadDarsInput is the input to [UploadDarsOp].
 type UploadDarsInput struct {

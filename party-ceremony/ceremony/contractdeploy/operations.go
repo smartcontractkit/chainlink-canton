@@ -15,6 +15,39 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+// FetchParticipantsOp queries the Canton topology store for the participant UIDs
+// that currently host the decentralized party. The result drives the upload and
+// signing loops in [ContractDeploySequence].
+var FetchParticipantsOp = operations.NewOperation(
+	"contract-deploy/canton-ceremony/fetch-participants",
+	semver.MustParse("1.0.0"),
+	"Fetch participant UIDs for the decentralized party from the topology store",
+	func(b operations.Bundle, deps ContractDeployDeps, in FetchParticipantsInput) (FetchParticipantsOutput, error) {
+		ctx := b.GetContext()
+
+		p2pState, err := deps.AdminClient.GetP2P(ctx, in.DecentralizedPartyID, in.SynchronizerID)
+		if err != nil {
+			return FetchParticipantsOutput{}, fmt.Errorf("fetching P2P state for party %q: %w", in.DecentralizedPartyID, err)
+		}
+
+		if len(p2pState.Participants) == 0 {
+			return FetchParticipantsOutput{}, fmt.Errorf("no participants found for party %q: ensure the onboarding ceremony completed successfully", in.DecentralizedPartyID)
+		}
+
+		participants := make([]string, len(p2pState.Participants))
+		for i, p := range p2pState.Participants {
+			participants[i] = p.ParticipantUID
+		}
+
+		deps.Logger.Infow("Fetched participants for decentralized party",
+			"party", in.DecentralizedPartyID,
+			"count", len(participants),
+		)
+
+		return FetchParticipantsOutput{Participants: participants}, nil
+	},
+)
+
 // UploadDarsOp uploads all configured DARs to a single participant.
 // Each participant runs this operation independently. The operation is
 // idempotent: re-uploading the same DAR returns the same package ID.

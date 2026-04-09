@@ -131,7 +131,6 @@ func (s *ContractDeployFlowTestSuite) TestContractDeployFlow() {
 	input := contractdeploy.ContractDeployInput{
 		DecentralizedPartyID: s.PartyID,
 		SynchronizerID:       s.SynchronizerID,
-		Participants:         s.ParticipantIDs,
 		Packages:             []contractdeploy.PackageRef{{Name: "test-test", Version: "0.0.1"}},
 		TemplateModule:       "Main",
 		TemplateEntity:       "DisclosedTarget",

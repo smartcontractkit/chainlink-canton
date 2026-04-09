@@ -280,7 +280,6 @@ var knownContracts = map[string]contractProfile{
 //	canton-party-ceremony init contract-deploy \
 //	  --decentralized-party-id "prefix::namespace" \
 //	  --synchronizer-id global \
-//	  --participants p1,p2,p3 \
 //	  --packages "mcms:current" \
 //	  --contract-args-file ./mcms-args.json \
 //	  --config ./participant-config.json
@@ -303,7 +302,6 @@ func init() {
 
 	f.String("decentralized-party-id", "", "Full party ID in the format <prefix>::<namespace> (required)")
 	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
-	f.String("participants", "", "Comma-separated list of participant IDs (required)")
 	f.String("packages", "", "Comma-separated list of packages in name:version format, e.g. mcms:current,globalconfig:1.0.0 (required)")
 	f.String("template-module", "", "Fully-qualified DAML module name, e.g. MCMS.Main")
 	f.String("template-entity", "", "DAML template entity name, e.g. MCMS")
@@ -313,7 +311,6 @@ func init() {
 
 	_ = initContractDeployCmd.MarkFlagRequired("decentralized-party-id")
 	_ = initContractDeployCmd.MarkFlagRequired("synchronizer-id")
-	_ = initContractDeployCmd.MarkFlagRequired("participants")
 	_ = initContractDeployCmd.MarkFlagRequired("packages")
 
 	initCmd.AddCommand(initContractDeployCmd)
@@ -324,7 +321,6 @@ func runInitContractDeploy(cmd *cobra.Command, _ []string) error {
 
 	partyID, _ := f.GetString("decentralized-party-id")
 	synchronizerID, _ := f.GetString("synchronizer-id")
-	participantsRaw, _ := f.GetString("participants")
 	packagesRaw, _ := f.GetString("packages")
 	templateModule, _ := f.GetString("template-module")
 	templateEntity, _ := f.GetString("template-entity")
@@ -335,11 +331,6 @@ func runInitContractDeploy(cmd *cobra.Command, _ []string) error {
 	cfg, err := client.LoadConfig(configPath)
 	if err != nil {
 		return err
-	}
-
-	participants := splitParticipants(participantsRaw)
-	if len(participants) < 2 {
-		return fmt.Errorf("--participants must list at least 2 participants")
 	}
 
 	packages, err := parsePackageRefs(packagesRaw)
@@ -367,7 +358,6 @@ func runInitContractDeploy(cmd *cobra.Command, _ []string) error {
 	input := contractdeploy.ContractDeployInput{
 		DecentralizedPartyID: partyID,
 		SynchronizerID:       synchronizerID,
-		Participants:         participants,
 		Packages:             packages,
 		TemplateModule:       templateModule,
 		TemplateEntity:       templateEntity,

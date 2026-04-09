@@ -34,19 +34,21 @@ type CeremonyTestSuite struct {
 func (s *CeremonyTestSuite) SetupSuite() {
 	t := s.T()
 
-	// Uncomment to use local Canton environment for faster test runs (requires local setup).
-	// chain, err := s.NewLocalEnv()
-	// require.NoError(t, err, "failed to create local environment")
+	if s.chain == nil {
+		// Uncomment to use local Canton environment for faster test runs (requires local setup).
+		// chain, err := s.NewLocalEnv()
+		// require.NoError(t, err, "failed to create local environment")
 
-	chain, err := integrationtests.LoadChainWithCTF(t, 3)
-	require.NoError(t, err, "failed to load chain with CTF")
-	require.Len(t, chain.Participants, 3, "expected 3 participants")
-	s.chain = chain
+		chain, err := integrationtests.LoadChainWithCTF(t, 3)
+		require.NoError(t, err, "failed to load chain with CTF")
+		require.Len(t, chain.Participants, 3, "expected 3 participants")
+		s.chain = chain
+	}
 
 	// Build CantonClients for each participant.
 	actors := make([]Actor, 3)
 	for i := range 3 {
-		c, conn := s.NewCantonClient(chain.Participants[i])
+		c, conn := s.NewCantonClient(s.chain.Participants[i])
 		t.Cleanup(func() { _ = conn.Close() })
 		actors[i] = Actor{
 			client: c,
@@ -55,7 +57,7 @@ func (s *CeremonyTestSuite) SetupSuite() {
 		t.Logf("Participant %d: %s", i+1, actors[i].uid)
 	}
 
-	synchronizerID := s.DiscoverSynchronizerID(chain.Participants[0])
+	synchronizerID := s.DiscoverSynchronizerID(s.chain.Participants[0])
 	participantIDs := []string{actors[0].uid, actors[1].uid, actors[2].uid}
 
 	s.SynchronizerID = synchronizerID
