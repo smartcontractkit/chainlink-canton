@@ -174,6 +174,7 @@ func uploadAndVetDar(ctx context.Context, participant canton.Participant, pkg co
 	if err != nil {
 		return fmt.Errorf("failed to upload %s dar file: %w", pkg, err)
 	}
+
 	return nil
 }
 
@@ -189,7 +190,8 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 			return nil, err
 		}
 	}
-	return nil, nil
+
+	return datastore.NewMemoryDataStore().Seal(), nil
 }
 
 func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (ccipChangesets.DeployChainContractsPerChainCfg, error) {
@@ -204,7 +206,7 @@ func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector
 }
 
 func (c *Chain) PostDeployContractsForSelector(_ context.Context, _ *deployment.Environment, _ uint64, _ *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
-	return nil, nil
+	return datastore.NewMemoryDataStore().Seal(), nil
 }
 
 // DeployContractsForSelector implements cciptestinterfaces.CCIP17Configuration.
@@ -268,6 +270,7 @@ func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64
 	}
 
 	defaultFeeQuoterCfg := cantonadapters.DefaultCantonFeeQuoterDestChainConfig()
+
 	return cciptestinterfaces.ChainLaneProfile{
 		AddressBytesLength:   32,
 		BaseExecutionGasCost: 1,

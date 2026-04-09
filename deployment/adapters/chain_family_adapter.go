@@ -45,6 +45,7 @@ func SetRuntimeDataStore(ds datastore.DataStore) {
 func getRuntimeDataStore() datastore.DataStore {
 	runtimeDataStoreMu.RLock()
 	defer runtimeDataStoreMu.RUnlock()
+
 	return runtimeDataStore
 }
 
@@ -229,6 +230,7 @@ func (a *CantonChainFamilyAdapter) ResolveExecutor(ds datastore.DataStore, chain
 	if err != nil {
 		return "", err
 	}
+
 	return ref.Address, nil
 }
 
@@ -241,6 +243,7 @@ func findContractBytes(ds datastore.DataStore, chainSelector uint64, contractTyp
 	if err != nil {
 		return nil, err
 	}
+
 	return dsutil.ToInstanceAddressBytes(ref)
 }
 
@@ -254,6 +257,7 @@ func resolveContractRefByAddress(ds datastore.DataStore, chainSelector uint64, c
 			return ref, nil
 		}
 	}
+
 	return datastore.AddressRef{}, fmt.Errorf("no %s address ref found for %s on chain %d", contractType, address, chainSelector)
 }
 
@@ -266,6 +270,7 @@ func resolveContractRefsByAddresses(ds datastore.DataStore, chainSelector uint64
 		}
 		refs = append(refs, ref)
 	}
+
 	return refs, nil
 }
 
@@ -292,6 +297,7 @@ func convertCommitteeVerifierConfigs(configs []ccipadapters.CommitteeVerifierCon
 			RemoteChains:      remoteChains,
 		})
 	}
+
 	return out
 }
 

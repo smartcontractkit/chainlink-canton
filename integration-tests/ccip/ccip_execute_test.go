@@ -147,6 +147,7 @@ func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
 func finalityConfigFromBlockConfirmations(blockConfirmations uint16) [4]byte {
 	var config [4]byte
 	binary.BigEndian.PutUint16(config[2:], blockConfirmations)
+
 	return config
 }
 

@@ -28,6 +28,27 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 )
 
+const (
+	receiverWaitForFinalityConfig types.TEXT = "00000000"
+	receiverWaitForSafeConfig     types.TEXT = "00010000"
+)
+
+func encodeReceiverFinalityConfig(finality int64) (types.TEXT, error) {
+	switch {
+	case finality < 0:
+		return "", fmt.Errorf("invalid finality %d: must be non-negative", finality)
+	case finality == 0:
+		return receiverWaitForFinalityConfig, nil
+	case finality == 0x00010000:
+		return receiverWaitForSafeConfig, nil
+	case finality > 0xFFFF:
+		return "", fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
+	default:
+		// Receiver-side config uses bytes4 text with flags in the upper 16 bits.
+		return types.TEXT(fmt.Sprintf("%08x", uint32(finality))), nil
+	}
+}
+
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
 func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {

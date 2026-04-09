@@ -11,6 +11,10 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	seqcore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -27,10 +31,6 @@ import (
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
-	seqcore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 )
 
 var _ ccipadapters.DeployChainContractsAdapter = (*CantonDeployChainContractsAdapter)(nil)
@@ -129,6 +129,7 @@ func deployerPartyID(deployerContract string, participant canton.Participant) st
 	if deployerContract != "" {
 		return deployerContract
 	}
+
 	return participant.PartyID
 }
 
@@ -140,6 +141,7 @@ func lookupNativeInstrumentID(ctx context.Context, participant canton.Participan
 			return fmt.Errorf("failed to retrieve token: %w", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
 		return nil
 	}
 
@@ -190,6 +192,7 @@ func committeeVerifierParams(ownerParty string, verifiers []ccipadapters.Committ
 			},
 		})
 	}
+
 	return params
 }
 
@@ -222,6 +225,7 @@ func executorParams(ownerParty string, executors []ccipadapters.ExecutorDeployPa
 			},
 		})
 	}
+
 	return params
 }
 
@@ -246,6 +250,7 @@ func finalityConfig(cfg finality.Config) types.TEXT {
 		return receiverWaitForFinalityConfig
 	}
 	raw := cfg.Raw()
+
 	return types.TEXT(hex.EncodeToString(raw[:]))
 }
 
