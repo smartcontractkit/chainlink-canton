@@ -709,18 +709,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("update fee token prices: %w", err)
 	}
 
-	// UpdatePrices also archives/recreates FeeQuoter; refresh again for Send context/disclosures.
-	activeFeeQuoterContract, err = contract.FindActiveContractByInstanceAddress(
-		ctx,
-		participant.LedgerServices.State,
-		party,
-		feequoter.FeeQuoter{}.GetTemplateID(),
-		contracts.HexToInstanceAddress(feeQuoterRef.Address),
-	)
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active fee quoter contract: %w", err)
-	}
-
 	// collect ccv instance addresses so we can request their disclosures from EDS.
 	var ccvInstanceAddresses []contracts.InstanceAddress
 	for _, ccvItem := range opts.CCVs {
