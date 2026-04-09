@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +21,8 @@ import (
 	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
@@ -53,7 +53,7 @@ import (
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
+	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -61,18 +61,28 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
-	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-
-	// Side-effect: registers Canton LaneAdapter and other deployment adapters.
-	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 var (
-	_ cciptestinterfaces.CCIP17              = &Chain{}
-	_ cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_ ccv.ImplFactory                        = &ImplFactory{}
+	_                       cciptestinterfaces.CCIP17              = &Chain{}
+	_                       cciptestinterfaces.CCIP17Configuration = &Chain{}
+	_                       ccv.ImplFactory                        = &ImplFactory{}
+	cantonDeployDarPackages                                        = []contracts.Package{
+		contracts.CCIPCommon,
+		contracts.CCIPReceiver,
+		contracts.CCIPOffRamp,
+		contracts.CCIPOnRamp,
+		contracts.CCIPTokenAdminRegistry,
+		contracts.CCIPCommitteeVerifier,
+		contracts.CCIPPerPartyRouter,
+		contracts.CCIPFeeQuoter,
+		contracts.CCIPRMN,
+		contracts.CCIPSender,
+		contracts.CCIPExecutor,
+		contracts.CCIPTest,
+		contracts.CCIPLockReleaseTokenPool,
+	}
 )
 
 type ImplFactory struct{}
@@ -152,260 +162,54 @@ func (c *Chain) ConfigureNodes(ctx context.Context, blockchain *blockchain.Input
 	return "", nil // TODO: implement
 }
 
+func uploadAndVetDar(ctx context.Context, participant canton.Participant, pkg contracts.Package) error {
+	dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+	if err != nil {
+		return fmt.Errorf("failed to get %s dar file: %w", pkg, err)
+	}
+	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
+		DarFile:       dar,
+		VettingChange: adminv2.UploadDarFileRequest_VETTING_CHANGE_VET_ALL_PACKAGES,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to upload %s dar file: %w", pkg, err)
+	}
+	return nil
+}
+
+func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return nil, fmt.Errorf("canton chain %d not found or has no participants", selector)
+	}
+
+	participant := chain.Participants[0]
+	for _, pkg := range cantonDeployDarPackages {
+		if err := uploadAndVetDar(ctx, participant, pkg); err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
+}
+
+func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (ccipChangesets.DeployChainContractsPerChainCfg, error) {
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return ccipChangesets.DeployChainContractsPerChainCfg{}, fmt.Errorf("canton chain %d not found or has no participants", selector)
+	}
+
+	return ccipChangesets.DeployChainContractsPerChainCfg{
+		DeployerContract: fmt.Sprintf("canton:%s", chain.Participants[0].PartyID),
+	}, nil
+}
+
+func (c *Chain) PostDeployContractsForSelector(_ context.Context, _ *deployment.Environment, _ uint64, _ *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
+	return nil, nil
+}
+
 // DeployContractsForSelector implements cciptestinterfaces.CCIP17Configuration.
 func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, topology *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
-	// Only using a single participant for now
-	participant := env.BlockChains.CantonChains()[selector].Participants[0]
-
-	l := c.logger
-	l.Info().Msg("Configuring contracts for selector")
-	l.Info().Any("Selector", selector).Msg("Deploying for chain selectors")
-	runningDS := datastore.NewMemoryDataStore()
-
-	l.Info().Uint64("Selector", selector).Msg("Configuring per-chain contracts bundle")
-	bundle := operations.NewBundle(
-		func() context.Context { return context.Background() },
-		env.Logger,
-		operations.NewMemoryReporter(),
-	)
-	env.OperationsBundle = bundle
-
-	l.Info().Msg("Uploading and vetting CCIP DARs...")
-	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get common dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: commonDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload common dar file")
-	}
-	offRampDar, err := contracts.GetDar(contracts.CCIPOffRamp, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get offramp dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: offRampDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload offramp dar file")
-	}
-	onRampDar, err := contracts.GetDar(contracts.CCIPOnRamp, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get onramp dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: onRampDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload onramp dar file")
-	}
-	tokenAdminRegistryDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token admin registry dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: tokenAdminRegistryDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload token admin registry dar file")
-	}
-	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get committee verifier dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: committeeVerifierDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload committee verifier dar file")
-	}
-	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get per-party router dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: perPartyRouterDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload per-party router dar file")
-	}
-	feeQuoterDar, err := contracts.GetDar(contracts.CCIPFeeQuoter, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get fee quoter dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: feeQuoterDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload fee quoter dar file")
-	}
-	rmnDar, err := contracts.GetDar(contracts.CCIPRMN, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get rmn dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: rmnDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload rmn dar file")
-	}
-	ccipSenderDar, err := contracts.GetDar(contracts.CCIPSender, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ccip sender dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: ccipSenderDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload ccip sender dar file")
-	}
-	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ccip executor dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: ccipExecutorDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload ccip executor dar file")
-	}
-	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ccip test dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: ccipTestDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload ccip test dar file")
-	}
-
-	tokenPoolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPool, contracts.CurrentVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get token pool dar file")
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: tokenPoolDar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload token pool dar file")
-	}
-
-	// Create Scan and Registry API clients
-	// All participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
-	tokenSource := participant.TokenSource
-	interceptor := func(ctx context.Context, req *http.Request) error {
-		token, err := tokenSource.Token()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve token: %w", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-
-		return nil
-	}
-	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create token metadata client: %w", err)
-	}
-
-	// Setup Amulet token as fee token
-	// Get registry admin for Amulet tokens
-	registryInfoResponse, err := tokenMetadataClient.GetRegistryInfoWithResponse(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error getting registry info: %w", err)
-	}
-	if registryInfoResponse.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code from tokenMetadataClient: %d: %v", registryInfoResponse.StatusCode(), registryInfoResponse.Body)
-	}
-
-	// Native is Amulet
-	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(registryInfoResponse.JSON200.AdminId),
-		Id:    types.TEXT("Amulet"),
-	}
-
-	l.Info().Any("selector", selector).Any("party", participant.PartyID).Msg("Deploying chain contracts")
-	config := cantonChangesets.CantonCSDeps[cantonChangesets.DeployChainContractsConfig]{
-		ChainSelector: selector,
-		Participant:   0,
-		Config: cantonChangesets.DeployChainContractsConfig{
-			Params: sequences.DeployChainContractsParams{
-				CCIPOwnerParty:     participant.PartyID,
-				CommitteeVerifiers: nil,
-				GlobalConfig: sequences.GlobalConfigParams{
-					Template: common.GlobalConfig{
-						CcipOwner:     "", // Populated by the sequence
-						ChainSelector: types.NUMERIC(strconv.FormatUint(selector, 10)),
-					},
-				},
-				NativeInstrumentId: nativeInstrumentId,
-				FeeQuoterConfig: sequences.FeeQuoterParams{
-					Template: feequoter.FeeQuoter{
-						PriceUpdaters: []types.PARTY{types.PARTY(participant.PartyID)},
-					},
-					USDPerNative: big.NewInt(100_000_000), // $1 with a decimals
-				},
-				RMNRemote: sequences.RMNRemoteParams{
-					Template: rmn.RMNRemote{
-						RmnOwner:       types.PARTY(participant.PartyID),
-						CursedSubjects: nil,
-					},
-				},
-				Executors: []sequences.ExecutorParams{
-					{
-						Qualifier: devenvcommon.DefaultExecutorQualifier,
-						Template: executorBinding.Executor{
-							Owner:         types.PARTY(participant.PartyID),
-							MaxCCVsPerMsg: 10,
-							DynamicConfig: executorBinding.DynamicConfig{
-								FeeAggregator:         nil,
-								AllowedFinalityConfig: receiverWaitForFinalityConfig,
-								CcvAllowlistEnabled:   false,
-							},
-							AllowedCCVs: nil,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// Get committees
-	for qualifier, committeeConfig := range topology.NOPTopology.Committees {
-		storageLocations := make([]types.TEXT, len(committeeConfig.StorageLocations))
-		for i, location := range committeeConfig.StorageLocations {
-			storageLocations[i] = types.TEXT(location)
-		}
-		cv := sequences.CommitteeVerifierParams{
-			Qualifier: qualifier,
-			Template: ccvs.CommitteeVerifier{
-				Owner:                        types.PARTY(participant.PartyID), // TODO: use different ccv owner?
-				CcipOwner:                    types.PARTY(participant.PartyID),
-				VersionTag:                   types.TEXT("e9a05a20"),
-				MessageSentObservers:         nil, // no need to specify additional observers, the CCV's owner will be a signatory on CCIPMessageSent
-				StorageLocations:             storageLocations,
-				StorageLocationsAdmin:        types.PARTY(participant.PartyID),
-				PendingStorageLocationsAdmin: types.PARTY(participant.PartyID),
-				Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
-			},
-		}
-		config.Config.Params.CommitteeVerifiers = append(config.Config.Params.CommitteeVerifiers, cv)
-	}
-
-	out, err := cantonChangesets.DeployChainContracts{}.Apply(*env, config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy chain contracts for selector %d: %w", selector, err)
-	}
-	err = runningDS.Merge(out.DataStore.Seal())
-	if err != nil {
-		return nil, err
-	}
-
-	env.DataStore = runningDS.Seal()
-
-	return runningDS.Seal(), nil
+	return ccv.DeployContractsForSelector(ctx, env, c, selector, topology)
 }
 
 func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint64) (lanes.ChainDefinition, lanes.CommitteeVerifierRemoteChainInput, error) {
@@ -454,6 +258,56 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	}
 
 	return chainDefinition, cvConfig, nil
+}
+
+func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64) (cciptestinterfaces.ChainLaneProfile, error) {
+	if env != nil && env.DataStore != nil {
+		cantonadapters.SetRuntimeDataStore(env.DataStore)
+	} else if c.e != nil && c.e.DataStore != nil {
+		cantonadapters.SetRuntimeDataStore(c.e.DataStore)
+	}
+
+	defaultFeeQuoterCfg := cantonadapters.DefaultCantonFeeQuoterDestChainConfig()
+	return cciptestinterfaces.ChainLaneProfile{
+		AddressBytesLength:   32,
+		BaseExecutionGasCost: 1,
+		FeeQuoterDestChainConfig: ccipadapters.FeeQuoterDestChainConfig{
+			OverrideExistingConfig:      defaultFeeQuoterCfg.OverrideExistingConfig,
+			IsEnabled:                   defaultFeeQuoterCfg.IsEnabled,
+			MaxDataBytes:                defaultFeeQuoterCfg.MaxDataBytes,
+			MaxPerMsgGasLimit:           defaultFeeQuoterCfg.MaxPerMsgGasLimit,
+			DestGasOverhead:             defaultFeeQuoterCfg.DestGasOverhead,
+			DestGasPerPayloadByteBase:   defaultFeeQuoterCfg.DestGasPerPayloadByteBase,
+			ChainFamilySelector:         cantonadapters.CantonFamilySelector,
+			DefaultTokenFeeUSDCents:     defaultFeeQuoterCfg.DefaultTokenFeeUSDCents,
+			DefaultTokenDestGasOverhead: defaultFeeQuoterCfg.DefaultTokenDestGasOverhead,
+			DefaultTxGasLimit:           defaultFeeQuoterCfg.DefaultTxGasLimit,
+			NetworkFeeUSDCents:          defaultFeeQuoterCfg.NetworkFeeUSDCents,
+			LinkFeeMultiplierPercent:    defaultFeeQuoterCfg.V2Params.LinkFeeMultiplierPercent,
+			USDPerUnitGas:               defaultFeeQuoterCfg.V2Params.USDPerUnitGas,
+		},
+		ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
+			Enabled: true,
+		},
+		DefaultExecutorQualifier: devenvcommon.DefaultExecutorQualifier,
+		DefaultInboundCCVs: []datastore.AddressRef{
+			{
+				ChainSelector: selector,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
+				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
+			},
+		},
+		DefaultOutboundCCVs: []datastore.AddressRef{
+			{
+				ChainSelector: selector,
+				Type:          datastore.ContractType(committee_verifier.ContractType),
+				Version:       committee_verifier.Version,
+				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
+			},
+		},
+		GasForVerification: 50_000,
+	}, nil
 }
 
 func (c *Chain) PostConnect(env *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
