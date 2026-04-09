@@ -151,9 +151,18 @@ func finalityConfigFromBlockConfirmations(blockConfirmations uint16) [4]byte {
 	return config
 }
 
-func finalityConfigTextFromBlockConfirmations(blockConfirmations uint16) string {
-	config := finalityConfigFromBlockConfirmations(blockConfirmations)
-	return hex.EncodeToString(config[:])
+func finalityConfigValueFromBlockConfirmations(blockConfirmations uint16) *apiv2.Value {
+	if blockConfirmations == 0 {
+		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
+			Constructor: "WaitForFinality",
+			Value:       &apiv2.Value{Sum: &apiv2.Value_Unit{}},
+		}}}
+	}
+
+	return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
+		Constructor: "BlockDepth",
+		Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(blockConfirmations)}},
+	}}}
 }
 
 func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
@@ -619,7 +628,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "receiverFinalityConfig", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: finalityConfigTextFromBlockConfirmations(2000)}}},
+						{Label: "receiverFinalityConfig", Value: finalityConfigValueFromBlockConfirmations(2000)},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
