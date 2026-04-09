@@ -2,23 +2,18 @@ package store
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 )
-
-var ErrHoldingDisclosureNotFound = errors.New("holding disclosure not found")
 
 var holdingInterfaceId = &apiv2.Identifier{
 	// PackageId seems to be the hashed package ID, not the human-readable one.
@@ -28,14 +23,7 @@ var holdingInterfaceId = &apiv2.Identifier{
 	EntityName: "Holding",
 }
 
-// InstrumentHoldingStore provides access to the latest instrument holdings for a given instrument ID.
-type InstrumentHoldingStore interface {
-	// GetInstrumentHolding returns the latest instrument holding for the given instrument ID.
-	// Returns nil if no instrument holding is found.
-	GetInstrumentHolding(ctx context.Context, instrumentID splice_api_token_holding_v1.InstrumentId) (*apiv2.DisclosedContract, error)
-}
-
-var _ InstrumentHoldingStore = &InstrumentHoldingStoreService{}
+type InstrumentHoldingStore Store[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]
 
 // defaultReconnectBackoff is the delay before reconnecting after the update stream closes (e.g. server closed or error).
 const defaultReconnectBackoff = 5 * time.Second
@@ -49,53 +37,21 @@ type InstrumentHoldingStoreConfig struct {
 	ReconnectBackoff time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
 }
 
-type InstrumentHoldingStoreService struct {
-	logger zerolog.Logger
-
-	filtersByParty map[string]*apiv2.Filters
-
-	// owner is the party that we're tracking the holdings of.
-	owner types.PARTY
-
-	// holdingDisclosures is a map of instrument IDs to the owner's latest holding disclosure for that instrument.
-	holdingDisclosures map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract
-
-	// stateService is the service used to get the latest active contracts via interface id,
-	// specifically the #splice-api-token-holding-v1 interface.
-	stateService apiv2.StateServiceClient
-
-	// updateService is the service used to subscribe to updates from the Canton participant,
-	// specifically fetching _new_ holdings.
-	updateService apiv2.UpdateServiceClient
-
-	// maxRetries is the maximum number of retries when creating the active contracts stream (0 = unlimited).
-	maxRetries int
-
-	// reconnectBackoff is the delay before reconnecting after the stream closes (avoids log thrashing on misconfiguration).
-	reconnectBackoff time.Duration
-
-	ledgerEnd int64
-
-	// mux is to protect the holdings map.
-	mux sync.RWMutex
-}
-
 func NewInstrumentHoldingStore(
 	config InstrumentHoldingStoreConfig,
-) *InstrumentHoldingStoreService {
+	metrics Metrics,
+) *ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract] {
 	backoff := config.ReconnectBackoff
 	if backoff == 0 {
 		backoff = defaultReconnectBackoff
 	}
+	owner := config.Owner
 
-	return &InstrumentHoldingStoreService{
-		logger: config.Logger.With().Str("component", "InstrumentHoldingStoreService").Logger(),
-
-		owner:              config.Owner,
-		holdingDisclosures: make(map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract),
-
-		stateService:     config.StateService,
+	return &ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]{
+		logger:           config.Logger.With().Str("component", "InstrumentHoldingStore").Logger(),
 		updateService:    config.UpdateService,
+		stateService:     config.StateService,
+		metrics:          metrics,
 		maxRetries:       config.MaxRetries,
 		reconnectBackoff: backoff,
 		filtersByParty: map[string]*apiv2.Filters{
@@ -115,135 +71,68 @@ func NewInstrumentHoldingStore(
 				},
 			},
 		},
-	}
-}
-
-// updateStreamFactory returns a StreamFactory that creates GetUpdates streams for this store's owner and Holding interface.
-// It mirrors UpdateStore's updateStreamFactory but filters for the Holding interface only.
-func (i *InstrumentHoldingStoreService) updateStreamFactory() StreamFactory[apiv2.GetUpdatesResponse] {
-	return func(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
-		return i.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
-			BeginExclusive: offset,
-			EndInclusive:   nil, // not set, stream will not terminate
-			UpdateFormat: &apiv2.UpdateFormat{
-				IncludeTransactions: &apiv2.TransactionFormat{
-					EventFormat: &apiv2.EventFormat{
-						FiltersByParty: i.filtersByParty,
-						Verbose:        true,
-					},
-					TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
-				},
-			},
-		})
-	}
-}
-
-func (i *InstrumentHoldingStoreService) Run(ctx context.Context) error {
-	i.logger.Debug().Msg("Starting InstrumentHoldingStoreService")
-	ledgerEndResponse, err := i.stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return fmt.Errorf("failed to get ledger end: %w", err)
-	}
-	offset := ledgerEndResponse.Offset
-
-	// backfill
-	i.logger.Debug().Int64("offset", offset).Msg("Starting backfill")
-	holdingDisclosures, err := i.backfill(ctx, offset)
-	if err != nil {
-		return fmt.Errorf("backfill failed: %w", err)
-	}
-	i.mux.Lock()
-	i.ledgerEnd = offset
-	i.holdingDisclosures = holdingDisclosures
-	i.mux.Unlock()
-	i.logger.Debug().Int("holdingDisclosures", len(holdingDisclosures)).Int64("ledgerEnd", offset).Msg("Backfill complete")
-
-	// Subscribe to updates; reconnect on stream error (including EOF)
-	for {
-		i.logger.Debug().Int64("offset", i.ledgerEnd).Msg("Subscribing to update stream")
-		stream, err := GetStreamWithRetry(ctx, i.ledgerEnd, i.updateStreamFactory(), DefaultReliableStreamConfig(i.logger, i.maxRetries))
-		if err != nil {
-			return fmt.Errorf("failed to create update stream: %w", err)
-		}
-
-		i.logger.Debug().Int64("offset", i.ledgerEnd).Msg("Update stream created, listening for updates")
-		respChan, errChan := ReceiveFromStream(ctx, stream)
-	reconnect:
-		for {
-			select {
-			case err := <-errChan:
-				if errors.Is(err, io.EOF) {
-					i.logger.Debug().Msg("Update stream closed by server, reconnecting")
-					break reconnect
-				}
-				if err != nil {
-					i.logger.Warn().Err(err).Msg("Update stream closed by server, reconnecting")
-					break reconnect
-				}
-			case <-ctx.Done():
-				i.logger.Debug().Msg("Context cancelled, stopping InstrumentHoldingStoreService")
-				_ = stream.CloseSend()
-
-				return ctx.Err()
-			case resp, ok := <-respChan:
-				if !ok {
-					// respChan closed; err was already sent on errChan, inner loop will handle it
-					break reconnect
-				}
-				if tx, ok := resp.GetUpdate().(*apiv2.GetUpdatesResponse_Transaction); ok {
-					for _, event := range tx.Transaction.GetEvents() {
-						if createdEvent, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-							i.logger.Debug().
-								Any("createArguments", createdEvent.Created.GetCreateArguments()).
-								Str("contractID", createdEvent.Created.GetContractId()).
-								Str("packageName", createdEvent.Created.GetPackageName()).
-								Str("packageID", createdEvent.Created.GetTemplateId().GetPackageId()).
-								Str("moduleName", createdEvent.Created.GetTemplateId().GetModuleName()).
-								Str("entityName", createdEvent.Created.GetTemplateId().GetEntityName()).
-								Any("interfaceViews", createdEvent.Created.GetInterfaceViews()).
-								Msg("Processing holding")
-
-							relevantView, err := getRelevantInterfaceViewValue(createdEvent.Created.GetInterfaceViews(), holdingInterfaceId)
-							if err != nil {
-								i.logger.Debug().Err(err).Str("contractID", createdEvent.Created.GetContractId()).Msg("Failed to get relevant interface view value, skipping")
-								continue
-							}
-
-							holdingView, err := getHoldingView(i.owner, relevantView)
-							if err != nil {
-								i.logger.Debug().Err(err).Str("contractID", createdEvent.Created.GetContractId()).Msg("Failed to get holding disclosure for created event, skipping")
-								continue
-							}
-
-							// create the disclosure
-							holdingDisclosure := &apiv2.DisclosedContract{
-								TemplateId:       createdEvent.Created.GetTemplateId(),
-								ContractId:       createdEvent.Created.GetContractId(),
-								CreatedEventBlob: createdEvent.Created.GetCreatedEventBlob(),
-								SynchronizerId:   tx.Transaction.GetSynchronizerId(),
-							}
-							i.logger.Info().
-								Any("holdingView", holdingView).
-								Any("holdingDisclosure", holdingDisclosure).
-								Msg("Recording holding disclosure")
-
-							i.mux.Lock()
-							i.ledgerEnd = tx.Transaction.GetOffset()
-							i.holdingDisclosures[holdingView.InstrumentId] = holdingDisclosure
-							i.mux.Unlock()
-						}
-					}
-				}
+		mux:       sync.RWMutex{},
+		ledgerEnd: 0,
+		contracts: make(map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract),
+		handleActiveContract: func(ctx context.Context, store *ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract], activeContract *apiv2.ActiveContract) (updates []ContractUpdate[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract], err error) {
+			relevantView, err := getRelevantInterfaceViewValue(activeContract.GetCreatedEvent().GetInterfaceViews(), holdingInterfaceId)
+			if err != nil {
+				store.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get relevant interface view value, skipping")
+				return nil, nil
 			}
-		}
+			holdingView, err := getHoldingView(owner, relevantView)
+			if err != nil {
+				store.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get holding disclosure for active contract, skipping")
+				return nil, nil
+			}
 
-		// Backoff before reconnecting to avoid thrashing logs (e.g. on misconfiguration).
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(i.reconnectBackoff):
-			i.logger.Debug().Str("backoff", i.reconnectBackoff.String()).Msg("Reconnect backoff elapsed, reconnecting")
-		}
+			// create the disclosure
+			holdingDisclosure := &apiv2.DisclosedContract{
+				TemplateId:       activeContract.GetCreatedEvent().GetTemplateId(),
+				ContractId:       activeContract.GetCreatedEvent().GetContractId(),
+				CreatedEventBlob: activeContract.GetCreatedEvent().GetCreatedEventBlob(),
+				SynchronizerId:   activeContract.GetSynchronizerId(),
+			}
+			store.logger.Info().
+				Any("holdingView", holdingView).
+				Any("holdingDisclosure", holdingDisclosure).
+				Msg("Recording holding disclosure")
+
+			return []ContractUpdate[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]{{
+				Key:   holdingView.InstrumentId,
+				Value: holdingDisclosure,
+			}}, nil
+		},
+		handleCreatedEvent: func(ctx context.Context, store *ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract], transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) (updates []ContractUpdate[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract], err error) {
+			relevantView, err := getRelevantInterfaceViewValue(createdEvent.GetInterfaceViews(), holdingInterfaceId)
+			if err != nil {
+				store.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get relevant interface view value, skipping")
+				return nil, nil
+			}
+
+			holdingView, err := getHoldingView(owner, relevantView)
+			if err != nil {
+				store.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get holding disclosure for created event, skipping")
+				return nil, nil
+			}
+
+			// create the disclosure
+			holdingDisclosure := &apiv2.DisclosedContract{
+				TemplateId:       createdEvent.GetTemplateId(),
+				ContractId:       createdEvent.GetContractId(),
+				CreatedEventBlob: createdEvent.GetCreatedEventBlob(),
+				SynchronizerId:   transaction.GetSynchronizerId(),
+			}
+			store.logger.Info().
+				Any("holdingView", holdingView).
+				Any("holdingDisclosure", holdingDisclosure).
+				Msg("Recording holding disclosure")
+
+			return []ContractUpdate[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]{{
+				Key:   holdingView.InstrumentId,
+				Value: holdingDisclosure,
+			}}, nil
+		},
 	}
 }
 
@@ -273,87 +162,4 @@ func getRelevantInterfaceViewValue(interfaceViews []*apiv2.InterfaceView, expect
 	}
 
 	return nil, fmt.Errorf("no interface view found for interface id: %s", expectedInterfaceId.String())
-}
-
-// backfill returns all currently-active contracts for s.filtersByParty at a given offset, indexed by InstanceAddress.
-func (i *InstrumentHoldingStoreService) backfill(ctx context.Context, offset int64) (map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract, error) {
-	holdingDisclosures := make(map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract)
-
-	activeContractsResponse, err := i.stateService.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: offset,
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: i.filtersByParty,
-			Verbose:        true,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get active contracts: %w", err)
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			_ = activeContractsResponse.CloseSend()
-			return holdingDisclosures, ctx.Err()
-		default:
-			resp, err := activeContractsResponse.Recv()
-			if errors.Is(err, io.EOF) {
-				_ = activeContractsResponse.CloseSend()
-				return holdingDisclosures, nil
-			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to receive active contract: %w", err)
-			}
-
-			if ac, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-				i.logger.Debug().
-					Any("createArguments", ac.ActiveContract.GetCreatedEvent().GetCreateArguments()).
-					Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).
-					Str("packageName", ac.ActiveContract.GetCreatedEvent().GetPackageName()).
-					Str("packageID", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetPackageId()).
-					Str("moduleName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetModuleName()).
-					Str("entityName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName()).
-					Any("interfaceViews", ac.ActiveContract.GetCreatedEvent().GetInterfaceViews()).
-					Msg("Backfilling holding")
-
-				relevantView, err := getRelevantInterfaceViewValue(ac.ActiveContract.GetCreatedEvent().GetInterfaceViews(), holdingInterfaceId)
-				if err != nil {
-					i.logger.Debug().Err(err).Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).Msg("Failed to get relevant interface view value, skipping")
-					continue
-				}
-				holdingView, err := getHoldingView(i.owner, relevantView)
-				if err != nil {
-					i.logger.Debug().Err(err).Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).Msg("Failed to get holding disclosure for active contract, skipping")
-					continue
-				}
-
-				// create the disclosure
-				holdingDisclosure := &apiv2.DisclosedContract{
-					TemplateId:       ac.ActiveContract.GetCreatedEvent().GetTemplateId(),
-					ContractId:       ac.ActiveContract.GetCreatedEvent().GetContractId(),
-					CreatedEventBlob: ac.ActiveContract.GetCreatedEvent().GetCreatedEventBlob(),
-					SynchronizerId:   ac.ActiveContract.GetSynchronizerId(),
-				}
-				i.logger.Info().
-					Any("holdingView", holdingView).
-					Any("holdingDisclosure", holdingDisclosure).
-					Msg("Recording holding disclosure")
-
-				holdingDisclosures[holdingView.InstrumentId] = holdingDisclosure
-			}
-		}
-	}
-}
-
-// GetInstrumentHolding implements [InstrumentHoldingStore].
-func (i *InstrumentHoldingStoreService) GetInstrumentHolding(ctx context.Context, instrumentID splice_api_token_holding_v1.InstrumentId) (*apiv2.DisclosedContract, error) {
-	i.mux.RLock()
-	defer i.mux.RUnlock()
-
-	holdingDisclosure, ok := i.holdingDisclosures[instrumentID]
-	if !ok {
-		return nil, ErrHoldingDisclosureNotFound
-	}
-
-	return holdingDisclosure, nil
 }

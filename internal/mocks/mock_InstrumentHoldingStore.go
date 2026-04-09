@@ -3,8 +3,6 @@
 package mocks
 
 import (
-	context "context"
-
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	mock "github.com/stretchr/testify/mock"
 
@@ -24,61 +22,60 @@ func (_m *MockInstrumentHoldingStore) EXPECT() *MockInstrumentHoldingStore_Expec
 	return &MockInstrumentHoldingStore_Expecter{mock: &_m.Mock}
 }
 
-// GetInstrumentHolding provides a mock function with given fields: ctx, instrumentID
-func (_m *MockInstrumentHoldingStore) GetInstrumentHolding(ctx context.Context, instrumentID splice_api_token_holding_v1.InstrumentId) (*v2.DisclosedContract, error) {
-	ret := _m.Called(ctx, instrumentID)
+// Get provides a mock function with given fields: key
+func (_m *MockInstrumentHoldingStore) Get(key splice_api_token_holding_v1.InstrumentId) (*v2.DisclosedContract, bool) {
+	ret := _m.Called(key)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetInstrumentHolding")
+		panic("no return value specified for Get")
 	}
 
 	var r0 *v2.DisclosedContract
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, splice_api_token_holding_v1.InstrumentId) (*v2.DisclosedContract, error)); ok {
-		return rf(ctx, instrumentID)
+	var r1 bool
+	if rf, ok := ret.Get(0).(func(splice_api_token_holding_v1.InstrumentId) (*v2.DisclosedContract, bool)); ok {
+		return rf(key)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, splice_api_token_holding_v1.InstrumentId) *v2.DisclosedContract); ok {
-		r0 = rf(ctx, instrumentID)
+	if rf, ok := ret.Get(0).(func(splice_api_token_holding_v1.InstrumentId) *v2.DisclosedContract); ok {
+		r0 = rf(key)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v2.DisclosedContract)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, splice_api_token_holding_v1.InstrumentId) error); ok {
-		r1 = rf(ctx, instrumentID)
+	if rf, ok := ret.Get(1).(func(splice_api_token_holding_v1.InstrumentId) bool); ok {
+		r1 = rf(key)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1
 }
 
-// MockInstrumentHoldingStore_GetInstrumentHolding_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInstrumentHolding'
-type MockInstrumentHoldingStore_GetInstrumentHolding_Call struct {
+// MockInstrumentHoldingStore_Get_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Get'
+type MockInstrumentHoldingStore_Get_Call struct {
 	*mock.Call
 }
 
-// GetInstrumentHolding is a helper method to define mock.On call
-//   - ctx context.Context
-//   - instrumentID splice_api_token_holding_v1.InstrumentId
-func (_e *MockInstrumentHoldingStore_Expecter) GetInstrumentHolding(ctx interface{}, instrumentID interface{}) *MockInstrumentHoldingStore_GetInstrumentHolding_Call {
-	return &MockInstrumentHoldingStore_GetInstrumentHolding_Call{Call: _e.mock.On("GetInstrumentHolding", ctx, instrumentID)}
+// Get is a helper method to define mock.On call
+//   - key splice_api_token_holding_v1.InstrumentId
+func (_e *MockInstrumentHoldingStore_Expecter) Get(key interface{}) *MockInstrumentHoldingStore_Get_Call {
+	return &MockInstrumentHoldingStore_Get_Call{Call: _e.mock.On("Get", key)}
 }
 
-func (_c *MockInstrumentHoldingStore_GetInstrumentHolding_Call) Run(run func(ctx context.Context, instrumentID splice_api_token_holding_v1.InstrumentId)) *MockInstrumentHoldingStore_GetInstrumentHolding_Call {
+func (_c *MockInstrumentHoldingStore_Get_Call) Run(run func(key splice_api_token_holding_v1.InstrumentId)) *MockInstrumentHoldingStore_Get_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(splice_api_token_holding_v1.InstrumentId))
+		run(args[0].(splice_api_token_holding_v1.InstrumentId))
 	})
 	return _c
 }
 
-func (_c *MockInstrumentHoldingStore_GetInstrumentHolding_Call) Return(_a0 *v2.DisclosedContract, _a1 error) *MockInstrumentHoldingStore_GetInstrumentHolding_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockInstrumentHoldingStore_Get_Call) Return(value *v2.DisclosedContract, ok bool) *MockInstrumentHoldingStore_Get_Call {
+	_c.Call.Return(value, ok)
 	return _c
 }
 
-func (_c *MockInstrumentHoldingStore_GetInstrumentHolding_Call) RunAndReturn(run func(context.Context, splice_api_token_holding_v1.InstrumentId) (*v2.DisclosedContract, error)) *MockInstrumentHoldingStore_GetInstrumentHolding_Call {
+func (_c *MockInstrumentHoldingStore_Get_Call) RunAndReturn(run func(splice_api_token_holding_v1.InstrumentId) (*v2.DisclosedContract, bool)) *MockInstrumentHoldingStore_Get_Call {
 	_c.Call.Return(run)
 	return _c
 }

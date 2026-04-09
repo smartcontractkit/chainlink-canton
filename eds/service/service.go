@@ -158,34 +158,39 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		tokenPoolOutboundRateLimiterCids[i] = tokenPool.OutboundRateLimiter.InstanceAddress
 	}
 
-	updateStore, err := store.NewUpdateStore(ctx, store.UpdateStoreConfig{
-		Logger:        logger,
-		UpdateService: cantonChain.Participants[0].LedgerServices.Update,
-		StateService:  cantonChain.Participants[0].LedgerServices.State,
-		MaxRetries:    cfg.Node.MaxRetries,
-	},
-		metrics,
+	activeContractStore, err := store.NewActiveContractStore(
+		ctx,
+		store.ActiveContractStoreConfig{
+			Logger:        logger,
+			UpdateService: cantonChain.Participants[0].LedgerServices.Update,
+			StateService:  cantonChain.Participants[0].LedgerServices.State,
+			MaxRetries:    cfg.Node.MaxRetries,
+		},
+		metrics.With("store", "ActiveContractStore"),
 		templates...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create store: %w", err)
+		return fmt.Errorf("failed to create active contract store: %w", err)
 	}
 
-	instrumentHoldingStore := store.NewInstrumentHoldingStore(store.InstrumentHoldingStoreConfig{
-		Logger:        logger,
-		UpdateService: cantonChain.Participants[0].LedgerServices.Update,
-		StateService:  cantonChain.Participants[0].LedgerServices.State,
-		MaxRetries:    cfg.Node.MaxRetries,
-		Owner:         types.PARTY(cfg.Contracts.PoolOwner),
-	})
+	instrumentHoldingStore := store.NewInstrumentHoldingStore(
+		store.InstrumentHoldingStoreConfig{
+			Logger:        logger,
+			UpdateService: cantonChain.Participants[0].LedgerServices.Update,
+			StateService:  cantonChain.Participants[0].LedgerServices.State,
+			MaxRetries:    cfg.Node.MaxRetries,
+			Owner:         types.PARTY(cfg.Contracts.PoolOwner),
+		},
+		metrics.With("store", "InstrumentHoldingStore"),
+	)
 
 	// Run update store in the background
 	errChan := make(chan error)
 	go func(errChan chan<- error) {
-		logger.Info().Msg("starting update store")
-		err := updateStore.Run(ctx)
+		logger.Info().Msg("starting active contract store")
+		err := activeContractStore.Run(ctx)
 		if err != nil {
-			errChan <- fmt.Errorf("failed to run store: %w", err)
+			errChan <- fmt.Errorf("failed to run active contract store: %w", err)
 		}
 	}(errChan)
 
@@ -199,7 +204,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	}(errChan)
 
 	disclosureSvc := disclosure.NewDisclosureService(ctx, disclosure.DisclosureServiceConfig{
-		ContractStore:          updateStore,
+		ActiveContractStore:    activeContractStore,
 		InstrumentHoldingStore: instrumentHoldingStore,
 		PerPartyRouterFactory:  cfg.Contracts.PerPartyRouterFactory.InstanceAddress,
 		OnRamp:                 cfg.Contracts.OnRamp.InstanceAddress,

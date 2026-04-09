@@ -11,118 +11,60 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
-
-	"github.com/smartcontractkit/go-daml/pkg/types"
-
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
-// ContractStore provides access to currently active contracts on the ledger, indexed by InstanceAddress.
-type ContractStore interface {
-	// GetContract returns the currently active contract for a given InstanceAddress.
-	// Returns nil if no active contract is found.
-	GetContract(ctx context.Context, instanceAddress contracts.InstanceAddress) *apiv2.ActiveContract
+type Store[K comparable, V any] interface {
+	// Get returns the currently stored value for the given key.
+	// Returns false if no value is found.
+	Get(key K) (value V, ok bool)
 }
 
-var _ ContractStore = &UpdateStore{}
+type ContractUpdate[K comparable, V any] struct {
+	Key   K
+	Value V
+}
 
-type UpdateStore struct {
-	logger        zerolog.Logger
+type ContractStore[K comparable, V any] struct {
+	logger zerolog.Logger
+	// updateService is the service used to subscribe to updates from the Canton participant
 	updateService apiv2.UpdateServiceClient
-	stateService  apiv2.StateServiceClient
+	// stateService is the service used to get the latest active contracts from the Canton participant
+	stateService apiv2.StateServiceClient
 
 	metrics Metrics
+
+	// maxRetries is the maximum number of retries when creating the active contracts stream (0 = unlimited).
+	maxRetries int
+	// reconnectBackoff is the delay before reconnecting after the stream closes (avoids log thrashing on misconfiguration).
+	reconnectBackoff time.Duration
 
 	// The filters to apply when backfilling/subscribing to updates
 	filtersByParty map[string]*apiv2.Filters
 
-	mux       sync.RWMutex
+	// mutex to protect the contracts map and ledgerEnd
+	mux sync.RWMutex
+	// the last-processed ledgerEnd
 	ledgerEnd int64
-	contracts map[contracts.InstanceAddress]*apiv2.ActiveContract
+	// the currently stored values
+	contracts map[K]V
 
-	maxRetries int
+	// handler functions
+
+	// handleActiveContract is used to convert an ActiveContract to store updates.
+	// It is being called during backfill for each currently active contract returned by the configured filters.
+	handleActiveContract func(ctx context.Context, store *ContractStore[K, V], activeContract *apiv2.ActiveContract) (updates []ContractUpdate[K, V], err error)
+	// handleCreatedEvent is used to convert a CreatedEvent to store updates.
+	// It is being called for each CreatedEvent received in the update stream that matches the configured filters.
+	handleCreatedEvent func(ctx context.Context, store *ContractStore[K, V], transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) (updates []ContractUpdate[K, V], err error)
 }
 
-// RegisteredTemplate defines a template that the UpdateStore will keep track of.
-// It defines a TemplateID, as well as a Party - the latter of which must be a stakeholder (signatory or observer)
-// on the contract in order for the UpdateStore to pick up the contract.
-type RegisteredTemplate struct {
-	TemplateID contracts.TemplateID
-	PartyID    string
-}
-
-type UpdateStoreConfig struct {
-	Logger        zerolog.Logger
-	UpdateService apiv2.UpdateServiceClient
-	StateService  apiv2.StateServiceClient
-	MaxRetries    int
-}
-
-// NewUpdateStore returns a ContractStore implementation that keeps track of active contracts by subscribing
-// to incremental ledger updates.
-// The UpdateStore is configured with a variable list of registeredTemplates which are the only templates is will
-// keep track of. All templates must contain an 'InstanceId' field in order to calculate their InstanceAddress.
-// For example, if configured with:
-//
-//	store.RegisteredTemplate{
-//	   TemplateID: store.TemplateID{
-//	       PackageID:  "#ccip-committeeverifier",
-//	       ModuleName: "CCIP.CommitteeVerifier",
-//	       EntityName: "CommitteeVerifier",
-//	   },
-//	   PartyID: "ccvOwerParty::0x123567890",
-//	}
-//
-// The UpdateStore will list and subscribe all CommitteeVerifier contracts that the 'ccvOwnerParty' can see.
-// It will then index them by their calculated InstanceAddress using the combination of signatory + instanceId field.
-//
-// NewUpdateStore itself will perform not RPC calls, it will immediately return.
-// In order for the UpdateStore to initialize and subscribe to updates, (s *UpdateStore)Run() needs to be run.
-func NewUpdateStore(
-	ctx context.Context,
-	config UpdateStoreConfig,
-	metrics Metrics,
-	registeredTemplates ...RegisteredTemplate,
-) (*UpdateStore, error) {
-	filtersByParty := make(map[string]*apiv2.Filters) // Assemble filters
-	for _, template := range registeredTemplates {
-		existingFilterForParty, ok := filtersByParty[template.PartyID]
-		if !ok {
-			existingFilterForParty = &apiv2.Filters{}
-		}
-		existingFilterForParty.Cumulative = append(existingFilterForParty.Cumulative, &apiv2.CumulativeFilter{
-			IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{TemplateFilter: &apiv2.TemplateFilter{
-				TemplateId: &apiv2.Identifier{
-					PackageId:  template.TemplateID.PackageID,
-					ModuleName: template.TemplateID.ModuleName,
-					EntityName: template.TemplateID.EntityName,
-				},
-				IncludeCreatedEventBlob: true,
-			}},
-		})
-		filtersByParty[template.PartyID] = existingFilterForParty
-	}
-
-	return &UpdateStore{
-		logger:         config.Logger.With().Str("component", "UpdateStore").Logger(),
-		updateService:  config.UpdateService,
-		stateService:   config.StateService,
-		metrics:        metrics,
-		mux:            sync.RWMutex{},
-		ledgerEnd:      0,
-		filtersByParty: filtersByParty,
-		contracts:      make(map[contracts.InstanceAddress]*apiv2.ActiveContract),
-		maxRetries:     config.MaxRetries,
-	}, nil
-}
-
-// Run runs the UpdateStore. It will start by initializing the UpdateStore with a backfill of all existing active contracts
+// Run runs the ContractStore. It will start by initializing the ContractStore with a backfill of all existing active contracts
 // and subscribe to incremental updates afterward.
-// Run is a long-running function that needs to keep running int the background in order for the UpdateStore to keep
-// up-tp-date.
+// Run is a long-running function that needs to keep running in the background in order for the ContractStore to keep
+// up-to-date.
 // To terminate Run, cancel the context.
-func (s *UpdateStore) Run(ctx context.Context) error {
-	s.logger.Debug().Msg("Starting UpdateStore")
+func (s *ContractStore[K, V]) Run(ctx context.Context) error {
+	s.logger.Debug().Msg("Starting ContractStore")
 	ledgerEndResponse, err := s.stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
 	if err != nil {
 		return fmt.Errorf("failed to get ledger end: %w", err)
@@ -143,7 +85,7 @@ func (s *UpdateStore) Run(ctx context.Context) error {
 
 	// Create uptime ticker
 	// Ticking once a second to increase the uptime counter metric
-	// Checking if the metric is increasing can be used to verify that the UpdateStore is still subscribed and ready to process updates
+	// Checking if the metric is increasing can be used to verify that the ContractStore is still subscribed and ready to process updates
 	uptimeTicker := time.NewTicker(time.Second)
 	defer uptimeTicker.Stop()
 
@@ -172,57 +114,89 @@ func (s *UpdateStore) Run(ctx context.Context) error {
 					break reconnect
 				}
 			case <-ctx.Done():
-				s.logger.Debug().Msg("Context cancelled, stopping UpdateStore")
+				s.logger.Debug().Msg("Context cancelled, stopping ContractStore")
 				_ = stream.CloseSend()
 
 				return ctx.Err()
 			case <-uptimeTicker.C:
 				// Increment uptime metric on every tick
 				s.metrics.IncrementStoreSubscriptionUptime(ctx)
-			case resp := <-updateChan:
+			case resp, ok := <-updateChan:
+				if !ok {
+					// updateChan closed; err was already sent on errChan, inner loop will handle it
+					break reconnect
+				}
 				if transaction, ok := resp.GetUpdate().(*apiv2.GetUpdatesResponse_Transaction); ok {
 					s.logger.Trace().Str("updateID", transaction.Transaction.GetUpdateId()).Int("events", len(transaction.Transaction.GetEvents())).Msg("Update received")
 					for _, event := range transaction.Transaction.GetEvents() {
-						if createdEvent, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+						switch event := event.GetEvent().(type) {
+						case *apiv2.Event_Created:
 							s.logger.Trace().
-								Str("contractID", createdEvent.Created.GetContractId()).
-								Str("packageName", createdEvent.Created.GetPackageName()).
-								Str("packageID", createdEvent.Created.GetTemplateId().GetPackageId()).
-								Str("moduleName", createdEvent.Created.GetTemplateId().GetModuleName()).
-								Str("entityName", createdEvent.Created.GetTemplateId().GetEntityName()).
+								Str("contractID", event.Created.GetContractId()).
+								Str("packageName", event.Created.GetPackageName()).
+								Str("packageID", event.Created.GetTemplateId().GetPackageId()).
+								Str("moduleName", event.Created.GetTemplateId().GetModuleName()).
+								Str("entityName", event.Created.GetTemplateId().GetEntityName()).
 								Msg("Received CreatedEvent")
-							instanceAddresses, err := getInstanceAddresses(createdEvent.Created)
+
+							updates, err := s.handleCreatedEvent(ctx, s, transaction.Transaction, event.Created)
 							if err != nil {
-								s.logger.Debug().Err(err).Str("contractID", createdEvent.Created.GetContractId()).Msg("Failed to get instance addresses for created contract, skipping")
-								continue
+								return fmt.Errorf("failed to handle created event: %w", err)
 							}
-							// Increment updates metric
+
+							s.mux.Lock()
+							// Save updates
+							for _, update := range updates {
+								s.logger.Trace().Any("key", update.Key).Msg("Updating contract")
+								s.contracts[update.Key] = update.Value
+							}
+							// Update ledgerEnd
+							s.ledgerEnd = transaction.Transaction.GetOffset()
+							s.mux.Unlock()
+
+							// Update metrics
 							s.metrics.IncrementStoreUpdatesCounter(ctx)
-							for _, address := range instanceAddresses {
-								s.logger.Trace().Stringer("instanceAddress", address).Msg("Updating active contract")
-								s.mux.Lock()
-								s.contracts[address] = &apiv2.ActiveContract{
-									CreatedEvent:        createdEvent.Created,
-									SynchronizerId:      transaction.Transaction.GetSynchronizerId(),
-									ReassignmentCounter: 0,
-								}
-								// Update ledgerEnd
-								s.ledgerEnd = transaction.Transaction.GetOffset()
-								s.mux.Unlock()
-								// Record latest ledger end
-								s.metrics.RecordStoreLedgerEndGauge(ctx, transaction.Transaction.GetOffset())
-							}
+							s.metrics.RecordStoreLedgerEndGauge(ctx, transaction.Transaction.GetOffset())
+						default:
+							continue
 						}
 					}
 				}
 			}
 		}
+
+		// Backoff before reconnecting to avoid thrashing logs (e.g. on misconfiguration).
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(s.reconnectBackoff):
+			s.logger.Debug().Str("backoff", s.reconnectBackoff.String()).Msg("Reconnect backoff elapsed, reconnecting")
+		}
 	}
 }
 
-// backfill returns all currently-active contracts for s.filtersByParty at a given offset, indexed by InstanceAddress.
-func (s *UpdateStore) backfill(ctx context.Context, offset int64) (map[contracts.InstanceAddress]*apiv2.ActiveContract, error) {
-	activeContracts := make(map[contracts.InstanceAddress]*apiv2.ActiveContract)
+// updateStreamFactory returns a StreamFactory that creates GetUpdates streams for this store's filters.
+func (s *ContractStore[K, V]) updateStreamFactory() StreamFactory[apiv2.GetUpdatesResponse] {
+	return func(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
+		return s.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
+			BeginExclusive: offset,
+			EndInclusive:   nil, // not set, stream will not terminate
+			UpdateFormat: &apiv2.UpdateFormat{
+				IncludeTransactions: &apiv2.TransactionFormat{
+					EventFormat: &apiv2.EventFormat{
+						FiltersByParty: s.filtersByParty,
+						Verbose:        true,
+					},
+					TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
+				},
+			},
+		})
+	}
+}
+
+// backfill returns all currently-active contracts for s.filtersByParty at a given offset.
+func (s *ContractStore[K, V]) backfill(ctx context.Context, offset int64) (map[K]V, error) {
+	activeContracts := make(map[K]V)
 
 	activeContractsResponse, err := s.stateService.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
 		ActiveAtOffset: offset,
@@ -249,73 +223,37 @@ func (s *UpdateStore) backfill(ctx context.Context, offset int64) (map[contracts
 				return nil, fmt.Errorf("failed to receive active contract: %w", err)
 			}
 
-			if ac, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+			switch c := resp.GetContractEntry().(type) {
+			case *apiv2.GetActiveContractsResponse_ActiveContract:
 				s.logger.Trace().
-					Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).
-					Str("packageName", ac.ActiveContract.GetCreatedEvent().GetPackageName()).
-					Str("packageID", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetPackageId()).
-					Str("moduleName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetModuleName()).
-					Str("entityName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName()).
+					Str("contractID", c.ActiveContract.GetCreatedEvent().GetContractId()).
+					Str("packageName", c.ActiveContract.GetCreatedEvent().GetPackageName()).
+					Str("packageID", c.ActiveContract.GetCreatedEvent().GetTemplateId().GetPackageId()).
+					Str("moduleName", c.ActiveContract.GetCreatedEvent().GetTemplateId().GetModuleName()).
+					Str("entityName", c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName()).
 					Msg("Backfilling active contract")
-				instanceAddresses, err := getInstanceAddresses(ac.ActiveContract.GetCreatedEvent())
+
+				updates, err := s.handleActiveContract(ctx, s, c.ActiveContract)
 				if err != nil {
-					s.logger.Debug().Err(err).Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).Msg("Failed to get instance addresses for active contract, skipping")
-					continue
+					return nil, fmt.Errorf("failed to handle active contract: %w", err)
 				}
-				for _, address := range instanceAddresses {
-					s.logger.Trace().Stringer("instanceAddress", address).Msg("Updating active contract")
-					activeContracts[address] = ac.ActiveContract
+
+				for _, update := range updates {
+					s.logger.Trace().Any("key", update.Key).Msg("Backfilling contract")
+					activeContracts[update.Key] = update.Value
 				}
+			default:
+				continue
 			}
 		}
 	}
 }
 
-// updateStreamFactory returns a StreamFactory that creates GetUpdates streams for this store's filters.
-func (s *UpdateStore) updateStreamFactory() StreamFactory[apiv2.GetUpdatesResponse] {
-	return func(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
-		return s.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
-			BeginExclusive: offset,
-			EndInclusive:   nil, // not set, stream will not terminate
-			UpdateFormat: &apiv2.UpdateFormat{
-				IncludeTransactions: &apiv2.TransactionFormat{
-					EventFormat: &apiv2.EventFormat{
-						FiltersByParty: s.filtersByParty,
-						Verbose:        true,
-					},
-					TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
-				},
-			},
-		})
-	}
-}
-
-// getInstanceAddresses returns all possible InstanceAddresses for a given active contract.
-// The contract must contain a create argument 'instanceID' of type text.
-// Since a contract with multiple signatories can have multiple InstanceAddresses, this returns all possible values.
-func getInstanceAddresses(createdEvent *apiv2.CreatedEvent) ([]contracts.InstanceAddress, error) {
-	var instanceID string
-	for _, field := range createdEvent.GetCreateArguments().GetFields() {
-		if field.GetLabel() == "instanceId" {
-			instanceID = field.GetValue().GetText()
-		}
-	}
-	if instanceID == "" {
-		return nil, fmt.Errorf("no instanceId found in active contract")
-	}
-
-	instanceAddresses := make([]contracts.InstanceAddress, len(createdEvent.GetSignatories()))
-	for i, s := range createdEvent.GetSignatories() {
-		instanceAddresses[i] = contracts.InstanceID(instanceID).RawInstanceAddress(types.PARTY(s)).InstanceAddress()
-	}
-
-	return instanceAddresses, nil
-}
-
-// GetContract returns the active contract for the given InstanceAddress. If no active contract is found, it returns nil.
-func (s *UpdateStore) GetContract(ctx context.Context, instanceAddress contracts.InstanceAddress) *apiv2.ActiveContract {
+func (s *ContractStore[K, V]) Get(key K) (V, bool) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
-	return s.contracts[instanceAddress]
+	value, ok := s.contracts[key]
+
+	return value, ok
 }

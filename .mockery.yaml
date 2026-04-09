@@ -10,5 +10,8 @@ packages:
       UpdateServiceClient:
   github.com/smartcontractkit/chainlink-canton/eds/internal/store:
     interfaces:
-      ContractStore:
+      ActiveContractStore:
       InstrumentHoldingStore:
+  google.golang.org/grpc:
+    interfaces:
+      ServerStreamingClient:
