@@ -88,4 +88,11 @@ type CantonClient interface {
 	// ListDecentralizedNamespaces returns all active DecentralizedNamespaceDefinition
 	// mappings visible in the specified store. Used by the query-parties command.
 	ListDecentralizedNamespaces(ctx context.Context, synchronizerID string) ([]*DNSState, error)
+
+	// ── Package Management (PackageService) ─────────────────────────────
+
+	// UploadDar uploads a DAR file to the participant via PackageService.UploadDar.
+	// The DAR is vetted and vetting is synchronised before returning.
+	// Returns the main package ID from the uploaded DAR.
+	UploadDar(ctx context.Context, darBytes []byte) (string, error)
 }

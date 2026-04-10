@@ -80,7 +80,7 @@ build-eds:
 ## Assuming chainlink-ccv is checked out in ../chainlink-ccv.
 .PHONY: build-ccv-images
 build-ccv-images:
-	cd ../chainlink-ccv/build/devenv && just build-docker
+	cd ../chainlink-ccv/build/devenv && just build-docker-dev
 
 .PHONY: start-devenv
 start-devenv: build-ccv-images build-committeeverifier build-eds
@@ -92,3 +92,7 @@ run-e2e-tests:
 
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests
+
+.PHONY: mocks
+mocks:
+	go run github.com/vektra/mockery/v3@v3.7.0

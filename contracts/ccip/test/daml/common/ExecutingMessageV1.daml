@@ -1,12 +1,32 @@
 module ExecutingMessageV1 where
 
 import Daml.Script
-import DA.Optional (fromSome)
+import DA.Optional (fromSome, fromSomeNote)
 import DA.Assert
 
 import CCIP.ExecutingMessageV1
+import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+
+finalityConfig n =
+    if n == 0
+    then FinalityCodec.WaitForFinality
+    else FinalityCodec.BlockDepth n
+
+rawFinalityConfig n =
+    if n == 0
+    then FinalityCodec.waitForFinalityFlag
+    else fromSome do
+        flagsHex <- CCIP.MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- CCIP.MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)
+
+unsafeDecodeRequestedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityCodec.decodeRequestedFinality finalityConfig)
+
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
 testAddCCVVerification : Script ()
 testAddCCVVerification = do
@@ -24,7 +44,7 @@ testAddCCVVerification = do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
@@ -52,7 +72,7 @@ testAddCCVVerification = do
                            ]
             optionalCCVs = []
             optionalCCVThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
             inboundPoolCCVs = None
             deps = ExecutingMessageDeps with
@@ -121,7 +141,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
@@ -151,7 +171,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
             requiredCCVs = [RawInstanceAddress.make "0xCCV1" ccvOwner]
             optionalCCVs = []
             optionalCCVThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
             inboundPoolCCVs = None
             deps = ExecutingMessageDeps with

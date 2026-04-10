@@ -15,6 +15,7 @@ import qualified DA.TextMap as TextMap
 import qualified CCIP.Client
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FinalityConfig
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
@@ -29,7 +30,6 @@ import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
-
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Executor
@@ -40,6 +40,25 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 
 import qualified TestToken
+
+finalityConfig n =
+    if n == 0
+    then CCIP.FinalityConfig.WaitForFinality
+    else CCIP.FinalityConfig.BlockDepth n
+
+rawFinalityConfig n =
+    if n == 0
+    then CCIP.FinalityConfig.waitForFinalityFlag
+    else fromSome do
+        flagsHex <- CCIP.MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- CCIP.MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)
+
+unsafeDecodeRequestedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (CCIP.FinalityConfig.decodeRequestedFinality finalityConfig)
+
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
 seedExecutedMessages : Int -> [BytesHex]
 seedExecutedMessages n =
@@ -82,7 +101,6 @@ mkTokenInput admin = do
 basicExtraArgs : Int -> CCIP.Client.ExtraArgs
 basicExtraArgs gasLimit = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
     gasLimit = gasLimit
-    blockConfirmations = 0
     ccvs = []
     executor = CCIP.Client.Executor_NoExecutor
     tokenReceiver = ""
@@ -96,7 +114,6 @@ extraArgsWithDefaultExecutor
 extraArgsWithDefaultExecutor gasLimit _executorCid executorArgs =
     CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
         gasLimit = gasLimit
-        blockConfirmations = 0
         ccvs = []
         executor = CCIP.Client.Executor_UseDefault with
             executorArgs = executorArgs
@@ -112,7 +129,6 @@ extraArgsWithExecutor
 extraArgsWithExecutor gasLimit requiredExecutor _executorCid executorArgs =
     CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
         gasLimit = gasLimit
-        blockConfirmations = 0
         ccvs = []
         executor = CCIP.Client.Executor_WithAddress with
             executorAddress = requiredExecutor
@@ -279,7 +295,7 @@ testCCIPSend = script do
             maxCCVsPerMsg = 10
             dynamicConfig = CCIP.Executor.DynamicConfig with
                 feeAggregator = None
-                minBlockConfirmations = 0
+                allowedFinalityConfig = finalityConfig 0
                 ccvAllowlistEnabled = False
             allowedCCVs = []
             remoteChainConfigs = Map.fromList [(destChainSelector, CCIP.Executor.RemoteChainConfig with
@@ -537,7 +553,7 @@ testCCIPExecute = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
@@ -569,7 +585,7 @@ testCCIPExecute = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Add CCV verification
@@ -783,7 +799,6 @@ testPrepareSendExtraArgs = script do
                 feeToken = basicFeeToken feeTokenId dummyTokenInput
                 extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 123
-                    blockConfirmations = 0
                     ccvs =
                         [CCIP.Client.CCVExtraArg with
                             ccvAddress = RawInstanceAddress.make "custom-ccv" user
@@ -806,7 +821,6 @@ testPrepareSendExtraArgs = script do
                 feeToken = basicFeeToken feeTokenId dummyTokenInput
                 extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 0
-                    blockConfirmations = 0
                     ccvs = []
                     executor = CCIP.Client.Executor_NoExecutor
                     tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89"
@@ -1141,7 +1155,7 @@ testExecuteRollsOverExecutedMessages = script do
             sequenceNumber = 7.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
@@ -1173,7 +1187,7 @@ testExecuteRollsOverExecutedMessages = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
@@ -1253,7 +1267,7 @@ testExecuteRollsOverExecutedMessages = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     debug "testExecuteRollsOverExecutedMessages: PASSED"
@@ -1397,7 +1411,6 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                 tokenTransfer = None
                 extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 0
-                    blockConfirmations = 0
                     ccvs =
                         [ CCIP.Client.CCVExtraArg with
                             ccvAddress = RawInstanceAddress.make "sender-ccv" ccipOwner

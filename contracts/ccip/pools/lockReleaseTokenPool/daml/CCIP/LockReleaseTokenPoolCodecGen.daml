@@ -27,7 +27,7 @@ import MCMS.Codec (
     extractBytes
     )
 
-import CCIP.Codec (decodeRawInstanceAddressAt, decodeRawInstanceAddressList, encodeRawInstanceAddress, encodeRawInstanceAddressList)
+import CCIP.Codec (decodeRawInstanceAddressAt, decodeRawInstanceAddressList, decodeRequestedFinalityAt, encodeRawInstanceAddress, encodeRawInstanceAddressList, encodeRequestedFinality)
 
 
 -- ===============================================
@@ -41,7 +41,7 @@ encodeChainUpdate params =
     <> encodeBytesHex params.remoteTokenAddress
     <> encodeRawInstanceAddressList params.inboundCCVs
     <> encodeRawInstanceAddressList params.outboundCCVs
-    <> fromSome (encodeInt64 params.minBlockConfirmations)
+    <> encodeRequestedFinality params.finalityConfig
     <> encodeRawInstanceAddress params.inboundRateLimiter
     <> encodeRawInstanceAddress params.inboundCustomBlockConfirmationsRateLimiter
     <> encodeRawInstanceAddress params.outboundRateLimiter
@@ -53,7 +53,7 @@ decodeChainUpdateAt encoded offset = do
     (remoteTokenAddress, offset) <- decodeBytesHexAt encoded offset
     (inboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (outboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
-    (minBlockConfirmations, offset) <- decodeInt64At encoded offset
+    (finalityConfig, offset) <- decodeRequestedFinalityAt encoded offset
     (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
@@ -70,7 +70,7 @@ encodeRemoteChainConfig params =
     <> encodeBytesHex params.remoteTokenAddress
     <> encodeRawInstanceAddressList params.inboundCCVs
     <> encodeRawInstanceAddressList params.outboundCCVs
-    <> fromSome (encodeInt64 params.minBlockConfirmations)
+    <> encodeRequestedFinality params.finalityConfig
     <> encodeRawInstanceAddress params.inboundRateLimiter
     <> encodeRawInstanceAddress params.inboundCustomBlockConfirmationsRateLimiter
     <> encodeRawInstanceAddress params.outboundRateLimiter
@@ -81,7 +81,7 @@ decodeRemoteChainConfigAt encoded offset = do
     (remoteTokenAddress, offset) <- decodeBytesHexAt encoded offset
     (inboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (outboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
-    (minBlockConfirmations, offset) <- decodeInt64At encoded offset
+    (finalityConfig, offset) <- decodeRequestedFinalityAt encoded offset
     (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset

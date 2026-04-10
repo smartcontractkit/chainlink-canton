@@ -26,6 +26,7 @@ import CCIP.Codec
   )
 import qualified Splice.Api.Token.HoldingV1
 
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.Factory
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -34,6 +35,19 @@ import CCIP.ContextCodec (encodeCCIPContext)
 import CCIP.LockReleaseTokenPoolCodecGen (encodeTransferTimeout)
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
 import CCIP.Context (emptyCCIPContext)
+
+finalityConfig n =
+  if n == 0
+  then FinalityCodec.WaitForFinality
+  else FinalityCodec.BlockDepth n
+
+encodeRequestedFinality : FinalityCodec.FinalityConfig -> BytesHex
+encodeRequestedFinality requestedFinality =
+  case requestedFinality of
+    FinalityCodec.WaitForFinality -> fromSome (encodeUint8 0)
+    FinalityCodec.WaitForSafe -> fromSome (encodeUint8 1)
+    FinalityCodec.BlockDepth depth ->
+      fromSome (encodeUint8 2) <> fromSome (encodeInt64 depth)
 
 -- ===========================================================================
 -- ENCODER FUNCTIONS FOR DEPLOY PARAMS
@@ -147,7 +161,7 @@ encodeDeployCCIPReceiverParams params =
   <> encodeRawInstanceAddressList params.requiredCCVs
   <> encodeRawInstanceAddressList params.optionalCCVs
   <> fromSome (encodeInt64 params.optionalThreshold)
-  <> fromSome (encodeInt64 params.minBlockConfirmations)
+  <> encodeRequestedFinality params.receiverFinalityConfig
 
 -- ===========================================================================
 -- ROUND-TRIP TESTS
@@ -549,7 +563,7 @@ testDecodeDeployCCIPReceiverParams = script do
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
         optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
         optionalThreshold = 20
-        minBlockConfirmations = 42
+        receiverFinalityConfig = finalityConfig 42
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
@@ -560,7 +574,7 @@ testDecodeDeployCCIPReceiverParams = script do
       decoded.requiredCCVs === params.requiredCCVs
       decoded.optionalCCVs === params.optionalCCVs
       decoded.optionalThreshold === params.optionalThreshold
-      decoded.minBlockConfirmations === params.minBlockConfirmations
+      decoded.receiverFinalityConfig === params.receiverFinalityConfig
 
   pure ()
 
@@ -574,7 +588,7 @@ testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
         requiredCCVs = []
         optionalCCVs = []
         optionalThreshold = 0
-        minBlockConfirmations = 0
+        receiverFinalityConfig = finalityConfig 0
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
@@ -583,7 +597,7 @@ testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
       decoded.requiredCCVs === []
       decoded.optionalCCVs === []
       decoded.optionalThreshold === 0
-      decoded.minBlockConfirmations === 0
+      decoded.receiverFinalityConfig === finalityConfig 0
 
   pure ()
 

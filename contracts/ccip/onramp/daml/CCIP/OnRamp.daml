@@ -31,7 +31,7 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Crypto (assertValidHex, isValidHex)
 
 messageStaticSize : Int
-messageStaticSize = 67
+messageStaticSize = 69
 
 tokenTransferBaseSizeWithoutExtraData : Int -> Int
 tokenTransferBaseSizeWithoutExtraData remoteAddressBytes =
@@ -327,7 +327,6 @@ template OnRamp
                         CCIP.Client.V3 v3 -> pure v3
                         _ -> abort "onramp: unsupported extraArgs version" -- exhaustive default match to ensure this fails if new versions of extraArgs are added without updating the onramp
                 assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
-                assertMsg "onramp: block confirmations not allowed from Canton" (extraArgs.blockConfirmations == 0)
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
                 assertValidHex "tokenArgs" extraArgs.tokenArgs
@@ -930,4 +929,3 @@ validateDestChainAddress address addressBytesLength =
          in if actualLength == addressBytesLength
             then address
             else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
-

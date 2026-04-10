@@ -28,7 +28,22 @@ import (
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
+
+func (c *Chain) GetDisclosuresForSend(ctx context.Context, ccvs []contracts.InstanceAddress) (*testhelpers.SendDisclosures, error) {
+	// Get the EDS output from generic services output, will contain the EDS API URL
+	edsOut, err := util.OpaqueToConcreteStrict[output](c.cfg.GenericServices[c.ChainSelector()].Output)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get generic services output for chain %d: %w", c.ChainSelector(), err)
+	}
+	edsClient, err := edsv1.NewClientWithResponses(edsOut.EDSURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create eds client: %w", err)
+	}
+
+	return testhelpers.GetCCIPSendDisclosures(ctx, edsClient, ccvs)
+}
 
 // GetDisclosuresForExecution returns all the necessary disclosed contracts to execute a message on Canton using the EDS API.
 func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []contracts.InstanceAddress) (

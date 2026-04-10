@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "039ced81bded813a0529a08df3c236d8ae229861b305564c4ec27f72dfcde9a5"
+	PackageID   = "4c091d4d4d733779a5db7634cdab992a89e23e1794529ea5a73017ab1c1129b0"
 	SDKVersion  = "3.4.10"
 )
 
@@ -210,12 +210,12 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	InstanceId            types.TEXT                `json:"instanceId"`
-	Owner                 types.PARTY               `json:"owner"`
-	RequiredCCVs          []mcms.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs          []mcms.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold     types.INT64               `json:"optionalThreshold"`
-	MinBlockConfirmations types.INT64               `json:"minBlockConfirmations"`
+	InstanceId             types.TEXT                `json:"instanceId"`
+	Owner                  types.PARTY               `json:"owner"`
+	RequiredCCVs           []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs           []mcms.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold      types.INT64               `json:"optionalThreshold"`
+	ReceiverFinalityConfig common.FinalityConfig     `json:"receiverFinalityConfig"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -270,7 +270,13 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	args["optionalThreshold"] = int64(t.OptionalThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	args["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -320,7 +326,13 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 	args["optionalThreshold"] = int64(t.OptionalThreshold)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	args["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
