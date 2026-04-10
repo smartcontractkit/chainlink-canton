@@ -53,7 +53,6 @@ type ActiveContractStoreConfig struct {
 // NewActiveContractStore itself will perform no RPC calls, it will immediately return.
 // In order for the ActiveContractStore to initialize and subscribe to updates, (s *ContractStore) Run() needs to be run.
 func NewActiveContractStore(
-	_ context.Context,
 	config ActiveContractStoreConfig,
 	metrics Metrics,
 	registeredTemplates ...RegisteredTemplate,

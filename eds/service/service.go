@@ -159,7 +159,6 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	}
 
 	activeContractStore, err := store.NewActiveContractStore(
-		ctx,
 		store.ActiveContractStoreConfig{
 			Logger:        logger,
 			UpdateService: cantonChain.Participants[0].LedgerServices.Update,
@@ -228,7 +227,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 
 	server := api.NewServer(logger, disclosureSvc)
 
-	r := gin.Default()
+	r := gin.Default().With()
 	r.Use(middleware.RequestMonitoringMiddleware(metrics))
 
 	edsv1.RegisterHandlers(r, server)
