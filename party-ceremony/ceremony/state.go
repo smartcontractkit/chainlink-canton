@@ -23,6 +23,9 @@ const (
 	// WorkflowTypeKick identifies a real gRPC-backed kick (participant removal) ceremony.
 	WorkflowTypeKick = "kick"
 
+	// WorkflowTypeAddParticipant identifies a real gRPC-backed add-participant ceremony.
+	WorkflowTypeAddParticipant = "add-participant"
+
 	// WorkflowTypeContractDeploy identifies a contract deployment ceremony.
 	WorkflowTypeContractDeploy = "contract-deploy"
 )
