@@ -28,11 +28,11 @@ require (
 	github.com/icza/gox v0.2.6
 	github.com/jpillora/backoff v1.0.0
 	github.com/lib/pq v1.12.2
-	github.com/oapi-codegen/runtime v1.3.1
+	github.com/oapi-codegen/runtime v1.4.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.0
 	github.com/schollz/progressbar/v3 v3.19.0
-	github.com/smartcontractkit/chain-selectors v1.0.97
+	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260408173936-5b7036b83fc5
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260408173936-5b7036b83fc5
 	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260408185451-7b2512c2651c

@@ -19,9 +19,9 @@ func testInstanceAddress(instanceID string) contracts.InstanceAddress {
 	return contracts.InstanceID(instanceID).RawInstanceAddress(types.PARTY("party")).InstanceAddress()
 }
 
-func defaultTestConfig(contractStore *mocks.MockContractStore, instrumentStore *mocks.MockInstrumentHoldingStore) DisclosureServiceConfig {
+func defaultTestConfig(contractStore *mocks.MockActiveContractStore, instrumentStore *mocks.MockInstrumentHoldingStore) DisclosureServiceConfig {
 	return DisclosureServiceConfig{
-		ContractStore:          contractStore,
+		ActiveContractStore:    contractStore,
 		InstrumentHoldingStore: instrumentStore,
 		PerPartyRouterFactory:  testInstanceAddress("router-factory"),
 		OnRamp:                 testInstanceAddress("onramp"),
@@ -49,7 +49,7 @@ func makeActiveContract(contractID string, templateID *apiv2.Identifier) *apiv2.
 func TestNewDisclosureService(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	contractStore := mocks.NewMockContractStore(t)
+	contractStore := mocks.NewMockActiveContractStore(t)
 	instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 	config := defaultTestConfig(contractStore, instrumentStore)
 
@@ -63,7 +63,7 @@ func TestDisclosureService_GetDisclosure(t *testing.T) {
 
 	t.Run("returns error when address is not configured", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
@@ -78,12 +78,12 @@ func TestDisclosureService_GetDisclosure(t *testing.T) {
 
 	t.Run("returns error when contract store returns nil", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
 
-		contractStore.EXPECT().GetContract(ctx, config.OnRamp).Return(nil)
+		contractStore.EXPECT().Get(config.OnRamp).Return(nil, true)
 
 		disclosure, err := svc.GetDisclosure(ctx, config.OnRamp)
 		require.Error(t, err)
@@ -93,7 +93,7 @@ func TestDisclosureService_GetDisclosure(t *testing.T) {
 
 	t.Run("returns disclosure when contract is found", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
@@ -104,7 +104,7 @@ func TestDisclosureService_GetDisclosure(t *testing.T) {
 			EntityName: "OnRamp",
 		}
 		activeContract := makeActiveContract("contract-123", templateID)
-		contractStore.EXPECT().GetContract(ctx, config.OnRamp).Return(activeContract)
+		contractStore.EXPECT().Get(config.OnRamp).Return(activeContract, true)
 
 		disclosure, err := svc.GetDisclosure(ctx, config.OnRamp)
 		require.NoError(t, err)
@@ -121,18 +121,18 @@ func TestDisclosureService_GetCCIPSendDisclosures(t *testing.T) {
 
 	t.Run("returns all disclosures when all lookups succeed", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
 
-		contractStore.EXPECT().GetContract(ctx, config.OnRamp).Return(makeActiveContract("onramp-1", nil))
-		contractStore.EXPECT().GetContract(ctx, config.GlobalConfig).Return(makeActiveContract("global-1", nil))
-		contractStore.EXPECT().GetContract(ctx, config.TokenAdminRegistry).Return(makeActiveContract("tar-1", nil))
-		contractStore.EXPECT().GetContract(ctx, config.RMNRemote).Return(makeActiveContract("rmn-1", nil))
-		contractStore.EXPECT().GetContract(ctx, config.FeeQuoter).Return(makeActiveContract("fee-1", nil))
+		contractStore.EXPECT().Get(config.OnRamp).Return(makeActiveContract("onramp-1", nil), true)
+		contractStore.EXPECT().Get(config.GlobalConfig).Return(makeActiveContract("global-1", nil), true)
+		contractStore.EXPECT().Get(config.TokenAdminRegistry).Return(makeActiveContract("tar-1", nil), true)
+		contractStore.EXPECT().Get(config.RMNRemote).Return(makeActiveContract("rmn-1", nil), true)
+		contractStore.EXPECT().Get(config.FeeQuoter).Return(makeActiveContract("fee-1", nil), true)
 		for _, ccvAddr := range config.CCVs {
-			contractStore.EXPECT().GetContract(ctx, ccvAddr).Return(makeActiveContract("ccv-1", nil))
+			contractStore.EXPECT().Get(ccvAddr).Return(makeActiveContract("ccv-1", nil), true)
 		}
 
 		result, err := svc.GetCCIPSendDisclosures(ctx, CCIPSendRequest{CCVs: config.CCVs})
@@ -148,12 +148,12 @@ func TestDisclosureService_GetCCIPSendDisclosures(t *testing.T) {
 
 	t.Run("returns error when onRamp disclosure fails", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
 
-		contractStore.EXPECT().GetContract(ctx, config.OnRamp).Return(nil)
+		contractStore.EXPECT().Get(config.OnRamp).Return(nil, false)
 
 		result, err := svc.GetCCIPSendDisclosures(ctx, CCIPSendRequest{CCVs: config.CCVs})
 		require.Error(t, err)
@@ -169,17 +169,17 @@ func TestDisclosureService_GetCCIPExecuteDisclosures(t *testing.T) {
 
 	t.Run("returns disclosures with nil token pool and holding when message has no token transfer", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
 
-		contractStore.EXPECT().GetContract(ctx, config.OffRamp).Return(makeActiveContract("offramp-1", nil))
-		contractStore.EXPECT().GetContract(ctx, config.GlobalConfig).Return(makeActiveContract("global-1", nil))
-		contractStore.EXPECT().GetContract(ctx, config.TokenAdminRegistry).Return(makeActiveContract("tar-1", nil))
-		contractStore.EXPECT().GetContract(ctx, config.RMNRemote).Return(makeActiveContract("rmn-1", nil))
+		contractStore.EXPECT().Get(config.OffRamp).Return(makeActiveContract("offramp-1", nil), true)
+		contractStore.EXPECT().Get(config.GlobalConfig).Return(makeActiveContract("global-1", nil), true)
+		contractStore.EXPECT().Get(config.TokenAdminRegistry).Return(makeActiveContract("tar-1", nil), true)
+		contractStore.EXPECT().Get(config.RMNRemote).Return(makeActiveContract("rmn-1", nil), true)
 		for _, ccvAddr := range config.CCVs {
-			contractStore.EXPECT().GetContract(ctx, ccvAddr).Return(makeActiveContract("ccv-1", nil))
+			contractStore.EXPECT().Get(ccvAddr).Return(makeActiveContract("ccv-1", nil), true)
 		}
 
 		result, err := svc.GetCCIPExecuteDisclosures(ctx, CCIPExecuteRequest{
@@ -194,12 +194,12 @@ func TestDisclosureService_GetCCIPExecuteDisclosures(t *testing.T) {
 
 	t.Run("returns error when offRamp disclosure fails", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
 
-		contractStore.EXPECT().GetContract(ctx, config.OffRamp).Return(nil)
+		contractStore.EXPECT().Get(config.OffRamp).Return(nil, false)
 
 		result, err := svc.GetCCIPExecuteDisclosures(ctx, CCIPExecuteRequest{
 			Message: &protocol.Message{},
@@ -217,12 +217,12 @@ func TestDisclosureService_GetPerPartyRouterFactory(t *testing.T) {
 
 	t.Run("returns disclosure when contract is found", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
 
-		contractStore.EXPECT().GetContract(ctx, config.PerPartyRouterFactory).Return(makeActiveContract("router-factory-1", nil))
+		contractStore.EXPECT().Get(config.PerPartyRouterFactory).Return(makeActiveContract("router-factory-1", nil), true)
 
 		result, err := svc.GetPerPartyRouterFactory(ctx, PerPartyRouterFactoryRequest{})
 		require.NoError(t, err)
@@ -232,12 +232,12 @@ func TestDisclosureService_GetPerPartyRouterFactory(t *testing.T) {
 
 	t.Run("returns error when contract store returns nil", func(t *testing.T) {
 		t.Parallel()
-		contractStore := mocks.NewMockContractStore(t)
+		contractStore := mocks.NewMockActiveContractStore(t)
 		instrumentStore := mocks.NewMockInstrumentHoldingStore(t)
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
 
-		contractStore.EXPECT().GetContract(ctx, config.PerPartyRouterFactory).Return(nil)
+		contractStore.EXPECT().Get(config.PerPartyRouterFactory).Return(nil, false)
 
 		result, err := svc.GetPerPartyRouterFactory(ctx, PerPartyRouterFactoryRequest{})
 		require.Error(t, err)
