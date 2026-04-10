@@ -1,0 +1,21 @@
+version: "3.3"
+name: swagger-ui
+services:
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: "swagger-ui"
+    ports:
+      - "80:8080"
+    volumes:
+      - .:/usr/share/nginx/html/openapi
+    environment:
+      URLS: "[
+          {url: '/openapi/scan-proxy.yaml', name: 'Scan Proxy'},
+          {url: '/openapi/token-metadata-v1.yaml', name: 'Token Metadata V1'},
+          {url: '/openapi/transfer-instruction-v1.yaml', name: 'Transfer Instruction V1'},
+          {url: '/openapi/eds/ccip/eds-ccip.yaml', name: 'EDS - CCIP'},
+          {url: '/openapi/eds/ccv/eds-ccv.yaml', name: 'EDS - CCV'},
+          {url: '/openapi/eds/executor/eds-executor.yaml', name: 'EDS - Executor'},
+          {url: '/openapi/eds/tokenpool/eds-tokenpool.yaml', name: 'EDS - Token Pool'}
+        ]"

@@ -1,0 +1,11 @@
+sdk-version: 3.4.10
+name: ccip-eds-registry
+source: daml
+version: 0.0.1
+build-options:
+  - "-Werror=unused-dependency"
+data-dependencies:
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - ../../mcms/.daml/dist/mcms-0.0.1.dar

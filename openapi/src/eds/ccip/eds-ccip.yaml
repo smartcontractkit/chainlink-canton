@@ -1,0 +1,290 @@
+openapi: 3.0.0
+info:
+  title: CCIP Explicit Disclosure API
+  description: Provides access to explicit disclosures required to send/execute CCIP messages from/to Canton.
+  version: 0.0.1
+
+paths:
+  /ccip/v1/global/perPartyRouter/factory:
+    post:
+      operationId: postPerPartyRouterFactory
+      description: |
+        Get the explicit disclosures for instantiating a PerPartyRouter using the PerPartyRouterFactory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CCIPPerPartyRouterFactoryRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CCIPPerPartyRouterFactoryResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+  /ccip/v1/global/tokenAdminRegistry/token/{instrumentId}:
+    get:
+      operationId: getTokenAdminRegistryToken
+      description: |
+        Get the token pool for a given instrument from the token admin registry.
+      parameters:
+        - in: path
+          name: instrumentId
+          required: true
+          schema:
+            $ref: '../common/eds-common.yaml#/components/schemas/HashedInstrumentId'
+          description: The hashed InstrumentId, encoded as a hex string.
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LookupTokenPoolResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+
+  /ccip/v1/global/message/send:
+    post:
+      operationId: postCCIPSend
+      description: |
+        Get the explicit disclosure for sending a CCIP message from Canton.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CCIPSendRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CCIPSendResponse"
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+  /ccip/v1/global/message/execute:
+    post:
+      operationId: postCCIPExecute
+      description: |
+        Get the explicit disclosures for executing a CCIP message on Canton.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CCIPExecuteRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CCIPExecuteResponse"
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+components:
+  schemas:
+    CCIPPerPartyRouterFactoryRequest:
+      type: object
+      required:
+        - partyID
+      properties:
+        partyID:
+          $ref: "../common/eds-common.yaml#/components/schemas/PartyId"
+    CCIPPerPartyRouterFactoryResponse:
+      type: object
+      required:
+        - contractId
+        - disclosedContracts
+      properties:
+        contractId:
+          $ref: '../common/eds-common.yaml#/components/schemas/ContractId'
+        disclosedContracts:
+          description: Disclosures for all contracts required for the caller to instantiate a PerPartyRouter
+          type: array
+          items:
+            $ref: '../common/eds-common.yaml#/components/schemas/DisclosedContract'
+
+    LookupTokenPoolResponse:
+      type: object
+      required:
+          - instanceAddress
+      properties:
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+        baseUrl:
+          $ref: "../common/eds-common.yaml#/components/schemas/EDSBaseUrl"
+
+    CCIPSendRequest:
+      type: object
+      required:
+        - canton2AnyMessage
+      properties:
+        canton2AnyMessage:
+          $ref: "../common/eds-common.yaml#/components/schemas/Canton2AnyMessage"
+        senderRequiredCCVs:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
+        tokenPoolRequiredCCVs:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
+    CCIPSendResponse:
+      type: object
+      required:
+        - contextData
+        - disclosedContracts
+        - ccvs
+      properties:
+        contextData:
+          type: object
+          description: The context to be passed along to CCIP.
+        disclosedContracts:
+          type: array
+          items:
+        ccvs:
+          type: array
+          description: |
+            A list of requested CCVs containing their addresses and EDS URLs.
+            If default CCVs apply, this list might contain more CCVs than originally requested.
+            If any of the given CCVs cannot be found in the registry, its RawInstanceAddress and BaseURL fields might be empty.
+          items:
+            type: object
+            required:
+              - instanceAddress
+            properties:
+              instanceAddress:
+                $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+              rawInstanceAddress:
+                $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+              baseUrl:
+                $ref: "../common/eds-common.yaml#/components/schemas/EDSBaseUrl"
+          example:
+            - instanceAddress: "0x27a9f20250528c5cc710c2ae48ac9dcf2b3339d657befd3ccc4df86d0d1516f3"
+              rawInstanceAddress: "committeeverifier-abcde@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+              baseUrl: "https://canton-eds.chain.link"
+            - instanceAddress: "0x4bed5af0e77b4d7a552a1f933b13c275bbdc231b8499b2e14edcc634a6869a5f"
+        executor:
+          type: object
+          description: |
+            The address and EDS URL of the requested executor.
+            If "noExecutor" has been requested, this will not be returned.
+            If a default executor applies, this might be returned even if it was not explicitly requested.
+            If the executor cannot be found in the registry, its RawInstanceAddress and BaseURL fields might be empty.
+          required:
+            - instanceAddress
+          properties:
+            instanceAddress:
+              $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+            rawInstanceAddress:
+              $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+            baseUrl:
+              $ref: "../common/eds-common.yaml#/components/schemas/EDSBaseUrl"
+          example:
+            instanceAddress: "0x390b4a68b330097e97deebf6ae6784653e6210d8fd202985afb6480e2dca9a2a"
+            rawInstanceAddress: "executor-abcde@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+            baseUrl: "https://canton-eds.chain.link"
+
+    CCIPExecuteRequest:
+      type: object
+      properties:
+        encodedMessage:
+          type: string
+          description: The CCIP message to be executed, encoded as a hex string.
+        ccvs:
+          type: array
+          description: |
+            The list of InstanceAddresses for all CCVs which should verify the message.
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
+    CCIPExecuteResponse:
+      type: object
+      properties:
+      contextData:
+        type: object
+        description: The context to be passed along to CCIP.
+      disclosedContracts:
+        type: array
+        items:
+          $ref: '../common/eds-common.yaml#/components/schemas/DisclosedContract'
+      ccvs:
+        type: array
+        description: |
+          A list of requested CCVs containing their addresses and EDS URLs.
+          If any of the given CCVs cannot be found in the registry, its RawInstanceAddress and BaseURL fields might be empty.
+        items:
+          type: object
+          required:
+            - instanceAddress
+          properties:
+            instanceAddress:
+              $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+            rawInstanceAddress:
+              $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+            baseUrl:
+              $ref: "../common/eds-common.yaml#/components/schemas/EDSBaseUrl"
+        example:
+          - instanceAddress: "0x27a9f20250528c5cc710c2ae48ac9dcf2b3339d657befd3ccc4df86d0d1516f3"
+            rawInstanceAddress: "committeeverifier-abcde@ccipOwner::1220131b86f50178e6f7abe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+            baseUrl: "https://canton-eds.chain.link"
+          - instanceAddress: "0x4bed5af0e77b4d7a552a1f933b13c275bbdc231b8499b2e14edcc634a6869a5f"
+      tokenPool:
+        type: object
+        description: |
+          The address and EDS URL of the token pool which this message belongs to.
+          If the message does not contain a token transfer, or ff the token pool cannot be
+          found in the registry, its RawInstanceAddress and BaseURL fields might be empty.
+        required:
+          - instanceAddress
+        properties:
+          instanceAddress:
+            $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+          rawInstanceAddress:
+            $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+          baseUrl:
+            $ref: "../common/eds-common.yaml#/components/schemas/EDSBaseUrl"
+        example:
+          instanceAddress: "0x390b4a68b330097e97deebf6ae6784653e6210d8fd202985afb6480e2dca9a2a"
+          rawInstanceAddress: "tokenpool-abcde@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+          baseUrl: "https://canton-eds.chain.link"
+
+
+
+
+
+
+
+
+
+
+
+
+

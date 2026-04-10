@@ -1,0 +1,125 @@
+openapi: 3.0.0
+info:
+  title: CCV Explicit Disclosure API
+  description: Provides access to explicit disclosures required to interact with CCVs on Canton.
+  version: 0.0.1
+
+paths:
+  /ccip/v1/external/ccv/{address}/send:
+    post:
+      operationId: postCCVSend
+      description: |
+        Get the explicit disclosures for sending a message using this Cross-Chain-Verifier.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+          description: |
+            The address of the CCV instance to forward the message to.
+            Can be either a RawInstanceAddress or an InstanceAddress.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CCVSendRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CCVSendResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+  /ccip/v1/external/ccv/{address}/execute:
+    post:
+      operationId: postCCVExecute
+      description: |
+        Get the explicit disclosures for executing a message using this Cross-Chain-Verifier.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+          description: |
+            The address of the CCV instance that should verify this message.
+            Can be either a RawInstanceAddress or an InstanceAddress.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CCVExecuteRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CCVExecuteResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+components:
+  schemas:
+    CCVSendRequest:
+      type: object
+      required:
+      properties:
+        canton2AnyMessage:
+          $ref: "../common/eds-common.yaml#/components/schemas/Canton2AnyMessage"
+    CCVSendResponse:
+      type: object
+      required:
+      properties:
+        contractId:
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+        contextData:
+          type: object
+          description: The context to be passed along to the verifier.
+        disclosedContracts:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/DisclosedContract"
+
+    CCVExecuteRequest:
+      type: object
+      required:
+      properties:
+        encodedMessage:
+          type: string
+          description: The CCIP message to be executed, encoded as a hex string.
+    CCVExecuteResponse:
+      type: object
+      required:
+      properties:
+        contractId:
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+        contextData:
+          type: object
+          description: The context to be passed along to the verifier.
+        disclosedContracts:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/DisclosedContract"
