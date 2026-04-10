@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"testing"
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
+
+	"github.com/smartcontractkit/chainlink-canton/eds/monitoring"
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -20,111 +23,15 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
 )
 
-// fakeActiveContractsStream implements grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse] for tests.
-type fakeActiveContractsStream struct {
-	ctx        context.Context //nolint:containedctx
-	responses  []*apiv2.GetActiveContractsResponse
-	err        error
-	idx        int
-	blockOnEOF bool // when true, Recv blocks on ctx.Done() instead of returning EOF (for context cancellation tests)
-}
-
-func (s *fakeActiveContractsStream) Recv() (*apiv2.GetActiveContractsResponse, error) {
-	if s.idx < len(s.responses) {
-		resp := s.responses[s.idx]
-		s.idx++
-
-		return resp, nil
-	}
-	if s.err != nil {
-		return nil, s.err
-	}
-	if s.blockOnEOF && s.ctx != nil {
-		<-s.ctx.Done()
-		return nil, s.ctx.Err()
-	}
-
-	return nil, io.EOF
-}
-
-func (s *fakeActiveContractsStream) Header() (metadata.MD, error) {
-	return metadata.MD{}, nil
-}
-
-func (s *fakeActiveContractsStream) Trailer() metadata.MD {
-	return metadata.MD{}
-}
-
-func (s *fakeActiveContractsStream) CloseSend() error {
-	return nil
-}
-
-func (s *fakeActiveContractsStream) Context() context.Context {
-	if s.ctx != nil {
-		return s.ctx
-	}
-
-	return context.Background()
-}
-
-func (s *fakeActiveContractsStream) SendMsg(any) error {
-	return nil
-}
-
-func (s *fakeActiveContractsStream) RecvMsg(any) error {
-	return nil
-}
-
-var _ grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse] = (*fakeActiveContractsStream)(nil)
-
-// fakeUpdatesStream implements grpc.ServerStreamingClient[apiv2.GetUpdatesResponse] for tests.
-type fakeUpdatesStream struct {
-	ctx        context.Context //nolint:containedctx
-	responses  []*apiv2.GetUpdatesResponse
-	err        error
-	idx        int
-	blockOnEOF bool
-}
-
-func (s *fakeUpdatesStream) Recv() (*apiv2.GetUpdatesResponse, error) {
-	if s.idx < len(s.responses) {
-		resp := s.responses[s.idx]
-		s.idx++
-
-		return resp, nil
-	}
-	if s.err != nil {
-		return nil, s.err
-	}
-	if s.blockOnEOF && s.ctx != nil {
-		<-s.ctx.Done()
-		return nil, s.ctx.Err()
-	}
-
-	return nil, io.EOF
-}
-
-func (s *fakeUpdatesStream) Header() (metadata.MD, error) { return metadata.MD{}, nil }
-func (s *fakeUpdatesStream) Trailer() metadata.MD         { return metadata.MD{} }
-func (s *fakeUpdatesStream) CloseSend() error             { return nil }
-func (s *fakeUpdatesStream) Context() context.Context {
-	if s.ctx != nil {
-		return s.ctx
-	}
-
-	return context.Background()
-}
-func (s *fakeUpdatesStream) SendMsg(any) error { return nil }
-func (s *fakeUpdatesStream) RecvMsg(any) error { return nil }
-
-var _ grpc.ServerStreamingClient[apiv2.GetUpdatesResponse] = (*fakeUpdatesStream)(nil)
-
 // stubEmptyActiveContractsBackfill makes GetActiveContracts return an empty stream so backfill completes
 // without blocking. Required for any Run test that passes GetLedgerEnd: unexpected GetActiveContracts
 // from a non-test goroutine triggers mock fail → t.FailNow on wrong goroutine → deadlock on <-done.
-func stubEmptyActiveContractsBackfill(stateClient *mocks.MockStateServiceClient) {
+func stubEmptyActiveContractsBackfill(t *testing.T, stateClient *mocks.MockStateServiceClient) {
+	activeContractStream := mocks.NewMockServerStreamingClient[apiv2.GetActiveContractsResponse](t)
+	activeContractStream.EXPECT().Recv().Return(nil, io.EOF).Maybe()
 	stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything).
-		Return(&fakeActiveContractsStream{}, nil).Once()
+		Return(activeContractStream, nil).Once()
+	activeContractStream.EXPECT().CloseSend().Return(nil).Maybe()
 }
 
 // holdingCreatedEvent returns a CreatedEvent that UnmarshalCreatedEvent[HoldingView] can parse.
@@ -165,19 +72,32 @@ func holdingCreatedEvent(contractID string, owner types.PARTY, instrumentID spli
 	}
 }
 
+// afterCancel waits for the context to be Done and then send the current time on the returned channel.
+func afterCancel(ctx context.Context) <-chan time.Time {
+	ch := make(chan time.Time, 1)
+	go func() {
+		<-ctx.Done()
+		ch <- time.Now()
+	}()
+
+	return ch
+}
+
 func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 	t.Parallel()
 	const testOwner = "test-owner"
 	owner := types.PARTY(testOwner)
-	logger := zerolog.Nop()
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stdout}).Level(zerolog.TraceLevel)
 
 	makeConfig := func(stateClient *mocks.MockStateServiceClient, updateClient *mocks.MockUpdateServiceClient, maxRetries int) InstrumentHoldingStoreConfig {
 		return InstrumentHoldingStoreConfig{
-			Logger:           logger,
-			Owner:            owner,
-			StateService:     stateClient,
-			UpdateService:    updateClient,
-			MaxRetries:       maxRetries,
+			Logger:        logger,
+			Owner:         owner,
+			StateService:  stateClient,
+			UpdateService: updateClient,
+			StreamConfig: ReliableStreamConfig{
+				MaxRetries: maxRetries,
+			},
 			ReconnectBackoff: time.Millisecond, // short backoff in tests so reconnect tests don't wait
 		}
 	}
@@ -194,7 +114,11 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 5}, nil)
-		stubEmptyActiveContractsBackfill(stateClient)
+
+		stubEmptyActiveContractsBackfill(t, stateClient)
+
+		updatesStream := mocks.NewMockServerStreamingClient[apiv2.GetUpdatesResponse](t)
+		updateClient := mocks.NewMockUpdateServiceClient(t)
 
 		tx := &apiv2.Transaction{
 			UpdateId: "test-update-id",
@@ -203,38 +127,43 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 				{Event: &apiv2.Event_Created{Created: createdEvent}},
 			},
 		}
-		updateClient := mocks.NewMockUpdateServiceClient(t)
-		// First call: one transaction then EOF; Run will reconnect. Second call: block until ctx done.
+		// First subscription: one transaction then EOF; Run will reconnect
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.MatchedBy(func(req *apiv2.GetUpdatesRequest) bool {
-			return req != nil && req.BeginExclusive == 5 &&
+			return req != nil && req.BeginExclusive == 5 && // Begin must match offset returned by GetLedgerEnd
 				req.UpdateFormat != nil &&
 				req.UpdateFormat.IncludeTransactions != nil &&
 				req.UpdateFormat.IncludeTransactions.EventFormat != nil &&
 				req.UpdateFormat.IncludeTransactions.EventFormat.FiltersByParty[testOwner] != nil
 		}), mock.Anything).
-			Return(&fakeUpdatesStream{
-				ctx: ctx,
-				responses: []*apiv2.GetUpdatesResponse{
-					{Update: &apiv2.GetUpdatesResponse_Transaction{Transaction: tx}},
-				},
-			}, nil)
+			Return(updatesStream, nil).Once()
+		updatesStream.EXPECT().Recv().Return(
+			&apiv2.GetUpdatesResponse{
+				Update: &apiv2.GetUpdatesResponse_Transaction{Transaction: tx},
+			},
+			nil,
+		).Once()
+		updatesStream.EXPECT().Recv().Return(nil, io.EOF).Once() // Send EOF, store will reconnect
+
+		// Second subscription: block until ctx done; Run will call CloseSend during teardown
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.MatchedBy(func(req *apiv2.GetUpdatesRequest) bool {
 			return req != nil && req.BeginExclusive == 6
 		}), mock.Anything).
-			Return(&fakeUpdatesStream{ctx: ctx, blockOnEOF: true}, nil)
+			Return(updatesStream, nil).Once()
+		updatesStream.EXPECT().Recv().WaitUntil(afterCancel(ctx)).Return(nil, nil).Once()
+		updatesStream.EXPECT().CloseSend().Return(nil).Once()
 
-		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0))
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0), monitoring.NoopEDSMetricLabeler{})
 		done := make(chan error, 1)
 		go func() { done <- svc.Run(ctx) }()
 
 		// Wait for disclosure to be recorded (from first stream)
 		require.Eventually(t, func() bool {
-			_, err := svc.GetInstrumentHolding(ctx, instrumentID)
-			return err == nil
+			_, ok := svc.Get(instrumentID)
+			return ok
 		}, 2*time.Second, 10*time.Millisecond)
 
-		disclosure, err := svc.GetInstrumentHolding(ctx, instrumentID)
-		require.NoError(t, err)
+		disclosure, ok := svc.Get(instrumentID)
+		require.True(t, ok)
 		require.NotNil(t, disclosure)
 		require.Equal(t, contractID, disclosure.ContractId)
 		require.Equal(t, createdEvent.TemplateId, disclosure.TemplateId)
@@ -252,7 +181,7 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 			Return((*apiv2.GetLedgerEndResponse)(nil), expectedErr)
 		updateClient := mocks.NewMockUpdateServiceClient(t)
 
-		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0))
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0), monitoring.NoopEDSMetricLabeler{})
 		err := svc.Run(ctx)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to get ledger end")
@@ -266,12 +195,12 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
-		stubEmptyActiveContractsBackfill(stateClient)
+		stubEmptyActiveContractsBackfill(t, stateClient)
 		updateClient := mocks.NewMockUpdateServiceClient(t)
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
 			Return((grpc.ServerStreamingClient[apiv2.GetUpdatesResponse])(nil), expectedErr).Times(2)
 
-		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 1))
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 1), monitoring.NoopEDSMetricLabeler{})
 		err := svc.Run(ctx)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to create update stream")
@@ -285,15 +214,19 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
-		stubEmptyActiveContractsBackfill(stateClient)
+		stubEmptyActiveContractsBackfill(t, stateClient)
+		updatesStream := mocks.NewMockServerStreamingClient[apiv2.GetUpdatesResponse](t)
 		updateClient := mocks.NewMockUpdateServiceClient(t)
 		// First stream returns recvErr; Run reconnects. Second stream blocks until ctx done.
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
-			Return(&fakeUpdatesStream{ctx: ctx, err: errors.New("recv failed")}, nil)
+			Return(updatesStream, nil)
+		updatesStream.EXPECT().Recv().Return(nil, errors.New("recv failed")).Once()
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
-			Return(&fakeUpdatesStream{ctx: ctx, blockOnEOF: true}, nil)
+			Return(updatesStream, nil)
+		updatesStream.EXPECT().Recv().WaitUntil(afterCancel(ctx)).Return(nil, nil).Once()
+		updatesStream.EXPECT().CloseSend().Return(nil).Once()
 
-		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0))
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0), monitoring.NoopEDSMetricLabeler{})
 		done := make(chan error, 1)
 		go func() { done <- svc.Run(ctx) }()
 		// Let Run pass backfill and the first (failing) stream before cancelling, otherwise ctx may
@@ -309,11 +242,11 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
-		stubEmptyActiveContractsBackfill(stateClient)
+		stubEmptyActiveContractsBackfill(t, stateClient)
 		// Cancel before Run: backfill observes ctx.Done() and returns before GetUpdates.
 		updateClient := mocks.NewMockUpdateServiceClient(t)
 
-		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 1))
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 1), monitoring.NoopEDSMetricLabeler{})
 		cancel()
 		err := svc.Run(ctx)
 		require.Error(t, err)
