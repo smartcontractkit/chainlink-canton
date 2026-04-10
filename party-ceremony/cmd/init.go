@@ -249,7 +249,6 @@ func runInitKick(cmd *cobra.Command, _ []string) error {
 //	canton-party-ceremony init add-participant \
 //	  --decentralized-party-id "prefix::namespace" \
 //	  --new-participant-id "PAR::newnode::fp" \
-//	  --existing-participants "PAR::p1::fp1,PAR::p2::fp2" \
 //	  --namespace-name "add-2026" \
 //	  --synchronizer-id global \
 //	  --config ./participant-config.json

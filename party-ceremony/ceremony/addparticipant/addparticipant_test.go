@@ -51,12 +51,6 @@ func (s *mockState) onKeyGenerated() {
 	s.keyGenerated = true
 }
 
-func (s *mockState) hasKeyGenerated() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.keyGenerated
-}
-
 func (s *mockState) onNSDProposed() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -66,6 +60,7 @@ func (s *mockState) onNSDProposed() {
 func (s *mockState) hasNSDProposed() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	return s.nsdProposed
 }
 
@@ -78,6 +73,7 @@ func (s *mockState) onAddTransactions() {
 func (s *mockState) dnsSubmitted() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	return s.addCallCount > 0
 }
 
@@ -90,6 +86,7 @@ func (s *mockState) onP2PAuthorize() {
 func (s *mockState) p2pSubmitted() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	return s.authorizePostDNS > 0
 }
 
@@ -113,6 +110,7 @@ func (m *mockCantonClient) GenerateSigningKey(_ context.Context, name string, _ 
 		m.state.onKeyGenerated()
 	}
 	raw := sha256.Sum256([]byte(m.participantID + ":" + name))
+
 	return &cryptov30.SigningPublicKey{
 		PublicKey: raw[:],
 		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
@@ -176,6 +174,7 @@ func (m *mockCantonClient) NSDExists(_ context.Context, _ string, _ string) (boo
 	if m.state != nil {
 		return m.state.hasNSDProposed(), nil
 	}
+
 	return true, nil
 }
 
