@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
@@ -24,10 +25,11 @@ type RegisteredTemplate struct {
 }
 
 type ActiveContractStoreConfig struct {
-	Logger        zerolog.Logger
-	UpdateService apiv2.UpdateServiceClient
-	StateService  apiv2.StateServiceClient
-	MaxRetries    int
+	Logger           zerolog.Logger
+	StateService     apiv2.StateServiceClient
+	UpdateService    apiv2.UpdateServiceClient
+	StreamConfig     ReliableStreamConfig
+	ReconnectBackoff time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
 }
 
 // NewActiveContractStore returns a Store implementation that keeps track of active contracts by subscribing
@@ -76,15 +78,16 @@ func NewActiveContractStore(
 	}
 
 	return &ContractStore[contracts.InstanceAddress, *apiv2.ActiveContract]{
-		logger:         config.Logger.With().Str("component", "ActiveContractStore").Logger(),
-		updateService:  config.UpdateService,
-		stateService:   config.StateService,
-		metrics:        metrics,
-		maxRetries:     config.MaxRetries,
-		filtersByParty: filtersByParty,
-		mux:            sync.RWMutex{},
-		ledgerEnd:      0,
-		contracts:      make(map[contracts.InstanceAddress]*apiv2.ActiveContract),
+		logger:           config.Logger.With().Str("component", "ActiveContractStore").Logger(),
+		updateService:    config.UpdateService,
+		stateService:     config.StateService,
+		metrics:          metrics,
+		streamConfig:     config.StreamConfig,
+		reconnectBackoff: config.ReconnectBackoff,
+		filtersByParty:   filtersByParty,
+		mux:              sync.RWMutex{},
+		ledgerEnd:        0,
+		contracts:        make(map[contracts.InstanceAddress]*apiv2.ActiveContract),
 		handleActiveContract: func(ctx context.Context, store *ContractStore[contracts.InstanceAddress, *apiv2.ActiveContract], activeContract *apiv2.ActiveContract) (updates []ContractUpdate[contracts.InstanceAddress, *apiv2.ActiveContract], err error) {
 			instanceAddresses, err := getInstanceAddresses(activeContract.GetCreatedEvent())
 			if err != nil {

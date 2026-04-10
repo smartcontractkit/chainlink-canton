@@ -164,7 +164,9 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			Logger:        logger,
 			UpdateService: cantonChain.Participants[0].LedgerServices.Update,
 			StateService:  cantonChain.Participants[0].LedgerServices.State,
-			MaxRetries:    cfg.Node.MaxRetries,
+			StreamConfig: store.ReliableStreamConfig{
+				MaxRetries: cfg.Node.MaxRetries,
+			},
 		},
 		metrics.With("store", "ActiveContractStore"),
 		templates...,
@@ -176,10 +178,12 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	instrumentHoldingStore := store.NewInstrumentHoldingStore(
 		store.InstrumentHoldingStoreConfig{
 			Logger:        logger,
+			Owner:         types.PARTY(cfg.Contracts.PoolOwner),
 			UpdateService: cantonChain.Participants[0].LedgerServices.Update,
 			StateService:  cantonChain.Participants[0].LedgerServices.State,
-			MaxRetries:    cfg.Node.MaxRetries,
-			Owner:         types.PARTY(cfg.Contracts.PoolOwner),
+			StreamConfig: store.ReliableStreamConfig{
+				MaxRetries: cfg.Node.MaxRetries,
+			},
 		},
 		metrics.With("store", "InstrumentHoldingStore"),
 	)

@@ -25,15 +25,12 @@ var holdingInterfaceId = &apiv2.Identifier{
 
 type InstrumentHoldingStore Store[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]
 
-// defaultReconnectBackoff is the delay before reconnecting after the update stream closes (e.g. server closed or error).
-const defaultReconnectBackoff = 5 * time.Second
-
 type InstrumentHoldingStoreConfig struct {
 	Logger           zerolog.Logger
 	Owner            types.PARTY
 	StateService     apiv2.StateServiceClient
 	UpdateService    apiv2.UpdateServiceClient
-	MaxRetries       int
+	StreamConfig     ReliableStreamConfig
 	ReconnectBackoff time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
 }
 
@@ -41,10 +38,6 @@ func NewInstrumentHoldingStore(
 	config InstrumentHoldingStoreConfig,
 	metrics Metrics,
 ) *ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract] {
-	backoff := config.ReconnectBackoff
-	if backoff == 0 {
-		backoff = defaultReconnectBackoff
-	}
 	owner := config.Owner
 
 	return &ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]{
@@ -52,8 +45,8 @@ func NewInstrumentHoldingStore(
 		updateService:    config.UpdateService,
 		stateService:     config.StateService,
 		metrics:          metrics,
-		maxRetries:       config.MaxRetries,
-		reconnectBackoff: backoff,
+		streamConfig:     config.StreamConfig,
+		reconnectBackoff: config.ReconnectBackoff,
 		filtersByParty: map[string]*apiv2.Filters{
 			string(config.Owner): {
 				Cumulative: []*apiv2.CumulativeFilter{

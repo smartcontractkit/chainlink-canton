@@ -33,8 +33,8 @@ type ContractStore[K comparable, V any] struct {
 
 	metrics Metrics
 
-	// maxRetries is the maximum number of retries when creating the active contracts stream (0 = unlimited).
-	maxRetries int
+	// The config of the underlying gRPC stream
+	streamConfig ReliableStreamConfig
 	// reconnectBackoff is the delay before reconnecting after the stream closes (avoids log thrashing on misconfiguration).
 	reconnectBackoff time.Duration
 
@@ -58,12 +58,31 @@ type ContractStore[K comparable, V any] struct {
 	handleCreatedEvent func(ctx context.Context, store *ContractStore[K, V], transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) (updates []ContractUpdate[K, V], err error)
 }
 
+func (s *ContractStore[K, V]) Get(key K) (V, bool) {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+
+	value, ok := s.contracts[key]
+
+	return value, ok
+}
+
+const (
+	// DefaultReconnectBackoff is the delay before reconnecting after the update stream closes (e.g. server closed or error).
+	DefaultReconnectBackoff = time.Second * 5
+)
+
 // Run runs the ContractStore. It will start by initializing the ContractStore with a backfill of all existing active contracts
 // and subscribe to incremental updates afterward.
 // Run is a long-running function that needs to keep running in the background in order for the ContractStore to keep
 // up-to-date.
 // To terminate Run, cancel the context.
 func (s *ContractStore[K, V]) Run(ctx context.Context) error {
+	backoff := s.reconnectBackoff
+	if backoff == 0 {
+		backoff = DefaultReconnectBackoff
+	}
+
 	s.logger.Debug().Msg("Starting ContractStore")
 	ledgerEndResponse, err := s.stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
 	if err != nil {
@@ -93,7 +112,7 @@ func (s *ContractStore[K, V]) Run(ctx context.Context) error {
 	for {
 		// Start streaming from s.ledgerEnd (exclusive)
 		s.logger.Debug().Int64("offset", s.ledgerEnd).Msg("Subscribing to update stream")
-		stream, err := GetStreamWithRetry(ctx, s.ledgerEnd, s.updateStreamFactory(), DefaultReliableStreamConfig(s.logger, s.maxRetries))
+		stream, err := GetStreamWithRetry(ctx, s.logger, s.ledgerEnd, s.updateStreamFactory(), s.streamConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create update stream: %w", err)
 		}
@@ -169,8 +188,8 @@ func (s *ContractStore[K, V]) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(s.reconnectBackoff):
-			s.logger.Debug().Str("backoff", s.reconnectBackoff.String()).Msg("Reconnect backoff elapsed, reconnecting")
+		case <-time.After(backoff):
+			s.logger.Debug().Str("backoff", backoff.String()).Msg("Reconnect backoff elapsed, reconnecting")
 		}
 	}
 }
@@ -247,13 +266,4 @@ func (s *ContractStore[K, V]) backfill(ctx context.Context, offset int64) (map[K
 			}
 		}
 	}
-}
-
-func (s *ContractStore[K, V]) Get(key K) (V, bool) {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
-	value, ok := s.contracts[key]
-
-	return value, ok
 }

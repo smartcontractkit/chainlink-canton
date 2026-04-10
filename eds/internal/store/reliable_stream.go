@@ -16,38 +16,32 @@ type StreamFactory[T any] func(ctx context.Context, offset int64) (grpc.ServerSt
 
 // ReliableStreamConfig configures retry and backoff when creating a stream.
 type ReliableStreamConfig struct {
-	Logger        zerolog.Logger
 	MaxRetries    int           // 0 means unlimited retries
 	BackoffMin    time.Duration // default 100ms
 	BackoffMax    time.Duration // default 3s
 	BackoffFactor float64       // default 2
 }
 
-// DefaultReliableStreamConfig returns a config with standard backoff and no retry limit.
-func DefaultReliableStreamConfig(logger zerolog.Logger, maxRetries int) ReliableStreamConfig {
-	return ReliableStreamConfig{
-		Logger:        logger,
-		MaxRetries:    maxRetries,
-		BackoffMin:    100 * time.Millisecond,
-		BackoffMax:    3 * time.Second,
-		BackoffFactor: 2,
-	}
-}
+const (
+	DefaultBackoffMin    = 100 * time.Millisecond
+	DefaultBackoffMax    = 30 * time.Second
+	DefaultBackoffFactor = 2
+)
 
 // GetStreamWithRetry creates a stream by calling createStream, retrying with backoff on failure.
 // The stream starts at the given offset (meaning is defined by the factory, e.g. BeginExclusive or ActiveAtOffset).
-func GetStreamWithRetry[T any](ctx context.Context, offset int64, createStream StreamFactory[T], config ReliableStreamConfig) (grpc.ServerStreamingClient[T], error) {
+func GetStreamWithRetry[T any](ctx context.Context, logger zerolog.Logger, offset int64, createStream StreamFactory[T], config ReliableStreamConfig) (grpc.ServerStreamingClient[T], error) {
 	backoffMin := config.BackoffMin
 	if backoffMin == 0 {
-		backoffMin = 100 * time.Millisecond
+		backoffMin = DefaultBackoffMin
 	}
 	backoffMax := config.BackoffMax
 	if backoffMax == 0 {
-		backoffMax = 3 * time.Second
+		backoffMax = DefaultBackoffMax
 	}
 	backoffFactor := config.BackoffFactor
 	if backoffFactor == 0 {
-		backoffFactor = 2
+		backoffFactor = DefaultBackoffFactor
 	}
 	b := &backoff.Backoff{Min: backoffMin, Max: backoffMax, Factor: backoffFactor}
 	b.Reset()
@@ -65,7 +59,7 @@ func GetStreamWithRetry[T any](ctx context.Context, offset int64, createStream S
 		lastErr = err
 
 		wait := b.Duration()
-		config.Logger.Warn().Err(err).Str("wait", wait.String()).Int("attempt", attempt).Msg("Failed to create stream, retrying")
+		logger.Warn().Err(err).Str("wait", wait.String()).Int("attempt", attempt).Msg("Failed to create stream, retrying")
 
 		select {
 		case <-ctx.Done():
