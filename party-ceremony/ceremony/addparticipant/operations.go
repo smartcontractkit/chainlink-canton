@@ -314,7 +314,7 @@ var CreateAddDNSProposalOp = operations.NewOperation(
 			NewOwners:          newOwners,
 			NewThreshold:       in.NewThreshold,
 			// Only existing members sign — the new participant is not yet an owner.
-			RequiredSigners: append([]string{}, in.ExistingParticipants...),
+			RequiredSigners: append([]string{}, in.ExistingParticipantUIDs...),
 		}, nil
 	},
 )

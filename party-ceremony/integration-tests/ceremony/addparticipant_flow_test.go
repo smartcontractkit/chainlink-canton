@@ -135,12 +135,9 @@ func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 	require.NoError(t, err, "GetP2P after kick")
 	require.Len(t, p2pState.Participants, 2, "should have 2 P2P participants after kick")
 
-	// Remaining participant UIDs (p1 and p2).
-	existingUIDs := []string{actors[0].uid, actors[1].uid}
 	newParticipantUID := actors[2].uid
 
 	t.Logf("Adding participant back: %s", newParticipantUID)
-	t.Logf("Existing participants: %v", existingUIDs)
 
 	// ── Phase 2: Add participant 3 ────────────────────────────────────────
 	t.Log("Phase 2: add-participant ceremony")
@@ -148,7 +145,6 @@ func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 	addInput := addparticipant.AddParticipantInput{
 		DecentralizedPartyID: s.PartyID,
 		NewParticipantID:     newParticipantUID,
-		ExistingParticipants: existingUIDs,
 		NamespaceName:        "inttest-add-participant",
 		SynchronizerID:       synchronizerID,
 		NewThreshold:         2,

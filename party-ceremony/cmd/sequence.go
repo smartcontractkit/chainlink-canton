@@ -428,7 +428,6 @@ func executeAddParticipantSequence(
 	lggr.Infow("Running add-participant sequence",
 		"party", input.DecentralizedPartyID,
 		"new_participant", input.NewParticipantID,
-		"existing_count", len(input.ExistingParticipants),
 		"participant", cfg.ParticipantID,
 	)
 

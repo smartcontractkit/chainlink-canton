@@ -268,7 +268,6 @@ func init() {
 
 	f.String("decentralized-party-id", "", "Full party ID in the format <prefix>::<namespace> (required)")
 	f.String("new-participant-id", "", "Canton UID of the participant to add (required)")
-	f.String("existing-participants", "", "Comma-separated Canton UIDs of current members (required)")
 	f.String("namespace-name", "", "Label for the new participant's key generation (required)")
 	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
 	f.Int("new-threshold", 0, "Signing threshold after the addition. 0 = keep current")
@@ -277,7 +276,6 @@ func init() {
 
 	_ = initAddParticipantCmd.MarkFlagRequired("decentralized-party-id")
 	_ = initAddParticipantCmd.MarkFlagRequired("new-participant-id")
-	_ = initAddParticipantCmd.MarkFlagRequired("existing-participants")
 	_ = initAddParticipantCmd.MarkFlagRequired("namespace-name")
 	_ = initAddParticipantCmd.MarkFlagRequired("synchronizer-id")
 
@@ -289,7 +287,6 @@ func runInitAddParticipant(cmd *cobra.Command, _ []string) error {
 
 	partyID, _ := f.GetString("decentralized-party-id")
 	newUID, _ := f.GetString("new-participant-id")
-	existingRaw, _ := f.GetString("existing-participants")
 	namespaceName, _ := f.GetString("namespace-name")
 	synchronizerID, _ := f.GetString("synchronizer-id")
 	newThreshold, _ := f.GetInt("new-threshold")
@@ -301,19 +298,9 @@ func runInitAddParticipant(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	existing := splitParticipants(existingRaw)
-	if len(existing) < 2 {
-		return fmt.Errorf("--existing-participants must list at least 2 participants")
-	}
-
-	if slices.Contains(existing, newUID) {
-		return fmt.Errorf("new participant %q must not appear in --existing-participants", newUID)
-	}
-
 	input := addparticipant.AddParticipantInput{
 		DecentralizedPartyID: partyID,
 		NewParticipantID:     newUID,
-		ExistingParticipants: existing,
 		NamespaceName:        namespaceName,
 		SynchronizerID:       synchronizerID,
 		NewThreshold:         newThreshold,

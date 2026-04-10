@@ -266,7 +266,6 @@ func baseInput() addparticipant.AddParticipantInput {
 	return addparticipant.AddParticipantInput{
 		DecentralizedPartyID: testPartyID,
 		NewParticipantID:     testNewUID,
-		ExistingParticipants: []string{"p1", "p2"},
 		NamespaceName:        testNSName,
 		SynchronizerID:       testSyncID,
 	}

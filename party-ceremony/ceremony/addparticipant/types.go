@@ -12,11 +12,6 @@ type AddParticipantInput struct {
 	// (e.g. "PAR::newnode::fingerprint").
 	NewParticipantID string `json:"new_participant_id"`
 
-	// ExistingParticipants is the ordered list of Canton UIDs for all
-	// participants that are already members of the decentralized party.
-	// Only these actors sign the DNS update and propose P2P.
-	ExistingParticipants []string `json:"existing_participants"`
-
 	// NamespaceName is the human-readable label used when generating the
 	// new participant's namespace and DAML signing keys.
 	NamespaceName string `json:"namespace_name"`
@@ -98,11 +93,12 @@ type CreateAddDNSProposalInput struct {
 	NewOwnerFingerprint    string   `json:"new_owner_fingerprint"`
 	NewThreshold           int      `json:"new_threshold"`
 	CurrentSerial          int      `json:"current_serial"`
-	// ExistingParticipants are the Canton UIDs that are already members.
+	// ExistingParticipantUIDs are the Canton UIDs that are already members,
+	// derived dynamically from the P2P topology state.
 	// Only existing members sign the DNS update (the new participant is not
 	// yet an owner and cannot sign).
-	ExistingParticipants []string `json:"existing_participants"`
-	SynchronizerID       string   `json:"synchronizer_id"`
+	ExistingParticipantUIDs []string `json:"existing_participant_uids"`
+	SynchronizerID          string   `json:"synchronizer_id"`
 }
 
 // CreateAddDNSProposalOutput is the output of [CreateAddDNSProposalOp].

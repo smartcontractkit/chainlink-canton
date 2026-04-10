@@ -163,24 +163,24 @@ var AddParticipantSequence = operations.NewSequence(
 		}
 
 		// Verify existing participants can reach the current DNS threshold.
-		if len(in.ExistingParticipants) < int(currentState.DNSThreshold) {
+		if len(currentState.P2PParticipantUIDs) < int(currentState.DNSThreshold) {
 			return AddParticipantOutput{}, operations.NewUnrecoverableError(
 				fmt.Errorf(
 					"add is impossible: %d existing participants cannot reach current DNS threshold of %d",
-					len(in.ExistingParticipants), currentState.DNSThreshold,
+					len(currentState.P2PParticipantUIDs), currentState.DNSThreshold,
 				),
 			)
 		}
 
 		// ── Step 4: Create add DNS proposal ──────────────────────────────────
 		proposalReport, err := operations.ExecuteOperation(b, CreateAddDNSProposalOp, deps, CreateAddDNSProposalInput{
-			DecentralizedNamespace: decNS,
-			CurrentOwners:          currentState.DNSOwners,
-			NewOwnerFingerprint:    newMember.NamespaceFingerprint,
-			NewThreshold:           newThreshold,
-			CurrentSerial:          int(currentState.DNSSerial),
-			ExistingParticipants:   in.ExistingParticipants,
-			SynchronizerID:         in.SynchronizerID,
+			DecentralizedNamespace:  decNS,
+			CurrentOwners:           currentState.DNSOwners,
+			NewOwnerFingerprint:     newMember.NamespaceFingerprint,
+			NewThreshold:            newThreshold,
+			CurrentSerial:           int(currentState.DNSSerial),
+			ExistingParticipantUIDs: currentState.P2PParticipantUIDs,
+			SynchronizerID:          in.SynchronizerID,
 		})
 		if err != nil {
 			return AddParticipantOutput{}, fmt.Errorf("create-add-dns-proposal: %w", err)
@@ -266,7 +266,7 @@ var AddParticipantSequence = operations.NewSequence(
 		allParticipantUIDs := append(append([]string{}, currentState.P2PParticipantUIDs...), newMember.ParticipantUID)
 
 		var existingProposedCount int
-		for _, uid := range in.ExistingParticipants {
+		for _, uid := range currentState.P2PParticipantUIDs {
 			_, p2pErr := operations.ExecuteOperation(b, ProposeAddP2POp, deps, ProposeAddP2PInput{
 				ParticipantID:      uid,
 				PartyID:            in.DecentralizedPartyID,
