@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
@@ -60,7 +61,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 	routerAddress = routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
 
 	// Get disclosure and contract id of the router
-	disclosedRouter, err = GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
+	disclosedRouter, err = testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
 	if err != nil {

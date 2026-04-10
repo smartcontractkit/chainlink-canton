@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -22,123 +19,19 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cldfdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
-func GetCCIPSendDisclosures(
-	ctx context.Context,
-	edsClient *edsv1.ClientWithResponses,
-	ccvs []contracts.InstanceAddress,
-) (*SendDisclosures, error) {
-	// Add the requested CCVs to the API request
-	request := edsv1.CCIPSendRequest{
-		Ccvs: make([]string, len(ccvs)),
-	}
-	for i, ccv := range ccvs {
-		request.Ccvs[i] = ccv.String()
-	}
-
-	resp, err := edsClient.CcipSendWithResponse(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("error calling CCIPSend: %w", err)
-	}
-	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
-	}
-
-	// The top-level choice context has the following disclosures:
-	// - OnRamp
-	// - GlobalConfig
-	// - TokenAdminRegistry
-	// - RMNRemote
-	// - FeeQuoter
-	var disclosedContracts []*apiv2.DisclosedContract
-	for _, contract := range resp.JSON200.ChoiceContext.DisclosedContracts {
-		disclosedContract, err := disclosedContractToProto(contract)
-		if err != nil {
-			return nil, err
-		}
-		disclosedContracts = append(disclosedContracts, disclosedContract)
-	}
-
-	// Build sendContext from the return choice context data
-	// TODO: ledger.RecordToStruct isn't working for some reason on this.
-	choiceCtxValues, ok := resp.JSON200.ChoiceContext.ChoiceContextData["values"]
-	if !ok {
-		return nil, fmt.Errorf("key 'values' not found in choice context")
-	}
-	choiceCtxValuesMap, ok := choiceCtxValues.(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("values is not a map[string]any")
-	}
-	values := types.TEXTMAP{}
-	for contractKey, entry := range choiceCtxValuesMap {
-		entryMap, ok := entry.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("entry is not a map[string]any")
-		}
-		value := entryMap["value"].(string)
-		valueContractID := types.CONTRACT_ID(value)
-		values[contractKey] = common.AnyValue{AVContractId: &valueContractID}
-	}
-	sendContext := common.CCIPContext{Values: values}
-
-	// Handle CCVs
-	ccvContractIDs := make([]*apiv2.Value_ContractId, len(ccvs))
-	for i, ccv := range ccvs {
-		// Check if the API returned an explicit disclosure for the requested CCV
-		disclosure, ok := resp.JSON200.Ccvs[ccv.String()]
-		if !ok || disclosure.DisclosedContract == nil {
-			return nil, fmt.Errorf("failed to get disclosure for ccv: %s", ccv.String())
-		}
-		ccvContractIDs[i] = &apiv2.Value_ContractId{
-			ContractId: disclosure.DisclosedContract.ContractId,
-		}
-		// Add the CCV's explicit disclosure to disclosedContracts
-		disclosedContract, err := disclosedContractToProto(*disclosure.DisclosedContract)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert disclosed contract for ccv %s: %w", ccv.String(), err)
-		}
-		disclosedContracts = append(disclosedContracts, disclosedContract)
-	}
-
-	// Handle executor
-	var executorContractID *apiv2.Value_ContractId
-	if len(resp.JSON200.DefaultExecutor.ContractId) > 0 {
-		executorContractID = &apiv2.Value_ContractId{
-			ContractId: resp.JSON200.DefaultExecutor.ContractId,
-		}
-		// don't need to add to disclosedContracts, its already part of the choice context
-		// disclosures.
-	}
-
-	return &SendDisclosures{
-		DisclosedContracts: disclosedContracts,
-		SendContext:        sendContext,
-		CCVContractIDs:     ccvContractIDs,
-		ExecutorContractID: executorContractID,
-	}, nil
-}
-
-type SendDisclosures struct {
-	DisclosedContracts []*apiv2.DisclosedContract
-	SendContext        common.CCIPContext
-	CCVContractIDs     []*apiv2.Value_ContractId
-	ExecutorContractID *apiv2.Value_ContractId
-}
-
-func (c *Chain) GetDisclosuresForSend(ctx context.Context, ccvs []contracts.InstanceAddress) (*SendDisclosures, error) {
+func (c *Chain) GetDisclosuresForSend(ctx context.Context, ccvs []contracts.InstanceAddress) (*testhelpers.SendDisclosures, error) {
 	// Get the EDS output from generic services output, will contain the EDS API URL
 	edsOut, err := util.OpaqueToConcreteStrict[output](c.cfg.GenericServices[c.ChainSelector()].Output)
 	if err != nil {
@@ -149,82 +42,7 @@ func (c *Chain) GetDisclosuresForSend(ctx context.Context, ccvs []contracts.Inst
 		return nil, fmt.Errorf("failed to create eds client: %w", err)
 	}
 
-	return GetCCIPSendDisclosures(ctx, edsClient, ccvs)
-}
-
-func GetDisclosedContractByTemplateId(ctx context.Context, participant canton.Participant, templateId *apiv2.Identifier) (*apiv2.DisclosedContract, error) {
-	activeContracts, err := ListActiveContractsByTemplateId(ctx, participant, templateId)
-	if err != nil {
-		return nil, fmt.Errorf("could not get active contracts: %w", err)
-	}
-	if len(activeContracts) == 0 {
-		return nil, fmt.Errorf("no active contracts with templateId %v found on participant %vfor party %s", templateId, participant.Name, participant.PartyID)
-	}
-
-	contract := activeContracts[len(activeContracts)-1]
-
-	return &apiv2.DisclosedContract{
-		TemplateId:       contract.GetCreatedEvent().GetTemplateId(),
-		ContractId:       contract.GetCreatedEvent().GetContractId(),
-		CreatedEventBlob: contract.GetCreatedEvent().GetCreatedEventBlob(),
-		SynchronizerId:   contract.GetSynchronizerId(),
-	}, nil
-}
-
-func GetCurrentOffset(ctx context.Context, stateService apiv2.StateServiceClient) (int64, error) {
-	ledgerEndResp, err := stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return 0, fmt.Errorf("failed to get ledger end: %w", err)
-	}
-
-	return ledgerEndResp.GetOffset(), nil
-}
-
-func ListActiveContractsByTemplateId(ctx context.Context, participant canton.Participant, templateId *apiv2.Identifier) ([]*apiv2.ActiveContract, error) {
-	var activeContracts []*apiv2.ActiveContract
-	offset, err := GetCurrentOffset(ctx, participant.LedgerServices.State)
-	if err != nil {
-		return nil, err
-	}
-	activeContractsResponse, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: offset,
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{TemplateFilter: &apiv2.TemplateFilter{
-								TemplateId:              templateId,
-								IncludeCreatedEventBlob: true,
-							}},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get active contracts for party %v: %w", participant.PartyID, err)
-	}
-	defer activeContractsResponse.CloseSend()
-	for {
-		activeContract, err := activeContractsResponse.Recv()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to receive active contracts: %w", err)
-		}
-		if c, ok := activeContract.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-			activeContracts = append(activeContracts, c.ActiveContract)
-		}
-	}
-	slices.SortFunc(activeContracts, func(a, b *apiv2.ActiveContract) int {
-		return a.GetCreatedEvent().GetCreatedAt().AsTime().Compare(b.GetCreatedEvent().GetCreatedAt().AsTime())
-	})
-
-	return activeContracts, nil
+	return testhelpers.GetCCIPSendDisclosures(ctx, edsClient, ccvs)
 }
 
 // GetDisclosuresForExecution returns all the necessary disclosed contracts to execute a message on Canton using the EDS API.

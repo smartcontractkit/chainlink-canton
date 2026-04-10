@@ -59,10 +59,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	// Import to register adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
