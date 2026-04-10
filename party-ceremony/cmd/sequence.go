@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/chainlink/canton-party-ceremony/ceremony"
+	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
 	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
 	"github.com/chainlink/canton-party-ceremony/ceremony/example"
 	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
@@ -375,6 +376,88 @@ func executeContractDeploySequence(
 		if strings.Contains(seqErr.Error(), contractdeploy.ErrThresholdNotMet.Error()) {
 			fmt.Fprintf(os.Stderr, "contract-deploy ceremony not yet complete: %v\n", seqErr)
 			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have uploaded DARs.")
+			os.Exit(2) //nolint:gocritic // intentional early exit for UX
+		}
+
+		return seqErr
+	}
+
+	return nil
+}
+
+// executeAddParticipantSequence is the execution kernel for the real gRPC-backed
+// add-participant ceremony. It dials the Canton admin API, runs
+// AddParticipantSequence, and persists the ceremony state.
+func executeAddParticipantSequence(
+	ctx context.Context,
+	cfg client.ClientConfig,
+	input addparticipant.AddParticipantInput,
+	stateDir string,
+	workflowId string,
+) error {
+	lggr, err := newCLILogger()
+	if err != nil {
+		return fmt.Errorf("creating logger: %w", err)
+	}
+
+	var previousReports []operations.Report[any, any]
+	if workflowId != "" {
+		ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+		previousReports, err = ceremony.LoadReports(ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("loading previous reports: %w", err)
+		}
+	}
+
+	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
+	bundle := operations.NewBundle(
+		func() context.Context { return ctx },
+		logger.Nop(),
+		reporter,
+	)
+
+	conn, err := client.Dial(cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to Canton admin API: %w", err)
+	}
+	defer conn.Close()
+
+	grpcClient := client.NewGRPCClient(conn)
+	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr}
+
+	lggr.Infow("Running add-participant sequence",
+		"party", input.DecentralizedPartyID,
+		"new_participant", input.NewParticipantID,
+		"participant", cfg.ParticipantID,
+	)
+
+	sr, seqErr := operations.ExecuteSequence(bundle, addparticipant.AddParticipantSequence, deps, input)
+
+	if workflowId == "" {
+		workflowId = sr.ID
+	}
+	ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
+		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
+	}
+	allReports, _ := reporter.GetReports()
+	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+		lggr.Errorw("Failed to save reports", "err", saveErr)
+	}
+
+	state := ceremony.WorkflowState[addparticipant.AddParticipantInput]{
+		CeremonyID: workflowId,
+		Type:       ceremony.WorkflowTypeAddParticipant,
+		Input:      input,
+	}
+	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	}
+
+	if seqErr != nil {
+		if strings.Contains(seqErr.Error(), addparticipant.ErrThresholdNotMet.Error()) {
+			fmt.Fprintf(os.Stderr, "add-participant ceremony not yet complete: %v\n", seqErr)
+			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have acted.")
 			os.Exit(2) //nolint:gocritic // intentional early exit for UX
 		}
 
