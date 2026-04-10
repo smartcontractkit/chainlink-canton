@@ -3,12 +3,9 @@ package devenv
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"os"
-	"strings"
 	"time"
 
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -37,18 +34,12 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
-	onrampbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
@@ -58,9 +49,7 @@ import (
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
@@ -460,159 +449,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	participant := c.chain.Participants[0]
 	party := participant.PartyID
 
-	seqNo := c.nextSeq + 1
-	resolveDisclosedByAddress := func(templateID string, address contracts.InstanceAddress) (types.CONTRACT_ID, *ledgerv2.DisclosedContract, error) {
-		active, err := contract.FindActiveContractByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, templateID, address)
-		if err != nil {
-			if !strings.Contains(err.Error(), "multiple active contracts found") {
-				return "", nil, err
-			}
-
-			// In long-lived devenv runs we can have duplicate active contracts with the same instance address.
-			// Fall back to selecting the most recent matching active contract.
-			parts := strings.Split(templateID, ":")
-			if len(parts) != 3 {
-				return "", nil, fmt.Errorf("invalid template ID for fallback lookup %q: %w", templateID, err)
-			}
-			packageID, moduleName, entityName := parts[0], parts[1], parts[2]
-
-			lookupCtx, cancelLookup := context.WithTimeout(ctx, 20*time.Second)
-			defer cancelLookup()
-
-			ledgerEnd, endErr := participant.LedgerServices.State.GetLedgerEnd(lookupCtx, &ledgerv2.GetLedgerEndRequest{})
-			if endErr != nil {
-				return "", nil, fmt.Errorf("get ledger end for fallback lookup: %w", endErr)
-			}
-			stream, streamErr := participant.LedgerServices.State.GetActiveContracts(lookupCtx, &ledgerv2.GetActiveContractsRequest{
-				ActiveAtOffset: ledgerEnd.GetOffset(),
-				EventFormat: &ledgerv2.EventFormat{
-					FiltersByParty: map[string]*ledgerv2.Filters{
-						participant.PartyID: {
-							Cumulative: []*ledgerv2.CumulativeFilter{
-								{
-									IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{
-										TemplateFilter: &ledgerv2.TemplateFilter{
-											TemplateId: &ledgerv2.Identifier{
-												PackageId:  packageID,
-												ModuleName: moduleName,
-												EntityName: entityName,
-											},
-											IncludeCreatedEventBlob: true,
-										},
-									},
-								},
-							},
-						},
-					},
-					Verbose: true,
-				},
-			})
-			if streamErr != nil {
-				return "", nil, fmt.Errorf("get active contracts for fallback lookup: %w", streamErr)
-			}
-			defer stream.CloseSend()
-
-			var latestMatch *ledgerv2.ActiveContract
-			for {
-				resp, recvErr := stream.Recv()
-				if recvErr != nil {
-					if lookupCtx.Err() != nil {
-						return "", nil, fmt.Errorf("fallback lookup timed out while reading active contracts for %s: %w", address.String(), lookupCtx.Err())
-					}
-					if errors.Is(recvErr, io.EOF) {
-						break
-					}
-
-					return "", nil, fmt.Errorf("receive active contracts for fallback lookup: %w", recvErr)
-				}
-				entry, ok := resp.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract)
-				if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-					continue
-				}
-				created := entry.ActiveContract.GetCreatedEvent()
-				createArgs := created.GetCreateArguments()
-				if createArgs == nil {
-					continue
-				}
-				var instanceIDText string
-				for _, f := range createArgs.GetFields() {
-					if f.GetLabel() == "instanceId" {
-						instanceIDText = f.GetValue().GetText()
-						break
-					}
-				}
-				if instanceIDText == "" || len(created.GetSignatories()) != 1 {
-					continue
-				}
-				gotAddr := contracts.InstanceID(instanceIDText).RawInstanceAddress(types.PARTY(created.GetSignatories()[0])).InstanceAddress()
-				if gotAddr != address {
-					continue
-				}
-				if latestMatch == nil || created.GetOffset() > latestMatch.GetCreatedEvent().GetOffset() {
-					latestMatch = entry.ActiveContract
-				}
-			}
-			if latestMatch == nil {
-				return "", nil, err
-			}
-			active = latestMatch
-		}
-
-		return types.CONTRACT_ID(active.GetCreatedEvent().GetContractId()), convertToDisclosedContract(active), nil
-	}
-
-	// Resolve commonly required contracts and disclosures.
-	onRampRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(onramp.ContractType), onramp.Version, ""))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get source onramp address: %w", err)
-	}
-	globalConfigRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(global_config.ContractType), global_config.Version, ""))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get global config address: %w", err)
-	}
-	tokenAdminRegistryRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(token_admin_registry.ContractType), token_admin_registry.Version, ""))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get token admin registry address: %w", err)
-	}
-	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get rmn remote address: %w", err)
-	}
-	feeQuoterRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get fee quoter address: %w", err)
-	}
-
-	onRampCID, disclosedOnRamp, err := resolveDisclosedByAddress(onrampbindings.OnRamp{}.GetTemplateID(), contracts.HexToInstanceAddress(onRampRef.Address))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve onramp disclosed contract: %w", err)
-	}
-	globalConfigCID, disclosedGlobalConfig, err := resolveDisclosedByAddress(common.GlobalConfig{}.GetTemplateID(), contracts.HexToInstanceAddress(globalConfigRef.Address))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve global config disclosed contract: %w", err)
-	}
-	tokenAdminRegistryCID, disclosedTokenAdminRegistry, err := resolveDisclosedByAddress(tokenadminregistry.TokenAdminRegistry{}.GetTemplateID(), contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve token admin registry disclosed contract: %w", err)
-	}
-	rmnRemoteCID, disclosedRMNRemote, err := resolveDisclosedByAddress(rmn.RMNRemote{}.GetTemplateID(), contracts.HexToInstanceAddress(rmnRemoteRef.Address))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve rmn remote disclosed contract: %w", err)
-	}
-	feeQuoterCID, disclosedFeeQuoter, err := resolveDisclosedByAddress(feequoter.FeeQuoter{}.GetTemplateID(), contracts.HexToInstanceAddress(feeQuoterRef.Address))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve fee quoter disclosed contract: %w", err)
-	}
-
 	// Router for sender party.
-	routerAddress, err := c.DeployPerPartyRouter(ctx, party)
+	_, disclosedRouter, err := c.DeployPerPartyRouter(ctx, participant, party)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("deploy per-party router: %w", err)
 	}
-	routerCID, disclosedRouter, err := resolveDisclosedByAddress(perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve per-party router disclosed contract: %w", err)
-	}
+
+	seqNo := c.nextSeq + 1
 
 	// Deploy a sender-owned CCIPSender contract.
 	senderInstanceID := contracts.MustNewInstanceID("devenv-ccipsender")
@@ -646,7 +489,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			break
 		}
 	}
-	_, disclosedCCIPSender, err := resolveDisclosedByAddress(ccipsender.CCIPSender{}.GetTemplateID(), senderInstanceAddress)
+	activeContract, err := contract.FindActiveContractByInstanceAddress(
+		ctx, participant.LedgerServices.State, party, ccipsender.CCIPSender{}.GetTemplateID(), senderInstanceAddress)
+	disclosedCCIPSender := convertToDisclosedContract(activeContract)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve ccip sender disclosed contract: %w", err)
 	}
@@ -657,18 +502,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolved empty ccip sender contract ID")
 	}
 
-	if len(opts.Executor) == 0 {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("executor address is required")
-	}
-	executorCID, disclosedExecutor, err := resolveDisclosedByAddress(
-		executorBinding.Executor{}.GetTemplateID(),
-		contracts.BytesToInstanceAddress(opts.Executor.Bytes()),
-	)
+	feeQuoterRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve executor disclosed contract: %w", err)
-	}
-	if executorCID == "" {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolved empty executor contract ID")
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get fee quoter address: %w", err)
 	}
 
 	// Keep fee token setup local and deterministic for devenv sends.
@@ -680,13 +516,24 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Admin: types.PARTY(party),
 		Id:    types.TEXT("link-token"),
 	}
+	activeFeeQuoterContract, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		party,
+		feequoter.FeeQuoter{}.GetTemplateID(),
+		contracts.HexToInstanceAddress(feeQuoterRef.Address),
+	)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active fee quoter contract: %w", err)
+	}
+	disclosedFeeQuoter := convertToDisclosedContract(activeFeeQuoterContract)
 	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
 		Commands: &ledgerv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*ledgerv2.Command{{
 				Command: &ledgerv2.Command_Exercise{Exercise: &ledgerv2.ExerciseCommand{
 					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
-					ContractId: string(feeQuoterCID),
+					ContractId: activeFeeQuoterContract.GetCreatedEvent().GetContractId(),
 					Choice:     "UpdatePrices",
 					ChoiceArgument: ledger.MapToValue(feequoter.UpdatePrices{
 						PriceUpdates: feequoter.PriceUpdates{
@@ -716,104 +563,58 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("update fee token prices: %w", err)
 	}
-	// UpdatePrices also archives/recreates FeeQuoter; refresh again for Send context/disclosures.
-	feeQuoterCID, disclosedFeeQuoter, err = resolveDisclosedByAddress(
-		feequoter.FeeQuoter{}.GetTemplateID(),
-		contracts.HexToInstanceAddress(feeQuoterRef.Address),
-	)
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("refresh fee quoter after price update: %w", err)
+
+	// collect ccv instance addresses so we can request their disclosures from EDS.
+	var ccvInstanceAddresses []contracts.InstanceAddress
+	for _, ccvItem := range opts.CCVs {
+		ccvInstanceAddress := contracts.BytesToInstanceAddress(ccvItem.CCVAddress.Bytes())
+		ccvInstanceAddresses = append(ccvInstanceAddresses, ccvInstanceAddress)
 	}
 
-	defaultCCVRef, defaultCCVRefErr := c.e.DataStore.Addresses().Get(
-		datastore.NewAddressRefKey(
-			c.chainDetails.ChainSelector,
-			datastore.ContractType(committee_verifier.ContractType),
-			committee_verifier.Version,
-			devenvcommon.DefaultCommitteeVerifierQualifier,
-		),
-	)
+	// get send disclosures and build the ccipsender.Send struct.
+	sendDisclosures, err := c.GetDisclosuresForSend(ctx, ccvInstanceAddresses)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get disclosures for send: %w", err)
+	}
+	if len(sendDisclosures.CCVContractIDs) != len(opts.CCVs) {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("expected %d ccv disclosures returned from EDS, got %d", len(opts.CCVs), len(sendDisclosures.CCVContractIDs))
+	}
 
 	ccvExtraArgs := make([]ccipclient.CCVExtraArg, 0, len(opts.CCVs))
 	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
-	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
-	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
 	var fallbackVerifierBlob []byte
-	for _, ccvItem := range opts.CCVs {
-		verifierAddress := contracts.BytesToInstanceAddress(ccvItem.CCVAddress.Bytes())
-		// In this devenv e2e lane we use a single default committee verifier.
-		// Prefer datastore canonical address to avoid stale/rotated test-input drift.
-		if len(opts.CCVs) == 1 && defaultCCVRefErr == nil && defaultCCVRef.Address != "" {
-			verifierAddress = contracts.HexToInstanceAddress(defaultCCVRef.Address)
-		}
-		activeVerifier, err := contract.FindActiveContractByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, ccvs.CommitteeVerifier{}.GetTemplateID(), verifierAddress)
+	for i := range opts.CCVs {
+		// Get the raw instance address of the CCV from the datastore
+		addrRef, err := getByAddress(c.e.DataStore, ccvInstanceAddresses[i].String())
 		if err != nil {
-			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve verifier by address %s: %w", verifierAddress.String(), err)
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get address ref for ccv %d from env datastore: %w", i, err)
 		}
-		parsedVerifier, err := bindings.UnmarshalCreatedEvent[ccvs.CommitteeVerifier](activeVerifier.GetCreatedEvent())
-		if err != nil {
-			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse committee verifier contract: %w", err)
+		if len(addrRef.Labels.List()) == 0 {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no labels found for ccv %d", i)
 		}
-		var rawAddr contracts.RawInstanceAddress
-		// Prefer canonical raw address from datastore labels (same source used in integration tests).
-		ccvRef, err := c.e.DataStore.Addresses().Get(
-			datastore.NewAddressRefKey(
-				c.chainDetails.ChainSelector,
-				datastore.ContractType(committee_verifier.ContractType),
-				committee_verifier.Version,
-				devenvcommon.DefaultCommitteeVerifierQualifier,
-			),
-		)
-		if err != nil {
-			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve committee verifier address ref: %w", err)
-		}
-		if strings.EqualFold(ccvRef.Address, verifierAddress.String()) && len(ccvRef.Labels.List()) > 0 {
-			rawAddr, err = contracts.RawInstanceAddressFromString(ccvRef.Labels.List()[0])
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse committee verifier raw address label: %w", err)
-			}
-		} else {
-			rawAddr, err = contracts.RawInstanceAddressFromString(fmt.Sprintf("%s@%s", parsedVerifier.InstanceId, parsedVerifier.Owner))
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("construct verifier raw address: %w", err)
-			}
-		}
-		rawAddrBinding := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(rawAddr.String())}
+		rawInstanceAddress := addrRef.Labels.List()[0]
+		rawAddrBinding := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(rawInstanceAddress)}
 		ccvExtraArgs = append(ccvExtraArgs, ccipclient.CCVExtraArg{
 			CcvAddress: rawAddrBinding,
 			CcvArgs:    types.TEXT(""),
 		})
 		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
 			CcvAddress:      rawAddrBinding,
-			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
+			CcvCid:          types.CONTRACT_ID(sendDisclosures.CCVContractIDs[i].ContractId),
 			CcvExtraContext: common.CCIPContext{},
 		})
-		disclosedVerifierContracts = append(disclosedVerifierContracts, convertToDisclosedContract(activeVerifier))
-		receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(verifierAddress.Bytes()))
-		if len(fallbackVerifierDestAddress) == 0 {
-			fallbackVerifierDestAddress = protocol.UnknownAddress(verifierAddress.Bytes())
-		}
-		if len(fallbackVerifierBlob) == 0 {
-			versionTagBytes, decodeErr := hex.DecodeString(string(parsedVerifier.VersionTag))
-			if decodeErr == nil {
-				fallbackVerifierBlob = versionTagBytes
-			}
-		}
-	}
-	if len(opts.Executor) > 0 {
-		receiptIssuers = append(receiptIssuers, opts.Executor)
-	}
-	receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(contracts.HexToInstanceAddress(onRampRef.Address).Bytes()))
 
-	sendContext := common.CCIPContext{
-		Values: types.TEXTMAP{
-			"on-ramp":              common.AnyValue{AVContractId: &onRampCID},
-			"global-config":        common.AnyValue{AVContractId: &globalConfigCID},
-			"token-admin-registry": common.AnyValue{AVContractId: &tokenAdminRegistryCID},
-			"fee-quoter":           common.AnyValue{AVContractId: &feeQuoterCID},
-			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCID},
-		},
+		// TODO: what is this for?
+		// if len(fallbackVerifierDestAddress) == 0 {
+		// 	fallbackVerifierDestAddress = protocol.UnknownAddress(verifierAddress.Bytes())
+		// }
+		// if len(fallbackVerifierBlob) == 0 {
+		// 	versionTagBytes, decodeErr := hex.DecodeString(string(parsedVerifier.VersionTag))
+		// 	if decodeErr == nil {
+		// 		fallbackVerifierBlob = versionTagBytes
+		// 	}
+		// }
 	}
 
 	feeTokenInput := interfaces.TokenInput{
@@ -823,7 +624,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		// TransferFactory_Transfer on the same CID fails with
 		// CONTRACT_NOT_ACTIVE. This only works today because total fees
 		// are 0 (gas price set to 0 below) so the transfer is skipped.
-		TransferFactory: routerCID,
+		TransferFactory: types.CONTRACT_ID(disclosedRouter.ContractId),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 			Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
 			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
@@ -832,8 +633,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	sendArgs := ccipsender.Send{
-		Context:                  sendContext,
-		RouterCid:                routerCID,
+		Context:                  sendDisclosures.SendContext,
+		RouterCid:                types.CONTRACT_ID(disclosedRouter.ContractId),
 		DestinationChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
@@ -859,30 +660,16 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		},
 		CcvSendInputs: ccvSendInputs,
 		ExecutorInput: &ccipsender.ExecutorInput{
-			ExecutorCid:          executorCID,
+			ExecutorCid:          types.CONTRACT_ID(sendDisclosures.ExecutorContractID.ContractId),
 			ExecutorExtraContext: common.CCIPContext{},
 		},
 	}
 	sendArgsMap := sendArgs.ToMap()
-	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
-			"empty contract ID before send: ccipSender=%q router=%q executor=%q onRamp=%q globalConfig=%q tokenAdminRegistry=%q feeQuoter=%q rmnRemote=%q",
-			ccipSenderCID, routerCID, executorCID, onRampCID, globalConfigCID, tokenAdminRegistryCID, feeQuoterCID, rmnRemoteCID,
-		)
-	}
 
-	disclosedContracts := make([]*ledgerv2.DisclosedContract, 0, 8+len(disclosedVerifierContracts))
-	disclosedContracts = append(disclosedContracts,
-		disclosedCCIPSender,
-		disclosedExecutor,
-		disclosedRouter,
-		disclosedOnRamp,
-		disclosedGlobalConfig,
-		disclosedTokenAdminRegistry,
-		disclosedRMNRemote,
-		disclosedFeeQuoter,
-	)
-	disclosedContracts = append(disclosedContracts, disclosedVerifierContracts...)
+	// sender, router + all other disclosed contracts
+	disclosedContracts := make([]*ledgerv2.DisclosedContract, 0, 2+len(sendDisclosures.DisclosedContracts))
+	disclosedContracts = append(disclosedContracts, disclosedCCIPSender, disclosedRouter)
+	disclosedContracts = append(disclosedContracts, sendDisclosures.DisclosedContracts...)
 	for _, dc := range disclosedContracts {
 		if dc != nil && dc.GetContractId() == "" {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("empty disclosed contract ID before ccip sender send")
@@ -975,7 +762,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	event := cciptestinterfaces.MessageSentEvent{
 		MessageID:      messageID,
-		ReceiptIssuers: receiptIssuers,
+		ReceiptIssuers: nil, // TODO: add them later, not currently needed
 	}
 	if foundEncodedMessage {
 		msg := decodedMessage
@@ -991,6 +778,20 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	c.lastSentHasVerificationInputs = foundEncodedMessage && len(fallbackVerifierDestAddress) > 0 && len(fallbackVerifierBlob) > 0
 
 	return event, nil
+}
+
+func getByAddress(ds datastore.DataStore, address string) (datastore.AddressRef, error) {
+	all, err := ds.Addresses().Fetch()
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("failed to fetch addresses: %w", err)
+	}
+	for _, addr := range all {
+		if addr.Address == address {
+			return addr, nil
+		}
+	}
+
+	return datastore.AddressRef{}, fmt.Errorf("address %s not found", address)
 }
 
 // SendMessageWithNonce implements cciptestinterfaces.CCIP17.
