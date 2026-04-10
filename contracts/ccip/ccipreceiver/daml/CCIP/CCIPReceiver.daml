@@ -13,6 +13,7 @@ import DA.List (unique)
 import DA.Optional (fromSomeNote)
 
 import qualified CCIP.Context
+import qualified CCIP.FinalityConfig
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
@@ -50,13 +51,13 @@ template CCIPReceiver
         requiredCCVs : [RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress]
         optionalThreshold : Int
-        -- Minimum source-chain block confirmations this receiver will accept for FTF messages.
-        -- A value of 0 means finalized-only and rejects FTF.
-        minBlockConfirmations : Int
+        -- Allowed finality policy for inbound execution.
+        receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
     where
         signatory owner
         -- Ensure that requiredCCVs are unique
-        ensure assertValidInstanceId instanceId && unique requiredCCVs
+        ensure assertValidInstanceId instanceId
+            && unique requiredCCVs
 
         -- | Query the final required CCVs for executing an inbound message.
         -- Aggregates receiver policy with token-pool requirements and delegates
@@ -86,7 +87,7 @@ template CCIPReceiver
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = message.sourceChainSelector
                                 amount = tokenAmount
-                                finality = message.finality
+                                finality = message.finality.requested
                                 extraData = tokenExtraData
                                 direction = CCIP.Interfaces.TokenPool.Inbound
                                 caller = owner
@@ -142,7 +143,7 @@ template CCIPReceiver
                     receiverRequiredCCVs = requiredCCVs
                     receiverOptionalCCVs = optionalCCVs
                     receiverOptionalThreshold = optionalThreshold
-                    receiverMinBlockConfirmations = minBlockConfirmations
+                    receiverFinalityConfig = receiverFinalityConfig
                     caller = owner
 
                 -- Token transfers must resolve pool CCVs before any CCV can contribute.

@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "52bfeb2e62d0535c6de1785531bd0f41d8d116dc4ecb78158d485837c37dc80d"
+	PackageID   = "262e92e5277973708dddb912fcb77089603ecc9a542b1021197e517bccebd30f"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1975,15 +1975,15 @@ var _ mcms.IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
-	Context                       common.CCIPContext        `json:"context"`
-	EncodedMessage                types.TEXT                `json:"encodedMessage"`
-	ReceiverParty                 types.PARTY               `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
-	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
-	Caller                        types.PARTY               `json:"caller"`
+	Context                   common.CCIPContext        `json:"context"`
+	EncodedMessage            types.TEXT                `json:"encodedMessage"`
+	ReceiverParty             types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
+	Caller                    types.PARTY               `json:"caller"`
 }
 
 // ToMap converts PrepareExecute2 to a map for DAML arguments
@@ -2041,7 +2041,13 @@ func (t PrepareExecute2) ToMap() map[string]any {
 
 	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
 
-	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+	m["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -2073,14 +2079,14 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 // PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecute2MCMSParams struct {
-	Context                       common.CCIPContext        `json:"context"`
-	EncodedMessage                types.TEXT                `json:"encodedMessage"`
-	ReceiverParty                 types.PARTY               `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
-	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
+	Context                   common.CCIPContext        `json:"context"`
+	EncodedMessage            types.TEXT                `json:"encodedMessage"`
+	ReceiverParty             types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.

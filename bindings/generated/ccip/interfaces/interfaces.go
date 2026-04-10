@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "c687e0db16cc8d7b511d1b4ac3236a1687150533f8c8f1e0969dbae1c0a1d92c"
+	PackageID   = "60c62dcbdeed9822de20f97e0126e051c8961c742853e0f289cef3a9fd37d227"
 	SDKVersion  = "3.4.10"
 )
 
@@ -648,12 +648,12 @@ func (t *TokenPoolGetFee) UnmarshalHex(data string) error {
 
 // TokenPoolGetRequiredCCVs is a Record type
 type TokenPoolGetRequiredCCVs struct {
-	RemoteChainSelector types.NUMERIC     `json:"remoteChainSelector"`
-	Amount              types.NUMERIC     `json:"amount"`
-	Finality            types.INT64       `json:"finality"`
-	ExtraData           types.TEXT        `json:"extraData"`
-	Direction           TransferDirection `json:"direction"`
-	Caller              types.PARTY       `json:"caller"`
+	RemoteChainSelector types.NUMERIC         `json:"remoteChainSelector"`
+	Amount              types.NUMERIC         `json:"amount"`
+	Finality            common.FinalityConfig `json:"finality"`
+	ExtraData           types.TEXT            `json:"extraData"`
+	Direction           TransferDirection     `json:"direction"`
+	Caller              types.PARTY           `json:"caller"`
 }
 
 // ToMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
@@ -664,7 +664,13 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["finality"] = int64(t.Finality)
+	m["finality"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Finality).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Finality
+	}()
 
 	m["extraData"] = string(t.ExtraData)
 

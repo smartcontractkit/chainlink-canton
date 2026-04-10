@@ -14,6 +14,7 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import qualified CCIP.Context
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.GlobalConfig qualified as GlobalConfig
 import CCIP.Internal qualified as Internal
 import CCIP.Interfaces.CrossChainVerifier qualified as CrossChainVerifier
@@ -26,6 +27,25 @@ import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
+
+finalityConfig n =
+    if n == 0
+    then FinalityCodec.WaitForFinality
+    else FinalityCodec.BlockDepth n
+
+rawFinalityConfig n =
+    if n == 0
+    then FinalityCodec.waitForFinalityFlag
+    else fromSome do
+        flagsHex <- MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)
+
+unsafeDecodeRequestedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityCodec.decodeRequestedFinality finalityConfig)
+
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
 -- | Test execute with CCV verification via collecting contract pattern.
 --
@@ -126,7 +146,7 @@ testExecuteWithCCVVerification = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "test-offramp" ccipOwner)
@@ -160,7 +180,7 @@ testExecuteWithCCVVerification = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Exercise AddCCVVerification directly on ExecutingMessageV1
@@ -296,7 +316,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress offRampAddr
@@ -327,7 +347,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             requiredCCVs = [defaultCCV]
             optionalCCVs = []
             optionalCCVThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = [defaultCCV]
             inboundPoolCCVs = Some []
             deps = ExecutingMessageV1.ExecutingMessageDeps with
@@ -459,7 +479,7 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "test-offramp" ccipOwner)
@@ -490,7 +510,7 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Add CCV1 verification
@@ -637,7 +657,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "test-offramp" ccipOwner)
@@ -668,7 +688,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
             receiverRequiredCCVs = [ccv1RawAddress, CrossChainVerifier.useDefaultCCVs, ccv3RawAddress]
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Add CCV1 verification
@@ -820,7 +840,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "test-offramp" ccipOwner)
@@ -851,7 +871,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 1
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- PrepareExecute to create ExecutingMessageV1 with optional CCVs.
@@ -868,7 +888,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = [ccv2RawAddress, ccv3RawAddress, ccv4RawAddress]
             receiverOptionalThreshold = 2
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Add CCV1 verification
@@ -1004,7 +1024,7 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
@@ -1033,7 +1053,7 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Execute with receiverRequiredCCVs set but NOT verified - should fail.
@@ -1048,6 +1068,119 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
             executingMessageCid = executingMessageCid
 
     debug "testExecuteMessageOnlyRequiresReceiverCCVs: PASSED"
+
+testPrepareExecuteAllowsSafeFinalityConfig : Script ()
+testPrepareExecuteAllowsSafeFinalityConfig = script do
+    ccipOwner <- allocateParty "ccip-owner-safe"
+    rmnOwner <- allocateParty "rmn-owner-safe"
+    receiver <- allocateParty "receiver-safe"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+    let globalConfigInstanceId = "test-globalconfig-safe"
+    let rmnInstanceId = "test-rmn-safe"
+    let tokenAdminRegistryInstanceId = "test-tar-safe"
+    let offRampInstanceId = "test-offramp-safe"
+
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
+                laneMandatedCCVs = []
+                defaultCCVs = [])]
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    offRamp <- submit ccipOwner do
+        createCmd OffRamp.OffRamp with
+            instanceId = offRampInstanceId
+            ccipOwner = ccipOwner
+            deps = OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    factory <- submit ccipOwner do
+        createCmd PerPartyRouter.PerPartyRouterFactory with
+            instanceId = "test-factory-safe"
+            ccipOwner = ccipOwner
+            deps = PerPartyRouter.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.make "unused-onramp-safe" ccipOwner
+                offRamp = RawInstanceAddress.make offRampInstanceId ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = RawInstanceAddress.make "unused-feequoter-safe" ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createResult <- submit (actAs receiver <> disclose disclosedFactory) do
+        exerciseCmd factory PerPartyRouter.CreateRouter with
+            partyOwner = receiver
+            instanceId = "test-router-safe"
+    let router = createResult.router
+
+    let safeFinality = FinalityCodec.WaitForSafe
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = fromSomeNote "safe finality must decode" (FinalityCodec.decodeRequestedFinality "00010000")
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "48656c6c6f2053616665"
+    let encodedMessage = MessageCodecV1.encodeMessageV1 message
+
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    _ <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = []
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverFinalityConfig = safeFinality
+            caller = receiver
+
+    debug "testPrepareExecuteAllowsSafeFinalityConfig: PASSED"
 
 -- | Test that execute fails when required CCV is missing.
 -- Verifies that lane-mandated CCVs must be provided.
@@ -1140,7 +1273,7 @@ testExecuteFailsMissingCCV = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "test-offramp-missing" ccipOwner)
@@ -1171,7 +1304,7 @@ testExecuteFailsMissingCCV = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Execute WITHOUT adding any CCV verification - should fail
@@ -1275,7 +1408,7 @@ testExecuteWrongReceiver = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "test-offramp-wrongrecv" ccipOwner)
@@ -1306,7 +1439,7 @@ testExecuteWrongReceiver = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     debug ("Execute fails with wrong receiver: PASSED")
@@ -1396,7 +1529,7 @@ testExecuteAllowsMultipleOnRamps = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = rotatedOnRamp
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "test-offramp-multionramp" ccipOwner)
@@ -1425,7 +1558,7 @@ testExecuteAllowsMultipleOnRamps = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     -- Add CCV verification
@@ -1529,7 +1662,7 @@ testExecuteRejectsUnconfiguredOnRamp = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = disallowedOnRamp
             offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "test-offramp-badonramp" ccipOwner)
@@ -1558,7 +1691,7 @@ testExecuteRejectsUnconfiguredOnRamp = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            receiverMinBlockConfirmations = 2000
+            receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do

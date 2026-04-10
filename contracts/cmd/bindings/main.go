@@ -107,7 +107,6 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Str("package", string(p)).Msg("Failed to generate bindings for package")
 		}
-
 		outputFile := filepath.Join(*artifactsDir, filepath.Join(s...), fmt.Sprintf("%s.go", s[len(s)-1]))
 		log.Debug().Str("package", string(p)).Str("outputFile", outputFile).Msg("Writing generated bindings to file")
 		// Ensure the output subdirectory exists
