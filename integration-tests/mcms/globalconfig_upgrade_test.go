@@ -11,7 +11,7 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 // TestGlobalConfig_UpgradeV1ToV2 simulates a realistic Smart Contract Upgrade (SCU):

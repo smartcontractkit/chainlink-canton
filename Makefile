@@ -92,3 +92,7 @@ run-e2e-tests:
 
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests
+
+.PHONY: mocks
+mocks:
+	go run github.com/vektra/mockery/v3@v3.7.0

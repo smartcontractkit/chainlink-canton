@@ -19,12 +19,12 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Generate mocks
-        run: go run github.com/vektra/mockery/v2@v2.53.5
+        run: make mocks
       - name: Check mocks are up to date
         run: |
           if ! git diff --quiet HEAD; then
-            echo "❌ Generated mocks are out of date. Run \`go run github.com/vektra/mockery/v2@v2.53.5\` and commit the changes."
-            echo "❌ Generated mocks are out of date. Run \`go run github.com/vektra/mockery/v2@v2.53.5\` and commit the changes:" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Generated mocks are out of date. Run \`make mocks\` and commit the changes."
+            echo "❌ Generated mocks are out of date. Run \`make mocks\` and commit the changes:" >> $GITHUB_STEP_SUMMARY
             git diff --name-only | while read -r n; do
               echo "- $n" >> $GITHUB_STEP_SUMMARY
             done

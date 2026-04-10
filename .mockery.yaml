@@ -1,14 +1,28 @@
-with-expecter: true
-
 dir: ./internal/mocks
-outpkg: mocks
+pkgname: mocks
+template: testify
+
+include-auto-generated: true
 
 packages:
   github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2:
     interfaces:
       StateServiceClient:
+        config:
+          filename: "mock_StateServiceClient.go"
       UpdateServiceClient:
+        config:
+          filename: "mock_UpdateServiceClient.go"
   github.com/smartcontractkit/chainlink-canton/eds/internal/store:
     interfaces:
-      ContractStore:
+      ActiveContractStore:
+        config:
+          filename: "mock_ActiveContractStore.go"
       InstrumentHoldingStore:
+        config:
+          filename: "mock_InstrumentHoldingStore.go"
+  google.golang.org/grpc:
+    interfaces:
+      ServerStreamingClient:
+        config:
+          filename: "mock_ServerStreamingClient.go"
