@@ -11,6 +11,7 @@ import (
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -23,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
@@ -54,7 +56,7 @@ func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error)
 
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
-func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {
+func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Participant, partyId string) (routerAddress contracts.InstanceAddress, disclosedRouter *apiv2.DisclosedContract, err error) {
 	// Create PerPartyRouter (ignore error if it exists already)
 	cantonPerPartyRouterFactoryRef, err := c.e.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(
@@ -65,7 +67,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contr
 		),
 	)
 	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to get canton per party router factory address ref: %w", err)
+		return contracts.InstanceAddress{}, nil, fmt.Errorf("failed to get canton per party router factory address ref: %w", err)
 	}
 	c.logger.Debug().Str("CantonPerPartyRouterFactory", cantonPerPartyRouterFactoryRef.Address).Msg("Resolved per-party router factory address")
 	cantonPerPartyRouterFactory := contracts.HexToInstanceAddress(cantonPerPartyRouterFactoryRef.Address)
@@ -80,9 +82,17 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contr
 			InstanceId: types.TEXT(routerInstanceID.String()),
 		},
 	})
-	routerAddress := routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
+	routerAddress = routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
 
-	return routerAddress, nil
+	// Get disclosure and contract id of the router
+	disclosedRouter, err = testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
+		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
+	})
+	if err != nil {
+		return contracts.InstanceAddress{}, nil, fmt.Errorf("failed to get disclosed router: %w", err)
+	}
+
+	return routerAddress, disclosedRouter, nil
 }
 
 func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
@@ -138,7 +148,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Deploy PerPartyRouter for the receiver party
-	routerAddress, err := c.DeployPerPartyRouter(ctx, executingParty)
+	routerAddress, _, err := c.DeployPerPartyRouter(ctx, participant, executingParty)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
 	}

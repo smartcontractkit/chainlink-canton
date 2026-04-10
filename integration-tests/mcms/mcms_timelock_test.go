@@ -17,7 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/mcmstest"
-	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 func TestMCMS_Timelock(t *testing.T) {
