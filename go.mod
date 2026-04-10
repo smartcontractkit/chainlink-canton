@@ -38,7 +38,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260408185451-7b2512c2651c
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260408185451-7b2512c2651c
 	github.com/smartcontractkit/chainlink-common v0.11.1
-	github.com/smartcontractkit/chainlink-deployments-framework v0.93.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.94.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.15
 	github.com/smartcontractkit/go-daml v0.6.1-0.20260409205140-498c8a12f856
 	github.com/stretchr/testify v1.11.1
@@ -92,6 +92,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.59.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.20 // indirect
+	github.com/aws/aws-sdk-go-v2/service/kms v1.50.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.8 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.17 // indirect
@@ -398,6 +399,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.18.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b // indirect
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260205130626-db2a2aab956b // indirect
+	github.com/smartcontractkit/chainlink-protos/op-catalog v0.0.4 // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.10.0 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260205175622-33e65031f9a9 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
@@ -410,7 +412,7 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20251212213002-0a5e2f907dda // indirect
-	github.com/smartcontractkit/mcms v0.39.0 // indirect
+	github.com/smartcontractkit/mcms v0.40.1 // indirect
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect
 	github.com/sony/gobreaker/v2 v2.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
