@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/runtime"
 	externalRef0 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
@@ -86,6 +87,18 @@ type CCIPSendResponse struct {
 		// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
 		RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
 	} `json:"executor,omitempty"`
+}
+
+// LookupTokenPoolResponse defines model for LookupTokenPoolResponse.
+type LookupTokenPoolResponse struct {
+	// BaseUrl The base URL of the operators EDS API.
+	BaseUrl *externalRef0.EDSBaseUrl `json:"baseUrl,omitempty"`
+
+	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
+	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
+
+	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
+	RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
 }
 
 // PostCCIPExecuteJSONRequestBody defines body for PostCCIPExecute for application/json ContentType.
@@ -184,6 +197,9 @@ type ClientInterface interface {
 	PostPerPartyRouterFactoryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PostPerPartyRouterFactory(ctx context.Context, body PostPerPartyRouterFactoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTokenAdminRegistryToken request
+	GetTokenAdminRegistryToken(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) PostCCIPExecuteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -248,6 +264,18 @@ func (c *Client) PostPerPartyRouterFactoryWithBody(ctx context.Context, contentT
 
 func (c *Client) PostPerPartyRouterFactory(ctx context.Context, body PostPerPartyRouterFactoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostPerPartyRouterFactoryRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetTokenAdminRegistryToken(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTokenAdminRegistryTokenRequest(c.Server, instrumentId)
 	if err != nil {
 		return nil, err
 	}
@@ -378,6 +406,40 @@ func NewPostPerPartyRouterFactoryRequestWithBody(server string, contentType stri
 	return req, nil
 }
 
+// NewGetTokenAdminRegistryTokenRequest generates requests for GetTokenAdminRegistryToken
+func NewGetTokenAdminRegistryTokenRequest(server string, instrumentId externalRef0.HashedInstrumentId) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "instrumentId", runtime.ParamLocationPath, instrumentId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/ccip/v1/global/tokenAdminRegistry/token/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -435,6 +497,9 @@ type ClientWithResponsesInterface interface {
 	PostPerPartyRouterFactoryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostPerPartyRouterFactoryResponse, error)
 
 	PostPerPartyRouterFactoryWithResponse(ctx context.Context, body PostPerPartyRouterFactoryJSONRequestBody, reqEditors ...RequestEditorFn) (*PostPerPartyRouterFactoryResponse, error)
+
+	// GetTokenAdminRegistryTokenWithResponse request
+	GetTokenAdminRegistryTokenWithResponse(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*GetTokenAdminRegistryTokenResponse, error)
 }
 
 type PostCCIPExecuteResponse struct {
@@ -512,6 +577,31 @@ func (r PostPerPartyRouterFactoryResponse) StatusCode() int {
 	return 0
 }
 
+type GetTokenAdminRegistryTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *LookupTokenPoolResponse
+	JSON400      *externalRef0.N400
+	JSON404      *externalRef0.N404
+	JSON500      *externalRef0.N500
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTokenAdminRegistryTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTokenAdminRegistryTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // PostCCIPExecuteWithBodyWithResponse request with arbitrary body returning *PostCCIPExecuteResponse
 func (c *ClientWithResponses) PostCCIPExecuteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCIPExecuteResponse, error) {
 	rsp, err := c.PostCCIPExecuteWithBody(ctx, contentType, body, reqEditors...)
@@ -561,6 +651,15 @@ func (c *ClientWithResponses) PostPerPartyRouterFactoryWithResponse(ctx context.
 		return nil, err
 	}
 	return ParsePostPerPartyRouterFactoryResponse(rsp)
+}
+
+// GetTokenAdminRegistryTokenWithResponse request returning *GetTokenAdminRegistryTokenResponse
+func (c *ClientWithResponses) GetTokenAdminRegistryTokenWithResponse(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*GetTokenAdminRegistryTokenResponse, error) {
+	rsp, err := c.GetTokenAdminRegistryToken(ctx, instrumentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTokenAdminRegistryTokenResponse(rsp)
 }
 
 // ParsePostCCIPExecuteResponse parses an HTTP response from a PostCCIPExecuteWithResponse call
@@ -704,6 +803,53 @@ func ParsePostPerPartyRouterFactoryResponse(rsp *http.Response) (*PostPerPartyRo
 	return response, nil
 }
 
+// ParseGetTokenAdminRegistryTokenResponse parses an HTTP response from a GetTokenAdminRegistryTokenWithResponse call
+func ParseGetTokenAdminRegistryTokenResponse(rsp *http.Response) (*GetTokenAdminRegistryTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTokenAdminRegistryTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LookupTokenPoolResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest externalRef0.N400
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest externalRef0.N404
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.N500
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
@@ -715,6 +861,9 @@ type ServerInterface interface {
 
 	// (POST /ccip/v1/global/perPartyRouter/factory)
 	PostPerPartyRouterFactory(c *gin.Context)
+
+	// (GET /ccip/v1/global/tokenAdminRegistry/token/{instrumentId})
+	GetTokenAdminRegistryToken(c *gin.Context, instrumentId externalRef0.HashedInstrumentId)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -765,6 +914,30 @@ func (siw *ServerInterfaceWrapper) PostPerPartyRouterFactory(c *gin.Context) {
 	siw.Handler.PostPerPartyRouterFactory(c)
 }
 
+// GetTokenAdminRegistryToken operation middleware
+func (siw *ServerInterfaceWrapper) GetTokenAdminRegistryToken(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "instrumentId" -------------
+	var instrumentId externalRef0.HashedInstrumentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "instrumentId", c.Param("instrumentId"), &instrumentId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter instrumentId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTokenAdminRegistryToken(c, instrumentId)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -795,4 +968,5 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/ccip/v1/global/message/execute", wrapper.PostCCIPExecute)
 	router.POST(options.BaseURL+"/ccip/v1/global/message/send", wrapper.PostCCIPSend)
 	router.POST(options.BaseURL+"/ccip/v1/global/perPartyRouter/factory", wrapper.PostPerPartyRouterFactory)
+	router.GET(options.BaseURL+"/ccip/v1/global/tokenAdminRegistry/token/:instrumentId", wrapper.GetTokenAdminRegistryToken)
 }

@@ -20,8 +20,8 @@ import (
 
 // CCVExecuteRequest defines model for CCVExecuteRequest.
 type CCVExecuteRequest struct {
-	// Canton2AnyMessage A message in the Canton 2 AnyMessage format, to be used by the caller during submission.
-	Canton2AnyMessage *externalRef0.Canton2AnyMessage `json:"canton2AnyMessage,omitempty"`
+	// EncodedMessage The CCIP message to be executed, encoded as a hex string.
+	EncodedMessage *string `json:"encodedMessage,omitempty"`
 }
 
 // CCVExecuteResponse defines model for CCVExecuteResponse.

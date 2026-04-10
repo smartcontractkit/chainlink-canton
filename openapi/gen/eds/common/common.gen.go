@@ -70,6 +70,9 @@ type ErrorResponse struct {
 	Error   string  `json:"error"`
 }
 
+// HashedInstrumentId The hashed identifier of an instrument, the keccak256 hash of the concatenated InstrumentId in the form of `id@admin`.
+type HashedInstrumentId = string
+
 // InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
 type InstanceAddress = string
 
