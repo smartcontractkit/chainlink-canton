@@ -1,4 +1,4 @@
-module CCIP.FinalityCodec where
+module CCIP.FinalityConfig where
 
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Optional (fromSomeNote)

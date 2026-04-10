@@ -27,7 +27,7 @@ import DA.Crypto.Text
 import qualified DA.Text as Text
 import DA.Optional (fromSome)
 
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import qualified Splice.Api.Token.HoldingV1
 
 -- | MessageV1 struct matching EVM MessageV1Codec.sol exactly.
@@ -49,7 +49,7 @@ data MessageV1 = MessageV1
         sequenceNumber : Numeric 0        -- uint64 (called messageNumber in EVM)
         executionGasLimit : Int           -- uint32
         ccipReceiveGasLimit : Int         -- uint32 (gas limit for user callback)
-        finality : CCIP.FinalityCodec.DecodedFinality -- bytes4 finality config
+        finality : CCIP.FinalityConfig.DecodedFinality -- bytes4 finality config
         ccvAndExecutorHash : BytesHex     -- bytes32 (hash of CCVs and executor)
         -- Variable length fields (must be in this exact order for encoding)
         onRampAddress : BytesHex          -- bytes (length-prefixed)
@@ -714,7 +714,7 @@ decodeMessageV1 encoded =
 
                 -- Extract finality config (4 bytes, offset 33)
                 finalityHex <- extractBytes encoded 33 4
-                finality <- CCIP.FinalityCodec.decodeRequestedFinality finalityHex
+                finality <- CCIP.FinalityConfig.decodeRequestedFinality finalityHex
 
                 -- Extract ccvAndExecutorHash (32 bytes, offset 37)
                 ccvHashHex <- extractBytes encoded 37 32

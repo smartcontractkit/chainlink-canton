@@ -33,7 +33,7 @@ import MCMS.Codec
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import DA.Optional (fromSome)
 import qualified Splice.Api.Token.HoldingV1
-import qualified CCIP.FinalityCodec as FinalityCodec
+import qualified CCIP.FinalityConfig as FinalityCodec
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================

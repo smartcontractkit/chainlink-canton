@@ -15,7 +15,7 @@ import DA.Time (time)
 import qualified CCIP.Context
 import CCIP.Events qualified as Events
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.FeeQuoter qualified as FeeQuoter
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool

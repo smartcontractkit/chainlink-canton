@@ -9,7 +9,7 @@ import qualified Splice.Api.Token.TransferInstructionV1
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import MCMS.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
@@ -37,7 +37,7 @@ interface ITokenPool where
         with
             remoteChainSelector : Numeric 0
             amount : Decimal
-            finality : CCIP.FinalityCodec.FinalityConfig
+            finality : CCIP.FinalityConfig.FinalityConfig
             extraData : BytesHex
             direction : TransferDirection
             caller : Party

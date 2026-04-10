@@ -11,7 +11,7 @@ import DA.Set qualified as Set
 import DA.Time (time)
 
 import CCIP.FeeQuoter
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.SendingMessageV1 qualified as SendingMessageV1

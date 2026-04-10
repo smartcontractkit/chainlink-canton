@@ -5,7 +5,7 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Optional (fromSome)
 
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.ExecutorCodecGen qualified as ExecutorCodecGen
 import CCIP.ExecutorTypes (
     RemoteChainConfig(..),

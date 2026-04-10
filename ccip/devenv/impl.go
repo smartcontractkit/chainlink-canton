@@ -841,9 +841,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			FeeToken: feeTokenInstrument,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
-					GasLimit:           types.INT64(opts.ExecutionGasLimit),
-					BlockConfirmations: 0,
-					Ccvs:               ccvExtraArgs,
+					GasLimit: types.INT64(opts.ExecutionGasLimit),
+					Ccvs:     ccvExtraArgs,
 					Executor: ccipclient.ExecutorExtraArg{
 						ExecutorUseDefault: &ccipclient.ExecutorUseDefault{
 							ExecutorArgs: types.TEXT(""),

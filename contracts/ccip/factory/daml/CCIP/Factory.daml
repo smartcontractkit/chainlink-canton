@@ -42,7 +42,7 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.RateLimiter
 import qualified CCIP.CCIPSender
 import qualified CCIP.CCIPReceiver
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import CCIP.ContextCodec (decodeCCIPContextAt)
 import CCIP.LockReleaseTokenPoolCodecGen (decodeTransferTimeoutAt)
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
@@ -564,7 +564,7 @@ data DeployCCIPReceiverParams = DeployCCIPReceiverParams
         requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalThreshold : Int
-        receiverFinalityConfig : CCIP.FinalityCodec.FinalityConfig
+        receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
     deriving (Eq, Show)
 
 requireDecoded : Text -> Optional a -> Update a
@@ -705,14 +705,14 @@ mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
     optionalThreshold = params.optionalThreshold
     receiverFinalityConfig = params.receiverFinalityConfig
 
-decodeRequestedFinalityAt : BytesHex -> Int -> Optional (CCIP.FinalityCodec.FinalityConfig, Int)
+decodeRequestedFinalityAt : BytesHex -> Int -> Optional (CCIP.FinalityConfig.FinalityConfig, Int)
 decodeRequestedFinalityAt encoded offset = do
     tagHex <- extractBytes encoded offset 1
-    if tagHex == "00" then Some (CCIP.FinalityCodec.WaitForFinality, offset + 1)
-    else if tagHex == "01" then Some (CCIP.FinalityCodec.WaitForSafe, offset + 1)
+    if tagHex == "00" then Some (CCIP.FinalityConfig.WaitForFinality, offset + 1)
+    else if tagHex == "01" then Some (CCIP.FinalityConfig.WaitForSafe, offset + 1)
     else if tagHex == "02" then do
         (payload, newOffset) <- decodeInt64At encoded (offset + 1)
-        Some (CCIP.FinalityCodec.BlockDepth payload, newOffset)
+        Some (CCIP.FinalityConfig.BlockDepth payload, newOffset)
     else None
 
 -- | Helper to assert that all bytes have been consumed (no trailing bytes)

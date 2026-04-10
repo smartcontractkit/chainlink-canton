@@ -8,7 +8,7 @@ import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
@@ -111,7 +111,7 @@ template OffRamp
                 receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
-                receiverFinalityConfig : CCIP.FinalityCodec.FinalityConfig
+                receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
@@ -175,7 +175,7 @@ template OffRamp
                     then pure ()
                     else
                         assertMsg "prepareExecute: message finality not allowed by receiver finality config"
-                            (CCIP.FinalityCodec.requestedFinalityAllowed message.finality.requested receiverFinalityConfig)
+                            (CCIP.FinalityConfig.requestedFinalityAllowed message.finality.requested receiverFinalityConfig)
 
                 (baseRequiredCCVs, baseOptionalCCVs, baseOptionalCCVThreshold) <-
                     CCIP.Internal.computeExecuteCCVs

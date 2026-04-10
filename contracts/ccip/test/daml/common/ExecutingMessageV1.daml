@@ -5,7 +5,7 @@ import DA.Optional (fromSome, fromSomeNote)
 import DA.Assert
 
 import CCIP.ExecutingMessageV1
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 

@@ -1,6 +1,6 @@
 module CCIP.ExecutorTypes where
 
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import MCMS.RawInstanceAddress (RawInstanceAddress)
 
 data RemoteChainConfig = RemoteChainConfig
@@ -18,7 +18,7 @@ data RemoteChainConfigArgs = RemoteChainConfigArgs
 data DynamicConfig = DynamicConfig
     with
         feeAggregator : Optional Party
-        allowedFinalityConfig : CCIP.FinalityCodec.FinalityConfig
+        allowedFinalityConfig : CCIP.FinalityConfig.FinalityConfig
         ccvAllowlistEnabled : Bool
     deriving (Eq, Show)
 

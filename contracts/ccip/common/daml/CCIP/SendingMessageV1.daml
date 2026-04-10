@@ -11,7 +11,7 @@ import DA.List (dedup)
 import DA.Optional (isNone, isSome, fromSome, fromOptional)
 
 import qualified CCIP.Events
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -144,7 +144,7 @@ buildMessageArtifacts sm =
             sequenceNumber = sm.sequenceNumber
             executionGasLimit = sm.executionGasLimit
             ccipReceiveGasLimit = sm.ccipReceiveGasLimit
-            finality = CCIP.FinalityCodec.waitForFinalityDecoded
+            finality = CCIP.FinalityConfig.waitForFinalityDecoded
             ccvAndExecutorHash = finalHash
             onRampAddress = sm.onRampAddress
             offRampAddress = sm.offRampAddress

@@ -7,7 +7,7 @@ import DA.Crypto.Text (byteCount)
 import DA.Text qualified as Text
 import DA.Optional
 
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.MessageCodecV1 qualified as MessageCodecV1

@@ -13,7 +13,7 @@ import DA.List (unique)
 import DA.Optional (fromSomeNote)
 
 import qualified CCIP.Context
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
@@ -52,7 +52,7 @@ template CCIPReceiver
         optionalCCVs : [RawInstanceAddress]
         optionalThreshold : Int
         -- Allowed finality policy for inbound execution.
-        receiverFinalityConfig : CCIP.FinalityCodec.FinalityConfig
+        receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
     where
         signatory owner
         -- Ensure that requiredCCVs are unique

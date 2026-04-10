@@ -4,7 +4,7 @@ module CCIP.Tickets where
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import MCMS.RawInstanceAddress (RawInstanceAddress)
 import qualified Splice.Api.Token.HoldingV1
 
@@ -51,7 +51,7 @@ template TokenReceiveTicket
 
         messageId : BytesHex
         sourceChainSelector : Numeric 0
-        finality : CCIP.FinalityCodec.FinalityConfig
+        finality : CCIP.FinalityConfig.FinalityConfig
     where
         signatory dedup (ccipOwner :: ccvOwners)
         observer poolOwner, receiver, tokenReceiver

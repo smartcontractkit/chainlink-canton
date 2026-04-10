@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-client"
-	PackageID   = "28a4fa65e0c4fec436ca2db87ce08189891f03616f3741ea736c45b655abf700"
+	PackageID   = "709b4b2a3afd6ba11204c35f1b9e057144e6510d92630b1431451d32ddebc8e9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -370,12 +370,11 @@ var _ types.VARIANT = (*ExtraArgs)(nil)
 
 // GenericExtraArgsV3 is a Record type
 type GenericExtraArgsV3 struct {
-	GasLimit           types.INT64      `json:"gasLimit"`
-	BlockConfirmations types.INT64      `json:"blockConfirmations"`
-	Ccvs               []CCVExtraArg    `json:"ccvs"`
-	Executor           ExecutorExtraArg `json:"executor"`
-	TokenReceiver      types.TEXT       `json:"tokenReceiver"`
-	TokenArgs          types.TEXT       `json:"tokenArgs"`
+	GasLimit      types.INT64      `json:"gasLimit"`
+	Ccvs          []CCVExtraArg    `json:"ccvs"`
+	Executor      ExecutorExtraArg `json:"executor"`
+	TokenReceiver types.TEXT       `json:"tokenReceiver"`
+	TokenArgs     types.TEXT       `json:"tokenArgs"`
 }
 
 // ToMap converts GenericExtraArgsV3 to a map for DAML arguments
@@ -383,8 +382,6 @@ func (t GenericExtraArgsV3) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["gasLimit"] = int64(t.GasLimit)
-
-	m["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	m["ccvs"] = func() []any {
 		res := make([]any, 0, len(t.Ccvs))

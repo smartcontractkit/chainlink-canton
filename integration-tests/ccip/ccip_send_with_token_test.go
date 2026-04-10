@@ -706,8 +706,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			FeeToken: nativeInstrumentId,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
-					GasLimit:           0,
-					BlockConfirmations: 0,
+					GasLimit: 0,
 					Ccvs: []ccipclient.CCVExtraArg{
 						{
 							CcvAddress: ccvRawAddr,

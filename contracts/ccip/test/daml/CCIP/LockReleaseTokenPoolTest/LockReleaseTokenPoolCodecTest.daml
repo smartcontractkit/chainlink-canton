@@ -22,7 +22,7 @@ import CCIP.Context qualified as Context
 import CCIP.ContextCodec (encodeCCIPContext, decodeCCIPContextAt)
 import DA.TextMap qualified as TextMap
 
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 
 mkFinalityConfig n =
     if n == 0

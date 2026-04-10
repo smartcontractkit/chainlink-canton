@@ -4,15 +4,15 @@ import DA.Crypto.Text (BytesHex, byteCount)
 import DA.List ((!!))
 import DA.Optional (fromSome, fromSomeNote)
 
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.CommitteeVerifier
-unsafeDecodeRequestedFinality : BytesHex -> CCIP.FinalityCodec.DecodedFinality
+unsafeDecodeRequestedFinality : BytesHex -> CCIP.FinalityConfig.DecodedFinality
 unsafeDecodeRequestedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
-        (CCIP.FinalityCodec.decodeRequestedFinality finalityConfig)
+        (CCIP.FinalityConfig.decodeRequestedFinality finalityConfig)
 
-blockDepthFinalityConfig : Int -> CCIP.FinalityCodec.DecodedFinality
+blockDepthFinalityConfig : Int -> CCIP.FinalityConfig.DecodedFinality
 blockDepthFinalityConfig n =
     unsafeDecodeRequestedFinality (fromSome do
         flagsHex <- CCIP.MessageCodecV1.encodeUint16 0

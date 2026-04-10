@@ -9,7 +9,7 @@ import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome)
 
 import qualified CCIP.Events
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress (RawInstanceAddress)
@@ -64,7 +64,7 @@ template ExecutingMessageV1
         requiredCCVs : [RawInstanceAddress]
         optionalCCVs : [RawInstanceAddress]
         optionalCCVThreshold : Int
-        receiverFinalityConfig : CCIP.FinalityCodec.FinalityConfig
+        receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
         sourceDefaultCCVs : [RawInstanceAddress]
         -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
         -- None = pool hasn't been called; Some [] = called, no requirements.

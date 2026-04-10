@@ -14,7 +14,7 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import qualified CCIP.Context
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.GlobalConfig qualified as GlobalConfig
 import CCIP.Internal qualified as Internal
 import CCIP.Interfaces.CrossChainVerifier qualified as CrossChainVerifier

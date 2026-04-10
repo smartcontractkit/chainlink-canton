@@ -26,7 +26,7 @@ import CCIP.Codec
   )
 import qualified Splice.Api.Token.HoldingV1
 
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.Factory
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress

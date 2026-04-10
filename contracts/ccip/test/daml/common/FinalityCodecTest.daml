@@ -6,7 +6,7 @@ import DA.Assert
 import DA.Optional
 import DA.Crypto.Text (byteCount)
 
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 
 mkFinalityConfig : Int -> Int -> Text

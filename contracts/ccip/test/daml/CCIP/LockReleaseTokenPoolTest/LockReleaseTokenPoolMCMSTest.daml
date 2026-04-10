@@ -11,7 +11,7 @@ import DA.TextMap qualified as TextMap
 import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
-import CCIP.FinalityCodec qualified as FinalityCodec
+import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.LockReleaseTokenPool
 import CCIP.LockReleaseTokenPoolCodecGen (
     encodeSetDynamicConfigParams,

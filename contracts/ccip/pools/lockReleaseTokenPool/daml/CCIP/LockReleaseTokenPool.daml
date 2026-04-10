@@ -51,7 +51,7 @@ import qualified Splice.Api.Token.TransferInstructionV1
 import qualified CCIP.Context
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.FinalityCodec
+import qualified CCIP.FinalityConfig
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
@@ -153,9 +153,9 @@ bpsDenominator = 10000.0
 calculateFeeFromBps : Numeric 0 -> Numeric 0 -> Numeric 0
 calculateFeeFromBps amount feeBps = CCIP.Math.mulDivDown amount feeBps bpsDenominator
 
-customFinalityRateLimiterRequired : CCIP.FinalityCodec.FinalityConfig -> Bool
+customFinalityRateLimiterRequired : CCIP.FinalityConfig.FinalityConfig -> Bool
 customFinalityRateLimiterRequired finalityConfig =
-    CCIP.FinalityCodec.customFinalityRateLimiterRequired finalityConfig
+    CCIP.FinalityConfig.customFinalityRateLimiterRequired finalityConfig
 
 -- | Lock/release token pool with dynamic CCV requirements per chain.
 template LockReleaseTokenPool
@@ -451,7 +451,7 @@ template LockReleaseTokenPool
             with
                 remoteChainSelector : Numeric 0
                 amount : Decimal
-                finality : CCIP.FinalityCodec.FinalityConfig
+                finality : CCIP.FinalityConfig.FinalityConfig
                 extraData : BytesHex
                 direction : CCIP.Interfaces.TokenPool.TransferDirection
                 caller : Party
@@ -496,7 +496,7 @@ template LockReleaseTokenPool
                     None -> abort "pool: unsupported source chain"
                     Some cfg -> pure cfg
                 assertMsg "pool: message finality not allowed by pool finality config"
-                    (CCIP.FinalityCodec.requestedFinalityAllowed message.finality.requested remoteChainCfg.finalityConfig)
+                    (CCIP.FinalityConfig.requestedFinalityAllowed message.finality.requested remoteChainCfg.finalityConfig)
 
                 assertMsg "pool: invalid sourcePoolAddress"
                     (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)
@@ -589,8 +589,8 @@ template LockReleaseTokenPool
                         (requiredCCV `elem` ticket.verifiedCCVs)
 
                 let useCustomFinalityRateLimiter =
-                        ticket.finality /= CCIP.FinalityCodec.WaitForFinality
-                        && CCIP.FinalityCodec.customFinalityRateLimiterRequired remoteChainCfg.finalityConfig
+                        ticket.finality /= CCIP.FinalityConfig.WaitForFinality
+                        && CCIP.FinalityConfig.customFinalityRateLimiterRequired remoteChainCfg.finalityConfig
                 let expectedRateLimitMode = if useCustomFinalityRateLimiter
                         then CCIP.RateLimiter.RateLimitMode_CustomFinality
                         else CCIP.RateLimiter.RateLimitMode_DefaultFinality
