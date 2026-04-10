@@ -29,6 +29,15 @@ type ClientConfig struct {
 	// Defaults: localhost:5001.
 	AdminHost string `json:"admin_host,omitempty"`
 	AdminPort int    `json:"admin_port,omitempty"`
+
+	// LedgerHost and LedgerPort are the Canton Ledger gRPC endpoint (optional).
+	// Used by the contract-deploy ceremony to interact with the Ledger API.
+	// Defaults: localhost:5002.
+	LedgerHost string `json:"ledger_host,omitempty"`
+	LedgerPort int    `json:"ledger_port,omitempty"`
+
+	// LedgerJWT is the Bearer token for the Canton Ledger API (optional).
+	LedgerJWT string `json:"ledger_jwt,omitempty"`
 }
 
 // LoadConfig reads a ClientConfig from the given JSON file path.

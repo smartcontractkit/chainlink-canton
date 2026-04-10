@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	cryptoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/admin/v30"
 	cryptov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/v30"
 	protov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"
@@ -66,6 +67,7 @@ type GRPCCantonClient struct {
 	reader topoadminv30.TopologyManagerReadServiceClient
 	vault  cryptoadminv30.VaultServiceClient
 	id     topoadminv30.IdentityInitializationServiceClient
+	pkg    participantv30.PackageServiceClient
 }
 
 // NewGRPCClient creates a new [GRPCCantonClient] from an established gRPC connection.
@@ -76,6 +78,7 @@ func NewGRPCClient(conn *grpc.ClientConn) *GRPCCantonClient {
 		reader: topoadminv30.NewTopologyManagerReadServiceClient(conn),
 		vault:  cryptoadminv30.NewVaultServiceClient(conn),
 		id:     topoadminv30.NewIdentityInitializationServiceClient(conn),
+		pkg:    participantv30.NewPackageServiceClient(conn),
 	}
 }
 
@@ -421,4 +424,26 @@ func (c *GRPCCantonClient) ListDecentralizedNamespaces(ctx context.Context, sync
 	}
 
 	return results, nil
+}
+
+// ── Package Management ───────────────────────────────────────────────────────
+
+func (c *GRPCCantonClient) UploadDar(ctx context.Context, darBytes []byte) (string, error) {
+	resp, err := c.pkg.UploadDar(ctx, &participantv30.UploadDarRequest{
+		Dars: []*participantv30.UploadDarRequest_UploadDarData{
+			{Bytes: darBytes},
+		},
+		VetAllPackages:     true,
+		SynchronizeVetting: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("UploadDar: %w", err)
+	}
+
+	darIDs := resp.GetDarIds()
+	if len(darIDs) == 0 {
+		return "", fmt.Errorf("UploadDar: no DAR IDs returned")
+	}
+
+	return darIDs[0], nil
 }

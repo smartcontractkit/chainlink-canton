@@ -43,6 +43,11 @@ var customCodecs = map[string]damltemplate.CustomCodec{
 		EncodeListFunc: "encodeBytesHexList",
 		DecodeListFunc: "decodeBytesHexList",
 	},
+	"FinalityConfig": {
+		EncodeFunc:   "encodeRequestedFinality",
+		DecodeFunc:   "decodeRequestedFinalityAt",
+		ImportModule: "CCIP.Codec",
+	},
 }
 
 // Variant tag byte overrides. By default variants use constructor index as

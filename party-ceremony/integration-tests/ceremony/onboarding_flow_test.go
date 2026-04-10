@@ -25,7 +25,7 @@ type OnboardingFlowTestSuite struct {
 }
 
 func (s *OnboardingFlowTestSuite) SetupSuite() {
-	s.CeremonyTestSuite.SetupSuite() // use local environment for faster test runs
+	s.CeremonyTestSuite.SetupSuite()
 }
 
 // performOnboarding executes the full 7-step onboarding ceremony using the

@@ -22,6 +22,13 @@ import CCIP.Context qualified as Context
 import CCIP.ContextCodec (encodeCCIPContext, decodeCCIPContextAt)
 import DA.TextMap qualified as TextMap
 
+import CCIP.FinalityConfig qualified as FinalityCodec
+
+mkFinalityConfig n =
+    if n == 0
+    then FinalityCodec.WaitForFinality
+    else FinalityCodec.BlockDepth n
+
 -- ===============================================
 -- |              SetDynamicConfig               |
 -- ===============================================
@@ -52,7 +59,7 @@ testApplyChainUpdatesParamsRoundtrip = do
                 remoteTokenAddress = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
                 inboundCCVs = [RawInstanceAddress.RawInstanceAddress "ccv-inbound@party1", RawInstanceAddress.RawInstanceAddress "ccv-inbound2@party2"]
                 outboundCCVs = [RawInstanceAddress.RawInstanceAddress "ccv-outbound@party1"]
-                minBlockConfirmations = 0
+                finalityConfig = mkFinalityConfig 0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
@@ -62,7 +69,7 @@ testApplyChainUpdatesParamsRoundtrip = do
                 remoteTokenAddress = ""
                 inboundCCVs = []
                 outboundCCVs = []
-                minBlockConfirmations = 7
+                finalityConfig = mkFinalityConfig 7
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
@@ -72,7 +79,7 @@ testApplyChainUpdatesParamsRoundtrip = do
                 remoteTokenAddress = "c44879cc487d6ed2fdda5dfbebace4d430bd3f5a"
                 inboundCCVs = []
                 outboundCCVs = []
-                minBlockConfirmations = 3
+                finalityConfig = mkFinalityConfig 3
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"

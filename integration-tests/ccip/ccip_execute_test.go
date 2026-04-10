@@ -82,7 +82,7 @@ type MessageV1 struct {
 	SequenceNumber      uint64
 	ExecutionGasLimit   uint32
 	CCIPReceiveGasLimit uint32
-	Finality            uint16
+	Finality            [4]byte
 	CCVAndExecutorHash  [32]byte
 	OnRampAddress       []byte
 	OffRampAddress      []byte
@@ -113,7 +113,7 @@ func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
 	_ = binary.Write(&buf, binary.BigEndian, msg.SequenceNumber)
 	_ = binary.Write(&buf, binary.BigEndian, msg.ExecutionGasLimit)
 	_ = binary.Write(&buf, binary.BigEndian, msg.CCIPReceiveGasLimit)
-	_ = binary.Write(&buf, binary.BigEndian, msg.Finality)
+	buf.Write(msg.Finality[:])
 	buf.Write(msg.CCVAndExecutorHash[:])
 
 	// Length-prefixed fields (1-byte length)
@@ -142,6 +142,27 @@ func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
 	buf.Write(msg.MessageData)
 
 	return buf.Bytes(), nil
+}
+
+func finalityConfigFromBlockConfirmations(blockConfirmations uint16) [4]byte {
+	var config [4]byte
+	binary.BigEndian.PutUint16(config[2:], blockConfirmations)
+
+	return config
+}
+
+func finalityConfigValueFromBlockConfirmations(blockConfirmations uint16) *apiv2.Value {
+	if blockConfirmations == 0 {
+		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
+			Constructor: "WaitForFinality",
+			Value:       &apiv2.Value{Sum: &apiv2.Value_Unit{}},
+		}}}
+	}
+
+	return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
+		Constructor: "BlockDepth",
+		Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(blockConfirmations)}},
+	}}}
 }
 
 func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
@@ -347,7 +368,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								MinBlockConfirmations: 0,
+								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -574,7 +595,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		SequenceNumber:      1,
 		ExecutionGasLimit:   200000,
 		CCIPReceiveGasLimit: 100000,
-		Finality:            2000,
+		Finality:            finalityConfigFromBlockConfirmations(2000),
 		CCVAndExecutorHash:  [32]byte{},
 		OnRampAddress:       hexToBytes("000000000000000000000000f6eced5e96fff2de4f0ecd722beb57556fc443fd"), // left-padded to 32 bytes
 		OffRampAddress:      localOffRampAddress,
@@ -607,7 +628,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "minBlockConfirmations", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
+						{Label: "receiverFinalityConfig", Value: finalityConfigValueFromBlockConfirmations(2000)},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},

@@ -12,6 +12,9 @@ module CCIP.Codec
   , decodeRawInstanceAddressAt
   , encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
+  -- FinalityConfig encoding for MCMS/config codecs
+  , encodeRequestedFinality
+  , decodeRequestedFinalityAt
   -- Optional RawInstanceAddress encoding
   , encodeOptionalRawInstanceAddress
   , decodeOptionalRawInstanceAddressAt
@@ -19,7 +22,9 @@ module CCIP.Codec
 
 import MCMS.Codec
   ( extractBytes
+  , encodeInt64
   , encodeUint8
+  , decodeInt64At
   , decodeUint8
   , encodeText
   , decodeText
@@ -28,6 +33,7 @@ import MCMS.Codec
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import DA.Optional (fromSome)
 import qualified Splice.Api.Token.HoldingV1
+import qualified CCIP.FinalityConfig as FinalityCodec
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
@@ -115,6 +121,35 @@ decodeRawInstanceAddressListHelper _ offset 0 acc = Some (reverse acc, offset)
 decodeRawInstanceAddressListHelper encoded offset remaining acc = do
   (ria, newOffset) <- decodeRawInstanceAddressAt encoded offset
   decodeRawInstanceAddressListHelper encoded newOffset (remaining - 1) (ria :: acc)
+
+-- ===========================================================================
+-- REQUESTED FINALITY ENCODING/DECODING
+-- Format: [uint8 tag] for nullary constructors, [uint8 tag][int64 depth]
+-- Tags:
+--   0 = WaitForFinality
+--   1 = WaitForSafe
+--   2 = BlockDepth
+-- ===========================================================================
+
+encodeRequestedFinality : FinalityCodec.FinalityConfig -> BytesHex
+encodeRequestedFinality requestedFinality =
+  case requestedFinality of
+    FinalityCodec.WaitForFinality -> fromSome (encodeUint8 0)
+    FinalityCodec.WaitForSafe -> fromSome (encodeUint8 1)
+    FinalityCodec.BlockDepth depth ->
+      fromSome (encodeUint8 2) <> fromSome (encodeInt64 depth)
+
+decodeRequestedFinalityAt : BytesHex -> Int -> Optional (FinalityCodec.FinalityConfig, Int)
+decodeRequestedFinalityAt encoded offset = do
+  tagHex <- extractBytes encoded offset 1
+  tag <- decodeUint8 tagHex
+  case tag of
+    0 -> Some (FinalityCodec.WaitForFinality, offset + 1)
+    1 -> Some (FinalityCodec.WaitForSafe, offset + 1)
+    2 -> do
+      (depth, newOffset) <- decodeInt64At encoded (offset + 1)
+      Some (FinalityCodec.BlockDepth depth, newOffset)
+    _ -> None
 
 -- ===========================================================================
 -- OPTIONAL RAW INSTANCE ADDRESS ENCODING/DECODING
