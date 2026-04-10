@@ -209,7 +209,7 @@ func TestCCIPSend(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								MinBlockConfirmations: 0,
+								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -600,8 +600,7 @@ func TestCCIPSend(t *testing.T) {
 			FeeToken: nativeInstrumentId,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
-					GasLimit:           100_000,
-					BlockConfirmations: 0,
+					GasLimit: 100_000,
 					Ccvs: []ccipclient.CCVExtraArg{
 						{
 							CcvAddress: ccvRawAddr,

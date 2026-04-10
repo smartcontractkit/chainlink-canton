@@ -3,12 +3,13 @@ module CCIP.Executor where
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (fromOptional, fromSome, fromSomeNote)
+import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.Map as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import qualified CCIP.Context
+import qualified CCIP.FinalityConfig
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.SendingMessageV1
 import CCIP.ExecutorTypes (RemoteChainConfig(..), RemoteChainConfigArgs(..), DynamicConfig(..), ApplyDestChainUpdatesParams(..), SetDynamicConfigParams(..), ApplyAllowedCCVUpdatesParams(..))
@@ -24,7 +25,8 @@ template Executor
         remoteChainConfigs : Map.Map (Numeric 0) RemoteChainConfig
     where
         signatory owner
-        ensure assertValidInstanceId instanceId && maxCCVsPerMsg > 0 && dynamicConfig.minBlockConfirmations >= 0
+        ensure assertValidInstanceId instanceId
+            && maxCCVsPerMsg > 0
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where
             view = CCIP.Interfaces.Executor.ExecutorView with
@@ -60,8 +62,6 @@ template Executor
                 newDynamicConfig : DynamicConfig
             controller owner
             do
-                assertMsg "executor: minBlockConfirmations must be >= 0"
-                    (newDynamicConfig.minBlockConfirmations >= 0)
                 create this with dynamicConfig = newDynamicConfig
 
         choice ApplyAllowedCCVUpdates : ContractId Executor
@@ -109,12 +109,12 @@ template Executor
             do
                 pure maxCCVsPerMsg
 
-        nonconsuming choice GetMinBlockConfirmations : Int
+        nonconsuming choice GetAllowedFinalityConfig : CCIP.FinalityConfig.FinalityConfig
             with
                 caller : Party
             controller caller
             do
-                pure dynamicConfig.minBlockConfirmations
+                pure dynamicConfig.allowedFinalityConfig
 
         -- Calculates the executor flat fee and validates the message.
         nonconsuming choice CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -215,4 +215,3 @@ template Executor
                                     ccvAllowlistEnabled
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-

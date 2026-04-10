@@ -10,6 +10,7 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.Factory
+import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FactoryTest.FactoryCodecTest
@@ -30,6 +31,11 @@ import CCIP.FactoryTest.FactoryCodecTest
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
 import CCIP.Context (emptyCCIPContext)
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
+
+finalityConfig n =
+  if n == 0
+  then FinalityCodec.WaitForFinality
+  else FinalityCodec.BlockDepth n
 
 -- ===========================================================================
 -- INITIALIZATION & OWNERSHIP TESTS
@@ -693,7 +699,7 @@ testDeployCCIPReceiver_MCMS = script do
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
         optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
         optionalThreshold = 20
-        minBlockConfirmations = 7
+        receiverFinalityConfig = finalityConfig 7
       encoded = encodeDeployCCIPReceiverParams params
 
   submit mcmsParty do

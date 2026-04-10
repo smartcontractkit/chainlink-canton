@@ -14,9 +14,9 @@ var tokenPoolVersions = []string{
 }
 
 func init() {
-	v := semver.MustParse("2.0.0")
-
-	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyCanton, v, &CantonLaneAdapter{})
+	ccipadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyCanton, &CantonDeployChainContractsAdapter{})
+	ccipadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyCanton, &CantonChainFamilyAdapter{})
+	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"), CantonLaneAdapter{})
 	ccipadapters.GetCommitteeVerifierContractRegistry().Register(chainsel.FamilyCanton, &CantonCommitteeVerifierContractAdapter{})
 	ccipadapters.GetAggregatorConfigRegistry().Register(chainsel.FamilyCanton, &CantonAggregatorConfigAdapter{})
 	ccipadapters.GetIndexerConfigRegistry().Register(chainsel.FamilyCanton, &CantonIndexerConfigAdapter{})

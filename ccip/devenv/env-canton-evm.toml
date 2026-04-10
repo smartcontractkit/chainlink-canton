@@ -67,6 +67,9 @@ threshold = 2
 [environment_topology.nop_topology.committees.default.chain_configs.8706591216959472610]
 nop_aliases = ["canton-default-verifier-1", "canton-default-verifier-2"]
 threshold = 2
+# Required by the shared DeployChainContracts topology validation path.
+# Canton deployment currently ignores committee fee aggregator config.
+fee_aggregator = "canton-unused-fee-aggregator"
 
 [environment_topology.executor_pools.default]
 indexer_query_limit = 100
