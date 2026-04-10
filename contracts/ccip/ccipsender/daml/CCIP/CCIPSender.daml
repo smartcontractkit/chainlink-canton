@@ -10,6 +10,7 @@ import DA.List (filter)
 import qualified CCIP.Client
 import qualified CCIP.Context
 import qualified CCIP.FeeQuoter
+import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Math
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
@@ -100,7 +101,7 @@ template CCIPSender
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = destinationChainSelector
                                 amount = tt.amount
-                                finality = 0
+                                finality = CCIP.FinalityConfig.WaitForFinality
                                 extraData = extraArgs.tokenArgs
                                 direction = CCIP.Interfaces.TokenPool.Outbound
                                 caller = owner

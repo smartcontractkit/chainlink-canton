@@ -7,11 +7,21 @@ import DA.Crypto.Text (byteCount)
 import DA.Text qualified as Text
 import DA.Optional
 
+import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.OnRamp qualified as OnRamp
+
+finalityConfig n =
+    if n == 0
+    then FinalityCodec.waitForFinalityDecoded
+    else fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityCodec.decodeRequestedFinality (fromSome do
+        flagsHex <- MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)))
 
 setup = script do
 
@@ -115,8 +125,8 @@ setup = script do
 
     -- Test full MessageV1 encoding (new format matching EVM MessageV1Codec)
     -- Note: The expected encoding must match the new EVM-compatible format:
-    -- Static section (67 bytes): version(1) + sourceChain(8) + destChain(8) + seqNum(8) +
-    --   execGasLimit(4) + ccipReceiveGasLimit(4) + finality(2) + ccvAndExecutorHash(32)
+    -- Static section (69 bytes): version(1) + sourceChain(8) + destChain(8) + seqNum(8) +
+    --   execGasLimit(4) + ccipReceiveGasLimit(4) + finality(4) + ccvAndExecutorHash(32)
     -- Variable section: onRampLen(1)+onRamp + offRampLen(1)+offRamp + senderLen(1)+sender +
     --   receiverLen(1)+receiver + destBlobLen(2)+destBlob + tokenLen(2)+token + dataLen(2)+data
     let msg = MessageCodecV1.MessageV1
@@ -126,7 +136,7 @@ setup = script do
                 sequenceNumber = 789.0
                 executionGasLimit = 400000
                 ccipReceiveGasLimit = 200000
-                finality = 2000
+                finality = finalityConfig 2000
                 ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
                 onRampAddress = "f611F19236c999E05a62c9804F757A22553d2b50"
                 offRampAddress = "6B968538A8b1692451F18588C808E8D1702D5e3D"
@@ -274,7 +284,7 @@ setup = script do
             sequenceNumber = 0.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
-            finality = 0
+            finality = FinalityCodec.waitForFinalityDecoded
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = ""
             offRampAddress = ""
@@ -284,10 +294,10 @@ setup = script do
             tokenTransfer = None
             messageData = ""
     let encodedEmptyMsg = Text.asciiToLower (MessageCodecV1.encodeMessageV1 emptyMsg)
-    -- Expected: MESSAGE_V1_BASE_SIZE = 77 bytes = 154 hex chars
-    -- Static(67) + onRampLen(1) + offRampLen(1) + senderLen(1) + receiverLen(1) +
-    --   destBlobLen(2) + tokenLen(2) + dataLen(2) = 77
-    let expectedEmptyMsgLen = 154
+    -- Expected: MESSAGE_V1_BASE_SIZE = 79 bytes = 158 hex chars
+    -- Static(69) + onRampLen(1) + offRampLen(1) + senderLen(1) + receiverLen(1) +
+    --   destBlobLen(2) + tokenLen(2) + dataLen(2) = 79
+    let expectedEmptyMsgLen = 158
     debug("Empty message encoded length: " <> show (Text.length encodedEmptyMsg))
     Text.length encodedEmptyMsg === expectedEmptyMsgLen
     debug("Empty message encoding length test PASSED")

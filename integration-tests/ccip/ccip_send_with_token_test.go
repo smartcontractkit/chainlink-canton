@@ -209,7 +209,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								MinBlockConfirmations: 0,
+								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -415,12 +415,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Qualifier:    "test-pool-send",
 			RemoteChainConfigs: types.GENMAP{
 				strconv.FormatUint(remoteSelector, 10): lockreleasetokenpool.RemoteChainConfig{
-					RemotePools:           []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
-					RemoteTokenAddress:    types.TEXT(hex.EncodeToString(remoteTokenAddress)),
-					InboundCCVs:           []mcms.RawInstanceAddress{},
-					OutboundCCVs:          []mcms.RawInstanceAddress{},
-					MinBlockConfirmations: types.INT64(0),
-					InboundRateLimiter:    outboundRateLimiterAddr.Binding(),
+					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
+					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
+					InboundCCVs:        []mcms.RawInstanceAddress{},
+					OutboundCCVs:       []mcms.RawInstanceAddress{},
+					FinalityConfig:     common.FinalityConfig{WaitForFinality: &types.UNIT{}},
+					InboundRateLimiter: outboundRateLimiterAddr.Binding(),
 					InboundCustomBlockConfirmationsRateLimiter: outboundRateLimiterAddr.Binding(),
 					OutboundRateLimiter:                        outboundRateLimiterAddr.Binding(),
 				},
@@ -706,8 +706,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			FeeToken: nativeInstrumentId,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
-					GasLimit:           0,
-					BlockConfirmations: 0,
+					GasLimit: 0,
 					Ccvs: []ccipclient.CCVExtraArg{
 						{
 							CcvAddress: ccvRawAddr,
@@ -947,7 +946,7 @@ func extractTokenTransferAmountFromEncodedMessageHex(t *testing.T, encodedMessag
 	b, err := hex.DecodeString(encodedMessageHex)
 	require.NoError(t, err, "decode encodedMessage")
 
-	i := 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32
+	i := 1 + 8 + 8 + 8 + 4 + 4 + 4 + 32
 	for range 4 {
 		i += 1 + int(b[i])
 	}

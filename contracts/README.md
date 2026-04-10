@@ -263,13 +263,13 @@ messageId = keccak256(encodedMessage)
 ```daml
 data MessageV1 = MessageV1
     with
-        -- Static section (67 bytes)
+        -- Static section (69 bytes)
         sourceChainSelector : Numeric 0   -- uint64
         destChainSelector : Numeric 0     -- uint64
         sequenceNumber : Numeric 0        -- uint64
         executionGasLimit : Int           -- uint32
         ccipReceiveGasLimit : Int         -- uint32
-        finality : Int                    -- uint16
+        finality : BytesHex               -- bytes4 finality config
         ccvAndExecutorHash : BytesHex     -- bytes32
         -- Variable section
         onRampAddress : BytesHex

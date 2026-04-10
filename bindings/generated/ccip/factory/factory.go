@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "a4224fee53e9b8a60e2940f7cda504fa3e3ad6fb2ce9c43542306ea32bc090cd"
+	PackageID   = "a30d78fba74c351138d9a5df265b049ab0b9aa2647bb4597fbf0c1550d265d57"
 	SDKVersion  = "3.4.10"
 )
 
@@ -568,12 +568,12 @@ func (t *DeployCCIPReceiver) UnmarshalHex(data string) error {
 
 // DeployCCIPReceiverParams is a Record type
 type DeployCCIPReceiverParams struct {
-	InstanceId            types.TEXT                `json:"instanceId"`
-	Owner                 types.PARTY               `json:"owner"`
-	RequiredCCVs          []mcms.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs          []mcms.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold     types.INT64               `json:"optionalThreshold"`
-	MinBlockConfirmations types.INT64               `json:"minBlockConfirmations"`
+	InstanceId             types.TEXT                `json:"instanceId"`
+	Owner                  types.PARTY               `json:"owner"`
+	RequiredCCVs           []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs           []mcms.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold      types.INT64               `json:"optionalThreshold"`
+	ReceiverFinalityConfig common.FinalityConfig     `json:"receiverFinalityConfig"`
 }
 
 // ToMap converts DeployCCIPReceiverParams to a map for DAML arguments
@@ -612,7 +612,13 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 
 	m["optionalThreshold"] = int64(t.OptionalThreshold)
 
-	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	m["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	return m
 }

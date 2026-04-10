@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "9d4505b9bf1f04aa50340cad02a6e888e805123f5a7eee7efa8ff72e2132bb8f"
+	PackageID   = "fc0cb3ecd610247431122305c49e7a2eac17c1d23600c742517a3a1bfbf0ba11"
 	SDKVersion  = "3.4.10"
 )
 
@@ -576,17 +576,17 @@ func (t *OffRampDeps) UnmarshalHex(data string) error {
 
 // PrepareExecute is a Record type
 type PrepareExecute struct {
-	EncodedMessage                types.TEXT                `json:"encodedMessage"`
-	GlobalConfigCid               types.CONTRACT_ID         `json:"globalConfigCid"`
-	TokenAdminRegistryCid         types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
-	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
-	RmnRemoteCid                  types.CONTRACT_ID         `json:"rmnRemoteCid"`
-	ReceiverParty                 types.PARTY               `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
-	Caller                        types.PARTY               `json:"caller"`
+	EncodedMessage            types.TEXT                `json:"encodedMessage"`
+	GlobalConfigCid           types.CONTRACT_ID         `json:"globalConfigCid"`
+	TokenAdminRegistryCid     types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
+	RmnRemoteCid              types.CONTRACT_ID         `json:"rmnRemoteCid"`
+	ReceiverParty             types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	Caller                    types.PARTY               `json:"caller"`
 }
 
 // ToMap converts PrepareExecute to a map for DAML arguments
@@ -639,7 +639,13 @@ func (t PrepareExecute) ToMap() map[string]any {
 
 	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
 
-	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+	m["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -692,16 +698,16 @@ func (t *PrepareExecute) UnmarshalHex(data string) error {
 // PrepareExecuteMCMSParams is PrepareExecute without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecuteMCMSParams struct {
-	EncodedMessage                types.TEXT                `json:"encodedMessage"`
-	GlobalConfigCid               types.CONTRACT_ID         `json:"globalConfigCid"`
-	TokenAdminRegistryCid         types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
-	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
-	RmnRemoteCid                  types.CONTRACT_ID         `json:"rmnRemoteCid"`
-	ReceiverParty                 types.PARTY               `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	EncodedMessage            types.TEXT                `json:"encodedMessage"`
+	GlobalConfigCid           types.CONTRACT_ID         `json:"globalConfigCid"`
+	TokenAdminRegistryCid     types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
+	RmnRemoteCid              types.CONTRACT_ID         `json:"rmnRemoteCid"`
+	ReceiverParty             types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
 }
 
 // MarshalHex encodes PrepareExecuteMCMSParams to hex string for MCMS operationData.

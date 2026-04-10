@@ -28,6 +28,30 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 )
 
+func receiverWaitForFinalityConfig() common.FinalityConfig {
+	return common.FinalityConfig{WaitForFinality: &types.UNIT{}}
+}
+
+func receiverWaitForSafeConfig() common.FinalityConfig {
+	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
+}
+
+func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error) {
+	switch {
+	case finality < 0:
+		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
+	case finality == 0:
+		return receiverWaitForFinalityConfig(), nil
+	case finality == 0x00010000:
+		return receiverWaitForSafeConfig(), nil
+	case finality > 0xFFFF:
+		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
+	default:
+		depth := types.INT64(finality)
+		return common.FinalityConfig{BlockDepth: &depth}, nil
+	}
+}
+
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
 func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {
@@ -61,9 +85,13 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contr
 	return routerAddress, nil
 }
 
-func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {
+func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
 	// Use only a single participant for now
 	participant := c.chain.Participants[0]
+	finalityConfig, err := encodeReceiverFinalityConfig(receiverFinality)
+	if err != nil {
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to encode receiver finality config: %w", err)
+	}
 
 	// Upload the necessary Dar
 	receiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
@@ -82,8 +110,11 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string) (contrac
 	out, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Deploy, c.chain, contract.DeployInput[ccipreceiver.CCIPReceiver]{
 		Qualifier: nil,
 		Template: ccipreceiver.CCIPReceiver{
-			Owner:        types.PARTY(partyId),
-			RequiredCCVs: nil,
+			Owner:                  types.PARTY(partyId),
+			RequiredCCVs:           nil,
+			OptionalCCVs:           nil,
+			OptionalThreshold:      0,
+			ReceiverFinalityConfig: finalityConfig,
 		},
 		OwnerParty: types.PARTY(partyId),
 	})
@@ -114,7 +145,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	c.logger.Debug().Str("RouterAddress", routerAddress.String()).Msg("Deployed PerPartyRouter")
 
 	// Deploy CCIPReceiver contract
-	receiverAddress, err := c.DeployCCIPReceiver(ctx, executingParty)
+	receiverAddress, err := c.DeployCCIPReceiver(ctx, executingParty, int64(message.Finality))
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy CCIPReceiver contract: %w", err)
 	}
