@@ -30,7 +30,8 @@ func TestNewCantonTransaction(t *testing.T) {
 	}
 	contractType := deployment.ContractType("CantonGlobalConfig")
 
-	tx, err := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, contractType)
+	templateID := "#pkg-123:CCIP.GlobalConfig:GlobalConfig"
+	tx, err := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, contractType, templateID)
 	require.NoError(t, err)
 
 	assert.Equal(t, instanceAddr.Hex(), tx.To)
@@ -44,6 +45,7 @@ func TestNewCantonTransaction(t *testing.T) {
 	assert.Equal(t, rawAddr, af.TargetInstanceAddress, "TargetInstanceAddress should be raw instanceId@partyId format")
 	assert.Equal(t, "ApplyDestChainConfigUpdates", af.FunctionName)
 	assert.Equal(t, "abcdef0123456789", af.OperationData)
+	assert.Equal(t, templateID, af.TargetTemplateID, "TargetTemplateID should be set for dynamic CID resolution")
 }
 
 func TestNewCantonTransaction_RawAddressNotHex(t *testing.T) {
@@ -55,7 +57,7 @@ func TestNewCantonTransaction_RawAddressNotHex(t *testing.T) {
 		OperationData: "ff",
 	}
 
-	tx, err := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, "TestType")
+	tx, err := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, "TestType", "#test:Module:Entity")
 	require.NoError(t, err)
 
 	var af cantonsdk.AdditionalFields

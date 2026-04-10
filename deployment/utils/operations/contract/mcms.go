@@ -18,16 +18,20 @@ import (
 // rawInstanceAddress must be in "instanceId@partyId" format (e.g. "globalconfig-abc12@party::hash")
 // as required by the Canton MCMS SDK for Merkle leaf hashing.
 // instanceAddress is the 32-byte Keccak256 hash used for the Transaction.To field.
+// targetTemplateID is the Daml template ID (e.g. "#pkg:Module:Entity") of the target contract,
+// used by the MCMS SDK to dynamically resolve the contract ID at execution time.
 func NewCantonTransaction(
 	rawInstanceAddress string,
 	instanceAddress contracts.InstanceAddress,
 	encodedChoice *bind.EncodedChoice,
 	contractType deployment.ContractType,
+	targetTemplateID string,
 ) (mcms_types.Transaction, error) {
 	af, err := json.Marshal(cantonsdk.AdditionalFields{
 		TargetInstanceAddress: rawInstanceAddress,
 		FunctionName:          encodedChoice.Choice,
 		OperationData:         encodedChoice.OperationData,
+		TargetTemplateID:      targetTemplateID,
 	})
 	if err != nil {
 		return mcms_types.Transaction{}, fmt.Errorf("failed to marshal canton additional fields: %w", err)

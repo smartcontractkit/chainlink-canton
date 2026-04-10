@@ -265,33 +265,8 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	}
 	t.Log("ScheduleBatch succeeded")
 
-	// Step 3d: Resolve contract IDs and patch AdditionalFields for TimelockExecutor.
-	// The changeset doesn't set TargetCid (it's an execution-time concern), but the SDK's
-	// TimelockExecutor reads it from AdditionalFields to build the targetCids map.
-	t.Log("Resolving contract IDs for ExecuteScheduledBatch...")
-	for i := range proposal.Operations {
-		for j := range proposal.Operations[i].Transactions {
-			ptx := &proposal.Operations[i].Transactions[j]
-			var txAF cantonsdk.AdditionalFields
-			require.NoError(t, json.Unmarshal(ptx.AdditionalFields, &txAF))
-
-			if txAF.TargetCid == "" {
-				rawAddr, err := contracts.RawInstanceAddressFromString(txAF.TargetInstanceAddress)
-				require.NoError(t, err, "parse target instance address")
-				cid, err := opcontract.FindActiveContractIDByInstanceAddress(
-					t.Context(), participant.LedgerServices.State, party,
-					common.GlobalConfig{}.GetTemplateID(), rawAddr.InstanceAddress(),
-				)
-				require.NoError(t, err, "resolve contract ID for %s", txAF.TargetInstanceAddress)
-				txAF.TargetCid = cid
-				txAF.ContractIds = []string{cid}
-				ptx.AdditionalFields, err = json.Marshal(txAF)
-				require.NoError(t, err, "re-marshal additional fields")
-			}
-		}
-	}
-
-	// Step 3e: ExecuteScheduledBatch via TimelockExecutor
+	// Step 3d: ExecuteScheduledBatch via TimelockExecutor
+	// TargetCid resolution is now handled automatically by the SDK using TargetTemplateID.
 	t.Log("ExecuteScheduledBatch via SDK...")
 	timelockExecutor := cantonsdk.NewTimelockExecutor(
 		participant.LedgerServices.Command, participant.LedgerServices.State, party,

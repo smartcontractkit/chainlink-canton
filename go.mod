@@ -8,8 +8,8 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 replace (
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
-	// Use canton-main branch which includes sdk/canton/ (not yet in tagged releases)
-	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260408025748-900d559752a2
+	// Pin mcms canton-main (TargetCid resolution); https://github.com/smartcontractkit/mcms/commit/0771796ef83c32ae52ca411a56d3b570a35b8aae
+	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260410182733-0771796ef83c
 	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
 	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )

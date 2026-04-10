@@ -10,8 +10,8 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 replace (
 	// go-daml v0.6.0 is a fake tag used in mcms's go.mod; redirect to the real pseudo-version
 	github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260331185746-126b4945e013
-	// Use canton-main branch which includes sdk/canton/ (not yet in tagged releases)
-	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260408025748-900d559752a2
+	// Pin mcms canton-main
+	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260410182733-0771796ef83c
 )
 
 require (
