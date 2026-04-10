@@ -8,10 +8,10 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 replace (
+	// go-daml v0.6.0 is a fake tag used in mcms's go.mod; redirect to the real pseudo-version
+	github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260331185746-126b4945e013
 	// Use canton-main branch which includes sdk/canton/ (not yet in tagged releases)
 	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260408025748-900d559752a2
-// // Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
-// github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )
 
 require (
@@ -30,6 +30,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.93.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.6.0
+	github.com/smartcontractkit/mcms v0.39.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	google.golang.org/grpc v1.80.0
@@ -219,7 +220,6 @@ require (
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20251212213002-0a5e2f907dda // indirect
-	github.com/smartcontractkit/mcms v0.39.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stellar/go-stellar-sdk v0.1.0 // indirect
