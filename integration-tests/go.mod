@@ -8,13 +8,12 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 require (
-	github.com/BurntSushi/toml v1.6.0
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/ethereum/go-ethereum v1.17.2
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.0
-	github.com/smartcontractkit/chain-selectors v1.0.97
+	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-canton v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260408173936-5b7036b83fc5
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260408173936-5b7036b83fc5
@@ -24,7 +23,6 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.6.1-0.20260409205140-498c8a12f856
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	google.golang.org/grpc v1.80.0
 )
 
@@ -33,6 +31,7 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/edwards25519 v1.1.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
+	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/XSAM/otelsql v0.37.0 // indirect
@@ -272,6 +271,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect

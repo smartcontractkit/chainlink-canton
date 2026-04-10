@@ -21,7 +21,7 @@ import (
 )
 
 type DisclosureServiceConfig struct {
-	ContractStore          store.ContractStore
+	ActiveContractStore    store.ActiveContractStore
 	InstrumentHoldingStore store.InstrumentHoldingStore
 
 	// Contracts
@@ -45,7 +45,7 @@ type DisclosureServiceConfig struct {
 // It uses a store.ContractStore to retrieve active contracts from the ledger and provides explicit disclosures for them.
 // It is configured with a fixed list of InstanceAddresses for all CCIP contracts.
 type DisclosureService struct {
-	contractStore          store.ContractStore
+	activeContractStore    store.ActiveContractStore
 	instrumentHoldingStore store.InstrumentHoldingStore
 
 	perPartyRouterFactory contracts.InstanceAddress
@@ -98,7 +98,7 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 	}
 
 	return &DisclosureService{
-		contractStore:          config.ContractStore,
+		activeContractStore:    config.ActiveContractStore,
 		instrumentHoldingStore: config.InstrumentHoldingStore,
 
 		perPartyRouterFactory: config.PerPartyRouterFactory,
@@ -139,8 +139,8 @@ func (s *DisclosureService) GetDisclosure(ctx context.Context, address contracts
 		return nil, fmt.Errorf("contract %s not found", address)
 	}
 
-	activeContract := s.contractStore.GetContract(ctx, address)
-	if activeContract == nil {
+	activeContract, ok := s.activeContractStore.Get(address)
+	if !ok || (activeContract == nil) {
 		return nil, fmt.Errorf("contract %s not found", address)
 	}
 
@@ -293,8 +293,8 @@ func (s *DisclosureService) getTokenPoolRelatedDisclosures(ctx context.Context, 
 	}
 
 	// get the created event of the token admin registry via the update store.
-	tarActiveContract := s.contractStore.GetContract(ctx, s.tokenAdminRegistry)
-	if tarActiveContract == nil {
+	tarActiveContract, ok := s.activeContractStore.Get(s.tokenAdminRegistry)
+	if !ok || (tarActiveContract == nil) {
 		return tokenPoolRelatedDisclosures{}, fmt.Errorf("token admin registry contract not found in update store (instance: %v)", s.tokenAdminRegistry)
 	}
 	tarCreatedEvent, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenAdminRegistry](tarActiveContract.GetCreatedEvent())
@@ -315,8 +315,8 @@ func (s *DisclosureService) getTokenPoolRelatedDisclosures(ctx context.Context, 
 		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get token pool disclosure: %w", err)
 	}
 
-	tpActiveContract := s.contractStore.GetContract(ctx, tokenPoolInstanceAddress)
-	if tpActiveContract == nil {
+	tpActiveContract, ok := s.activeContractStore.Get(tokenPoolInstanceAddress)
+	if !ok || (tpActiveContract == nil) {
 		return tokenPoolRelatedDisclosures{}, fmt.Errorf("token pool contract not found in update store (instance: %v)", tokenPoolInstanceAddress)
 	}
 
@@ -346,8 +346,8 @@ func (s *DisclosureService) getTokenPoolRelatedDisclosures(ctx context.Context, 
 	}
 
 	// look up the instrument holding disclosure for the instrument id.
-	instrumentHoldingDisclosure, err := s.instrumentHoldingStore.GetInstrumentHolding(ctx, instrumentID)
-	if err != nil {
+	instrumentHoldingDisclosure, ok := s.instrumentHoldingStore.Get(instrumentID)
+	if !ok {
 		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get instrument holding disclosure: %w", err)
 	}
 

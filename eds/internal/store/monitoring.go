@@ -8,7 +8,7 @@ import (
 
 var _ Metrics = common.EDSMetricLabeler(nil)
 
-// Metrics captures a subset of metrics that are used for montitoring a ContractStore.
+// Metrics captures a subset of metrics that are used for monitoring a ContractStore.
 // // It is implemented by the global common.EDSMetricLabeler
 type Metrics interface {
 	IncrementStoreSubscriptionUptime(ctx context.Context)
