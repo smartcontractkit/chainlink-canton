@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 // SharedCantonEnvironment holds shared test infrastructure that can be reused across tests.
