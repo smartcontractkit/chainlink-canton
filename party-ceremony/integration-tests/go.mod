@@ -10,7 +10,7 @@ require (
 	github.com/chainlink/canton-party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-deployments-framework v0.93.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.94.1
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0
 )
