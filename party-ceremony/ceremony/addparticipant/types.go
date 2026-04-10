@@ -155,12 +155,9 @@ type ProposeAddP2PInput struct {
 	// AllParticipantUIDs includes both existing and new participant UIDs.
 	// All receive Confirmation permission.
 	AllParticipantUIDs []string `json:"all_participant_uids"`
-	// DamlKeys holds the base64-encoded DAML signing keys for ALL participants
-	// (existing + new). These are registered in PartyToParticipant.SigningKeysWithThreshold.
-	DamlKeys         []string `json:"daml_keys"`
-	NewP2PThreshold  int      `json:"new_p2p_threshold"`
-	CurrentP2PSerial int      `json:"current_p2p_serial"`
-	SynchronizerID   string   `json:"synchronizer_id"`
+	NewP2PThreshold    int      `json:"new_p2p_threshold"`
+	CurrentP2PSerial   int      `json:"current_p2p_serial"`
+	SynchronizerID     string   `json:"synchronizer_id"`
 }
 
 // ProposeAddP2POutput is the output of [ProposeAddP2POp].

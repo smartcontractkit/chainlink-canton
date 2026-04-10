@@ -507,33 +507,12 @@ var ProposeAddP2POp = operations.NewOperation(
 			}
 		}
 
-		// Decode DAML signing keys for all participants.
-		damlKeys := make([]*cryptov30.SigningPublicKey, 0, len(in.DamlKeys))
-		for _, keyB64 := range in.DamlKeys {
-			if keyB64 == "" {
-				continue
-			}
-			keyBytes, decErr := base64.StdEncoding.DecodeString(keyB64)
-			if decErr != nil {
-				return ProposeAddP2POutput{}, fmt.Errorf("decoding DAML key: %w", decErr)
-			}
-			var damlKey cryptov30.SigningPublicKey
-			if unmErr := proto.Unmarshal(keyBytes, &damlKey); unmErr != nil {
-				return ProposeAddP2POutput{}, fmt.Errorf("unmarshalling DAML key: %w", unmErr)
-			}
-			damlKeys = append(damlKeys, &damlKey)
-		}
-
 		mapping := &protov30.TopologyMapping{
 			Mapping: &protov30.TopologyMapping_PartyToParticipant{
 				PartyToParticipant: &protov30.PartyToParticipant{
 					Party:        in.PartyID,
 					Threshold:    uint32(in.NewP2PThreshold),
 					Participants: hostingParticipants,
-					PartySigningKeys: &cryptov30.SigningKeysWithThreshold{
-						Keys:      damlKeys,
-						Threshold: uint32(in.NewP2PThreshold),
-					},
 				},
 			},
 		}

@@ -10,15 +10,15 @@ import (
 
 	"github.com/chainlink/canton-party-ceremony/ceremony"
 	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
+	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
 )
 
 // AddParticipantFlowTestSuite validates adding a participant back to a
 // decentralized party that was previously reduced by a kick.
 //
-// It embeds KickFlowTestSuite, which embeds OnboardingFlowTestSuite. The
-// embedded SetupSuite runs:
-//  1. Onboard a 3-member party (threshold=3).
-//  2. Kick participant 3 → 2-member party (threshold=2).
+// SetupSuite runs:
+//  1. Onboard a 3-member party (threshold=3) via inherited KickFlowTestSuite.
+//  2. Kick participant 3 → 2-member party (threshold=2) via performKick.
 //
 // TestAddParticipantFlow then adds participant 3 back.
 type AddParticipantFlowTestSuite struct {
@@ -26,7 +26,63 @@ type AddParticipantFlowTestSuite struct {
 }
 
 func (s *AddParticipantFlowTestSuite) SetupSuite() {
+	// Runs CeremonyTestSuite.SetupSuite (chain init) + performOnboarding.
 	s.KickFlowTestSuite.SetupSuite()
+	// Run kick so TestAddParticipantFlow finds a 2-member party.
+	s.performKick()
+}
+
+// performKick executes the full kick ceremony to remove participant 3 (actors[2]).
+// Called in SetupSuite so TestAddParticipantFlow (alphabetically before TestKickFlow)
+// finds the expected 2-member post-kick state.
+func (s *AddParticipantFlowTestSuite) performKick() {
+	t := s.T()
+
+	actors := s.Actors
+	synchronizerID := s.SynchronizerID
+
+	decNS := strings.SplitN(s.PartyID, "::", 2)[1]
+	dnsState, err := actors[0].client.GetDNS(t.Context(), decNS, synchronizerID)
+	require.NoError(t, err, "GetDNS after onboarding")
+
+	kickedNSFP, err := actors[2].client.GetNamespaceFingerprint(t.Context(), onboardingNamespaceName, synchronizerID, dnsState.Owners)
+	require.NoError(t, err, "GetNamespaceFingerprint for kicked participant")
+
+	kickInput := kick.KickInput{
+		DecentralizedPartyID:       s.PartyID,
+		KickedParticipantID:        actors[2].uid,
+		KickedNamespaceFingerprint: kickedNSFP,
+		NewThreshold:               2,
+		RemainingParticipants:      []string{actors[0].uid, actors[1].uid},
+		SynchronizerID:             synchronizerID,
+	}
+
+	sharedKickReporter := operations.NewMemoryReporter()
+	newKickBundle := func() operations.Bundle {
+		return operations.NewBundle(t.Context, logger.Test(t), sharedKickReporter)
+	}
+
+	kickDeps := [3]ceremony.CantonDeps{
+		{Client: actors[0].client, Logger: logger.Test(t)},
+		{Client: actors[1].client, Logger: logger.Test(t)},
+		{Client: actors[2].client, Logger: logger.Test(t)},
+	}
+
+	// Run 1 (p1): reads state, creates DNS proposal, signs (1/3) → ErrThresholdNotMet.
+	_, err = operations.ExecuteSequence(newKickBundle(), kick.KickSequence, kickDeps[0], kickInput)
+	require.ErrorContains(t, err, kick.ErrThresholdNotMet.Error())
+
+	// Run 2 (p3 — kicked, still a current DNS owner): signs DNS (2/3) → ErrThresholdNotMet.
+	_, err = operations.ExecuteSequence(newKickBundle(), kick.KickSequence, kickDeps[2], kickInput)
+	require.ErrorContains(t, err, kick.ErrThresholdNotMet.Error())
+
+	// Run 3 (p2): signs DNS (3/3) → DNS submitted → P2P (1/2) → ErrThresholdNotMet.
+	_, err = operations.ExecuteSequence(newKickBundle(), kick.KickSequence, kickDeps[1], kickInput)
+	require.ErrorContains(t, err, kick.ErrThresholdNotMet.Error())
+
+	// Run 4 (p1): P2P (2/2) → confirmed → SUCCESS.
+	_, err = operations.ExecuteSequence(newKickBundle(), kick.KickSequence, kickDeps[0], kickInput)
+	require.NoError(t, err, "kick ceremony should complete successfully")
 }
 
 // TestOnboardingFlow overrides the inherited method — onboarding was already
@@ -58,8 +114,9 @@ func (s *AddParticipantFlowTestSuite) TestKickFlow() {
 //   - Run 1 (p3 — new): generates keys, proposes NSD, reads state, creates DNS
 //     proposal → 0/2 DNS sigs → ErrThresholdNotMet.
 //   - Run 2 (p1): signs DNS (1/2) → ErrThresholdNotMet.
-//   - Run 3 (p2): signs DNS (2/2) → submits → P2P (1/2) → ErrThresholdNotMet.
-//   - Run 4 (p1): P2P (2/2) → P2P confirmed → SUCCESS.
+//   - Run 3 (p2): signs DNS (2/2) → submits → P2P from p2 (1/2 existing) → ErrThresholdNotMet.
+//   - Run 4 (p1): P2P from p1 (2/2 existing) → new participant consent pending → ErrThresholdNotMet.
+//   - Run 5 (p3 — new): consents to P2P hosting → P2P confirmed → SUCCESS.
 func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 	t := s.T()
 
@@ -118,14 +175,19 @@ func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 	_, err = operations.ExecuteSequence(newAddBundle(), addparticipant.AddParticipantSequence, addDeps[0], addInput)
 	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "add run 2: DNS signing (1/2)")
 
-	// Run 3 (p2): signs DNS (2/2) → submits → P2P (1/2) → ErrThresholdNotMet.
-	t.Log("Add run 3: p2 signs DNS (2/2) + P2P proposal (1/2)")
+	// Run 3 (p2): signs DNS (2/2) → submits → P2P from p2 (1/2 existing) → ErrThresholdNotMet.
+	t.Log("Add run 3: p2 signs DNS (2/2) + P2P proposal (1/2 existing)")
 	_, err = operations.ExecuteSequence(newAddBundle(), addparticipant.AddParticipantSequence, addDeps[1], addInput)
-	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "add run 3: P2P proposals (1/2)")
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "add run 3: P2P proposals (1/2 existing)")
 
-	// Run 4 (p1): P2P (2/2) → confirmed → SUCCESS.
-	t.Log("Add run 4: p1 proposes P2P (2/2) — completing add-participant ceremony")
-	addResult, err := operations.ExecuteSequence(newAddBundle(), addparticipant.AddParticipantSequence, addDeps[0], addInput)
+	// Run 4 (p1): P2P from p1 (2/2 existing) → new participant consent pending → ErrThresholdNotMet.
+	t.Log("Add run 4: p1 proposes P2P (2/2 existing) — new participant consent pending")
+	_, err = operations.ExecuteSequence(newAddBundle(), addparticipant.AddParticipantSequence, addDeps[0], addInput)
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "add run 4: new participant consent pending")
+
+	// Run 5 (p3 — new): consents to P2P hosting → confirmed → SUCCESS.
+	t.Log("Add run 5: p3 consents to P2P hosting — completing add-participant ceremony")
+	addResult, err := operations.ExecuteSequence(newAddBundle(), addparticipant.AddParticipantSequence, addDeps[2], addInput)
 	require.NoError(t, err, "add-participant ceremony should complete successfully")
 
 	// ── Verify output ─────────────────────────────────────────────────────

@@ -255,34 +255,22 @@ var AddParticipantSequence = operations.NewSequence(
 			return AddParticipantOutput{}, fmt.Errorf("waiting for add DNS confirmation: %w", err)
 		}
 
-		// ── Step 7: Each existing participant proposes the updated P2P mapping ──
-		// Only existing participants propose — the new participant is not yet
-		// authorized to submit topology proposals for this namespace.
-		runnerUID, err := deps.Client.GetParticipantUID(ctx)
-		if err != nil {
-			return AddParticipantOutput{}, fmt.Errorf("fetching runner participant UID: %w", err)
-		}
-		if runnerUID == in.NewParticipantID {
-			return AddParticipantOutput{}, fmt.Errorf("%w: new participant may not propose P2P update",
-				ErrThresholdNotMet)
-		}
+		// ── Step 7: P2P proposals from existing participants + new participant consent ──
+		// Existing members propose the updated P2P mapping for namespace authority
+		// (Canton requires threshold-of-current-owners signatures).
+		// The new participant must ALSO call Authorize to consent to hosting the party
+		// on their node — Canton requires participant consent independently of the
+		// namespace threshold, same as in the onboarding ceremony.
 
 		// Build full participant UID list (existing + new).
 		allParticipantUIDs := append(append([]string{}, currentState.P2PParticipantUIDs...), newMember.ParticipantUID)
 
-		// Collect DAML keys: we need existing P2P keys + the new participant's key.
-		// For existing participants we don't have their DAML keys in this context,
-		// so we pass only the new member's key. The P2P proposal includes all
-		// hosting participants; Canton handles key resolution for existing members.
-		damlKeys := []string{newMember.DamlKeyB64}
-
-		var p2pProposedCount int
+		var existingProposedCount int
 		for _, uid := range in.ExistingParticipants {
 			_, p2pErr := operations.ExecuteOperation(b, ProposeAddP2POp, deps, ProposeAddP2PInput{
 				ParticipantID:      uid,
 				PartyID:            in.DecentralizedPartyID,
 				AllParticipantUIDs: allParticipantUIDs,
-				DamlKeys:           damlKeys,
 				NewP2PThreshold:    newThreshold,
 				CurrentP2PSerial:   int(currentState.P2PSerial),
 				SynchronizerID:     in.SynchronizerID,
@@ -291,17 +279,38 @@ var AddParticipantSequence = operations.NewSequence(
 				deps.Logger.Infow("P2P add proposal pending", "participant", uid, "err", p2pErr)
 				continue
 			}
-			p2pProposedCount++
+			existingProposedCount++
+		}
+
+		// New participant must consent to hosting by proposing the same P2P mapping.
+		_, newConsentErr := operations.ExecuteOperation(b, ProposeAddP2POp, deps, ProposeAddP2PInput{
+			ParticipantID:      in.NewParticipantID,
+			PartyID:            in.DecentralizedPartyID,
+			AllParticipantUIDs: allParticipantUIDs,
+			NewP2PThreshold:    newThreshold,
+			CurrentP2PSerial:   int(currentState.P2PSerial),
+			SynchronizerID:     in.SynchronizerID,
+		})
+		newParticipantProposed := newConsentErr == nil
+		if newConsentErr != nil {
+			deps.Logger.Infow("New participant P2P consent pending",
+				"participant", in.NewParticipantID, "err", newConsentErr)
 		}
 
 		deps.Logger.Infow("Collected add P2P proposals",
-			"collected", p2pProposedCount, "required", newThreshold,
+			"existing", existingProposedCount, "existing_required", currentState.DNSThreshold,
+			"new_participant_proposed", newParticipantProposed,
 		)
 
-		if p2pProposedCount < newThreshold {
-			return AddParticipantOutput{}, fmt.Errorf("%w: %d/%d P2P proposals collected",
-				ErrThresholdNotMet, p2pProposedCount, newThreshold,
+		if existingProposedCount < int(currentState.DNSThreshold) {
+			return AddParticipantOutput{}, fmt.Errorf("%w: %d/%d P2P proposals collected from existing participants",
+				ErrThresholdNotMet, existingProposedCount, currentState.DNSThreshold,
 			)
+		}
+
+		if !newParticipantProposed {
+			return AddParticipantOutput{}, fmt.Errorf("%w: new participant has not yet consented to P2P hosting",
+				ErrThresholdNotMet)
 		}
 
 		// Poll until the updated P2P is confirmed (new participant present).

@@ -276,10 +276,11 @@ func baseInput() addparticipant.AddParticipantInput {
 
 // TestAddParticipantSequence_HappyPath validates the full multi-actor happy path.
 //
-//	Run 1 (p3 — new): generates keys → NSD proposed → reads state → creates DNS proposal → ErrThresholdNotMet (0/2 DNS sigs).
+//	Run 1 (p3 — new): key-gen → NSD → reads state → DNS proposal → ErrThresholdNotMet (0/2 DNS sigs).
 //	Run 2 (p1): signs DNS (1/2) → ErrThresholdNotMet.
-//	Run 3 (p2): signs DNS (2/2) → DNS submitted → proposes P2P (1/2) → ErrThresholdNotMet.
-//	Run 4 (p1): P2P proposal (2/2) → P2P confirmed → SUCCESS.
+//	Run 3 (p2): signs DNS (2/2) → DNS submitted → P2P (1/2 existing) → ErrThresholdNotMet.
+//	Run 4 (p1): P2P (2/2 existing) → new participant consent pending → ErrThresholdNotMet.
+//	Run 5 (p3 — new): consents to P2P hosting → P2P confirmed → SUCCESS.
 func TestAddParticipantSequence_HappyPath(t *testing.T) {
 	t.Parallel()
 	sharedReporter := operations.NewMemoryReporter()
@@ -289,7 +290,7 @@ func TestAddParticipantSequence_HappyPath(t *testing.T) {
 	}
 	input := baseInput()
 
-	// Run 1 (p3 — new): generates keys, proposes NSD, reads state, creates DNS proposal → 0/2 DNS sigs.
+	// Run 1 (p3 — new): key-gen, NSD, reads state, DNS proposal → 0/2 DNS sigs.
 	_, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state), input)
 	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 1: DNS threshold not met (0/2)")
 
@@ -297,13 +298,17 @@ func TestAddParticipantSequence_HappyPath(t *testing.T) {
 	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
 	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 2: DNS threshold not met (1/2)")
 
-	// Run 3 (p2): signs DNS (2/2) → DNS submitted → proposes P2P (1/2) → threshold not met.
+	// Run 3 (p2): signs DNS (2/2) → submits → P2P from p2 (1/2 existing) → threshold not met.
 	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p2", state), input)
-	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 3: P2P threshold not met (1/2)")
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 3: P2P existing threshold not met (1/2)")
 
-	// Run 4 (p1): P2P proposal (2/2) → P2P confirmed → success.
-	sr, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
-	require.NoError(t, err, "run 4: ceremony should complete successfully")
+	// Run 4 (p1): P2P from p1 (2/2 existing) → new participant consent pending.
+	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 4: new participant consent pending")
+
+	// Run 5 (p3 — new): consents to P2P hosting → confirmed → SUCCESS.
+	sr, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state), input)
+	require.NoError(t, err, "run 5: ceremony should complete successfully")
 
 	assert.True(t, sr.Output.DNSUpdated, "DNSUpdated should be true")
 	assert.True(t, sr.Output.P2PUpdated, "P2PUpdated should be true")
@@ -322,15 +327,16 @@ func TestAddParticipantSequence_Idempotent(t *testing.T) {
 	}
 	input := baseInput()
 
-	// Complete the ceremony.
+	// Complete the ceremony (5 runs: p3, p1, p2, p1, p3).
 	_, _ = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state), input)
 	_, _ = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
 	_, _ = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p2", state), input)
-	sr1, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
+	_, _ = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
+	sr1, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state), input)
 	require.NoError(t, err)
 
 	// Re-run should return cached result.
-	sr2, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
+	sr2, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state), input)
 	require.NoError(t, err)
 
 	assert.Equal(t, sr1.ID, sr2.ID, "second call must return the cached report")
@@ -391,8 +397,8 @@ func TestAddParticipantSequence_ThresholdNotMet_P2PProposal(t *testing.T) {
 	require.ErrorContains(t, err, "P2P proposals collected")
 }
 
-// TestAddParticipantSequence_NewThresholdOverride verifies the explicit
-// --new-threshold override is respected.
+// TestAddParticipantSequence_NewThresholdOverride verifies an explicit
+// --new-threshold override is propagated to the output.
 func TestAddParticipantSequence_NewThresholdOverride(t *testing.T) {
 	t.Parallel()
 	sharedReporter := operations.NewMemoryReporter()
@@ -401,29 +407,17 @@ func TestAddParticipantSequence_NewThresholdOverride(t *testing.T) {
 		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter)
 	}
 	input := baseInput()
-	input.NewThreshold = 3
+	input.NewThreshold = 3 // override: propagates to ProposeAddP2POp.NewP2PThreshold
 
+	// Same 5-run flow as HappyPath. Gate still uses currentState.DNSThreshold=2
+	// for existing participants regardless of the override value.
 	_, _ = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state), input)
 	_, _ = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
 	_, _ = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p2", state), input)
-	// Need p1 again for P2P since threshold=3 but only 2 existing can propose.
-	// P2P threshold=3 means we need 3 proposals but only have 2 existing participants.
-	// Since set threshold=3 > len(existingParticipants)=2, P2P gate won't pass.
-	// Adjust: set threshold=1 to test override propagation.
-	input.NewThreshold = 1
-
-	sharedReporter2 := operations.NewMemoryReporter()
-	state2 := &mockState{}
-	newBundle2 := func() operations.Bundle {
-		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter2)
-	}
-
-	_, _ = operations.ExecuteSequence(newBundle2(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state2), input)
-	_, _ = operations.ExecuteSequence(newBundle2(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state2), input)
-	// p2 signs DNS (2/2) → submit → P2P (1/1 with threshold=1) → success.
-	sr, err := operations.ExecuteSequence(newBundle2(), addparticipant.AddParticipantSequence, newDepsWithState("p2", state2), input)
+	_, _ = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
+	sr, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state), input)
 	require.NoError(t, err)
-	assert.Equal(t, 1, sr.Output.NewThreshold, "NewThreshold should match override")
+	assert.Equal(t, 3, sr.Output.NewThreshold, "NewThreshold should match override")
 }
 
 // TestAddParticipantSequence_InvalidPartyID verifies that a malformed party ID
@@ -436,40 +430,6 @@ func TestAddParticipantSequence_InvalidPartyID(t *testing.T) {
 	_, err := operations.ExecuteSequence(b, addparticipant.AddParticipantSequence, newDeps(testNewUID), input)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid decentralized_party_id")
-}
-
-// TestAddParticipantSequence_NewParticipantAlreadyInDNS verifies that adding
-// a participant whose namespace fingerprint is already in DNS returns an error.
-func TestAddParticipantSequence_NewParticipantAlreadyInDNS(t *testing.T) {
-	t.Parallel()
-	sharedReporter := operations.NewMemoryReporter()
-	// Use a mock where GetDNS returns post-add state (3 owners including new).
-	// This simulates the new participant already being in DNS.
-	alreadyAddedState := &mockState{}
-	alreadyAddedState.onAddTransactions() // Triggers post-add DNS state.
-	alreadyAddedState.onNSDProposed()     // NSD already exists.
-
-	newBundle := func() operations.Bundle {
-		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter)
-	}
-	input := baseInput()
-
-	// New participant generates keys (the mock will generate a fingerprint).
-	// Then read state returns 3 owners. The validation should catch the conflict
-	// because the mock DNS fingerprints don't match the generated key fingerprint.
-	// So this test won't trigger "already exists" with the generic mock.
-	// Instead, test the validation directly with a custom scenario.
-	_ = newBundle
-	_ = alreadyAddedState
-
-	// Direct test: use the sequence but override new participant to have
-	// a fingerprint that matches an existing owner.
-	// Since our mock GenerateSigningKey produces deterministic keys based on
-	// participantID + name, and GetDNS returns fixed fingerprints, we can't
-	// easily force a collision here. Instead, verify the error message pattern
-	// exists by checking the sequence code covers this path.
-	// This is a design verification rather than a runtime test.
-	t.Log("Validation path exists: new participant fingerprint checked against DNS owners")
 }
 
 // TestAddParticipantSequence_ResumeAfterPartialSigning exercises the full async
@@ -491,13 +451,17 @@ func TestAddParticipantSequence_ResumeAfterPartialSigning(t *testing.T) {
 	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
 	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 2: DNS signing gate (1/2)")
 
-	// Run 3 (p2): signs DNS (2/2) → submit → P2P (1/2).
+	// Run 3 (p2): signs DNS (2/2) → submit → P2P from p2 (1/2 existing).
 	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p2", state), input)
-	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 3: P2P gate (1/2)")
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 3: P2P existing gate (1/2)")
 
-	// Run 4 (p1): P2P (2/2) → success.
-	sr, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
-	require.NoError(t, err, "run 4: ceremony complete")
+	// Run 4 (p1): P2P from p1 (2/2 existing) → new participant consent pending.
+	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 4: new participant consent pending")
+
+	// Run 5 (p3 — new): consents to P2P hosting → confirmed → success.
+	sr, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState(testNewUID, state), input)
+	require.NoError(t, err, "run 5: ceremony complete")
 	assert.True(t, sr.Output.DNSUpdated)
 	assert.True(t, sr.Output.P2PUpdated)
 }
