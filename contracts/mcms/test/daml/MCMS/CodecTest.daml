@@ -1,0 +1,87 @@
+module MCMS.CodecTest where
+
+import DA.Crypto.Text (byteCount)
+import Daml.Script
+import MCMS.Codec
+
+assertRoundTrip : Decimal -> Script ()
+assertRoundTrip d = do
+  let encoded = encodeDecimal d
+  case decodeDecimalAt encoded 0 of
+    None -> assertFail ("decodeDecimalAt returned None for: " <> show d)
+    Some (decoded, _) ->
+      assertMsg ("round-trip failed for " <> show d <> ": got " <> show decoded) (decoded == d)
+
+testDecimalRoundTrip : Script ()
+testDecimalRoundTrip = script do
+  assertRoundTrip 0.0
+  assertRoundTrip 1.0
+  assertRoundTrip 5.3
+  assertRoundTrip (-5.3)
+  assertRoundTrip (-0.3)
+  assertRoundTrip 0.0000000001   -- minimum positive (1 ULP)
+  assertRoundTrip (-0.0000000001)
+  assertRoundTrip 9999999999999999999999999999.9999999999  -- max Decimal
+  assertRoundTrip (-9999999999999999999999999999.9999999999)
+  assertRoundTrip 123456789.1234567890
+  assertRoundTrip (-123456789.1234567890)
+  debug "✓ Decimal round-trip tests passed"
+
+-- ===========================================================================
+-- OFFSET TESTS
+-- verify decodeDecimalAt respects offset and returns correct next offset
+-- ===========================================================================
+
+testDecimalOffset : Script ()
+testDecimalOffset = script do
+  let prefix = "deadbeef"
+  let encoded = encodeDecimal 5.3
+  let padded = prefix <> encoded
+  case decodeDecimalAt padded 4 of  -- offset = 4 bytes (8 hex chars)
+    None -> assertFail "decodeDecimalAt returned None with offset"
+    Some (decoded, newOffset) -> do
+      assertMsg ("offset decode mismatch: " <> show decoded) (decoded == 5.3)
+      -- newOffset should equal 4 + length of encoded
+      let expectedOffset = 4 + (byteCount encoded)
+      assertMsg ("newOffset mismatch: expected " <> show expectedOffset <> " got " <> show newOffset)
+        (newOffset == expectedOffset)
+  debug "✓ Decimal offset tests passed"
+
+-- ===========================================================================
+-- SIGN BIT TESTS
+-- ===========================================================================
+
+testDecimalSignBit : Script ()
+testDecimalSignBit = script do
+  -- positive: first byte = 00
+  let encodedPos = encodeDecimal 1.5
+  case extractBytes encodedPos 0 1 of
+    None -> assertFail "extractBytes failed on positive"
+    Some signByte -> assertMsg "positive should have sign byte 00" (signByte == "00")
+  -- negative: first byte = 01
+  let encodedNeg = encodeDecimal (-1.5)
+  case extractBytes encodedNeg 0 1 of
+    None -> assertFail "extractBytes failed on negative"
+    Some signByte -> assertMsg "negative should have sign byte 01" (signByte == "01")
+  -- zero: first byte = 00
+  let encodedZero = encodeDecimal 0.0
+  case extractBytes encodedZero 0 1 of
+    None -> assertFail "extractBytes failed on zero"
+    Some signByte -> assertMsg "zero should have sign byte 00" (signByte == "00")
+  debug "✓ Decimal sign bit tests passed"
+
+-- ===========================================================================
+-- ALL CODEC TESTS
+-- ===========================================================================
+
+testAllCodec : Script ()
+testAllCodec = script do
+  debug "=========================================="
+  debug "Running Codec Tests"
+  debug "=========================================="
+  testDecimalRoundTrip
+  testDecimalOffset
+  testDecimalSignBit
+  debug "=========================================="
+  debug "All codec tests passed! ✓"
+  debug "=========================================="
