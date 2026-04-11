@@ -15,6 +15,8 @@ var ContractType = deployment.ContractType("Executor")
 
 var Version = semver.MustParse("0.1.0")
 
+var executorEncoder = executor.NewContract("", "CCIP.Executor", "Executor").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[executor.Executor]{
 	Name:           "canton/ccip/executor/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -42,8 +44,9 @@ var ApplyDestChainUpdates = contract.NewExercise(contract.ExerciseParams[executo
 
 		return nil
 	},
-	Template: executor.Executor{},
-	Method:   executor.Executor{}.ApplyDestChainUpdates,
+	Template:     executor.Executor{},
+	Method:       executor.Executor{}.ApplyDestChainUpdates,
+	EncodeMethod: executorEncoder.ApplyDestChainUpdates,
 })
 
 var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[executor.SetDynamicConfig]{
@@ -55,8 +58,9 @@ var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[executor.Set
 
 		return nil
 	},
-	Template: executor.Executor{},
-	Method:   executor.Executor{}.SetDynamicConfig,
+	Template:     executor.Executor{},
+	Method:       executor.Executor{}.SetDynamicConfig,
+	EncodeMethod: executorEncoder.SetDynamicConfig,
 })
 
 var ApplyAllowedCCVUpdates = contract.NewExercise(contract.ExerciseParams[executor.ApplyAllowedCCVUpdates]{
@@ -68,6 +72,7 @@ var ApplyAllowedCCVUpdates = contract.NewExercise(contract.ExerciseParams[execut
 
 		return nil
 	},
-	Template: executor.Executor{},
-	Method:   executor.Executor{}.ApplyAllowedCCVUpdates,
+	Template:     executor.Executor{},
+	Method:       executor.Executor{}.ApplyAllowedCCVUpdates,
+	EncodeMethod: executorEncoder.ApplyAllowedCCVUpdates,
 })

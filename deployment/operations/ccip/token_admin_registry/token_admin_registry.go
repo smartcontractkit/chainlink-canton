@@ -16,6 +16,8 @@ var ContractType = deployment.ContractType("TokenAdminRegistry")
 
 var Version = semver.MustParse("0.1.0")
 
+var tarEncoder = tokenadminregistry.NewContract("", "CCIP.TokenAdminRegistry", "TokenAdminRegistry").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[tokenadminregistry.TokenAdminRegistry]{
 	Name:           "canton/ccip/token_admin_registry/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -39,8 +41,9 @@ var ProposeAdministrator = contract.NewExercise(contract.ExerciseParams[tokenadm
 	Validate: func(input tokenadminregistry.TokenAdminRegistryProposeAdministrator) error {
 		return nil
 	},
-	Template: tokenadminregistry.TokenAdminRegistry{},
-	Method:   tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistryProposeAdministrator,
+	Template:     tokenadminregistry.TokenAdminRegistry{},
+	Method:       tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistryProposeAdministrator,
+	EncodeMethod: tarEncoder.TokenAdminRegistryProposeAdministrator,
 })
 
 var AcceptAdminRole = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.TokenAdminRegistryAcceptAdminRole]{
@@ -51,8 +54,9 @@ var AcceptAdminRole = contract.NewExercise(contract.ExerciseParams[tokenadminreg
 	Validate: func(input tokenadminregistry.TokenAdminRegistryAcceptAdminRole) error {
 		return nil
 	},
-	Template: tokenadminregistry.TokenAdminRegistry{},
-	Method:   tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistryAcceptAdminRole,
+	Template:     tokenadminregistry.TokenAdminRegistry{},
+	Method:       tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistryAcceptAdminRole,
+	EncodeMethod: tarEncoder.TokenAdminRegistryAcceptAdminRole,
 })
 
 var SetPool = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.TokenAdminRegistrySetPool]{
@@ -63,6 +67,7 @@ var SetPool = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.To
 	Validate: func(input tokenadminregistry.TokenAdminRegistrySetPool) error {
 		return nil
 	},
-	Template: tokenadminregistry.TokenAdminRegistry{},
-	Method:   tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistrySetPool,
+	Template:     tokenadminregistry.TokenAdminRegistry{},
+	Method:       tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistrySetPool,
+	EncodeMethod: tarEncoder.TokenAdminRegistrySetPool,
 })

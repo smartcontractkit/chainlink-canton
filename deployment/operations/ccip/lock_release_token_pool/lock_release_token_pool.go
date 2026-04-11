@@ -17,6 +17,8 @@ var ContractType = deployment.ContractType("CantonLockReleaseTokenPool")
 
 var Version = semver.MustParse("1.0.0")
 
+var lrtpEncoder = lockreleasetokenpool.NewContract("", "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockReleaseTokenPool]{
 	Name:           "canton/ccip/lock_release_token_pool/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -49,6 +51,7 @@ var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[lockreleaset
 	Validate:     nil,
 	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
 	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.SetDynamicConfig,
+	EncodeMethod: lrtpEncoder.SetDynamicConfig,
 })
 
 var ApplyChainUpdates = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.ApplyChainUpdates]{
@@ -60,8 +63,9 @@ var ApplyChainUpdates = contract.NewExercise(contract.ExerciseParams[lockrelease
 
 		return nil
 	},
-	Template: lockreleasetokenpool.LockReleaseTokenPool{},
-	Method:   lockreleasetokenpool.LockReleaseTokenPool{}.ApplyChainUpdates,
+	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
+	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.ApplyChainUpdates,
+	EncodeMethod: lrtpEncoder.ApplyChainUpdates,
 })
 
 var ApplyTokenTransferFeeConfigUpdates = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.ApplyTokenTransferFeeConfigUpdates]{
@@ -73,8 +77,9 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewExercise(contract.ExerciseP
 
 		return nil
 	},
-	Template: lockreleasetokenpool.LockReleaseTokenPool{},
-	Method:   lockreleasetokenpool.LockReleaseTokenPool{}.ApplyTokenTransferFeeConfigUpdates,
+	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
+	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.ApplyTokenTransferFeeConfigUpdates,
+	EncodeMethod: lrtpEncoder.ApplyTokenTransferFeeConfigUpdates,
 })
 
 var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.SetRateLimitConfig]{
@@ -89,6 +94,7 @@ var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[lockreleas
 
 		return nil
 	},
-	Template: lockreleasetokenpool.LockReleaseTokenPool{},
-	Method:   lockreleasetokenpool.LockReleaseTokenPool{}.SetRateLimitConfig,
+	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
+	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.SetRateLimitConfig,
+	EncodeMethod: lrtpEncoder.SetRateLimitConfig,
 })

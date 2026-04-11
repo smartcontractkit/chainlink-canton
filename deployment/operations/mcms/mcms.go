@@ -16,6 +16,8 @@ var ContractType = deployment.ContractType("CantonMCMS")
 
 var Version = semver.MustParse("0.1.0")
 
+var mcmsEncoder = mcms.NewContract("", "MCMS.Main", "MCMS").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[mcms.MCMS]{
 	Name:           "canton/mcms/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -44,8 +46,9 @@ var SetRoot = contract.NewExercise(contract.ExerciseParams[mcms.SetRoot]{
 
 		return nil
 	},
-	Template: mcms.MCMS{},
-	Method:   mcms.MCMS{}.SetRoot,
+	Template:     mcms.MCMS{},
+	Method:       mcms.MCMS{}.SetRoot,
+	EncodeMethod: mcmsEncoder.SetRoot,
 })
 
 var SetConfig = contract.NewExercise(contract.ExerciseParams[mcms.SetConfig]{
@@ -58,6 +61,7 @@ var SetConfig = contract.NewExercise(contract.ExerciseParams[mcms.SetConfig]{
 
 		return nil
 	},
-	Template: mcms.MCMS{},
-	Method:   mcms.MCMS{}.SetConfig,
+	Template:     mcms.MCMS{},
+	Method:       mcms.MCMS{}.SetConfig,
+	EncodeMethod: mcmsEncoder.SetConfig,
 })
