@@ -47,11 +47,8 @@ func (c *Chain) GetDisclosuresForSend(ctx context.Context, ccvs []contracts.Inst
 
 // GetDisclosuresForExecution returns all the necessary disclosed contracts to execute a message on Canton using the EDS API.
 func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []contracts.InstanceAddress) (
-	// List of disclosed contracts to be used during the execute call
 	[]*apiv2.DisclosedContract,
-	// The choiceContext value
 	*apiv2.Value,
-	// The CCV ContractIDs, in the same order as the input ccvs
 	[]*apiv2.Value_ContractId,
 	error,
 ) {
@@ -65,15 +62,13 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 		return nil, nil, nil, fmt.Errorf("failed to create eds client: %w", err)
 	}
 
-	// Add the verifier addresses to the request - required for EDS to return explicit disclosures for them
 	request := edsv1.CCIPExecuteRequest{
 		Ccvs:           make([]string, len(verifiers)),
-		EncodedMessage: "", // not used (yet)
+		EncodedMessage: "",
 	}
 	for i, verifier := range verifiers {
 		request.Ccvs[i] = verifier.String()
 	}
-
 	resp, err := edsClient.CcipExecuteWithResponse(ctx, request)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to get disclosures from EDS: %w", err)
@@ -88,7 +83,6 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 		if err != nil {
 			return nil, nil, nil, err
 		}
-
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 	choiceContext, err := ChoiceContextFromData(resp.JSON200.ChoiceContext.ChoiceContextData)
@@ -96,10 +90,8 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 		return nil, nil, nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
 
-	// Handle Verifiers
 	ccvContractIDs := make([]*apiv2.Value_ContractId, len(verifiers))
 	for i, verifier := range verifiers {
-		// Check if the API returned an explicit disclosure for the requested verifier
 		disclosure, ok := resp.JSON200.Ccvs[verifier.String()]
 		if !ok || disclosure.DisclosedContract == nil {
 			return nil, nil, nil, fmt.Errorf("failed to get disclosure for verifier: %s", verifier.String())
@@ -107,7 +99,6 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 		ccvContractIDs[i] = &apiv2.Value_ContractId{
 			ContractId: disclosure.DisclosedContract.ContractId,
 		}
-		// Add the CCV's explicit disclosure to disclosedContracts
 		disclosedContract, err := disclosedContractToProto(*disclosure.DisclosedContract)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to convert disclosed contract for verifier %s: %w", verifier.String(), err)

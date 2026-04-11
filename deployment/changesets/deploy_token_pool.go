@@ -65,7 +65,6 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	ds := datastore.NewMemoryDataStore()
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
-
 	cfg := config.Config
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
@@ -115,6 +114,13 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	if err = ds.AddressRefStore.Add(out.Output); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save deployed LockReleaseTokenPool contract address: %w", err)
 	}
+	if len(out.Output.Labels.List()) == 0 {
+		return cldf.ChangesetOutput{}, fmt.Errorf("missing raw lock/release pool label in deploy output")
+	}
+	rawPoolAddr, err := contracts.RawInstanceAddressFromString(out.Output.Labels.List()[0])
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to parse raw lock/release pool label: %w", err)
+	}
 
 	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {
 		regInput := sequences.RegisterTokenPoolInput{
@@ -122,7 +128,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 			InstrumentId:                      cfg.InstrumentId,
 			CcipParty:                         cfg.CcipOwner,
 			PoolOwnerParty:                    cfg.PoolOwner,
-			PoolInstanceID:                    cfg.InstanceID,
+			PoolInstanceID:                    rawPoolAddr.InstanceID(),
 		}
 		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {

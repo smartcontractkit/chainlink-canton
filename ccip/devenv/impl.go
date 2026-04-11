@@ -1,23 +1,32 @@
 package devenv
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	evmtokenadapter "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	evmtestsetup "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/testsetup"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
@@ -34,11 +43,13 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
@@ -50,13 +61,16 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 var (
 	_                       cciptestinterfaces.CCIP17              = &Chain{}
 	_                       cciptestinterfaces.CCIP17Configuration = &Chain{}
 	_                       ccv.ImplFactory                        = &ImplFactory{}
+	cantonTokenPoolVersion                                         = semver.MustParse("2.0.0")
 	cantonDeployDarPackages                                        = []contracts.Package{
 		contracts.CCIPCommon,
 		contracts.CCIPReceiver,
@@ -72,6 +86,11 @@ var (
 		contracts.CCIPTest,
 		contracts.CCIPLockReleaseTokenPool,
 	}
+)
+
+const (
+	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 2.0.0 [default] to LockReleaseTokenPool 2.0.0 [default])"
+	cantonDestTokenQualifier  = "TEST (LockReleaseTokenPool 2.0.0 [default] to BurnMintTokenPool 2.0.0 [default])"
 )
 
 type ImplFactory struct{}
@@ -303,7 +322,248 @@ func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64
 }
 
 func (c *Chain) PostConnect(env *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
+	var evmSelector uint64
+	for _, remoteSelector := range remoteSelectors {
+		family, err := chainsel.GetSelectorFamily(remoteSelector)
+		if err != nil {
+			continue
+		}
+		if family == chainsel.FamilyEVM {
+			evmSelector = remoteSelector
+			break
+		}
+	}
+	if evmSelector == 0 {
+		return nil
+	}
+
+	tokenRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		evmSelector,
+		datastore.ContractType("BurnMintERC20WithDripToken"),
+		semver.MustParse("1.0.0"),
+		evmToCantonTokenQualifier,
+	))
+	if err != nil {
+		return fmt.Errorf("get evm token ref: %w", err)
+	}
+	poolRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		evmSelector,
+		datastore.ContractType("BurnMintTokenPool"),
+		semver.MustParse("2.0.0"),
+		evmToCantonTokenQualifier,
+	))
+	if err != nil {
+		return fmt.Errorf("get evm pool ref: %w", err)
+	}
+	registryRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		evmSelector,
+		datastore.ContractType("TokenAdminRegistry"),
+		semver.MustParse("1.5.0"),
+		"",
+	))
+	if err != nil {
+		return fmt.Errorf("get evm token admin registry ref: %w", err)
+	}
+	cantonRegistryRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(token_admin_registry.ContractType),
+		token_admin_registry.Version,
+		"",
+	))
+	if err != nil {
+		return fmt.Errorf("get canton token admin registry ref: %w", err)
+	}
+	cantonCCVRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(committee_verifier.ContractType),
+		committee_verifier.Version,
+		devenvcommon.DefaultCommitteeVerifierQualifier,
+	))
+	if err != nil {
+		return fmt.Errorf("get canton committee verifier ref: %w", err)
+	}
+	destPoolRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType("LockReleaseTokenPool"),
+		semver.MustParse("2.0.0"),
+		cantonDestTokenQualifier,
+	))
+	if err != nil {
+		return fmt.Errorf("get canton destination pool ref: %w", err)
+	}
+	destTokenRefs := env.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(datastore.ContractType("Token")),
+		datastore.AddressRefByQualifier(cantonDestTokenQualifier),
+	)
+	if len(destTokenRefs) != 1 {
+		return fmt.Errorf("expected exactly 1 canton destination token, got %d", len(destTokenRefs))
+	}
+	evmCCVRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		evmSelector,
+		datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+		versioned_verifier_resolver.Version,
+		devenvcommon.DefaultCommitteeVerifierQualifier,
+	))
+	if err != nil {
+		return fmt.Errorf("get evm committee verifier ref: %w", err)
+	}
+
+	_, err = operations.ExecuteSequence(
+		env.OperationsBundle,
+		cantonadapters.CantonTokenAdapter{}.ConfigureTokenForTransfersSequence(),
+		env.BlockChains,
+		tokenscore.ConfigureTokenForTransfersInput{
+			ChainSelector:    selector,
+			TokenAddress:     destTokenRefs[0].Address,
+			TokenPoolAddress: destPoolRef.Address,
+			RegistryAddress:  cantonRegistryRef.Address,
+			AllowedFinalityConfig: finality.Config{
+				WaitForFinality: true,
+			},
+			ExistingDataStore: env.DataStore,
+			RemoteChains: map[uint64]tokenscore.RemoteChainConfig[[]byte, string]{
+				evmSelector: {
+					RemoteToken:  gethcommon.FromHex(tokenRef.Address),
+					RemotePool:   gethcommon.FromHex(poolRef.Address),
+					OutboundCCVs: []string{cantonCCVRef.Address},
+					InboundCCVs:  []string{cantonCCVRef.Address},
+				},
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("configure canton token transfer lane: %w", err)
+	}
+
+	_, err = operations.ExecuteSequence(
+		env.OperationsBundle,
+		evmtokenadapter.NewTokenAdapter().ConfigureTokenForTransfersSequence(),
+		env.BlockChains,
+		tokenscore.ConfigureTokenForTransfersInput{
+			ChainSelector:    evmSelector,
+			TokenAddress:     tokenRef.Address,
+			TokenPoolAddress: poolRef.Address,
+			RegistryAddress:  registryRef.Address,
+			AllowedFinalityConfig: finality.Config{
+				BlockDepth:  1,
+				WaitForSafe: true,
+			},
+			ExistingDataStore: env.DataStore,
+			RemoteChains: map[uint64]tokenscore.RemoteChainConfig[[]byte, string]{
+				selector: {
+					RemoteToken:            gethcommon.FromHex(destTokenRefs[0].Address),
+					RemotePool:             gethcommon.FromHex(destPoolRef.Address),
+					OutboundCCVs:           []string{evmCCVRef.Address},
+					InboundCCVs:            []string{evmCCVRef.Address},
+					TokenTransferFeeConfig: evmtestsetup.CreateBasicTokenTransferFeeConfig(),
+				},
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("configure evm token transfer lane: %w", err)
+	}
+
 	return nil
+}
+
+func (c *Chain) GetSupportedPools() []devenvcommon.PoolCapability {
+	return []devenvcommon.PoolCapability{
+		{
+			PoolType:    devenvcommon.LockReleaseTokenPoolType,
+			PoolVersion: cantonTokenPoolVersion,
+		},
+	}
+}
+
+func (c *Chain) GetTokenExpansionConfigs(
+	_ *deployment.Environment,
+	_ uint64,
+	combos []devenvcommon.TokenCombination,
+) ([]tokenscore.TokenExpansionInputPerChain, error) {
+	seen := make(map[string]struct{})
+	var configs []tokenscore.TokenExpansionInputPerChain
+
+	for _, combo := range combos {
+		for _, poolRef := range []datastore.AddressRef{combo.LocalPoolAddressRef(), combo.RemotePoolAddressRef()} {
+			if poolRef.Type != datastore.ContractType(devenvcommon.LockReleaseTokenPoolType) {
+				continue
+			}
+			key := string(poolRef.Type) + "\x00" + poolRef.Version.String() + "\x00" + poolRef.Qualifier
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+
+			configs = append(configs, tokenscore.TokenExpansionInputPerChain{
+				TokenPoolVersion: poolRef.Version,
+				DeployTokenPoolInput: &tokenscore.DeployTokenPoolInput{
+					TokenRef:           cantonLogicalTokenRef(poolRef.Qualifier),
+					PoolType:           string(poolRef.Type),
+					TokenPoolQualifier: poolRef.Qualifier,
+				},
+			})
+		}
+	}
+
+	return configs, nil
+}
+
+func (c *Chain) PostTokenDeploy(
+	env *deployment.Environment,
+	selector uint64,
+	deployedRefs []datastore.AddressRef,
+) error {
+	hasLockReleasePool := false
+	for _, ref := range deployedRefs {
+		if ref.Type == datastore.ContractType(devenvcommon.LockReleaseTokenPoolType) {
+			hasLockReleasePool = true
+			break
+		}
+	}
+	if !hasLockReleasePool {
+		return nil
+	}
+
+	chain := env.BlockChains.CantonChains()[selector]
+	if len(chain.Participants) == 0 {
+		return fmt.Errorf("canton chain %d has no participants", selector)
+	}
+	ctx := context.Background()
+	if env.GetContext != nil {
+		ctx = env.GetContext()
+	}
+	if err := seedAMTLiquidity(ctx, chain.Participants[0], chain.Participants[0].PartyID, "1000000.00"); err != nil {
+		return fmt.Errorf("seed AMT liquidity: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Chain) GetTokenTransferConfigs(
+	_ *deployment.Environment,
+	_ uint64,
+	_ []uint64,
+	_ *ccipOffchain.EnvironmentTopology,
+) ([]tokenscore.TokenTransferConfig, error) {
+	// Why this intentionally returns no generic config:
+	// ConfigureTokensForTransfers builds transfer configs from full topology pairings.
+	// In this devenv, that generic path creates Canton pairings we do not actually
+	// provision (extra EVM selectors/qualifiers), which led to runtime failures like:
+	// "missing token transfer config for remote chain selector <...>" and missing
+	// LockReleaseTokenPool remote config lookups during send/execute.
+	//
+	// Canton token transfer setup is therefore done explicitly in PostConnect where
+	// we configure only the intended lane (and matching qualifiers) deterministically.
+	return nil, nil
+}
+
+func cantonLogicalTokenRef(qualifier string) *datastore.AddressRef {
+	return &datastore.AddressRef{
+		Type:      datastore.ContractType("Token"),
+		Qualifier: qualifier,
+	}
 }
 
 // DeployLocalNetwork implements cciptestinterfaces.CCIP17Configuration.
@@ -399,7 +659,12 @@ func (c *Chain) ExposeMetrics(ctx context.Context, source, dest uint64) ([]strin
 
 // GetEOAReceiverAddress implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetEOAReceiverAddress() (protocol.UnknownAddress, error) {
-	return protocol.UnknownAddress{}, nil // TODO: implement
+	if len(c.chain.Participants) == 0 {
+		return nil, fmt.Errorf("no canton participants configured")
+	}
+
+	receiver := contracts.HashedPartyFromString(c.chain.Participants[0].PartyID)
+	return protocol.UnknownAddress(receiver.Bytes()), nil
 }
 
 // GetExpectedNextSequenceNumber implements cciptestinterfaces.CCIP17.
@@ -424,7 +689,62 @@ func (c *Chain) GetSenderAddress() (protocol.UnknownAddress, error) {
 
 // GetTokenBalance implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetTokenBalance(ctx context.Context, address, tokenAddress protocol.UnknownAddress) (*big.Int, error) {
-	return nil, nil //nolint:nilnil // not implemented yet
+	if len(c.chain.Participants) == 0 {
+		return nil, fmt.Errorf("no canton participants configured")
+	}
+	participant := c.chain.Participants[0]
+	ownerParty := participant.PartyID
+	if len(address) > 0 {
+		for _, p := range c.chain.Participants {
+			if bytes.Equal(contracts.HashedPartyFromString(p.PartyID).Bytes(), []byte(address)) {
+				participant = p
+				ownerParty = p.PartyID
+				break
+			}
+		}
+	}
+
+	holdingContracts, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &ledgerv2.Identifier{
+		PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
+		ModuleName: "Splice.Api.Token.HoldingV1",
+		EntityName: "Holding",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list active token holdings: %w", err)
+	}
+
+	total := big.NewInt(0)
+	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(10), nil)
+	scaleRat := new(big.Rat).SetInt(scale)
+	for _, holding := range holdingContracts {
+		views := holding.GetCreatedEvent().GetInterfaceViews()
+		if len(views) == 0 || views[0].GetViewValue() == nil {
+			continue
+		}
+		fields := views[0].GetViewValue().GetFields()
+		if len(fields) < 4 {
+			continue
+		}
+		ownerField := fields[0].GetValue().GetParty()
+		amountRaw := strings.TrimSpace(fields[2].GetValue().GetNumeric())
+		locked := fields[3].GetValue().GetOptional().GetValue() != nil
+
+		if ownerField != ownerParty || amountRaw == "" || locked {
+			continue
+		}
+
+		amountRat, ok := new(big.Rat).SetString(amountRaw)
+		if !ok {
+			return nil, fmt.Errorf("invalid holding amount %q", fields[2].GetValue().GetNumeric())
+		}
+		amountRat.Mul(amountRat, scaleRat)
+		if !amountRat.IsInt() {
+			return nil, fmt.Errorf("holding amount scale exceeds 10: %q", fields[2].GetValue().GetNumeric())
+		}
+		total.Add(total, amountRat.Num())
+	}
+
+	return total, nil
 }
 
 // NativeBalance implements cciptestinterfaces.CCIP17.
@@ -507,10 +827,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get fee quoter address: %w", err)
 	}
 
-	// Keep fee token setup local and deterministic for devenv sends.
+	registryAdmin, err := resolveRegistryAdmin(ctx, participant)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve registry admin: %w", err)
+	}
 	feeTokenInstrument := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(party),
-		Id:    types.TEXT("devenv-fee-token"),
+		Admin: types.PARTY(registryAdmin),
+		Id:    types.TEXT("Amulet"),
 	}
 	linkTokenInstrument := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(party),
@@ -605,31 +928,54 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			CcvExtraContext: common.CCIPContext{},
 		})
 
-		// TODO: what is this for?
-		// if len(fallbackVerifierDestAddress) == 0 {
-		// 	fallbackVerifierDestAddress = protocol.UnknownAddress(verifierAddress.Bytes())
-		// }
-		// if len(fallbackVerifierBlob) == 0 {
-		// 	versionTagBytes, decodeErr := hex.DecodeString(string(parsedVerifier.VersionTag))
-		// 	if decodeErr == nil {
-		// 		fallbackVerifierBlob = versionTagBytes
-		// 	}
-		// }
 	}
 
+	hasTokenTransfer := fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
+	feeSenderInputCIDs := []types.CONTRACT_ID{}
+	var preferredTokenHoldingCID types.CONTRACT_ID
+	var mintedHoldingDisclosures []*ledgerv2.DisclosedContract
+	if hasTokenTransfer {
+		feeHoldingCID, tokenHoldingCID, holdingDisclosures, mintErr := mintTwoAmuletHoldings(ctx, participant, party, "1000000.00")
+		if mintErr != nil {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("mint two amulet holdings for send: %w", mintErr)
+		}
+		feeSenderInputCIDs = []types.CONTRACT_ID{feeHoldingCID}
+		preferredTokenHoldingCID = tokenHoldingCID
+		mintedHoldingDisclosures = holdingDisclosures
+	}
+	feeTransferFactoryCID, feeTransferFactoryDisclosures, feeTransferFactoryChoiceContext, err := getTransferFactoryFromScanProxy(
+		ctx,
+		participant,
+		registryAdmin,
+		party,
+		party,
+		"100.00",
+		string(feeTokenInstrument.Admin),
+		string(feeTokenInstrument.Id),
+		[]string{},
+	)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve fee transfer factory from scan-proxy: %w", err)
+	}
 	feeTokenInput := interfaces.TokenInput{
-		// TODO: replace with a real Splice TransferFactory CID from the
-		// transfer-instruction API. Using routerCID is invalid because
-		// CCIPSend is a consuming choice on the router, so exercising
-		// TransferFactory_Transfer on the same CID fails with
-		// CONTRACT_NOT_ACTIVE. This only works today because total fees
-		// are 0 (gas price set to 0 below) so the transfer is skipped.
-		TransferFactory: types.CONTRACT_ID(disclosedRouter.ContractId),
+		TransferFactory: feeTransferFactoryCID,
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
+			Context: feeTransferFactoryChoiceContext,
 			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
 		},
-		TokenPoolHoldings: nil,
+		TokenPoolHoldings: []types.CONTRACT_ID{},
+	}
+	var messageTokenTransfer *ccipclient.TokenTransfer
+	var tokenTransferInput *ccipsender.TokenTransferInput
+	var tokenTransferDisclosures []*ledgerv2.DisclosedContract
+	ccipReceiveGasLimit := opts.ExecutionGasLimit
+	if hasTokenTransfer {
+		messageTokenTransfer, tokenTransferInput, tokenTransferDisclosures, err = c.buildTokenTransferSendInput(ctx, participant, party, dest, fields.TokenAmount.Amount, feeSenderInputCIDs, preferredTokenHoldingCID)
+		if err != nil {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("build token transfer send input: %w", err)
+		}
+		// Keep send fee path deterministic for token-transfer devenv tests.
+		ccipReceiveGasLimit = 0
 	}
 
 	sendArgs := ccipsender.Send{
@@ -637,12 +983,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		RouterCid:                types.CONTRACT_ID(disclosedRouter.ContractId),
 		DestinationChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
 		Message: ccipclient.Canton2AnyMessage{
-			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
-			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
-			FeeToken: feeTokenInstrument,
+			Receiver:      types.TEXT(hex.EncodeToString(fields.Receiver)),
+			Payload:       types.TEXT(hex.EncodeToString(fields.Data)),
+			TokenTransfer: messageTokenTransfer,
+			FeeToken:      feeTokenInstrument,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
-					GasLimit: types.INT64(opts.ExecutionGasLimit),
+					GasLimit: types.INT64(ccipReceiveGasLimit),
 					Ccvs:     ccvExtraArgs,
 					Executor: ccipclient.ExecutorExtraArg{
 						ExecutorUseDefault: &ccipclient.ExecutorUseDefault{
@@ -655,21 +1002,36 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			},
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
-			SenderInputCids: nil,
+			SenderInputCids: feeSenderInputCIDs,
 			TokenInput:      feeTokenInput,
 		},
-		CcvSendInputs: ccvSendInputs,
+		CcvSendInputs:      ccvSendInputs,
+		TokenTransferInput: tokenTransferInput,
 		ExecutorInput: &ccipsender.ExecutorInput{
 			ExecutorCid:          types.CONTRACT_ID(sendDisclosures.ExecutorContractID.ContractId),
 			ExecutorExtraContext: common.CCIPContext{},
 		},
 	}
 	sendArgsMap := sendArgs.ToMap()
+	if messageMap, ok := sendArgsMap["message"].(map[string]any); ok {
+		if extraArgs, ok := messageMap["extraArgs"].(ccipclient.ExtraArgs); ok && extraArgs.V3 != nil {
+			v3Map := extraArgs.V3.ToMap()
+			v3Map["blockConfirmations"] = int64(uint32(opts.FinalityConfig) & 0xFFFF)
+			messageMap["extraArgs"] = map[string]any{
+				"tag":   "V3",
+				"value": v3Map,
+			}
+		}
+	}
 
 	// sender, router + all other disclosed contracts
 	disclosedContracts := make([]*ledgerv2.DisclosedContract, 0, 2+len(sendDisclosures.DisclosedContracts))
 	disclosedContracts = append(disclosedContracts, disclosedCCIPSender, disclosedRouter)
 	disclosedContracts = append(disclosedContracts, sendDisclosures.DisclosedContracts...)
+	disclosedContracts = append(disclosedContracts, mintedHoldingDisclosures...)
+	disclosedContracts = append(disclosedContracts, feeTransferFactoryDisclosures...)
+	disclosedContracts = append(disclosedContracts, tokenTransferDisclosures...)
+	disclosedContracts = testhelpers.DeduplicateDisclosedContracts(disclosedContracts...)
 	for _, dc := range disclosedContracts {
 		if dc != nil && dc.GetContractId() == "" {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("empty disclosed contract ID before ccip sender send")
@@ -778,6 +1140,261 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	c.lastSentHasVerificationInputs = foundEncodedMessage && len(fallbackVerifierDestAddress) > 0 && len(fallbackVerifierBlob) > 0
 
 	return event, nil
+}
+
+func (c *Chain) buildTokenTransferSendInput(
+	ctx context.Context,
+	participant canton.Participant,
+	party string,
+	dest uint64,
+	amount *big.Int,
+	excludeHoldingCIDs []types.CONTRACT_ID,
+	preferredHoldingCID types.CONTRACT_ID,
+) (*ccipclient.TokenTransfer, *ccipsender.TokenTransferInput, []*ledgerv2.DisclosedContract, error) {
+	if amount == nil || amount.Sign() <= 0 {
+		return nil, nil, nil, nil
+	}
+	poolRefs := c.e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(c.chainDetails.ChainSelector),
+		datastore.AddressRefByType(datastore.ContractType("LockReleaseTokenPool")),
+		datastore.AddressRefByQualifier(cantonDestTokenQualifier),
+	)
+	remoteKey := fmt.Sprintf("%d.", dest)
+
+	var (
+		poolCID                     string
+		poolDisclosed               *ledgerv2.DisclosedContract
+		outboundRateLimiterCID      string
+		outboundRateLimiterDisclose *ledgerv2.DisclosedContract
+		instrument                  splice_api_token_holding_v1.InstrumentId
+		found                       bool
+	)
+	for _, poolRef := range poolRefs {
+		activePool, err := contract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			participant.PartyID,
+			lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
+			contracts.HexToInstanceAddress(poolRef.Address),
+		)
+		if err != nil {
+			continue
+		}
+		parsedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
+		if err != nil {
+			continue
+		}
+		cfgAny, ok := parsedPool.RemoteChainConfigs[remoteKey]
+		if !ok {
+			continue
+		}
+		cfgMap, ok := cfgAny.(map[string]any)
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("remote config %s has invalid type %T", remoteKey, cfgAny)
+		}
+		outboundAddr, err := parseInstanceAddressFromRemoteConfig(cfgMap, "outboundRateLimiter")
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("parse outbound rate limiter from remote config: %w", err)
+		}
+		activeOutboundRateLimiter, err := contract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			participant.PartyID,
+			common.RateLimiter{}.GetTemplateID(),
+			outboundAddr,
+		)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("resolve outbound rate limiter contract: %w", err)
+		}
+
+		poolCID = activePool.GetCreatedEvent().GetContractId()
+		poolDisclosed = convertToDisclosedContract(activePool)
+		outboundRateLimiterCID = activeOutboundRateLimiter.GetCreatedEvent().GetContractId()
+		outboundRateLimiterDisclose = convertToDisclosedContract(activeOutboundRateLimiter)
+		instrument = parsedPool.InstrumentId
+		found = true
+		break
+	}
+	if !found {
+		return nil, nil, nil, fmt.Errorf("no LockReleaseTokenPool with remote config for selector %d", dest)
+	}
+
+	registryAdmin, err := resolveRegistryAdmin(ctx, participant)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("resolve registry admin: %w", err)
+	}
+	c.logger.Debug().
+		Str("InstrumentAdmin", string(instrument.Admin)).
+		Str("InstrumentID", string(instrument.Id)).
+		Uint64("Dest", dest).
+		Msg("Resolved token transfer instrument for Canton send")
+	holdingContracts, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &ledgerv2.Identifier{
+		PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
+		ModuleName: "Splice.Api.Token.HoldingV1",
+		EntityName: "Holding",
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("list active token holdings: %w", err)
+	}
+	holdingCIDs, holdingDisclosures := selectUnlockedHoldingCIDs(
+		holdingContracts,
+		party,
+		string(instrument.Admin),
+		string(instrument.Id),
+	)
+	if len(holdingCIDs) == 0 && string(instrument.Id) == "Amulet" {
+		if err := seedAMTLiquidity(ctx, participant, party, "200.00"); err != nil {
+			return nil, nil, nil, fmt.Errorf("seed token-transfer liquidity: %w", err)
+		}
+		holdingContracts, err = testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &ledgerv2.Identifier{
+			PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
+			ModuleName: "Splice.Api.Token.HoldingV1",
+			EntityName: "Holding",
+		})
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("re-list active token holdings: %w", err)
+		}
+		holdingCIDs, holdingDisclosures = selectUnlockedHoldingCIDs(
+			holdingContracts,
+			party,
+			string(instrument.Admin),
+			string(instrument.Id),
+		)
+	}
+	if len(holdingCIDs) == 0 {
+		return nil, nil, nil, fmt.Errorf("no unlocked holdings found for instrument %s/%s", instrument.Admin, instrument.Id)
+	}
+	excluded := make(map[types.CONTRACT_ID]struct{}, len(excludeHoldingCIDs))
+	for _, cid := range excludeHoldingCIDs {
+		excluded[cid] = struct{}{}
+	}
+	var selectedHoldingCIDs []types.CONTRACT_ID
+	if preferredHoldingCID != "" {
+		if _, isExcluded := excluded[preferredHoldingCID]; isExcluded {
+			return nil, nil, nil, fmt.Errorf("preferred token-transfer holding %s is excluded by fee holdings", preferredHoldingCID)
+		}
+		foundPreferred := false
+		for _, cid := range holdingCIDs {
+			if cid == preferredHoldingCID {
+				foundPreferred = true
+				break
+			}
+		}
+		if !foundPreferred {
+			return nil, nil, nil, fmt.Errorf("preferred token-transfer holding %s not found among unlocked holdings", preferredHoldingCID)
+		}
+		selectedHoldingCIDs = []types.CONTRACT_ID{preferredHoldingCID}
+	} else {
+		for _, cid := range holdingCIDs {
+			if _, isExcluded := excluded[cid]; isExcluded {
+				continue
+			}
+			selectedHoldingCIDs = []types.CONTRACT_ID{cid}
+			break
+		}
+	}
+	if len(selectedHoldingCIDs) == 0 {
+		if string(instrument.Id) == "Amulet" {
+			if err := seedAMTLiquidity(ctx, participant, party, "200.00"); err != nil {
+				return nil, nil, nil, fmt.Errorf("seed additional token-transfer liquidity: %w", err)
+			}
+			holdingContracts, err = testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &ledgerv2.Identifier{
+				PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
+				ModuleName: "Splice.Api.Token.HoldingV1",
+				EntityName: "Holding",
+			})
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("re-list active token holdings after mint: %w", err)
+			}
+			holdingCIDs, holdingDisclosures = selectUnlockedHoldingCIDs(
+				holdingContracts,
+				party,
+				string(instrument.Admin),
+				string(instrument.Id),
+			)
+			for _, cid := range holdingCIDs {
+				if _, isExcluded := excluded[cid]; isExcluded {
+					continue
+				}
+				selectedHoldingCIDs = []types.CONTRACT_ID{cid}
+				break
+			}
+		}
+	}
+	if len(selectedHoldingCIDs) == 0 {
+		return nil, nil, nil, fmt.Errorf("no eligible unlocked holdings remain for token transfer after excluding fee holdings")
+	}
+
+	transferFactoryCID, transferFactoryDisclosures, transferFactoryChoiceContext, err := getTransferFactoryFromScanProxy(
+		ctx,
+		participant,
+		registryAdmin,
+		party,
+		party,
+		amount.String(),
+		string(instrument.Admin),
+		string(instrument.Id),
+		[]string{},
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("resolve transfer factory from scan-proxy: %w", err)
+	}
+	tokenInput := interfaces.TokenInput{
+		TransferFactory: transferFactoryCID,
+		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+			Context: transferFactoryChoiceContext,
+			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+		},
+		TokenPoolHoldings: []types.CONTRACT_ID{},
+	}
+	outboundRateLimiter := types.CONTRACT_ID(outboundRateLimiterCID)
+	tokenTransferInput := &ccipsender.TokenTransferInput{
+		SenderInputCids: selectedHoldingCIDs,
+		TokenPoolCid:    types.CONTRACT_ID(poolCID),
+		PoolExtraContext: common.CCIPContext{
+			Values: types.TEXTMAP{
+				"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiter},
+			},
+		},
+		TokenInput: tokenInput,
+	}
+
+	disclosures := []*ledgerv2.DisclosedContract{poolDisclosed, outboundRateLimiterDisclose}
+	disclosures = append(disclosures, holdingDisclosures...)
+	disclosures = append(disclosures, transferFactoryDisclosures...)
+
+	return &ccipclient.TokenTransfer{
+		Token:  instrument,
+		Amount: toAmuletAmountNumeric(amount),
+	}, tokenTransferInput, disclosures, nil
+}
+
+func toAmuletAmountNumeric(amount *big.Int) types.NUMERIC {
+	const scale = 10
+	if amount == nil {
+		return types.NUMERIC("0")
+	}
+	sign := ""
+	n := new(big.Int).Set(amount)
+	if n.Sign() < 0 {
+		sign = "-"
+		n.Abs(n)
+	}
+	base := new(big.Int).Exp(big.NewInt(10), big.NewInt(scale), nil)
+	intPart := new(big.Int).Div(n, base)
+	fracPart := new(big.Int).Mod(n, base)
+	frac := fracPart.String()
+	for len(frac) < scale {
+		frac = "0" + frac
+	}
+	for len(frac) > 1 && frac[len(frac)-1] == '0' {
+		frac = frac[:len(frac)-1]
+	}
+	if frac == "0" {
+		return types.NUMERIC(sign + intPart.String())
+	}
+
+	return types.NUMERIC(fmt.Sprintf("%s%s.%s", sign, intPart.String(), frac))
 }
 
 func getByAddress(ds datastore.DataStore, address string) (datastore.AddressRef, error) {
