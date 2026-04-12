@@ -61,14 +61,14 @@ func (c *Chain) resolveTransferFactoryForExecute(
 	executingParty string,
 	message protocol.Message,
 ) (types.CONTRACT_ID, []*apiv2.DisclosedContract, splice_api_token_metadata_v1.ChoiceContext, error) {
-	registryAdmin, err := resolveRegistryAdmin(ctx, participant)
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
 	if err != nil {
 		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("resolve registry admin: %w", err)
 	}
 	if message.TokenTransfer == nil || message.TokenTransfer.Amount == nil {
 		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("token transfer amount is required")
 	}
-	transferClient, err := newTransferInstructionClient(participant)
+	_, _, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
 	if err != nil {
 		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("create transfer instruction client: %w", err)
 	}
@@ -298,7 +298,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 			}
 		}
 		if pendingTransferInstructionCID != "" {
-			transferClient, err := newTransferInstructionClient(participant)
+			_, _, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
 			if err != nil {
 				return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("create transfer instruction client: %w", err)
 			}

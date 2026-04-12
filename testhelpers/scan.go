@@ -137,3 +137,17 @@ func NewValidatorAPIClients(
 
 	return scanProxyClient, tokenMetadataClient, transferInstructionClient, nil
 }
+
+func ResolveRegistryAdmin(ctx context.Context, participant canton.Participant) (string, error) {
+	_, tokenMetadataClient, _, err := NewValidatorAPIClients(participant)
+	if err != nil {
+		return "", err
+	}
+
+	registryAdmin, err := GetRegistryAdmin(ctx, tokenMetadataClient)
+	if err != nil {
+		return "", fmt.Errorf("get registry admin: %w", err)
+	}
+
+	return registryAdmin, nil
+}

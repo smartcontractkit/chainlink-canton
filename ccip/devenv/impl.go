@@ -85,9 +85,14 @@ var (
 )
 
 const (
-	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 2.0.0 [default] to LockReleaseTokenPool 2.0.0 [default])"
-	cantonDestTokenQualifier  = "TEST (LockReleaseTokenPool 2.0.0 [default] to BurnMintTokenPool 2.0.0 [default])"
+	cantonDestTokenQualifier = "TEST (LockReleaseTokenPool 2.0.0 [default] to BurnMintTokenPool 2.0.0 [default])"
 )
+
+type poolConfigKey struct {
+	poolType    datastore.ContractType
+	poolVersion string
+	qualifier   string
+}
 
 type ImplFactory struct{}
 
@@ -226,7 +231,7 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	}
 	c.logger.Debug().Str("GlobalConfig", globalConfig.Address).Msg("Resolved GlobalConfig")
 
-	registryAdmin, err := resolveRegistryAdmin(context.Background(), c.chain.Participants[0])
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), c.chain.Participants[0])
 	if err != nil {
 		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("resolve registry admin for token prices: %w", err)
 	}
@@ -347,16 +352,11 @@ func (c *Chain) GetTokenExpansionConfigs(
 	if !ok || len(chain.Participants) == 0 {
 		return nil, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
-	registryAdmin, err := resolveRegistryAdmin(context.Background(), chain.Participants[0])
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), chain.Participants[0])
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry admin for token expansion: %w", err)
 	}
 
-	type poolConfigKey struct {
-		poolType    datastore.ContractType
-		poolVersion string
-		qualifier   string
-	}
 	seen := make(map[poolConfigKey]struct{})
 	var configs []tokenscore.TokenExpansionInputPerChain
 
@@ -422,11 +422,47 @@ func (c *Chain) PostTokenDeploy(
 	if env.GetContext != nil {
 		ctx = env.GetContext()
 	}
-	if err := seedAMTLiquidity(ctx, chain.Participants[0], chain.Participants[0].PartyID, "1000000.00"); err != nil {
+	if _, _, _, err := mintTwoAmuletHoldings(ctx, chain.Participants[0], chain.Participants[0].PartyID, "1000000.00"); err != nil {
 		return fmt.Errorf("seed AMT liquidity: %w", err)
 	}
 
 	return nil
+}
+
+func mintTwoAmuletHoldings(
+	ctx context.Context,
+	participant canton.Participant,
+	ownerParty string,
+	amount string,
+) (types.CONTRACT_ID, types.CONTRACT_ID, []*ledgerv2.DisclosedContract, error) {
+	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
+	if err != nil {
+		return "", "", nil, err
+	}
+	feeHoldingCID, err := testhelpers.MintAMT(ctx, participant, metadataClient, transferClient, scanClient, ownerParty, amount)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("mint fee holding: %w", err)
+	}
+	tokenHoldingCID, err := testhelpers.MintAMT(ctx, participant, metadataClient, transferClient, scanClient, ownerParty, amount)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("mint token-transfer holding: %w", err)
+	}
+	if feeHoldingCID == tokenHoldingCID {
+		return "", "", nil, fmt.Errorf("mint returned same holding cid twice: %s", feeHoldingCID)
+	}
+	disclosedFeeHolding, err := testhelpers.GetDisclosedContractById(ctx, participant, feeHoldingCID)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("get disclosed fee holding by id: %w", err)
+	}
+	disclosedTokenHolding, err := testhelpers.GetDisclosedContractById(ctx, participant, tokenHoldingCID)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("get disclosed token holding by id: %w", err)
+	}
+
+	return types.CONTRACT_ID(feeHoldingCID), types.CONTRACT_ID(tokenHoldingCID), []*ledgerv2.DisclosedContract{
+		disclosedFeeHolding,
+		disclosedTokenHolding,
+	}, nil
 }
 
 func (c *Chain) GetTokenTransferConfigs(
@@ -435,12 +471,6 @@ func (c *Chain) GetTokenTransferConfigs(
 	remoteSelectors []uint64,
 	topology *ccipOffchain.EnvironmentTopology,
 ) ([]tokenscore.TokenTransferConfig, error) {
-	type poolConfigKey struct {
-		poolType    datastore.ContractType
-		poolVersion string
-		qualifier   string
-	}
-
 	applicableCombos := devenvcommon.FilterTokenCombinations(
 		devenvcommon.AllTokenCombinations(), topology, nil, nil,
 	)
@@ -854,7 +884,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		preferredTokenHoldingCID = tokenHoldingCID
 		mintedHoldingDisclosures = holdingDisclosures
 	}
-	registryAdmin, err := resolveRegistryAdmin(ctx, participant)
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve registry admin: %w", err)
 	}
@@ -863,7 +893,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Id:    types.TEXT("Amulet"),
 	}
 
-	transferClient, err := newTransferInstructionClient(participant)
+	_, _, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("create transfer instruction client: %w", err)
 	}

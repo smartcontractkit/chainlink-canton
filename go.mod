@@ -6,9 +6,6 @@ go 1.25.6
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
 
 replace (
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment => github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260408173936-5b7036b83fc5
-	github.com/smartcontractkit/chainlink-ccip/deployment => github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260408173936-5b7036b83fc5
-	github.com/smartcontractkit/chainlink-ccv/build/devenv => ../chainlink-ccv/build/devenv
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
 	// Pin mcms canton-main (TargetCid resolution); https://github.com/smartcontractkit/mcms/commit/0771796ef83c32ae52ca411a56d3b570a35b8aae
@@ -40,8 +37,8 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260408173936-5b7036b83fc5
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260408173936-5b7036b83fc5
-	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260408185451-7b2512c2651c
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260408185451-7b2512c2651c
+	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260412200608-734d7149ed55
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260412200608-734d7149ed55
 	github.com/smartcontractkit/chainlink-common v0.11.1
 	github.com/smartcontractkit/chainlink-deployments-framework v0.93.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.13

@@ -66,18 +66,39 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 	cfg := config.Config
+	poolReceiveContext := cfg.PoolReceiveContext
+	if poolReceiveContext.Values == nil {
+		poolReceiveContext = common.CCIPContext{Values: types.TEXTMAP{}}
+	}
+	transferTimeout := cfg.TransferTimeout
+	if transferTimeout.RelativeHours == nil && transferTimeout.Indefinite == nil {
+		h := types.INT64(24)
+		transferTimeout = lockreleasetokenpool.TransferTimeout{RelativeHours: &h}
+	}
+	remoteChainConfigs := cfg.RemoteChainConfigs
+	if remoteChainConfigs == nil {
+		remoteChainConfigs = types.GENMAP{}
+	}
+	tokenTransferFeeConfigs := cfg.TokenTransferFeeConfigs
+	if tokenTransferFeeConfigs == nil {
+		tokenTransferFeeConfigs = types.GENMAP{}
+	}
+	qualifier := ptr.String(cfg.Qualifier)
+	if cfg.Qualifier == "" {
+		qualifier = nil
+	}
 	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, lock_release_token_pool.Deploy, chain, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
-		Qualifier: ptr.String(cfg.Qualifier),
+		Qualifier: qualifier,
 		Template: lockreleasetokenpool.LockReleaseTokenPool{
 			CcipOwner:               types.PARTY(cfg.CcipOwner),
 			PoolOwner:               types.PARTY(cfg.PoolOwner),
 			InstanceId:              types.TEXT(cfg.InstanceID),
 			InstrumentId:            cfg.InstrumentId,
 			Decimals:                types.INT64(cfg.Decimals),
-			RemoteChainConfigs:      cfg.RemoteChainConfigs,
-			TokenTransferFeeConfigs: cfg.TokenTransferFeeConfigs,
-			PoolReceiveContext:      cfg.PoolReceiveContext,
-			TransferTimeout:         cfg.TransferTimeout,
+			RemoteChainConfigs:      remoteChainConfigs,
+			TokenTransferFeeConfigs: tokenTransferFeeConfigs,
+			PoolReceiveContext:      poolReceiveContext,
+			TransferTimeout:         transferTimeout,
 			Deps:                    cfg.Deps,
 		},
 		OwnerParty: types.PARTY(cfg.PoolOwner),

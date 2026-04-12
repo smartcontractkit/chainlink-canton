@@ -158,6 +158,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			outboundRef, outboundRaw, err := deployTokenPoolRateLimiter(
 				b,
 				cantonChain,
+				input.ExistingDataStore,
 				parsedPool,
 				input.TokenPoolAddress,
 				remoteSelectorKey,
@@ -171,6 +172,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			inboundRef, inboundRaw, err := deployTokenPoolRateLimiter(
 				b,
 				cantonChain,
+				input.ExistingDataStore,
 				parsedPool,
 				input.TokenPoolAddress,
 				remoteSelectorKey,
@@ -188,6 +190,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				customRef, customRaw, customErr := deployTokenPoolRateLimiter(
 					b,
 					cantonChain,
+					input.ExistingDataStore,
 					parsedPool,
 					input.TokenPoolAddress,
 					remoteSelectorKey,
@@ -270,6 +273,7 @@ var SetTokenPoolRateLimits = operations.NewSequence(
 		outboundRef, outboundRaw, err := deployTokenPoolRateLimiter(
 			b,
 			cantonChain,
+			input.ExistingDataStore,
 			parsedPool,
 			input.TokenPoolRef.Address,
 			remoteSelectorKey,
@@ -283,6 +287,7 @@ var SetTokenPoolRateLimits = operations.NewSequence(
 		inboundRef, inboundRaw, err := deployTokenPoolRateLimiter(
 			b,
 			cantonChain,
+			input.ExistingDataStore,
 			parsedPool,
 			input.TokenPoolRef.Address,
 			remoteSelectorKey,
@@ -300,6 +305,7 @@ var SetTokenPoolRateLimits = operations.NewSequence(
 			customRef, customRaw, customErr := deployTokenPoolRateLimiter(
 				b,
 				cantonChain,
+				input.ExistingDataStore,
 				parsedPool,
 				input.TokenPoolRef.Address,
 				remoteSelectorKey,
@@ -517,6 +523,7 @@ func toCantonFinalityConfig(cfg tokenadaptersfinality.Config) common.FinalityCon
 func deployTokenPoolRateLimiter(
 	b operations.Bundle,
 	cantonChain cldfcanton.Chain,
+	existingDataStore datastore.DataStore,
 	parsedPool *lockreleasetokenpool.LockReleaseTokenPool,
 	tokenPoolAddress string,
 	remoteSelectorKey string,
@@ -558,6 +565,13 @@ func deployTokenPoolRateLimiter(
 		OwnerParty: parsedPool.PoolOwner,
 	})
 	if err != nil {
+		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, err
+	}
+	addresses, ok := existingDataStore.Addresses().(datastore.MutableAddressRefStore)
+	if !ok {
+		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, fmt.Errorf("existing datastore addresses are not mutable")
+	}
+	if err := addresses.Add(report.Output); err != nil {
 		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, err
 	}
 
