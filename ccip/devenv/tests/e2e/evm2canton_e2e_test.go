@@ -1,7 +1,6 @@
 package canton
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -33,6 +32,7 @@ import (
 
 const (
 	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 2.0.0 [default] to LockReleaseTokenPool 2.0.0 [default])"
+	// 1e11 (10-decimal units) gives a stable non-dust transfer in this lane after fee handling.
 	evmToCantonTransferAmount = int64(100_000_000_000)
 )
 
@@ -62,7 +62,7 @@ func assertMessageForEVM2Canton(
 	return vr.Message, vr.VerifierDestAddress, vr.CCVData
 }
 
-func getHoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
+func GetHoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
 	var total float64
 	for _, h := range holdings {
 		views := h.GetCreatedEvent().GetInterfaceViews()
@@ -82,17 +82,6 @@ func getHoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
 		total += v
 	}
 	return total
-}
-
-func getReceiverHoldingsBalance(t *testing.T, ctx context.Context, receiverParticipant canton.Participant) float64 {
-	t.Helper()
-	receiverHoldings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, receiverParticipant, &apiv2.Identifier{
-		PackageId:  "#splice-api-token-holding-v1",
-		ModuleName: "Splice.Api.Token.HoldingV1",
-		EntityName: "Holding",
-	})
-	require.NoError(t, err)
-	return getHoldingsBalance(receiverHoldings)
 }
 
 //nolint:paralleltest // we won't run this in parallel.
@@ -133,6 +122,13 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 	srcSelector := srcChain.ChainSelector()
 	dstSelector := dstChain.ChainSelector()
+	_, opsEnv, err := ccv.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
+	require.NoError(t, err)
+	var receiverParticipant canton.Participant
+	if chains := opsEnv.BlockChains.CantonChains(); chains[dstSelector].Participants != nil && len(chains[dstSelector].Participants) > 0 {
+		receiverParticipant = chains[dstSelector].Participants[0]
+	}
+	require.NotEmpty(t, receiverParticipant.PartyID)
 
 	receiver, err := dstChain.GetEOAReceiverAddress()
 	require.NoError(t, err)
@@ -247,6 +243,15 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(subtestCtx, message, 0, []protocol.UnknownAddress{verifierDestAddress}, [][]byte{ccvData})
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
+
+		receiverHoldings, err := testhelpers.ListActiveContractsByInterfaceId(subtestCtx, receiverParticipant, &apiv2.Identifier{
+			PackageId:  "#splice-api-token-holding-v1",
+			ModuleName: "Splice.Api.Token.HoldingV1",
+			EntityName: "Holding",
+		})
+		require.NoError(t, err)
+		t.Logf("Canton receiver total holdings after execute: %.10f", GetHoldingsBalance(receiverHoldings))
+
 		srcBalanceAfter, err := srcChain.GetTokenBalance(subtestCtx, srcSender, srcToken)
 		require.NoError(t, err)
 		require.NotNil(t, srcBalanceAfter)

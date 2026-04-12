@@ -3,9 +3,7 @@ package devenv
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -46,67 +44,18 @@ func (c *Chain) GetDisclosuresForSend(ctx context.Context, ccvs []contracts.Inst
 }
 
 // GetDisclosuresForExecution returns all the necessary disclosed contracts to execute a message on Canton using the EDS API.
-func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []contracts.InstanceAddress) (
-	[]*apiv2.DisclosedContract,
-	*apiv2.Value,
-	[]*apiv2.Value_ContractId,
-	error,
-) {
+func (c *Chain) GetDisclosuresForExecution(ctx context.Context, encodedMessageHex string, verifiers []contracts.InstanceAddress) (*testhelpers.ExecuteDisclosures, error) {
 	// Get the EDS output from generic services output, will contain the EDS API URL
 	edsOut, err := util.OpaqueToConcreteStrict[output](c.cfg.GenericServices[c.ChainSelector()].Output)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get generic services output for chain %d: %w", c.ChainSelector(), err)
+		return nil, fmt.Errorf("failed to get generic services output for chain %d: %w", c.ChainSelector(), err)
 	}
 	edsClient, err := edsv1.NewClientWithResponses(edsOut.EDSURL)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create eds client: %w", err)
+		return nil, fmt.Errorf("failed to create eds client: %w", err)
 	}
 
-	request := edsv1.CCIPExecuteRequest{
-		Ccvs:           make([]string, len(verifiers)),
-		EncodedMessage: "",
-	}
-	for i, verifier := range verifiers {
-		request.Ccvs[i] = verifier.String()
-	}
-	resp, err := edsClient.CcipExecuteWithResponse(ctx, request)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get disclosures from EDS: %w", err)
-	}
-	if resp.StatusCode() != http.StatusOK {
-		return nil, nil, nil, fmt.Errorf("failed to get disclosures from EDS: %s", resp.Status())
-	}
-
-	var disclosedContracts []*apiv2.DisclosedContract
-	for _, contract := range resp.JSON200.ChoiceContext.DisclosedContracts {
-		disclosedContract, err := disclosedContractToProto(contract)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		disclosedContracts = append(disclosedContracts, disclosedContract)
-	}
-	choiceContext, err := ChoiceContextFromData(resp.JSON200.ChoiceContext.ChoiceContextData)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to convert choice context: %w", err)
-	}
-
-	ccvContractIDs := make([]*apiv2.Value_ContractId, len(verifiers))
-	for i, verifier := range verifiers {
-		disclosure, ok := resp.JSON200.Ccvs[verifier.String()]
-		if !ok || disclosure.DisclosedContract == nil {
-			return nil, nil, nil, fmt.Errorf("failed to get disclosure for verifier: %s", verifier.String())
-		}
-		ccvContractIDs[i] = &apiv2.Value_ContractId{
-			ContractId: disclosure.DisclosedContract.ContractId,
-		}
-		disclosedContract, err := disclosedContractToProto(*disclosure.DisclosedContract)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to convert disclosed contract for verifier %s: %w", verifier.String(), err)
-		}
-		disclosedContracts = append(disclosedContracts, disclosedContract)
-	}
-
-	return disclosedContracts, choiceContext, ccvContractIDs, nil
+	return testhelpers.GetCCIPExecuteDisclosures(ctx, encodedMessageHex, edsClient, verifiers)
 }
 
 func TemplateIdFromString(s string) (*apiv2.Identifier, error) {
@@ -119,24 +68,6 @@ func TemplateIdFromString(s string) (*apiv2.Identifier, error) {
 		PackageId:  split[0],
 		ModuleName: split[1],
 		EntityName: split[2],
-	}, nil
-}
-
-func disclosedContractToProto(contract edsv1.DisclosedContract) (*apiv2.DisclosedContract, error) {
-	id, err := TemplateIdFromString(contract.TemplateId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse template id: %w", err)
-	}
-	createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode created event blob: %w", err)
-	}
-
-	return &apiv2.DisclosedContract{
-		TemplateId:       id,
-		ContractId:       contract.ContractId,
-		CreatedEventBlob: createdEventBlob,
-		SynchronizerId:   contract.SynchronizerId,
 	}, nil
 }
 

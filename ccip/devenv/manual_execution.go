@@ -2,13 +2,10 @@ package devenv
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"net/http"
 	"strings"
-	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
@@ -22,15 +19,12 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	transferInstructionV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
@@ -74,214 +68,24 @@ func (c *Chain) resolveTransferFactoryForExecute(
 	if message.TokenTransfer == nil || message.TokenTransfer.Amount == nil {
 		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("token transfer amount is required")
 	}
-	transferFactoryCID, transferFactoryDisclosures, transferFactoryChoiceContext, err := getTransferFactoryFromScanProxy(
+	transferClient, err := newTransferInstructionClient(participant)
+	if err != nil {
+		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("create transfer instruction client: %w", err)
+	}
+	transferFactoryCIDRaw, transferFactoryDisclosures, transferFactoryChoiceContextValue, err := testhelpers.GetTransferFactory(
 		ctx,
-		participant,
+		transferClient,
 		registryAdmin,
 		executingParty,
 		executingParty,
-		string(toAmuletAmountNumeric(message.TokenTransfer.Amount)),
-		registryAdmin,
-		"Amulet",
-		[]string{},
 	)
 	if err != nil {
 		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("resolve transfer factory from scan-proxy: %w", err)
 	}
-	return transferFactoryCID, transferFactoryDisclosures, transferFactoryChoiceContext, nil
-}
-
-func parseInstanceAddressFromRemoteConfig(remoteConfig map[string]any, field string) (contracts.InstanceAddress, error) {
-	fieldValue, ok := remoteConfig[field]
-	if !ok {
-		return contracts.InstanceAddress{}, fmt.Errorf("missing field %s in remote chain config", field)
-	}
-	fieldMap, ok := fieldValue.(map[string]any)
-	if !ok {
-		return contracts.InstanceAddress{}, fmt.Errorf("field %s has type %T, expected map[string]any", field, fieldValue)
-	}
-	unpackValue, ok := fieldMap["unpack"].(string)
-	if !ok {
-		return contracts.InstanceAddress{}, fmt.Errorf("field %s.unpack missing or not string", field)
-	}
-	unpackValue = strings.TrimSpace(unpackValue)
-	if unpackValue == "" {
-		return contracts.InstanceAddress{}, nil
-	}
-	raw, err := contracts.RawInstanceAddressFromString(unpackValue)
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("parse %s.unpack raw instance address: %w", field, err)
-	}
-
-	return raw.InstanceAddress(), nil
-}
-
-func (c *Chain) resolvePoolContextForExecute(
-	ctx context.Context,
-	participant canton.Participant,
-	message protocol.Message,
-) (tokenPoolCID string, poolExtraContext *apiv2.Value, poolOwner, instrumentAdmin, instrumentID string, err error) {
-	poolRefs := c.e.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(c.chainDetails.ChainSelector),
-		datastore.AddressRefByType(datastore.ContractType("LockReleaseTokenPool")),
-	)
-	remoteKey := fmt.Sprintf("%d.", uint64(message.SourceChainSelector))
-	for _, poolRef := range poolRefs {
-		activePool, findErr := contract.FindActiveContractByInstanceAddress(
-			ctx,
-			participant.LedgerServices.State,
-			participant.PartyID,
-			lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-			contracts.HexToInstanceAddress(poolRef.Address),
-		)
-		if findErr != nil {
-			continue
-		}
-		parsedPool, unmarshalErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
-		if unmarshalErr != nil {
-			continue
-		}
-		cfgAny, ok := parsedPool.RemoteChainConfigs[remoteKey]
-		if !ok {
-			continue
-		}
-		cfgMap, ok := cfgAny.(map[string]any)
-		if !ok {
-			return "", nil, "", "", "", fmt.Errorf("remote config %s is %T, expected map[string]any", remoteKey, cfgAny)
-		}
-		inboundAddr, parseErr := parseInstanceAddressFromRemoteConfig(cfgMap, "inboundRateLimiter")
-		if parseErr != nil {
-			return "", nil, "", "", "", parseErr
-		}
-		customInboundAddr, parseErr := parseInstanceAddressFromRemoteConfig(cfgMap, "inboundCustomBlockConfirmationsRateLimiter")
-		if parseErr != nil {
-			return "", nil, "", "", "", parseErr
-		}
-		inboundCID, findErr := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, common.RateLimiter{}.GetTemplateID(), inboundAddr)
-		if findErr != nil {
-			return "", nil, "", "", "", fmt.Errorf("resolve inbound rate limiter cid: %w", findErr)
-		}
-		customInboundCID := inboundCID
-		if customInboundAddr != (contracts.InstanceAddress{}) {
-			customInboundCID, findErr = contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, common.RateLimiter{}.GetTemplateID(), customInboundAddr)
-			if findErr != nil {
-				return "", nil, "", "", "", fmt.Errorf("resolve inbound custom rate limiter cid: %w", findErr)
-			}
-		}
-
-		poolExtraEntries := []*apiv2.TextMap_Entry{
-			{
-				Key: "rate-limiter",
-				Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-					Constructor: "AV_ContractId",
-					Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: inboundCID}},
-				}}},
-			},
-			{
-				Key: "inbound-rate-limiter",
-				Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-					Constructor: "AV_ContractId",
-					Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: inboundCID}},
-				}}},
-			},
-			{
-				Key: "inbound-custom-block-confirmations-rate-limiter",
-				Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-					Constructor: "AV_ContractId",
-					Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: customInboundCID}},
-				}}},
-			},
-		}
-		return activePool.GetCreatedEvent().GetContractId(),
-			&apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{
-					Label: "values",
-					Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: poolExtraEntries}}},
-				},
-			}}}},
-			string(parsedPool.PoolOwner),
-			string(parsedPool.InstrumentId.Admin),
-			string(parsedPool.InstrumentId.Id),
-			nil
-	}
-
-	return "", nil, "", "", "", fmt.Errorf("failed to resolve lock release token pool for remote selector %d", message.SourceChainSelector)
-}
-
-func (c *Chain) acceptPendingTransferInstruction(ctx context.Context, participant canton.Participant, executingParty, pendingTransferInstructionCID string) error {
-	requestEditor := func(reqCtx context.Context, req *http.Request) error {
-		token, err := participant.TokenSource.Token()
-		if err != nil {
-			return fmt.Errorf("retrieve participant token: %w", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-		return nil
-	}
-	transferClient, err := transferInstructionV1.NewClientWithResponses(
-		fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL),
-		transferInstructionV1.WithRequestEditorFn(requestEditor),
-	)
-	if err != nil {
-		return fmt.Errorf("create transfer instruction client: %w", err)
-	}
-	acceptContextResp, err := transferClient.GetTransferInstructionAcceptContextWithResponse(ctx, pendingTransferInstructionCID, transferInstructionV1.GetChoiceContextRequest{})
-	if err != nil {
-		return fmt.Errorf("get transfer instruction accept context: %w", err)
-	}
-	if acceptContextResp.StatusCode() != http.StatusOK || acceptContextResp.JSON200 == nil {
-		return fmt.Errorf("unexpected transfer instruction accept context status=%d", acceptContextResp.StatusCode())
-	}
-	acceptDisclosures := make([]*apiv2.DisclosedContract, 0, len(acceptContextResp.JSON200.DisclosedContracts))
-	for _, contract := range acceptContextResp.JSON200.DisclosedContracts {
-		id, err := testhelpers.TemplateIdFromString(contract.TemplateId)
-		if err != nil {
-			return fmt.Errorf("parse accept-context template id: %w", err)
-		}
-		createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
-		if err != nil {
-			return fmt.Errorf("decode accept-context created event blob: %w", err)
-		}
-		acceptDisclosures = append(acceptDisclosures, &apiv2.DisclosedContract{
-			TemplateId:       id,
-			ContractId:       contract.ContractId,
-			CreatedEventBlob: createdEventBlob,
-			SynchronizerId:   contract.SynchronizerId,
-		})
-	}
-	acceptContext, err := ChoiceContextFromData(acceptContextResp.JSON200.ChoiceContextData)
-	if err != nil {
-		return fmt.Errorf("convert transfer instruction accept context: %w", err)
-	}
-	emptyMetadata := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{
-			Label: "values",
-			Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
-		},
-	}}}}
-	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferInstruction"},
-					ContractId: pendingTransferInstructionCID,
-					Choice:     "TransferInstruction_Accept",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "context", Value: acceptContext},
-							{Label: "meta", Value: emptyMetadata},
-						}}}}},
-					}}}},
-				}},
-			}},
-			ActAs:              []string{executingParty},
-			DisclosedContracts: acceptDisclosures,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("accept pending transfer instruction: %w", err)
-	}
-	return nil
+	transferFactoryCID := types.CONTRACT_ID(transferFactoryCIDRaw)
+	return transferFactoryCID, transferFactoryDisclosures, splice_api_token_metadata_v1.ChoiceContext{
+		Values: testhelpers.ExtractChoiceContextValues(transferFactoryChoiceContextValue),
+	}, nil
 }
 
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
@@ -386,10 +190,11 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		ccvs[i] = contracts.HexToInstanceAddress(verifier.String())
 	}
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
-	disclosedContracts, choiceContext, ccvContractIDs, err := c.GetDisclosuresForExecution(ctx, ccvs)
+	executeDisclosures, err := c.GetDisclosuresForExecution(ctx, encodedMessageHex, ccvs)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get disclosures for execution: %w", err)
 	}
+	disclosedContracts := executeDisclosures.DisclosedContracts
 	tokenTransferArg := &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}
 	if message.TokenTransfer != nil {
 		transferFactoryCID, transferFactoryDisclosures, transferFactoryChoiceContext, tfErr := c.resolveTransferFactoryForExecute(ctx, participant, executingParty, message)
@@ -397,32 +202,18 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("resolve transfer factory for execute: %w", tfErr)
 		}
 		disclosedContracts = append(disclosedContracts, transferFactoryDisclosures...)
-		tokenPoolCID, poolExtraContext, poolOwner, instrumentAdmin, instrumentID, resolveErr := c.resolvePoolContextForExecute(ctx, participant, message)
-		if resolveErr != nil {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("resolve token pool context for execute: %w", resolveErr)
+		if executeDisclosures.TokenPoolContractID == nil {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing token pool disclosure from EDS")
 		}
-		holdingContracts, listErr := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
-			PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
-			ModuleName: "Splice.Api.Token.HoldingV1",
-			EntityName: "Holding",
-		})
-		if listErr != nil {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("list active token holdings: %w", listErr)
+		if executeDisclosures.PoolExtraContext == nil {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing pool extra context from EDS")
 		}
-		holdingCIDs, holdingDisclosures := selectUnlockedHoldingCIDs(holdingContracts, poolOwner, instrumentAdmin, instrumentID)
-		if len(holdingCIDs) == 0 {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing unlocked token pool holdings for pool owner %s", poolOwner)
-		}
-		disclosedContracts = append(disclosedContracts, holdingDisclosures...)
-		tokenPoolHoldingValues := make([]*apiv2.Value, 0, len(holdingCIDs))
-		for _, cid := range holdingCIDs {
-			tokenPoolHoldingValues = append(tokenPoolHoldingValues, &apiv2.Value{
-				Sum: &apiv2.Value_ContractId{ContractId: string(cid)},
-			})
+		if len(executeDisclosures.TokenPoolHoldingsContractIDs) == 0 {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing token pool holdings from EDS")
 		}
 
 		tokenTransferRecord := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-			{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: tokenPoolCID}}},
+			{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: executeDisclosures.TokenPoolContractID.ContractId}}},
 			{Label: "tokenReceiverParty", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: executingParty}}},
 			{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 				{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: string(transferFactoryCID)}}},
@@ -430,9 +221,9 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					Context: transferFactoryChoiceContext,
 					Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
 				})},
-				{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: tokenPoolHoldingValues}}}},
+				{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: executeDisclosures.TokenPoolHoldingsContractIDs}}}},
 			}}}}},
-			{Label: "poolExtraContext", Value: poolExtraContext},
+			{Label: "poolExtraContext", Value: executeDisclosures.PoolExtraContext},
 		}}}}
 		tokenTransferArg = &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: tokenTransferRecord}}
 	}
@@ -462,7 +253,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
 	}}}}
 	ccvElements := make([]*apiv2.Value, len(verifiers))
-	for i, ccvCid := range ccvContractIDs {
+	for i, ccvCid := range executeDisclosures.CCVContractIDs {
 		ccvElements[i] = &apiv2.Value{
 			Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 				{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvCid}},
@@ -480,7 +271,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					ContractId: receiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: choiceContext},
+						{Label: "context", Value: executeDisclosures.ChoiceContext},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: tokenTransferArg}},
@@ -507,7 +298,11 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 			}
 		}
 		if pendingTransferInstructionCID != "" {
-			if err := c.acceptPendingTransferInstruction(ctx, participant, executingParty, pendingTransferInstructionCID); err != nil {
+			transferClient, err := newTransferInstructionClient(participant)
+			if err != nil {
+				return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("create transfer instruction client: %w", err)
+			}
+			if err := testhelpers.AcceptPendingTransferInstruction(ctx, participant, transferClient, executingParty, pendingTransferInstructionCID); err != nil {
 				return cciptestinterfaces.ExecutionStateChangedEvent{}, err
 			}
 		}
@@ -618,102 +413,4 @@ func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfa
 		State:               executionState,
 		ReturnData:          returnData,
 	}, nil
-}
-
-// This is copied from chainlink-canton, replace with EDS client once available.
-func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, error) {
-	values, ok := choiceContextData["values"].(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("no values found in choice context")
-	}
-
-	// ref: https://docs.digitalasset.com/build/3.5/reference/json-api/lf-value-specification.html
-	// AnyValue is a variant
-	fields := make([]*apiv2.TextMap_Entry, 0, len(values))
-	for k, v := range values {
-		f := v.(map[string]any)
-		tag := f["tag"].(string)
-		rawValue := f["value"]
-
-		var value *apiv2.Value
-		switch tag {
-		case "AV_Text":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Text value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Text{Text: valueString}}
-		case "AV_Int":
-			// JSON numbers come as float64
-			valueFloat, ok := rawValue.(float64)
-			if !ok {
-				return nil, fmt.Errorf("AV_Int value is not a number: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}
-		case "AV_Decimal":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Decimal value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: valueString}}
-		case "AV_Bool":
-			valueBool, ok := rawValue.(bool)
-			if !ok {
-				return nil, fmt.Errorf("AV_Bool value is not a bool: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: valueBool}}
-		case "AV_Date":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Date value is not a string: %T", rawValue)
-			}
-			t, err := time.Parse(time.RFC3339, valueString)
-			if err != nil {
-				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Date{Date: int32(t.Unix() / 86400)}} //nolint:gosec
-		case "AV_Time":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Time value is not a string: %T", rawValue)
-			}
-			t, err := time.Parse(time.RFC3339, valueString)
-			if err != nil {
-				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: t.UnixMicro()}}
-		case "AV_RelTime":
-			valueFloat, ok := rawValue.(float64)
-			if !ok {
-				return nil, fmt.Errorf("AV_RelTime value is not a number: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}},
-			}}}}
-		case "AV_ContractId":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_ContractId value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: valueString}}
-		default:
-			// Add lists and maps
-			return nil, fmt.Errorf("unimplemented tag: %v", tag)
-		}
-
-		fields = append(fields, &apiv2.TextMap_Entry{
-			Key: k,
-			Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-				Constructor: tag,
-				Value:       value,
-			}}},
-		})
-	}
-
-	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{
-			Label: "values",
-			Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: fields}}},
-		},
-	}}}}, nil
 }

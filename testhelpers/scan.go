@@ -10,8 +10,11 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
 func TemplateIdFromString(s string) (*apiv2.Identifier, error) {
@@ -90,4 +93,47 @@ func GetFirstOpenMiningRound(ctx context.Context, scanProxyClient scanProxy.Clie
 	}
 
 	return nil, fmt.Errorf("failed to find open mining round contract")
+}
+
+func NewValidatorAPIClients(
+	participant canton.Participant,
+) (
+	scanProxy.ClientWithResponsesInterface,
+	tokenMetadataV1.ClientWithResponsesInterface,
+	transferInstructionV1.ClientWithResponsesInterface,
+	error,
+) {
+	tokenSource := participant.TokenSource
+	interceptor := func(ctx context.Context, req *http.Request) error {
+		token, err := tokenSource.Token()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve token: %w", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+		return nil
+	}
+
+	scanProxyClient, err := scanProxy.NewClientWithResponses(
+		participant.Endpoints.ValidatorAPIURL,
+		scanProxy.WithRequestEditorFn(interceptor),
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create scan proxy client: %w", err)
+	}
+	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(
+		fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL),
+		tokenMetadataV1.WithRequestEditorFn(interceptor),
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create token metadata client: %w", err)
+	}
+	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(
+		fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL),
+		transferInstructionV1.WithRequestEditorFn(interceptor),
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create transfer instruction client: %w", err)
+	}
+
+	return scanProxyClient, tokenMetadataClient, transferInstructionClient, nil
 }

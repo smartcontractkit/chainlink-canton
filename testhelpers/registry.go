@@ -14,6 +14,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
@@ -116,6 +117,37 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 	}}}}, nil
 }
 
+// ExtractChoiceContextValues converts a Splice ChoiceContext proto value into a TEXTMAP
+// suitable for use as TokenInput.ExtraArgs.Context.Values.
+func ExtractChoiceContextValues(choiceContext *apiv2.Value) types.TEXTMAP {
+	contextValues := make(types.TEXTMAP)
+	if rec := choiceContext.GetRecord(); rec != nil && len(rec.Fields) > 0 {
+		valuesField := rec.Fields[0]
+		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
+			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
+				if v := entry.GetValue().GetVariant(); v != nil {
+					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
+				} else if entry.GetValue().GetText() != "" {
+					txt := types.TEXT(entry.GetValue().GetText())
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
+				}
+			}
+		}
+	}
+
+	return contextValues
+}
+
+var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+	{
+		Label: "values",
+		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
+	},
+}}}}
+
+// GetRegistryAdmin reads the already-provisioned token registry admin (AdminId)
+// from scan-proxy registry info. It does not register or mutate admin state.
 func GetRegistryAdmin(ctx context.Context, metadataClient tokenMetadataV1.ClientWithResponsesInterface) (string, error) {
 	registryInfoResponse, err := metadataClient.GetRegistryInfoWithResponse(ctx)
 	if err != nil {
@@ -188,9 +220,72 @@ func GetTransferFactory(ctx context.Context, transferInstructionClient transferI
 		return "", nil, nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
 
-	factoryCid := transferFactoryResponse.JSON200.FactoryId
+	return transferFactoryResponse.JSON200.FactoryId, disclosedContracts, choiceContext, nil
+}
 
-	return factoryCid, disclosedContracts, choiceContext, nil
+func AcceptPendingTransferInstruction(
+	ctx context.Context,
+	participant canton.Participant,
+	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface,
+	executingParty string,
+	pendingTransferInstructionCID string,
+) error {
+	acceptContextResp, err := transferInstructionClient.GetTransferInstructionAcceptContextWithResponse(ctx, pendingTransferInstructionCID, transferInstructionV1.GetChoiceContextRequest{})
+	if err != nil {
+		return fmt.Errorf("get transfer instruction accept context: %w", err)
+	}
+	if acceptContextResp.StatusCode() != http.StatusOK || acceptContextResp.JSON200 == nil {
+		return fmt.Errorf("unexpected transfer instruction accept context status=%d", acceptContextResp.StatusCode())
+	}
+
+	acceptDisclosures := make([]*apiv2.DisclosedContract, 0, len(acceptContextResp.JSON200.DisclosedContracts))
+	for _, contract := range acceptContextResp.JSON200.DisclosedContracts {
+		id, err := TemplateIdFromString(contract.TemplateId)
+		if err != nil {
+			return fmt.Errorf("parse accept-context template id: %w", err)
+		}
+		createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
+		if err != nil {
+			return fmt.Errorf("decode accept-context created event blob: %w", err)
+		}
+		acceptDisclosures = append(acceptDisclosures, &apiv2.DisclosedContract{
+			TemplateId:       id,
+			ContractId:       contract.ContractId,
+			CreatedEventBlob: createdEventBlob,
+			SynchronizerId:   contract.SynchronizerId,
+		})
+	}
+
+	acceptContext, err := ChoiceContextFromData(acceptContextResp.JSON200.ChoiceContextData)
+	if err != nil {
+		return fmt.Errorf("convert transfer instruction accept context: %w", err)
+	}
+
+	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.NewString(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferInstruction"},
+					ContractId: pendingTransferInstructionCID,
+					Choice:     "TransferInstruction_Accept",
+					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "context", Value: acceptContext},
+							{Label: "meta", Value: emptyMetadata},
+						}}}}},
+					}}}},
+				}},
+			}},
+			ActAs:              []string{executingParty},
+			DisclosedContracts: acceptDisclosures,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("accept pending transfer instruction: %w", err)
+	}
+
+	return nil
 }
 
 func MintAMT(

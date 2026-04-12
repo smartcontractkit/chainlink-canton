@@ -1,13 +1,10 @@
 package tests
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"math/big"
-	"net/http"
 	"slices"
 	"strconv"
 	"strings"
@@ -59,9 +56,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	// Import to register adapters
@@ -134,22 +128,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	// Create Scan and Registry API clients
 	// Using the scanProxy endpoint of the 0-th participant, all participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
-	tokenSource := ccipParticipant.TokenSource
-	interceptor := func(ctx context.Context, req *http.Request) error {
-		token, err := tokenSource.Token()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve token: %w", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-
-		return nil
-	}
-	scanProxyClient, err := scanProxy.NewClientWithResponses(ccipParticipant.Endpoints.ValidatorAPIURL, scanProxy.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create scan proxy client")
-	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create token metadata client")
-	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), transferInstructionV1.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create transfer instruction client")
+	scanProxyClient, tokenMetadataClient, transferInstructionClient, err := testhelpers.NewValidatorAPIClients(ccipParticipant)
+	require.NoError(t, err, "Failed to create validator API clients")
 
 	// Setup Amulet token as fee token
 	// Get registry admin for Amulet tokens
@@ -633,7 +613,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 
 	// Extract transfer factory context values (e.g. amulet-rules) for the fee token input
-	transferFactoryContextValues := extractChoiceContextValues(choiceContext)
+	transferFactoryContextValues := testhelpers.ExtractChoiceContextValues(choiceContext)
 
 	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
 		Context: splice_api_token_metadata_v1.ChoiceContext{
@@ -652,7 +632,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
 	require.NoError(t, err, "failed to get token transfer factory")
-	tokenTransferContextValues := extractChoiceContextValues(tokenTransferChoiceContext)
+	tokenTransferContextValues := testhelpers.ExtractChoiceContextValues(tokenTransferChoiceContext)
 
 	// This transfer preapproval must be specified for transfer to the pool's owner to be automatically be accepted.
 	// The pool's EDS must also provide explicit disclosures for this preapproval contract, else the send will fail.
@@ -786,7 +766,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	feeTokenInput = interfaces.TokenInput{
 		TransferFactory: types.CONTRACT_ID(transferFactoryCid),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: splice_api_token_metadata_v1.ChoiceContext{Values: extractChoiceContextValues(choiceContext)},
+			Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(choiceContext)},
 			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
 		},
 		TokenPoolHoldings: []types.CONTRACT_ID{},
@@ -797,7 +777,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to re-fetch token transfer factory")
 	disclosedPreapproval, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#splice-amulet", ModuleName: "Splice.AmuletRules", EntityName: "TransferPreapproval"})
 	require.NoError(t, err, "failed to re-fetch disclosed TransferPreapproval")
-	tokenTransferContextValues = extractChoiceContextValues(tokenTransferChoiceContext)
+	tokenTransferContextValues = testhelpers.ExtractChoiceContextValues(tokenTransferChoiceContext)
 	preapprovalCid = types.CONTRACT_ID(disclosedPreapproval.ContractId)
 	tokenTransferContextValues["transfer-preapproval"] = splice_api_token_metadata_v1.AnyValue{AVContractId: &preapprovalCid}
 	sendArgs.TokenTransferInput.TokenInput = interfaces.TokenInput{
@@ -912,28 +892,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
-}
-
-// extractChoiceContextValues converts a Splice ChoiceContext proto value into a TEXTMAP
-// suitable for use as TokenInput.ExtraArgs.Context.Values.
-func extractChoiceContextValues(choiceContext *apiv2.Value) types.TEXTMAP {
-	contextValues := make(types.TEXTMAP)
-	if rec := choiceContext.GetRecord(); rec != nil && len(rec.Fields) > 0 {
-		valuesField := rec.Fields[0]
-		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
-			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
-				if v := entry.GetValue().GetVariant(); v != nil {
-					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
-					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
-				} else if entry.GetValue().GetText() != "" {
-					txt := types.TEXT(entry.GetValue().GetText())
-					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
-				}
-			}
-		}
-	}
-
-	return contextValues
 }
 
 // extractTokenTransferAmountFromEncodedMessageHex decodes encodedMessage and returns
