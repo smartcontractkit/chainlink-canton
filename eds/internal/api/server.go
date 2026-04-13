@@ -112,30 +112,37 @@ func (s Server) CcipExecute(c *gin.Context) {
 		tokenPoolHoldings *edsv1.DisclosedContract
 	)
 	if disclosures.TokenPool != nil {
-		// If TokenPool is not nil then all of these should be non-nil as well.
 		tokenPoolDisclosure := convertDisclosedContract(disclosures.TokenPool)
 		tokenPoolHoldingsDisclosure := convertDisclosedContract(disclosures.TokenPoolHolding)
 		disclosedContracts = append(disclosedContracts,
 			tokenPoolDisclosure,
 			tokenPoolHoldingsDisclosure,
 			convertDisclosedContract(disclosures.InboundRateLimiter),
-			convertDisclosedContract(disclosures.InboundCustomBlockConfirmationsRateLimiter),
 			convertDisclosedContract(disclosures.OutboundRateLimiter),
 		)
 
 		// update the poolExtraContext with the relevant data.
+		values := map[string]any{
+			"rate-limiter": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosures.InboundRateLimiter.GetContractId(),
+			},
+			// TODO: outbound rate limiter not needed?
+		}
+		if disclosures.InboundCustomBlockConfirmationsRateLimiter != nil {
+			disclosedContracts = append(disclosedContracts, convertDisclosedContract(disclosures.InboundCustomBlockConfirmationsRateLimiter))
+			values["inbound-custom-block-confirmations-rate-limiter"] = map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosures.InboundCustomBlockConfirmationsRateLimiter.GetContractId(),
+			}
+		}
 		poolExtraContext = map[string]any{
 			"values": map[string]any{
-				"rate-limiter": map[string]any{
-					"tag":   "AV_ContractId",
-					"value": disclosures.InboundRateLimiter.GetContractId(),
-				},
-				"inbound-custom-block-confirmations-rate-limiter": map[string]any{
-					"tag":   "AV_ContractId",
-					"value": disclosures.InboundCustomBlockConfirmationsRateLimiter.GetContractId(),
-				},
-				// TODO: outbound rate limiter not needed?
+				"rate-limiter": values["rate-limiter"],
 			},
+		}
+		if inboundCustom, ok := values["inbound-custom-block-confirmations-rate-limiter"]; ok {
+			poolExtraContext["values"].(map[string]any)["inbound-custom-block-confirmations-rate-limiter"] = inboundCustom
 		}
 		tokenPool = &tokenPoolDisclosure
 		tokenPoolHoldings = &tokenPoolHoldingsDisclosure

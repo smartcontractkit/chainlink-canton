@@ -37,12 +37,12 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260408173936-5b7036b83fc5
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260408173936-5b7036b83fc5
-	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260413083003-e6b9f3084c13
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260413083003-e6b9f3084c13
+	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260413182303-03c12fb34ee9
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260413182303-03c12fb34ee9
 	github.com/smartcontractkit/chainlink-common v0.11.1
 	github.com/smartcontractkit/chainlink-deployments-framework v0.94.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.15
-	github.com/smartcontractkit/go-daml v0.6.1-0.20260413061426-a18238d0246a
+	github.com/smartcontractkit/go-daml v0.6.1-0.20260413170941-75a7c4be0cd9
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
 	go.opentelemetry.io/otel v1.43.0
