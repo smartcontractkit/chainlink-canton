@@ -129,20 +129,16 @@ func (s Server) CcipExecute(c *gin.Context) {
 			},
 			// TODO: outbound rate limiter not needed?
 		}
-		if disclosures.InboundCustomBlockConfirmationsRateLimiter != nil {
-			disclosedContracts = append(disclosedContracts, convertDisclosedContract(disclosures.InboundCustomBlockConfirmationsRateLimiter))
-			values["inbound-custom-block-confirmations-rate-limiter"] = map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.InboundCustomBlockConfirmationsRateLimiter.GetContractId(),
-			}
+		disclosedContracts = append(disclosedContracts, convertDisclosedContract(disclosures.InboundCustomBlockConfirmationsRateLimiter))
+		values["inbound-custom-block-confirmations-rate-limiter"] = map[string]any{
+			"tag":   "AV_ContractId",
+			"value": disclosures.InboundCustomBlockConfirmationsRateLimiter.GetContractId(),
 		}
 		poolExtraContext = map[string]any{
 			"values": map[string]any{
 				"rate-limiter": values["rate-limiter"],
+				"inbound-custom-block-confirmations-rate-limiter": values["inbound-custom-block-confirmations-rate-limiter"],
 			},
-		}
-		if inboundCustom, ok := values["inbound-custom-block-confirmations-rate-limiter"]; ok {
-			poolExtraContext["values"].(map[string]any)["inbound-custom-block-confirmations-rate-limiter"] = inboundCustom
 		}
 		tokenPool = &tokenPoolDisclosure
 		tokenPoolHoldings = &tokenPoolHoldingsDisclosure

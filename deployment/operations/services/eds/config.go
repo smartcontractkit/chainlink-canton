@@ -155,6 +155,9 @@ var BuildConfig = operations.NewOperation(
 						break
 					}
 				}
+				if customRLRef == nil {
+					return GenerateEDSConfigOutput{}, fmt.Errorf("missing custom inbound rate limiter ref for token pool %s remote %s", ref.Address, remoteSelector)
+				}
 				if outboundRLRef == nil {
 					return GenerateEDSConfigOutput{}, fmt.Errorf("missing outbound rate limiter ref for token pool %s remote %s", ref.Address, remoteSelector)
 				}
@@ -169,14 +172,8 @@ var BuildConfig = operations.NewOperation(
 						InstanceAddress: contracts.HexToInstanceAddress(inboundRLRef.Address),
 					},
 					InboundCustomBlockConfirmationsRateLimiter: edsConfig.ContractIdentifier{
-						PartyID: participant.PartyID,
-						InstanceAddress: func() contracts.InstanceAddress {
-							if customRLRef == nil {
-								return contracts.InstanceAddress{}
-							}
-
-							return contracts.HexToInstanceAddress(customRLRef.Address)
-						}(),
+						PartyID:         participant.PartyID,
+						InstanceAddress: contracts.HexToInstanceAddress(customRLRef.Address),
 					},
 					OutboundRateLimiter: edsConfig.ContractIdentifier{
 						PartyID:         participant.PartyID,

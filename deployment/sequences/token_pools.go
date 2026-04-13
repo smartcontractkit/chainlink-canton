@@ -189,25 +189,21 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			}
 			out.Addresses = append(out.Addresses, outboundRef, inboundRef)
 
-			customInboundRaw := mcms.RawInstanceAddress{}
-			if inboundCustomCfg.IsEnabled {
-				customRef, customRaw, customErr := deployTokenPoolRateLimiter(
-					b,
-					cantonChain,
-					input.ExistingDataStore,
-					parsedPool,
-					input.TokenPoolAddress,
-					remoteSelectorKey,
-					"inbound-custom",
-					inboundCustomCfg,
-					common.RateLimitModeRateLimitMode_CustomFinality,
-				)
-				if customErr != nil {
-					return out, fmt.Errorf("deploy custom inbound rate limiter for remote chain %d: %w", remoteSelector, customErr)
-				}
-				out.Addresses = append(out.Addresses, customRef)
-				customInboundRaw = customRaw
+			customRef, customInboundRaw, err := deployTokenPoolRateLimiter(
+				b,
+				cantonChain,
+				input.ExistingDataStore,
+				parsedPool,
+				input.TokenPoolAddress,
+				remoteSelectorKey,
+				"inbound-custom",
+				inboundCustomCfg,
+				common.RateLimitModeRateLimitMode_CustomFinality,
+			)
+			if err != nil {
+				return out, fmt.Errorf("deploy custom inbound rate limiter for remote chain %d: %w", remoteSelector, err)
 			}
+			out.Addresses = append(out.Addresses, customRef)
 
 			remoteFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
 			if err != nil {

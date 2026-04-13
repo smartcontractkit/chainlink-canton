@@ -335,12 +335,9 @@ func (s *DisclosureService) getTokenPoolRelatedDisclosures(ctx context.Context, 
 		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get inbound rate limiter disclosure: %w", err)
 	}
 
-	var inboundCustomBlockConfirmationsRateLimiterDisclosure *apiv2.DisclosedContract
-	if inboundCustomBlockConfirmationsRateLimiterInstanceAddress != (contracts.InstanceAddress{}) {
-		inboundCustomBlockConfirmationsRateLimiterDisclosure, err = s.GetDisclosure(ctx, inboundCustomBlockConfirmationsRateLimiterInstanceAddress)
-		if err != nil {
-			return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get inbound custom block confirmations rate limiter disclosure: %w", err)
-		}
+	inboundCustomBlockConfirmationsRateLimiterDisclosure, err := s.GetDisclosure(ctx, inboundCustomBlockConfirmationsRateLimiterInstanceAddress)
+	if err != nil {
+		return tokenPoolRelatedDisclosures{}, fmt.Errorf("can't get inbound custom block confirmations rate limiter disclosure: %w", err)
 	}
 
 	outboundRateLimiterDisclosure, err := s.GetDisclosure(ctx, outboundRateLimiterInstanceAddress)
@@ -391,13 +388,11 @@ func getRateLimiterInstanceAddresses(remoteChainSelector uint64, tpCreatedEvent 
 	}
 	inboundRateLimiterInstanceAddress = rawInboundRateLimiterInstanceAddress.InstanceAddress()
 
-	if unpack := string(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack); unpack != "" {
-		rawInboundCustomBlockConfirmationsRateLimiterInstanceAddress, err := contracts.RawInstanceAddressFromString(unpack)
-		if err != nil {
-			return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to parse inbound custom block confirmations rate limiter instance address: %w", err)
-		}
-		inboundCustomBlockConfirmationsRateLimiterInstanceAddress = rawInboundCustomBlockConfirmationsRateLimiterInstanceAddress.InstanceAddress()
+	rawInboundCustomBlockConfirmationsRateLimiterInstanceAddress, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack))
+	if err != nil {
+		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to parse inbound custom block confirmations rate limiter instance address: %w", err)
 	}
+	inboundCustomBlockConfirmationsRateLimiterInstanceAddress = rawInboundCustomBlockConfirmationsRateLimiterInstanceAddress.InstanceAddress()
 	rawOutboundRateLimiterInstanceAddress, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.OutboundRateLimiter.Unpack))
 	if err != nil {
 		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to parse outbound rate limiter instance address: %w", err)
