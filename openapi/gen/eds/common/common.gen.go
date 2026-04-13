@@ -23,7 +23,7 @@ type Canton2AnyMessage struct {
 
 	// Executor The executor of the message, which determines the executor the message will be forwarded to on the source chain.
 	// If not specified, or if type is "", the message will be executed with the default executor on the remote chain.
-	// If type is "noExecutor", the message will not be executed automatically on the remote chain>.
+	// If type is "noExecutor", the message will not be executed automatically on the remote chain.
 	// If type is "withAddress", the message will be executed with an executor at the specified address.
 	Executor struct {
 		// Address An address which can be either a RawInstanceAddress or an InstanceAddress.
