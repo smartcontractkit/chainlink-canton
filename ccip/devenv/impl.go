@@ -1140,6 +1140,7 @@ func (c *Chain) buildTokenTransferSendInput(
 		return nil, nil, nil, fmt.Errorf("expected exactly one LockReleaseTokenPool, got %d", len(poolRefs))
 	}
 	poolRef := poolRefs[0]
+	// TODO: replace with EDS ccipSend token disclosure whenever available
 	activePool, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
 		participant.LedgerServices.State,
