@@ -82,6 +82,7 @@ func (c *Chain) resolveTransferFactoryForExecute(
 		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("resolve transfer factory from scan-proxy: %w", err)
 	}
 	transferFactoryCID := types.CONTRACT_ID(transferFactoryCIDRaw)
+
 	return transferFactoryCID, transferFactoryDisclosures, splice_api_token_metadata_v1.ChoiceContext{
 		Values: testhelpers.ExtractChoiceContextValues(transferFactoryChoiceContextValue),
 	}, nil

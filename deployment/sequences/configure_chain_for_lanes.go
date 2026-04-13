@@ -295,5 +295,6 @@ func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]feequoter.T
 			UsdPerToken: types.NUMERIC(price.String()),
 		})
 	}
+
 	return updates, nil
 }

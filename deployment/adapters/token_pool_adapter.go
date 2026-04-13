@@ -50,6 +50,7 @@ func (c CantonTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSe
 	if err != nil || len(addrBytes) == 0 {
 		return nil, fmt.Errorf("invalid precomputed token address %q for qualifier %q", addr, poolRef.Qualifier)
 	}
+
 	return addrBytes, nil
 }
 

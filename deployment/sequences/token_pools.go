@@ -107,6 +107,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 					if strings.EqualFold(ccvRef.Address, inboundCCVAddress) {
 						refCopy := ccvRef
 						matchedRef = &refCopy
+
 						break
 					}
 				}
@@ -127,6 +128,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 					if strings.EqualFold(ccvRef.Address, outboundCCVAddress) {
 						refCopy := ccvRef
 						matchedRef = &refCopy
+
 						break
 					}
 				}
@@ -258,6 +260,7 @@ var SetTokenPoolRateLimits = operations.NewSequence(
 		_ = b
 		_ = chains
 		_ = input
+
 		return ccipsequences.OnChainOutput{}, fmt.Errorf(
 			"SetTokenPoolRateLimits is disabled: initial Canton rate limiter setup happens during ConfigureTokenForTransfers",
 		)
@@ -339,6 +342,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			if err != nil {
 				return datastore.AddressRef{}, "", fmt.Errorf("resolve %s raw address: %w", name, err)
 			}
+
 			return ref, raw, nil
 		}
 
@@ -418,6 +422,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			Qualifier:     qualifier,
 			ChainSelector: input.ChainSelector,
 		}
+
 		return ccipsequences.OnChainOutput{
 			Addresses: []datastore.AddressRef{
 				deployReport.Output,

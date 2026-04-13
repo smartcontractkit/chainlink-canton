@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"math/big"
 	"os"
 	"strings"
@@ -84,6 +85,7 @@ var (
 )
 
 const (
+	// #nosec G101 -- fixed test datastore qualifier, not a credential
 	cantonDestTokenQualifier = "TEST (LockReleaseTokenPool 2.0.0 [default] to BurnMintTokenPool 2.0.0 [default])"
 )
 
@@ -502,6 +504,7 @@ func (c *Chain) GetTokenTransferConfigs(
 			ref.Version,
 			ref.Qualifier,
 		))
+
 		return err == nil
 	}
 	merged := make(map[poolConfigKey]tokenscore.TokenTransferConfig)
@@ -575,9 +578,7 @@ func (c *Chain) GetTokenTransferConfigs(
 				qualifier:   cfg.TokenPoolRef.Qualifier,
 			}
 			if existing, ok := merged[key]; ok {
-				for remoteSelector, remoteCfg := range cfg.RemoteChains {
-					existing.RemoteChains[remoteSelector] = remoteCfg
-				}
+				maps.Copy(existing.RemoteChains, cfg.RemoteChains)
 				merged[key] = existing
 			} else {
 				merged[key] = cfg
@@ -589,6 +590,7 @@ func (c *Chain) GetTokenTransferConfigs(
 	for _, cfg := range merged {
 		configs = append(configs, cfg)
 	}
+
 	return configs, nil
 }
 
@@ -690,6 +692,7 @@ func (c *Chain) GetEOAReceiverAddress() (protocol.UnknownAddress, error) {
 	}
 
 	receiver := contracts.HashedPartyFromString(c.chain.Participants[0].PartyID)
+
 	return protocol.UnknownAddress(receiver.Bytes()), nil
 }
 
@@ -726,6 +729,7 @@ func (c *Chain) GetTokenBalance(ctx context.Context, address, tokenAddress proto
 			if bytes.Equal(contracts.HashedPartyFromString(p.PartyID).Bytes(), []byte(address)) {
 				participant = p
 				ownerParty = p.PartyID
+
 				break
 			}
 		}
@@ -889,11 +893,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			CcvCid:          types.CONTRACT_ID(sendDisclosures.CCVContractIDs[i].ContractId),
 			CcvExtraContext: common.CCIPContext{},
 		})
-
 	}
 
 	hasTokenTransfer := fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
-	feeSenderInputCIDs := []types.CONTRACT_ID{}
+	var feeSenderInputCIDs []types.CONTRACT_ID
 	var preferredTokenHoldingCID types.CONTRACT_ID
 	var mintedHoldingDisclosures []*ledgerv2.DisclosedContract
 	if hasTokenTransfer {
@@ -957,7 +960,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			registryAdmin,
 			party,
 			dest,
-			types.CONTRACT_ID(preferredTokenHoldingCID),
+			preferredTokenHoldingCID,
 		)
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, err

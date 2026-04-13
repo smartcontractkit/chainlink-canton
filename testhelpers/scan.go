@@ -110,6 +110,7 @@ func NewValidatorAPIClients(
 			return fmt.Errorf("failed to retrieve token: %w", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
 		return nil
 	}
 

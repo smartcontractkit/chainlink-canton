@@ -59,6 +59,7 @@ func assertMessageForEVM2Canton(
 	require.Len(t, result.IndexedVerifications.Results, 1)
 
 	vr := result.IndexedVerifications.Results[0].VerifierResult
+
 	return vr.Message, vr.VerifierDestAddress, vr.CCVData
 }
 
@@ -81,6 +82,7 @@ func GetHoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
 		v, _ := balance.Float64()
 		total += v
 	}
+
 	return total
 }
 
@@ -125,7 +127,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	_, opsEnv, err := ccv.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	require.NoError(t, err)
 	var receiverParticipant canton.Participant
-	if chains := opsEnv.BlockChains.CantonChains(); chains[dstSelector].Participants != nil && len(chains[dstSelector].Participants) > 0 {
+	if chains := opsEnv.BlockChains.CantonChains(); len(chains[dstSelector].Participants) > 0 {
 		receiverParticipant = chains[dstSelector].Participants[0]
 	}
 	require.NotEmpty(t, receiverParticipant.PartyID)
@@ -239,7 +241,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NotNil(t, message.TokenTransfer)
 		require.NotNil(t, message.TokenTransfer.Amount)
 		t.Logf("Canton token transfer amount from verifier result: %s", message.TokenTransfer.Amount.String())
-		require.Greater(t, message.TokenTransfer.Amount.Cmp(big.NewInt(0)), 0, "token transfer amount must be positive")
+		require.Positive(t, message.TokenTransfer.Amount.Cmp(big.NewInt(0)), "token transfer amount must be positive")
 		executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(subtestCtx, message, 0, []protocol.UnknownAddress{verifierDestAddress}, [][]byte{ccvData})
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
