@@ -53,14 +53,9 @@ module MCMS.Codec
   , decodeBytesHexAt
   , encodeBytesHexList
   , decodeBytesHexList
-  -- Decimal encoding (as text)
+  -- Decimal encoding (shift-based)
   , encodeDecimal
   , decodeDecimalAt
-  , parseDecimal
-  , parseIntSafe
-  , parseDigitsUnsafe
-  , charToDigitInt
-  , pow10
   -- Party encoding
   , encodeParty
   , decodePartyAt
@@ -72,6 +67,7 @@ import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import qualified DA.Text as Text
 import DA.Optional (fromSome)
 import DA.Foldable ()
+import DA.Numeric (shift)
 import MCMS.Types (SignerInfo(..), Role(..), BlockedFunction(..), TimelockCall(..), intToRole)
 
 -- ===========================================================================
@@ -643,93 +639,26 @@ decodeBytesHexListHelper encoded offset remaining acc = do
 
 -- ===========================================================================
 -- DECIMAL ENCODING/DECODING
--- Format: [text representation of decimal]
+-- Format: [1 byte sign] [encodeNumeric0 of abs(d) shifted to Numeric 0]
+-- Encoding is lossless: shift multiplies by 10^10, packing all 10 fractional
+-- digits into the integer, which then round-trips through encodeNumeric0.
 -- ===========================================================================
 
--- | Encode Decimal as length-prefixed text
+-- | Encode Decimal as sign byte followed by shift-based Numeric 0 encoding
 encodeDecimal : Decimal -> BytesHex
-encodeDecimal d = encodeText (show d)
+encodeDecimal d =
+  let sign = if d < 0.0 then "01" else "00"
+      magnitude = shift (if d < 0.0 then negate d else d) : Numeric 0
+  in sign <> encodeNumeric0 magnitude
 
--- | Decode Decimal from length-prefixed text
+-- | Decode Decimal from sign byte followed by shift-based Numeric 0 encoding
 decodeDecimalAt : BytesHex -> Int -> Optional (Decimal, Int)
 decodeDecimalAt encoded offset = do
-  (text, newOffset) <- decodeText encoded offset
-  dec <- parseDecimal text
-  Some (dec, newOffset)
-
--- | Parse decimal from text (handles "123.456" format)
--- Check sign from original text to handle negative decimals correctly (e.g. "-0.3")
-parseDecimal : Text -> Optional Decimal
-parseDecimal text =
-  if Text.length text == 0 then None
-  else
-    let isNegative = Text.take 1 text == "-"
-        parts = Text.splitOn "." text
-    in case parts of
-      [intPart] -> do
-        intVal <- parseIntSafe intPart
-        Some (intToDecimal intVal)
-      [intPart, fracPart] -> do
-        intVal <- parseIntSafe intPart
-        if Text.length fracPart == 0 || not (allDigits fracPart)
-          then None
-          else
-            let fracLen = Text.length fracPart
-                fracVal = parseDigitsUnsafe fracPart 0
-                divisor = pow10 fracLen
-                frac = intToDecimal fracVal / intToDecimal divisor
-            in Some (if isNegative then intToDecimal intVal - frac
-                     else intToDecimal intVal + frac)
-      _ -> None
-
--- | Safe integer parsing - returns None on invalid input
-parseIntSafe : Text -> Optional Int
-parseIntSafe text =
-  if Text.length text == 0 then Some 0
-  else
-    let (negative, digits) =
-          if Text.take 1 text == "-"
-          then (True, Text.drop 1 text)
-          else (False, text)
-    in if Text.length digits == 0 || not (allDigits digits)
-       then None
-       else
-         let value = parseDigitsUnsafe digits 0
-         in Some (if negative then negate value else value)
-
--- | Check if all characters in text are digits
-allDigits : Text -> Bool
-allDigits text =
-  if Text.length text == 0 then True
-  else
-    let c = Text.take 1 text
-        rest = Text.drop 1 text
-    in isDigitChar c && allDigits rest
-
--- | Check if a single character is a digit
-isDigitChar : Text -> Bool
-isDigitChar c =
-  c == "0" || c == "1" || c == "2" || c == "3" || c == "4" ||
-  c == "5" || c == "6" || c == "7" || c == "8" || c == "9"
-
-parseDigitsUnsafe : Text -> Int -> Int
-parseDigitsUnsafe text acc =
-  if Text.length text == 0 then acc
-  else
-    let c = Text.take 1 text
-        rest = Text.drop 1 text
-        digit = charToDigitInt c
-    in parseDigitsUnsafe rest (acc * 10 + digit)
-
-charToDigitInt : Text -> Int
-charToDigitInt c = case c of
-  "0" -> 0; "1" -> 1; "2" -> 2; "3" -> 3; "4" -> 4
-  "5" -> 5; "6" -> 6; "7" -> 7; "8" -> 8; "9" -> 9
-  _ -> error ("Invalid digit: " <> c)
-
-pow10 : Int -> Int
-pow10 0 = 1
-pow10 n = 10 * pow10 (n - 1)
+  signHex <- extractBytes encoded offset 1
+  isNegative <- decodeBool signHex
+  (magnitude, newOffset) <- decodeNumeric0At encoded (offset + 1)
+  let d = shift magnitude : Decimal
+  Some (if isNegative then negate d else d, newOffset)
 
 -- ===========================================================================
 -- PARTY ENCODING/DECODING
