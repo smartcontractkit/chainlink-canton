@@ -52,6 +52,7 @@ components:
       properties:
         templateId:
           type: string
+          example: "7df46ed05b4ba4ab85f827623d5ab51180520060f2f44ccf7f373606e2b4228f:CCIP.FeeQuoter:FeeQuoter"
         contractId:
           $ref: "#/components/schemas/ContractId"
         createdEventBlob:
@@ -126,7 +127,7 @@ components:
           description: |
             The executor of the message, which determines the executor the message will be forwarded to on the source chain.
             If not specified, or if type is "", the message will be executed with the default executor on the remote chain.
-            If type is "noExecutor", the message will not be executed automatically on the remote chain>.
+            If type is "noExecutor", the message will not be executed automatically on the remote chain.
             If type is "withAddress", the message will be executed with an executor at the specified address.
           required:
             - type

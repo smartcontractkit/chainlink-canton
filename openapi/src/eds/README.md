@@ -121,7 +121,7 @@ destination chain.
 
 ### Overview
 
-Sending a message requires the following API calls:
+Sending a message from Canton requires the following API calls:
 
 1. (If the message includes as token transfer) The user needs to query the token pool API for the token's token pool to
    get the token pool disclosures along with a list of required CCVs for this token transfer.
@@ -203,7 +203,7 @@ sequenceDiagram
 
 ### Overview
 
-Executing a message requires the following API calls:
+Executing a message on Canton requires the following API calls:
 
 1. The user queries the global CCIP API, providing the encoded message itself and a list of addresses of all CCVs that
    have verified this message.
