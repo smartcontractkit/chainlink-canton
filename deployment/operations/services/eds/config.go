@@ -2,6 +2,7 @@ package eds
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -18,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
@@ -108,26 +110,80 @@ var BuildConfig = operations.NewOperation(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(lock_release_token_pool.ContractType)),
 		)
-		tokenPools := make([]edsConfig.TokenPoolContracts, len(refs))
-		for i, ref := range refs {
-			tokenPools[i] = edsConfig.TokenPoolContracts{
-				TokenPool: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
-				},
-				// TODO: use real addresses from the datastore, but how to properly get them?
-				InboundRateLimiter: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
-				},
-				InboundCustomBlockConfirmationsRateLimiter: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
-				},
-				OutboundRateLimiter: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress("0x0"),
-				},
+		filteredRefs := make([]datastore.AddressRef, 0, len(refs))
+		for _, ref := range refs {
+			if strings.Count(ref.Qualifier, "[default]") != 2 {
+				continue
+			}
+			filteredRefs = append(filteredRefs, ref)
+		}
+		refs = filteredRefs
+		inboundRLRefs := env.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(input.ChainSelector),
+			datastore.AddressRefByType(datastore.ContractType(rate_limiter.ContractTypeInbound)),
+		)
+		outboundRLRefs := env.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(input.ChainSelector),
+			datastore.AddressRefByType(datastore.ContractType(rate_limiter.ContractTypeOutbound)),
+		)
+		tokenPools := make([]edsConfig.TokenPoolContracts, 0, len(refs))
+		for _, ref := range refs {
+			inboundPrefix := ref.Address + "-inbound-"
+			customPrefix := ref.Address + "-inbound-custom-"
+			outboundPrefix := ref.Address + "-outbound-"
+			foundRemote := false
+
+			for _, inboundRLRef := range inboundRLRefs {
+				if strings.HasPrefix(inboundRLRef.Qualifier, customPrefix) || !strings.HasPrefix(inboundRLRef.Qualifier, inboundPrefix) {
+					continue
+				}
+
+				foundRemote = true
+				remoteSelector := strings.TrimPrefix(inboundRLRef.Qualifier, inboundPrefix)
+
+				var customRLRef, outboundRLRef *datastore.AddressRef
+				for i := range inboundRLRefs {
+					if inboundRLRefs[i].Qualifier == customPrefix+remoteSelector {
+						customRLRef = &inboundRLRefs[i]
+						break
+					}
+				}
+				if customRLRef == nil {
+					return GenerateEDSConfigOutput{}, fmt.Errorf("missing custom inbound rate limiter ref for token pool %s remote %s", ref.Address, remoteSelector)
+				}
+
+				for i := range outboundRLRefs {
+					if outboundRLRefs[i].Qualifier == outboundPrefix+remoteSelector {
+						outboundRLRef = &outboundRLRefs[i]
+						break
+					}
+				}
+				if outboundRLRef == nil {
+					return GenerateEDSConfigOutput{}, fmt.Errorf("missing outbound rate limiter ref for token pool %s remote %s", ref.Address, remoteSelector)
+				}
+
+				tokenPools = append(tokenPools, edsConfig.TokenPoolContracts{
+					TokenPool: edsConfig.ContractIdentifier{
+						PartyID:         participant.PartyID,
+						InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+					},
+					InboundRateLimiter: edsConfig.ContractIdentifier{
+						PartyID:         participant.PartyID,
+						InstanceAddress: contracts.HexToInstanceAddress(inboundRLRef.Address),
+					},
+					InboundCustomBlockConfirmationsRateLimiter: edsConfig.ContractIdentifier{
+						PartyID:         participant.PartyID,
+						InstanceAddress: contracts.HexToInstanceAddress(customRLRef.Address),
+					},
+					OutboundRateLimiter: edsConfig.ContractIdentifier{
+						PartyID:         participant.PartyID,
+						InstanceAddress: contracts.HexToInstanceAddress(outboundRLRef.Address),
+					},
+				})
+			}
+
+			if !foundRemote {
+				return GenerateEDSConfigOutput{}, fmt.Errorf("no rate limiter refs found for token pool %s", ref.Address)
 			}
 		}
 

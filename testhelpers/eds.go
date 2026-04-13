@@ -111,6 +111,11 @@ func GetCCIPExecuteDisclosures(
 	// TODO: is there a cleaner approach to this?
 	var poolExtraContext *apiv2.Value
 	if len(resp.JSON200.PoolExtraContext) > 0 {
+		if values, ok := resp.JSON200.PoolExtraContext["values"].(map[string]any); ok {
+			if inboundRateLimiter, ok := values["rate-limiter"]; ok {
+				values["inbound-rate-limiter"] = inboundRateLimiter
+			}
+		}
 		poolExtraContext, err = ChoiceContextFromData(resp.JSON200.PoolExtraContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert pool extra context: %w", err)
