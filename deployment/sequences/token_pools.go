@@ -9,6 +9,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/aws/smithy-go/ptr"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	tokenadaptersfinality "github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipsequences "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -205,10 +207,21 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				customInboundRaw = customRaw
 			}
 
+			remoteFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
+			if err != nil {
+				return out, fmt.Errorf("get remote chain family for %d: %w", remoteSelector, err)
+			}
+			remotePoolAddress := strings.ToLower(hex.EncodeToString(remoteCfg.RemotePool))
+			remoteTokenAddress := strings.ToLower(hex.EncodeToString(remoteCfg.RemoteToken))
+			if remoteFamily == chain_selectors.FamilyEVM {
+				remotePoolAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToHash(remoteCfg.RemotePool).Hex()), "0x")
+				remoteTokenAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToAddress(remoteCfg.RemoteToken).Hex()), "0x")
+			}
+
 			updates = append(updates, lockreleasetokenpool.ChainUpdate{
 				RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-				RemotePools:         []types.TEXT{types.TEXT(strings.ToLower(hex.EncodeToString(remoteCfg.RemotePool)))},
-				RemoteTokenAddress:  types.TEXT(strings.ToLower(hex.EncodeToString(remoteCfg.RemoteToken))),
+				RemotePools:         []types.TEXT{types.TEXT(remotePoolAddress)},
+				RemoteTokenAddress:  types.TEXT(remoteTokenAddress),
 				InboundCCVs:         inboundCCVs,
 				OutboundCCVs:        outboundCCVs,
 				FinalityConfig:      toCantonFinalityConfig(input.AllowedFinalityConfig),
@@ -235,110 +248,19 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 	},
 )
 
+// Canton wires rate limiters during initial remote-chain setup in ConfigureTokenForTransfers
+// via ApplyChainUpdates, so this follow-up sequence is intentionally unused.
 var SetTokenPoolRateLimits = operations.NewSequence(
 	"canton/token-adapter/set-token-pool-rate-limits",
 	semver.MustParse("2.0.0"),
-	"Replaces Canton lock/release pool rate limiter contracts for a remote chain",
+	"Updates Canton lock/release pool rate limiter config for a remote chain",
 	func(b operations.Bundle, chains chain.BlockChains, input tokenadapters.TPRLRemotes) (ccipsequences.OnChainOutput, error) {
-		if input.ExistingDataStore == nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("existing datastore is required")
-		}
-		cantonChain, ok := chains.CantonChains()[input.ChainSelector]
-		if !ok || len(cantonChain.Participants) == 0 {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("canton chain with selector %d not found", input.ChainSelector)
-		}
-
-		poolAddress, err := dsutils.ToInstanceAddress(input.TokenPoolRef)
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("resolve token pool address: %w", err)
-		}
-		activePool, err := contract.FindActiveContractByInstanceAddress(
-			b.GetContext(),
-			cantonChain.Participants[0].LedgerServices.State,
-			cantonChain.Participants[0].PartyID,
-			lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-			poolAddress,
+		_ = b
+		_ = chains
+		_ = input
+		return ccipsequences.OnChainOutput{}, fmt.Errorf(
+			"SetTokenPoolRateLimits is disabled: initial Canton rate limiter setup happens during ConfigureTokenForTransfers",
 		)
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("find active lock/release pool: %w", err)
-		}
-		parsedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("parse active lock/release pool: %w", err)
-		}
-
-		remoteSelectorKey := strconv.FormatUint(input.RemoteChainSelector, 10)
-
-		out := ccipsequences.OnChainOutput{}
-		outboundRef, outboundRaw, err := deployTokenPoolRateLimiter(
-			b,
-			cantonChain,
-			input.ExistingDataStore,
-			parsedPool,
-			input.TokenPoolRef.Address,
-			remoteSelectorKey,
-			"outbound",
-			input.DefaultFinalityOutboundRateLimiterConfig,
-			common.RateLimitModeRateLimitMode_DefaultFinality,
-		)
-		if err != nil {
-			return out, fmt.Errorf("deploy outbound rate limiter: %w", err)
-		}
-		inboundRef, inboundRaw, err := deployTokenPoolRateLimiter(
-			b,
-			cantonChain,
-			input.ExistingDataStore,
-			parsedPool,
-			input.TokenPoolRef.Address,
-			remoteSelectorKey,
-			"inbound",
-			input.DefaultFinalityInboundRateLimiterConfig,
-			common.RateLimitModeRateLimitMode_DefaultFinality,
-		)
-		if err != nil {
-			return out, fmt.Errorf("deploy inbound rate limiter: %w", err)
-		}
-		out.Addresses = append(out.Addresses, outboundRef, inboundRef)
-
-		customInboundRaw := mcms.RawInstanceAddress{}
-		if input.CustomFinalityInboundRateLimiterConfig.IsEnabled {
-			customRef, customRaw, customErr := deployTokenPoolRateLimiter(
-				b,
-				cantonChain,
-				input.ExistingDataStore,
-				parsedPool,
-				input.TokenPoolRef.Address,
-				remoteSelectorKey,
-				"inbound-custom",
-				input.CustomFinalityInboundRateLimiterConfig,
-				common.RateLimitModeRateLimitMode_CustomFinality,
-			)
-			if customErr != nil {
-				return out, fmt.Errorf("deploy custom inbound rate limiter: %w", customErr)
-			}
-			out.Addresses = append(out.Addresses, customRef)
-			customInboundRaw = customRaw
-		}
-
-		_, err = operations.ExecuteOperation(b, lock_release_token_pool.SetRateLimitConfig, cantonChain, contract.ChoiceInput[lockreleasetokenpool.SetRateLimitConfig]{
-			InstanceAddress: poolAddress,
-			Args: lockreleasetokenpool.SetRateLimitConfig{
-				Caller: parsedPool.PoolOwner,
-				RateLimitConfigArgs: []lockreleasetokenpool.RateLimitConfigArgs{
-					{
-						RemoteChainSelector:                        types.NUMERIC(remoteSelectorKey),
-						InboundRateLimiter:                         inboundRaw,
-						InboundCustomBlockConfirmationsRateLimiter: customInboundRaw,
-						OutboundRateLimiter:                        outboundRaw,
-					},
-				},
-			},
-		})
-		if err != nil {
-			return out, fmt.Errorf("set rate limit config on lock/release pool: %w", err)
-		}
-
-		return out, nil
 	},
 )
 

@@ -10,7 +10,7 @@ Use the upstream CCIP Deployment Tooling API docs on `main` as the canonical ref
 - Implementing Adapters: <https://github.com/smartcontractkit/chainlink-ccip/blob/main/deployment/docs/implementing-adapters.md>
 - MCMS and Utilities: <https://github.com/smartcontractkit/chainlink-ccip/blob/main/deployment/docs/mcms-and-utilities.md>
 
-## Tooling API Hierarchy
+## Canton Hierarchy
 
 - Operations are the leaf layer. Keep them to one side effect and serializable inputs/outputs.
 - Sequences compose ordered operations for a single-chain workflow and return `OnChainOutput`.
@@ -19,7 +19,7 @@ Use the upstream CCIP Deployment Tooling API docs on `main` as the canonical ref
 ## Operation Rules
 
 - Put contract-facing operations under `deployment/operations/<domain>/`.
-- Prefer existing chain-appropriate operation helpers such as `deployment/utils/operations/contract.NewDeploy` and `NewExercise` when the target chain exposes contract deploy/exercise wrappers.
+- Prefer `deployment/utils/operations/contract.NewDeploy` and `NewExercise` for Canton contract deploy/exercise flows.
 - Match the existing shape:
   - `ContractType`
   - `Version`
@@ -46,25 +46,6 @@ Use the upstream CCIP Deployment Tooling API docs on `main` as the canonical ref
 - `Apply` should create or update the datastore, run the minimal operation or sequence needed, and return `cldf.ChangesetOutput`.
 - Keep datastore reads/writes, environment access, and future MCMS wiring in the changeset layer rather than in the leaf operations.
 
-## Token Pool Setup Rules
-
-- Keep token adapters thin. They should return existing sequences and implement interface glue, not own deploy/config workflow logic.
-- Put token-pool deployment, token-transfer configuration, and pool rate-limit orchestration in sequences.
-- Use changesets as CLDF wrappers around the minimal deploy/config sequence or operation.
-- Drive deploys through the chain's standard deploy operations. Do not add custom deploy utility layers for token pools.
-- Keep first-time token-transfer setup and later rate-limit replacement separate:
-  - deploy pool
-  - configure pool for transfers
-  - later update pool rate limits
-- Build token-transfer configs from actual deployed refs and intended lane combinations, not from ad hoc topology guesses or post-connect hacks.
-- When the workflow deploys auxiliary contracts such as rate limiters, return them in `OnChainOutput.Addresses` so later steps can resolve them from datastore.
-- Prefer datastore and existing helper outputs over re-deriving state from encoded remote-config blobs.
-- Prefer shared helpers in `testhelpers` and EDS helpers over local devenv wrappers when they already provide the needed validator clients, disclosures, or accept-context handling.
-- Keep token identity explicit:
-  - require token refs and labels when needed
-  - avoid hidden fallback derivation of instrument identity or token address
-- Keep setup comments tied to the actual failure mode being prevented, not broad architecture narration.
-
 ## Good Local Examples
 
 - Deploy/exercise helpers:
@@ -74,7 +55,6 @@ Use the upstream CCIP Deployment Tooling API docs on `main` as the canonical ref
   - `deployment/operations/ccip/committee_verifier/committee_verifier.go`
 - Sequence orchestration:
   - `deployment/sequences/deploy_chain_contracts.go`
-  - `deployment/sequences/token_pools.go`
 - Basic changeset wrapper:
   - `deployment/changesets/deploy_chain_contracts.go`
 - Changeset mixing a direct operation with a follow-up sequence:

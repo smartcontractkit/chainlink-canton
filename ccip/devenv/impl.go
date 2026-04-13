@@ -54,7 +54,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -463,6 +462,28 @@ func mintTwoAmuletHoldings(
 		disclosedFeeHolding,
 		disclosedTokenHolding,
 	}, nil
+}
+
+func mintAmuletHolding(
+	ctx context.Context,
+	participant canton.Participant,
+	ownerParty string,
+	amount string,
+) (types.CONTRACT_ID, *ledgerv2.DisclosedContract, error) {
+	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
+	if err != nil {
+		return "", nil, err
+	}
+	holdingCID, err := testhelpers.MintAMT(ctx, participant, metadataClient, transferClient, scanClient, ownerParty, amount)
+	if err != nil {
+		return "", nil, fmt.Errorf("mint fee holding: %w", err)
+	}
+	disclosedHolding, err := testhelpers.GetDisclosedContractById(ctx, participant, holdingCID)
+	if err != nil {
+		return "", nil, fmt.Errorf("get disclosed holding by id: %w", err)
+	}
+
+	return types.CONTRACT_ID(holdingCID), disclosedHolding, nil
 }
 
 func (c *Chain) GetTokenTransferConfigs(
@@ -883,6 +904,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		feeSenderInputCIDs = []types.CONTRACT_ID{feeHoldingCID}
 		preferredTokenHoldingCID = tokenHoldingCID
 		mintedHoldingDisclosures = holdingDisclosures
+	} else {
+		feeHoldingCID, disclosedHolding, mintErr := mintAmuletHolding(ctx, participant, party, "1000000.00")
+		if mintErr != nil {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("mint fee holding for send: %w", mintErr)
+		}
+		feeSenderInputCIDs = []types.CONTRACT_ID{feeHoldingCID}
+		mintedHoldingDisclosures = []*ledgerv2.DisclosedContract{disclosedHolding}
 	}
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
 	if err != nil {
@@ -1126,21 +1154,42 @@ func (c *Chain) buildTokenTransferSendInput(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("parse lock/release pool %s: %w", poolRef.Address, err)
 	}
-	outboundRateLimiterRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		c.chainDetails.ChainSelector,
-		datastore.ContractType(rate_limiter.ContractTypeOutbound),
-		rate_limiter.Version,
-		fmt.Sprintf("%s-outbound-%d", poolRef.Address, dest),
-	))
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("resolve outbound rate limiter ref: %w", err)
+	remoteCfgAny, ok := parsedPool.RemoteChainConfigs[fmt.Sprintf("%d.", dest)]
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("missing remote chain config for %d", dest)
 	}
+	var outboundRateLimiterInstanceAddress contracts.InstanceAddress
+	switch remoteCfg := remoteCfgAny.(type) {
+	case lockreleasetokenpool.RemoteChainConfig:
+		rawOutboundRateLimiter, err := contracts.RawInstanceAddressFromString(string(remoteCfg.OutboundRateLimiter.Unpack))
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("parse outbound rate limiter raw address for %d: %w", dest, err)
+		}
+		outboundRateLimiterInstanceAddress = rawOutboundRateLimiter.InstanceAddress()
+	case map[string]any:
+		rawOutboundRateLimiter, ok := remoteCfg["outboundRateLimiter"].(map[string]any)
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("missing outbound rate limiter in remote chain config for %d", dest)
+		}
+		rawOutboundRateLimiterText, ok := rawOutboundRateLimiter["unpack"].(string)
+		if !ok || rawOutboundRateLimiterText == "" {
+			return nil, nil, nil, fmt.Errorf("missing outbound rate limiter address in remote chain config for %d", dest)
+		}
+		parsedRawOutboundRateLimiter, err := contracts.RawInstanceAddressFromString(rawOutboundRateLimiterText)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("parse outbound rate limiter raw address for %d: %w", dest, err)
+		}
+		outboundRateLimiterInstanceAddress = parsedRawOutboundRateLimiter.InstanceAddress()
+	default:
+		return nil, nil, nil, fmt.Errorf("unexpected remote chain config type %T for %d", remoteCfgAny, dest)
+	}
+	// TODO: maybe replace outboundRateLimiterInstanceAddress with value from EDS?? EDS TP rate limit is still 0x0
 	activeOutboundRateLimiter, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
 		participant.LedgerServices.State,
 		participant.PartyID,
 		common.RateLimiter{}.GetTemplateID(),
-		contracts.HexToInstanceAddress(outboundRateLimiterRef.Address),
+		outboundRateLimiterInstanceAddress,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("resolve outbound rate limiter contract: %w", err)

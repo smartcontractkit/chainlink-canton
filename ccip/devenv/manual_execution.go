@@ -18,12 +18,17 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
@@ -92,19 +97,11 @@ func (c *Chain) resolveTransferFactoryForExecute(
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
 func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Participant, partyId string) (routerAddress contracts.InstanceAddress, disclosedRouter *apiv2.DisclosedContract, err error) {
 	// Create PerPartyRouter (ignore error if it exists already)
-	cantonPerPartyRouterFactoryRef, err := c.e.DataStore.Addresses().Get(
-		datastore.NewAddressRefKey(
-			c.chainDetails.ChainSelector,
-			datastore.ContractType(per_party_router_factory.ContractType),
-			per_party_router_factory.Version,
-			"",
-		),
-	)
+	cantonPerPartyRouterFactory, err := c.getEDSPerPartyRouterFactory()
 	if err != nil {
-		return contracts.InstanceAddress{}, nil, fmt.Errorf("failed to get canton per party router factory address ref: %w", err)
+		return contracts.InstanceAddress{}, nil, fmt.Errorf("failed to get canton per party router factory address: %w", err)
 	}
-	c.logger.Debug().Str("CantonPerPartyRouterFactory", cantonPerPartyRouterFactoryRef.Address).Msg("Resolved per-party router factory address")
-	cantonPerPartyRouterFactory := contracts.HexToInstanceAddress(cantonPerPartyRouterFactoryRef.Address)
+	c.logger.Debug().Str("CantonPerPartyRouterFactory", cantonPerPartyRouterFactory.String()).Msg("Resolved per-party router factory address")
 
 	// Fixed instance ID for the router, this makes the InstanceAddress deterministic.
 	routerInstanceID := contracts.InstanceID("test-router")
@@ -180,7 +177,6 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 	c.logger.Debug().Str("ReceiverAddress", receiverAddress.String()).Msg("Deployed CCIPReceiver")
 
-	// Get disclosures for execution using EDS
 	encodedMessage, err := message.Encode()
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to encode message: %w", err)
@@ -190,7 +186,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		ccvs[i] = contracts.HexToInstanceAddress(verifier.String())
 	}
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
-	executeDisclosures, err := c.GetDisclosuresForExecution(ctx, encodedMessageHex, ccvs)
+	executeDisclosures, err := c.getExecuteDisclosures(ctx, participant, message, ccvs)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get disclosures for execution: %w", err)
 	}
@@ -360,6 +356,369 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 	// No event found in the update, return an error
 	return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no ExecutionStateChanged event found in update %s", res.GetTransaction().GetUpdateId())
+}
+
+func (c *Chain) getExecuteDisclosures(
+	ctx context.Context,
+	participant canton.Participant,
+	message protocol.Message,
+	verifiers []contracts.InstanceAddress,
+) (*testhelpers.ExecuteDisclosures, error) {
+	offRampDisclosure, err := testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
+		PackageId: "#ccip-offramp", ModuleName: "CCIP.OffRamp", EntityName: "OffRamp",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get offramp disclosure: %w", err)
+	}
+	globalConfigDisclosure, err := testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
+		PackageId: "#ccip-common", ModuleName: "CCIP.GlobalConfig", EntityName: "GlobalConfig",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get global config disclosure: %w", err)
+	}
+	tokenAdminRegistryDisclosure, err := testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
+		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get token admin registry disclosure: %w", err)
+	}
+	rmnRemoteDisclosure, err := testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
+		PackageId: "#ccip-rmn", ModuleName: "CCIP.RMNRemote", EntityName: "RMNRemote",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get rmn remote disclosure: %w", err)
+	}
+
+	disclosedContracts := []*apiv2.DisclosedContract{
+		offRampDisclosure,
+		globalConfigDisclosure,
+		tokenAdminRegistryDisclosure,
+		rmnRemoteDisclosure,
+	}
+	choiceContext := ledger.MapToValue(common.CCIPContext{
+		Values: types.TEXTMAP{
+			"off-ramp":             common.AnyValue{AVContractId: contractIDValue(offRampDisclosure.ContractId)},
+			"global-config":        common.AnyValue{AVContractId: contractIDValue(globalConfigDisclosure.ContractId)},
+			"token-admin-registry": common.AnyValue{AVContractId: contractIDValue(tokenAdminRegistryDisclosure.ContractId)},
+			"rmn-remote":           common.AnyValue{AVContractId: contractIDValue(rmnRemoteDisclosure.ContractId)},
+		},
+	})
+
+	ccvContractIDs := make([]*apiv2.Value_ContractId, len(verifiers))
+	for i, verifier := range verifiers {
+		activeCCV, err := contract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			participant.PartyID,
+			ccvs.CommitteeVerifier{}.GetTemplateID(),
+			verifier,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("find active committee verifier %s: %w", verifier.String(), err)
+		}
+		disclosedCCV := convertToDisclosedContract(activeCCV)
+		disclosedContracts = append(disclosedContracts, disclosedCCV)
+		ccvContractIDs[i] = &apiv2.Value_ContractId{ContractId: disclosedCCV.ContractId}
+	}
+
+	out := &testhelpers.ExecuteDisclosures{
+		DisclosedContracts: disclosedContracts,
+		ChoiceContext:      choiceContext,
+		CCVContractIDs:     ccvContractIDs,
+	}
+	if message.TokenTransfer == nil || len(message.TokenTransfer.DestTokenAddress) == 0 {
+		out.DisclosedContracts = testhelpers.DeduplicateDisclosedContracts(out.DisclosedContracts...)
+		return out, nil
+	}
+
+	tokenAdminRegistryRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		c.chainDetails.ChainSelector,
+		datastore.ContractType(token_admin_registry.ContractType),
+		token_admin_registry.Version,
+		"",
+	))
+	if err != nil {
+		return nil, fmt.Errorf("resolve token admin registry ref: %w", err)
+	}
+	activeTokenAdminRegistry, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		tokenadminregistry.TokenAdminRegistry{}.GetTemplateID(),
+		contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find active token admin registry: %w", err)
+	}
+	parsedTokenAdminRegistry, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenAdminRegistry](activeTokenAdminRegistry.GetCreatedEvent())
+	if err != nil {
+		return nil, fmt.Errorf("parse token admin registry created event: %w", err)
+	}
+	tokenPoolAddress, instrumentID, err := tokenPoolAddressAndInstrumentIDFromRegistry(parsedTokenAdminRegistry, message.TokenTransfer.DestTokenAddress)
+	if err != nil {
+		return nil, fmt.Errorf("resolve token pool from registry: %w", err)
+	}
+
+	activePool, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
+		tokenPoolAddress,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find active token pool %s: %w", tokenPoolAddress.String(), err)
+	}
+	disclosedPool := convertToDisclosedContract(activePool)
+	parsedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
+	if err != nil {
+		return nil, fmt.Errorf("parse token pool created event: %w", err)
+	}
+
+	inboundRateLimiterAddress, err := rateLimiterInstanceAddressFromRemoteConfig(parsedPool.RemoteChainConfigs, uint64(message.SourceChainSelector), "inboundRateLimiter")
+	if err != nil {
+		return nil, fmt.Errorf("resolve inbound rate limiter: %w", err)
+	}
+	outboundRateLimiterAddress, err := rateLimiterInstanceAddressFromRemoteConfig(parsedPool.RemoteChainConfigs, uint64(message.SourceChainSelector), "outboundRateLimiter")
+	if err != nil {
+		return nil, fmt.Errorf("resolve outbound rate limiter: %w", err)
+	}
+	customInboundRateLimiterAddress, err := optionalRateLimiterInstanceAddressFromRemoteConfig(parsedPool.RemoteChainConfigs, uint64(message.SourceChainSelector), "inboundCustomBlockConfirmationsRateLimiter")
+	if err != nil {
+		return nil, fmt.Errorf("resolve custom inbound rate limiter: %w", err)
+	}
+
+	activeInboundRateLimiter, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		common.RateLimiter{}.GetTemplateID(),
+		inboundRateLimiterAddress,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find active inbound rate limiter %s: %w", inboundRateLimiterAddress.String(), err)
+	}
+	activeOutboundRateLimiter, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		common.RateLimiter{}.GetTemplateID(),
+		outboundRateLimiterAddress,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find active outbound rate limiter %s: %w", outboundRateLimiterAddress.String(), err)
+	}
+
+	disclosedContracts = append(disclosedContracts, disclosedPool, convertToDisclosedContract(activeInboundRateLimiter), convertToDisclosedContract(activeOutboundRateLimiter))
+	poolExtraValues := types.TEXTMAP{
+		"inbound-rate-limiter": common.AnyValue{AVContractId: contractIDValue(activeInboundRateLimiter.GetCreatedEvent().GetContractId())},
+	}
+	if customInboundRateLimiterAddress != (contracts.InstanceAddress{}) {
+		activeCustomInboundRateLimiter, err := contract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			participant.PartyID,
+			common.RateLimiter{}.GetTemplateID(),
+			customInboundRateLimiterAddress,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("find active custom inbound rate limiter %s: %w", customInboundRateLimiterAddress.String(), err)
+		}
+		disclosedContracts = append(disclosedContracts, convertToDisclosedContract(activeCustomInboundRateLimiter))
+		poolExtraValues["inbound-custom-block-confirmations-rate-limiter"] = common.AnyValue{
+			AVContractId: contractIDValue(activeCustomInboundRateLimiter.GetCreatedEvent().GetContractId()),
+		}
+	}
+
+	poolHoldingDisclosure, err := findUnlockedHoldingDisclosure(ctx, participant, parsedPool.PoolOwner, instrumentID)
+	if err != nil {
+		return nil, fmt.Errorf("find token pool holding disclosure: %w", err)
+	}
+	disclosedContracts = append(disclosedContracts, poolHoldingDisclosure)
+
+	out.DisclosedContracts = testhelpers.DeduplicateDisclosedContracts(disclosedContracts...)
+	out.PoolExtraContext = ledger.MapToValue(common.CCIPContext{Values: poolExtraValues})
+	out.TokenPoolContractID = &apiv2.Value_ContractId{ContractId: disclosedPool.ContractId}
+	out.TokenPoolHoldingsContractIDs = []*apiv2.Value{
+		{Sum: &apiv2.Value_ContractId{ContractId: poolHoldingDisclosure.ContractId}},
+	}
+
+	return out, nil
+}
+
+func contractIDValue(contractID string) *types.CONTRACT_ID {
+	if contractID == "" {
+		return nil
+	}
+	cid := types.CONTRACT_ID(contractID)
+	return &cid
+}
+
+func tokenPoolAddressAndInstrumentIDFromRegistry(
+	tokenAdminRegistryCreatedEvent *tokenadminregistry.TokenAdminRegistry,
+	destTokenAddress []byte,
+) (contracts.InstanceAddress, splice_api_token_holding_v1.InstrumentId, error) {
+	expectedHashedInstrumentID := contracts.BytesToInstanceAddress(destTokenAddress)
+	tokenConfigValue, ok := tokenAdminRegistryCreatedEvent.TokenConfigs[strings.TrimPrefix(expectedHashedInstrumentID.Hex(), "0x")]
+	if !ok {
+		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf("missing token config for hashed instrument id %s", expectedHashedInstrumentID.Hex())
+	}
+	tokenConfigMap, ok := tokenConfigValue.(map[string]any)
+	if !ok {
+		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf("unexpected token config type %T", tokenConfigValue)
+	}
+
+	var tokenConfig tokenadminregistry.TokenConfig
+	if err := ledger.MapToStruct(tokenConfigMap, &tokenConfig); err != nil {
+		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf("parse token config: %w", err)
+	}
+
+	return contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).
+		RawInstanceAddress(tokenConfig.TokenPool.PoolOwner).
+		InstanceAddress(), tokenConfig.InstrumentId, nil
+}
+
+func rateLimiterInstanceAddressFromRemoteConfig(
+	remoteChainConfigs map[string]any,
+	remoteSelector uint64,
+	field string,
+) (contracts.InstanceAddress, error) {
+	remoteConfig, ok := remoteChainConfigs[fmt.Sprintf("%d.", remoteSelector)]
+	if !ok {
+		return contracts.InstanceAddress{}, fmt.Errorf("missing remote chain config for selector %d", remoteSelector)
+	}
+
+	switch cfg := remoteConfig.(type) {
+	case lockreleasetokenpool.RemoteChainConfig:
+		return rateLimiterInstanceAddressFromRawField(rawRateLimiterField(cfg, field), field)
+	case map[string]any:
+		rawField, ok := cfg[field]
+		if !ok {
+			return contracts.InstanceAddress{}, fmt.Errorf("missing %s in remote chain config for %d", field, remoteSelector)
+		}
+		rawMap, ok := rawField.(map[string]any)
+		if !ok {
+			return contracts.InstanceAddress{}, fmt.Errorf("unexpected %s type %T", field, rawField)
+		}
+		unpack, ok := rawMap["unpack"].(string)
+		if !ok || unpack == "" {
+			return contracts.InstanceAddress{}, fmt.Errorf("missing %s address in remote chain config for %d", field, remoteSelector)
+		}
+		return rateLimiterInstanceAddressFromRawField(unpack, field)
+	default:
+		return contracts.InstanceAddress{}, fmt.Errorf("unexpected remote chain config type %T", remoteConfig)
+	}
+}
+
+func optionalRateLimiterInstanceAddressFromRemoteConfig(
+	remoteChainConfigs map[string]any,
+	remoteSelector uint64,
+	field string,
+) (contracts.InstanceAddress, error) {
+	remoteConfig, ok := remoteChainConfigs[fmt.Sprintf("%d.", remoteSelector)]
+	if !ok {
+		return contracts.InstanceAddress{}, fmt.Errorf("missing remote chain config for selector %d", remoteSelector)
+	}
+
+	switch cfg := remoteConfig.(type) {
+	case lockreleasetokenpool.RemoteChainConfig:
+		if raw := rawRateLimiterField(cfg, field); raw != "" {
+			return rateLimiterInstanceAddressFromRawField(raw, field)
+		}
+		return contracts.InstanceAddress{}, nil
+	case map[string]any:
+		rawField, ok := cfg[field]
+		if !ok || rawField == nil {
+			return contracts.InstanceAddress{}, nil
+		}
+		rawMap, ok := rawField.(map[string]any)
+		if !ok {
+			return contracts.InstanceAddress{}, fmt.Errorf("unexpected %s type %T", field, rawField)
+		}
+		unpack, _ := rawMap["unpack"].(string)
+		if unpack == "" {
+			return contracts.InstanceAddress{}, nil
+		}
+		return rateLimiterInstanceAddressFromRawField(unpack, field)
+	default:
+		return contracts.InstanceAddress{}, fmt.Errorf("unexpected remote chain config type %T", remoteConfig)
+	}
+}
+
+func rawRateLimiterField(cfg lockreleasetokenpool.RemoteChainConfig, field string) string {
+	switch field {
+	case "inboundRateLimiter":
+		return string(cfg.InboundRateLimiter.Unpack)
+	case "inboundCustomBlockConfirmationsRateLimiter":
+		return string(cfg.InboundCustomBlockConfirmationsRateLimiter.Unpack)
+	case "outboundRateLimiter":
+		return string(cfg.OutboundRateLimiter.Unpack)
+	default:
+		return ""
+	}
+}
+
+func rateLimiterInstanceAddressFromRawField(raw string, field string) (contracts.InstanceAddress, error) {
+	rawAddress, err := contracts.RawInstanceAddressFromString(raw)
+	if err != nil {
+		return contracts.InstanceAddress{}, fmt.Errorf("parse %s raw instance address: %w", field, err)
+	}
+	return rawAddress.InstanceAddress(), nil
+}
+
+func findUnlockedHoldingDisclosure(
+	ctx context.Context,
+	participant canton.Participant,
+	owner types.PARTY,
+	instrumentID splice_api_token_holding_v1.InstrumentId,
+) (*apiv2.DisclosedContract, error) {
+	holdingContracts, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
+		PackageId:  "#splice-api-token-holding-v1",
+		ModuleName: "Splice.Api.Token.HoldingV1",
+		EntityName: "Holding",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list active holdings: %w", err)
+	}
+
+	for i := len(holdingContracts) - 1; i >= 0; i-- {
+		view, err := holdingViewFromActiveContract(holdingContracts[i])
+		if err != nil {
+			return nil, err
+		}
+		if view.Owner != owner {
+			continue
+		}
+		if view.InstrumentId.Admin != instrumentID.Admin || view.InstrumentId.Id != instrumentID.Id {
+			continue
+		}
+		if view.Lock != nil {
+			continue
+		}
+		amount, ok := new(big.Rat).SetString(string(view.Amount))
+		if !ok || amount.Sign() <= 0 {
+			continue
+		}
+		return convertToDisclosedContract(holdingContracts[i]), nil
+	}
+
+	return nil, fmt.Errorf("no unlocked holding found for %s/%s", instrumentID.Admin, instrumentID.Id)
+}
+
+func holdingViewFromActiveContract(active *apiv2.ActiveContract) (*splice_api_token_holding_v1.HoldingView, error) {
+	for _, interfaceView := range active.GetCreatedEvent().GetInterfaceViews() {
+		if interfaceView.GetInterfaceId().GetModuleName() != "Splice.Api.Token.HoldingV1" ||
+			interfaceView.GetInterfaceId().GetEntityName() != "Holding" {
+			continue
+		}
+		var view splice_api_token_holding_v1.HoldingView
+		if err := ledger.RecordToStruct(interfaceView.GetViewValue(), &view); err != nil {
+			return nil, fmt.Errorf("parse holding view: %w", err)
+		}
+		return &view, nil
+	}
+
+	return nil, fmt.Errorf("holding interface view not found")
 }
 
 // parseExecutionStateChangedEvent parses a common.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.

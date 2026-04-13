@@ -5,6 +5,7 @@ navigator.log
 
 .idea
 .vscode
+.cursor/
 .DS_Store
 
 go.work

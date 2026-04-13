@@ -30,10 +30,9 @@ import (
 )
 
 func (c *Chain) GetDisclosuresForSend(ctx context.Context, ccvs []contracts.InstanceAddress) (*testhelpers.SendDisclosures, error) {
-	// Get the EDS output from generic services output, will contain the EDS API URL
-	edsOut, err := util.OpaqueToConcreteStrict[output](c.cfg.GenericServices[c.ChainSelector()].Output)
+	edsOut, err := c.getEDSOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get generic services output for chain %d: %w", c.ChainSelector(), err)
+		return nil, err
 	}
 	edsClient, err := edsv1.NewClientWithResponses(edsOut.EDSURL)
 	if err != nil {
@@ -45,10 +44,9 @@ func (c *Chain) GetDisclosuresForSend(ctx context.Context, ccvs []contracts.Inst
 
 // GetDisclosuresForExecution returns all the necessary disclosed contracts to execute a message on Canton using the EDS API.
 func (c *Chain) GetDisclosuresForExecution(ctx context.Context, encodedMessageHex string, verifiers []contracts.InstanceAddress) (*testhelpers.ExecuteDisclosures, error) {
-	// Get the EDS output from generic services output, will contain the EDS API URL
-	edsOut, err := util.OpaqueToConcreteStrict[output](c.cfg.GenericServices[c.ChainSelector()].Output)
+	edsOut, err := c.getEDSOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get generic services output for chain %d: %w", c.ChainSelector(), err)
+		return nil, err
 	}
 	edsClient, err := edsv1.NewClientWithResponses(edsOut.EDSURL)
 	if err != nil {
@@ -69,6 +67,33 @@ func TemplateIdFromString(s string) (*apiv2.Identifier, error) {
 		ModuleName: split[1],
 		EntityName: split[2],
 	}, nil
+}
+
+func (c *Chain) getEDSOutput() (*output, error) {
+	edsOut, err := util.OpaqueToConcreteStrict[output](c.cfg.GenericServices[c.ChainSelector()].Output)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get generic services output for chain %d: %w", c.ChainSelector(), err)
+	}
+
+	return edsOut, nil
+}
+
+func (c *Chain) getEDSConfig() (*edsConfig.Config, error) {
+	edsOut, err := c.getEDSOutput()
+	if err != nil {
+		return nil, err
+	}
+
+	return &edsOut.EDSConfig, nil
+}
+
+func (c *Chain) getEDSPerPartyRouterFactory() (contracts.InstanceAddress, error) {
+	edsCfg, err := c.getEDSConfig()
+	if err != nil {
+		return contracts.InstanceAddress{}, err
+	}
+
+	return edsCfg.Contracts.PerPartyRouterFactory.InstanceAddress, nil
 }
 
 const (
