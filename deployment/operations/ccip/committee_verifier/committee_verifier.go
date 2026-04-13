@@ -21,6 +21,8 @@ var ContractType = deployment.ContractType("CommitteeVerifier")
 
 var Version = semver.MustParse("0.1.0")
 
+var ccvsEncoder = ccvs.NewContract("", "CCIP.CommitteeVerifier", "CommitteeVerifier").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[ccvs.CommitteeVerifier]{
 	Name:           "canton/ccip/committee_verifier/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -81,8 +83,9 @@ var ApplySignatureConfigs = contract.NewExercise(contract.ExerciseParams[ccvs.Ap
 
 		return nil
 	},
-	Template: ccvs.CommitteeVerifier{},
-	Method:   ccvs.CommitteeVerifier{}.ApplySignatureConfigs,
+	Template:     ccvs.CommitteeVerifier{},
+	Method:       ccvs.CommitteeVerifier{}.ApplySignatureConfigs,
+	EncodeMethod: ccvsEncoder.ApplySignatureConfigs,
 })
 
 var UpdateStorageLocations = contract.NewExercise(contract.ExerciseParams[ccvs.UpdateStorageLocations]{
@@ -93,6 +96,7 @@ var UpdateStorageLocations = contract.NewExercise(contract.ExerciseParams[ccvs.U
 	Validate:     nil,
 	Template:     ccvs.CommitteeVerifier{},
 	Method:       ccvs.CommitteeVerifier{}.UpdateStorageLocations,
+	EncodeMethod: ccvsEncoder.UpdateStorageLocations,
 })
 
 var TransferStorageLocationsAdmin = contract.NewExercise(contract.ExerciseParams[ccvs.TransferStorageLocationsAdmin]{
@@ -107,8 +111,9 @@ var TransferStorageLocationsAdmin = contract.NewExercise(contract.ExerciseParams
 
 		return nil
 	},
-	Template: ccvs.CommitteeVerifier{},
-	Method:   ccvs.CommitteeVerifier{}.TransferStorageLocationsAdmin,
+	Template:     ccvs.CommitteeVerifier{},
+	Method:       ccvs.CommitteeVerifier{}.TransferStorageLocationsAdmin,
+	EncodeMethod: ccvsEncoder.TransferStorageLocationsAdmin,
 })
 
 var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExerciseParams[ccvs.AcceptStorageLocationsAdmin]{
@@ -119,6 +124,7 @@ var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExercisePara
 	Validate:     nil,
 	Template:     ccvs.CommitteeVerifier{},
 	Method:       ccvs.CommitteeVerifier{}.AcceptStorageLocationsAdmin,
+	EncodeMethod: ccvsEncoder.AcceptStorageLocationsAdmin,
 })
 
 var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[ccvs.SetDynamicConfig]{
@@ -129,6 +135,7 @@ var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[ccvs.SetDyna
 	Validate:     nil,
 	Template:     ccvs.CommitteeVerifier{},
 	Method:       ccvs.CommitteeVerifier{}.SetDynamicConfig,
+	EncodeMethod: ccvsEncoder.SetDynamicConfig,
 })
 
 var ApplyRemoteChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[ccvs.ApplyRemoteChainConfigUpdates]{
@@ -139,6 +146,7 @@ var ApplyRemoteChainConfigUpdates = contract.NewExercise(contract.ExerciseParams
 	Validate:     nil,
 	Template:     ccvs.CommitteeVerifier{},
 	Method:       ccvs.CommitteeVerifier{}.ApplyRemoteChainConfigUpdates,
+	EncodeMethod: ccvsEncoder.ApplyRemoteChainConfigUpdates,
 })
 
 var ApplyAllowListUpdates = contract.NewExercise(contract.ExerciseParams[ccvs.ApplyAllowListUpdates]{
@@ -153,6 +161,7 @@ var ApplyAllowListUpdates = contract.NewExercise(contract.ExerciseParams[ccvs.Ap
 
 		return input, nil
 	},
-	Template: ccvs.CommitteeVerifier{},
-	Method:   ccvs.CommitteeVerifier{}.ApplyAllowListUpdates,
+	Template:     ccvs.CommitteeVerifier{},
+	Method:       ccvs.CommitteeVerifier{}.ApplyAllowListUpdates,
+	EncodeMethod: ccvsEncoder.ApplyAllowListUpdates,
 })

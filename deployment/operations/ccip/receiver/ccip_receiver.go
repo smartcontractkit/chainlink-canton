@@ -16,6 +16,8 @@ var ContractType = deployment.ContractType("CantonCCIPReceiver")
 
 var Version = semver.MustParse("0.1.0")
 
+var receiverEncoder = ccipreceiver.NewContract("", "CCIP.CCIPReceiver", "CCIPReceiver").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[ccipreceiver.CCIPReceiver]{
 	Name:           "canton/ccip/receiver/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -39,6 +41,7 @@ var Execute = contract.NewExercise(contract.ExerciseParams[ccipreceiver.Execute2
 	Validate: func(input ccipreceiver.Execute2) error {
 		return nil
 	},
-	Template: ccipreceiver.CCIPReceiver{},
-	Method:   ccipreceiver.CCIPReceiver{}.Execute,
+	Template:     ccipreceiver.CCIPReceiver{},
+	Method:       ccipreceiver.CCIPReceiver{}.Execute,
+	EncodeMethod: receiverEncoder.Execute2,
 })

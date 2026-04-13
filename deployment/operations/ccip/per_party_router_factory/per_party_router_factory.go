@@ -16,6 +16,8 @@ var ContractType = deployment.ContractType("CantonPerPartyRouterFactory")
 
 var Version = semver.MustParse("0.1.0")
 
+var pprfEncoder = perpartyrouter.NewContract("", "CCIP.PerPartyRouter", "PerPartyRouterFactory").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[perpartyrouter.PerPartyRouterFactory]{
 	Name:           "canton/ccip/per_party_router_factory/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -46,6 +48,7 @@ var CreateRouter = contract.NewExercise(contract.ExerciseParams[perpartyrouter.C
 
 		return nil
 	},
-	Template: perpartyrouter.PerPartyRouterFactory{},
-	Method:   perpartyrouter.PerPartyRouterFactory{}.CreateRouter,
+	Template:     perpartyrouter.PerPartyRouterFactory{},
+	Method:       perpartyrouter.PerPartyRouterFactory{}.CreateRouter,
+	EncodeMethod: pprfEncoder.CreateRouter,
 })

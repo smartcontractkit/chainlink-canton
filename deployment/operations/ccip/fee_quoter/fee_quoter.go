@@ -19,6 +19,8 @@ var ContractType = deployment.ContractType("FeeQuoter")
 
 var Version = semver.MustParse("0.1.0")
 
+var feeQuoterEncoder = feequoter.NewContract("", "CCIP.FeeQuoter", "FeeQuoter").Encoder()
+
 var Deploy = contract.NewDeploy(contract.DeployParams[feequoter.FeeQuoter]{
 	Name:           "canton/ccip/fee_quoter/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -42,6 +44,7 @@ var ApplyPriceUpdatersUpdate = contract.NewExercise(contract.ExerciseParams[feeq
 	Validate:     nil,
 	Template:     feequoter.FeeQuoter{},
 	Method:       feequoter.FeeQuoter{}.ApplyPriceUpdatersUpdate,
+	EncodeMethod: feeQuoterEncoder.ApplyPriceUpdatersUpdate,
 })
 
 var UpdatePrices = contract.NewExercise(contract.ExerciseParams[feequoter.UpdatePrices]{
@@ -59,8 +62,9 @@ var UpdatePrices = contract.NewExercise(contract.ExerciseParams[feequoter.Update
 
 		return input, nil
 	},
-	Template: feequoter.FeeQuoter{},
-	Method:   feequoter.FeeQuoter{}.UpdatePrices,
+	Template:     feequoter.FeeQuoter{},
+	Method:       feequoter.FeeQuoter{}.UpdatePrices,
+	EncodeMethod: feeQuoterEncoder.UpdatePrices,
 })
 
 var RemoveFeeTokens = contract.NewExercise(contract.ExerciseParams[feequoter.RemoveFeeTokens]{
@@ -72,8 +76,9 @@ var RemoveFeeTokens = contract.NewExercise(contract.ExerciseParams[feequoter.Rem
 		// TODO add validation
 		return nil
 	},
-	Template: feequoter.FeeQuoter{},
-	Method:   feequoter.FeeQuoter{}.RemoveFeeTokens,
+	Template:     feequoter.FeeQuoter{},
+	Method:       feequoter.FeeQuoter{}.RemoveFeeTokens,
+	EncodeMethod: feeQuoterEncoder.RemoveFeeTokens,
 })
 
 var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyDestChainConfigUpdates2]{
@@ -90,6 +95,7 @@ var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[f
 
 		return nil
 	},
-	Template: feequoter.FeeQuoter{},
-	Method:   feequoter.FeeQuoter{}.ApplyDestChainConfigUpdates,
+	Template:     feequoter.FeeQuoter{},
+	Method:       feequoter.FeeQuoter{}.ApplyDestChainConfigUpdates,
+	EncodeMethod: feeQuoterEncoder.ApplyDestChainConfigUpdates2,
 })
