@@ -2,15 +2,17 @@ package adapters
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -123,7 +125,11 @@ func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapte
 
 		signers := make([]string, 0, len(cfg.SignerKeys))
 		for _, key := range cfg.SignerKeys {
-			signers = append(signers, normalizeSignerHex(string(key)))
+			signer, err := signerKeyToAddress(string(key))
+			if err != nil {
+				return nil, fmt.Errorf("normalize signer key %q: %w", key, err)
+			}
+			signers = append(signers, signer)
 		}
 
 		thr := cfg.Threshold
@@ -165,4 +171,22 @@ func numericToUint64(n types.NUMERIC) (uint64, error) {
 func normalizeSignerHex(hexKey string) string {
 	hexKey = strings.TrimPrefix(strings.TrimSpace(hexKey), "0x")
 	return "0x" + hexKey
+}
+
+func signerKeyToAddress(hexKey string) (string, error) {
+	normalized := normalizeSignerHex(hexKey)
+	keyBytes, err := hex.DecodeString(strings.TrimPrefix(normalized, "0x"))
+	if err != nil {
+		return "", fmt.Errorf("decode hex: %w", err)
+	}
+	if len(keyBytes) != 65 {
+		return "", fmt.Errorf("expected 65-byte uncompressed pubkey, got %d bytes", len(keyBytes))
+	}
+
+	pubKey, err := gethcrypto.UnmarshalPubkey(keyBytes)
+	if err != nil {
+		return "", fmt.Errorf("unmarshal pubkey: %w", err)
+	}
+
+	return gethcrypto.PubkeyToAddress(*pubKey).Hex(), nil
 }

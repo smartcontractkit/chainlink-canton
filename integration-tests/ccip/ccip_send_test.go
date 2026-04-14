@@ -65,7 +65,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	// Import to register adapters
-	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )

@@ -3,6 +3,8 @@ package devenv
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	cryptorand "crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"maps"
@@ -24,12 +26,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/changesets"
-	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
+	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
+	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	ccvservices "github.com/smartcontractkit/chainlink-ccv/build/devenv/services"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -116,6 +119,49 @@ func (i *ImplFactory) NewEmpty() cciptestinterfaces.CCIP17Configuration {
 			Fields(map[string]any{"component": "Canton"}).
 			Logger(),
 	)
+}
+
+func (i *ImplFactory) DefaultSignerKey(keys ccvservices.BootstrapKeys) string {
+	return keys.ECDSAPublicKey
+}
+
+func (i *ImplFactory) DefaultFeeAggregator(env *deployment.Environment, chainSelector uint64) string {
+	chain, ok := env.BlockChains.CantonChains()[chainSelector]
+	if !ok || len(chain.Participants) == 0 {
+		return ""
+	}
+
+	return chain.Participants[0].PartyID
+}
+
+func (i *ImplFactory) SupportsFunding() bool {
+	return false
+}
+
+func (i *ImplFactory) SupportsBootstrapExecutor() bool {
+	return true
+}
+
+func (i *ImplFactory) GenerateTransmitterKey() (string, error) {
+	_, privateKey, err := ed25519.GenerateKey(cryptorand.Reader)
+	if err != nil {
+		return "", fmt.Errorf("generate ed25519 transmitter key: %w", err)
+	}
+
+	return hex.EncodeToString(privateKey), nil
+}
+
+func (i *ImplFactory) TransmitterAddress(privateKeyHex string) (protocol.UnknownAddress, error) {
+	privateKeyBytes, err := hex.DecodeString(privateKeyHex)
+	if err != nil {
+		return protocol.UnknownAddress{}, fmt.Errorf("invalid Canton private key hex: %w", err)
+	}
+	if len(privateKeyBytes) != ed25519.PrivateKeySize {
+		return protocol.UnknownAddress{}, fmt.Errorf("invalid Canton private key length: %d", len(privateKeyBytes))
+	}
+
+	publicKey := ed25519.PrivateKey(privateKeyBytes).Public().(ed25519.PublicKey)
+	return protocol.UnknownAddress(publicKey), nil
 }
 
 type Chain struct {
