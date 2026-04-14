@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -758,81 +759,94 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NotEqual(t, "0", feeStr, "GetFee should return a positive fee")
 	require.NotEqual(t, "0", poolFeeStr, "GetFee should return a positive pool fee")
 
-	// Re-fetch volatile Splice contracts (AmuletRules, transfer factories, preapproval)
-	// to avoid INACTIVE_CONTRACTS race from Splice background automation (round advancement)
-	// archiving and recreating system contracts between the initial fetch and Send submission.
-	transferFactoryCid, transferFactoryDisclosures, choiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
-	require.NoError(t, err, "failed to re-fetch fee transfer factory")
-	feeTokenInput = interfaces.TokenInput{
-		TransferFactory: types.CONTRACT_ID(transferFactoryCid),
-		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(choiceContext)},
-			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
-		},
-		TokenPoolHoldings: []types.CONTRACT_ID{},
+	refreshVolatileSendState := func() []*apiv2.DisclosedContract {
+		// Re-fetch volatile Splice contracts (AmuletRules, transfer factories, preapproval)
+		// to avoid DSO-side races from background automation archiving/locking contracts
+		// between quote and final Send submission.
+		transferFactoryCid, transferFactoryDisclosures, choiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
+		require.NoError(t, err, "failed to re-fetch fee transfer factory")
+		feeTokenInput = interfaces.TokenInput{
+			TransferFactory: types.CONTRACT_ID(transferFactoryCid),
+			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+				Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(choiceContext)},
+				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+			},
+			TokenPoolHoldings: []types.CONTRACT_ID{},
+		}
+		sendArgs.FeeTokenInput.TokenInput = feeTokenInput
+
+		tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
+		require.NoError(t, err, "failed to re-fetch token transfer factory")
+		disclosedPreapproval, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#splice-amulet", ModuleName: "Splice.AmuletRules", EntityName: "TransferPreapproval"})
+		require.NoError(t, err, "failed to re-fetch disclosed TransferPreapproval")
+		tokenTransferContextValues = testhelpers.ExtractChoiceContextValues(tokenTransferChoiceContext)
+		preapprovalCid = types.CONTRACT_ID(disclosedPreapproval.ContractId)
+		tokenTransferContextValues["transfer-preapproval"] = splice_api_token_metadata_v1.AnyValue{AVContractId: &preapprovalCid}
+		sendArgs.TokenTransferInput.TokenInput = interfaces.TokenInput{
+			TransferFactory: types.CONTRACT_ID(tokenTransferFactoryCid),
+			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+				Context: splice_api_token_metadata_v1.ChoiceContext{Values: tokenTransferContextValues},
+				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+			},
+			TokenPoolHoldings: []types.CONTRACT_ID{},
+		}
+
+		return testhelpers.DeduplicateDisclosedContracts(slices.Concat(
+			[]*apiv2.DisclosedContract{
+				disclosedCCIPSender,
+				disclosedRouter,
+				disclosedOnRamp,
+				disclosedGlobalConfig,
+				disclosedTar,
+				disclosedRmnRemote,
+				disclosedFeeQuoter,
+				disclosedFeeTokenHolding,
+				disclosedTokenTransferHolding,
+				disclosedCCV,
+				disclosedPool,
+				disclosedOutboundRateLimiter,
+				disclosedPreapproval,
+				disclosedExecutor,
+			},
+			transferFactoryDisclosures,
+			tokenTransferFactoryDisclosures,
+		)...)
 	}
-	sendArgs.FeeTokenInput.TokenInput = feeTokenInput
 
-	tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
-	require.NoError(t, err, "failed to re-fetch token transfer factory")
-	disclosedPreapproval, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#splice-amulet", ModuleName: "Splice.AmuletRules", EntityName: "TransferPreapproval"})
-	require.NoError(t, err, "failed to re-fetch disclosed TransferPreapproval")
-	tokenTransferContextValues = testhelpers.ExtractChoiceContextValues(tokenTransferChoiceContext)
-	preapprovalCid = types.CONTRACT_ID(disclosedPreapproval.ContractId)
-	tokenTransferContextValues["transfer-preapproval"] = splice_api_token_metadata_v1.AnyValue{AVContractId: &preapprovalCid}
-	sendArgs.TokenTransferInput.TokenInput = interfaces.TokenInput{
-		TransferFactory: types.CONTRACT_ID(tokenTransferFactoryCid),
-		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: splice_api_token_metadata_v1.ChoiceContext{Values: tokenTransferContextValues},
-			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
-		},
-		TokenPoolHoldings: []types.CONTRACT_ID{},
-	}
+	for attempt := 1; attempt <= 3; attempt++ {
+		sendDisclosures = refreshVolatileSendState()
+		ccipSendArgs := ledger.MapToValue(sendArgs)
 
-	sendDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(
-		[]*apiv2.DisclosedContract{
-			disclosedCCIPSender,
-			disclosedRouter,
-			disclosedOnRamp,
-			disclosedGlobalConfig,
-			disclosedTar,
-			disclosedRmnRemote,
-			disclosedFeeQuoter,
-			disclosedFeeTokenHolding,
-			disclosedTokenTransferHolding,
-			disclosedCCV,
-			disclosedPool,
-			disclosedOutboundRateLimiter,
-			disclosedPreapproval,
-			disclosedExecutor,
-		},
-		transferFactoryDisclosures,
-		tokenTransferFactoryDisclosures,
-	)...)
-	ccipSendArgs := ledger.MapToValue(sendArgs)
-
-	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
-	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
-					ContractId:     ccipSenderCid,
-					Choice:         "Send",
-					ChoiceArgument: ccipSendArgs,
+		// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction.
+		res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+			Commands: &apiv2.Commands{
+				CommandId: uuid.Must(uuid.NewUUID()).String(),
+				Commands: []*apiv2.Command{{
+					Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+						TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+						ContractId:     ccipSenderCid,
+						Choice:         "Send",
+						ChoiceArgument: ccipSendArgs,
+					}},
 				}},
-			}},
-			ActAs:              []string{partySender},
-			DisclosedContracts: sendDisclosures,
-		},
-	})
-	if err != nil {
-		if s, ok := status.FromError(err); ok {
+				ActAs:              []string{partySender},
+				DisclosedContracts: sendDisclosures,
+			},
+		})
+		if err == nil {
+			break
+		}
+
+		s, ok := status.FromError(err)
+		if ok {
 			t.Logf("gRPC error: code=%s message=%s", s.Code(), s.Message())
 			t.Logf("Error details: %v", s.Details())
 		}
-		require.NoError(t, err)
+		if !ok || s.Code() != codes.Aborted || !strings.Contains(s.Message(), "LOCAL_VERDICT_LOCKED_CONTRACTS") || attempt == 3 {
+			require.NoError(t, err)
+		}
+		t.Logf("retrying Send after locked-contract abort (attempt %d/3)", attempt)
+		time.Sleep(time.Second)
 	}
 
 	// Extract messageId from CCIPMessageSent to verify success
