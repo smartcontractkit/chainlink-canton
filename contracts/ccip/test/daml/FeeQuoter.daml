@@ -67,8 +67,7 @@ finalizeUsingQuote owner feeQuoter sendingMessageCid = do
                         None -> 0)
                     + sm.executorDestGasLimit
             calldataSize =
-                byteCount sm.payload
-                    + foldl (\acc fee -> acc + fee.destBytesOverhead) 0 sm.ccvFees
+                foldl (\acc fee -> acc + fee.destBytesOverhead) 0 sm.ccvFees
                     + (case sm.tokenSendFee of
                         Some fee -> fee.destBytesOverhead
                         None -> 0)
@@ -1134,3 +1133,123 @@ testFinalizeFee_LinkCapMixedFees = script do
     sm.networkFeeTokenAmount === 0.05
 
     debug "testFinalizeFee_LinkCapMixedFees: PASSED"
+
+-- Regression: payload bytes must only be counted once in calldataSize.
+-- executorDestBytesOverhead already includes messageData = 2 + payloadBytes.
+testFinalizeFee_PayloadBytesCountedOnce = script do
+    owner <- allocateParty "owner-payload-once"
+    sender <- allocateParty "sender-payload-once"
+
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "USDC"
+
+    let payload = "0011223344"
+    let payloadBytes = byteCount payload
+    let destGasPerPayloadByteBase = 10
+    let destChainSelector = 456.0
+
+    feeQuoter <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-payload-once"
+            feeTokens = Set.fromList [feeToken]
+            destChainConfigs = Map.fromList
+                [ (destChainSelector, testDestChainConfig with
+                    destGasPerPayloadByteBase = destGasPerPayloadByteBase
+                  )
+                ]
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList
+                [(destChainSelector, TimestampedPrice 1.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList
+                [(feeToken, TimestampedPrice 1.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
+                admin = owner
+                id = "LINK"
+            priceUpdaters = [owner]
+
+    let executorDestBytesOverhead =
+            69
+            + (1 + 32)
+            + (1 + 32)
+            + (1 + 32)
+            + (1 + 32)
+            + (2 + 0)
+            + 2
+            + (2 + payloadBytes)
+
+    sendingMessageCid <- submit owner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "router-payload-once" sender
+                onRamp = RawInstanceAddress.make "onramp-payload-once" owner
+                globalConfig = RawInstanceAddress.make "globalconfig-payload-once" owner
+                rmnRemote = RawInstanceAddress.make "rmn-payload-once" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-payload-once" owner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-payload-once" owner
+            ccipOwner = owner
+            sender = sender
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            requiredExecutor = None
+            executorAddress = "00"
+            executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
+            sourceChainSelector = 123.0
+            senderAddress = "01"
+            receiver = "02"
+            payload = payload
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "03"
+            offRampAddress = "04"
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorDestGasLimit = 0
+            executorDestBytesOverhead = executorDestBytesOverhead
+            executorFeeTokenAmount = 0.0
+            observingParties = [sender]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
+
+    Some sm <- queryContractId owner sendingMessageCid
+    let expectedGas = executorDestBytesOverhead * destGasPerPayloadByteBase
+    let expectedExecutionCost = SendingMessageV1.gasCostUsdCents 1.0 expectedGas
+
+    sm.executorDestBytesOverhead === executorDestBytesOverhead
+    sm.executionGasLimit === expectedGas
+    sm.executorFeeTokenAmount === 0.0
+
+    -- If payload were double-counted, both totalGas and gasCostUSDCents would be larger
+    -- by payloadBytes * destGasPerPayloadByteBase.
+    quote <- submit owner do
+        exerciseCmd feeQuoter QuoteGasForExec with
+            destChainSelector = destChainSelector
+            nonCalldataGas = sm.executorDestGasLimit
+            calldataSize = sm.executorDestBytesOverhead
+            feeToken = feeToken
+            caller = owner
+    quote.totalGas === expectedGas
+    quote.gasCostUSDCents === expectedExecutionCost
+
+    debug "testFinalizeFee_PayloadBytesCountedOnce: PASSED"
