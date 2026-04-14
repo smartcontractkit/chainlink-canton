@@ -161,6 +161,7 @@ func (i *ImplFactory) TransmitterAddress(privateKeyHex string) (protocol.Unknown
 	}
 
 	publicKey := ed25519.PrivateKey(privateKeyBytes).Public().(ed25519.PublicKey)
+
 	return protocol.UnknownAddress(publicKey), nil
 }
 
