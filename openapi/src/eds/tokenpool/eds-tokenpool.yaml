@@ -8,6 +8,8 @@ paths:
   /ccip/v1/external/tokenPool/{address}/send:
     post:
       operationId: postTokenPoolSend
+      tags:
+        - sending
       description: |
         Get the explicit disclosures for sending a token transfer using this token pool.
       parameters:
@@ -42,6 +44,8 @@ paths:
   /ccip/v1/external/tokenPool/{address}/execute:
     post:
       operationId: postTokenPoolExecute
+      tags:
+        - execution
       description: |
         Get the explicit disclosures for executing a token transfer using this token pool.
       parameters:
@@ -73,6 +77,11 @@ paths:
         '500':
           $ref: '../common/eds-common.yaml#/components/responses/500'
 
+tags:
+  - name: sending
+    description: Endpoints related to sending CCIP messages
+  - name: execution
+    description: Endpoints related to executing CCIP messages
 
 components:
   schemas:
@@ -80,8 +89,8 @@ components:
       type: object
       required:
       properties:
-        canton2AnyMessage:
-          $ref: "../common/eds-common.yaml#/components/schemas/Canton2AnyMessage"
+        message:
+          $ref: "../common/eds-common.yaml#/components/schemas/Message"
     TokenPoolSendResponse:
       type: object
       required:

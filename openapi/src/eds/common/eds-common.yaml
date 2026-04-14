@@ -98,9 +98,9 @@ components:
         - $ref: "#/components/schemas/RawInstanceAddress"
         - $ref: "#/components/schemas/InstanceAddress"
 
-    Canton2AnyMessage:
+    Message:
       type: object
-      description: A message in the Canton 2 AnyMessage format, to be used by the caller during submission.
+      description: A message to be sent from Canton.
       required:
         - destinationChainSelector
         - receiver

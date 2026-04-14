@@ -8,6 +8,8 @@ paths:
   /ccip/v1/external/executor/{address}/send:
     post:
       operationId: postExecutorSend
+      tags:
+        - sending
       description: |
         Get the explicit disclosures for sending a message using this Executor.
       parameters:
@@ -39,14 +41,18 @@ paths:
         '500':
           $ref: '../common/eds-common.yaml#/components/responses/500'
 
+tags:
+  - name: sending
+    description: Endpoints related to sending CCIP messages
+
 components:
   schemas:
     ExecutorSendRequest:
       type: object
       required:
       properties:
-        canton2AnyMessage:
-          $ref: "../common/eds-common.yaml#/components/schemas/Canton2AnyMessage"
+        message:
+          $ref: "../common/eds-common.yaml#/components/schemas/Message"
         ccvs:
           type: array
           items:

@@ -9,43 +9,12 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
-// Defines values for Canton2AnyMessageExecutorType.
+// Defines values for MessageExecutorType.
 const (
-	Empty       Canton2AnyMessageExecutorType = ""
-	NoExecutor  Canton2AnyMessageExecutorType = "noExecutor"
-	WithAddress Canton2AnyMessageExecutorType = "withAddress"
+	Empty       MessageExecutorType = ""
+	NoExecutor  MessageExecutorType = "noExecutor"
+	WithAddress MessageExecutorType = "withAddress"
 )
-
-// Canton2AnyMessage A message in the Canton 2 AnyMessage format, to be used by the caller during submission.
-type Canton2AnyMessage struct {
-	// DestinationChainSelector The chain selector of the destination chain.
-	DestinationChainSelector int `json:"destinationChainSelector"`
-
-	// Executor The executor of the message, which determines the executor the message will be forwarded to on the source chain.
-	// If not specified, or if type is "", the message will be executed with the default executor on the remote chain.
-	// If type is "noExecutor", the message will not be executed automatically on the remote chain.
-	// If type is "withAddress", the message will be executed with an executor at the specified address.
-	Executor struct {
-		// Address An address which can be either a RawInstanceAddress or an InstanceAddress.
-		Address *RawOrHashedAddress           `json:"address,omitempty"`
-		Type    Canton2AnyMessageExecutorType `json:"type"`
-	} `json:"executor"`
-
-	// FeeToken A globally unique identifier for instruments.
-	FeeToken InstrumentId `json:"feeToken"`
-
-	// Payload The payload of the message, encoded as a hex string.
-	Payload string `json:"payload"`
-
-	// Receiver The receiver of the message on the remote chain, encoded as a hex string.
-	Receiver string `json:"receiver"`
-
-	// TokenTransfer A token transfer to be included in the message, set to null if the message does not include a token transfer.
-	TokenTransfer *TokenTransfer `json:"tokenTransfer,omitempty"`
-}
-
-// Canton2AnyMessageExecutorType defines model for Canton2AnyMessage.Executor.Type.
-type Canton2AnyMessageExecutorType string
 
 // ContractId The unique identifier of a contract.
 type ContractId = string
@@ -82,6 +51,37 @@ type InstrumentId struct {
 	Admin PartyId `json:"admin"`
 	Id    string  `json:"id"`
 }
+
+// Message A message to be sent from Canton.
+type Message struct {
+	// DestinationChainSelector The chain selector of the destination chain.
+	DestinationChainSelector int `json:"destinationChainSelector"`
+
+	// Executor The executor of the message, which determines the executor the message will be forwarded to on the source chain.
+	// If not specified, or if type is "", the message will be executed with the default executor on the remote chain.
+	// If type is "noExecutor", the message will not be executed automatically on the remote chain.
+	// If type is "withAddress", the message will be executed with an executor at the specified address.
+	Executor struct {
+		// Address An address which can be either a RawInstanceAddress or an InstanceAddress.
+		Address *RawOrHashedAddress `json:"address,omitempty"`
+		Type    MessageExecutorType `json:"type"`
+	} `json:"executor"`
+
+	// FeeToken A globally unique identifier for instruments.
+	FeeToken InstrumentId `json:"feeToken"`
+
+	// Payload The payload of the message, encoded as a hex string.
+	Payload string `json:"payload"`
+
+	// Receiver The receiver of the message on the remote chain, encoded as a hex string.
+	Receiver string `json:"receiver"`
+
+	// TokenTransfer A token transfer to be included in the message, set to null if the message does not include a token transfer.
+	TokenTransfer *TokenTransfer `json:"tokenTransfer,omitempty"`
+}
+
+// MessageExecutorType defines model for Message.Executor.Type.
+type MessageExecutorType string
 
 // PartyId The unique identifier of a party.
 type PartyId = string

@@ -55,8 +55,8 @@ type TokenPoolExecuteResponse struct {
 
 // TokenPoolSendRequest defines model for TokenPoolSendRequest.
 type TokenPoolSendRequest struct {
-	// Canton2AnyMessage A message in the Canton 2 AnyMessage format, to be used by the caller during submission.
-	Canton2AnyMessage *externalRef0.Canton2AnyMessage `json:"canton2AnyMessage,omitempty"`
+	// Message A message to be sent from Canton.
+	Message *externalRef0.Message `json:"message,omitempty"`
 }
 
 // TokenPoolSendResponse defines model for TokenPoolSendResponse.

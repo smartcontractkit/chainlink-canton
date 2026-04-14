@@ -126,8 +126,10 @@ Sending a message from Canton requires the following API calls:
 1. (If the message includes as token transfer) The user needs to query the token pool API for the token's token pool to
    get the token pool disclosures along with a list of required CCVs for this token transfer.
     1. If the token pool is unknown, the user needs to query the global CCIP API to look up the token pool for the
-       token from the Token Admin Registry. This might also return the base URL for the token pool API if the token pool
-       operator has registered it on the global EDS registry (see [GlobalRegistry](#global-eds-registry))
+       token from the Token Admin Registry.
+    2. If the Token Pool's API endpoint is unknown, the user can query the global CCIP API to look up the API endpoint
+       for the token pool from the global EDS registry, providing the instance address of the token pool
+       (see [GlobalRegistry](#global-eds-registry)).
 2. The user needs to query the global CCIP API to get the disclosures for sending a message, providing the list of
    required CCVs from the previous step along with any sender-required CCVs that the sender-contract might require.
     1. The global CCIP API will return the disclosures for sending a message
@@ -138,10 +140,16 @@ Sending a message from Canton requires the following API calls:
        address of the Executor contract.
 3. The user needs to query the Executor API to get the disclosures for the Executor, providing the list of all CCVs that
    were returned by the previous step.
-    1. The Executor API accepts a list of CCVs along with the message, as an Executor can limit the CCVs that can be
+    1. If the Executor's API endpoint is unknown, the user can query the global CCIP API to look up the API endpoint for
+       the Executor from the global EDS registry, providing the instance address of the Executor
+       (see [GlobalRegistry](#global-eds-registry)).
+    2. The Executor API accepts a list of CCVs along with the message, as an Executor can limit the CCVs that can be
        used with it. This allows the Executor to provide disclosures based on the specific CCVs that will be used with
        this message or reject the request if the provided CCVs are not compatible with this Executor.
 4. The user needs to query the CCV API for each CCV that was returned by the global CCIP API.
+    1. If a CCV's API endpoint is unknown, the user can query the global CCIP API to look up the API endpoint for that
+       CCV from the global EDS registry, providing the instance address of the CCV 
+       (see [GlobalRegistry](#global-eds-registry)).
 5. The user submits the transaction to the Canton participant, which includes the message and all required disclosures
    from the previous steps, along with the necessary inputs for each of the TP,CCV, and Executor contracts which have
    been returned by their corresponding APIs.
@@ -158,6 +166,7 @@ config:
         noteMargin: 10
     
 ---
+
 sequenceDiagram
     actor User
     participant TP as Token Pool API
@@ -173,30 +182,50 @@ sequenceDiagram
             note over User, CCIP: Returns: <br/> - instanceAddress: InstanceAddress of the pool <br/> - rawInstanceAddress: RawInstanceAddress of the pool <br/> - baseURL: URL of the token pool API
         end
 
+        opt If the TP's EDS URL is unknown
+            User ->>+ CCIP: GET /ccip/v1/global/edsRegistry/address/{address}
+            CCIP -->>- User: Return Base URL
+            note over User, CCIP: Returns: <br/> - baseURL: URL of the TP's API
+        end
+
         User ->>+ TP: POST /ccip/v1/external/tokenPool/{address}/send
-        note over User, TP: Provide: <br/> - canton2AnyMessage: the message to be sent
+        note over User, TP: Provide: <br/> - message: the message to be sent
         TP -->>- User: Return requiredCCVs
         note over User, TP: Returns: <br/> - requiredCCVs: List of CCVs that this token transfer requires <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - disclosedContracts[]
     end
 
     User ->>+ CCIP: POST /ccip/v1/global/message/send
-    note over User, CCIP: Provide: <br/> - canton2AnyMessage: the message to be sent <br/> - senderRequiredCCVs: List of CCVs that the sender requires <br/> - tokenPoolRequiredCCVs: List of CCVs that the token pool requires
-    CCIP -->>- User: Return messageId
+    note over User, CCIP: Provide: <br/> - message: the message to be sent <br/> - senderRequiredCCVs: List of CCVs that the sender requires <br/> - tokenPoolRequiredCCVs: List of CCVs that the token pool requires
+    CCIP -->>- User: Return
     note over User, CCIP: Returns: <br/> - ccvs[]: <br/> ---- instanceAddress: <br/> ---- rawInstanceAddress: <br/> ---- baseURL: URL of the CCV API <br/> - disclosedContracts[]
+
+    opt If the Executors's EDS URL is unknown
+        User ->>+ CCIP: GET /ccip/v1/global/edsRegistry/address/{address}
+        CCIP -->>- User: Return Base URL
+        note over User, CCIP: Returns: <br/> - baseURL: URL of the Executors's API
+    end
+
     User ->>+ Executor: POST /ccip/v1/external/executor/{address}/send
-    note over User, Executor: Provide: <br/> - canton2AnyMessage: the message to be sent <br/> - ccvs[]: List of all CCVs that will be used for this message
+    note over User, Executor: Provide: <br/> - message: the message to be sent <br/> - ccvs[]: List of all CCVs that will be used for this message
     Executor -->>- User: Return
-    note over User, Executor: Returns: <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - baseURL: <br/> - disclosedContracts[]
+    note over User, Executor: Returns: <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - disclosedContracts[]
 
     loop For each CCV
+        opt If the CCV's EDS URL is unknown
+            User ->>+ CCIP: GET /ccip/v1/global/edsRegistry/address/{address}
+            CCIP -->>- User: Return Base URL
+            note over User, CCIP: Returns: <br/> - baseURL: URL of the CCV's API
+        end
+
         User ->>+ CCV: POST /ccip/v1/external/ccv/{address}/send
-        note over User, CCV: Provide: <br/> - canton2AnyMessage: the message to be sent
+        note over User, CCV: Provide: <br/> - message: the message to be sent
         CCV -->>- User: Return
-        note over User, CCV: Returns: <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - baseURL: <br/> - disclosedContracts[]
+        note over User, CCV: Returns: <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - disclosedContracts[]
     end
 
     User ->> Canton: Submit Transaction
     note over User, Canton: The user submits the transaction to the Canton participant, which includes the message and all required disclosures from the previous steps. <br/> Along with the necessary inputs for each of the TP,CCV, and Executor contracts which have been returned by their corresponding APIs.
+
 ```
 
 ## Executing a message
@@ -208,18 +237,16 @@ Executing a message on Canton requires the following API calls:
 1. The user queries the global CCIP API, providing the encoded message itself and a list of addresses of all CCVs that
    have verified this message.
     1. The global CCIP API will return the disclosures for all global CCIP contracts that are relevant for execution
-    2. It will also look up all provided CCVs in the global EDS registry and return the `rawInstanceAddress` and
-       `baseURL` for each CCV that is found in the registry, which the user can use to query the CCV APIs for these
-       CCVs.
-    3. If the message includes a token transfer, and the token pool operator has registered the token pool with the
-       global EDS registry (see [GlobalRegistry](#global-eds-registry)), then it will also return the
-       `rawInstanceAddress` and `baseURL` for the token pool, which
-       the user can use to query the token pool API for disclosures related to execution.
-2. The user needs to query the token pool API for the token pool of the transferred token, providing the encoded
+    2. If the message contains a token transfer, it will also return the Token Pool that's registered for the token
+       being transferred.
+2. If the user does not know the API endpoint for the token pool or any of the CCVs that verified this message, the
+   user can query the global CCIP API to look up the API endpoint for these contracts from the global EDS registry,
+   providing the instance address of the contract (see [GlobalRegistry](#global-eds-registry)).
+3. The user needs to query the token pool API for the token pool of the transferred token, providing the encoded
    message.
-3. The user needs to query the CCV API for each CCV that verified this message to get the disclosures for execution,
+4. The user needs to query the CCV API for each CCV that verified this message to get the disclosures for execution,
    providing the encoded message to each CCV API.
-4. The user submits the transaction to the Canton participant, which includes the message and all required disclosures
+5. The user submits the transaction to their Canton participant, which includes the message and all required disclosures
    from the previous steps, along with the necessary inputs for each of the TP and CCV contracts which have been
    returned by their corresponding APIs.
 
@@ -241,24 +268,39 @@ sequenceDiagram
     participant TP as Token Pool API
     participant CCV as CCV API
     participant Canton as Canton Participant
+
     User ->>+ CCIP: POST /ccip/v1/global/message/execute
-    note over User, CCIP: Provide: <br/> - encodedMessage: the encoded message to-be-executed <br/> - ccvs[]: List of CCVs that have verified this message
+    note over User, CCIP: Provide: <br/> - encodedMessage: the encoded message to-be-executed
     CCIP -->>- User: Return
-    note over User, CCIP: Returns: <br/> - ccvs[]: <br/> ---- instanceAddress: <br/> ---- rawInstanceAddress: <br/> ---- baseURL: URL of the CCV API <br/> - tokenPool: <br/> ---- instanceAddress: <br/> ---- rawInstanceAddress: <br/> ---- baseURL: URL of the Token Pool API <br/> - disclosedContracts[]
+    note over User, CCIP: Returns: <br/> - tokenPool: <br/> ---- instanceAddress: <br/> ---- rawInstanceAddress: <br/> - disclosedContracts[]
+
+    opt If the TP's EDS URL is unknown
+        User ->>+ CCIP: GET /ccip/v1/global/edsRegistry/address/{address}
+        CCIP -->>- User: Return Base URL
+        note over User, CCIP: Returns: <br/> - baseURL: URL of the TP's API
+    end
+
     User ->>+ TP: POST /ccip/v1/external/tokenPool/{address}/execute
-    note over User, TP: Provide: <br/> - encodedMessage: the encoded message to-be-executed <br/>
+    note over User, TP: Provide: <br/> - encodedMessage: the encoded message to-be-executed
     TP -->>- User: Return
-    note over User, TP: Returns: <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - baseURL: <br/> - disclosedContracts[]
+    note over User, TP: Returns: <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - disclosedContracts[]
 
     loop For each CCV
+        opt If the CCV's EDS URL is unknown
+            User ->>+ CCIP: GET /ccip/v1/global/edsRegistry/address/{address}
+            CCIP -->>- User: Return Base URL
+            note over User, CCIP: Returns: <br/> - baseURL: URL of the CCV's API
+        end
+
         User ->>+ CCV: POST /ccip/v1/external/ccv/{address}/execute
-        note over User, CCV: Provide: <br/> - encodedMessage: the encoded message to-be-executed <br/>
+        note over User, CCV: Provide: <br/> - encodedMessage: the encoded message to-be-executed
         CCV -->>- User: Return
-        note over User, CCV: Returns: <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - baseURL: <br/> - disclosedContracts[]
+        note over User, CCV: Returns: <br/> - contractId: <br/> - instanceAddress: <br/> - rawInstanceAddress: <br/> - disclosedContracts[]
     end
 
     User ->> Canton: Submit Transaction
     note over User, Canton: The user submits the transaction to the Canton participant, which includes the message and verifier results and all required disclosures from the previous steps. <br/> Along with the necessary inputs for each of the TP,CCV, and Executor contracts which have been returned by their corresponding APIs.
+
 ```
 
 ## Global EDS Registry
