@@ -1,12 +1,18 @@
 package tests
 
 import (
+	"context"
+	"math/big"
 	"testing"
+	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
+	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 )
@@ -39,4 +45,64 @@ func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, harness tcapi.TestHa
 	require.NoError(t, err)
 
 	return chainMap[chainDetails.ChainSelector]
+}
+
+func AssertSingleVerifierResult(
+	t *testing.T,
+	ctx context.Context,
+	harness *tcapi.TestHarness,
+	messageID [32]byte,
+) tcapi.AssertionResult {
+	t.Helper()
+
+	chainMap, err := harness.Lib.ChainsMap(ctx)
+	require.NoError(t, err)
+
+	testCtx, cleanupFn := tcapi.NewTestingContext(
+		ctx,
+		chainMap,
+		harness.AggregatorClients[common.DefaultCommitteeVerifierQualifier],
+		harness.IndexerMonitor,
+	)
+	defer cleanupFn()
+
+	result, err := testCtx.AssertMessage(messageID, tcapi.AssertMessageOptions{
+		TickInterval:            time.Second,
+		Timeout:                 utilstests.WaitTimeout(t),
+		ExpectedVerifierResults: 1,
+		AssertVerifierLogs:      false,
+		AssertExecutorLogs:      false,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.AggregatedResult)
+	require.Len(t, result.IndexedVerifications.Results, 1)
+
+	return result
+}
+
+func HoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
+	var total float64
+
+	for _, h := range holdings {
+		views := h.GetCreatedEvent().GetInterfaceViews()
+		if len(views) == 0 || views[0].GetViewValue() == nil {
+			continue
+		}
+
+		fields := views[0].GetViewValue().GetFields()
+		if len(fields) < 3 {
+			continue
+		}
+
+		balanceStr := fields[2].GetValue().GetNumeric()
+		balance, ok := new(big.Float).SetString(balanceStr)
+		if !ok {
+			continue
+		}
+
+		v, _ := balance.Float64()
+		total += v
+	}
+
+	return total
 }

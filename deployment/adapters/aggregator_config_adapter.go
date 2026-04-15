@@ -173,6 +173,10 @@ func normalizeSignerHex(hexKey string) string {
 	return "0x" + hexKey
 }
 
+// signerKeyToAddress converts a Canton signer key into the address form expected
+// by the aggregator quorum config. Canton stores raw 65-byte secp256k1 public
+// keys, while the aggregator matches recovered signer addresses from verifier
+// signatures against configured signer addresses.
 func signerKeyToAddress(hexKey string) (string, error) {
 	normalized := normalizeSignerHex(hexKey)
 	keyBytes, err := hex.DecodeString(strings.TrimPrefix(normalized, "0x"))

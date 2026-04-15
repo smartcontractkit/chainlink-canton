@@ -139,21 +139,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		t.Logf("CCIPMessageSent event: %+v", sentEvent)
 
-		chainMap, err := harness.Lib.ChainsMap(subtestCtx)
-		require.NoError(t, err)
-		testCtx, cleanupFn := tcapi.NewTestingContext(subtestCtx, chainMap, harness.AggregatorClients[devenvcommon.DefaultCommitteeVerifierQualifier], harness.IndexerMonitor)
-		defer cleanupFn()
 		t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID)
-		result, err := testCtx.AssertMessage(sentEvent.MessageID, tcapi.AssertMessageOptions{
-			TickInterval:            1 * time.Second,
-			ExpectedVerifierResults: 1,
-			Timeout:                 tests.WaitTimeout(t),
-			AssertVerifierLogs:      false,
-			AssertExecutorLogs:      false,
-		})
-		require.NoError(t, err)
-		require.NotNil(t, result.AggregatedResult)
-		require.Len(t, result.IndexedVerifications.Results, 1)
+		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
 		t.Logf(
 			"Message assertion succeeded: aggregated=true indexerResults=%+v",
 			result.IndexedVerifications.Results,

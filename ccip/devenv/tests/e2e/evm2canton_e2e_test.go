@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -36,62 +35,14 @@ const (
 	evmToCantonTransferAmount = int64(100_000_000_000)
 )
 
-func assertMessageForEVM2Canton(
-	t *testing.T,
-	harness *tcapi.TestHarness,
-	messageID [32]byte,
-) (protocol.Message, protocol.UnknownAddress, []byte) {
-	t.Helper()
-
-	chainMap, err := harness.Lib.ChainsMap(t.Context())
-	require.NoError(t, err)
-	testCtx, cleanupFn := tcapi.NewTestingContext(t.Context(), chainMap, harness.AggregatorClients[common.DefaultCommitteeVerifierQualifier], harness.IndexerMonitor)
-	defer cleanupFn()
-	result, err := testCtx.AssertMessage(messageID, tcapi.AssertMessageOptions{
-		TickInterval:            time.Second,
-		Timeout:                 tests.WaitTimeout(t),
-		ExpectedVerifierResults: 1,
-		AssertVerifierLogs:      false,
-		AssertExecutorLogs:      false,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result.AggregatedResult)
-	require.Len(t, result.IndexedVerifications.Results, 1)
-
-	vr := result.IndexedVerifications.Results[0].VerifierResult
-
-	return vr.Message, vr.VerifierDestAddress, vr.CCVData
-}
-
-func GetHoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
-	var total float64
-	for _, h := range holdings {
-		views := h.GetCreatedEvent().GetInterfaceViews()
-		if len(views) == 0 || views[0].GetViewValue() == nil {
-			continue
-		}
-		fields := views[0].GetViewValue().GetFields()
-		if len(fields) < 3 {
-			continue
-		}
-		balanceStr := fields[2].GetValue().GetNumeric()
-		balance, ok := new(big.Float).SetString(balanceStr)
-		if !ok {
-			continue
-		}
-		v, _ := balance.Float64()
-		total += v
-	}
-
-	return total
-}
-
 //nolint:paralleltest // we won't run this in parallel.
 func TestEVM2Canton_Basic(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping EVM2Canton_Basic test in short mode")
 	}
 
+	// Register the Canton impl factory so the shared CCV harness can resolve the
+	// Canton family to this repo's devenv/test implementation.
 	ccv.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
 
 	configPath := "../../env-canton-evm-out.toml"
@@ -184,7 +135,9 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NotNil(t, sentEvent.Message)
 		require.Nil(t, sentEvent.Message.TokenTransfer)
 
-		message, verifierDestAddress, ccvData := assertMessageForEVM2Canton(t, &harness, sentEvent.MessageID)
+		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
+		vr := result.IndexedVerifications.Results[0].VerifierResult
+		message, verifierDestAddress, ccvData := vr.Message, vr.VerifierDestAddress, vr.CCVData
 		require.Nil(t, message.TokenTransfer)
 		executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(subtestCtx, message, 0, []protocol.UnknownAddress{verifierDestAddress}, [][]byte{ccvData})
 		require.NoError(t, err)
@@ -237,7 +190,9 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NotNil(t, sentEvent.Message)
 		require.NotNil(t, sentEvent.Message.TokenTransfer)
 
-		message, verifierDestAddress, ccvData := assertMessageForEVM2Canton(t, &harness, sentEvent.MessageID)
+		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
+		vr := result.IndexedVerifications.Results[0].VerifierResult
+		message, verifierDestAddress, ccvData := vr.Message, vr.VerifierDestAddress, vr.CCVData
 		require.NotNil(t, message.TokenTransfer)
 		require.NotNil(t, message.TokenTransfer.Amount)
 		t.Logf("Canton token transfer amount from verifier result: %s", message.TokenTransfer.Amount.String())
@@ -252,7 +207,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 			EntityName: "Holding",
 		})
 		require.NoError(t, err)
-		t.Logf("Canton receiver total holdings after execute: %.10f", GetHoldingsBalance(receiverHoldings))
+		t.Logf("Canton receiver total holdings after execute: %.10f", devenvtests.HoldingsBalance(receiverHoldings))
 
 		srcBalanceAfter, err := srcChain.GetTokenBalance(subtestCtx, srcSender, srcToken)
 		require.NoError(t, err)
