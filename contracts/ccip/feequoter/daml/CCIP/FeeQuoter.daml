@@ -9,7 +9,6 @@ import DA.List (unique, dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional
 import DA.Set qualified as Set
-import DA.Time (convertRelTimeToMicroseconds, subTime)
 import Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
@@ -229,18 +228,9 @@ template FeeQuoter
                 assertMsg ("Fee token not configured: " <> feeToken.id)
                     (Set.member feeToken feeTokens)
 
-                now <- getTime
                 gasPrice <- exercise self GetDestinationChainGasPrice with
                     destChainSelector
                     caller
-                if destChainConfig.gasPriceStalenessThreshold > 0 then do
-                    let elapsedMicros = convertRelTimeToMicroseconds (subTime now gasPrice.timestamp)
-                    let elapsedSecs = elapsedMicros / 1_000_000
-                    assertMsg ("feequoter: stale gas price for chain " <> show destChainSelector
-                        <> " (threshold " <> show destChainConfig.gasPriceStalenessThreshold
-                        <> "s, elapsed " <> show elapsedSecs <> "s)")
-                        (elapsedSecs <= destChainConfig.gasPriceStalenessThreshold)
-                else pure ()
                 feeTokenPrice <- exercise self GetTokenPrice with
                     instrumentId = feeToken
                     caller
