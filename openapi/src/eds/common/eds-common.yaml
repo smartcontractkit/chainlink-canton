@@ -82,6 +82,12 @@ components:
       description: The hashed identifier of an instrument, the keccak256 hash of the concatenated InstrumentId in the form of `id@admin`.
       example: "0xd661ca168d25fea40edc85adb17786a5ecc7e547a3674e60359bac4fb0803aeb"
 
+    RawOrHashedInstrumentId:
+      description: An instrument identifier which can be either a RawInstrumentId or a HashedInstrumentId.
+      oneOf:
+        - $ref: "#/components/schemas/InstrumentId"
+        - $ref: "#/components/schemas/HashedInstrumentId"
+
     RawInstanceAddress:
       type: string
       description: The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.

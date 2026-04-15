@@ -94,6 +94,11 @@ type RawOrHashedAddress struct {
 	union json.RawMessage
 }
 
+// RawOrHashedInstrumentId An instrument identifier which can be either a RawInstrumentId or a HashedInstrumentId.
+type RawOrHashedInstrumentId struct {
+	union json.RawMessage
+}
+
 // TokenTransfer A token transfer to be included in the message, set to null if the message does not include a token transfer.
 type TokenTransfer struct {
 	// Amount The decimal amount of the token to be transferred.
@@ -170,6 +175,68 @@ func (t RawOrHashedAddress) MarshalJSON() ([]byte, error) {
 }
 
 func (t *RawOrHashedAddress) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsInstrumentId returns the union data inside the RawOrHashedInstrumentId as a InstrumentId
+func (t RawOrHashedInstrumentId) AsInstrumentId() (InstrumentId, error) {
+	var body InstrumentId
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromInstrumentId overwrites any union data inside the RawOrHashedInstrumentId as the provided InstrumentId
+func (t *RawOrHashedInstrumentId) FromInstrumentId(v InstrumentId) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeInstrumentId performs a merge with any union data inside the RawOrHashedInstrumentId, using the provided InstrumentId
+func (t *RawOrHashedInstrumentId) MergeInstrumentId(v InstrumentId) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsHashedInstrumentId returns the union data inside the RawOrHashedInstrumentId as a HashedInstrumentId
+func (t RawOrHashedInstrumentId) AsHashedInstrumentId() (HashedInstrumentId, error) {
+	var body HashedInstrumentId
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromHashedInstrumentId overwrites any union data inside the RawOrHashedInstrumentId as the provided HashedInstrumentId
+func (t *RawOrHashedInstrumentId) FromHashedInstrumentId(v HashedInstrumentId) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeHashedInstrumentId performs a merge with any union data inside the RawOrHashedInstrumentId, using the provided HashedInstrumentId
+func (t *RawOrHashedInstrumentId) MergeHashedInstrumentId(v HashedInstrumentId) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RawOrHashedInstrumentId) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RawOrHashedInstrumentId) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

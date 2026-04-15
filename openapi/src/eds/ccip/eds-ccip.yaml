@@ -5,7 +5,7 @@ info:
   version: 0.0.1
 
 paths:
-  /ccip/v1/global/perPartyRouter/factory:
+  /ccip/v1/global/PerPartyRouter/factory:
     post:
       operationId: postPerPartyRouterFactory
       tags:
@@ -32,7 +32,7 @@ paths:
         '500':
           $ref: '../common/eds-common.yaml#/components/responses/500'
 
-  /ccip/v1/global/tokenAdminRegistry/token/{instrumentId}:
+  /ccip/v1/global/TokenAdminRegistry/token/{instrumentId}:
     get:
       operationId: getTokenAdminRegistryToken
       tags:
@@ -44,8 +44,8 @@ paths:
           name: instrumentId
           required: true
           schema:
-            $ref: '../common/eds-common.yaml#/components/schemas/HashedInstrumentId'
-          description: The hashed InstrumentId, encoded as a hex string.
+            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedInstrumentId'
+          description: The InstrumentId or the asset, either as a raw or hashed value, to look up in the token admin registry.
       responses:
         '200':
           description: ok
