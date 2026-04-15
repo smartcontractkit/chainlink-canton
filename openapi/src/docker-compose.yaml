@@ -17,5 +17,6 @@ services:
           {url: '/openapi/eds/ccip/eds-ccip.yaml', name: 'EDS - CCIP'},
           {url: '/openapi/eds/ccv/eds-ccv.yaml', name: 'EDS - CCV'},
           {url: '/openapi/eds/executor/eds-executor.yaml', name: 'EDS - Executor'},
+          {url: '/openapi/eds/global/eds-global.yaml', name: 'EDS - Global'},
           {url: '/openapi/eds/tokenpool/eds-tokenpool.yaml', name: 'EDS - Token Pool'}
         ]"

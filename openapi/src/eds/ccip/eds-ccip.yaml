@@ -60,35 +60,6 @@ paths:
         '500':
           $ref: '../common/eds-common.yaml#/components/responses/500'
 
-  /ccip/v1/global/edsRegistry/address/{address}:
-    get:
-      operationId: getEDSRegistryAddress
-      tags:
-        - general
-      description: |
-        Look up an address from the EDS registry.
-      parameters:
-        - in: path
-          name: address
-          required: true
-          schema:
-            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
-          description: The address to look up, either as a RawInstanceAddress or an InstanceAddress, encoded as a hex string.
-      responses:
-        '200':
-          description: The requested address was found in the EDS registry.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LookupEDSRegistryResponse'
-        '400':
-          $ref: '../common/eds-common.yaml#/components/responses/400'
-        '404':
-          $ref: '../common/eds-common.yaml#/components/responses/404'
-        '500':
-          $ref: '../common/eds-common.yaml#/components/responses/500'
-
-
   /ccip/v1/global/message/send:
     post:
       operationId: postCCIPSend
@@ -184,18 +155,6 @@ components:
         rawInstanceAddress:
           $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
 
-    LookupEDSRegistryResponse:
-      type: object
-      required:
-        - instanceAddress
-      properties:
-        instanceAddress:
-          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
-        rawInstanceAddress:
-          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
-        baseUrl:
-          $ref: "../common/eds-common.yaml#/components/schemas/EDSBaseUrl"
-
     CCIPSendRequest:
       type: object
       required:
@@ -289,16 +248,3 @@ components:
           example:
             instanceAddress: "0x390b4a68b330097e97deebf6ae6784653e6210d8fd202985afb6480e2dca9a2a"
             rawInstanceAddress: "tokenpool-abcde@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -37,7 +37,6 @@ const (
 	CCIPFactory              = Package("ccip-factory")
 	CCIPRMN                  = Package("ccip-rmn")
 	CCIPTest                 = Package("ccip-test")
-	CCIPEDSRegistry          = Package("ccip-eds-registry")
 
 	SpliceApiTokenBurnMintV1            = Package("splice-api-token-burn-mint-v1")
 	SpliceApiTokenHoldingV1             = Package("splice-api-token-holding-v1")
@@ -70,7 +69,6 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPFactory:              []string{"0.0.1", CurrentVersion},
 	CCIPRMN:                  []string{"0.0.1", CurrentVersion},
 	CCIPTest:                 []string{"0.0.1", CurrentVersion},
-	CCIPEDSRegistry:          []string{"0.0.1", CurrentVersion},
 
 	SpliceApiTokenBurnMintV1:            []string{"1.0.0"},
 	SpliceApiTokenHoldingV1:             []string{"1.0.0"},
@@ -122,7 +120,6 @@ var OutputDirs = map[Package][]string{
 	CCIPFactory:              []string{"ccip", "factory"},
 	CCIPRMN:                  []string{"ccip", "rmn"},
 	CCIPTokenAdminRegistry:   []string{"ccip", "tokenadminregistry"},
-	CCIPEDSRegistry:          []string{"ccip", "edsregistry"},
 
 	SpliceApiTokenBurnMintV1:            []string{"splice", "splice_api_token_burn_mint_v1"},
 	SpliceApiTokenHoldingV1:             []string{"splice", "splice_api_token_holding_v1"},

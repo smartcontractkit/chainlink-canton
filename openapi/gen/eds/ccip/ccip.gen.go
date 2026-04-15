@@ -92,18 +92,6 @@ type CCIPSendResponse struct {
 	} `json:"executor,omitempty"`
 }
 
-// LookupEDSRegistryResponse defines model for LookupEDSRegistryResponse.
-type LookupEDSRegistryResponse struct {
-	// BaseUrl The base URL of the operators EDS API.
-	BaseUrl *externalRef0.EDSBaseUrl `json:"baseUrl,omitempty"`
-
-	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
-
-	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-	RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
-}
-
 // LookupTokenPoolResponse defines model for LookupTokenPoolResponse.
 type LookupTokenPoolResponse struct {
 	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
@@ -195,9 +183,6 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// GetEDSRegistryAddress request
-	GetEDSRegistryAddress(ctx context.Context, address externalRef0.RawOrHashedAddress, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// PostCCIPExecuteWithBody request with any body
 	PostCCIPExecuteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -215,18 +200,6 @@ type ClientInterface interface {
 
 	// GetTokenAdminRegistryToken request
 	GetTokenAdminRegistryToken(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*http.Response, error)
-}
-
-func (c *Client) GetEDSRegistryAddress(ctx context.Context, address externalRef0.RawOrHashedAddress, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetEDSRegistryAddressRequest(c.Server, address)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
 }
 
 func (c *Client) PostCCIPExecuteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -311,40 +284,6 @@ func (c *Client) GetTokenAdminRegistryToken(ctx context.Context, instrumentId ex
 		return nil, err
 	}
 	return c.Client.Do(req)
-}
-
-// NewGetEDSRegistryAddressRequest generates requests for GetEDSRegistryAddress
-func NewGetEDSRegistryAddressRequest(server string, address externalRef0.RawOrHashedAddress) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "address", runtime.ParamLocationPath, address)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/ccip/v1/global/edsRegistry/address/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
 }
 
 // NewPostCCIPExecuteRequest calls the generic PostCCIPExecute builder with application/json body
@@ -544,9 +483,6 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// GetEDSRegistryAddressWithResponse request
-	GetEDSRegistryAddressWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, reqEditors ...RequestEditorFn) (*GetEDSRegistryAddressResponse, error)
-
 	// PostCCIPExecuteWithBodyWithResponse request with any body
 	PostCCIPExecuteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCIPExecuteResponse, error)
 
@@ -564,31 +500,6 @@ type ClientWithResponsesInterface interface {
 
 	// GetTokenAdminRegistryTokenWithResponse request
 	GetTokenAdminRegistryTokenWithResponse(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*GetTokenAdminRegistryTokenResponse, error)
-}
-
-type GetEDSRegistryAddressResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *LookupEDSRegistryResponse
-	JSON400      *externalRef0.N400
-	JSON404      *externalRef0.N404
-	JSON500      *externalRef0.N500
-}
-
-// Status returns HTTPResponse.Status
-func (r GetEDSRegistryAddressResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetEDSRegistryAddressResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
 }
 
 type PostCCIPExecuteResponse struct {
@@ -691,15 +602,6 @@ func (r GetTokenAdminRegistryTokenResponse) StatusCode() int {
 	return 0
 }
 
-// GetEDSRegistryAddressWithResponse request returning *GetEDSRegistryAddressResponse
-func (c *ClientWithResponses) GetEDSRegistryAddressWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, reqEditors ...RequestEditorFn) (*GetEDSRegistryAddressResponse, error) {
-	rsp, err := c.GetEDSRegistryAddress(ctx, address, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetEDSRegistryAddressResponse(rsp)
-}
-
 // PostCCIPExecuteWithBodyWithResponse request with arbitrary body returning *PostCCIPExecuteResponse
 func (c *ClientWithResponses) PostCCIPExecuteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCIPExecuteResponse, error) {
 	rsp, err := c.PostCCIPExecuteWithBody(ctx, contentType, body, reqEditors...)
@@ -758,53 +660,6 @@ func (c *ClientWithResponses) GetTokenAdminRegistryTokenWithResponse(ctx context
 		return nil, err
 	}
 	return ParseGetTokenAdminRegistryTokenResponse(rsp)
-}
-
-// ParseGetEDSRegistryAddressResponse parses an HTTP response from a GetEDSRegistryAddressWithResponse call
-func ParseGetEDSRegistryAddressResponse(rsp *http.Response) (*GetEDSRegistryAddressResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetEDSRegistryAddressResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest LookupEDSRegistryResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest externalRef0.N400
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest externalRef0.N404
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest externalRef0.N500
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
 }
 
 // ParsePostCCIPExecuteResponse parses an HTTP response from a PostCCIPExecuteWithResponse call
@@ -998,9 +853,6 @@ func ParseGetTokenAdminRegistryTokenResponse(rsp *http.Response) (*GetTokenAdmin
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /ccip/v1/global/edsRegistry/address/{address})
-	GetEDSRegistryAddress(c *gin.Context, address externalRef0.RawOrHashedAddress)
-
 	// (POST /ccip/v1/global/message/execute)
 	PostCCIPExecute(c *gin.Context)
 
@@ -1022,30 +874,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
-
-// GetEDSRegistryAddress operation middleware
-func (siw *ServerInterfaceWrapper) GetEDSRegistryAddress(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "address" -------------
-	var address externalRef0.RawOrHashedAddress
-
-	err = runtime.BindStyledParameterWithOptions("simple", "address", c.Param("address"), &address, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter address: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetEDSRegistryAddress(c, address)
-}
 
 // PostCCIPExecute operation middleware
 func (siw *ServerInterfaceWrapper) PostCCIPExecute(c *gin.Context) {
@@ -1137,7 +965,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
-	router.GET(options.BaseURL+"/ccip/v1/global/edsRegistry/address/:address", wrapper.GetEDSRegistryAddress)
 	router.POST(options.BaseURL+"/ccip/v1/global/message/execute", wrapper.PostCCIPExecute)
 	router.POST(options.BaseURL+"/ccip/v1/global/message/send", wrapper.PostCCIPSend)
 	router.POST(options.BaseURL+"/ccip/v1/global/perPartyRouter/factory", wrapper.PostPerPartyRouterFactory)
