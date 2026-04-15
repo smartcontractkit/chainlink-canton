@@ -2,7 +2,6 @@ package adapters
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -16,8 +15,6 @@ import (
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -27,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 )
@@ -72,51 +68,35 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		return seqcore.OnChainOutput{}, err
 	}
 
-	env := deployment.Environment{
-		BlockChains:       chains,
-		DataStore:         datastore.NewMemoryDataStore().Seal(),
-		Logger:            bundle.Logger,
-		OperationsBundle:  bundle,
-		ExistingAddresses: nil,
-	}
-
-	cfg := cantonChangesets.CantonCSDeps[cantonChangesets.DeployChainContractsConfig]{
-		ChainSelector: input.ChainSelector,
-		Participant:   0,
-		Config: cantonChangesets.DeployChainContractsConfig{
-			Params: sequences.DeployChainContractsParams{
-				CCIPOwnerParty:     ownerParty,
-				CommitteeVerifiers: committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
-				GlobalConfig: sequences.GlobalConfigParams{
-					Template: common.GlobalConfig{
-						CcipOwner:     "",
-						ChainSelector: types.NUMERIC(strconv.FormatUint(input.ChainSelector, 10)),
-					},
-				},
-				NativeInstrumentId: nativeInstrumentID,
-				FeeQuoterConfig: sequences.FeeQuoterParams{
-					Template: feequoter.FeeQuoter{
-						PriceUpdaters: []types.PARTY{types.PARTY(ownerParty)},
-					},
-					USDPerNative: big.NewInt(100_000_000),
-				},
-				RMNRemote: sequences.RMNRemoteParams{
-					Template: rmn.RMNRemote{
-						RmnOwner:       types.PARTY(ownerParty),
-						CursedSubjects: nil,
-					},
-				},
-				Executors: executorParams(ownerParty, input.ContractParams.Executors),
+	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContracts, chain, sequences.DeployChainContractsParams{
+		CCIPOwnerParty:     ownerParty,
+		CommitteeVerifiers: committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
+		GlobalConfig: sequences.GlobalConfigParams{
+			Template: common.GlobalConfig{
+				CcipOwner:     "",
+				ChainSelector: types.NUMERIC(strconv.FormatUint(input.ChainSelector, 10)),
 			},
 		},
-	}
-
-	out, err := cantonChangesets.DeployChainContracts{}.Apply(env, cfg)
+		NativeInstrumentId: nativeInstrumentID,
+		FeeQuoterConfig: sequences.FeeQuoterParams{
+			Template: feequoter.FeeQuoter{
+				PriceUpdaters: []types.PARTY{types.PARTY(ownerParty)},
+			},
+			USDPerNative: big.NewInt(100_000_000),
+		},
+		RMNRemote: sequences.RMNRemoteParams{
+			Template: rmn.RMNRemote{
+				RmnOwner:       types.PARTY(ownerParty),
+				CursedSubjects: nil,
+			},
+		},
+		Executors: executorParams(ownerParty, input.ContractParams.Executors),
+	})
 	if err != nil {
 		return seqcore.OnChainOutput{}, fmt.Errorf("failed to deploy canton chain contracts for selector %d: %w", input.ChainSelector, err)
 	}
 
-	return datastoreToOnChainOutput(out.DataStore.Seal())
+	return seqcore.OnChainOutput{Addresses: out.Output.Addresses}, nil
 }
 
 func deployerPartyID(deployerContract string, participant canton.Participant) string {
@@ -266,41 +246,4 @@ func waitForFinalityRequested() common.FinalityConfig {
 
 func waitForSafeRequested() common.FinalityConfig {
 	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
-}
-
-func datastoreToOnChainOutput(ds datastore.DataStore) (seqcore.OnChainOutput, error) {
-	addresses, err := ds.Addresses().Fetch()
-	if err != nil {
-		return seqcore.OnChainOutput{}, fmt.Errorf("fetch deployed addresses: %w", err)
-	}
-	contractsMeta, err := ds.ContractMetadata().Fetch()
-	if err != nil {
-		return seqcore.OnChainOutput{}, fmt.Errorf("fetch deployed contract metadata: %w", err)
-	}
-	chainMeta, err := ds.ChainMetadata().Fetch()
-	if err != nil {
-		return seqcore.OnChainOutput{}, fmt.Errorf("fetch deployed chain metadata: %w", err)
-	}
-
-	output := seqcore.OnChainOutput{
-		Addresses: addresses,
-		Metadata: seqcore.Metadata{
-			Contracts: contractsMeta,
-		},
-	}
-	if len(chainMeta) > 1 {
-		return seqcore.OnChainOutput{}, fmt.Errorf("expected at most one chain metadata record, got %d", len(chainMeta))
-	}
-	if len(chainMeta) == 1 {
-		output.Metadata.Chain = &chainMeta[0]
-	}
-
-	envMeta, err := ds.EnvMetadata().Get()
-	if err == nil {
-		output.Metadata.Env = &envMeta
-	} else if !errors.Is(err, datastore.ErrEnvMetadataNotSet) {
-		return seqcore.OnChainOutput{}, fmt.Errorf("fetch deployed env metadata: %w", err)
-	}
-
-	return output, nil
 }
