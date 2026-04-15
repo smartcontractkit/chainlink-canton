@@ -105,6 +105,7 @@ encodeDestChainConfig params =
     <> encodeNumeric0 params.linkFeeMultiplierPercent
     <> encodeNumeric0 params.defaultTokenFeeUSD
     <> fromSome (encodeInt64 params.defaultTokenDestGasOverhead)
+    <> fromSome (encodeInt64 params.gasPriceStalenessThreshold)
 
 decodeDestChainConfigAt : BytesHex -> Int -> Optional (DestChainConfig, Int)
 decodeDestChainConfigAt encoded offset = do
@@ -117,6 +118,7 @@ decodeDestChainConfigAt encoded offset = do
     (linkFeeMultiplierPercent, offset) <- decodeNumeric0At encoded offset
     (defaultTokenFeeUSD, offset) <- decodeNumeric0At encoded offset
     (defaultTokenDestGasOverhead, offset) <- decodeInt64At encoded offset
+    (gasPriceStalenessThreshold, offset) <- decodeInt64At encoded offset
     Some (DestChainConfig{..}, offset)
 
 

@@ -172,6 +172,7 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
             linkFeeMultiplierPercent = 90.0
             defaultTokenFeeUSD = usdToCents 0.5
             defaultTokenDestGasOverhead = 50000
+            gasPriceStalenessThreshold = 0
 
         encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with
             destChainConfigArgs = [DestChainConfigArgs 1.0 destConfig])
@@ -222,8 +223,8 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Create multiple dest chain configs
-    let config1 = DestChainConfig True 65535 3000000 100000 16 200000 100.0 (usdToCents 0.5) 50000
-        config2 = DestChainConfig True 32768 1500000 50000 8 100000 90.0 (usdToCents 1.0) 25000
+    let config1 = DestChainConfig True 65535 3000000 100000 16 200000 100.0 (usdToCents 0.5) 50000 0
+        config2 = DestChainConfig True 32768 1500000 50000 8 100000 90.0 (usdToCents 1.0) 25000 0
         configArgs = [DestChainConfigArgs 1.0 config1, DestChainConfigArgs 137.0 config2]
         encoded = encodeApplyDestChainConfigUpdatesParams (ApplyDestChainConfigUpdatesParams with
             destChainConfigArgs = configArgs)

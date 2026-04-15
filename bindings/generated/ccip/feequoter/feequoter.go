@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "a1b83b7b15b82e41824f82b09ae60899e5e702c4b96205e74a860ae4d6093e4e"
+	PackageID   = "109e801a6417e410098d44b5eb2be385cc026a8174443e6f94c9b43c33dfba75"
 	SDKVersion  = "3.4.10"
 )
 
@@ -302,6 +302,7 @@ type DestChainConfig2 struct {
 	LinkFeeMultiplierPercent    types.NUMERIC `json:"linkFeeMultiplierPercent"`
 	DefaultTokenFeeUSD          types.NUMERIC `json:"defaultTokenFeeUSD"`
 	DefaultTokenDestGasOverhead types.INT64   `json:"defaultTokenDestGasOverhead"`
+	GasPriceStalenessThreshold  types.INT64   `json:"gasPriceStalenessThreshold"`
 }
 
 // ToMap converts DestChainConfig2 to a map for DAML arguments
@@ -325,6 +326,8 @@ func (t DestChainConfig2) ToMap() map[string]any {
 	m["defaultTokenFeeUSD"] = t.DefaultTokenFeeUSD
 
 	m["defaultTokenDestGasOverhead"] = int64(t.DefaultTokenDestGasOverhead)
+
+	m["gasPriceStalenessThreshold"] = int64(t.GasPriceStalenessThreshold)
 
 	return m
 }

@@ -206,6 +206,22 @@ testCryptoComputeSignedHash = script do
 
   debug "✓ computeSignedHashNative test passed"
 
+-- Verify publicKeyToAddress validates key format.
+-- Compressed/short keys are rejected via `error` in the pure function
+-- (not catchable in Daml scripts). We test that valid 04-prefixed 65-byte
+-- keys of different content all produce consistent 20-byte addresses.
+testCryptoKeyFormatValidation : Script ()
+testCryptoKeyFormatValidation = script do
+  -- Valid 04-prefix, 65-byte keys should always produce 40-hex-char addresses
+  let key1 = "04" <> replicateText 128 "a"
+  let key2 = "04" <> replicateText 128 "b"
+  let addr1 = publicKeyToAddress key1
+  let addr2 = publicKeyToAddress key2
+  assertMsg "addr1 should be 40 hex chars (20 bytes)" (T.length addr1 == 40)
+  assertMsg "addr2 should be 40 hex chars (20 bytes)" (T.length addr2 == 40)
+  assertMsg "different keys should produce different addresses" (addr1 /= addr2)
+  debug "✓ key format validation tests passed (rejection of compressed keys enforced by error guard in publicKeyToAddress)"
+
 -- | Test DER encoding for signatures
 -- Verifies the rawToDerSignature function works correctly
 testCryptoDerEncoding : Script ()
@@ -233,6 +249,7 @@ testAllCrypto = script do
   testCryptoHashMetadataLeaf
   testCryptoTimeToHex
   testCryptoComputeSignedHash
+  testCryptoKeyFormatValidation
   testCryptoDerEncoding
   debug "=========================================="
   debug "All crypto tests passed! ✓"

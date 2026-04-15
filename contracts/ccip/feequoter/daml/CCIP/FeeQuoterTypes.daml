@@ -42,7 +42,8 @@ data DestChainConfig = DestChainConfig
         linkFeeMultiplierPercent : Numeric 0 -- │ LINK-specific percent multiplier. 90 = 10% discount.
         -- | The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
         defaultTokenFeeUSD : Numeric 0 --       │ Legacy field name retained; value is integer USD cents.
-        defaultTokenDestGasOverhead : Int --  ──╯ Default gas charged to execute a token transfer on the destination chain.
+        defaultTokenDestGasOverhead : Int --     │ Default gas charged to execute a token transfer on the destination chain.
+        gasPriceStalenessThreshold : Int --   ──╯ Max seconds a gas price can be stale (0 = disabled).
     deriving (Eq, Show)
 
 -- ===========================================================================

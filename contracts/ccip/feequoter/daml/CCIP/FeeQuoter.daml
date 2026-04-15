@@ -9,6 +9,7 @@ import DA.List (unique, dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional
 import DA.Set qualified as Set
+import DA.Time (convertRelTimeToMicroseconds, subTime)
 import Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
@@ -128,8 +129,18 @@ template FeeQuoter
                 caller : Party
             controller caller
             do
-                -- The caller must be an authorized price updater.
-                assertMsg ("Caller is not an authorized price updater: " <> show caller) (caller `elem` priceUpdaters)
+                -- The caller must be an authorized price updater or the owner.
+                assertMsg
+                    ("Caller is not an authorized price updater or owner: " <> show caller)
+                    (caller `elem` priceUpdaters || caller == owner)
+
+                -- Validate price bounds
+                Foldable.mapA_ (\tpu ->
+                    assertMsg ("token price must be positive: " <> tpu.instrumentId.id) (tpu.usdPerToken > 0.0)
+                    ) priceUpdates.tokenPriceUpdates
+                Foldable.mapA_ (\gpu ->
+                    assertMsg ("gas price must be non-negative for chain " <> show gpu.destChainSelector) (gpu.usdPerUnitGas >= 0.0)
+                    ) priceUpdates.gasPriceUpdates
 
                 now <- getTime
                 let newUsdPerToken = foldl (\acc tpu -> Map.insert tpu.instrumentId (TimestampedPrice tpu.usdPerToken now) acc) usdPerToken priceUpdates.tokenPriceUpdates
@@ -179,13 +190,7 @@ template FeeQuoter
                 case tokenConfig of
                     Some config | config.isEnabled ->
                         return (config.feeUSD, config.destGasOverhead, config.destBytesOverhead)
-                    None -> do
-                        -- Use default fee from dest chain config
-                        let defaultConfig = fromSomeNote
-                                ("No dest chain config found for " <> show destChainSelector)
-                                (Map.lookup destChainSelector destChainConfigs)
-                        return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
-                    Some _ -> do
+                    _ -> do
                         let defaultConfig = fromSomeNote
                                 ("No dest chain config found for " <> show destChainSelector)
                                 (Map.lookup destChainSelector destChainConfigs)
@@ -224,9 +229,18 @@ template FeeQuoter
                 assertMsg ("Fee token not configured: " <> feeToken.id)
                     (Set.member feeToken feeTokens)
 
+                now <- getTime
                 gasPrice <- exercise self GetDestinationChainGasPrice with
                     destChainSelector
                     caller
+                if destChainConfig.gasPriceStalenessThreshold > 0 then do
+                    let elapsedMicros = convertRelTimeToMicroseconds (subTime now gasPrice.timestamp)
+                    let elapsedSecs = elapsedMicros / 1_000_000
+                    assertMsg ("feequoter: stale gas price for chain " <> show destChainSelector
+                        <> " (threshold " <> show destChainConfig.gasPriceStalenessThreshold
+                        <> "s, elapsed " <> show elapsedSecs <> "s)")
+                        (elapsedSecs <= destChainConfig.gasPriceStalenessThreshold)
+                else pure ()
                 feeTokenPrice <- exercise self GetTokenPrice with
                     instrumentId = feeToken
                     caller

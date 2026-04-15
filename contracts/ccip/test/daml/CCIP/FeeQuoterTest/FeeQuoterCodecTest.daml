@@ -114,8 +114,8 @@ testRemoveFeeTokensRoundtrip = do
 
 testApplyDestChainConfigUpdatesRoundtrip : Script ()
 testApplyDestChainConfigUpdatesRoundtrip = do
-    let config1 = DestChainConfig True 1024 500000 21000 16 300000 90.0 (usdToCents 0.50) 25000
-        config2 = DestChainConfig False 2048 1000000 30000 32 500000 100.0 (usdToCents 1.00) 35000
+    let config1 = DestChainConfig True 1024 500000 21000 16 300000 90.0 (usdToCents 0.50) 25000 0
+        config2 = DestChainConfig False 2048 1000000 30000 32 500000 100.0 (usdToCents 1.00) 35000 0
         configArgs1 = DestChainConfigArgs 1.0 config1
         configArgs2 = DestChainConfigArgs 18446744073709551615.0 config2  -- max uint64
         args = ApplyDestChainConfigUpdatesParams with

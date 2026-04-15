@@ -49,6 +49,7 @@ testDestChainConfig = DestChainConfig with
     linkFeeMultiplierPercent = 100.0
     defaultTokenFeeUSD = 0.0
     defaultTokenDestGasOverhead = 0
+    gasPriceStalenessThreshold = 0
 
 finalizeUsingQuote
     : Party
@@ -215,6 +216,7 @@ setup = script do
             maxPerMsgGasLimit = 2000000
             defaultTokenFeeUSD = usdToCents 0.50
             defaultTokenDestGasOverhead = 0
+            gasPriceStalenessThreshold = 0
     let destChainConfig2 = DestChainConfig with
             isEnabled = True
             maxDataBytes = 8000
@@ -225,6 +227,7 @@ setup = script do
             maxPerMsgGasLimit = 3000000
             defaultTokenFeeUSD = usdToCents 0.25
             defaultTokenDestGasOverhead = 0
+            gasPriceStalenessThreshold = 0
     fq <- submit owner do
         exerciseCmd fq ApplyDestChainConfigUpdates with
             destChainConfigArgs = [
@@ -382,8 +385,8 @@ testFeeQuoter_ApplyPriceUpdatersUpdate = script do
             linkTokenInstrumentId = instrumentIdLINK
             priceUpdaters = []
 
-    -- try updating prices as the owner, without being a price updater, should fail
-    submitMustFail owner do
+    -- owner can update prices even without being in priceUpdaters
+    fq <- submit owner do
         exerciseCmd fq UpdatePrices with
             priceUpdates = PriceUpdates with
                 tokenPriceUpdates = []

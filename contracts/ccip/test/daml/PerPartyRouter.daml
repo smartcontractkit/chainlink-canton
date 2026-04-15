@@ -261,7 +261,8 @@ testCCIPSend = script do
                 defaultTxGasLimit = 1
                 linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = 0.0
-                defaultTokenDestGasOverhead = 0)]
+                defaultTokenDestGasOverhead = 0
+                gasPriceStalenessThreshold = 0)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
                 CCIP.FeeQuoter.TimestampedPrice with
@@ -701,7 +702,8 @@ testPrepareSendExtraArgs = script do
                 defaultTxGasLimit = 1
                 linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = 0.0
-                defaultTokenDestGasOverhead = 0)]
+                defaultTokenDestGasOverhead = 0
+                gasPriceStalenessThreshold = 0)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
                 CCIP.FeeQuoter.TimestampedPrice with
@@ -911,7 +913,8 @@ testPrepareSendRejectsOversizedPayload = script do
                 defaultTxGasLimit = 1
                 linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = 0.0
-                defaultTokenDestGasOverhead = 0)]
+                defaultTokenDestGasOverhead = 0
+                gasPriceStalenessThreshold = 0)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
                 CCIP.FeeQuoter.TimestampedPrice with
@@ -1498,7 +1501,8 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 defaultTxGasLimit = 1
                 linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = 0.0
-                defaultTokenDestGasOverhead = 0)]
+                defaultTokenDestGasOverhead = 0
+                gasPriceStalenessThreshold = 0)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
                 CCIP.FeeQuoter.TimestampedPrice with
