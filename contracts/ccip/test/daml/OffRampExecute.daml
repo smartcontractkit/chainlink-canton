@@ -259,20 +259,20 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = feeToken
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = feeToken
             caller = poolOwner
 
     disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = feeToken
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner

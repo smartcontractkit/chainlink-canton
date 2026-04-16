@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
+	lock_release_token_pool "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -65,7 +65,6 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	ds := datastore.NewMemoryDataStore()
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
-
 	cfg := config.Config
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
@@ -84,32 +83,35 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	if tokenTransferFeeConfigs == nil {
 		tokenTransferFeeConfigs = types.GENMAP{}
 	}
-
-	template := lockreleasetokenpool.LockReleaseTokenPool{
-		CcipOwner:               types.PARTY(cfg.CcipOwner),
-		PoolOwner:               types.PARTY(cfg.PoolOwner),
-		InstanceId:              types.TEXT(cfg.InstanceID),
-		InstrumentId:            cfg.InstrumentId,
-		Decimals:                types.INT64(cfg.Decimals),
-		RemoteChainConfigs:      remoteChainConfigs,
-		TokenTransferFeeConfigs: tokenTransferFeeConfigs,
-		PoolReceiveContext:      poolReceiveContext,
-		TransferTimeout:         transferTimeout,
-		Deps:                    cfg.Deps,
-	}
-
 	qualifier := ptr.String(cfg.Qualifier)
 	if cfg.Qualifier == "" {
 		qualifier = nil
 	}
-
 	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, lock_release_token_pool.Deploy, chain, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
-		Qualifier:  qualifier,
-		Template:   template,
+		Qualifier: qualifier,
+		Template: lockreleasetokenpool.LockReleaseTokenPool{
+			CcipOwner:               types.PARTY(cfg.CcipOwner),
+			PoolOwner:               types.PARTY(cfg.PoolOwner),
+			InstanceId:              types.TEXT(cfg.InstanceID),
+			InstrumentId:            cfg.InstrumentId,
+			Decimals:                types.INT64(cfg.Decimals),
+			RemoteChainConfigs:      remoteChainConfigs,
+			TokenTransferFeeConfigs: tokenTransferFeeConfigs,
+			PoolReceiveContext:      poolReceiveContext,
+			TransferTimeout:         transferTimeout,
+			Deps:                    cfg.Deps,
+		},
 		OwnerParty: types.PARTY(cfg.PoolOwner),
 	})
 	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to apply DeployTokenPool operation: %w", err)
+		return cldf.ChangesetOutput{}, err
+	}
+	if len(out.Output.Labels.List()) == 0 {
+		return cldf.ChangesetOutput{}, fmt.Errorf("missing raw lock/release pool label in deploy output")
+	}
+	rawPoolAddr, err := contracts.RawInstanceAddressFromString(out.Output.Labels.List()[0])
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("parse raw lock/release pool label: %w", err)
 	}
 
 	if err = ds.AddressRefStore.Add(out.Output); err != nil {
@@ -122,7 +124,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 			InstrumentId:                      cfg.InstrumentId,
 			CcipParty:                         cfg.CcipOwner,
 			PoolOwnerParty:                    cfg.PoolOwner,
-			PoolInstanceID:                    cfg.InstanceID,
+			PoolInstanceID:                    rawPoolAddr.InstanceID(),
 		}
 		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {

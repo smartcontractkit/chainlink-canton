@@ -387,6 +387,7 @@ func getRateLimiterInstanceAddresses(remoteChainSelector uint64, tpCreatedEvent 
 		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to parse inbound rate limiter instance address: %w", err)
 	}
 	inboundRateLimiterInstanceAddress = rawInboundRateLimiterInstanceAddress.InstanceAddress()
+
 	rawInboundCustomBlockConfirmationsRateLimiterInstanceAddress, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack))
 	if err != nil {
 		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to parse inbound custom block confirmations rate limiter instance address: %w", err)

@@ -198,9 +198,11 @@ data TokenConfig = TokenConfig
 
 **Key choices:**
 
-- `TokenAdminRegistry_IssueSendTicket` - Called by pool after locking tokens
-- `TokenAdminRegistry_IssueReceiveTicket` - Called by OffRamp after verification
-- `TokenAdminRegistry_ConsumeReceiveTicket` - Called by pool to release tokens
+- `SetPool` - Registers or clears the pool for an instrument
+- `ProposeAdministrator` / `AcceptAdminRole` / `TransferAdminRole` - Two-step token admin management
+- `ConsumeReceiveTicket` - Called by pool to release tokens against an inbound ticket
+- `SetOutboundPoolCCVs` / `SetInboundPoolCCVs` - Records pool-required CCVs on outbound and inbound message state
+- `AddTokenSendFee` / `AddTokenSend` / `FinalizeExecute` - Finalizes token-side message accounting and execution state
 
 ### CommitteeVerifier
 
@@ -339,7 +341,7 @@ interface choices.
 │  2. GET CCV ATTESTATION                                                     │
 │  ══════════════════════                                                     │
 │                                                                             │
-│     User ──► CommitteeVerifier_ForwardToVerifier                            │
+│     User ──► ForwardToVerifier                            │
 │                   │                                                         │
 │                   ▼                                                         │
 │              VerifierData appended to SendingMessageV1                      │
@@ -517,7 +519,7 @@ Executing an inbound cross-chain message on Canton.
 │     User ──► TokenPool.ReleaseFromTicket(tokenReceiveTicket)                │
 │                   │                                                         │
 │                   ▼                                                         │
-│              TokenAdminRegistry_ConsumeReceiveTicket                        │
+│              ConsumeReceiveTicket                        │
 │                   │                                                         │
 │                   ▼                                                         │
 │              Tokens released to receiver                                    │

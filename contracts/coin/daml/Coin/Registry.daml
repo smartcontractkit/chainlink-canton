@@ -178,4 +178,3 @@ template MintRole
                         context = emptyChoiceContext
                         meta = emptyMetadata
                 pure result.outputCids
-

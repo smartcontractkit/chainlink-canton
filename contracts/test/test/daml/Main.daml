@@ -29,13 +29,13 @@ setup = script do
   proxyDisclosure <- fromSome <$> queryDisclosure ccipOwner proxy
 
   _ <- submit (actAs ccipUser <> disclose proxyDisclosure) do
-    exerciseCmd proxy Proxy.Proxy_EmitEvent with
+    exerciseCmd proxy Proxy.EmitEvent with
       receiver = toInterfaceContractId @Interface.IReceiver receiver
       eventValue = 456
       caller = ccipUser
 
   _ <- submit (actAs ccipUser <> disclose proxyDisclosure) do
-    exerciseCmd proxy Proxy.Proxy_EmitValue with
+    exerciseCmd proxy Proxy.EmitValue with
       receiver = toInterfaceContractId @Interface.IReceiver receiver
       caller = ccipUser
   

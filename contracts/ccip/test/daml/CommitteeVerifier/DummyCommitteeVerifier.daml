@@ -59,11 +59,11 @@ template DummyCommitteeVerifier
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
-                    DummyCommitteeVerifier_ForwardToVerifier with
+                    ForwardToVerifier with
                         sendingMessageCid = arg.sendingMessageCid
                         caller = arg.caller
 
-        nonconsuming choice DummyCommitteeVerifier_ForwardToVerifier
+        nonconsuming choice ForwardToVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1

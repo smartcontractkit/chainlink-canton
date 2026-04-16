@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "8b7387d27b589b2804b7d6a9f076c56d36432f3f7290b5cd514b67744c5c4803"
+	PackageID   = "a348c31180506a0f0c4b8060132a6bd86b85919aae22f973dfb98866633e30eb"
 	SDKVersion  = "3.4.10"
 )
 
@@ -592,23 +592,23 @@ func (t Executor) CalculateFeeWithPackageID(contractID string, packageID string,
 	}
 }
 
-// ExecutorGetFee exercises the Executor_GetFee choice on this Executor contract via the IIExecutor interface
+// GetFee exercises the GetFee choice on this Executor contract
 // This method uses the package name in the template ID
-func (t Executor) ExecutorGetFee(contractID string, args common.ExecutorGetFee) *model.ExerciseCommand {
+func (t Executor) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_GetFee",
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecutorGetFeeWithPackageID exercises the Executor_GetFee choice using the provided package ID instead of package name
-func (t Executor) ExecutorGetFeeWithPackageID(contractID string, packageID string, args common.ExecutorGetFee) *model.ExerciseCommand {
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t Executor) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
-		Choice:     "Executor_GetFee",
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -844,64 +844,32 @@ func (t Executor) ExecutorCalculateFeeWithPackageID(contractID string, packageID
 	}
 }
 
+// ExecutorGetFee exercises the Executor_GetFee choice on this Executor contract via the IIExecutor interface
+// This method uses the package name in the template ID
+func (t Executor) ExecutorGetFee(contractID string, args common.ExecutorGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "IExecutor"),
+		ContractID: contractID,
+		Choice:     "Executor_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ExecutorGetFeeWithPackageID exercises the Executor_GetFee choice using the provided package ID instead of package name
+func (t Executor) ExecutorGetFeeWithPackageID(contractID string, packageID string, args common.ExecutorGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "IExecutor"),
+		ContractID: contractID,
+		Choice:     "Executor_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Verify interface implementations for Executor
 
 var _ mcms.IMCMSReceiver = (*Executor)(nil)
 
 var _ common.IIExecutor = (*Executor)(nil)
-
-// ExecutorGetFee2 is a Record type
-type ExecutorGetFee2 struct {
-	DestChainSelector types.NUMERIC             `json:"destChainSelector"`
-	RequiredCCVs      []mcms.RawInstanceAddress `json:"requiredCCVs"`
-	Caller            types.PARTY               `json:"caller"`
-}
-
-// ToMap converts ExecutorGetFee2 to a map for DAML arguments
-func (t ExecutorGetFee2) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["requiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.RequiredCCVs))
-		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t ExecutorGetFee2) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ExecutorGetFee2) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ExecutorGetFee2 to hex string (Canton MCMS format)
-func (t ExecutorGetFee2) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ExecutorGetFee2 from hex string (Canton MCMS format)
-func (t *ExecutorGetFee2) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
 
 // GetAllowedCCVs is a Record type
 type GetAllowedCCVs struct {
@@ -1111,6 +1079,78 @@ func (t GetDynamicConfigMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetDynamicConfigMCMSParams from hex string.
 func (t *GetDynamicConfigMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFee is a Record type
+type GetFee struct {
+	DestChainSelector types.NUMERIC             `json:"destChainSelector"`
+	RequiredCCVs      []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	Caller            types.PARTY               `json:"caller"`
+}
+
+// ToMap converts GetFee to a map for DAML arguments
+func (t GetFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t GetFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetFee to hex string (Canton MCMS format)
+func (t GetFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFee from hex string (Canton MCMS format)
+func (t *GetFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetFeeMCMSParams struct {
+	DestChainSelector types.NUMERIC             `json:"destChainSelector"`
+	RequiredCCVs      []mcms.RawInstanceAddress `json:"requiredCCVs"`
+}
+
+// MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.
+func (t GetFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFeeMCMSParams from hex string.
+func (t *GetFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1353,6 +1393,8 @@ type MCMSEncoder interface {
 	GetDestChainsMCMSParams(args GetDestChainsMCMSParams) (*bind.EncodedChoice, error)
 	GetDynamicConfig(args GetDynamicConfig) (*bind.EncodedChoice, error)
 	GetDynamicConfigMCMSParams(args GetDynamicConfigMCMSParams) (*bind.EncodedChoice, error)
+	GetFee(args GetFee) (*bind.EncodedChoice, error)
+	GetFeeMCMSParams(args GetFeeMCMSParams) (*bind.EncodedChoice, error)
 	GetMaxCCVsPerMessage(args GetMaxCCVsPerMessage) (*bind.EncodedChoice, error)
 	GetMaxCCVsPerMessageMCMSParams(args GetMaxCCVsPerMessageMCMSParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
@@ -1454,6 +1496,16 @@ func (e *encoder) GetDynamicConfig(args GetDynamicConfig) (*bind.EncodedChoice, 
 // GetDynamicConfigMCMSParams encodes MCMS parameters (without Caller) for the GetDynamicConfig choice.
 func (e *encoder) GetDynamicConfigMCMSParams(args GetDynamicConfigMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetDynamicConfig", args)
+}
+
+// GetFee encodes parameters for the GetFee choice.
+func (e *encoder) GetFee(args GetFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
+}
+
+// GetFeeMCMSParams encodes MCMS parameters (without Caller) for the GetFee choice.
+func (e *encoder) GetFeeMCMSParams(args GetFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
 }
 
 // GetMaxCCVsPerMessage encodes parameters for the GetMaxCCVsPerMessage choice.

@@ -10,8 +10,8 @@ import qualified CCIP.MessageCodecV1
 import CCIP.TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes (TokenConfig(..))
 
-testTokenAdminRegistry_TransferAdminRoleRequiresAcceptance : Script ()
-testTokenAdminRegistry_TransferAdminRoleRequiresAcceptance = script do
+testTransferAdminRoleRequiresAcceptance : Script ()
+testTransferAdminRoleRequiresAcceptance = script do
   owner <- allocateParty "ccip_owner"
   tokenAdmin <- allocateParty "TokenAdmin"
   newAdmin <- allocateParty "NewAdmin"
@@ -29,7 +29,7 @@ testTokenAdminRegistry_TransferAdminRoleRequiresAcceptance = script do
         ]
 
   tarCid <- submit owner do
-    exerciseCmd tarCid TokenAdminRegistry_TransferAdminRole with
+    exerciseCmd tarCid TransferAdminRole with
       instrumentId
       newAdmin
       caller = owner
@@ -46,7 +46,7 @@ testTokenAdminRegistry_TransferAdminRoleRequiresAcceptance = script do
 
   disclosedTar <- fromSome <$> queryDisclosure owner tarCid
   tarCid <- submit (actAs newAdmin <> disclose disclosedTar) do
-    exerciseCmd tarCid TokenAdminRegistry_AcceptAdminRole with
+    exerciseCmd tarCid AcceptAdminRole with
       instrumentId
       caller = newAdmin
 
@@ -62,8 +62,8 @@ testTokenAdminRegistry_TransferAdminRoleRequiresAcceptance = script do
 
   pure ()
 
-testTokenAdminRegistry_TransferAdminRoleRejectsSameAdmin : Script ()
-testTokenAdminRegistry_TransferAdminRoleRejectsSameAdmin = script do
+testTransferAdminRoleRejectsSameAdmin : Script ()
+testTransferAdminRoleRejectsSameAdmin = script do
   owner <- allocateParty "ccip_owner"
   tokenAdmin <- allocateParty "TokenAdmin"
 
@@ -80,7 +80,7 @@ testTokenAdminRegistry_TransferAdminRoleRejectsSameAdmin = script do
         ]
 
   submitMustFail owner do
-    exerciseCmd tarCid TokenAdminRegistry_TransferAdminRole with
+    exerciseCmd tarCid TransferAdminRole with
       instrumentId
       newAdmin = owner
       caller = owner

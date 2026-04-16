@@ -41,7 +41,7 @@ template Executor
                     caller = arg.caller
 
             executor_getFeeImpl self arg = do
-                exercise (fromInterfaceContractId @Executor self) Executor_GetFee with
+                exercise (fromInterfaceContractId @Executor self) GetFee with
                     destChainSelector = arg.destChainSelector
                     requiredCCVs = arg.requiredCCVs
                     caller = arg.caller
@@ -149,7 +149,7 @@ template Executor
                     caller = owner
 
         -- Quote-only fee path for executor.
-        nonconsuming choice Executor_GetFee : CCIP.Interfaces.Executor.ExecutorFeeQuote
+        nonconsuming choice GetFee : CCIP.Interfaces.Executor.ExecutorFeeQuote
             with
                 destChainSelector : Numeric 0
                 requiredCCVs : [RawInstanceAddress]

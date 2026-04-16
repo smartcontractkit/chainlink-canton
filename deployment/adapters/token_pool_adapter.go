@@ -1,7 +1,9 @@
 package adapters
 
 import (
-	"github.com/Masterminds/semver/v3"
+	"encoding/hex"
+	"fmt"
+	"strings"
 
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -11,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	cantonsequences "github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 )
 
 var (
@@ -19,19 +22,8 @@ var (
 
 type CantonTokenAdapter struct{}
 
-// No-op sequence so devenv ConfigureTokensForTransfers succeeds on Canton without sending EVM-style
-// token pool transactions to the ledger (Canton uses DAML contracts; message-only lanes do not need this).
-var cantonConfigureTokenForTransfersNoOp = operations.NewSequence(
-	"canton/devenv/configure_token_for_transfers_noop",
-	semver.MustParse("0.0.1"),
-	"Canton devenv: skip EVM token pool configure sequence; pools are not driven by the shared EVM path",
-	func(_ operations.Bundle, _ chain.BlockChains, _ tokenadapters.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
-		return sequences.OnChainOutput{}, nil
-	},
-)
-
 func (c CantonTokenAdapter) ConfigureTokenForTransfersSequence() *operations.Sequence[tokenadapters.ConfigureTokenForTransfersInput, sequences.OnChainOutput, chain.BlockChains] {
-	return cantonConfigureTokenForTransfersNoOp
+	return cantonsequences.ConfigureTokenForTransfers
 }
 
 func (c CantonTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
@@ -39,18 +31,35 @@ func (c CantonTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte,
 }
 
 func (c CantonTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
-	// TODO implement me
-	panic("implement me")
+	tokenRefs := e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType("Token")),
+		datastore.AddressRefByQualifier(poolRef.Qualifier),
+	)
+	if len(tokenRefs) != 1 {
+		return nil, fmt.Errorf("expected exactly one precomputed token ref for qualifier %q, got %d", poolRef.Qualifier, len(tokenRefs))
+	}
+	addr := strings.TrimSpace(tokenRefs[0].Address)
+	if addr == "" {
+		return nil, fmt.Errorf("precomputed token ref for qualifier %q has empty address", poolRef.Qualifier)
+	}
+	if rawAddr, rawErr := contracts.RawInstanceAddressFromString(addr); rawErr == nil {
+		return rawAddr.InstanceAddress().Bytes(), nil
+	}
+	addrBytes, err := hex.DecodeString(strings.TrimPrefix(addr, "0x"))
+	if err != nil || len(addrBytes) == 0 {
+		return nil, fmt.Errorf("invalid precomputed token address %q for qualifier %q", addr, poolRef.Qualifier)
+	}
+
+	return addrBytes, nil
 }
 
 func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
-	// TODO implement me
-	panic("implement me")
+	return 10, nil
 }
 
 func (c CantonTokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
-	// TODO implement me
-	panic("implement me")
+	return tokenPool, nil
 }
 
 func (c CantonTokenAdapter) ManualRegistration() *operations.Sequence[tokenadapters.ManualRegistrationSequenceInput, sequences.OnChainOutput, chain.BlockChains] {
@@ -59,8 +68,7 @@ func (c CantonTokenAdapter) ManualRegistration() *operations.Sequence[tokenadapt
 }
 
 func (c CantonTokenAdapter) SetTokenPoolRateLimits() *operations.Sequence[tokenadapters.TPRLRemotes, sequences.OnChainOutput, chain.BlockChains] {
-	// TODO implement me
-	panic("implement me")
+	return cantonsequences.SetTokenPoolRateLimits
 }
 
 func (c CantonTokenAdapter) DeployToken() *operations.Sequence[tokenadapters.DeployTokenInput, sequences.OnChainOutput, chain.BlockChains] {
@@ -74,8 +82,7 @@ func (c CantonTokenAdapter) DeployTokenVerify(e deployment.Environment, in token
 }
 
 func (c CantonTokenAdapter) DeployTokenPoolForToken() *operations.Sequence[tokenadapters.DeployTokenPoolInput, sequences.OnChainOutput, chain.BlockChains] {
-	// TODO implement me
-	panic("implement me")
+	return cantonsequences.DeployTokenPoolForToken
 }
 
 func (c CantonTokenAdapter) UpdateAuthorities() *operations.Sequence[tokenadapters.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {

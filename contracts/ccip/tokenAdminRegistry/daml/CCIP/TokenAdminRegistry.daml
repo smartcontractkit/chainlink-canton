@@ -58,14 +58,14 @@ template TokenAdminRegistry
             controller caller
             do pure this
 
-        nonconsuming choice TokenAdminRegistry_GetTokenConfig : Optional TokenConfig
+        nonconsuming choice GetTokenConfig : Optional TokenConfig
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
             do pure (Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs)
 
-        choice TokenAdminRegistry_SetPool : ContractId TokenAdminRegistry
+        choice SetPool : ContractId TokenAdminRegistry
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 tokenPool : Optional PoolRegistration
@@ -74,20 +74,20 @@ template TokenAdminRegistry
             do
                 case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None ->
-                        abort "TokenAdminRegistry_SetPool: No config for instrument"
+                        abort "SetPool: No config for instrument"
                     Some config ->
                         case config.admin of
                             None ->
-                                abort "TokenAdminRegistry_SetPool: No admin set for instrument"
+                                abort "SetPool: No admin set for instrument"
                             Some admin ->
                                 if admin /= caller then
-                                    abort "TokenAdminRegistry_SetPool: Caller is not the admin"
+                                    abort "SetPool: Caller is not the admin"
                                 else do
                                     let updatedConfig = config with tokenPool
                                         updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 
-        choice TokenAdminRegistry_AcceptAdminRole : ContractId TokenAdminRegistry
+        choice AcceptAdminRole : ContractId TokenAdminRegistry
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
@@ -95,14 +95,14 @@ template TokenAdminRegistry
             do
                 case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None ->
-                        abort "TokenAdminRegistry_AcceptAdminRole: No config for instrument"
+                        abort "AcceptAdminRole: No config for instrument"
                     Some config ->
                         case config.pendingAdmin of
                             None ->
-                                abort "TokenAdminRegistry_AcceptAdminRole: No pending admin to accept"
+                                abort "AcceptAdminRole: No pending admin to accept"
                             Some pendingAdmin ->
                                 if pendingAdmin /= caller then
-                                    abort "TokenAdminRegistry_AcceptAdminRole: Caller is not the pending admin"
+                                    abort "AcceptAdminRole: Caller is not the pending admin"
                                 else do
                                     let updatedConfig = config with
                                             admin = Some pendingAdmin
@@ -110,7 +110,7 @@ template TokenAdminRegistry
                                         updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 
-        choice TokenAdminRegistry_TransferAdminRole : ContractId TokenAdminRegistry
+        choice TransferAdminRole : ContractId TokenAdminRegistry
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 newAdmin : Party
@@ -119,22 +119,22 @@ template TokenAdminRegistry
             do
                 case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None ->
-                        abort "TokenAdminRegistry_TransferAdminRole: No config for instrument"
+                        abort "TransferAdminRole: No config for instrument"
                     Some config ->
                         case config.admin of
                             None ->
-                                abort "TokenAdminRegistry_TransferAdminRole: No admin to transfer"
+                                abort "TransferAdminRole: No admin to transfer"
                             Some currentAdmin ->
                                 if currentAdmin /= caller then
-                                    abort "TokenAdminRegistry_TransferAdminRole: Caller is not the current admin"
+                                    abort "TransferAdminRole: Caller is not the current admin"
                                 else if currentAdmin == newAdmin then
-                                    abort "TokenAdminRegistry_TransferAdminRole: New admin must differ from current admin"
+                                    abort "TransferAdminRole: New admin must differ from current admin"
                                 else do
                                     let updatedConfig = config with pendingAdmin = Some newAdmin
                                         updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 
-        nonconsuming choice TokenAdminRegistry_IsAdministrator : Bool
+        nonconsuming choice IsAdministrator : Bool
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 administrator : Party
@@ -147,7 +147,7 @@ template TokenAdminRegistry
         -- Propose a new administrator for a token.
         -- Can only be called if no admin is currently set.
         -- Can be called by the admin of the instrument, or the CCIP owner/owner of this registry.
-        choice TokenAdminRegistry_ProposeAdministrator : ContractId TokenAdminRegistry
+        choice ProposeAdministrator : ContractId TokenAdminRegistry
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 newAdmin : Party
@@ -158,7 +158,7 @@ template TokenAdminRegistry
                 let isOwner = caller == owner
                     isAdmin = caller == instrumentId.admin
                 if not (isOwner || isAdmin) then
-                    abort "TokenAdminRegistry_ProposeAdministrator: Caller must be either the registry owner or the token admin"
+                    abort "ProposeAdministrator: Caller must be either the registry owner or the token admin"
                 else
                     case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                         None -> do
@@ -172,7 +172,7 @@ template TokenAdminRegistry
                             create this with tokenConfigs = updatedMap
                         Some config ->
                             if isSome config.admin then
-                                abort "TokenAdminRegistry_ProposeAdministrator: Admin already set"
+                                abort "ProposeAdministrator: Admin already set"
                             else do
                                 -- Config exists but admin is not set, update it
                                 let updatedConfig = config with pendingAdmin = Some newAdmin
@@ -183,7 +183,7 @@ template TokenAdminRegistry
         -- Validates caller is the registered pool owner, ticket was issued by this TAR,
         -- then archives the ticket. Callers should fetch the ticket beforehand to read
         -- its fields (poolOwner is an observer on TokenReceiveTicket).
-        nonconsuming choice TokenAdminRegistry_ConsumeReceiveTicket : ()
+        nonconsuming choice ConsumeReceiveTicket : ()
             with
                 ticketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -192,30 +192,30 @@ template TokenAdminRegistry
             do
                 case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None ->
-                        abort "TokenAdminRegistry_ConsumeReceiveTicket: No config for instrument"
+                        abort "ConsumeReceiveTicket: No config for instrument"
                     Some config ->
                         case config.tokenPool of
                             None ->
-                                abort "TokenAdminRegistry_ConsumeReceiveTicket: No pool registered for instrument"
+                                abort "ConsumeReceiveTicket: No pool registered for instrument"
                             Some pool ->
                                 if pool.poolOwner /= caller then
-                                    abort "TokenAdminRegistry_ConsumeReceiveTicket: Caller is not the registered pool owner"
+                                    abort "ConsumeReceiveTicket: Caller is not the registered pool owner"
                                 else do
                                     ticket <- fetch ticketCid
-                                    assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: instanceId mismatch"
+                                    assertMsg "ConsumeReceiveTicket: instanceId mismatch"
                                         (ticket.tokenAdminRegistryInstanceId == instanceId)
-                                    assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: owner mismatch"
+                                    assertMsg "ConsumeReceiveTicket: owner mismatch"
                                         (ticket.ccipOwner == owner)
-                                    assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: ticket pool owner must match registered pool owner"
+                                    assertMsg "ConsumeReceiveTicket: ticket pool owner must match registered pool owner"
                                         (ticket.poolOwner == pool.poolOwner)
-                                    assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: ticket instrument must match requested instrument"
+                                    assertMsg "ConsumeReceiveTicket: ticket instrument must match requested instrument"
                                         (ticket.instrumentId == instrumentId)
                                     archive ticketCid
 
         -- | Record pool's outbound CCV requirements on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,
         -- then exercises SetOutboundPoolCCVs (authorized via TAR's signatory = ccipOwner).
-        nonconsuming choice TokenAdminRegistry_SetOutboundPoolCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice SetOutboundPoolCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 poolInstanceId : Text
@@ -258,7 +258,7 @@ template TokenAdminRegistry
         -- | Record pool's outbound token-send fee on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,
         -- then exercises AddTokenSendFee under TAR/ccipOwner authority.
-        nonconsuming choice TokenAdminRegistry_AddTokenSendFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice AddTokenSendFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 poolInstanceId : Text
@@ -298,7 +298,7 @@ template TokenAdminRegistry
         -- | Record pool's outbound token send data on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,
         -- then exercises AddTokenSend under TAR/ccipOwner authority.
-        nonconsuming choice TokenAdminRegistry_AddTokenSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice AddTokenSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 poolInstanceId : Text
@@ -342,7 +342,7 @@ template TokenAdminRegistry
         -- | Record pool's inbound CCV requirements on an ExecutingMessageV1.
         -- Validates the caller is the registered pool for the token in the message,
         -- then exercises SetInboundPoolCCVs (authorized via TAR's signatory = ccipOwner).
-        nonconsuming choice TokenAdminRegistry_SetInboundPoolCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+        nonconsuming choice SetInboundPoolCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 poolInstanceId : Text
@@ -360,15 +360,15 @@ template TokenAdminRegistry
                     instanceId owner execMsg.deps.tokenAdminRegistry
 
                 let tt = fromSomeNote
-                        "TokenAdminRegistry_SetInboundPoolCCVs: no token transfer in message"
+                        "SetInboundPoolCCVs: no token transfer in message"
                         execMsg.message.tokenTransfer
                 config <- case Map.lookup tt.destTokenAddress tokenConfigs of
-                    None -> abort "TokenAdminRegistry_SetInboundPoolCCVs: no config for instrument"
+                    None -> abort "SetInboundPoolCCVs: no config for instrument"
                     Some c -> pure c
                 pool <- case config.tokenPool of
-                    None -> abort "TokenAdminRegistry_SetInboundPoolCCVs: no pool registered for instrument"
+                    None -> abort "SetInboundPoolCCVs: no pool registered for instrument"
                     Some p -> pure p
-                assertMsg "TokenAdminRegistry_SetInboundPoolCCVs: caller is not the registered pool"
+                assertMsg "SetInboundPoolCCVs: caller is not the registered pool"
                     (caller == pool.poolOwner && poolInstanceId == pool.poolInstanceId)
                 exercise executingMessageCid CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
                     poolCCVs
@@ -376,7 +376,7 @@ template TokenAdminRegistry
         -- | Resolve token-side finalization data for an inbound token transfer and
         -- exercise ExecutingMessageV1.FinalizeExecute under TAR's signatory context.
         -- OffRamp remains the authority that decides execution is valid and complete.
-        nonconsuming choice TokenAdminRegistry_FinalizeExecute : CCIP.ExecutingMessageV1.FinalizeExecuteResult
+        nonconsuming choice FinalizeExecute : CCIP.ExecutingMessageV1.FinalizeExecuteResult
             with
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 ticketReceiver : Party
@@ -431,7 +431,7 @@ template TokenAdminRegistry
                   Some (SetPoolParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: SetPool" $
                       finalOffset == byteCount operationData
-                    newCid <- exercise selfTarCid TokenAdminRegistry_SetPool with
+                    newCid <- exercise selfTarCid SetPool with
                       instrumentId
                       tokenPool
                       caller = owner
@@ -443,7 +443,7 @@ template TokenAdminRegistry
                   Some (ProposeAdminParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: ProposeAdministrator" $
                       finalOffset == byteCount operationData
-                    newCid <- exercise selfTarCid TokenAdminRegistry_ProposeAdministrator with
+                    newCid <- exercise selfTarCid ProposeAdministrator with
                       instrumentId
                       newAdmin
                       caller = owner
@@ -455,7 +455,7 @@ template TokenAdminRegistry
                   Some (TransferAdminParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: TransferAdminRole" $
                       finalOffset == byteCount operationData
-                    newCid <- exercise selfTarCid TokenAdminRegistry_TransferAdminRole with
+                    newCid <- exercise selfTarCid TransferAdminRole with
                       instrumentId
                       newAdmin
                       caller = owner
@@ -467,7 +467,7 @@ template TokenAdminRegistry
                   Some (AcceptAdminParams{..}, finalOffset) -> do
                     assertMsg "E_TRAILING_BYTES: AcceptAdminRole" $
                       finalOffset == byteCount operationData
-                    newCid <- exercise selfTarCid TokenAdminRegistry_AcceptAdminRole with
+                    newCid <- exercise selfTarCid AcceptAdminRole with
                       instrumentId
                       caller = owner
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)

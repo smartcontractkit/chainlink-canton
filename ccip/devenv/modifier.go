@@ -1,10 +1,9 @@
 package devenv
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -70,20 +69,12 @@ func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInpu
 		return req, fmt.Errorf("failed to hydrate and marshal canton config: %w", err)
 	}
 
-	// Save the canton config bytes to a temporary file.
-	confDir := util.CCVConfigDir()
-	cantonConfigFilePath := filepath.Join(confDir,
-		fmt.Sprintf("canton-%s-config-%d.toml", verifierInput.CommitteeName, verifierInput.NodeIndex+1))
-	if err := os.WriteFile(cantonConfigFilePath, cantonConfigBytes, 0o644); err != nil { //nolint:gosec
-		return req, fmt.Errorf("failed to write canton config to file: %w", err)
-	}
-
-	// Mount the canton config file.
-	//nolint:staticcheck // we're still using it...
-	req.Mounts = append(req.Mounts, testcontainers.BindMount(
-		cantonConfigFilePath,
-		ccip.DefaultCantonConfigPath,
-	))
+	// Copy the hydrated config into the container using the supported Files API.
+	req.Files = append(req.Files, testcontainers.ContainerFile{
+		Reader:            bytes.NewReader(cantonConfigBytes),
+		ContainerFilePath: ccip.DefaultCantonConfigPath,
+		FileMode:          0o644,
+	})
 
 	return req, nil
 }
