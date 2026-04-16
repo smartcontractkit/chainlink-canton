@@ -1,0 +1,10 @@
+package: tokenpool
+output: tokenpool.gen.go
+generate:
+  models: true
+  client: true
+  gin-server: true
+output-options:
+  skip-prune: true
+import-mapping:
+  ../common/eds-common.yaml: github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common

@@ -1,0 +1,76 @@
+openapi: 3.0.0
+info:
+  title: Executor Explicit Disclosure API
+  description: Provides access to explicit disclosures required to interact with Executors on Canton.
+  version: 0.0.1
+
+paths:
+  /ccip/v1/external/executor/{address}/send:
+    post:
+      operationId: postExecutorSend
+      tags:
+        - sending
+      description: |
+        Get the explicit disclosures for sending a message using this Executor.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+          description: |
+            The address of the Executor instance to forward the message to.
+            Can be either a RawInstanceAddress or an InstanceAddress.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutorSendRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutorSendResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+tags:
+  - name: sending
+    description: Endpoints related to sending CCIP messages
+
+components:
+  schemas:
+    ExecutorSendRequest:
+      type: object
+      required:
+      properties:
+        message:
+          $ref: "../common/eds-common.yaml#/components/schemas/Message"
+        ccvs:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
+    ExecutorSendResponse:
+      type: object
+      required:
+      properties:
+        contractId:
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+        contextData:
+          type: object
+          description: The context to be passed along to the Executor.
+        disclosedContracts:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/DisclosedContract"

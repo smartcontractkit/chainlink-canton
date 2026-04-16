@@ -1,0 +1,163 @@
+
+components:
+  responses:
+    '400':
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+
+    PartyId:
+      type: string
+      description: The unique identifier of a party.
+      example: "some-party::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+
+    ContractId:
+      type: string
+      description: The unique identifier of a contract.
+      example: "00929f6a675c128bb54bef77a8cad8d330badd4330cf71f6a19b596b01f4b66b2dca121220cd655ce27fae64bdf6a203fcd987727de81c3762e46b1882ce2c2fbf0a72c64f"
+
+    DisclosedContract:
+      type: object
+      description: A disclosed contract, to be used by the caller during submission.
+      required:
+        - templateId
+        - contractId
+        - createdEventBlob
+        - synchronizerId
+      properties:
+        templateId:
+          type: string
+          example: "7df46ed05b4ba4ab85f827623d5ab51180520060f2f44ccf7f373606e2b4228f:CCIP.FeeQuoter:FeeQuoter"
+        contractId:
+          $ref: "#/components/schemas/ContractId"
+        createdEventBlob:
+          type: string
+        synchronizerId:
+          description: The synchronizer to which the contract is currently assigned.
+          example: "global-domain::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc"
+          type: string
+
+    InstrumentId:
+      type: object
+      description: A globally unique identifier for instruments.
+      required:
+        - admin
+        - id
+      properties:
+        admin:
+          $ref: "#/components/schemas/PartyId"
+        id:
+          type: string
+      example:
+        admin: "linkOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+        id: "LINK"
+
+    HashedInstrumentId:
+      type: string
+      description: The hashed identifier of an instrument, the keccak256 hash of the concatenated InstrumentId in the form of `id@admin`.
+      example: "0xd661ca168d25fea40edc85adb17786a5ecc7e547a3674e60359bac4fb0803aeb"
+
+    RawOrHashedInstrumentId:
+      description: An instrument identifier which can be either a RawInstrumentId or a HashedInstrumentId.
+      oneOf:
+        - $ref: "#/components/schemas/InstrumentId"
+        - $ref: "#/components/schemas/HashedInstrumentId"
+
+    RawInstanceAddress:
+      type: string
+      description: The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
+      example: "some-contract-fgtlw@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+
+    InstanceAddress:
+      type: string
+      description: The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
+      example: "0x9d24274102a5d2f57506d48dee1394e33f7cef9a9c0920ee714d6f4a216a21a9"
+
+    RawOrHashedAddress:
+      description: An address which can be either a RawInstanceAddress or an InstanceAddress.
+      oneOf:
+        - $ref: "#/components/schemas/RawInstanceAddress"
+        - $ref: "#/components/schemas/InstanceAddress"
+
+    Message:
+      type: object
+      description: A message to be sent from Canton.
+      required:
+        - destinationChainSelector
+        - receiver
+        - payload
+        - feeToken
+        - executor
+      properties:
+        destinationChainSelector:
+          type: integer
+          description: The chain selector of the destination chain.
+        receiver:
+          type: string
+          description: The receiver of the message on the remote chain, encoded as a hex string.
+          example: "0x78914f092ba8ee6e76aeb3e6cfbb5d52dd101e36"
+        payload:
+          type: string
+          description: The payload of the message, encoded as a hex string.
+          example: "0xdeadbeef"
+        tokenTransfer:
+          $ref: '#/components/schemas/TokenTransfer'
+        feeToken:
+          $ref: '#/components/schemas/InstrumentId'
+        executor:
+          description: |
+            The executor of the message, which determines the executor the message will be forwarded to on the source chain.
+            If not specified, or if type is "", the message will be executed with the default executor on the remote chain.
+            If type is "noExecutor", the message will not be executed automatically on the remote chain.
+            If type is "withAddress", the message will be executed with an executor at the specified address.
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              enum: ["", "noExecutor", "withAddress"]
+            address:
+              $ref: '#/components/schemas/RawOrHashedAddress'
+          example:
+            type: "noExecutor"
+
+    TokenTransfer:
+      type: object
+      description: A token transfer to be included in the message, set to null if the message does not include a token transfer.
+      properties:
+        token:
+          $ref: '#/components/schemas/InstrumentId'
+        amount:
+          type: string
+          description: The decimal amount of the token to be transferred.
+          example: "77.77"
+
+    EDSBaseUrl:
+      type: string
+      description: The base URL of the operators EDS API.
+      example: "https://canton-eds.chain.link"

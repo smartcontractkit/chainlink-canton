@@ -1,0 +1,177 @@
+openapi: 3.0.0
+info:
+  title: Token Pool Explicit Disclosure API
+  description: Provides access to explicit disclosures required to interact with token pools on Canton.
+  version: 0.0.1
+
+paths:
+  /ccip/v1/external/tokenPool/{address}/send:
+    post:
+      operationId: postTokenPoolSend
+      tags:
+        - sending
+      description: |
+        Get the explicit disclosures for sending a token transfer using this token pool.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+          description: |
+            The address of the Token Pool instance to forward the message to.
+            Can be either a RawInstanceAddress or an InstanceAddress.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenPoolSendRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPoolSendResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+  /ccip/v1/external/tokenPool/{address}/execute:
+    post:
+      operationId: postTokenPoolExecute
+      tags:
+        - execution
+      description: |
+        Get the explicit disclosures for executing a token transfer using this token pool.
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+          description: |
+            The address of the Token Pool instance to forward the message to.
+            Can be either a RawInstanceAddress or an InstanceAddress.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenPoolSendRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPoolSendResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+tags:
+  - name: sending
+    description: Endpoints related to sending CCIP messages
+  - name: execution
+    description: Endpoints related to executing CCIP messages
+
+components:
+  schemas:
+    TokenPoolSendRequest:
+      type: object
+      required:
+      properties:
+        message:
+          $ref: "../common/eds-common.yaml#/components/schemas/Message"
+    TokenPoolSendResponse:
+      type: object
+      required:
+      properties:
+        contractId:
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+        requiredCCVs:
+            type: array
+            items:
+                $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
+        contextData:
+          type: object
+          description: The context to be passed along to the token pool.
+        tokenInput:
+          type: object
+          description: The token input for the token transfer.
+          properties:
+            transferFactory:
+              $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+            extraArgs:
+              type: object
+              properties:
+                metadata:
+                  type: object
+                context:
+                  type: object
+            tokenPoolHoldings:
+              type: array
+              items:
+                $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        disclosedContracts:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/DisclosedContract"
+
+    TokenPoolExecuteRequest:
+      type: object
+      required:
+      properties:
+        encodedMessage:
+          type: string
+          description: The CCIP message to be executed, encoded as a hex string.
+    TokenPoolExecuteResponse:
+      type: object
+      required:
+      properties:
+        contractId:
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+        requiredCCVs:
+            type: array
+            items:
+                $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
+        contextData:
+          type: object
+          description: The context to be passed along to the token pool.
+        tokenInput:
+          type: object
+          description: The token input for the token transfer.
+          properties:
+            transferFactory:
+              $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+            extraArgs:
+              type: object
+              properties:
+                metadata:
+                  type: object
+                context:
+                  type: object
+            tokenPoolHoldings:
+              type: array
+              items:
+                $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        disclosedContracts:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/DisclosedContract"
