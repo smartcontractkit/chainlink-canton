@@ -42,8 +42,8 @@ var ProposeAdministrator = contract.NewExercise(contract.ExerciseParams[tokenadm
 		return nil
 	},
 	Template:     tokenadminregistry.TokenAdminRegistry{},
-	Method:       tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistryProposeAdministrator,
-	EncodeMethod: tarEncoder.TokenAdminRegistryProposeAdministrator,
+	Method:       tokenadminregistry.TokenAdminRegistry{}.ProposeAdministrator,
+	EncodeMethod: tarEncoder.ProposeAdministrator,
 })
 
 var AcceptAdminRole = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.AcceptAdminRole]{
@@ -55,8 +55,8 @@ var AcceptAdminRole = contract.NewExercise(contract.ExerciseParams[tokenadminreg
 		return nil
 	},
 	Template:     tokenadminregistry.TokenAdminRegistry{},
-	Method:       tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistryAcceptAdminRole,
-	EncodeMethod: tarEncoder.TokenAdminRegistryAcceptAdminRole,
+	Method:       tokenadminregistry.TokenAdminRegistry{}.AcceptAdminRole,
+	EncodeMethod: tarEncoder.AcceptAdminRole,
 })
 
 var SetPool = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.SetPool]{
@@ -68,6 +68,6 @@ var SetPool = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.Se
 		return nil
 	},
 	Template:     tokenadminregistry.TokenAdminRegistry{},
-	Method:       tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistrySetPool,
-	EncodeMethod: tarEncoder.TokenAdminRegistrySetPool,
+	Method:       tokenadminregistry.TokenAdminRegistry{}.SetPool,
+	EncodeMethod: tarEncoder.SetPool,
 })
