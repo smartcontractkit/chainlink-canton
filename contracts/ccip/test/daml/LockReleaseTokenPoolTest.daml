@@ -2267,20 +2267,20 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
             instrumentId = testInstrumentId
             newAdmin = poolOwner
             caller = ccipOwner
 
     disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
             instrumentId = testInstrumentId
             caller = poolOwner
 
     disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
             instrumentId = testInstrumentId
             tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
@@ -2365,7 +2365,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
     disclosedEm <- fromSome <$> queryDisclosure ccipOwner executingMessageCid
     newEmCid <- submit (actAs receiver
                         <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedEm) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_VerifyInboundMessage with
+        exerciseCmd tokenPool LockReleaseTokenPool.VerifyInboundMessage with
             tokenAdminRegistryCid = tokenAdminRegistry
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
