@@ -522,7 +522,7 @@ func TestCoin(t *testing.T) {
 								EntityName: "MintRole",
 							},
 							ContractId: daveMintRoleCid,
-							Choice:     "Mint",
+							Choice:     "MintRole_Mint",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{
 									Label: "instrumentId",
