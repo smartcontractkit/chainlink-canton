@@ -22,6 +22,7 @@ import CCIP.FactoryTest.FactoryCodecTest
   , encodeDeployPerPartyRouterFactoryParams
   , encodeDeployRMNRemoteParams
   , encodeDeployCommitteeVerifierParams
+  , encodeDeployExecutorParams
   , encodeDeployLockReleaseTokenPoolParams
   , encodeDeployRateLimiterParams
   , encodeDeployCCIPSenderParams
@@ -595,6 +596,40 @@ testDeployLockReleaseTokenPool_MCMS = script do
   submit mcmsParty do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "DeployLockReleaseTokenPool"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
+-- | Test DeployExecutor via MCMS entrypoint
+testDeployExecutor_MCMS : Script ()
+testDeployExecutor_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+
+  let factoryInstanceId = "factory-executor"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = DeployExecutorParams with
+        instanceId = "executor-1"
+        owner = mcmsParty
+        maxCCVsPerMsg = 10
+        allowedFinalityConfig = finalityConfig 0
+        ccvAllowlistEnabled = False
+      encoded = encodeDeployExecutorParams params
+
+  submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployExecutor"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 
