@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "950b435fa65445f3e6cf62a50fab285bddf135e476ea263e6fd1d3f5c32577e4"
+	PackageID   = "f27c63f3661b8c832ba875d26bae7ef12d4e14be19e801b87fb6f511eb7bf992"
 	SDKVersion  = "3.4.10"
 )
 
@@ -466,6 +466,79 @@ func (t *ApplySignatureConfigsParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// CalculateFee is a Record type
+type CalculateFee struct {
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	Caller            types.PARTY        `json:"caller"`
+}
+
+// ToMap converts CalculateFee to a map for DAML arguments
+func (t CalculateFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t CalculateFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CalculateFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CalculateFee to hex string (Canton MCMS format)
+func (t CalculateFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CalculateFee from hex string (Canton MCMS format)
+func (t *CalculateFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type CalculateFeeMCMSParams struct {
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+}
+
+// MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
+func (t CalculateFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CalculateFeeMCMSParams from hex string.
+func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CommitteeVerifier is a Template type
 type CommitteeVerifier struct {
 	InstanceId                   types.TEXT            `json:"instanceId"`
@@ -680,23 +753,23 @@ func (t *CommitteeVerifier) UnmarshalHex(data string) error {
 
 // Choice methods for CommitteeVerifier
 
-// CommitteeVerifierVerifyMessage exercises the CommitteeVerifier_VerifyMessage choice on this CommitteeVerifier contract
+// VerifyMessage exercises the VerifyMessage choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierVerifyMessage(contractID string, args CommitteeVerifierVerifyMessage) *model.ExerciseCommand {
+func (t CommitteeVerifier) VerifyMessage(contractID string, args VerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_VerifyMessage",
+		Choice:     "VerifyMessage",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierVerifyMessageWithPackageID exercises the CommitteeVerifier_VerifyMessage choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierVerifyMessageWithPackageID(contractID string, packageID string, args CommitteeVerifierVerifyMessage) *model.ExerciseCommand {
+// VerifyMessageWithPackageID exercises the VerifyMessage choice using the provided package ID instead of package name
+func (t CommitteeVerifier) VerifyMessageWithPackageID(contractID string, packageID string, args VerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_VerifyMessage",
+		Choice:     "VerifyMessage",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -785,44 +858,44 @@ func (t CommitteeVerifier) AcceptStorageLocationsAdminWithPackageID(contractID s
 	}
 }
 
-// CommitteeVerifierCalculateFee exercises the CommitteeVerifier_CalculateFee choice on this CommitteeVerifier contract
+// CalculateFee exercises the CalculateFee choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierCalculateFee(contractID string, args CommitteeVerifierCalculateFee) *model.ExerciseCommand {
+func (t CommitteeVerifier) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_CalculateFee",
+		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierCalculateFeeWithPackageID exercises the CommitteeVerifier_CalculateFee choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierCalculateFeeWithPackageID(contractID string, packageID string, args CommitteeVerifierCalculateFee) *model.ExerciseCommand {
+// CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_CalculateFee",
+		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierForwardToVerifier exercises the CommitteeVerifier_ForwardToVerifier choice on this CommitteeVerifier contract
+// ForwardToVerifier exercises the ForwardToVerifier choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierForwardToVerifier(contractID string, args CommitteeVerifierForwardToVerifier) *model.ExerciseCommand {
+func (t CommitteeVerifier) ForwardToVerifier(contractID string, args ForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_ForwardToVerifier",
+		Choice:     "ForwardToVerifier",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierForwardToVerifierWithPackageID exercises the CommitteeVerifier_ForwardToVerifier choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierForwardToVerifierWithPackageID(contractID string, packageID string, args CommitteeVerifierForwardToVerifier) *model.ExerciseCommand {
+// ForwardToVerifierWithPackageID exercises the ForwardToVerifier choice using the provided package ID instead of package name
+func (t CommitteeVerifier) ForwardToVerifierWithPackageID(contractID string, packageID string, args ForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_ForwardToVerifier",
+		Choice:     "ForwardToVerifier",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -848,23 +921,23 @@ func (t CommitteeVerifier) ArchiveWithPackageID(contractID string, packageID str
 	}
 }
 
-// CommitteeVerifierGetFee exercises the CommitteeVerifier_GetFee choice on this CommitteeVerifier contract
+// GetFee exercises the GetFee choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierGetFee(contractID string, args CommitteeVerifierGetFee) *model.ExerciseCommand {
+func (t CommitteeVerifier) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_GetFee",
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierGetFeeWithPackageID exercises the CommitteeVerifier_GetFee choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierGetFeeWithPackageID(contractID string, packageID string, args CommitteeVerifierGetFee) *model.ExerciseCommand {
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t CommitteeVerifier) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_GetFee",
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1106,310 +1179,6 @@ func (t *CommitteeVerifierDeps) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// CommitteeVerifierCalculateFee is a Record type
-type CommitteeVerifierCalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
-	ExtraContext      common.CCIPContext `json:"extraContext"`
-	Caller            types.PARTY        `json:"caller"`
-}
-
-// ToMap converts CommitteeVerifierCalculateFee to a map for DAML arguments
-func (t CommitteeVerifierCalculateFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t CommitteeVerifierCalculateFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CommitteeVerifierCalculateFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CommitteeVerifierCalculateFee to hex string (Canton MCMS format)
-func (t CommitteeVerifierCalculateFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierCalculateFee from hex string (Canton MCMS format)
-func (t *CommitteeVerifierCalculateFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierCalculateFeeMCMSParams is CommitteeVerifierCalculateFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type CommitteeVerifierCalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
-	ExtraContext      common.CCIPContext `json:"extraContext"`
-}
-
-// MarshalHex encodes CommitteeVerifierCalculateFeeMCMSParams to hex string for MCMS operationData.
-func (t CommitteeVerifierCalculateFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierCalculateFeeMCMSParams from hex string.
-func (t *CommitteeVerifierCalculateFeeMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierForwardToVerifier is a Record type
-type CommitteeVerifierForwardToVerifier struct {
-	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
-	ExtraContext      common.CCIPContext `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT         `json:"verifierArgs"`
-	Caller            types.PARTY        `json:"caller"`
-}
-
-// ToMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
-func (t CommitteeVerifierForwardToVerifier) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["verifierArgs"] = string(t.VerifierArgs)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t CommitteeVerifierForwardToVerifier) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CommitteeVerifierForwardToVerifier) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CommitteeVerifierForwardToVerifier to hex string (Canton MCMS format)
-func (t CommitteeVerifierForwardToVerifier) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierForwardToVerifier from hex string (Canton MCMS format)
-func (t *CommitteeVerifierForwardToVerifier) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierForwardToVerifierMCMSParams is CommitteeVerifierForwardToVerifier without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type CommitteeVerifierForwardToVerifierMCMSParams struct {
-	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
-	ExtraContext      common.CCIPContext `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT         `json:"verifierArgs"`
-}
-
-// MarshalHex encodes CommitteeVerifierForwardToVerifierMCMSParams to hex string for MCMS operationData.
-func (t CommitteeVerifierForwardToVerifierMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierForwardToVerifierMCMSParams from hex string.
-func (t *CommitteeVerifierForwardToVerifierMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierGetFee is a Record type
-type CommitteeVerifierGetFee struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-	Caller            types.PARTY   `json:"caller"`
-}
-
-// ToMap converts CommitteeVerifierGetFee to a map for DAML arguments
-func (t CommitteeVerifierGetFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t CommitteeVerifierGetFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CommitteeVerifierGetFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CommitteeVerifierGetFee to hex string (Canton MCMS format)
-func (t CommitteeVerifierGetFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierGetFee from hex string (Canton MCMS format)
-func (t *CommitteeVerifierGetFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierGetFeeMCMSParams is CommitteeVerifierGetFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type CommitteeVerifierGetFeeMCMSParams struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-}
-
-// MarshalHex encodes CommitteeVerifierGetFeeMCMSParams to hex string for MCMS operationData.
-func (t CommitteeVerifierGetFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierGetFeeMCMSParams from hex string.
-func (t *CommitteeVerifierGetFeeMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierVerifyMessage is a Record type
-type CommitteeVerifierVerifyMessage struct {
-	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
-	ExtraContext        common.CCIPContext `json:"extraContext"`
-	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
-	VerifierResults     types.TEXT         `json:"verifierResults"`
-	Caller              types.PARTY        `json:"caller"`
-}
-
-// ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
-func (t CommitteeVerifierVerifyMessage) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["executingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutingMessageCid
-	}()
-
-	m["verifierResults"] = string(t.VerifierResults)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t CommitteeVerifierVerifyMessage) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CommitteeVerifierVerifyMessage) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CommitteeVerifierVerifyMessage to hex string (Canton MCMS format)
-func (t CommitteeVerifierVerifyMessage) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierVerifyMessage from hex string (Canton MCMS format)
-func (t *CommitteeVerifierVerifyMessage) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierVerifyMessageMCMSParams is CommitteeVerifierVerifyMessage without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type CommitteeVerifierVerifyMessageMCMSParams struct {
-	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
-	ExtraContext        common.CCIPContext `json:"extraContext"`
-	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
-	VerifierResults     types.TEXT         `json:"verifierResults"`
-}
-
-// MarshalHex encodes CommitteeVerifierVerifyMessageMCMSParams to hex string for MCMS operationData.
-func (t CommitteeVerifierVerifyMessageMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierVerifyMessageMCMSParams from hex string.
-func (t *CommitteeVerifierVerifyMessageMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // DynamicConfig is a Record type
 type DynamicConfig struct {
 	AllowListAdmin       *types.PARTY  `json:"allowListAdmin" hex:"optional"`
@@ -1460,6 +1229,150 @@ func (t DynamicConfig) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes DynamicConfig from hex string (Canton MCMS format)
 func (t *DynamicConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ForwardToVerifier is a Record type
+type ForwardToVerifier struct {
+	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT         `json:"verifierArgs"`
+	Caller            types.PARTY        `json:"caller"`
+}
+
+// ToMap converts ForwardToVerifier to a map for DAML arguments
+func (t ForwardToVerifier) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["rmnRemoteCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["verifierArgs"] = string(t.VerifierArgs)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ForwardToVerifier) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ForwardToVerifier) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ForwardToVerifier to hex string (Canton MCMS format)
+func (t ForwardToVerifier) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ForwardToVerifier from hex string (Canton MCMS format)
+func (t *ForwardToVerifier) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ForwardToVerifierMCMSParams is ForwardToVerifier without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type ForwardToVerifierMCMSParams struct {
+	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT         `json:"verifierArgs"`
+}
+
+// MarshalHex encodes ForwardToVerifierMCMSParams to hex string for MCMS operationData.
+func (t ForwardToVerifierMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ForwardToVerifierMCMSParams from hex string.
+func (t *ForwardToVerifierMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFee is a Record type
+type GetFee struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	Caller            types.PARTY   `json:"caller"`
+}
+
+// ToMap converts GetFee to a map for DAML arguments
+func (t GetFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t GetFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetFee to hex string (Canton MCMS format)
+func (t GetFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFee from hex string (Canton MCMS format)
+func (t *GetFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetFeeMCMSParams struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+}
+
+// MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.
+func (t GetFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFeeMCMSParams from hex string.
+func (t *GetFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1941,6 +1854,93 @@ func (t *UpdateStorageLocationsParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// VerifyMessage is a Record type
+type VerifyMessage struct {
+	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext        common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	VerifierResults     types.TEXT         `json:"verifierResults"`
+	Caller              types.PARTY        `json:"caller"`
+}
+
+// ToMap converts VerifyMessage to a map for DAML arguments
+func (t VerifyMessage) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["rmnRemoteCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["executingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutingMessageCid
+	}()
+
+	m["verifierResults"] = string(t.VerifierResults)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t VerifyMessage) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *VerifyMessage) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes VerifyMessage to hex string (Canton MCMS format)
+func (t VerifyMessage) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes VerifyMessage from hex string (Canton MCMS format)
+func (t *VerifyMessage) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// VerifyMessageMCMSParams is VerifyMessage without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type VerifyMessageMCMSParams struct {
+	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext        common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	VerifierResults     types.TEXT         `json:"verifierResults"`
+}
+
+// MarshalHex encodes VerifyMessageMCMSParams to hex string for MCMS operationData.
+func (t VerifyMessageMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes VerifyMessageMCMSParams from hex string.
+func (t *VerifyMessageMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
@@ -1952,14 +1952,12 @@ type MCMSEncoder interface {
 	ApplyRemoteChainConfigUpdatesParams(args ApplyRemoteChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	ApplySignatureConfigs(args ApplySignatureConfigs) (*bind.EncodedChoice, error)
 	ApplySignatureConfigsParams(args ApplySignatureConfigsParams) (*bind.EncodedChoice, error)
-	CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error)
-	CommitteeVerifierCalculateFeeMCMSParams(args CommitteeVerifierCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
-	CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error)
-	CommitteeVerifierForwardToVerifierMCMSParams(args CommitteeVerifierForwardToVerifierMCMSParams) (*bind.EncodedChoice, error)
-	CommitteeVerifierGetFee(args CommitteeVerifierGetFee) (*bind.EncodedChoice, error)
-	CommitteeVerifierGetFeeMCMSParams(args CommitteeVerifierGetFeeMCMSParams) (*bind.EncodedChoice, error)
-	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
-	CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error)
+	CalculateFee(args CalculateFee) (*bind.EncodedChoice, error)
+	CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error)
+	ForwardToVerifier(args ForwardToVerifier) (*bind.EncodedChoice, error)
+	ForwardToVerifierMCMSParams(args ForwardToVerifierMCMSParams) (*bind.EncodedChoice, error)
+	GetFee(args GetFee) (*bind.EncodedChoice, error)
+	GetFeeMCMSParams(args GetFeeMCMSParams) (*bind.EncodedChoice, error)
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
 	SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
@@ -1968,6 +1966,8 @@ type MCMSEncoder interface {
 	TransferStorageLocationsAdminParams(args TransferStorageLocationsAdminParams) (*bind.EncodedChoice, error)
 	UpdateStorageLocations(args UpdateStorageLocations) (*bind.EncodedChoice, error)
 	UpdateStorageLocationsParams(args UpdateStorageLocationsParams) (*bind.EncodedChoice, error)
+	VerifyMessage(args VerifyMessage) (*bind.EncodedChoice, error)
+	VerifyMessageMCMSParams(args VerifyMessageMCMSParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -2037,44 +2037,34 @@ func (e *encoder) ApplySignatureConfigsParams(args ApplySignatureConfigsParams) 
 	return e.EncodeChoiceArgs("ApplySignatureConfigs", args)
 }
 
-// CommitteeVerifierCalculateFee encodes parameters for the CommitteeVerifierCalculateFee choice.
-func (e *encoder) CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierCalculateFee", args)
+// CalculateFee encodes parameters for the CalculateFee choice.
+func (e *encoder) CalculateFee(args CalculateFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CalculateFee", args)
 }
 
-// CommitteeVerifierCalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierCalculateFee choice.
-func (e *encoder) CommitteeVerifierCalculateFeeMCMSParams(args CommitteeVerifierCalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierCalculateFee", args)
+// CalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the CalculateFee choice.
+func (e *encoder) CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CalculateFee", args)
 }
 
-// CommitteeVerifierForwardToVerifier encodes parameters for the CommitteeVerifierForwardToVerifier choice.
-func (e *encoder) CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierForwardToVerifier", args)
+// ForwardToVerifier encodes parameters for the ForwardToVerifier choice.
+func (e *encoder) ForwardToVerifier(args ForwardToVerifier) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ForwardToVerifier", args)
 }
 
-// CommitteeVerifierForwardToVerifierMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierForwardToVerifier choice.
-func (e *encoder) CommitteeVerifierForwardToVerifierMCMSParams(args CommitteeVerifierForwardToVerifierMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierForwardToVerifier", args)
+// ForwardToVerifierMCMSParams encodes MCMS parameters (without Caller) for the ForwardToVerifier choice.
+func (e *encoder) ForwardToVerifierMCMSParams(args ForwardToVerifierMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ForwardToVerifier", args)
 }
 
-// CommitteeVerifierGetFee encodes parameters for the CommitteeVerifierGetFee choice.
-func (e *encoder) CommitteeVerifierGetFee(args CommitteeVerifierGetFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierGetFee", args)
+// GetFee encodes parameters for the GetFee choice.
+func (e *encoder) GetFee(args GetFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
 }
 
-// CommitteeVerifierGetFeeMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierGetFee choice.
-func (e *encoder) CommitteeVerifierGetFeeMCMSParams(args CommitteeVerifierGetFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierGetFee", args)
-}
-
-// CommitteeVerifierVerifyMessage encodes parameters for the CommitteeVerifierVerifyMessage choice.
-func (e *encoder) CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierVerifyMessage", args)
-}
-
-// CommitteeVerifierVerifyMessageMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierVerifyMessage choice.
-func (e *encoder) CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierVerifyMessage", args)
+// GetFeeMCMSParams encodes MCMS parameters (without Caller) for the GetFee choice.
+func (e *encoder) GetFeeMCMSParams(args GetFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
 }
 
 // SetDeps encodes parameters for the SetDeps choice.
@@ -2115,6 +2105,16 @@ func (e *encoder) UpdateStorageLocations(args UpdateStorageLocations) (*bind.Enc
 // UpdateStorageLocationsParams encodes parameters for the UpdateStorageLocations choice.
 func (e *encoder) UpdateStorageLocationsParams(args UpdateStorageLocationsParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("UpdateStorageLocations", args)
+}
+
+// VerifyMessage encodes parameters for the VerifyMessage choice.
+func (e *encoder) VerifyMessage(args VerifyMessage) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("VerifyMessage", args)
+}
+
+// VerifyMessageMCMSParams encodes MCMS parameters (without Caller) for the VerifyMessage choice.
+func (e *encoder) VerifyMessageMCMSParams(args VerifyMessageMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("VerifyMessage", args)
 }
 
 // Verify MCMSEncoder interface implementation

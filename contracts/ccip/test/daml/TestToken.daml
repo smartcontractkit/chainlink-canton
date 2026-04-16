@@ -39,7 +39,7 @@ template TestTransferPreapproval
 
     -- Direct send to receiver (like TransferPreapproval_Send).
     -- Controller is SENDER - any party can send if receiver has preapproved.
-    nonconsuming choice TestTransferPreapproval_Send : TransferV1.TransferInstructionResult
+    nonconsuming choice Send : TransferV1.TransferInstructionResult
       with
         sender : Party
         amount : Decimal
@@ -163,7 +163,7 @@ template TestTransferFactory
 
           -- Has preapproval: use it for direct transfer
           (False, Some paCid) -> do
-            exercise paCid TestTransferPreapproval_Send with
+            exercise paCid Send with
               sender = transfer.sender
               amount = transfer.amount
               instrumentId = transfer.instrumentId
@@ -176,7 +176,7 @@ template TestTransferFactory
         pure (view (toInterface @TransferV1.TransferFactory this))
 
     -- Update preapproval reference
-    choice TestTransferFactory_SetPreapproval : ContractId TestTransferFactory
+    choice SetPreapproval : ContractId TestTransferFactory
       with
         newPreapprovalCid : Optional (ContractId TestTransferPreapproval)
       controller admin

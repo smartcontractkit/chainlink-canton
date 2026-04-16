@@ -84,7 +84,7 @@ func encodeInstrumentId(admin, identifier string) []byte {
 // - Deploy all CCIP contracts including CommitteeVerifier, GlobalConfig, OffRamp, PerPartyRouter
 // - Mint tokens to pool (simulating prior locked tokens)
 // - Build inbound message with TokenTransfer
-// - Generate signatures and call CommitteeVerifier_VerifyMessage to append CCV verification
+// - Generate signatures and call VerifyMessage to append CCV verification
 // - Call PerPartyRouter.Execute to process message and get TokenReceiveTicket
 // - Call TokenPool_ReleaseFromTicket to transfer tokens from pool to receiver
 // - Verify receiver received the tokens
@@ -475,7 +475,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
 					ContractId: disclosedTar.ContractId,
-					Choice:     "TokenAdminRegistry_ProposeAdministrator",
+					Choice:     "ProposeAdministrator",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instrumentId", Value: instrumentIdAmt},
 						{Label: "newAdmin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
@@ -503,7 +503,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
 					ContractId: disclosedTar.ContractId,
-					Choice:     "TokenAdminRegistry_AcceptAdminRole",
+					Choice:     "AcceptAdminRole",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instrumentId", Value: instrumentIdAmt},
 						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
@@ -531,7 +531,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
 					ContractId: disclosedTar.ContractId,
-					Choice:     "TokenAdminRegistry_SetPool",
+					Choice:     "SetPool",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instrumentId", Value: instrumentIdAmt},
 						{Label: "tokenPool", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{

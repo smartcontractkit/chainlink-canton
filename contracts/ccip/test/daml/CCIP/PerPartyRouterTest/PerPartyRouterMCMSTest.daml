@@ -254,7 +254,7 @@ testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
 -- PERPARTYROUTERFACTORY MCMS ENTRYPOINT TESTS - FACTORY SET DEPS
 -- ===========================================================================
 
--- | Test MCMSReceiver entrypoint for FactorySetDeps function (all fields)
+-- | Test MCMSReceiver entrypoint for SetDeps function (all fields)
 testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps : Script ()
 testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps = script do
   ccipOwner <- allocateParty "ccip_owner"
@@ -290,7 +290,7 @@ testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps = script do
 
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "FactorySetDeps"
+      functionName = "SetDeps"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 
@@ -343,7 +343,7 @@ testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps_Partial = script do
 
   submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "FactorySetDeps"
+      functionName = "SetDeps"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 
@@ -416,7 +416,7 @@ testPerPartyRouterFactoryMCMSEntrypoint_InvalidParams = script do
 
   submitMustFail ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "FactorySetDeps"
+      functionName = "SetDeps"
       operationData = "ff"
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 
@@ -454,7 +454,7 @@ testPerPartyRouterFactoryMCMSEntrypoint_MissingSelfCid = script do
 
   submitMustFail ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "FactorySetDeps"
+      functionName = "SetDeps"
       operationData = encoded
       contractIds = Map.empty
 

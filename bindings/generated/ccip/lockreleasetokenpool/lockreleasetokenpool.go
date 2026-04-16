@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "c60c9cb785a19e0613162feef87acb8fd08f6152b82e0948243ec177d7b93d6c"
+	PackageID   = "1e2f611a84a960df2f229c4d7309dcafdd030db8b38f96212174357677dbb891"
 	SDKVersion  = "3.4.10"
 )
 
@@ -279,6 +279,109 @@ func (t *ApplyTokenTransferFeeConfigUpdatesParams) UnmarshalHex(data string) err
 	return hexCodec.Unmarshal(data, t)
 }
 
+// CalculateFee is a Record type
+type CalculateFee struct {
+	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext                       `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller                types.PARTY                              `json:"caller"`
+}
+
+// ToMap converts CalculateFee to a map for DAML arguments
+func (t CalculateFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["feeQuoterCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["tokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInstrumentId
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t CalculateFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CalculateFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CalculateFee to hex string (Canton MCMS format)
+func (t CalculateFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CalculateFee from hex string (Canton MCMS format)
+func (t *CalculateFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type CalculateFeeMCMSParams struct {
+	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext                       `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+}
+
+// MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
+func (t CalculateFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CalculateFeeMCMSParams from hex string.
+func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ChainUpdate is a Record type
 type ChainUpdate struct {
 	RemoteChainSelector                        types.NUMERIC             `json:"remoteChainSelector"`
@@ -387,6 +490,285 @@ func (t ChainUpdate) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ChainUpdate from hex string (Canton MCMS format)
 func (t *ChainUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFee is a Record type
+type GetFee struct {
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller            types.PARTY                              `json:"caller"`
+}
+
+// ToMap converts GetFee to a map for DAML arguments
+func (t GetFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["feeQuoterCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["tokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInstrumentId
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t GetFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetFee to hex string (Canton MCMS format)
+func (t GetFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFee from hex string (Canton MCMS format)
+func (t *GetFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetFeeMCMSParams struct {
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+}
+
+// MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.
+func (t GetFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFeeMCMSParams from hex string.
+func (t *GetFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetRequiredCCVs is a Record type
+type GetRequiredCCVs struct {
+	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
+	Amount              types.NUMERIC                `json:"amount"`
+	Finality            common.FinalityConfig        `json:"finality"`
+	ExtraData           types.TEXT                   `json:"extraData"`
+	Direction           interfaces.TransferDirection `json:"direction"`
+	Caller              types.PARTY                  `json:"caller"`
+}
+
+// ToMap converts GetRequiredCCVs to a map for DAML arguments
+func (t GetRequiredCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["remoteChainSelector"] = t.RemoteChainSelector
+
+	m["amount"] = t.Amount
+
+	m["finality"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Finality).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Finality
+	}()
+
+	m["extraData"] = string(t.ExtraData)
+
+	m["direction"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Direction).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Direction
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t GetRequiredCCVs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetRequiredCCVs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetRequiredCCVs to hex string (Canton MCMS format)
+func (t GetRequiredCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVs from hex string (Canton MCMS format)
+func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetRequiredCCVsMCMSParams is GetRequiredCCVs without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetRequiredCCVsMCMSParams struct {
+	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
+	Amount              types.NUMERIC                `json:"amount"`
+	Finality            common.FinalityConfig        `json:"finality"`
+	ExtraData           types.TEXT                   `json:"extraData"`
+	Direction           interfaces.TransferDirection `json:"direction"`
+}
+
+// MarshalHex encodes GetRequiredCCVsMCMSParams to hex string for MCMS operationData.
+func (t GetRequiredCCVsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVsMCMSParams from hex string.
+func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// LockOrBurn is a Record type
+type LockOrBurn struct {
+	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext    `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
+	TokenInput            interfaces.TokenInput `json:"tokenInput"`
+	SenderInputCids       []types.CONTRACT_ID   `json:"senderInputCids"`
+	Amount                types.NUMERIC         `json:"amount"`
+	Caller                types.PARTY           `json:"caller"`
+}
+
+// ToMap converts LockOrBurn to a map for DAML arguments
+func (t LockOrBurn) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["rmnRemoteCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["tokenInput"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInput
+	}()
+
+	m["senderInputCids"] = func() []any {
+		res := make([]any, 0, len(t.SenderInputCids))
+		for _, e := range t.SenderInputCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["amount"] = t.Amount
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t LockOrBurn) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LockOrBurn) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LockOrBurn to hex string (Canton MCMS format)
+func (t LockOrBurn) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockOrBurn from hex string (Canton MCMS format)
+func (t *LockOrBurn) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// LockOrBurnMCMSParams is LockOrBurn without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type LockOrBurnMCMSParams struct {
+	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext    `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
+	TokenInput            interfaces.TokenInput `json:"tokenInput"`
+	SenderInputCids       []types.CONTRACT_ID   `json:"senderInputCids"`
+	Amount                types.NUMERIC         `json:"amount"`
+}
+
+// MarshalHex encodes LockOrBurnMCMSParams to hex string for MCMS operationData.
+func (t LockOrBurnMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockOrBurnMCMSParams from hex string.
+func (t *LockOrBurnMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -610,44 +992,44 @@ func (t *LockReleaseTokenPool) UnmarshalHex(data string) error {
 
 // Choice methods for LockReleaseTokenPool
 
-// LockReleaseTokenPoolReleaseFromTicket exercises the LockReleaseTokenPool_ReleaseFromTicket choice on this LockReleaseTokenPool contract
+// ReleaseFromTicket exercises the ReleaseFromTicket choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolReleaseFromTicket(contractID string, args LockReleaseTokenPoolReleaseFromTicket) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) ReleaseFromTicket(contractID string, args ReleaseFromTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_ReleaseFromTicket",
+		Choice:     "ReleaseFromTicket",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolReleaseFromTicketWithPackageID exercises the LockReleaseTokenPool_ReleaseFromTicket choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolReleaseFromTicketWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolReleaseFromTicket) *model.ExerciseCommand {
+// ReleaseFromTicketWithPackageID exercises the ReleaseFromTicket choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) ReleaseFromTicketWithPackageID(contractID string, packageID string, args ReleaseFromTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_ReleaseFromTicket",
+		Choice:     "ReleaseFromTicket",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolLockOrBurn exercises the LockReleaseTokenPool_LockOrBurn choice on this LockReleaseTokenPool contract
+// LockOrBurn exercises the LockOrBurn choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolLockOrBurn(contractID string, args LockReleaseTokenPoolLockOrBurn) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) LockOrBurn(contractID string, args LockOrBurn) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_LockOrBurn",
+		Choice:     "LockOrBurn",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolLockOrBurnWithPackageID exercises the LockReleaseTokenPool_LockOrBurn choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolLockOrBurnWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolLockOrBurn) *model.ExerciseCommand {
+// LockOrBurnWithPackageID exercises the LockOrBurn choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockOrBurnWithPackageID(contractID string, packageID string, args LockOrBurn) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_LockOrBurn",
+		Choice:     "LockOrBurn",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -715,107 +1097,107 @@ func (t LockReleaseTokenPool) ApplyChainUpdatesWithPackageID(contractID string, 
 	}
 }
 
-// LockReleaseTokenPoolVerifyInboundMessage exercises the LockReleaseTokenPool_VerifyInboundMessage choice on this LockReleaseTokenPool contract
+// VerifyInboundMessage exercises the VerifyInboundMessage choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyInboundMessage(contractID string, args LockReleaseTokenPoolVerifyInboundMessage) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) VerifyInboundMessage(contractID string, args VerifyInboundMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_VerifyInboundMessage",
+		Choice:     "VerifyInboundMessage",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolVerifyInboundMessageWithPackageID exercises the LockReleaseTokenPool_VerifyInboundMessage choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyInboundMessageWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolVerifyInboundMessage) *model.ExerciseCommand {
+// VerifyInboundMessageWithPackageID exercises the VerifyInboundMessage choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) VerifyInboundMessageWithPackageID(contractID string, packageID string, args VerifyInboundMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_VerifyInboundMessage",
+		Choice:     "VerifyInboundMessage",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolVerifyOutboundCCVs exercises the LockReleaseTokenPool_VerifyOutboundCCVs choice on this LockReleaseTokenPool contract
+// VerifyOutboundCCVs exercises the VerifyOutboundCCVs choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyOutboundCCVs(contractID string, args LockReleaseTokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) VerifyOutboundCCVs(contractID string, args VerifyOutboundCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_VerifyOutboundCCVs",
+		Choice:     "VerifyOutboundCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolVerifyOutboundCCVsWithPackageID exercises the LockReleaseTokenPool_VerifyOutboundCCVs choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyOutboundCCVsWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
+// VerifyOutboundCCVsWithPackageID exercises the VerifyOutboundCCVs choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) VerifyOutboundCCVsWithPackageID(contractID string, packageID string, args VerifyOutboundCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_VerifyOutboundCCVs",
+		Choice:     "VerifyOutboundCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolCalculateFee exercises the LockReleaseTokenPool_CalculateFee choice on this LockReleaseTokenPool contract
+// CalculateFee exercises the CalculateFee choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFee(contractID string, args LockReleaseTokenPoolCalculateFee) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_CalculateFee",
+		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolCalculateFeeWithPackageID exercises the LockReleaseTokenPool_CalculateFee choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFeeWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolCalculateFee) *model.ExerciseCommand {
+// CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_CalculateFee",
+		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolGetFee exercises the LockReleaseTokenPool_GetFee choice on this LockReleaseTokenPool contract
+// GetFee exercises the GetFee choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetFee(contractID string, args LockReleaseTokenPoolGetFee) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetFee",
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolGetFeeWithPackageID exercises the LockReleaseTokenPool_GetFee choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetFeeWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolGetFee) *model.ExerciseCommand {
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetFee",
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolGetRequiredCCVs exercises the LockReleaseTokenPool_GetRequiredCCVs choice on this LockReleaseTokenPool contract
+// GetRequiredCCVs exercises the GetRequiredCCVs choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVs(contractID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) GetRequiredCCVs(contractID string, args GetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetRequiredCCVs",
+		Choice:     "GetRequiredCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolGetRequiredCCVsWithPackageID exercises the LockReleaseTokenPool_GetRequiredCCVs choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVsWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
+// GetRequiredCCVsWithPackageID exercises the GetRequiredCCVs choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) GetRequiredCCVsWithPackageID(contractID string, packageID string, args GetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetRequiredCCVs",
+		Choice:     "GetRequiredCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1138,661 +1520,6 @@ func (t *LockReleaseTokenPoolDeps) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// LockReleaseTokenPoolCalculateFee is a Record type
-type LockReleaseTokenPoolCalculateFee struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	ExtraContext          common.CCIPContext                       `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller                types.PARTY                              `json:"caller"`
-}
-
-// ToMap converts LockReleaseTokenPoolCalculateFee to a map for DAML arguments
-func (t LockReleaseTokenPoolCalculateFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["feeQuoterCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeQuoterCid
-	}()
-
-	m["tokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInstrumentId
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t LockReleaseTokenPoolCalculateFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LockReleaseTokenPoolCalculateFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LockReleaseTokenPoolCalculateFee to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolCalculateFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolCalculateFee from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolCalculateFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolCalculateFeeMCMSParams is LockReleaseTokenPoolCalculateFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolCalculateFeeMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	ExtraContext          common.CCIPContext                       `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-}
-
-// MarshalHex encodes LockReleaseTokenPoolCalculateFeeMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolCalculateFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolCalculateFeeMCMSParams from hex string.
-func (t *LockReleaseTokenPoolCalculateFeeMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolGetFee is a Record type
-type LockReleaseTokenPoolGetFee struct {
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller            types.PARTY                              `json:"caller"`
-}
-
-// ToMap converts LockReleaseTokenPoolGetFee to a map for DAML arguments
-func (t LockReleaseTokenPoolGetFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["feeQuoterCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeQuoterCid
-	}()
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["tokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInstrumentId
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t LockReleaseTokenPoolGetFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LockReleaseTokenPoolGetFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LockReleaseTokenPoolGetFee to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolGetFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolGetFee from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolGetFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolGetFeeMCMSParams is LockReleaseTokenPoolGetFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolGetFeeMCMSParams struct {
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-}
-
-// MarshalHex encodes LockReleaseTokenPoolGetFeeMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolGetFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolGetFeeMCMSParams from hex string.
-func (t *LockReleaseTokenPoolGetFeeMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolGetRequiredCCVs is a Record type
-type LockReleaseTokenPoolGetRequiredCCVs struct {
-	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
-	Amount              types.NUMERIC                `json:"amount"`
-	Finality            common.FinalityConfig        `json:"finality"`
-	ExtraData           types.TEXT                   `json:"extraData"`
-	Direction           interfaces.TransferDirection `json:"direction"`
-	Caller              types.PARTY                  `json:"caller"`
-}
-
-// ToMap converts LockReleaseTokenPoolGetRequiredCCVs to a map for DAML arguments
-func (t LockReleaseTokenPoolGetRequiredCCVs) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["remoteChainSelector"] = t.RemoteChainSelector
-
-	m["amount"] = t.Amount
-
-	m["finality"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Finality).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Finality
-	}()
-
-	m["extraData"] = string(t.ExtraData)
-
-	m["direction"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Direction).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Direction
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t LockReleaseTokenPoolGetRequiredCCVs) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LockReleaseTokenPoolGetRequiredCCVs) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LockReleaseTokenPoolGetRequiredCCVs to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolGetRequiredCCVs) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolGetRequiredCCVs from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolGetRequiredCCVsMCMSParams is LockReleaseTokenPoolGetRequiredCCVs without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolGetRequiredCCVsMCMSParams struct {
-	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
-	Amount              types.NUMERIC                `json:"amount"`
-	Finality            common.FinalityConfig        `json:"finality"`
-	ExtraData           types.TEXT                   `json:"extraData"`
-	Direction           interfaces.TransferDirection `json:"direction"`
-}
-
-// MarshalHex encodes LockReleaseTokenPoolGetRequiredCCVsMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolGetRequiredCCVsMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolGetRequiredCCVsMCMSParams from hex string.
-func (t *LockReleaseTokenPoolGetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolLockOrBurn is a Record type
-type LockReleaseTokenPoolLockOrBurn struct {
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext    `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
-	SenderInputCids       []types.CONTRACT_ID   `json:"senderInputCids"`
-	Amount                types.NUMERIC         `json:"amount"`
-	Caller                types.PARTY           `json:"caller"`
-}
-
-// ToMap converts LockReleaseTokenPoolLockOrBurn to a map for DAML arguments
-func (t LockReleaseTokenPoolLockOrBurn) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInput
-	}()
-
-	m["senderInputCids"] = func() []any {
-		res := make([]any, 0, len(t.SenderInputCids))
-		for _, e := range t.SenderInputCids {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	m["amount"] = t.Amount
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t LockReleaseTokenPoolLockOrBurn) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LockReleaseTokenPoolLockOrBurn) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LockReleaseTokenPoolLockOrBurn to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolLockOrBurn) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolLockOrBurn from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolLockOrBurn) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolLockOrBurnMCMSParams is LockReleaseTokenPoolLockOrBurn without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolLockOrBurnMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext    `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
-	SenderInputCids       []types.CONTRACT_ID   `json:"senderInputCids"`
-	Amount                types.NUMERIC         `json:"amount"`
-}
-
-// MarshalHex encodes LockReleaseTokenPoolLockOrBurnMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolLockOrBurnMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolLockOrBurnMCMSParams from hex string.
-func (t *LockReleaseTokenPoolLockOrBurnMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolReleaseFromTicket is a Record type
-type LockReleaseTokenPoolReleaseFromTicket struct {
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext    `json:"extraContext"`
-	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
-	Caller                types.PARTY           `json:"caller"`
-}
-
-// ToMap converts LockReleaseTokenPoolReleaseFromTicket to a map for DAML arguments
-func (t LockReleaseTokenPoolReleaseFromTicket) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["tokenReceiveTicketCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenReceiveTicketCid
-	}()
-
-	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInput
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t LockReleaseTokenPoolReleaseFromTicket) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LockReleaseTokenPoolReleaseFromTicket) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LockReleaseTokenPoolReleaseFromTicket to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolReleaseFromTicket) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolReleaseFromTicket from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolReleaseFromTicket) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolReleaseFromTicketMCMSParams is LockReleaseTokenPoolReleaseFromTicket without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolReleaseFromTicketMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext    `json:"extraContext"`
-	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
-}
-
-// MarshalHex encodes LockReleaseTokenPoolReleaseFromTicketMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolReleaseFromTicketMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolReleaseFromTicketMCMSParams from hex string.
-func (t *LockReleaseTokenPoolReleaseFromTicketMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolVerifyInboundMessage is a Record type
-type LockReleaseTokenPoolVerifyInboundMessage struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
-	Caller                types.PARTY        `json:"caller"`
-}
-
-// ToMap converts LockReleaseTokenPoolVerifyInboundMessage to a map for DAML arguments
-func (t LockReleaseTokenPoolVerifyInboundMessage) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["executingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutingMessageCid
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t LockReleaseTokenPoolVerifyInboundMessage) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LockReleaseTokenPoolVerifyInboundMessage) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LockReleaseTokenPoolVerifyInboundMessage to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolVerifyInboundMessage) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolVerifyInboundMessage from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolVerifyInboundMessage) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolVerifyInboundMessageMCMSParams is LockReleaseTokenPoolVerifyInboundMessage without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolVerifyInboundMessageMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
-}
-
-// MarshalHex encodes LockReleaseTokenPoolVerifyInboundMessageMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolVerifyInboundMessageMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolVerifyInboundMessageMCMSParams from hex string.
-func (t *LockReleaseTokenPoolVerifyInboundMessageMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolVerifyOutboundCCVs is a Record type
-type LockReleaseTokenPoolVerifyOutboundCCVs struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
-	Amount                types.NUMERIC      `json:"amount"`
-	Caller                types.PARTY        `json:"caller"`
-}
-
-// ToMap converts LockReleaseTokenPoolVerifyOutboundCCVs to a map for DAML arguments
-func (t LockReleaseTokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["amount"] = t.Amount
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t LockReleaseTokenPoolVerifyOutboundCCVs) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LockReleaseTokenPoolVerifyOutboundCCVs) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LockReleaseTokenPoolVerifyOutboundCCVs to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolVerifyOutboundCCVs) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolVerifyOutboundCCVs from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolVerifyOutboundCCVs) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams is LockReleaseTokenPoolVerifyOutboundCCVs without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
-	Amount                types.NUMERIC      `json:"amount"`
-}
-
-// MarshalHex encodes LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams from hex string.
-func (t *LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // RateLimitConfigArgs is a Record type
 type RateLimitConfigArgs struct {
 	RemoteChainSelector                        types.NUMERIC           `json:"remoteChainSelector"`
@@ -1852,6 +1579,109 @@ func (t RateLimitConfigArgs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes RateLimitConfigArgs from hex string (Canton MCMS format)
 func (t *RateLimitConfigArgs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ReleaseFromTicket is a Record type
+type ReleaseFromTicket struct {
+	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext    `json:"extraContext"`
+	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
+	TokenInput            interfaces.TokenInput `json:"tokenInput"`
+	Caller                types.PARTY           `json:"caller"`
+}
+
+// ToMap converts ReleaseFromTicket to a map for DAML arguments
+func (t ReleaseFromTicket) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["rmnRemoteCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["tokenReceiveTicketCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenReceiveTicketCid
+	}()
+
+	m["tokenInput"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInput
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ReleaseFromTicket) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ReleaseFromTicket) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ReleaseFromTicket to hex string (Canton MCMS format)
+func (t ReleaseFromTicket) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ReleaseFromTicket from hex string (Canton MCMS format)
+func (t *ReleaseFromTicket) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ReleaseFromTicketMCMSParams is ReleaseFromTicket without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type ReleaseFromTicketMCMSParams struct {
+	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext    `json:"extraContext"`
+	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
+	TokenInput            interfaces.TokenInput `json:"tokenInput"`
+}
+
+// MarshalHex encodes ReleaseFromTicketMCMSParams to hex string for MCMS operationData.
+func (t ReleaseFromTicketMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ReleaseFromTicketMCMSParams from hex string.
+func (t *ReleaseFromTicketMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2474,6 +2304,176 @@ func (v TransferTimeout) GetVariantTagByte() byte {
 
 var _ types.VariantWithTagByte = (*TransferTimeout)(nil)
 
+// VerifyInboundMessage is a Record type
+type VerifyInboundMessage struct {
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
+	Caller                types.PARTY        `json:"caller"`
+}
+
+// ToMap converts VerifyInboundMessage to a map for DAML arguments
+func (t VerifyInboundMessage) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["executingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutingMessageCid
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t VerifyInboundMessage) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *VerifyInboundMessage) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes VerifyInboundMessage to hex string (Canton MCMS format)
+func (t VerifyInboundMessage) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes VerifyInboundMessage from hex string (Canton MCMS format)
+func (t *VerifyInboundMessage) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// VerifyInboundMessageMCMSParams is VerifyInboundMessage without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type VerifyInboundMessageMCMSParams struct {
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
+}
+
+// MarshalHex encodes VerifyInboundMessageMCMSParams to hex string for MCMS operationData.
+func (t VerifyInboundMessageMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes VerifyInboundMessageMCMSParams from hex string.
+func (t *VerifyInboundMessageMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// VerifyOutboundCCVs is a Record type
+type VerifyOutboundCCVs struct {
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
+	Amount                types.NUMERIC      `json:"amount"`
+	Caller                types.PARTY        `json:"caller"`
+}
+
+// ToMap converts VerifyOutboundCCVs to a map for DAML arguments
+func (t VerifyOutboundCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["amount"] = t.Amount
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t VerifyOutboundCCVs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *VerifyOutboundCCVs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes VerifyOutboundCCVs to hex string (Canton MCMS format)
+func (t VerifyOutboundCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes VerifyOutboundCCVs from hex string (Canton MCMS format)
+func (t *VerifyOutboundCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// VerifyOutboundCCVsMCMSParams is VerifyOutboundCCVs without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type VerifyOutboundCCVsMCMSParams struct {
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
+	Amount                types.NUMERIC      `json:"amount"`
+}
+
+// MarshalHex encodes VerifyOutboundCCVsMCMSParams to hex string for MCMS operationData.
+func (t VerifyOutboundCCVsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes VerifyOutboundCCVsMCMSParams from hex string.
+func (t *VerifyOutboundCCVsMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
@@ -2481,20 +2481,16 @@ type MCMSEncoder interface {
 	ApplyChainUpdatesParams(args ApplyChainUpdatesParams) (*bind.EncodedChoice, error)
 	ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error)
 	ApplyTokenTransferFeeConfigUpdatesParams(args ApplyTokenTransferFeeConfigUpdatesParams) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalculateFee) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolGetFee(args LockReleaseTokenPoolGetFee) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolGetFeeMCMSParams(args LockReleaseTokenPoolGetFeeMCMSParams) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolGetRequiredCCVs) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolGetRequiredCCVsMCMSParams(args LockReleaseTokenPoolGetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolLockOrBurn(args LockReleaseTokenPoolLockOrBurn) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolLockOrBurnMCMSParams(args LockReleaseTokenPoolLockOrBurnMCMSParams) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolReleaseFromTicket(args LockReleaseTokenPoolReleaseFromTicket) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolReleaseFromTicketMCMSParams(args LockReleaseTokenPoolReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolVerifyInboundMessage(args LockReleaseTokenPoolVerifyInboundMessage) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolVerifyInboundMessageMCMSParams(args LockReleaseTokenPoolVerifyInboundMessageMCMSParams) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error)
+	CalculateFee(args CalculateFee) (*bind.EncodedChoice, error)
+	CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error)
+	GetFee(args GetFee) (*bind.EncodedChoice, error)
+	GetFeeMCMSParams(args GetFeeMCMSParams) (*bind.EncodedChoice, error)
+	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
+	GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
+	LockOrBurn(args LockOrBurn) (*bind.EncodedChoice, error)
+	LockOrBurnMCMSParams(args LockOrBurnMCMSParams) (*bind.EncodedChoice, error)
+	ReleaseFromTicket(args ReleaseFromTicket) (*bind.EncodedChoice, error)
+	ReleaseFromTicketMCMSParams(args ReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
 	SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error)
 	SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error)
@@ -2503,6 +2499,10 @@ type MCMSEncoder interface {
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
 	SetTransferTimeout(args SetTransferTimeout) (*bind.EncodedChoice, error)
 	SetTransferTimeoutParams(args SetTransferTimeoutParams) (*bind.EncodedChoice, error)
+	VerifyInboundMessage(args VerifyInboundMessage) (*bind.EncodedChoice, error)
+	VerifyInboundMessageMCMSParams(args VerifyInboundMessageMCMSParams) (*bind.EncodedChoice, error)
+	VerifyOutboundCCVs(args VerifyOutboundCCVs) (*bind.EncodedChoice, error)
+	VerifyOutboundCCVsMCMSParams(args VerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -2552,74 +2552,54 @@ func (e *encoder) ApplyTokenTransferFeeConfigUpdatesParams(args ApplyTokenTransf
 	return e.EncodeChoiceArgs("ApplyTokenTransferFeeConfigUpdates", args)
 }
 
-// LockReleaseTokenPoolCalculateFee encodes parameters for the LockReleaseTokenPoolCalculateFee choice.
-func (e *encoder) LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalculateFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolCalculateFee", args)
+// CalculateFee encodes parameters for the CalculateFee choice.
+func (e *encoder) CalculateFee(args CalculateFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CalculateFee", args)
 }
 
-// LockReleaseTokenPoolCalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolCalculateFee choice.
-func (e *encoder) LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolCalculateFee", args)
+// CalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the CalculateFee choice.
+func (e *encoder) CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CalculateFee", args)
 }
 
-// LockReleaseTokenPoolGetFee encodes parameters for the LockReleaseTokenPoolGetFee choice.
-func (e *encoder) LockReleaseTokenPoolGetFee(args LockReleaseTokenPoolGetFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetFee", args)
+// GetFee encodes parameters for the GetFee choice.
+func (e *encoder) GetFee(args GetFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
 }
 
-// LockReleaseTokenPoolGetFeeMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolGetFee choice.
-func (e *encoder) LockReleaseTokenPoolGetFeeMCMSParams(args LockReleaseTokenPoolGetFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetFee", args)
+// GetFeeMCMSParams encodes MCMS parameters (without Caller) for the GetFee choice.
+func (e *encoder) GetFeeMCMSParams(args GetFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
 }
 
-// LockReleaseTokenPoolGetRequiredCCVs encodes parameters for the LockReleaseTokenPoolGetRequiredCCVs choice.
-func (e *encoder) LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolGetRequiredCCVs) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetRequiredCCVs", args)
+// GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.
+func (e *encoder) GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
 }
 
-// LockReleaseTokenPoolGetRequiredCCVsMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolGetRequiredCCVs choice.
-func (e *encoder) LockReleaseTokenPoolGetRequiredCCVsMCMSParams(args LockReleaseTokenPoolGetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetRequiredCCVs", args)
+// GetRequiredCCVsMCMSParams encodes MCMS parameters (without Caller) for the GetRequiredCCVs choice.
+func (e *encoder) GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
 }
 
-// LockReleaseTokenPoolLockOrBurn encodes parameters for the LockReleaseTokenPoolLockOrBurn choice.
-func (e *encoder) LockReleaseTokenPoolLockOrBurn(args LockReleaseTokenPoolLockOrBurn) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolLockOrBurn", args)
+// LockOrBurn encodes parameters for the LockOrBurn choice.
+func (e *encoder) LockOrBurn(args LockOrBurn) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockOrBurn", args)
 }
 
-// LockReleaseTokenPoolLockOrBurnMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolLockOrBurn choice.
-func (e *encoder) LockReleaseTokenPoolLockOrBurnMCMSParams(args LockReleaseTokenPoolLockOrBurnMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolLockOrBurn", args)
+// LockOrBurnMCMSParams encodes MCMS parameters (without Caller) for the LockOrBurn choice.
+func (e *encoder) LockOrBurnMCMSParams(args LockOrBurnMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockOrBurn", args)
 }
 
-// LockReleaseTokenPoolReleaseFromTicket encodes parameters for the LockReleaseTokenPoolReleaseFromTicket choice.
-func (e *encoder) LockReleaseTokenPoolReleaseFromTicket(args LockReleaseTokenPoolReleaseFromTicket) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolReleaseFromTicket", args)
+// ReleaseFromTicket encodes parameters for the ReleaseFromTicket choice.
+func (e *encoder) ReleaseFromTicket(args ReleaseFromTicket) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ReleaseFromTicket", args)
 }
 
-// LockReleaseTokenPoolReleaseFromTicketMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolReleaseFromTicket choice.
-func (e *encoder) LockReleaseTokenPoolReleaseFromTicketMCMSParams(args LockReleaseTokenPoolReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolReleaseFromTicket", args)
-}
-
-// LockReleaseTokenPoolVerifyInboundMessage encodes parameters for the LockReleaseTokenPoolVerifyInboundMessage choice.
-func (e *encoder) LockReleaseTokenPoolVerifyInboundMessage(args LockReleaseTokenPoolVerifyInboundMessage) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyInboundMessage", args)
-}
-
-// LockReleaseTokenPoolVerifyInboundMessageMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolVerifyInboundMessage choice.
-func (e *encoder) LockReleaseTokenPoolVerifyInboundMessageMCMSParams(args LockReleaseTokenPoolVerifyInboundMessageMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyInboundMessage", args)
-}
-
-// LockReleaseTokenPoolVerifyOutboundCCVs encodes parameters for the LockReleaseTokenPoolVerifyOutboundCCVs choice.
-func (e *encoder) LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyOutboundCCVs", args)
-}
-
-// LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolVerifyOutboundCCVs choice.
-func (e *encoder) LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyOutboundCCVs", args)
+// ReleaseFromTicketMCMSParams encodes MCMS parameters (without Caller) for the ReleaseFromTicket choice.
+func (e *encoder) ReleaseFromTicketMCMSParams(args ReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ReleaseFromTicket", args)
 }
 
 // SetDynamicConfig encodes parameters for the SetDynamicConfig choice.
@@ -2660,6 +2640,26 @@ func (e *encoder) SetTransferTimeout(args SetTransferTimeout) (*bind.EncodedChoi
 // SetTransferTimeoutParams encodes parameters for the SetTransferTimeout choice.
 func (e *encoder) SetTransferTimeoutParams(args SetTransferTimeoutParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetTransferTimeout", args)
+}
+
+// VerifyInboundMessage encodes parameters for the VerifyInboundMessage choice.
+func (e *encoder) VerifyInboundMessage(args VerifyInboundMessage) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("VerifyInboundMessage", args)
+}
+
+// VerifyInboundMessageMCMSParams encodes MCMS parameters (without Caller) for the VerifyInboundMessage choice.
+func (e *encoder) VerifyInboundMessageMCMSParams(args VerifyInboundMessageMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("VerifyInboundMessage", args)
+}
+
+// VerifyOutboundCCVs encodes parameters for the VerifyOutboundCCVs choice.
+func (e *encoder) VerifyOutboundCCVs(args VerifyOutboundCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("VerifyOutboundCCVs", args)
+}
+
+// VerifyOutboundCCVsMCMSParams encodes MCMS parameters (without Caller) for the VerifyOutboundCCVs choice.
+func (e *encoder) VerifyOutboundCCVsMCMSParams(args VerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("VerifyOutboundCCVs", args)
 }
 
 // Verify MCMSEncoder interface implementation

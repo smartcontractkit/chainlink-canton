@@ -8,7 +8,7 @@ template Proxy
     where
         signatory owner
 
-        choice Proxy_GetValue : Int
+        choice GetValue : Int
             with
                 receiver : ContractId Interface.IReceiver
                 caller : Party
@@ -16,7 +16,7 @@ template Proxy
             do
                 exercise receiver Interface.Receiver_GetValue with caller = caller
 
-        nonconsuming choice Proxy_EmitEvent : ()
+        nonconsuming choice EmitEvent : ()
             with
                 receiver : ContractId Interface.IReceiver
                 eventValue : Int
@@ -25,7 +25,7 @@ template Proxy
             do
                 exercise receiver Interface.Receiver_EmitEvent with eventValue = eventValue, caller = caller
 
-        nonconsuming choice Proxy_EmitValue : ()
+        nonconsuming choice EmitValue : ()
             with
                 receiver : ContractId Interface.IReceiver
                 caller : Party

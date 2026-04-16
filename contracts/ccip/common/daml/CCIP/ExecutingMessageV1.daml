@@ -118,7 +118,7 @@ template ExecutingMessageV1
 
         -- Record the pool's inbound CCV requirements. Only exercisable by ccipOwner,
         -- authorized through TAR's signatory context when pool calls
-        -- TokenAdminRegistry_SetInboundPoolCCVs. OffRamp verifies coverage.
+        -- SetInboundPoolCCVs. OffRamp verifies coverage.
         choice SetInboundPoolCCVs : ContractId ExecutingMessageV1
             with
                 poolCCVs : [RawInstanceAddress]
