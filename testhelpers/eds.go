@@ -108,7 +108,6 @@ func GetCCIPExecuteDisclosures(
 	}
 
 	// Optionally populate poolExtraContext.
-	// TODO: is there a cleaner approach to this?
 	var poolExtraContext *apiv2.Value
 	if len(resp.JSON200.PoolExtraContext) > 0 {
 		poolExtraContext, err = ChoiceContextFromData(resp.JSON200.PoolExtraContext)

@@ -3,11 +3,9 @@ package tests
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"net/http"
 	"os"
 	"slices"
 	"strconv"
@@ -58,13 +56,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	// Import to register lane adapters
-	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
@@ -172,22 +167,8 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	// Create Scan and Registry API clients
 	// Using the scanProxy endpoint of the 0-th participant, all participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
-	tokenSource := ccipParticipant.TokenSource
-	interceptor := func(ctx context.Context, req *http.Request) error {
-		token, err := tokenSource.Token()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve token: %w", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-
-		return nil
-	}
-	scanProxyClient, err := scanProxy.NewClientWithResponses(ccipParticipant.Endpoints.ValidatorAPIURL, scanProxy.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create scan proxy client")
-	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create token metadata client")
-	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), transferInstructionV1.WithRequestEditorFn(interceptor))
-	require.NoError(t, err, "Failed to create transfer instruction client")
+	scanProxyClient, tokenMetadataClient, transferInstructionClient, err := testhelpers.NewValidatorAPIClients(ccipParticipant)
+	require.NoError(t, err, "Failed to create validator API clients")
 
 	// Get DSO Admin Party (registry admin)
 	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), tokenMetadataClient)
@@ -909,46 +890,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// If pending, receiver must accept the TransferInstruction to complete the transfer
 	if !releaseCompleted && pendingTransferInstructionCid != "" {
 		time.Sleep(500 * time.Millisecond)
-
-		acceptContextResp, err := transferInstructionClient.GetTransferInstructionAcceptContextWithResponse(t.Context(), pendingTransferInstructionCid, transferInstructionV1.GetChoiceContextRequest{})
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, acceptContextResp.StatusCode(), "Failed to get accept context: %s", string(acceptContextResp.Body))
-
-		acceptDisclosures := make([]*apiv2.DisclosedContract, 0, len(acceptContextResp.JSON200.DisclosedContracts))
-		for _, contract := range acceptContextResp.JSON200.DisclosedContracts {
-			id, err := testhelpers.TemplateIdFromString(contract.TemplateId)
-			require.NoError(t, err)
-			createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
-			require.NoError(t, err)
-			acceptDisclosures = append(acceptDisclosures, &apiv2.DisclosedContract{
-				TemplateId:       id,
-				ContractId:       contract.ContractId,
-				CreatedEventBlob: createdEventBlob,
-			})
-		}
-		acceptContext, err := testhelpers.ChoiceContextFromData(acceptContextResp.JSON200.ChoiceContextData)
-		require.NoError(t, err)
-
-		_, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-			Commands: &apiv2.Commands{
-				CommandId: uuid.Must(uuid.NewUUID()).String(),
-				Commands: []*apiv2.Command{{
-					Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferInstruction"},
-						ContractId: pendingTransferInstructionCid,
-						Choice:     "TransferInstruction_Accept",
-						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "context", Value: acceptContext},
-								{Label: "meta", Value: emptyMetadata},
-							}}}}},
-						}}}},
-					}},
-				}},
-				ActAs:              []string{partyReceiver},
-				DisclosedContracts: acceptDisclosures,
-			},
-		})
+		err := testhelpers.AcceptPendingTransferInstruction(t.Context(), receiverParticipant, transferInstructionClient, partyReceiver, pendingTransferInstructionCid)
 		require.NoError(t, err)
 	}
 

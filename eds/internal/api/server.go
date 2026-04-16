@@ -112,21 +112,19 @@ func (s Server) CcipExecute(c *gin.Context) {
 		tokenPoolHoldings *edsv1.DisclosedContract
 	)
 	if disclosures.TokenPool != nil {
-		// If TokenPool is not nil then all of these should be non-nil as well.
 		tokenPoolDisclosure := convertDisclosedContract(disclosures.TokenPool)
 		tokenPoolHoldingsDisclosure := convertDisclosedContract(disclosures.TokenPoolHolding)
 		disclosedContracts = append(disclosedContracts,
 			tokenPoolDisclosure,
 			tokenPoolHoldingsDisclosure,
 			convertDisclosedContract(disclosures.InboundRateLimiter),
-			convertDisclosedContract(disclosures.InboundCustomBlockConfirmationsRateLimiter),
 			convertDisclosedContract(disclosures.OutboundRateLimiter),
 		)
 
-		// update the poolExtraContext with the relevant data.
+		disclosedContracts = append(disclosedContracts, convertDisclosedContract(disclosures.InboundCustomBlockConfirmationsRateLimiter))
 		poolExtraContext = map[string]any{
 			"values": map[string]any{
-				"rate-limiter": map[string]any{
+				"inbound-rate-limiter": map[string]any{
 					"tag":   "AV_ContractId",
 					"value": disclosures.InboundRateLimiter.GetContractId(),
 				},
@@ -134,7 +132,6 @@ func (s Server) CcipExecute(c *gin.Context) {
 					"tag":   "AV_ContractId",
 					"value": disclosures.InboundCustomBlockConfirmationsRateLimiter.GetContractId(),
 				},
-				// TODO: outbound rate limiter not needed?
 			},
 		}
 		tokenPool = &tokenPoolDisclosure

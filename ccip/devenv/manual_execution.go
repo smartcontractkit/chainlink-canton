@@ -5,21 +5,21 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"time"
+	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
@@ -54,23 +54,49 @@ func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error)
 	}
 }
 
+func (c *Chain) resolveTransferFactoryForExecute(
+	ctx context.Context,
+	participant canton.Participant,
+	executingParty string,
+	message protocol.Message,
+) (types.CONTRACT_ID, []*apiv2.DisclosedContract, splice_api_token_metadata_v1.ChoiceContext, error) {
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
+	if err != nil {
+		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("resolve registry admin: %w", err)
+	}
+	if message.TokenTransfer == nil || message.TokenTransfer.Amount == nil {
+		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("token transfer amount is required")
+	}
+	_, _, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
+	if err != nil {
+		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("create transfer instruction client: %w", err)
+	}
+	transferFactoryCIDRaw, transferFactoryDisclosures, transferFactoryChoiceContextValue, err := testhelpers.GetTransferFactory(
+		ctx,
+		transferClient,
+		registryAdmin,
+		executingParty,
+		executingParty,
+	)
+	if err != nil {
+		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("resolve transfer factory from scan-proxy: %w", err)
+	}
+	transferFactoryCID := types.CONTRACT_ID(transferFactoryCIDRaw)
+
+	return transferFactoryCID, transferFactoryDisclosures, splice_api_token_metadata_v1.ChoiceContext{
+		Values: testhelpers.ExtractChoiceContextValues(transferFactoryChoiceContextValue),
+	}, nil
+}
+
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
 func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Participant, partyId string) (routerAddress contracts.InstanceAddress, disclosedRouter *apiv2.DisclosedContract, err error) {
 	// Create PerPartyRouter (ignore error if it exists already)
-	cantonPerPartyRouterFactoryRef, err := c.e.DataStore.Addresses().Get(
-		datastore.NewAddressRefKey(
-			c.chainDetails.ChainSelector,
-			datastore.ContractType(per_party_router_factory.ContractType),
-			per_party_router_factory.Version,
-			"",
-		),
-	)
+	cantonPerPartyRouterFactory, err := c.getEDSPerPartyRouterFactory()
 	if err != nil {
-		return contracts.InstanceAddress{}, nil, fmt.Errorf("failed to get canton per party router factory address ref: %w", err)
+		return contracts.InstanceAddress{}, nil, fmt.Errorf("failed to get canton per party router factory address: %w", err)
 	}
-	c.logger.Debug().Str("CantonPerPartyRouterFactory", cantonPerPartyRouterFactoryRef.Address).Msg("Resolved per-party router factory address")
-	cantonPerPartyRouterFactory := contracts.HexToInstanceAddress(cantonPerPartyRouterFactoryRef.Address)
+	c.logger.Debug().Str("CantonPerPartyRouterFactory", cantonPerPartyRouterFactory.String()).Msg("Resolved per-party router factory address")
 
 	// Fixed instance ID for the router, this makes the InstanceAddress deterministic.
 	routerInstanceID := contracts.InstanceID("test-router")
@@ -95,25 +121,10 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 	return routerAddress, disclosedRouter, nil
 }
 
-func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
-	// Use only a single participant for now
-	participant := c.chain.Participants[0]
+func (c *Chain) DeployCCIPReceiver(partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
 	finalityConfig, err := encodeReceiverFinalityConfig(receiverFinality)
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to encode receiver finality config: %w", err)
-	}
-
-	// Upload the necessary Dar
-	receiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to get receiver dar: %w", err)
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile:       receiverDar,
-		VettingChange: adminv2.UploadDarFileRequest_VETTING_CHANGE_VET_ALL_PACKAGES,
-	})
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to upload receiver dar file: %w", err)
 	}
 
 	// Deploy receiver contract
@@ -155,21 +166,59 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	c.logger.Debug().Str("RouterAddress", routerAddress.String()).Msg("Deployed PerPartyRouter")
 
 	// Deploy CCIPReceiver contract
-	receiverAddress, err := c.DeployCCIPReceiver(ctx, executingParty, int64(message.Finality))
+	receiverAddress, err := c.DeployCCIPReceiver(executingParty, int64(message.Finality))
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy CCIPReceiver contract: %w", err)
 	}
 	c.logger.Debug().Str("ReceiverAddress", receiverAddress.String()).Msg("Deployed CCIPReceiver")
 
-	// Get disclosures for execution using EDS
+	encodedMessage, err := message.Encode()
+	if err != nil {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to encode message: %w", err)
+	}
 	ccvs := make([]contracts.InstanceAddress, len(verifiers))
 	for i, verifier := range verifiers {
 		ccvs[i] = contracts.HexToInstanceAddress(verifier.String())
 	}
-	disclosedContracts, choiceContext, ccvContractIDs, err := c.GetDisclosuresForExecution(ctx, ccvs)
+	encodedMessageHex := hex.EncodeToString(encodedMessage)
+	executeDisclosures, err := c.GetDisclosuresForExecution(ctx, encodedMessageHex, ccvs)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get disclosures for execution: %w", err)
 	}
+	disclosedContracts := executeDisclosures.DisclosedContracts
+	tokenTransferArg := &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}
+	if message.TokenTransfer != nil {
+		transferFactoryCID, transferFactoryDisclosures, transferFactoryChoiceContext, tfErr := c.resolveTransferFactoryForExecute(ctx, participant, executingParty, message)
+		if tfErr != nil {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("resolve transfer factory for execute: %w", tfErr)
+		}
+		disclosedContracts = append(disclosedContracts, transferFactoryDisclosures...)
+		if executeDisclosures.TokenPoolContractID == nil {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing token pool disclosure from EDS")
+		}
+		if executeDisclosures.PoolExtraContext == nil {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing pool extra context from EDS")
+		}
+		if len(executeDisclosures.TokenPoolHoldingsContractIDs) == 0 {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing token pool holdings from EDS")
+		}
+
+		tokenTransferRecord := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+			{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: executeDisclosures.TokenPoolContractID.ContractId}}},
+			{Label: "tokenReceiverParty", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: executingParty}}},
+			{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+				{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: string(transferFactoryCID)}}},
+				{Label: "extraArgs", Value: ledger.MapToValue(splice_api_token_metadata_v1.ExtraArgs{
+					Context: transferFactoryChoiceContext,
+					Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+				})},
+				{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: executeDisclosures.TokenPoolHoldingsContractIDs}}}},
+			}}}}},
+			{Label: "poolExtraContext", Value: executeDisclosures.PoolExtraContext},
+		}}}}
+		tokenTransferArg = &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: tokenTransferRecord}}
+	}
+	disclosedContracts = testhelpers.DeduplicateDisclosedContracts(disclosedContracts...)
 
 	// Resolve all necessary contracts
 	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
@@ -185,10 +234,6 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	c.logger.Debug().Str("InstanceAddress", receiverAddress.String()).Str("ContractId", receiverCid).Msg("Resolved CCIPReceiver contract")
 
 	// Execute message
-	encodedMessage, err := message.Encode()
-	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to encode message: %w", err)
-	}
 	c.logger.Debug().
 		Str("EncodedMessage", hex.EncodeToString(encodedMessage)).
 		Str("VerifierResults", hex.EncodeToString(verifierResults[0])).
@@ -199,7 +244,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
 	}}}}
 	ccvElements := make([]*apiv2.Value, len(verifiers))
-	for i, ccvCid := range ccvContractIDs {
+	for i, ccvCid := range executeDisclosures.CCVContractIDs {
 		ccvElements[i] = &apiv2.Value{
 			Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 				{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvCid}},
@@ -208,7 +253,6 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 			}}},
 		}
 	}
-
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
@@ -218,10 +262,10 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					ContractId: receiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: choiceContext},
+						{Label: "context", Value: executeDisclosures.ChoiceContext},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
-						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(encodedMessage)}}},
-						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
+						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
+						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: tokenTransferArg}},
 						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: ccvElements}}}},
 					}}}},
 				}},
@@ -234,6 +278,26 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to execute message: %w", err)
 	}
 	c.logger.Debug().Str("UpdateID", res.GetTransaction().GetUpdateId()).Msg("Executed message")
+	if message.TokenTransfer != nil {
+		pendingTransferInstructionCID := ""
+		for _, event := range res.GetTransaction().GetEvents() {
+			if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+				templateName := e.Created.GetTemplateId().GetEntityName()
+				if strings.Contains(templateName, "TransferInstruction") {
+					pendingTransferInstructionCID = e.Created.GetContractId()
+				}
+			}
+		}
+		if pendingTransferInstructionCID != "" {
+			_, _, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
+			if err != nil {
+				return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("create transfer instruction client: %w", err)
+			}
+			if err := testhelpers.AcceptPendingTransferInstruction(ctx, participant, transferClient, executingParty, pendingTransferInstructionCID); err != nil {
+				return cciptestinterfaces.ExecutionStateChangedEvent{}, err
+			}
+		}
+	}
 
 	// Get Update
 	updateRes, err := participant.LedgerServices.Update.GetUpdateById(ctx, &apiv2.GetUpdateByIdRequest{
@@ -340,102 +404,4 @@ func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfa
 		State:               executionState,
 		ReturnData:          returnData,
 	}, nil
-}
-
-// This is copied from chainlink-canton, replace with EDS client once available.
-func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, error) {
-	values, ok := choiceContextData["values"].(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("no values found in choice context")
-	}
-
-	// ref: https://docs.digitalasset.com/build/3.5/reference/json-api/lf-value-specification.html
-	// AnyValue is a variant
-	fields := make([]*apiv2.TextMap_Entry, 0, len(values))
-	for k, v := range values {
-		f := v.(map[string]any)
-		tag := f["tag"].(string)
-		rawValue := f["value"]
-
-		var value *apiv2.Value
-		switch tag {
-		case "AV_Text":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Text value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Text{Text: valueString}}
-		case "AV_Int":
-			// JSON numbers come as float64
-			valueFloat, ok := rawValue.(float64)
-			if !ok {
-				return nil, fmt.Errorf("AV_Int value is not a number: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}
-		case "AV_Decimal":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Decimal value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: valueString}}
-		case "AV_Bool":
-			valueBool, ok := rawValue.(bool)
-			if !ok {
-				return nil, fmt.Errorf("AV_Bool value is not a bool: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: valueBool}}
-		case "AV_Date":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Date value is not a string: %T", rawValue)
-			}
-			t, err := time.Parse(time.RFC3339, valueString)
-			if err != nil {
-				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Date{Date: int32(t.Unix() / 86400)}} //nolint:gosec
-		case "AV_Time":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Time value is not a string: %T", rawValue)
-			}
-			t, err := time.Parse(time.RFC3339, valueString)
-			if err != nil {
-				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: t.UnixMicro()}}
-		case "AV_RelTime":
-			valueFloat, ok := rawValue.(float64)
-			if !ok {
-				return nil, fmt.Errorf("AV_RelTime value is not a number: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}},
-			}}}}
-		case "AV_ContractId":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_ContractId value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: valueString}}
-		default:
-			// Add lists and maps
-			return nil, fmt.Errorf("unimplemented tag: %v", tag)
-		}
-
-		fields = append(fields, &apiv2.TextMap_Entry{
-			Key: k,
-			Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-				Constructor: tag,
-				Value:       value,
-			}}},
-		})
-	}
-
-	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{
-			Label: "values",
-			Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: fields}}},
-		},
-	}}}}, nil
 }

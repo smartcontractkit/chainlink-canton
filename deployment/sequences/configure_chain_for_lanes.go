@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -159,12 +160,17 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to fee quoter: %w", err)
 		}
 
-		// FeeQuoter - Update prices (gas prices only, as these are per dest chain)
+		tokenPriceUpdates, err := tokenPriceUpdatesFromParams(destChain.TokenPrices)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("building token price updates from lane params: %w", err)
+		}
+
+		// FeeQuoter - Update prices.
 		_, err = operations.ExecuteOperation(b, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
 			InstanceAddress: feeQuoterAddress,
 			Args: feequoter.UpdatePrices{
 				PriceUpdates: feequoter.PriceUpdates{
-					TokenPriceUpdates: nil,
+					TokenPriceUpdates: tokenPriceUpdates,
 					GasPriceUpdates: []feequoter.GasPriceUpdate{
 						{
 							DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
@@ -176,7 +182,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			},
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("updating gas prices in fee quoter: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("updating prices in fee quoter: %w", err)
 		}
 
 		// CommitteeVerifier - Dest Chain Config
@@ -267,3 +273,28 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		return sequences.OnChainOutput{}, nil
 	},
 )
+
+func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]feequoter.TokenPriceUpdate, error) {
+	if len(tokenPrices) == 0 {
+		return nil, nil
+	}
+	updates := make([]feequoter.TokenPriceUpdate, 0, len(tokenPrices))
+	for instrument, price := range tokenPrices {
+		if price == nil {
+			continue
+		}
+		parts := strings.SplitN(instrument, ":", 2)
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+			return nil, fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+		}
+		updates = append(updates, feequoter.TokenPriceUpdate{
+			InstrumentId: splice_api_token_holding_v1.InstrumentId{
+				Admin: types.PARTY(strings.TrimSpace(parts[0])),
+				Id:    types.TEXT(strings.TrimSpace(parts[1])),
+			},
+			UsdPerToken: types.NUMERIC(price.String()),
+		})
+	}
+
+	return updates, nil
+}

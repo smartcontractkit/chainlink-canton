@@ -57,7 +57,7 @@ func main() {
 
 				return accessors.NewFactory(lggr, cantonConfig.BlockchainInfos, cantonConfig.ReaderConfigs, cfg.RMNRemoteAddresses), nil
 			}),
-		bootstrap.WithLogLevel[commit.JobSpec](zapcore.InfoLevel),
+		bootstrap.WithLogLevel(zapcore.InfoLevel),
 	); err != nil {
 		panic(fmt.Sprintf("failed to run Canton committee verifier: %s", err.Error()))
 	}
