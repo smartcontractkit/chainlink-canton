@@ -30,6 +30,7 @@ func defaultTestConfig(contractStore *mocks.MockActiveContractStore, instrumentS
 		TokenAdminRegistry:     testInstanceAddress("token-admin-registry"),
 		RMNRemote:              testInstanceAddress("rmn-remote"),
 		FeeQuoter:              testInstanceAddress("fee-quoter"),
+		DefaultExecutor:        testInstanceAddress("default-executor"),
 		CCVs:                   []contracts.InstanceAddress{testInstanceAddress("ccv1")},
 		TokenPools:             []contracts.InstanceAddress{testInstanceAddress("token-pool")},
 	}
@@ -131,6 +132,7 @@ func TestDisclosureService_GetCCIPSendDisclosures(t *testing.T) {
 		contractStore.EXPECT().Get(config.TokenAdminRegistry).Return(makeActiveContract("tar-1", nil), true)
 		contractStore.EXPECT().Get(config.RMNRemote).Return(makeActiveContract("rmn-1", nil), true)
 		contractStore.EXPECT().Get(config.FeeQuoter).Return(makeActiveContract("fee-1", nil), true)
+		contractStore.EXPECT().Get(config.DefaultExecutor).Return(makeActiveContract("executor-1", nil), true)
 		for _, ccvAddr := range config.CCVs {
 			contractStore.EXPECT().Get(ccvAddr).Return(makeActiveContract("ccv-1", nil), true)
 		}
