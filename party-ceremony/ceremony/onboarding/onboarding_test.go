@@ -49,6 +49,10 @@ func (m *mockCantonClient) GetNamespaceFingerprint(_ context.Context, keyName st
 	return fmt.Sprintf("1220%x", raw[:8]), nil
 }
 
+func (m *mockCantonClient) GetNamespaceKeyName(_ context.Context, _ string, _ []string) (string, error) {
+	return "mock-ns-key", nil
+}
+
 func (m *mockCantonClient) Authorize(_ context.Context, serial uint32, mapping *protov30.TopologyMapping, _ string, _ bool, _ ...string) (*protov30.SignedTopologyTransaction, error) {
 	payload, _ := proto.Marshal(mapping)
 	raw := sha256.Sum256(append(payload, byte(serial)))
@@ -98,6 +102,10 @@ func (m *mockCantonClient) GetP2P(_ context.Context, _ string, _ string) (*clien
 
 func (m *mockCantonClient) ListDecentralizedNamespaces(_ context.Context, _ string) ([]*client.DNSState, error) {
 	return []*client.DNSState{}, nil
+}
+
+func (m *mockCantonClient) GetProtocolKeyFingerprint(_ context.Context, _ []string) (string, string, error) {
+	return "mock-protocol-fp", "mock-protocol-key-b64", nil
 }
 
 func (m *mockCantonClient) UploadDar(_ context.Context, _ []byte) (string, error) {

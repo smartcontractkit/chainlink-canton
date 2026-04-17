@@ -10,6 +10,7 @@ import (
 	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
 	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
 	"github.com/chainlink/canton-party-ceremony/ceremony/example"
+	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
 	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
 	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
 	"github.com/chainlink/canton-party-ceremony/internal/client"
@@ -457,6 +458,90 @@ func executeAddParticipantSequence(
 	if seqErr != nil {
 		if strings.Contains(seqErr.Error(), addparticipant.ErrThresholdNotMet.Error()) {
 			fmt.Fprintf(os.Stderr, "add-participant ceremony not yet complete: %v\n", seqErr)
+			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have acted.")
+			os.Exit(2) //nolint:gocritic // intentional early exit for UX
+		}
+
+		return seqErr
+	}
+
+	return nil
+}
+
+// executeKeyRotationSequence is the execution kernel for the real gRPC-backed
+// key rotation ceremony. It dials the Canton admin API, runs
+// KeyRotationSequence, and persists the ceremony state.
+func executeKeyRotationSequence(
+	ctx context.Context,
+	cfg client.ClientConfig,
+	input keyrotation.KeyRotationInput,
+	stateDir string,
+	workflowId string,
+) error {
+	lggr, err := newCLILogger()
+	if err != nil {
+		return fmt.Errorf("creating logger: %w", err)
+	}
+
+	var previousReports []operations.Report[any, any]
+	if workflowId != "" {
+		ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+		previousReports, err = ceremony.LoadReports(ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("loading previous reports: %w", err)
+		}
+	}
+
+	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
+	bundle := operations.NewBundle(
+		func() context.Context { return ctx },
+		logger.Nop(),
+		reporter,
+	)
+
+	conn, err := client.Dial(cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to Canton admin API: %w", err)
+	}
+	defer conn.Close()
+
+	grpcClient := client.NewGRPCClient(conn)
+	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr}
+
+	lggr.Infow("Running key-rotation sequence",
+		"party", input.DecentralizedPartyID,
+		"target_participant", input.TargetParticipantID,
+		"rotate_namespace", input.RotateNamespaceKey,
+		"rotate_daml", input.RotateDamlKey,
+		"participant", cfg.ParticipantID,
+	)
+
+	sr, seqErr := operations.ExecuteSequence(bundle, keyrotation.KeyRotationSequence, deps, input)
+
+	if workflowId == "" {
+		workflowId = sr.ID
+	}
+	ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
+		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
+	}
+	allReports, _ := reporter.GetReports()
+	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+		lggr.Errorw("Failed to save reports", "err", saveErr)
+	}
+
+	state := ceremony.WorkflowState[keyrotation.KeyRotationInput]{
+		CeremonyID: workflowId,
+		Type:       ceremony.WorkflowTypeKeyRotation,
+		Input:      input,
+	}
+	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	}
+
+	if seqErr != nil {
+		if strings.Contains(seqErr.Error(), keyrotation.ErrThresholdNotMet.Error()) {
+			fmt.Fprintf(os.Stderr, "key-rotation ceremony not yet complete: %v\n", seqErr)
 			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have acted.")
 			os.Exit(2) //nolint:gocritic // intentional early exit for UX
 		}
