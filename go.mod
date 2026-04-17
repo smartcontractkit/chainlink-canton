@@ -30,7 +30,7 @@ require (
 	github.com/icza/gox v0.2.6
 	github.com/jpillora/backoff v1.0.0
 	github.com/lib/pq v1.12.2
-	github.com/oapi-codegen/runtime v1.3.1
+	github.com/oapi-codegen/runtime v1.4.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.0
 	github.com/schollz/progressbar/v3 v3.19.0
