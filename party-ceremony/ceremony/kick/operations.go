@@ -75,7 +75,7 @@ var ReadCurrentStateOp = operations.NewOperation(
 			"p2p_serial", p2pState.Serial,
 		)
 
-		return ReadCurrentStateOutput{
+		out := ReadCurrentStateOutput{
 			DecentralizedNamespace: dnsState.DecentralizedNamespace,
 			DNSOwners:              dnsState.Owners,
 			DNSThreshold:           dnsState.Threshold,
@@ -83,7 +83,13 @@ var ReadCurrentStateOp = operations.NewOperation(
 			P2PParticipantUIDs:     participantUIDs,
 			P2PThreshold:           p2pState.Threshold,
 			P2PSerial:              p2pState.Serial,
-		}, nil
+		}
+		if p2pState.PartySigningKeys != nil {
+			out.PartySigningKeysB64 = p2pState.PartySigningKeys.Keys
+			out.PartySigningThreshold = p2pState.PartySigningKeys.Threshold
+		}
+
+		return out, nil
 	},
 )
 

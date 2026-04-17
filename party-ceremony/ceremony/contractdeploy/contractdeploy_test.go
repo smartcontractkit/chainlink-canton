@@ -47,6 +47,10 @@ func (m *mockAdminClient) GetNamespaceFingerprint(_ context.Context, _ string, _
 	return "mock-ns-fp", nil
 }
 
+func (m *mockAdminClient) GetNamespaceKeyName(_ context.Context, _ string, _ []string) (string, error) {
+	return "mock-ns-key", nil
+}
+
 func (m *mockAdminClient) Authorize(_ context.Context, _ uint32, _ *protov30.TopologyMapping, _ string, _ bool, _ ...string) (*protov30.SignedTopologyTransaction, error) {
 	return &protov30.SignedTopologyTransaction{}, nil
 }
@@ -86,6 +90,10 @@ func (m *mockAdminClient) GetP2P(_ context.Context, _ string, _ string) (*client
 
 func (m *mockAdminClient) ListDecentralizedNamespaces(_ context.Context, _ string) ([]*client.DNSState, error) {
 	return []*client.DNSState{}, nil
+}
+
+func (m *mockAdminClient) GetProtocolKeyFingerprint(_ context.Context, _ []string) (string, string, error) {
+	return "mock-protocol-fp", "mock-protocol-key-b64", nil
 }
 
 func (m *mockAdminClient) UploadDar(_ context.Context, darBytes []byte) (string, error) {
