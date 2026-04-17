@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/rs/zerolog"
@@ -15,6 +17,8 @@ import (
 
 const (
 	// EnvConfigFile - The path to the config to use, defaults to 'config.toml'
+	// Multiple, comma-separated, files can be specified, in which case they take precedence in increasing order:
+	//  If e.g. CONFIG_FILE=config1.toml,config2.toml are specified, values from config2.toml will override values from config1.toml
 	EnvConfigFile = "CONFIG_FILE"
 )
 
@@ -24,19 +28,27 @@ func main() {
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel)
 
-	cfgPath := os.Getenv(EnvConfigFile)
-	if cfgPath == "" {
-		cfgPath = "config.toml"
+	cfgPaths := os.Getenv(EnvConfigFile)
+	if cfgPaths == "" {
+		cfgPaths = "config.toml"
 	}
 
-	logger.Info().Str("file", cfgPath).Msg("Reading config...")
-	cfgReader, err := os.Open(cfgPath)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to open config file")
+	paths := strings.Split(cfgPaths, ",")
+	readers := make([]io.Reader, len(paths))
+	for i, s := range paths {
+		s := strings.TrimSpace(s)
+		logger.Info().Str("file", s).Int("index", i).Msg("Reading config...")
+		cfgReader, err := os.Open(s)
+		if err != nil {
+			logger.Fatal().Err(err).Str("file", s).Int("index", i).Msg("failed to open config file")
+		}
+
+		readers[i] = cfgReader
 	}
-	cfg, err := config.Read(cfgReader)
+
+	cfg, err := config.ReadAndMerge(readers...)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to read config file")
+		logger.Fatal().Err(err).Msg("failed to parse config files")
 	}
 
 	logger.Fatal().Err(service.RunEDS(ctx, logger, cfg)).Msg("Running EDS server")

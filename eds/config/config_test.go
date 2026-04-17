@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
@@ -50,6 +52,9 @@ instance_address = "0x7f2ebf216e26051335a9e132d6c013a771d8406378011ca057a6222d3f
 [contracts.fee_quoter]
 party_id = "ccipOwner"
 instance_address = "0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"
+[contracts.default_executor]
+party_id = "ccipOwner"
+instance_address = "0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"
 [[contracts.ccvs]]
 party_id = "ccvOwner"
 instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
@@ -113,6 +118,10 @@ trace_batch_timeout = 5
 						PartyID:         "ccipOwner",
 						InstanceAddress: contracts.HexToInstanceAddress("0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"),
 					},
+					DefaultExecutor: ContractIdentifier{
+						PartyID:         "ccipOwner",
+						InstanceAddress: contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"),
+					},
 					CCVs: []ContractIdentifier{
 						{
 							PartyID:         "ccvOwner",
@@ -162,6 +171,123 @@ trace_batch_timeout = 5
 			if err := got.Validate(); (err != nil) != tt.wantValidationErr {
 				t.Errorf("Validate() error = %v, wantValidationErr %v", err, tt.wantValidationErr)
 			}
+		})
+	}
+}
+
+func TestConfig_Merge(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		base    *Config
+		config  *Config
+		want    *Config
+		wantErr bool
+	}{
+		{
+			name: "valid merge",
+			base: &Config{
+				ChainSelector: "123", // Should be overridden
+				Server: ServerConfig{ // Should not be overridden
+					Host: "localhost",
+					Port: 8080,
+				},
+				Contracts: Contracts{
+					CCVs: []ContractIdentifier{
+						{ // Should be overridden
+							PartyID:         "ccvOwner1",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1"),
+						},
+					},
+					TokenPoolContracts: []TokenPoolContracts{
+						{ // Should not be overridden
+							TokenPool: ContractIdentifier{
+								PartyID:         "tokenPoolOwner",
+								InstanceAddress: contracts.HexToInstanceAddress("0x3333"),
+							},
+						},
+					},
+				},
+			},
+			config: &Config{
+				ChainSelector: "456",
+				Server:        ServerConfig{},
+				Contracts: Contracts{
+					CCVs: []ContractIdentifier{
+						{
+							PartyID:         "ccvOwner2",
+							InstanceAddress: contracts.HexToInstanceAddress("0x2"),
+						},
+					},
+				},
+			},
+			want: &Config{
+				ChainSelector: "456",
+				Server: ServerConfig{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Contracts: Contracts{
+					CCVs: []ContractIdentifier{
+						{
+							PartyID:         "ccvOwner2",
+							InstanceAddress: contracts.HexToInstanceAddress("0x2"),
+						},
+					},
+					TokenPoolContracts: []TokenPoolContracts{
+						{
+							TokenPool: ContractIdentifier{
+								PartyID:         "tokenPoolOwner",
+								InstanceAddress: contracts.HexToInstanceAddress("0x3333"),
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		}, {
+			name: "nil override",
+			base: &Config{
+				ChainSelector: "1111",
+				Server:        ServerConfig{},
+				Node: NodeConfig{
+					URL: "localhost:1234",
+				},
+			},
+			config: nil,
+			want: &Config{
+				ChainSelector: "1111",
+				Server:        ServerConfig{},
+				Node: NodeConfig{
+					URL: "localhost:1234",
+				},
+			},
+			wantErr: false,
+		}, {
+			name: "nil base",
+			base: nil,
+			config: &Config{
+				ChainSelector: "1111",
+				Server:        ServerConfig{},
+				Node: NodeConfig{
+					URL: "localhost:1234",
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := tt.base.Merge(tt.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Merge() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
