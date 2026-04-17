@@ -40,7 +40,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260414185437-e41e205c8bfa
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260414185437-e41e205c8bfa
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
-	github.com/smartcontractkit/chainlink-deployments-framework v0.94.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.17
 	github.com/smartcontractkit/go-daml v0.6.1-0.20260413170941-75a7c4be0cd9
 	github.com/stretchr/testify v1.11.1
