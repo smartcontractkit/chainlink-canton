@@ -37,6 +37,21 @@ type CantonClient interface {
 	// holds multiple keys with the same name.
 	GetNamespaceFingerprint(ctx context.Context, keyName string, synchronizerID string, knownOwners []string) (string, error)
 
+	// GetNamespaceKeyName returns the human-readable name of this participant's
+	// NAMESPACE signing key that belongs to the decentralized namespace identified
+	// by knownOwners. It cross-references the vault (ListMyKeys with NAMESPACE
+	// usage) with namespace delegations (ListNamespaceDelegation) to find the
+	// matching key's label. Used by key rotation to auto-discover the original
+	// onboarding key name without requiring user input.
+	GetNamespaceKeyName(ctx context.Context, synchronizerID string, knownOwners []string) (string, error)
+
+	// GetProtocolKeyFingerprint returns the fingerprint and base64-encoded
+	// proto of this participant's PROTOCOL signing key that is currently
+	// active in the party's signing keys. It cross-references vault keys
+	// (ListMyKeys with PROTOCOL usage) against the provided knownSigningKeys
+	// (base64-encoded proto-marshalled keys from P2P PartySigningKeys).
+	GetProtocolKeyFingerprint(ctx context.Context, knownSigningKeys []string) (fingerprint string, keyB64 string, err error)
+
 	// ── Topology Write (TopologyManagerWriteService) ─────────────────────
 
 	// Authorize calls TopologyManagerWriteService.Authorize to create a

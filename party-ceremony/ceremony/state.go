@@ -28,6 +28,9 @@ const (
 
 	// WorkflowTypeContractDeploy identifies a contract deployment ceremony.
 	WorkflowTypeContractDeploy = "contract-deploy"
+
+	// WorkflowTypeKeyRotation identifies a key rotation ceremony.
+	WorkflowTypeKeyRotation = "key-rotation"
 )
 
 // WorkflowState is persisted to workflow.json inside the ceremony directory.
