@@ -37,15 +37,19 @@ party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c
 instance_address = '0xa6d983a8ae33181d42fcb46eea8d4fe0bc51b8bcc7ec15efd3e221c71d04679f'
 party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
 
+[contracts.default_executor]
+instance_address = '0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
 
 [node]
-url = "participant1.grpc-ledger-api.localhost:8575"
+url = "participant1.grpc-ledger-api.localhost:8080"
 max_retries = 10
 
 [node.auth]
-jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLXBhcnRpY2lwYW50MSIsImF1ZCI6WyJodHRwczovL2NoYWluLmxpbmsiXSwiZXhwIjoyMDg4NDQyMzQzLCJuYmYiOjE3NzMwODIzNDMsImlhdCI6MTc3MzA4MjM0M30.IPFC1soD4Mc1M-NdOm-F6J5nbEd4JnBNgpdzqxptRH8'
 type = 'insecureStatic'
 user_id = 'user-participant1'
+# jwt should be taken from a separate secrets file, see config_secrets.toml
 
 [monitoring]
 enabled = true

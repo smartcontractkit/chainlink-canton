@@ -30,7 +30,7 @@ require (
 	github.com/icza/gox v0.2.6
 	github.com/jpillora/backoff v1.0.0
 	github.com/lib/pq v1.12.2
-	github.com/oapi-codegen/runtime v1.3.1
+	github.com/oapi-codegen/runtime v1.4.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.0
 	github.com/schollz/progressbar/v3 v3.19.0
@@ -41,7 +41,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260414185437-e41e205c8bfa
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.94.1
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.15
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.17
 	github.com/smartcontractkit/go-daml v0.6.1-0.20260413170941-75a7c4be0cd9
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
@@ -76,7 +76,7 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	dario.cat/mergo v1.0.2 // indirect
+	dario.cat/mergo v1.0.2
 	filippo.io/edwards25519 v1.1.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/DataDog/zstd v1.5.6 // indirect
