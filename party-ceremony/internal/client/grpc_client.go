@@ -329,6 +329,7 @@ func (c *GRPCCantonClient) GetProtocolKeyFingerprint(ctx context.Context, knownS
 				if fpErr != nil {
 					return "", "", fmt.Errorf("computing fingerprint: %w", fpErr)
 				}
+
 				return fp, skB64, nil
 			}
 		}

@@ -343,10 +343,8 @@ var KeyRotationSequence = operations.NewSequence(
 						return fmt.Errorf("P2P signing keys not yet available")
 					}
 					// Verify the new key is present by checking if the old key is gone.
-					for _, keyB64 := range p2pState.PartySigningKeys.Keys {
-						if keyB64 == rotatedKeys.OldDamlKeyB64 {
-							return fmt.Errorf("old DAML key still present in P2P signing keys")
-						}
+					if slices.Contains(p2pState.PartySigningKeys.Keys, rotatedKeys.OldDamlKeyB64) {
+						return fmt.Errorf("old DAML key still present in P2P signing keys")
 					}
 					deps.Logger.Infow("Rotation P2P confirmed", "party", in.DecentralizedPartyID)
 
