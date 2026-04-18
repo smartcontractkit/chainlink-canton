@@ -13,6 +13,8 @@ import DA.Time (time)
 import CCIP.FeeQuoter
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
+import CCIP.OnRamp qualified as OnRamp
+import CCIP.Tickets qualified as Tickets
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
@@ -85,6 +87,50 @@ finalizeUsingQuote owner feeQuoter sendingMessageCid = do
                 case sm.executionMode of
                     Some SendingMessageV1.ExecutionMode_NoExecutor -> 0.0
                     _ -> quote.gasCostUSDCents
+
+sumQuoteNonCalldataGas : SendingMessageV1.SendingMessageV1 -> Int
+sumQuoteNonCalldataGas sm =
+    foldl (\acc fee -> acc + fee.destGasLimit) 0 sm.ccvFees
+        + (case sm.tokenSendFee of
+            Some fee -> fee.destGasOverhead
+            None -> 0)
+        + sm.executorDestGasLimit
+
+sumQuoteCalldataSize : SendingMessageV1.SendingMessageV1 -> Int
+sumQuoteCalldataSize sm =
+    foldl (\acc fee -> acc + fee.destBytesOverhead) 0 sm.ccvFees
+        + (case sm.tokenSendFee of
+            Some fee -> fee.destBytesOverhead
+            None -> 0)
+        + sm.executorDestBytesOverhead
+
+sumReceiptNonNetworkGas : [Tickets.Receipt] -> Int
+sumReceiptNonNetworkGas receipts =
+    foldl
+        (\acc r ->
+            case r.issuerType of
+                Tickets.IssuerType_Network -> acc
+                _ -> acc + r.destGasLimit)
+        0
+        receipts
+
+sumReceiptNonNetworkBytes : [Tickets.Receipt] -> Int
+sumReceiptNonNetworkBytes receipts =
+    foldl
+        (\acc r ->
+            case r.issuerType of
+                Tickets.IssuerType_Network -> acc
+                _ -> acc + r.destBytesOverhead)
+        0
+        receipts
+
+assertReceiptSumsMatchQuoteInputs
+    : SendingMessageV1.SendingMessageV1
+    -> [Tickets.Receipt]
+    -> Script ()
+assertReceiptSumsMatchQuoteInputs sm receipts = do
+    sumQuoteNonCalldataGas sm === sumReceiptNonNetworkGas receipts
+    sumQuoteCalldataSize sm === sumReceiptNonNetworkBytes receipts
 
 setup = script do
     owner <- allocateParty "owner"
@@ -1134,6 +1180,257 @@ testFinalizeFee_LinkCapMixedFees = script do
 
     debug "testFinalizeFee_LinkCapMixedFees: PASSED"
 
+testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
+    owner <- allocateParty "owner-receipt-mixed"
+    sender <- allocateParty "sender-receipt-mixed"
+    ccvOwner <- allocateParty "ccv-receipt-mixed"
+    poolOwner <- allocateParty "pool-receipt-mixed"
+    executorOwner <- allocateParty "executor-receipt-mixed"
+
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "USDC"
+
+    feeQuoter <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-receipt-mixed"
+            feeTokens = Set.fromList [feeToken]
+            destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList
+                [(456.0, TimestampedPrice 0.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList
+                [(feeToken, TimestampedPrice 1.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
+                admin = owner
+                id = "LINK"
+            priceUpdaters = [owner]
+
+    sendingMessageCid <- submit owner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "router-receipt-mixed" sender
+                onRamp = RawInstanceAddress.make "onramp-receipt-mixed" owner
+                globalConfig = RawInstanceAddress.make "globalconfig-receipt-mixed" owner
+                rmnRemote = RawInstanceAddress.make "rmn-receipt-mixed" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-receipt-mixed" owner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-receipt-mixed" owner
+            ccipOwner = owner
+            sender = sender
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            requiredCCVs = [RawInstanceAddress.make "ccv-receipt-mixed" ccvOwner]
+            requiredExecutor = Some (RawInstanceAddress.make "executor-receipt-mixed" executorOwner)
+            executorAddress = RawInstanceAddress.toInstanceAddress
+                (RawInstanceAddress.make "executor-receipt-mixed" executorOwner)
+            executionMode = Some SendingMessageV1.ExecutionMode_Executor
+            sourceChainSelector = 123.0
+            senderAddress = "01"
+            receiver = "02"
+            payload = "abcd"
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 1000
+            ccvAndExecutorHash = ""
+            onRampAddress = "03"
+            offRampAddress = "04"
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = cents 100.0
+            expectedTokenInstrumentId = Some feeToken
+            outboundPoolCCVs = Some []
+            executorArgs = "beef"
+            executorFee = None
+            executorDestGasLimit = 6000
+            executorDestBytesOverhead = 250
+            executorFeeTokenAmount = 0.0
+            observingParties = [sender]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData =
+                [SendingMessageV1.VerifierData with
+                    ccvInstanceId = "ccv-receipt-mixed"
+                    ccvOwner = ccvOwner
+                    versionTag = ""
+                    verifierBlob = "aa"
+                    messageSentObservers = []
+                ]
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-receipt-mixed"
+            feeUSDCents = cents 100.0
+            destGasLimit = 10000
+            destBytesOverhead = 111
+            caller = ccvOwner
+
+    sendingMessageCid <- submit owner do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
+            poolInstanceId = "pool-receipt-mixed"
+            poolOwner = poolOwner
+            feeUSDCents = cents 100.0
+            destGasOverhead = 50000
+            destBytesOverhead = 222
+
+    disclosedSm2 <- fromSome <$> queryDisclosure ccvOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm2) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+            executorInstanceId = "executor-receipt-mixed"
+            executorArgs = "beef"
+            feeUSDCents = cents 100.0
+            caller = executorOwner
+
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
+
+    sendingMessageCid <- submit owner do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSend with
+            poolInstanceId = "pool-receipt-mixed"
+            poolOwner = poolOwner
+            instrumentId = feeToken
+            amount = 1.0
+            destTokenAddress = "05"
+            extraData = ""
+
+    Some sm <- queryContractId owner sendingMessageCid
+    let receipts = OnRamp.assembleReceipts sm
+
+    assertReceiptSumsMatchQuoteInputs sm receipts
+    map (.issuerType) receipts ===
+        [ Tickets.IssuerType_CCV
+        , Tickets.IssuerType_Pool
+        , Tickets.IssuerType_Executor
+        , Tickets.IssuerType_Network
+        ]
+
+    debug "testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees: PASSED"
+
+testFinalizeFee_ReceiptSumsMatchQuoteInputs_CCVAndExecutor = script do
+    owner <- allocateParty "owner-receipt-msg"
+    sender <- allocateParty "sender-receipt-msg"
+    ccvOwner <- allocateParty "ccv-receipt-msg"
+    executorOwner <- allocateParty "executor-receipt-msg"
+
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "USDC"
+
+    feeQuoter <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-receipt-msg"
+            feeTokens = Set.fromList [feeToken]
+            destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList
+                [(456.0, TimestampedPrice 0.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList
+                [(feeToken, TimestampedPrice 1.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
+                admin = owner
+                id = "LINK"
+            priceUpdaters = [owner]
+
+    sendingMessageCid <- submit owner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "router-receipt-msg" sender
+                onRamp = RawInstanceAddress.make "onramp-receipt-msg" owner
+                globalConfig = RawInstanceAddress.make "globalconfig-receipt-msg" owner
+                rmnRemote = RawInstanceAddress.make "rmn-receipt-msg" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-receipt-msg" owner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-receipt-msg" owner
+            ccipOwner = owner
+            sender = sender
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            requiredCCVs = [RawInstanceAddress.make "ccv-receipt-msg" ccvOwner]
+            requiredExecutor = Some (RawInstanceAddress.make "executor-receipt-msg" executorOwner)
+            executorAddress = RawInstanceAddress.toInstanceAddress
+                (RawInstanceAddress.make "executor-receipt-msg" executorOwner)
+            executionMode = Some SendingMessageV1.ExecutionMode_Executor
+            sourceChainSelector = 123.0
+            senderAddress = "01"
+            receiver = "02"
+            payload = "aabbcc"
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 2500
+            ccvAndExecutorHash = ""
+            onRampAddress = "03"
+            offRampAddress = "04"
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = cents 100.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = "00"
+            executorFee = None
+            executorDestGasLimit = 7777
+            executorDestBytesOverhead = 333
+            executorFeeTokenAmount = 0.0
+            observingParties = [sender]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData =
+                [SendingMessageV1.VerifierData with
+                    ccvInstanceId = "ccv-receipt-msg"
+                    ccvOwner = ccvOwner
+                    versionTag = ""
+                    verifierBlob = "bb"
+                    messageSentObservers = []
+                ]
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-receipt-msg"
+            feeUSDCents = cents 25.0
+            destGasLimit = 1234
+            destBytesOverhead = 44
+            caller = ccvOwner
+
+    disclosedSm2 <- fromSome <$> queryDisclosure ccvOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm2) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+            executorInstanceId = "executor-receipt-msg"
+            executorArgs = "00"
+            feeUSDCents = cents 50.0
+            caller = executorOwner
+
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
+
+    Some sm <- queryContractId owner sendingMessageCid
+    let receipts = OnRamp.assembleReceipts sm
+
+    assertReceiptSumsMatchQuoteInputs sm receipts
+    map (.issuerType) receipts ===
+        [ Tickets.IssuerType_CCV
+        , Tickets.IssuerType_Executor
+        , Tickets.IssuerType_Network
+        ]
+
+    debug "testFinalizeFee_ReceiptSumsMatchQuoteInputs_CCVAndExecutor: PASSED"
+
 -- Regression: payload bytes must only be counted once in calldataSize.
 -- executorDestBytesOverhead already includes messageData = 2 + payloadBytes.
 testFinalizeFee_PayloadBytesCountedOnce = script do
@@ -1251,5 +1548,20 @@ testFinalizeFee_PayloadBytesCountedOnce = script do
             caller = owner
     quote.totalGas === expectedGas
     quote.gasCostUSDCents === expectedExecutionCost
+
+    let receipts = OnRamp.assembleReceipts sm
+    assertReceiptSumsMatchQuoteInputs sm receipts
+    map (.issuerType) receipts ===
+        [ Tickets.IssuerType_Executor
+        , Tickets.IssuerType_Network
+        ]
+    case receipts of
+        [executorReceipt, networkReceipt] -> do
+            executorReceipt.destBytesOverhead === executorDestBytesOverhead
+            executorReceipt.destGasLimit === sm.executorDestGasLimit
+            executorReceipt.feeTokenAmount === 0.0
+            networkReceipt.destGasLimit === 0
+            networkReceipt.destBytesOverhead === 0
+        _ -> abort "expected executor and network receipts only"
 
     debug "testFinalizeFee_PayloadBytesCountedOnce: PASSED"
