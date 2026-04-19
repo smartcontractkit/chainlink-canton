@@ -15,3 +15,5 @@ go.work.sum
 logs/
 
 vendor/
+scripts/staging/.env
+eds/staging_testnet_canton.local.toml
