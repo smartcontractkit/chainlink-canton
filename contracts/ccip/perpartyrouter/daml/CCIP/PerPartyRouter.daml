@@ -51,6 +51,15 @@ maxExecutedMessagesSize : Int
 -- setup instead of relying on script-runner limits.
 maxExecutedMessagesSize = 25000
 
+validateRouterDeps : PerPartyRouterDeps -> Update ()
+validateRouterDeps deps = do
+    RawInstanceAddress.assertValid "router deps: invalid onRamp address" deps.onRamp
+    RawInstanceAddress.assertValid "router deps: invalid offRamp address" deps.offRamp
+    RawInstanceAddress.assertValid "router deps: invalid globalConfig address" deps.globalConfig
+    RawInstanceAddress.assertValid "router deps: invalid tokenAdminRegistry address" deps.tokenAdminRegistry
+    RawInstanceAddress.assertValid "router deps: invalid feeQuoter address" deps.feeQuoter
+    RawInstanceAddress.assertValid "router deps: invalid rmnRemote address" deps.rmnRemote
+
 addFeeForParty : Map.Map Party Decimal -> Party -> Decimal -> Map.Map Party Decimal
 addFeeForParty allocs recipient amount =
     let existing = fromOptional 0.0 (Map.lookup recipient allocs)
@@ -114,6 +123,12 @@ template PerPartyRouterFactory
     where
         signatory ccipOwner
         ensure assertValidInstanceId instanceId
+            && RawInstanceAddress.isValid deps.onRamp
+            && RawInstanceAddress.isValid deps.offRamp
+            && RawInstanceAddress.isValid deps.globalConfig
+            && RawInstanceAddress.isValid deps.tokenAdminRegistry
+            && RawInstanceAddress.isValid deps.feeQuoter
+            && RawInstanceAddress.isValid deps.rmnRemote
 
         choice FactorySetDeps : ContractId PerPartyRouterFactory
             with
@@ -127,6 +142,7 @@ template PerPartyRouterFactory
                         tokenAdminRegistry = fromOptional deps.tokenAdminRegistry newDeps.tokenAdminRegistry
                         feeQuoter = fromOptional deps.feeQuoter newDeps.feeQuoter
                         rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
+                validateRouterDeps mergedDeps
                 create this with deps = mergedDeps
 
         choice CreateRouter : CreateRouterResult
@@ -142,6 +158,8 @@ template PerPartyRouterFactory
 
                 assertMsg "instanceId already in use"
                     (instanceId `notElem` Map.values registeredRouters)
+
+                validateRouterDeps deps
 
                 routerCid <- create PerPartyRouter with
                     ccipOwner = ccipOwner
@@ -233,7 +251,14 @@ template PerPartyRouter
     where
         signatory ccipOwner
         observer partyOwner :: customObservers
-        ensure assertValidInstanceId instanceId && unique customObservers
+        ensure assertValidInstanceId instanceId
+            && unique customObservers
+            && RawInstanceAddress.isValid deps.onRamp
+            && RawInstanceAddress.isValid deps.offRamp
+            && RawInstanceAddress.isValid deps.globalConfig
+            && RawInstanceAddress.isValid deps.tokenAdminRegistry
+            && RawInstanceAddress.isValid deps.feeQuoter
+            && RawInstanceAddress.isValid deps.rmnRemote
 
         nonconsuming choice GetFee : CCIP.OnRamp.GetFeeFromRouterResult
             with
@@ -284,6 +309,7 @@ template PerPartyRouter
                         tokenAdminRegistry = fromOptional deps.tokenAdminRegistry newDeps.tokenAdminRegistry
                         feeQuoter = fromOptional deps.feeQuoter newDeps.feeQuoter
                         rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
+                validateRouterDeps mergedDeps
                 create this with deps = mergedDeps
 
         choice AddCustomObservers : ContractId PerPartyRouter

@@ -982,6 +982,23 @@ testPrepareSendRejectsOversizedPayload = script do
 
     pure ()
 
+testFactoryRejectsMalformedDeps : Script ()
+testFactoryRejectsMalformedDeps = script do
+    ccipOwner <- allocateParty "ccip-owner-invalid-deps"
+
+    submitMustFail ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
+            instanceId = "factory-invalid-deps"
+            ccipOwner = ccipOwner
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.empty
+                offRamp = RawInstanceAddress.make "offramp-invalid-deps" ccipOwner
+                globalConfig = RawInstanceAddress.make "globalconfig-invalid-deps" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-invalid-deps" ccipOwner
+                feeQuoter = RawInstanceAddress.make "feequoter-invalid-deps" ccipOwner
+                rmnRemote = RawInstanceAddress.make "rmn-invalid-deps" ccipOwner
+            registeredRouters = Map.empty
+
 testGetExecutionStateUsesActiveAndArchivedMessages : Script ()
 testGetExecutionStateUsesActiveAndArchivedMessages = script do
     ccipOwner <- allocateParty "ccip-owner-exec-state"
