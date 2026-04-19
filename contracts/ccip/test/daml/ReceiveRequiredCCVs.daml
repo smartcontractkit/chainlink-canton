@@ -343,3 +343,36 @@ testMergeInboundPoolCCVsExpandsSentinel = script do
     sort required1 === sort (required0 ++ [default1, explicitPool])
     optional1 === []
     threshold1 === 0
+
+testReceiverAllowsDefaultRequiredCCVSentinel : Script ()
+testReceiverAllowsDefaultRequiredCCVSentinel = script do
+    receiver <- allocateParty "receiver-required-default-sentinel"
+
+    receiverCid <- submit receiver do
+        createCmd CCIP.CCIPReceiver.CCIPReceiver with
+            instanceId = "receiver-required-default-sentinel"
+            owner = receiver
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalThreshold = 0
+            receiverFinalityConfig = CCIP.FinalityConfig.WaitForFinality
+
+    receiverCid <- submit receiver do
+        exerciseCmd receiverCid CCIP.CCIPReceiver.UpdateRequiredCCVs with
+            newRequiredCCVs = [CCIP.Internal.useDefaultCCVs]
+
+    receiverContract <- fromSome <$> queryContractId receiver receiverCid
+    receiverContract.requiredCCVs === [CCIP.Internal.useDefaultCCVs]
+
+testReceiverRejectsMalformedRequiredCCV : Script ()
+testReceiverRejectsMalformedRequiredCCV = script do
+    receiver <- allocateParty "receiver-invalid-required-ccv"
+
+    submitMustFail receiver do
+        createCmd CCIP.CCIPReceiver.CCIPReceiver with
+            instanceId = "receiver-invalid-required-ccv"
+            owner = receiver
+            requiredCCVs = [RawInstanceAddress.RawInstanceAddress "not-a-valid-instance-address"]
+            optionalCCVs = []
+            optionalThreshold = 0
+            receiverFinalityConfig = CCIP.FinalityConfig.WaitForFinality

@@ -14,12 +14,14 @@ import DA.Optional (fromSomeNote)
 
 import qualified CCIP.Context
 import qualified CCIP.FinalityConfig
+import qualified CCIP.Internal
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.PerPartyRouter
 import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.TokenAdminRegistry
 
 -- | Per-CCV verification input. Pairs a verifier contract (via interface)
@@ -41,6 +43,10 @@ data TokenTransferInput = TokenTransferInput
         poolExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
 
+isValidRequiredReceiverCCV : RawInstanceAddress -> Bool
+isValidRequiredReceiverCCV ccv =
+    ccv == CCIP.Internal.useDefaultCCVs || RawInstanceAddress.isValid ccv
+
 template CCIPReceiver
     with
         instanceId : Text
@@ -58,6 +64,8 @@ template CCIPReceiver
         -- Ensure that requiredCCVs are unique
         ensure assertValidInstanceId instanceId
             && unique requiredCCVs
+            && all isValidRequiredReceiverCCV requiredCCVs
+            && all RawInstanceAddress.isValid optionalCCVs
 
         -- | Query the final required CCVs for executing an inbound message.
         -- Aggregates receiver policy with token-pool requirements and delegates
@@ -107,6 +115,8 @@ template CCIPReceiver
             controller owner
             do
                 assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in new required CCVs" (unique newRequiredCCVs)
+                assertMsg "InvalidReceiverCCV: invalid required CCV in new required CCVs"
+                    (all isValidRequiredReceiverCCV newRequiredCCVs)
                 create this with requiredCCVs = newRequiredCCVs
 
         -- | Executes an inbound CCIP message end-to-end.
