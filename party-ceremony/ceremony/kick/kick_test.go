@@ -99,6 +99,10 @@ func (m *mockCantonClient) GetNamespaceFingerprint(_ context.Context, keyName st
 	return fmt.Sprintf("1220%x", raw[:8]), nil
 }
 
+func (m *mockCantonClient) GetNamespaceKeyName(_ context.Context, _ string, _ []string) (string, error) {
+	return "mock-ns-key", nil
+}
+
 func (m *mockCantonClient) Authorize(_ context.Context, serial uint32, mapping *protov30.TopologyMapping, _ string, _ bool, _ ...string) (*protov30.SignedTopologyTransaction, error) {
 	// Track P2P Authorize calls (post-DNS) so GetP2P can return updated state.
 	if m.state != nil && m.state.dnsSubmitted() {
@@ -209,6 +213,10 @@ func (m *mockCantonClient) ListDecentralizedNamespaces(_ context.Context, _ stri
 			Serial:                 1,
 		},
 	}, nil
+}
+
+func (m *mockCantonClient) GetProtocolKeyFingerprint(_ context.Context, _ []string) (string, string, error) {
+	return "mock-protocol-fp", "mock-protocol-key-b64", nil
 }
 
 func (m *mockCantonClient) UploadDar(_ context.Context, _ []byte) (string, error) {

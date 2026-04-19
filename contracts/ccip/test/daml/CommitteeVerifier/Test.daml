@@ -115,7 +115,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys1)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv1 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -144,7 +144,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys2)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv2 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -193,7 +193,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys4)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv4 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -220,7 +220,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 4, signerKeys = pubKeys5)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv5 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -247,7 +247,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys6)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv6 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -309,7 +309,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = pubKeys9)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -319,7 +319,7 @@ testCommitteeVerifier = script do
                 "deadbeef"    -- invalid signature data
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -329,7 +329,7 @@ testCommitteeVerifier = script do
                 "deadbeef"    -- invalid signature data
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -360,7 +360,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -378,7 +378,7 @@ testCommitteeVerifier = script do
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4, 5]]
     executingMessageCid <- createExecMsg owner rmnOwner
     submit (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
@@ -391,7 +391,7 @@ testCommitteeVerifier = script do
             signatureConfigs = []
     executingMessageCid <- createExecMsg owner rmnOwner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+        exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid

@@ -1,0 +1,57 @@
+openapi: 3.0.0
+info:
+  title: Global Explicit Disclosure API
+  description: Provides global endpoints that must be implemented by all EDS APIs.
+  version: 0.0.1
+
+paths:
+  /ccip/v1/global/disclosure/batch:
+    post:
+      operationId: postGetExplicitDisclosureBatch
+      description: |
+        Get the explicit disclosures for instantiating a PerPartyRouter using the PerPartyRouterFactory.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetExplicitDisclosureBatchRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetExplicitDisclosureBatchResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
+components:
+  schemas:
+    GetExplicitDisclosureBatchRequest:
+      type: object
+      required:
+        - addresses
+      properties:
+        addresses:
+          type: array
+          description: |
+            A list of addresses to get explicit disclosures for. Can be either RawInstanceAddresses or InstanceAddresses.
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
+    GetExplicitDisclosureBatchResponse:
+      type: object
+      required:
+        - disclosures
+      properties:
+        disclosures:
+          type: array
+          description: |
+            A list of explicit disclosures for the requested addresses. The order of the responses corresponds to the order of the requests.
+            If any explicit disclosure for a requested address cannot be found, the request will fail.
+          items:
+            $ref: '../common/eds-common.yaml#/components/schemas/DisclosedContract'

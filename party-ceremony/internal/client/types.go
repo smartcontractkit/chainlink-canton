@@ -31,6 +31,16 @@ type P2PParticipantInfo struct {
 	Permission string
 }
 
+// P2PSigningKeysInfo holds the current DAML signing keys and their threshold
+// from a PartyToParticipant topology mapping.
+type P2PSigningKeysInfo struct {
+	// Keys is the list of base64-encoded proto-marshalled SigningPublicKey entries.
+	Keys []string
+
+	// Threshold is the signing threshold for the party.
+	Threshold uint32
+}
+
 // P2PState holds the current state of a PartyToParticipant topology mapping
 // as read from Canton's topology store.
 type P2PState struct {
@@ -45,4 +55,8 @@ type P2PState struct {
 
 	// Serial is the topology serial number of this mapping.
 	Serial int32
+
+	// PartySigningKeys holds the current DAML signing keys and their threshold.
+	// May be nil if the mapping was created without explicit signing keys.
+	PartySigningKeys *P2PSigningKeysInfo
 }

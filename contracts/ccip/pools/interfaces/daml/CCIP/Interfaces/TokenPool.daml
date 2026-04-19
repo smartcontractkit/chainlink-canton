@@ -67,7 +67,7 @@ interface ITokenPool where
         do tokenPool_verifyOutboundCCVsImpl this self arg
 
     -- Release tokens by consuming a TokenReceiveTicket issued by OffRamp.
-    -- The pool should consume the ticket via TokenAdminRegistry_ConsumeReceiveTicket.
+    -- The pool should consume the ticket via ConsumeReceiveTicket.
     nonconsuming choice TokenPool_ReleaseFromTicket : ReleaseOrMintResult
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry

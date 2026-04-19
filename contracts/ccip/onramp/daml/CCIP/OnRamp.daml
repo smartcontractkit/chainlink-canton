@@ -157,8 +157,7 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
             + inputs.poolGas
             + executorDestGasLimit
     let calldataSize =
-            byteCount inputs.payload
-            + inputs.ccvBytesSum
+            inputs.ccvBytesSum
             + inputs.poolBytes
             + executorDestBytesOverhead
     quote <- exercise feeQuoterCid CCIP.FeeQuoter.QuoteGasForExec with
@@ -743,7 +742,7 @@ template OnRamp
                 case (theMessage.tokenTransfer, sendingMsg.tokenSendData) of
                     (Some tt, Some tsd) -> do
                         configOpt <- exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
+                            CCIP.TokenAdminRegistry.GetTokenConfig with
                                 instrumentId = tsd.instrumentId
                                 caller = ccipOwner
                         pool <- case configOpt of

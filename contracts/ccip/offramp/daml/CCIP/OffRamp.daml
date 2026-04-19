@@ -338,7 +338,7 @@ template OffRamp
                                 returnData = ""
                     Some _ ->
                         exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.TokenAdminRegistry_FinalizeExecute with
+                            CCIP.TokenAdminRegistry.FinalizeExecute with
                                 executingMessageCid = executingMessageCid
                                 ticketReceiver = routerPartyOwner
                                 returnData = ""
