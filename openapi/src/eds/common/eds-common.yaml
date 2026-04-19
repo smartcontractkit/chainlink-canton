@@ -115,7 +115,7 @@ components:
         - executor
       properties:
         destinationChainSelector:
-          type: integer
+          type: string
           description: The chain selector of the destination chain.
         receiver:
           type: string

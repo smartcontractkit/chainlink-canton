@@ -78,22 +78,9 @@ func (c *Chain) getEDSOutput() (*output, error) {
 	return edsOut, nil
 }
 
-func (c *Chain) getEDSConfig() (*edsConfig.Config, error) {
-	edsOut, err := c.getEDSOutput()
-	if err != nil {
-		return nil, err
-	}
-
-	return &edsOut.EDSConfig, nil
-}
-
 func (c *Chain) getEDSPerPartyRouterFactory() (contracts.InstanceAddress, error) {
-	edsCfg, err := c.getEDSConfig()
-	if err != nil {
-		return contracts.InstanceAddress{}, err
-	}
-
-	return edsCfg.Contracts.PerPartyRouterFactory.InstanceAddress, nil
+	// TODO - actually use EDS to get the factory
+	return contracts.InstanceAddress{}, nil
 }
 
 const (

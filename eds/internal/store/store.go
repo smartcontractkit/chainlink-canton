@@ -24,6 +24,8 @@ type ContractUpdate[K comparable, V any] struct {
 	Value V
 }
 
+type FiltersByParty map[string]*apiv2.Filters
+
 type ContractStore[K comparable, V any] struct {
 	logger zerolog.Logger
 	// updateService is the service used to subscribe to updates from the Canton participant
@@ -39,7 +41,7 @@ type ContractStore[K comparable, V any] struct {
 	reconnectBackoff time.Duration
 
 	// The filters to apply when backfilling/subscribing to updates
-	filtersByParty map[string]*apiv2.Filters
+	filtersByParty FiltersByParty
 
 	// mutex to protect the contracts map and ledgerEnd
 	mux sync.RWMutex
@@ -72,12 +74,43 @@ const (
 	DefaultReconnectBackoff = time.Second * 5
 )
 
+type runOptions struct {
+	backfillCompletedCallback func()
+	filtersByParty            FiltersByParty
+}
+
+type RunOption func(options *runOptions)
+
+// WithBackfillCompletedCallback sets a callback that will be called once the initial backfill is completed and the
+// store is ready to serve reads and process updates.
+func WithBackfillCompletedCallback(callback func()) RunOption {
+	return func(options *runOptions) {
+		options.backfillCompletedCallback = callback
+	}
+}
+
+// WithFiltersByParty sets/overrides the filters used by the underlying ContractStore
+func WithFiltersByParty(filtersByParty FiltersByParty) RunOption {
+	return func(options *runOptions) {
+		options.filtersByParty = filtersByParty
+	}
+}
+
 // Run runs the ContractStore. It will start by initializing the ContractStore with a backfill of all existing active contracts
 // and subscribe to incremental updates afterward.
 // Run is a long-running function that needs to keep running in the background in order for the ContractStore to keep
 // up-to-date.
 // To terminate Run, cancel the context.
-func (s *ContractStore[K, V]) Run(ctx context.Context) error {
+func (s *ContractStore[K, V]) Run(ctx context.Context, options ...RunOption) error {
+	o := &runOptions{}
+	for _, option := range options {
+		option(o)
+	}
+
+	if o.filtersByParty != nil {
+		s.filtersByParty = o.filtersByParty
+	}
+
 	backoff := s.reconnectBackoff
 	if backoff == 0 {
 		backoff = DefaultReconnectBackoff
@@ -101,6 +134,9 @@ func (s *ContractStore[K, V]) Run(ctx context.Context) error {
 	s.contracts = activeContracts
 	s.mux.Unlock()
 	s.logger.Debug().Int("activeContracts", len(activeContracts)).Msg("Backfill complete")
+	if o.backfillCompletedCallback != nil {
+		go o.backfillCompletedCallback()
+	}
 
 	// Create uptime ticker
 	// Ticking once a second to increase the uptime counter metric

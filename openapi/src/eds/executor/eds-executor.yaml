@@ -17,7 +17,7 @@ paths:
           name: address
           required: true
           schema:
-            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+            type: string
           description: |
             The address of the Executor instance to forward the message to.
             Can be either a RawInstanceAddress or an InstanceAddress.
@@ -50,6 +50,8 @@ components:
     ExecutorSendRequest:
       type: object
       required:
+        - message
+        - ccvs
       properties:
         message:
           $ref: "../common/eds-common.yaml#/components/schemas/Message"
@@ -60,6 +62,11 @@ components:
     ExecutorSendResponse:
       type: object
       required:
+        - contractId
+        - instanceAddress
+        - rawInstanceAddress
+        - contextData
+        - disclosedContracts
       properties:
         contractId:
           $ref: "../common/eds-common.yaml#/components/schemas/ContractId"

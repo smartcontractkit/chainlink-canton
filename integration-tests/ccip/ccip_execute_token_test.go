@@ -31,6 +31,9 @@ import (
 	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
+	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
 
@@ -41,7 +44,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
@@ -307,16 +309,12 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NoError(t, err, "failed to get RMNRemote address")
 	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
-	executorAddress, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(executor.ContractType), executor.Version, devenvcommon.DefaultExecutorQualifier))
-	require.NoError(t, err, "failed to get Executor address")
 
 	// Token Pool Setup
 	// Deploy default inbound RateLimiter required by ReleaseFromTicket receive flow.
 	// Keep it enabled but lower-capacity so the test fails if the default-finality limiter
 	// is selected for this FTF transfer instead of the custom-finality limiter.
 	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
-	inboundRateLimiterRawInstanceAddress := contracts.InstanceID(inboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
-	inboundRateLimiterInstanceAddress := inboundRateLimiterRawInstanceAddress.InstanceAddress()
 	res, err := tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -345,8 +343,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	inboundRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed default inbound RateLimiter: %s", inboundRateLimiterCid)
 	inboundCustomBlockConfirmationsRateLimiterInstanceID := "test-pool-receive-inbound-custom-rl"
-	inboundCustomBlockConfirmationsRateLimiterRawInstanceAddress := contracts.InstanceID(inboundCustomBlockConfirmationsRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
-	inboundCustomBlockConfirmationsRateLimiterInstanceAddress := inboundCustomBlockConfirmationsRateLimiterRawInstanceAddress.InstanceAddress()
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -375,8 +371,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	inboundCustomBlockConfirmationsRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed custom-finality inbound RateLimiter: %s", inboundCustomBlockConfirmationsRateLimiterCid)
 	outboundRateLimiterInstanceID := "test-pool-receive-outbound-rl"
-	outboundRateLimiterRawInstanceAddress := contracts.InstanceID(outboundRateLimiterInstanceID).RawInstanceAddress(types.PARTY(partyTokenPoolOwner))
-	outboundRateLimiterInstanceAddress := outboundRateLimiterRawInstanceAddress.InstanceAddress()
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -570,7 +564,8 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				},
 				MaxRetries: 0,
 			},
-			Contracts: config.Contracts{
+			CCIPAPIConfig: config.CCIPAPIConfig{
+				Enabled: true,
 				PerPartyRouterFactory: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
@@ -599,34 +594,26 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
-				DefaultExecutor: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(executorAddress.Address),
-				},
-				CCVs: []config.ContractIdentifier{
+			},
+			CCVAPIConfig: config.CCVAPIConfig{
+				Enabled: true,
+				CCVs: []config.CCV{
 					{
-						PartyID:         partyCCIP,
-						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+						},
 					},
 				},
-				PoolOwner: partyCCIP,
-				TokenPoolContracts: []config.TokenPoolContracts{
+			},
+			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
+				Enabled: true,
+				TokenPools: []config.TokenPool{
 					{
-						TokenPool: config.ContractIdentifier{
+						Type: config.TokenPoolTypeLockRelease,
+						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
 							InstanceAddress: lrtpInstanceAddress,
-						},
-						InboundRateLimiter: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: inboundRateLimiterInstanceAddress,
-						},
-						InboundCustomBlockConfirmationsRateLimiter: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: inboundCustomBlockConfirmationsRateLimiterInstanceAddress,
-						},
-						OutboundRateLimiter: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: outboundRateLimiterInstanceAddress,
 						},
 					},
 				},
@@ -637,7 +624,10 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 			log.Error().Err(err).Msg("EDS server exited with error")
 		}
 	}()
-	// Create EDS client
+
+	// Create EDS clients
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create CCIP API client")
 	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create EDS client")
 
@@ -697,7 +687,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	time.Sleep(10 * time.Second)
 
 	// Create PerPartyRouter for receiver via EDS
-	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)
+	perPartyRouterFactoryCid, disclosedContracts, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), ccipAPIClient)
 	require.NoError(t, err)
 	t.Logf("disclosed contracts: %v", disclosedContracts)
 	t.Logf("per party router factory cid: %s", perPartyRouterFactoryCid)

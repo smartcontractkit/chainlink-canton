@@ -32,6 +32,29 @@ type ActiveContractStoreConfig struct {
 	ReconnectBackoff time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
 }
 
+func ActiveContractStoreFilters(registeredTemplates ...RegisteredTemplate) FiltersByParty {
+	filtersByParty := make(map[string]*apiv2.Filters) // Assemble filters
+	for _, template := range registeredTemplates {
+		existingFilterForParty, ok := filtersByParty[template.PartyID]
+		if !ok {
+			existingFilterForParty = &apiv2.Filters{}
+		}
+		existingFilterForParty.Cumulative = append(existingFilterForParty.Cumulative, &apiv2.CumulativeFilter{
+			IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{TemplateFilter: &apiv2.TemplateFilter{
+				TemplateId: &apiv2.Identifier{
+					PackageId:  template.TemplateID.PackageID,
+					ModuleName: template.TemplateID.ModuleName,
+					EntityName: template.TemplateID.EntityName,
+				},
+				IncludeCreatedEventBlob: true,
+			}},
+		})
+		filtersByParty[template.PartyID] = existingFilterForParty
+	}
+
+	return filtersByParty
+}
+
 // NewActiveContractStore returns a Store implementation that keeps track of active contracts by subscribing
 // to incremental ledger updates.
 // The ActiveContractStore is configured with a variable list of registeredTemplates which are the only templates is will
@@ -57,24 +80,7 @@ func NewActiveContractStore(
 	metrics Metrics,
 	registeredTemplates ...RegisteredTemplate,
 ) (*ContractStore[contracts.InstanceAddress, *apiv2.ActiveContract], error) {
-	filtersByParty := make(map[string]*apiv2.Filters) // Assemble filters
-	for _, template := range registeredTemplates {
-		existingFilterForParty, ok := filtersByParty[template.PartyID]
-		if !ok {
-			existingFilterForParty = &apiv2.Filters{}
-		}
-		existingFilterForParty.Cumulative = append(existingFilterForParty.Cumulative, &apiv2.CumulativeFilter{
-			IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{TemplateFilter: &apiv2.TemplateFilter{
-				TemplateId: &apiv2.Identifier{
-					PackageId:  template.TemplateID.PackageID,
-					ModuleName: template.TemplateID.ModuleName,
-					EntityName: template.TemplateID.EntityName,
-				},
-				IncludeCreatedEventBlob: true,
-			}},
-		})
-		filtersByParty[template.PartyID] = existingFilterForParty
-	}
+	filtersByParty := ActiveContractStoreFilters(registeredTemplates...)
 
 	return &ContractStore[contracts.InstanceAddress, *apiv2.ActiveContract]{
 		logger:           config.Logger.With().Str("component", "ActiveContractStore").Logger(),

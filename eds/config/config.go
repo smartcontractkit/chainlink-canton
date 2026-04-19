@@ -18,8 +18,11 @@ func DefaultConfig() *Config {
 		ChainSelector: "",
 		Server:        ServerConfig{},
 		Node:          NodeConfig{},
-		Contracts:     Contracts{},
 		Monitoring:    MonitoringConfig{},
+		GlobalAPIConfig: GlobalAPIConfig{
+			MaxBatchSize: 1024,
+		},
+		CCIPAPIConfig: CCIPAPIConfig{},
 	}
 }
 
@@ -27,8 +30,14 @@ type Config struct {
 	ChainSelector string           `toml:"chain_selector" validate:"required"`
 	Server        ServerConfig     `toml:"server" validate:"required"`
 	Node          NodeConfig       `toml:"node" validate:"required"`
-	Contracts     Contracts        `toml:"contracts" validate:"required"`
 	Monitoring    MonitoringConfig `toml:"monitoring"`
+
+	// API Configs
+	GlobalAPIConfig    GlobalAPIConfig    `toml:"global_api"`
+	CCIPAPIConfig      CCIPAPIConfig      `toml:"ccip_api"`
+	CCVAPIConfig       CCVAPIConfig       `toml:"ccv_api"`
+	ExecutorAPIConfig  ExecutorAPIConfig  `toml:"executor_api"`
+	TokenPoolAPIConfig TokenPoolAPIConfig `toml:"token_pool_api"`
 }
 
 type ServerConfig struct {
@@ -42,31 +51,71 @@ type NodeConfig struct {
 	MaxRetries int                     `toml:"max_retries"`
 }
 
-type TokenPoolContracts struct {
-	TokenPool                                  ContractIdentifier `toml:"token_pool" validate:"required"`
-	InboundRateLimiter                         ContractIdentifier `toml:"inbound_rate_limiter" validate:"required"`
-	InboundCustomBlockConfirmationsRateLimiter ContractIdentifier `toml:"inbound_custom_block_confirmations_rate_limiter" validate:"required"`
-	OutboundRateLimiter                        ContractIdentifier `toml:"outbound_rate_limiter" validate:"required"`
+// Global API
+
+type GlobalAPIConfig struct {
+	MaxBatchSize int `toml:"max_batch_size" validate:"required"`
 }
 
-type Contracts struct {
-	PerPartyRouterFactory ContractIdentifier   `toml:"per_party_router_factory" validate:"required"`
-	OnRamp                ContractIdentifier   `toml:"on_ramp" validate:"required"`
-	OffRamp               ContractIdentifier   `toml:"off_ramp" validate:"required"`
-	GlobalConfig          ContractIdentifier   `toml:"global_config" validate:"required"`
-	TokenAdminRegistry    ContractIdentifier   `toml:"token_admin_registry" validate:"required"`
-	RMNRemote             ContractIdentifier   `toml:"rmn_remote" validate:"required"`
-	FeeQuoter             ContractIdentifier   `toml:"fee_quoter" validate:"required"`
-	DefaultExecutor       ContractIdentifier   `toml:"default_executor" validate:"required"`
-	CCVs                  []ContractIdentifier `toml:"ccvs"`
-	TokenPoolContracts    []TokenPoolContracts `toml:"token_pool_contracts"`
+// CCIP API
 
-	// PoolOwner is the party that owns the token pools.
-	// The instrument holdings of this owner is what will end up getting tracked by EDS,
-	// and we will serve disclosures for them if needed (i.e. for token transfer executions).
-	PoolOwner string `toml:"pool_owner"`
+type CCIPAPIConfig struct {
+	Enabled bool `toml:"enabled"`
+
+	PerPartyRouterFactory ContractIdentifier `toml:"per_party_router_factory" validate:"required_if=Enabled true"`
+	OnRamp                ContractIdentifier `toml:"on_ramp" validate:"required_if=Enabled true"`
+	OffRamp               ContractIdentifier `toml:"off_ramp" validate:"required_if=Enabled true"`
+	GlobalConfig          ContractIdentifier `toml:"global_config" validate:"required_if=Enabled true"`
+	TokenAdminRegistry    ContractIdentifier `toml:"token_admin_registry" validate:"required_if=Enabled true"`
+	RMNRemote             ContractIdentifier `toml:"rmn_remote" validate:"required_if=Enabled true"`
+	FeeQuoter             ContractIdentifier `toml:"fee_quoter" validate:"required_if=Enabled true"`
 }
 
+// CCV API
+
+type CCV struct {
+	ContractIdentifier
+}
+
+type CCVAPIConfig struct {
+	Enabled bool  `toml:"enabled"`
+	CCVs    []CCV `toml:"ccvs" validate:"required"`
+}
+
+// Executor API
+
+type Executor struct {
+	ContractIdentifier
+}
+
+type ExecutorAPIConfig struct {
+	Enabled   bool       `toml:"enabled"`
+	Executors []Executor `toml:"executors" validate:"required_if=Enabled true"`
+}
+
+// Token Pool API
+
+type TokenPoolType string
+
+const (
+	TokenPoolTypeLockRelease TokenPoolType = "lockRelease"
+	TokenPoolTypeBurnMint    TokenPoolType = "burnMint"
+)
+
+type TokenPool struct {
+	ContractIdentifier
+	Type TokenPoolType `toml:"type" validate:"required,oneof=lockRelease burnMint"`
+}
+
+type TokenPoolAPIConfig struct {
+	Enabled    bool        `toml:"enabled"`
+	TokenPools []TokenPool `toml:"token_pools" validate:"required_if=Enabled true"`
+}
+
+// ContractIdentifier uniquely identifies a contract using an InstanceAddress.
+// It also contains a PartyID of a party that must be a stakeholder on the contract.
+// This party will be used to retrieve contracts from the Active Contract Set, it can be the same party that owns
+// the contract, but does not have to be.
 type ContractIdentifier struct {
 	PartyID         string                    `toml:"party_id" validate:"required"`
 	InstanceAddress contracts.InstanceAddress `toml:"instance_address" validate:"required"`

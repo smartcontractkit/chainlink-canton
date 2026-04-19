@@ -22,6 +22,12 @@ import (
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/freeport"
 
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
+	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
+
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -61,7 +67,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
-	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	// Import to register adapters
@@ -345,7 +350,8 @@ func TestCCIPSend(t *testing.T) {
 				},
 				MaxRetries: 0,
 			},
-			Contracts: config.Contracts{
+			CCIPAPIConfig: config.CCIPAPIConfig{
+				Enabled: true,
 				PerPartyRouterFactory: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
@@ -374,17 +380,28 @@ func TestCCIPSend(t *testing.T) {
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
-				CCVs: []config.ContractIdentifier{
+			},
+			CCVAPIConfig: config.CCVAPIConfig{
+				Enabled: true,
+				CCVs: []config.CCV{
 					{
-						PartyID:         partyCCIP,
-						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+						},
 					},
 				},
-				DefaultExecutor: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(executorAddress.Address),
+			},
+			ExecutorAPIConfig: config.ExecutorAPIConfig{
+				Enabled: true,
+				Executors: []config.Executor{
+					{
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: contracts.HexToInstanceAddress(executorAddress.Address),
+						},
+					},
 				},
-				PoolOwner: partyCCIP,
 			},
 		})
 		log.Info().Msg("EDS terminated")
@@ -393,15 +410,20 @@ func TestCCIPSend(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 
-	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
-	require.NoError(t, err, "failed to create EDS client")
+	// Create EDS clients
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create CCIP API client")
+	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create CCV API client")
+	executorAPIClient, err := oapiExecutor.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create Executor API client")
 
 	// Apply FeeQuoter dest chain config (needed by OnRamp.FinalizeFeeFromRouter)
 	// Create PerPartyRouter for sender
 	// Create PerPartyRouter for receiver
-	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)
+	perPartyRouterFactoryCid, disclosedContracts, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), ccipAPIClient)
 	require.NoError(t, err)
 
 	// TODO use operation to deploy PerPartyRouter
@@ -562,17 +584,33 @@ func TestCCIPSend(t *testing.T) {
 		TokenPoolHoldings: []types.CONTRACT_ID{},
 	}
 
-	sendDisclosures, err := testhelpers.GetCCIPSendDisclosures(
-		t.Context(),
-		edsClient,
-		[]contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
-	)
+	executorRawOrHashedAddress := oapiCommon.RawOrHashedAddress{}
+	_ = executorRawOrHashedAddress.FromRawInstanceAddress(executorRawAddr.String())
+	msg := oapiCommon.Message{
+		DestinationChainSelector: strconv.FormatUint(remoteSelector, 10),
+		Executor: struct {
+			Address *oapiCommon.RawOrHashedAddress `json:"address,omitempty"`
+			Type    oapiCommon.MessageExecutorType `json:"type"`
+		}{
+			Type:    oapiCommon.WithAddress,
+			Address: &executorRawOrHashedAddress,
+		},
+		FeeToken:      oapiCommon.InstrumentId{},
+		Payload:       "",
+		Receiver:      "",
+		TokenTransfer: nil,
+	}
+	ccipSendDisclosure, err := edsTesthelpers.GetCCIPSendDisclosure(t.Context(), ccipAPIClient, msg, nil, nil)
+	require.NoError(t, err)
+	ccvSendDisclosure, err := edsTesthelpers.GetCCVSendDisclosure(t.Context(), ccvAPIClient, msg, contracts.HexToInstanceAddress(committeeVerifier.Address))
+	require.NoError(t, err)
+	executorSendDisclosure, err := edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, contracts.HexToInstanceAddress(executorAddress.Address), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
 
 	ccvRawAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierRawAddr.String())}
 	execMcmsAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(executorRawAddr.String())}
 	sendArgs := ccipsender.Send{
-		Context:                  sendDisclosures.SendContext,
+		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 		Message: ccipclient.Canton2AnyMessage{
@@ -605,13 +643,13 @@ func TestCCIPSend(t *testing.T) {
 		},
 		CcvSendInputs: []ccipsender.CCVSendInput{
 			{
-				CcvAddress:      ccvRawAddr,
-				CcvCid:          types.CONTRACT_ID(sendDisclosures.CCVContractIDs[0].ContractId),
+				CcvAddress:      ccvSendDisclosure.Address.Binding(),
+				CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
 				CcvExtraContext: common.CCIPContext{},
 			},
 		},
 		ExecutorInput: &ccipsender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(sendDisclosures.ExecutorContractID.ContractId),
+			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
 			ExecutorExtraContext: common.CCIPContext{},
 		},
 	}
@@ -623,8 +661,10 @@ func TestCCIPSend(t *testing.T) {
 			disclosedRouter,          // not from EDS
 			disclosedFeeTokenHolding, // not from EDS
 		},
-		sendDisclosures.DisclosedContracts,
-		transferFactoryDisclosures,
+		transferFactoryDisclosures, // TODO should be returned by EDS?
+		ccipSendDisclosure.DisclosedContracts,
+		ccvSendDisclosure.DisclosedContracts,
+		executorSendDisclosure.DisclosedContracts,
 	)
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, allDisclosures)
 	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")

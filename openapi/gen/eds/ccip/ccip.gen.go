@@ -21,24 +21,17 @@ import (
 // CCIPExecuteRequest defines model for CCIPExecuteRequest.
 type CCIPExecuteRequest struct {
 	// EncodedMessage The CCIP message to be executed, encoded as a hex string.
-	EncodedMessage *string `json:"encodedMessage,omitempty"`
+	EncodedMessage string `json:"encodedMessage"`
 }
 
 // CCIPExecuteResponse defines model for CCIPExecuteResponse.
 type CCIPExecuteResponse struct {
 	// ContextData The context to be passed along to CCIP.
-	ContextData        *map[string]interface{}           `json:"contextData,omitempty"`
-	DisclosedContracts *[]externalRef0.DisclosedContract `json:"disclosedContracts,omitempty"`
+	ContextData        map[string]interface{}           `json:"contextData"`
+	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
 
-	// TokenPool The address of the token pool which this message belongs to.
-	// If the message does not contain a token transfer, this may be empty.
-	TokenPool *struct {
-		// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-		InstanceAddress *externalRef0.InstanceAddress `json:"instanceAddress,omitempty"`
-
-		// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-		RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
-	} `json:"tokenPool,omitempty"`
+	// TokenPool The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
+	TokenPool *externalRef0.RawInstanceAddress `json:"tokenPool,omitempty"`
 }
 
 // CCIPPerPartyRouterFactoryRequest defines model for CCIPPerPartyRouterFactoryRequest.
@@ -68,37 +61,20 @@ type CCIPSendRequest struct {
 type CCIPSendResponse struct {
 	// Ccvs A list of requested CCVs containing their addresses.
 	// If default CCVs apply, this list might contain more CCVs than originally requested.
-	Ccvs []struct {
-		// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-		InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
-
-		// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-		RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
-	} `json:"ccvs"`
+	Ccvs []externalRef0.RawOrHashedAddress `json:"ccvs"`
 
 	// ContextData The context to be passed along to CCIP.
 	ContextData        map[string]interface{}           `json:"contextData"`
 	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
 
-	// Executor The address of the requested executor.
-	// If "noExecutor" has been requested, this will not be returned.
-	// If a default executor applies, this might be returned even if it was not explicitly requested.
-	Executor *struct {
-		// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-		InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
-
-		// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-		RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
-	} `json:"executor,omitempty"`
+	// Executor An address which can be either a RawInstanceAddress or an InstanceAddress.
+	Executor *externalRef0.RawOrHashedAddress `json:"executor,omitempty"`
 }
 
 // LookupTokenPoolResponse defines model for LookupTokenPoolResponse.
 type LookupTokenPoolResponse struct {
-	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
-
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-	RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
+	RawInstanceAddress externalRef0.RawInstanceAddress `json:"rawInstanceAddress"`
 }
 
 // PostPerPartyRouterFactoryJSONRequestBody defines body for PostPerPartyRouterFactory for application/json ContentType.
@@ -189,7 +165,7 @@ type ClientInterface interface {
 	PostPerPartyRouterFactory(ctx context.Context, body PostPerPartyRouterFactoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetTokenAdminRegistryToken request
-	GetTokenAdminRegistryToken(ctx context.Context, instrumentId externalRef0.RawOrHashedInstrumentId, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetTokenAdminRegistryToken(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PostCCIPExecuteWithBody request with any body
 	PostCCIPExecuteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -226,7 +202,7 @@ func (c *Client) PostPerPartyRouterFactory(ctx context.Context, body PostPerPart
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetTokenAdminRegistryToken(ctx context.Context, instrumentId externalRef0.RawOrHashedInstrumentId, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) GetTokenAdminRegistryToken(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetTokenAdminRegistryTokenRequest(c.Server, instrumentId)
 	if err != nil {
 		return nil, err
@@ -327,7 +303,7 @@ func NewPostPerPartyRouterFactoryRequestWithBody(server string, contentType stri
 }
 
 // NewGetTokenAdminRegistryTokenRequest generates requests for GetTokenAdminRegistryToken
-func NewGetTokenAdminRegistryTokenRequest(server string, instrumentId externalRef0.RawOrHashedInstrumentId) (*http.Request, error) {
+func NewGetTokenAdminRegistryTokenRequest(server string, instrumentId externalRef0.HashedInstrumentId) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -489,7 +465,7 @@ type ClientWithResponsesInterface interface {
 	PostPerPartyRouterFactoryWithResponse(ctx context.Context, body PostPerPartyRouterFactoryJSONRequestBody, reqEditors ...RequestEditorFn) (*PostPerPartyRouterFactoryResponse, error)
 
 	// GetTokenAdminRegistryTokenWithResponse request
-	GetTokenAdminRegistryTokenWithResponse(ctx context.Context, instrumentId externalRef0.RawOrHashedInstrumentId, reqEditors ...RequestEditorFn) (*GetTokenAdminRegistryTokenResponse, error)
+	GetTokenAdminRegistryTokenWithResponse(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*GetTokenAdminRegistryTokenResponse, error)
 
 	// PostCCIPExecuteWithBodyWithResponse request with any body
 	PostCCIPExecuteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCIPExecuteResponse, error)
@@ -620,7 +596,7 @@ func (c *ClientWithResponses) PostPerPartyRouterFactoryWithResponse(ctx context.
 }
 
 // GetTokenAdminRegistryTokenWithResponse request returning *GetTokenAdminRegistryTokenResponse
-func (c *ClientWithResponses) GetTokenAdminRegistryTokenWithResponse(ctx context.Context, instrumentId externalRef0.RawOrHashedInstrumentId, reqEditors ...RequestEditorFn) (*GetTokenAdminRegistryTokenResponse, error) {
+func (c *ClientWithResponses) GetTokenAdminRegistryTokenWithResponse(ctx context.Context, instrumentId externalRef0.HashedInstrumentId, reqEditors ...RequestEditorFn) (*GetTokenAdminRegistryTokenResponse, error) {
 	rsp, err := c.GetTokenAdminRegistryToken(ctx, instrumentId, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -857,7 +833,7 @@ type ServerInterface interface {
 	PostPerPartyRouterFactory(c *gin.Context)
 
 	// (GET /ccip/v1/global/TokenAdminRegistry/token/{instrumentId})
-	GetTokenAdminRegistryToken(c *gin.Context, instrumentId externalRef0.RawOrHashedInstrumentId)
+	GetTokenAdminRegistryToken(c *gin.Context, instrumentId externalRef0.HashedInstrumentId)
 
 	// (POST /ccip/v1/global/message/execute)
 	PostCCIPExecute(c *gin.Context)
@@ -894,7 +870,7 @@ func (siw *ServerInterfaceWrapper) GetTokenAdminRegistryToken(c *gin.Context) {
 	var err error
 
 	// ------------- Path parameter "instrumentId" -------------
-	var instrumentId externalRef0.RawOrHashedInstrumentId
+	var instrumentId externalRef0.HashedInstrumentId
 
 	err = runtime.BindStyledParameterWithOptions("simple", "instrumentId", c.Param("instrumentId"), &instrumentId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {

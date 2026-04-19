@@ -31,8 +31,11 @@ type GenerateEDSConfigInput struct {
 }
 
 type GenerateEDSConfigOutput struct {
-	NodeConfig edsConfig.NodeConfig
-	Contracts  edsConfig.Contracts
+	NodeConfig         edsConfig.NodeConfig
+	CCIPAPIConfig      edsConfig.CCIPAPIConfig
+	CCVAPIConfig       edsConfig.CCVAPIConfig
+	ExecutorAPIConfig  edsConfig.ExecutorAPIConfig
+	TokenPoolAPIConfig edsConfig.TokenPoolAPIConfig
 }
 
 type BuildConfigDeps struct {
@@ -97,11 +100,13 @@ var BuildConfig = operations.NewOperation(
 		if len(refs) == 0 {
 			return GenerateEDSConfigOutput{}, fmt.Errorf("no CommitteeVerifier contracts found in datastore")
 		}
-		ccvs := make([]edsConfig.ContractIdentifier, len(refs))
+		ccvs := make([]edsConfig.CCV, len(refs))
 		for i, ref := range refs {
-			ccvs[i] = edsConfig.ContractIdentifier{
-				PartyID:         participant.PartyID,
-				InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+			ccvs[i] = edsConfig.CCV{
+				ContractIdentifier: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+				},
 			}
 		}
 
@@ -126,7 +131,7 @@ var BuildConfig = operations.NewOperation(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(rate_limiter.ContractTypeOutbound)),
 		)
-		tokenPools := make([]edsConfig.TokenPoolContracts, 0, len(refs))
+		tokenPools := make([]edsConfig.TokenPool, 0, len(refs))
 		for _, ref := range refs {
 			inboundPrefix := ref.Address + "-inbound-"
 			customPrefix := ref.Address + "-inbound-custom-"
@@ -162,22 +167,11 @@ var BuildConfig = operations.NewOperation(
 					return GenerateEDSConfigOutput{}, fmt.Errorf("missing outbound rate limiter ref for token pool %s remote %s", ref.Address, remoteSelector)
 				}
 
-				tokenPools = append(tokenPools, edsConfig.TokenPoolContracts{
-					TokenPool: edsConfig.ContractIdentifier{
+				tokenPools = append(tokenPools, edsConfig.TokenPool{
+					Type: edsConfig.TokenPoolTypeLockRelease,
+					ContractIdentifier: edsConfig.ContractIdentifier{
 						PartyID:         participant.PartyID,
 						InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
-					},
-					InboundRateLimiter: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(inboundRLRef.Address),
-					},
-					InboundCustomBlockConfirmationsRateLimiter: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(customRLRef.Address),
-					},
-					OutboundRateLimiter: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(outboundRLRef.Address),
 					},
 				})
 			}
@@ -213,7 +207,8 @@ var BuildConfig = operations.NewOperation(
 
 		return GenerateEDSConfigOutput{
 			NodeConfig: nodeConfig,
-			Contracts: edsConfig.Contracts{
+			CCIPAPIConfig: edsConfig.CCIPAPIConfig{
+				Enabled: true,
 				PerPartyRouterFactory: edsConfig.ContractIdentifier{
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
@@ -242,13 +237,25 @@ var BuildConfig = operations.NewOperation(
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
-				DefaultExecutor: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
+			},
+			CCVAPIConfig: edsConfig.CCVAPIConfig{
+				Enabled: len(ccvs) > 0,
+				CCVs:    ccvs,
+			},
+			ExecutorAPIConfig: edsConfig.ExecutorAPIConfig{
+				Enabled: true,
+				Executors: []edsConfig.Executor{
+					{
+						ContractIdentifier: edsConfig.ContractIdentifier{
+							PartyID:         participant.PartyID,
+							InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
+						},
+					},
 				},
-				CCVs:               ccvs,
-				TokenPoolContracts: tokenPools,
-				PoolOwner:          participant.PartyID,
+			},
+			TokenPoolAPIConfig: edsConfig.TokenPoolAPIConfig{
+				Enabled:    len(tokenPools) > 0,
+				TokenPools: tokenPools,
 			},
 		}, nil
 	},

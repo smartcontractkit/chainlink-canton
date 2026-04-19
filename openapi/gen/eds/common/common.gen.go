@@ -55,7 +55,7 @@ type InstrumentId struct {
 // Message A message to be sent from Canton.
 type Message struct {
 	// DestinationChainSelector The chain selector of the destination chain.
-	DestinationChainSelector int `json:"destinationChainSelector"`
+	DestinationChainSelector string `json:"destinationChainSelector"`
 
 	// Executor The executor of the message, which determines the executor the message will be forwarded to on the source chain.
 	// If not specified, or if type is "", the message will be executed with the default executor on the remote chain.
