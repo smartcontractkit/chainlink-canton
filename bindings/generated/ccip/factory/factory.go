@@ -773,7 +773,7 @@ type DeployCommitteeVerifierParams struct {
 	InstanceId                   types.TEXT              `json:"instanceId"`
 	Owner                        types.PARTY             `json:"owner"`
 	CcipOwner                    types.PARTY             `json:"ccipOwner"`
-	VersionTag                   types.TEXT              `json:"versionTag"`
+	VersionTag                   types.TEXT              `json:"versionTag" hex:"bytes"`
 	AllowListAdmin               *types.PARTY            `json:"allowListAdmin" hex:"optional"`
 	MessageSentObservers         []types.PARTY           `json:"messageSentObservers"`
 	RmnRemote                    mcms.RawInstanceAddress `json:"rmnRemote"`
