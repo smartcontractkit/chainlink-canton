@@ -157,7 +157,7 @@ func (t *AddCCVFeeMCMSParams) UnmarshalHex(data string) error {
 // AddCCVVerification is a Record type
 type AddCCVVerification struct {
 	CcvInstanceId types.TEXT  `json:"ccvInstanceId"`
-	VersionTag    types.TEXT  `json:"versionTag"`
+	VersionTag    types.TEXT  `json:"versionTag" hex:"bytes"`
 	Caller        types.PARTY `json:"caller"`
 }
 
@@ -200,7 +200,7 @@ func (t *AddCCVVerification) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type AddCCVVerificationMCMSParams struct {
 	CcvInstanceId types.TEXT `json:"ccvInstanceId"`
-	VersionTag    types.TEXT `json:"versionTag"`
+	VersionTag    types.TEXT `json:"versionTag" hex:"bytes"`
 }
 
 // MarshalHex encodes AddCCVVerificationMCMSParams to hex string for MCMS operationData.
@@ -388,7 +388,7 @@ func (t *AddTokenSendFee) UnmarshalHex(data string) error {
 // AddVerifierData is a Record type
 type AddVerifierData struct {
 	CcvInstanceId        types.TEXT    `json:"ccvInstanceId"`
-	VersionTag           types.TEXT    `json:"versionTag"`
+	VersionTag           types.TEXT    `json:"versionTag" hex:"bytes"`
 	VerifierBlob         types.TEXT    `json:"verifierBlob"`
 	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
 	Caller               types.PARTY   `json:"caller"`
@@ -443,7 +443,7 @@ func (t *AddVerifierData) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type AddVerifierDataMCMSParams struct {
 	CcvInstanceId        types.TEXT    `json:"ccvInstanceId"`
-	VersionTag           types.TEXT    `json:"versionTag"`
+	VersionTag           types.TEXT    `json:"versionTag" hex:"bytes"`
 	VerifierBlob         types.TEXT    `json:"verifierBlob"`
 	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
 }
@@ -1154,7 +1154,7 @@ func (t *CCVFee) UnmarshalHex(data string) error {
 type CCVVerification struct {
 	CcvInstanceId types.TEXT  `json:"ccvInstanceId"`
 	CcvOwner      types.PARTY `json:"ccvOwner"`
-	VersionTag    types.TEXT  `json:"versionTag"`
+	VersionTag    types.TEXT  `json:"versionTag" hex:"bytes"`
 }
 
 // ToMap converts CCVVerification to a map for DAML arguments
@@ -6413,7 +6413,7 @@ func (t *TokenTransferV1) UnmarshalHex(data string) error {
 type VerifierData struct {
 	CcvInstanceId        types.TEXT    `json:"ccvInstanceId"`
 	CcvOwner             types.PARTY   `json:"ccvOwner"`
-	VersionTag           types.TEXT    `json:"versionTag"`
+	VersionTag           types.TEXT    `json:"versionTag" hex:"bytes"`
 	VerifierBlob         types.TEXT    `json:"verifierBlob"`
 	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
 }
