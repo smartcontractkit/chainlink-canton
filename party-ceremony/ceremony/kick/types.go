@@ -57,6 +57,9 @@ type ReadCurrentStateOutput struct {
 	P2PParticipantUIDs []string `json:"p2p_participant_uids"`
 	P2PThreshold       uint32   `json:"p2p_threshold"`
 	P2PSerial          int32    `json:"p2p_serial"`
+	// Party signing keys (optional, populated when available in topology)
+	PartySigningKeysB64   []string `json:"party_signing_keys_b64,omitempty"`
+	PartySigningThreshold uint32   `json:"party_signing_threshold,omitempty"`
 }
 
 // CreateKickDNSProposalInput is the input to [CreateKickDNSProposalOp].

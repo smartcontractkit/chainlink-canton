@@ -157,8 +157,7 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
             + inputs.poolGas
             + executorDestGasLimit
     let calldataSize =
-            byteCount inputs.payload
-            + inputs.ccvBytesSum
+            inputs.ccvBytesSum
             + inputs.poolBytes
             + executorDestBytesOverhead
     quote <- exercise feeQuoterCid CCIP.FeeQuoter.QuoteGasForExec with
