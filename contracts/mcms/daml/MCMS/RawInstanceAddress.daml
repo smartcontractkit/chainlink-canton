@@ -19,6 +19,17 @@ assertValidInstanceId instanceId =
 empty : RawInstanceAddress
 empty = RawInstanceAddress ""
 
+isValid : RawInstanceAddress -> Bool
+isValid (RawInstanceAddress raw) =
+    case Text.splitOn "@" raw of
+        [instanceId, partyText] ->
+            instanceId /= "" && partyText /= "" && partyFromText partyText /= None
+        _ -> False
+
+assertValid : Text -> RawInstanceAddress -> Update ()
+assertValid msg rawAddress =
+    assertMsg msg (isValid rawAddress)
+
 -- | Create a raw instance address from instanceId and owner.
 -- Validates that instanceId doesn't contain "@" separator.
 make : Text -> Party -> RawInstanceAddress
