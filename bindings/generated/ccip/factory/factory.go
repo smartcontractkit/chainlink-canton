@@ -10,6 +10,7 @@ import (
 	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	ccvs "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	executor "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	feequoter "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	offramp "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
@@ -36,7 +37,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "ae665e0125e8501ea3116d2524a6db59cb9d13b5ad5abe196d513401c6fa5b01"
+	PackageID   = "b195d6c1c80c61257fed5c660e6bfd6e95174e84f8563dfb1707b414673ee94b"
 	SDKVersion  = "3.4.10"
 )
 
@@ -348,6 +349,27 @@ func (t CCIPFactory) DeployCommitteeVerifierWithPackageID(contractID string, pac
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "DeployCommitteeVerifier",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployExecutor exercises the DeployExecutor choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployExecutor(contractID string, args DeployExecutor) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployExecutor",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployExecutorWithPackageID exercises the DeployExecutor choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployExecutorWithPackageID(contractID string, packageID string, args DeployExecutor) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployExecutor",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -773,7 +795,7 @@ type DeployCommitteeVerifierParams struct {
 	InstanceId                   types.TEXT              `json:"instanceId"`
 	Owner                        types.PARTY             `json:"owner"`
 	CcipOwner                    types.PARTY             `json:"ccipOwner"`
-	VersionTag                   types.TEXT              `json:"versionTag"`
+	VersionTag                   types.TEXT              `json:"versionTag" hex:"bytes"`
 	AllowListAdmin               *types.PARTY            `json:"allowListAdmin" hex:"optional"`
 	MessageSentObservers         []types.PARTY           `json:"messageSentObservers"`
 	RmnRemote                    mcms.RawInstanceAddress `json:"rmnRemote"`
@@ -854,6 +876,102 @@ func (t DeployCommitteeVerifierParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes DeployCommitteeVerifierParams from hex string (Canton MCMS format)
 func (t *DeployCommitteeVerifierParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployExecutor is a Record type
+type DeployExecutor struct {
+	Contract executor.Executor `json:"contract"`
+}
+
+// ToMap converts DeployExecutor to a map for DAML arguments
+func (t DeployExecutor) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
+
+	return m
+}
+
+func (t DeployExecutor) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployExecutor) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployExecutor to hex string (Canton MCMS format)
+func (t DeployExecutor) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployExecutor from hex string (Canton MCMS format)
+func (t *DeployExecutor) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployExecutorParams is a Record type
+type DeployExecutorParams struct {
+	InstanceId            types.TEXT            `json:"instanceId"`
+	Owner                 types.PARTY           `json:"owner"`
+	MaxCCVsPerMsg         types.INT64           `json:"maxCCVsPerMsg"`
+	AllowedFinalityConfig common.FinalityConfig `json:"allowedFinalityConfig"`
+	CcvAllowlistEnabled   types.BOOL            `json:"ccvAllowlistEnabled"`
+}
+
+// ToMap converts DeployExecutorParams to a map for DAML arguments
+func (t DeployExecutorParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["owner"] = t.Owner.ToMap()
+
+	m["maxCCVsPerMsg"] = int64(t.MaxCCVsPerMsg)
+
+	m["allowedFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.AllowedFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.AllowedFinalityConfig
+	}()
+
+	m["ccvAllowlistEnabled"] = bool(t.CcvAllowlistEnabled)
+
+	return m
+}
+
+func (t DeployExecutorParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployExecutorParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployExecutorParams to hex string (Canton MCMS format)
+func (t DeployExecutorParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployExecutorParams from hex string (Canton MCMS format)
+func (t *DeployExecutorParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2042,6 +2160,8 @@ type MCMSEncoder interface {
 	DeployCCIPSenderParams(args DeployCCIPSenderParams) (*bind.EncodedChoice, error)
 	DeployCommitteeVerifier(args DeployCommitteeVerifier) (*bind.EncodedChoice, error)
 	DeployCommitteeVerifierParams(args DeployCommitteeVerifierParams) (*bind.EncodedChoice, error)
+	DeployExecutor(args DeployExecutor) (*bind.EncodedChoice, error)
+	DeployExecutorParams(args DeployExecutorParams) (*bind.EncodedChoice, error)
 	DeployFeeQuoter(args DeployFeeQuoter) (*bind.EncodedChoice, error)
 	DeployFeeQuoterParams(args DeployFeeQuoterParams) (*bind.EncodedChoice, error)
 	DeployGlobalConfig(args DeployGlobalConfig) (*bind.EncodedChoice, error)
@@ -2120,6 +2240,16 @@ func (e *encoder) DeployCommitteeVerifier(args DeployCommitteeVerifier) (*bind.E
 // DeployCommitteeVerifierParams encodes parameters for the DeployCommitteeVerifier choice.
 func (e *encoder) DeployCommitteeVerifierParams(args DeployCommitteeVerifierParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("DeployCommitteeVerifier", args)
+}
+
+// DeployExecutor encodes parameters for the DeployExecutor choice.
+func (e *encoder) DeployExecutor(args DeployExecutor) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployExecutor", args)
+}
+
+// DeployExecutorParams encodes parameters for the DeployExecutor choice.
+func (e *encoder) DeployExecutorParams(args DeployExecutorParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployExecutor", args)
 }
 
 // DeployFeeQuoter encodes parameters for the DeployFeeQuoter choice.
