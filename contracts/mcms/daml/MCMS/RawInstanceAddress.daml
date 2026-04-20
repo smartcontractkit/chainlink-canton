@@ -75,7 +75,8 @@ toInstanceAddress (RawInstanceAddress raw) =
 parseInstanceIdText : Text -> Optional Text
 parseInstanceIdText instanceAddress =
     case Text.splitOn "@" instanceAddress of
-        [instId, _partyId] -> Some instId
+        [instId, partyId]
+            | instId /= "" && partyId /= "" && partyFromText partyId /= None -> Some instId
         _ -> None
 
 -- | Parse partyId from instanceAddress format "instanceId@partyId".
@@ -83,5 +84,6 @@ parseInstanceIdText instanceAddress =
 parsePartyIdText : Text -> Optional Text
 parsePartyIdText instanceAddress =
     case Text.splitOn "@" instanceAddress of
-        [_instanceId, partyId] -> Some partyId
+        [instanceId, partyId]
+            | instanceId /= "" && partyId /= "" && partyFromText partyId /= None -> Some partyId
         _ -> None
