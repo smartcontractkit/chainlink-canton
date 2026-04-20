@@ -5,18 +5,18 @@ import (
 	"fmt"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 type CCVExecuteDisclosure struct {
 	ContractId         string
 	Address            contracts.RawInstanceAddress
 	DisclosedContracts []*apiv2.DisclosedContract
-	ChoiceContext      *apiv2.Value
+	ChoiceContext      common.CCIPContext
 }
 
 func GetCCVExecuteDisclosure(
@@ -49,7 +49,7 @@ func GetCCVExecuteDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := testhelpers.ChoiceContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := CCIPContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
@@ -66,7 +66,7 @@ type CCVSendDisclosure struct {
 	ContractId         string
 	Address            contracts.RawInstanceAddress
 	DisclosedContracts []*apiv2.DisclosedContract
-	ChoiceContext      *apiv2.Value
+	ChoiceContext      common.CCIPContext
 }
 
 func GetCCVSendDisclosure(
@@ -99,7 +99,7 @@ func GetCCVSendDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := testhelpers.ChoiceContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := CCIPContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}

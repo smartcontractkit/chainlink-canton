@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 func GetPerPartyRouterFactoryDisclosures(ctx context.Context, ccipAPIClient oapiCCIP.ClientWithResponsesInterface) (string, []*apiv2.DisclosedContract, error) {
@@ -50,7 +49,7 @@ func GetPerPartyRouterFactoryDisclosures(ctx context.Context, ccipAPIClient oapi
 }
 
 type CCIPExecuteDisclosure struct {
-	ChoiceContext      *apiv2.Value
+	ChoiceContext      common.CCIPContext
 	DisclosedContracts []*apiv2.DisclosedContract
 	TokenPool          *contracts.RawInstanceAddress
 }
@@ -79,7 +78,7 @@ func GetCCIPExecuteDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := testhelpers.ChoiceContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := CCIPContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
