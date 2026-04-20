@@ -22,6 +22,7 @@ dependencies:
   - ../pools/interfaces/.daml/dist/ccip-tokenpool-interfaces-0.0.1.dar
   - ../pools/lockReleaseTokenPool/.daml/dist/ccip-lockreleasetokenpool-0.0.1.dar
   - ../ccvs/.daml/dist/ccip-committeeverifier-0.0.1.dar
+  - ../executor/.daml/dist/ccip-executor-0.0.1.dar
   - ../rmn/.daml/dist/ccip-rmn-0.0.1.dar
   - ../ccipreceiver/.daml/dist/ccip-receiver-0.0.1.dar
   - ../ccipsender/.daml/dist/ccip-sender-0.0.1.dar

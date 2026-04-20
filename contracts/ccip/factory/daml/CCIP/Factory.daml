@@ -39,6 +39,8 @@ import qualified CCIP.PerPartyRouterTypes as CCIP.PerPartyRouter
 import qualified CCIP.LockReleaseTokenPool
 import qualified CCIP.CommitteeVerifier
 import qualified CCIP.RMNRemote
+import qualified CCIP.Executor
+import qualified CCIP.ExecutorTypes
 import qualified CCIP.RateLimiter
 import qualified CCIP.CCIPSender
 import qualified CCIP.CCIPReceiver
@@ -151,6 +153,14 @@ template CCIPFactory
                 params <- requireDecoded "DeployCommitteeVerifier" (decodeDeployCommitteeVerifierParams operationData)
                 deployResult <- exercise selfCid DeployCommitteeVerifier with
                   contract = mkCommitteeVerifierContract params
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
+
+              "DeployExecutor" -> do
+                params <- requireDecoded "DeployExecutor" (decodeDeployExecutorParams operationData)
+                deployResult <- exercise selfCid DeployExecutor with
+                  contract = mkExecutorContract params
                 let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
@@ -361,6 +371,25 @@ template CCIPFactory
                     factoryCid = newFactoryCid
                     deployedCid = coerceContractId deployedCid
 
+        choice DeployExecutor : DeployResult
+            with
+                contract : CCIP.Executor.Executor
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                let componentKey = "executor:" <> contract.instanceId
+                assertComponentNotDeployed componentKey deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
         choice DeployLockReleaseTokenPool : DeployResult
             with
                 contract : CCIP.LockReleaseTokenPool.LockReleaseTokenPool
@@ -523,6 +552,15 @@ data DeployCommitteeVerifierParams = DeployCommitteeVerifierParams
         pendingStorageLocationsAdmin : Party
     deriving (Eq, Show)
 
+data DeployExecutorParams = DeployExecutorParams
+    with
+        instanceId : Text
+        owner : Party
+        maxCCVsPerMsg : Int
+        allowedFinalityConfig : CCIP.FinalityConfig.FinalityConfig
+        ccvAllowlistEnabled : Bool
+    deriving (Eq, Show)
+
 data DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams
     with
         instanceId : Text
@@ -656,6 +694,18 @@ mkCommitteeVerifierContract params = CCIP.CommitteeVerifier.CommitteeVerifier wi
     signerConfigs = Map.empty
     deps = CCIP.CommitteeVerifier.CommitteeVerifierDeps with
         rmnRemote = params.rmnRemote
+
+mkExecutorContract : DeployExecutorParams -> CCIP.Executor.Executor
+mkExecutorContract params = CCIP.Executor.Executor with
+    instanceId = params.instanceId
+    owner = params.owner
+    maxCCVsPerMsg = params.maxCCVsPerMsg
+    dynamicConfig = CCIP.ExecutorTypes.DynamicConfig with
+        feeAggregator = None
+        allowedFinalityConfig = params.allowedFinalityConfig
+        ccvAllowlistEnabled = params.ccvAllowlistEnabled
+    allowedCCVs = []
+    remoteChainConfigs = Map.empty
 
 mkLockReleaseTokenPoolContract : DeployLockReleaseTokenPoolParams -> CCIP.LockReleaseTokenPool.LockReleaseTokenPool
 mkLockReleaseTokenPoolContract params = CCIP.LockReleaseTokenPool.LockReleaseTokenPool with
@@ -833,6 +883,21 @@ decodeDeployCommitteeVerifierParams encoded = do
         storageLocations
         storageLocationsAdmin
         pendingStorageLocationsAdmin
+
+decodeDeployExecutorParams : BytesHex -> Optional DeployExecutorParams
+decodeDeployExecutorParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (owner, offset2) <- decodePartyAt encoded offset1
+    (maxCCVsPerMsg, offset3) <- decodeInt64At encoded offset2
+    (allowedFinalityConfig, offset4) <- decodeRequestedFinalityAt encoded offset3
+    (ccvAllowlistEnabled, finalOffset) <- decodeBoolAt encoded offset4
+    assertOffset finalOffset (byteCount encoded)
+    Some DeployExecutorParams with
+        instanceId
+        owner
+        maxCCVsPerMsg
+        allowedFinalityConfig
+        ccvAllowlistEnabled
 
 decodeDeployLockReleaseTokenPoolParams : BytesHex -> Optional DeployLockReleaseTokenPoolParams
 decodeDeployLockReleaseTokenPoolParams encoded = do
