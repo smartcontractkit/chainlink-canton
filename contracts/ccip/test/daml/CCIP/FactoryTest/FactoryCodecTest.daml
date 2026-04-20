@@ -115,6 +115,14 @@ encodeDeployCommitteeVerifierParams params =
   <> encodeParty params.storageLocationsAdmin
   <> encodeParty params.pendingStorageLocationsAdmin
 
+encodeDeployExecutorParams : DeployExecutorParams -> BytesHex
+encodeDeployExecutorParams params =
+  encodeText params.instanceId
+  <> encodeParty params.owner
+  <> fromSome (encodeInt64 params.maxCCVsPerMsg)
+  <> encodeRequestedFinality params.allowedFinalityConfig
+  <> encodeBool params.ccvAllowlistEnabled
+
 encodeDeployLockReleaseTokenPoolParams : DeployLockReleaseTokenPoolParams -> BytesHex
 encodeDeployLockReleaseTokenPoolParams params =
   encodeText params.instanceId
@@ -406,6 +414,29 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
     Some decoded -> do
       decoded.storageLocations === []
       decoded.allowListAdmin === None
+
+  pure ()
+
+testDecodeDeployExecutorParams : Script ()
+testDecodeDeployExecutorParams = script do
+  owner <- allocateParty "ExecutorOwner"
+
+  let params = DeployExecutorParams with
+        instanceId = "executor-1"
+        owner
+        maxCCVsPerMsg = 10
+        allowedFinalityConfig = finalityConfig 0
+        ccvAllowlistEnabled = False
+      encoded = encodeDeployExecutorParams params
+
+  case decodeDeployExecutorParams encoded of
+    None -> abort "Failed to decode DeployExecutorParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.owner === params.owner
+      decoded.maxCCVsPerMsg === params.maxCCVsPerMsg
+      decoded.allowedFinalityConfig === params.allowedFinalityConfig
+      decoded.ccvAllowlistEnabled === params.ccvAllowlistEnabled
 
   pure ()
 
