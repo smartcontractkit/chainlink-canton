@@ -14,6 +14,7 @@ import Daml.Script
 import MCMS.CryptoTest
 import MCMS.GroupVotingTest
 import MCMS.FlowTest
+import MCMS.RawInstanceAddressTest
 
 -- ===========================================================================
 -- MASTER TEST RUNNER
@@ -51,6 +52,7 @@ testAll () = script do
   testReplayProtection
   testNonceOrdering
   testRootExpiry
+  testRawInstanceAddressRejectsMalformedText
 
   -- Note: Signatory check tests are in ExternalTargetTest.daml
 

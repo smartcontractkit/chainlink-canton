@@ -1,0 +1,14 @@
+module MCMS.RawInstanceAddressTest where
+
+import DA.Assert
+import Daml.Script
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+
+testRawInstanceAddressRejectsMalformedText : Script ()
+testRawInstanceAddressRejectsMalformedText = script do
+  owner <- allocateParty "raw-instance-owner"
+
+  RawInstanceAddress.parseInstanceIdText "missing-separator" === None
+  RawInstanceAddress.parseInstanceIdText "@owner" === None
+  RawInstanceAddress.parsePartyIdText "instance@" === None
+  RawInstanceAddress.parsePartyIdText "missing-separator" === None
