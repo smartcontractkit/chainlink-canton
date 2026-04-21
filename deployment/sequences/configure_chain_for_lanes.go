@@ -160,6 +160,17 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to fee quoter: %w", err)
 		}
 
+		_, err = operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
+			InstanceAddress: feeQuoterAddress,
+			Args: feequoter.ApplyPriceUpdatersUpdate{
+				AddedPriceUpdaters:   []types.PARTY{types.PARTY(chain.Participants[0].PartyID)},
+				RemovedPriceUpdaters: nil,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("ensuring price updater on fee quoter: %w", err)
+		}
+
 		tokenPriceUpdates, err := tokenPriceUpdatesFromParams(destChain.TokenPrices)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("building token price updates from lane params: %w", err)
