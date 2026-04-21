@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -510,6 +511,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		).Return(stream, nil)
 
 		reader := &sourceReader{
+			lggr:                 logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -627,6 +629,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything).Return(stream, nil)
 
 		reader := &sourceReader{
+			lggr:                 logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -655,6 +658,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		).Return(stream, nil)
 
 		reader := &sourceReader{
+			lggr:                 logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -689,6 +693,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		).Return(stream, nil)
 
 		reader := &sourceReader{
+			lggr:                 logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -863,6 +868,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything).Return(stream, nil)
 
 		reader := &sourceReader{
+			lggr:                 logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -909,7 +915,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		require.Nil(t, receipt3.Blob) // No corresponding verifier blob
 	})
 
-	t.Run("returns error when receipts fewer than verifier blobs", func(t *testing.T) {
+	t.Run("skips event when receipts fewer than verifier blobs", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
@@ -1016,6 +1022,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything).Return(stream, nil)
 
 		reader := &sourceReader{
+			lggr:                 logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -1024,12 +1031,12 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		_, err = reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "expected more receipts than verifier blobs")
+		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
+		require.NoError(t, err)
+		require.Empty(t, events)
 	})
 
-	t.Run("returns error on unknown receipt field", func(t *testing.T) {
+	t.Run("skips event on unknown receipt field", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
@@ -1138,6 +1145,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything).Return(stream, nil)
 
 		reader := &sourceReader{
+			lggr:                 logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -1146,11 +1154,9 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		_, err = reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
-		require.Error(t, err)
-		// With UnmarshalCreatedEvent, receipts are unmarshaled into binding structs; a receipt
-		// with only unknown fields has zero-valued required fields, so we fail on parse (e.g. fee token amount).
-		require.ErrorContains(t, err, "failed to process receipts")
+		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
+		require.NoError(t, err)
+		require.Empty(t, events)
 	})
 }
 

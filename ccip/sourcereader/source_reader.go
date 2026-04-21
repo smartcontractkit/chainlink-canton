@@ -85,6 +85,17 @@ func NewSourceReader(
 }
 
 // FetchMessageSentEvents implements chainaccess.SourceReader.
+//
+// It streams ledger updates in the requested offset range and collects CCIPMessageSent created
+// events that pass the configured node-operator filter, template id match, and signatory
+// checks (including ccipOwner alignment with the configured CCIP owner party).
+//
+// Resilience: after those checks, if decoding or validation fails for a single event (message
+// payload, receipts, verifier blobs, transaction update id, cross-field checks, etc.), the
+// failure is logged at error level with ledger context and that event is skipped. Other events
+// in the same range are still returned. Metadata mismatches (wrong owner / template) are
+// skipped without an error log. Transport and RPC errors (GetUpdates, Recv, GetLedgerEnd
+// when toBlock is nil) still fail the entire call.
 func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, toBlock *big.Int) ([]protocol.MessageSentEvent, error) {
 	// since begin is exclusive we need to subtract 1 from fromBlock
 	begin := new(big.Int).Sub(fromBlock, big.NewInt(1))
@@ -152,15 +163,14 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 		transactions = append(transactions, update.GetTransaction())
 	}
 
-	events, err := extractEvents(transactions, c.config.CCIPOwnerParty, ccipMessageSentIdentifier)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract events: %w", err)
-	}
-
-	return events, nil
+	return extractEvents(c.lggr, transactions, c.config.CCIPOwnerParty, ccipMessageSentIdentifier), nil
 }
 
-func extractEvents(transactions []*ledgerv2.Transaction, ccipOwnerParty string, ccipMessageSentTemplateID *ledgerv2.Identifier) ([]protocol.MessageSentEvent, error) {
+func extractEvents(lggr logger.Logger, transactions []*ledgerv2.Transaction, ccipOwnerParty string, ccipMessageSentTemplateID *ledgerv2.Identifier) []protocol.MessageSentEvent {
+	if lggr == nil {
+		lggr = logger.Nop()
+	}
+
 	var events []protocol.MessageSentEvent
 	for _, tx := range transactions {
 		if tx == nil {
@@ -183,7 +193,13 @@ func extractEvents(transactions []*ledgerv2.Transaction, ccipOwnerParty string, 
 					continue
 				}
 
-				return nil, err
+				lggr.Errorw(
+					"skipping CCIPMessageSent created event after post-filter processing failed",
+					"err", err,
+					"ledgerOffset", tx.GetOffset(),
+					"updateId", tx.GetUpdateId(),
+				)
+				continue
 			}
 			if messageSentEvent != nil {
 				events = append(events, *messageSentEvent)
@@ -191,7 +207,7 @@ func extractEvents(transactions []*ledgerv2.Transaction, ccipOwnerParty string, 
 		}
 	}
 
-	return events, nil
+	return events
 }
 
 // This is a sentinel error that is returned in the event of a metadata mismatch
