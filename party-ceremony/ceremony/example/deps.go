@@ -1,6 +1,9 @@
 package example
 
-import "github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+import (
+	"github.com/chainlink/canton-party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+)
 
 // ── Dependency types ─────────────────────────────────────────────────────────
 
@@ -71,6 +74,7 @@ type CantonClient interface {
 
 // CantonDeps is the dependency container passed to every operation handler.
 type CantonDeps struct {
-	Client CantonClient
-	Logger logger.Logger
+	Client    CantonClient
+	Logger    logger.Logger
+	Confirmer ceremony.Confirmer // nil means no confirmation prompt
 }
