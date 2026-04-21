@@ -423,3 +423,4 @@ require (
 )
 
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+replace github.com/smartcontractkit/go-daml => /Users/sish/Desktop/go-daml

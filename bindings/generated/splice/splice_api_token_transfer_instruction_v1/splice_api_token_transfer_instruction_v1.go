@@ -108,9 +108,9 @@ func (t Transfer) ToMap() map[string]any {
 	m["amount"] = t.Amount
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -128,9 +128,9 @@ func (t Transfer) ToMap() map[string]any {
 	}()
 
 	m["meta"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Meta
 	}()
@@ -173,9 +173,9 @@ func (t TransferFactoryView) ToMap() map[string]any {
 	m["admin"] = t.Admin.ToMap()
 
 	m["meta"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Meta
 	}()
@@ -258,17 +258,17 @@ func (t TransferFactoryTransfer) ToMap() map[string]any {
 	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
 
 	m["transfer"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Transfer).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Transfer
 	}()
 
 	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraArgs
 	}()
@@ -310,9 +310,9 @@ func (t TransferInstructionResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["output"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Output).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Output
 	}()
@@ -326,9 +326,9 @@ func (t TransferInstructionResult) ToMap() map[string]any {
 	}()
 
 	m["meta"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Meta
 	}()
@@ -479,9 +479,9 @@ func (t TransferInstructionResultPending) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["transferInstructionCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TransferInstructionCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TransferInstructionCid
 	}()
@@ -595,25 +595,25 @@ func (t TransferInstructionView) ToMap() map[string]any {
 	}
 
 	m["transfer"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Transfer).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Transfer
 	}()
 
 	m["status"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Status).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Status
 	}()
 
 	m["meta"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Meta
 	}()
@@ -653,9 +653,9 @@ func (t TransferInstructionAccept) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraArgs
 	}()
@@ -695,9 +695,9 @@ func (t TransferInstructionReject) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraArgs
 	}()
@@ -746,9 +746,9 @@ func (t TransferInstructionUpdate) ToMap() map[string]any {
 	}()
 
 	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraArgs
 	}()
@@ -788,9 +788,9 @@ func (t TransferInstructionWithdraw) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraArgs
 	}()

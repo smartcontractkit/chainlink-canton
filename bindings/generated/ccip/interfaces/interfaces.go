@@ -110,9 +110,9 @@ func (t LockOrBurnResult) ToMap() map[string]any {
 	}()
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
@@ -154,9 +154,9 @@ func (t ReleaseOrMintResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["output"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Output).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Output
 	}()
@@ -170,9 +170,9 @@ func (t ReleaseOrMintResult) ToMap() map[string]any {
 	}()
 
 	m["claimedEventCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ClaimedEventCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ClaimedEventCid
 	}()
@@ -314,9 +314,9 @@ func (t ReleaseOrMintResultPending) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["transferInstructionCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TransferInstructionCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TransferInstructionCid
 	}()
@@ -358,17 +358,17 @@ func (t TokenInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["transferFactory"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TransferFactory).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TransferFactory
 	}()
 
 	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraArgs
 	}()
@@ -476,9 +476,9 @@ func (t TokenPoolView) ToMap() map[string]any {
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -523,41 +523,41 @@ func (t TokenPoolCalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistryCid
 	}()
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
 
 	m["feeQuoterCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeQuoterCid
 	}()
 
 	m["tokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenInstrumentId
 	}()
@@ -602,9 +602,9 @@ func (t TokenPoolGetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["feeQuoterCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeQuoterCid
 	}()
@@ -612,9 +612,9 @@ func (t TokenPoolGetFee) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["tokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenInstrumentId
 	}()
@@ -665,9 +665,9 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
 	m["amount"] = t.Amount
 
 	m["finality"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Finality).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Finality
 	}()
@@ -675,9 +675,9 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
 	m["extraData"] = string(t.ExtraData)
 
 	m["direction"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Direction).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Direction
 	}()
@@ -726,41 +726,41 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistryCid
 	}()
 
 	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemoteCid
 	}()
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
 
 	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenInput
 	}()
@@ -817,41 +817,41 @@ func (t TokenPoolReleaseFromTicket) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistryCid
 	}()
 
 	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemoteCid
 	}()
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
 
 	m["tokenReceiveTicketCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenReceiveTicketCid
 	}()
 
 	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenInput
 	}()
@@ -896,25 +896,25 @@ func (t TokenPoolVerifyInboundMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistryCid
 	}()
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
 
 	m["executingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExecutingMessageCid
 	}()
@@ -960,25 +960,25 @@ func (t TokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistryCid
 	}()
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()

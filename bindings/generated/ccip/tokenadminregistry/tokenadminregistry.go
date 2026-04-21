@@ -63,9 +63,9 @@ func (t AcceptAdminParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -106,9 +106,9 @@ func (t AcceptAdminRole) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -174,9 +174,9 @@ func (t AddTokenSend2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
@@ -184,9 +184,9 @@ func (t AddTokenSend2) ToMap() map[string]any {
 	m["poolInstanceId"] = string(t.PoolInstanceId)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -262,9 +262,9 @@ func (t AddTokenSendFee2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
@@ -338,17 +338,17 @@ func (t ConsumeReceiveTicket) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["ticketCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TicketCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TicketCid
 	}()
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -412,9 +412,9 @@ func (t FinalizeExecute2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["executingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExecutingMessageCid
 	}()
@@ -534,9 +534,9 @@ func (t GetTokenConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -598,9 +598,9 @@ func (t IsAdministrator) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -703,9 +703,9 @@ func (t ProposeAdminParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -749,9 +749,9 @@ func (t ProposeAdministrator) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -817,9 +817,9 @@ func (t SetInboundPoolCCVs2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["executingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExecutingMessageCid
 	}()
@@ -829,9 +829,9 @@ func (t SetInboundPoolCCVs2) ToMap() map[string]any {
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
 		for _, e := range t.PoolCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -899,9 +899,9 @@ func (t SetOutboundPoolCCVs2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
@@ -911,9 +911,9 @@ func (t SetOutboundPoolCCVs2) ToMap() map[string]any {
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
 		for _, e := range t.PoolCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -980,9 +980,9 @@ func (t SetPool) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -1055,9 +1055,9 @@ func (t SetPoolParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -1519,9 +1519,9 @@ func (t TokenConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -1595,9 +1595,9 @@ func (t TransferAdminParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -1641,9 +1641,9 @@ func (t TransferAdminRole) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()

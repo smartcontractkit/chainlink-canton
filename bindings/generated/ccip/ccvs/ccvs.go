@@ -155,9 +155,9 @@ func (t ApplyAllowListUpdates) ToMap() map[string]any {
 	m["allowListConfigArgsItems"] = func() []any {
 		res := make([]any, 0, len(t.AllowListConfigArgsItems))
 		for _, e := range t.AllowListConfigArgsItems {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -223,9 +223,9 @@ func (t ApplyAllowListUpdatesParams) ToMap() map[string]any {
 	m["allowListConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.AllowListConfigArgs))
 		for _, e := range t.AllowListConfigArgs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -272,9 +272,9 @@ func (t ApplyRemoteChainConfigUpdates) ToMap() map[string]any {
 	m["remoteChainConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.RemoteChainConfigArgs))
 		for _, e := range t.RemoteChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -319,9 +319,9 @@ func (t ApplyRemoteChainConfigUpdatesParams) ToMap() map[string]any {
 	m["remoteChainConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.RemoteChainConfigArgs))
 		for _, e := range t.RemoteChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -375,9 +375,9 @@ func (t ApplySignatureConfigs) ToMap() map[string]any {
 	m["signatureConfigs"] = func() []any {
 		res := make([]any, 0, len(t.SignatureConfigs))
 		for _, e := range t.SignatureConfigs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -431,9 +431,9 @@ func (t ApplySignatureConfigsParams) ToMap() map[string]any {
 	m["signatureConfigs"] = func() []any {
 		res := make([]any, 0, len(t.SignatureConfigs))
 		for _, e := range t.SignatureConfigs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -478,17 +478,17 @@ func (t CalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
@@ -634,9 +634,9 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Deps).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Deps
 	}()
@@ -716,9 +716,9 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Deps).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Deps
 	}()
@@ -1147,9 +1147,9 @@ func (t CommitteeVerifierDeps) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["rmnRemote"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemote).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemote
 	}()
@@ -1247,25 +1247,25 @@ func (t ForwardToVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemoteCid
 	}()
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
@@ -1489,9 +1489,9 @@ func (t SetDeps) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["newDeps"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.NewDeps).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.NewDeps
 	}()
@@ -1576,9 +1576,9 @@ func (t SetDynamicConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["dynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.DynamicConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.DynamicConfig
 	}()
@@ -1618,9 +1618,9 @@ func (t SetDynamicConfigParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["dynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.DynamicConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.DynamicConfig
 	}()
@@ -1868,25 +1868,25 @@ func (t VerifyMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemoteCid
 	}()
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
 
 	m["executingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExecutingMessageCid
 	}()

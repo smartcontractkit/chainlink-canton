@@ -241,9 +241,9 @@ func (t ChoiceContext) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["values"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Values).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Values
 	}()
@@ -283,9 +283,9 @@ func (t ChoiceExecutionMetadata) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["meta"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Meta
 	}()
@@ -326,17 +326,17 @@ func (t ExtraArgs) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["context"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Context
 	}()
 
 	m["meta"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Meta
 	}()
@@ -376,9 +376,9 @@ func (t Metadata) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["values"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Values).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Values
 	}()

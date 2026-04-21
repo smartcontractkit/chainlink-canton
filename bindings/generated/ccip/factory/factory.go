@@ -65,26 +65,6 @@ func argsToMap(args any) map[string]any {
 	return map[string]any{"args": args}
 }
 
-func nestedContractArgs(v any) any {
-	type mapper interface {
-		ToMap() map[string]any
-	}
-	if m, ok := v.(mapper); ok {
-		return m.ToMap()
-	}
-
-	type creator interface {
-		CreateCommand() *model.CreateCommand
-	}
-	if c, ok := v.(creator); ok {
-		if cmd := c.CreateCommand(); cmd != nil {
-			return cmd.Arguments
-		}
-	}
-
-	return v
-}
-
 // CCIPFactory is a Template type
 type CCIPFactory struct {
 	InstanceId                    types.TEXT   `json:"instanceId"`
@@ -575,7 +555,13 @@ type DeployCCIPReceiver struct {
 func (t DeployCCIPReceiver) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -623,9 +609,9 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 	m["requiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -636,9 +622,9 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 	m["optionalCCVs"] = func() []any {
 		res := make([]any, 0, len(t.OptionalCCVs))
 		for _, e := range t.OptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -649,9 +635,9 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 	m["optionalThreshold"] = int64(t.OptionalThreshold)
 
 	m["receiverFinalityConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ReceiverFinalityConfig
 	}()
@@ -690,7 +676,13 @@ type DeployCCIPSender struct {
 func (t DeployCCIPSender) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -765,7 +757,13 @@ type DeployCommitteeVerifier struct {
 func (t DeployCommitteeVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -838,9 +836,9 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 	}()
 
 	m["rmnRemote"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemote).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemote
 	}()
@@ -891,7 +889,13 @@ type DeployExecutor struct {
 func (t DeployExecutor) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -938,9 +942,9 @@ func (t DeployExecutorParams) ToMap() map[string]any {
 	m["maxCCVsPerMsg"] = int64(t.MaxCCVsPerMsg)
 
 	m["allowedFinalityConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.AllowedFinalityConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.AllowedFinalityConfig
 	}()
@@ -981,7 +985,13 @@ type DeployFeeQuoter struct {
 func (t DeployFeeQuoter) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1021,9 +1031,9 @@ func (t DeployFeeQuoterParams) ToMap() map[string]any {
 	m["instanceId"] = string(t.InstanceId)
 
 	m["linkTokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.LinkTokenInstrumentId
 	}()
@@ -1062,7 +1072,13 @@ type DeployGlobalConfig struct {
 func (t DeployGlobalConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1137,7 +1153,13 @@ type DeployLockReleaseTokenPool struct {
 func (t DeployLockReleaseTokenPool) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1190,9 +1212,9 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -1211,41 +1233,41 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	}
 
 	m["tokenAdminRegistry"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistry
 	}()
 
 	m["feeQuoter"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeQuoter).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeQuoter
 	}()
 
 	m["rmnRemote"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemote).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemote
 	}()
 
 	m["poolReceiveContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.PoolReceiveContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.PoolReceiveContext
 	}()
 
 	m["transferTimeout"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TransferTimeout).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TransferTimeout
 	}()
@@ -1284,7 +1306,13 @@ type DeployOffRamp struct {
 func (t DeployOffRamp) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1326,25 +1354,25 @@ func (t DeployOffRampParams) ToMap() map[string]any {
 	m["instanceId"] = string(t.InstanceId)
 
 	m["globalConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.GlobalConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.GlobalConfig
 	}()
 
 	m["rmnRemote"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemote).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemote
 	}()
 
 	m["tokenAdminRegistry"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistry
 	}()
@@ -1383,7 +1411,13 @@ type DeployOnRamp struct {
 func (t DeployOnRamp) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1428,41 +1462,41 @@ func (t DeployOnRampParams) ToMap() map[string]any {
 	m["instanceId"] = string(t.InstanceId)
 
 	m["globalConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.GlobalConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.GlobalConfig
 	}()
 
 	m["rmnRemote"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemote).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemote
 	}()
 
 	m["tokenAdminRegistry"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistry
 	}()
 
 	m["feeQuoter"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeQuoter).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeQuoter
 	}()
 
 	m["ccvRegistry"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.CcvRegistry).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.CcvRegistry
 	}()
@@ -1503,7 +1537,13 @@ type DeployPerPartyRouterFactory struct {
 func (t DeployPerPartyRouterFactory) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1548,49 +1588,49 @@ func (t DeployPerPartyRouterFactoryParams) ToMap() map[string]any {
 	m["instanceId"] = string(t.InstanceId)
 
 	m["onRamp"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.OnRamp).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.OnRamp
 	}()
 
 	m["offRamp"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.OffRamp).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.OffRamp
 	}()
 
 	m["globalConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.GlobalConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.GlobalConfig
 	}()
 
 	m["tokenAdminRegistry"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenAdminRegistry
 	}()
 
 	m["feeQuoter"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeQuoter).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeQuoter
 	}()
 
 	m["rmnRemote"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RmnRemote).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RmnRemote
 	}()
@@ -1629,7 +1669,13 @@ type DeployRMNRemote struct {
 func (t DeployRMNRemote) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1725,7 +1771,13 @@ type DeployRateLimiter struct {
 func (t DeployRateLimiter) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1778,17 +1830,17 @@ func (t DeployRateLimiterParams) ToMap() map[string]any {
 	m["remoteChainSelector"] = t.RemoteChainSelector
 
 	m["direction"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Direction).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Direction
 	}()
 
 	m["mode"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Mode).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Mode
 	}()
@@ -1835,17 +1887,17 @@ func (t DeployResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["factoryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FactoryCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FactoryCid
 	}()
 
 	m["deployedCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.DeployedCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.DeployedCid
 	}()
@@ -1884,7 +1936,13 @@ type DeployTokenAdminRegistry struct {
 func (t DeployTokenAdminRegistry) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = nestedContractArgs(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ ToMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.ToMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }

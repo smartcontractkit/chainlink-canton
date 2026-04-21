@@ -64,9 +64,9 @@ func (t CCVExtraArg) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["ccvAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.CcvAddress).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.CcvAddress
 	}()
@@ -127,17 +127,17 @@ func (t Canton2AnyMessage) ToMap() map[string]any {
 	}
 
 	m["feeToken"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeToken
 	}()
 
 	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraArgs
 	}()
@@ -283,9 +283,9 @@ func (t ExecutorWithAddress) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["executorAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExecutorAddress).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExecutorAddress
 	}()
@@ -386,9 +386,9 @@ func (t GenericExtraArgsV3) ToMap() map[string]any {
 	m["ccvs"] = func() []any {
 		res := make([]any, 0, len(t.Ccvs))
 		for _, e := range t.Ccvs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -397,9 +397,9 @@ func (t GenericExtraArgsV3) ToMap() map[string]any {
 	}()
 
 	m["executor"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Executor).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Executor
 	}()
@@ -444,9 +444,9 @@ func (t TokenTransfer) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["token"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Token).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Token
 	}()

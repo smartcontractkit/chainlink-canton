@@ -82,9 +82,9 @@ func (t CCIPMessageReceived) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["router"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Router).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Router
 	}()
@@ -94,9 +94,9 @@ func (t CCIPMessageReceived) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["message"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Message
 	}()
@@ -127,9 +127,9 @@ func (t CCIPMessageReceived) CreateCommandWithPackageID(packageID string) *model
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["router"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Router).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Router
 	}()
@@ -139,9 +139,9 @@ func (t CCIPMessageReceived) CreateCommandWithPackageID(packageID string) *model
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["message"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Message
 	}()
@@ -242,9 +242,9 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	args["requiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -256,9 +256,9 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	args["optionalCCVs"] = func() []any {
 		res := make([]any, 0, len(t.OptionalCCVs))
 		for _, e := range t.OptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -271,9 +271,9 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["receiverFinalityConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ReceiverFinalityConfig
 	}()
@@ -298,9 +298,9 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 	args["requiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -312,9 +312,9 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 	args["optionalCCVs"] = func() []any {
 		res := make([]any, 0, len(t.OptionalCCVs))
 		for _, e := range t.OptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -327,9 +327,9 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["receiverFinalityConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ReceiverFinalityConfig
 	}()
@@ -460,9 +460,9 @@ func (t CCVInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["ccvCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.CcvCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.CcvCid
 	}()
@@ -470,9 +470,9 @@ func (t CCVInput) ToMap() map[string]any {
 	m["verifierResults"] = string(t.VerifierResults)
 
 	m["ccvExtraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.CcvExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.CcvExtraContext
 	}()
@@ -516,17 +516,17 @@ func (t Execute2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["context"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Context
 	}()
 
 	m["routerCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RouterCid
 	}()
@@ -547,9 +547,9 @@ func (t Execute2) ToMap() map[string]any {
 	m["ccvInputs"] = func() []any {
 		res := make([]any, 0, len(t.CcvInputs))
 		for _, e := range t.CcvInputs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -595,17 +595,17 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["context"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Context
 	}()
 
 	m["routerCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RouterCid
 	}()
@@ -661,9 +661,9 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenPoolCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenPoolCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenPoolCid
 	}()
@@ -671,17 +671,17 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	m["tokenReceiverParty"] = t.TokenReceiverParty.ToMap()
 
 	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenInput
 	}()
 
 	m["poolExtraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.PoolExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.PoolExtraContext
 	}()
@@ -723,9 +723,9 @@ func (t UpdateRequiredCCVs) ToMap() map[string]any {
 	m["newRequiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.NewRequiredCCVs))
 		for _, e := range t.NewRequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}

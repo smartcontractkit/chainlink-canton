@@ -67,9 +67,9 @@ func (t ApplyAllowedCCVUpdates) ToMap() map[string]any {
 	m["ccvsToRemove"] = func() []any {
 		res := make([]any, 0, len(t.CcvsToRemove))
 		for _, e := range t.CcvsToRemove {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -80,9 +80,9 @@ func (t ApplyAllowedCCVUpdates) ToMap() map[string]any {
 	m["ccvsToAdd"] = func() []any {
 		res := make([]any, 0, len(t.CcvsToAdd))
 		for _, e := range t.CcvsToAdd {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -131,9 +131,9 @@ func (t ApplyAllowedCCVUpdatesParams) ToMap() map[string]any {
 	m["ccvsToRemove"] = func() []any {
 		res := make([]any, 0, len(t.CcvsToRemove))
 		for _, e := range t.CcvsToRemove {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -144,9 +144,9 @@ func (t ApplyAllowedCCVUpdatesParams) ToMap() map[string]any {
 	m["ccvsToAdd"] = func() []any {
 		res := make([]any, 0, len(t.CcvsToAdd))
 		for _, e := range t.CcvsToAdd {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -202,9 +202,9 @@ func (t ApplyDestChainUpdates) ToMap() map[string]any {
 	m["destChainSelectorsToAdd"] = func() []any {
 		res := make([]any, 0, len(t.DestChainSelectorsToAdd))
 		for _, e := range t.DestChainSelectorsToAdd {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -258,9 +258,9 @@ func (t ApplyDestChainUpdatesParams) ToMap() map[string]any {
 	m["destChainSelectorsToAdd"] = func() []any {
 		res := make([]any, 0, len(t.DestChainSelectorsToAdd))
 		for _, e := range t.DestChainSelectorsToAdd {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -306,9 +306,9 @@ func (t CalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SendingMessageCid
 	}()
@@ -316,9 +316,9 @@ func (t CalculateFee) ToMap() map[string]any {
 	m["executorArgs"] = string(t.ExecutorArgs)
 
 	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraContext
 	}()
@@ -393,9 +393,9 @@ func (t DynamicConfig) ToMap() map[string]any {
 	}
 
 	m["allowedFinalityConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.AllowedFinalityConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.AllowedFinalityConfig
 	}()
@@ -462,9 +462,9 @@ func (t Executor) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["dynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.DynamicConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.DynamicConfig
 	}()
@@ -473,9 +473,9 @@ func (t Executor) CreateCommand() *model.CreateCommand {
 	args["allowedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.AllowedCCVs))
 		for _, e := range t.AllowedCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -512,9 +512,9 @@ func (t Executor) CreateCommandWithPackageID(packageID string) *model.CreateComm
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["dynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.DynamicConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.DynamicConfig
 	}()
@@ -523,9 +523,9 @@ func (t Executor) CreateCommandWithPackageID(packageID string) *model.CreateComm
 	args["allowedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.AllowedCCVs))
 		for _, e := range t.AllowedCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1099,9 +1099,9 @@ func (t GetFee) ToMap() map[string]any {
 	m["requiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1260,9 +1260,9 @@ func (t RemoteChainConfigArgs) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["config"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Config).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Config
 	}()
@@ -1302,9 +1302,9 @@ func (t SetDynamicConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["newDynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.NewDynamicConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.NewDynamicConfig
 	}()
@@ -1344,9 +1344,9 @@ func (t SetDynamicConfigParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["newDynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.NewDynamicConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.NewDynamicConfig
 	}()

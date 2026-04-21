@@ -223,25 +223,25 @@ func (t CCVSendInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["ccvAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.CcvAddress).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.CcvAddress
 	}()
 
 	m["ccvCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.CcvCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.CcvCid
 	}()
 
 	m["ccvExtraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.CcvExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.CcvExtraContext
 	}()
@@ -282,17 +282,17 @@ func (t ExecutorInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["executorCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExecutorCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExecutorCid
 	}()
 
 	m["executorExtraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExecutorExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExecutorExtraContext
 	}()
@@ -341,9 +341,9 @@ func (t FeeTokenInput) ToMap() map[string]any {
 	}()
 
 	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenInput
 	}()
@@ -391,25 +391,25 @@ func (t GetFee2) ToMap() map[string]any {
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Message
 	}()
 
 	m["context"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Context
 	}()
 
 	m["routerCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RouterCid
 	}()
@@ -417,9 +417,9 @@ func (t GetFee2) ToMap() map[string]any {
 	m["ccvSendInputs"] = func() []any {
 		res := make([]any, 0, len(t.CcvSendInputs))
 		for _, e := range t.CcvSendInputs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -529,25 +529,25 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Message
 	}()
 
 	m["context"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Context
 	}()
 
 	m["routerCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RouterCid
 	}()
@@ -607,33 +607,33 @@ func (t Send) ToMap() map[string]any {
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Message
 	}()
 
 	m["context"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Context
 	}()
 
 	m["routerCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RouterCid
 	}()
 
 	m["feeTokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeTokenInput).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeTokenInput
 	}()
@@ -641,9 +641,9 @@ func (t Send) ToMap() map[string]any {
 	m["ccvSendInputs"] = func() []any {
 		res := make([]any, 0, len(t.CcvSendInputs))
 		for _, e := range t.CcvSendInputs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -719,25 +719,25 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	}()
 
 	m["tokenPoolCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenPoolCid).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenPoolCid
 	}()
 
 	m["poolExtraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.PoolExtraContext).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.PoolExtraContext
 	}()
 
 	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TokenInput
 	}()

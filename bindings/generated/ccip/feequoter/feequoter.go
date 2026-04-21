@@ -107,9 +107,9 @@ func (t ApplyDestChainConfigUpdates2) ToMap() map[string]any {
 	m["destChainConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.DestChainConfigArgs))
 		for _, e := range t.DestChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -154,9 +154,9 @@ func (t ApplyDestChainConfigUpdatesParams2) ToMap() map[string]any {
 	m["destChainConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.DestChainConfigArgs))
 		for _, e := range t.DestChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -364,9 +364,9 @@ func (t DestChainConfigArgs2) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["destChainConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.DestChainConfig).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.DestChainConfig
 	}()
@@ -431,9 +431,9 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeTokens).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeTokens
 	}()
@@ -472,9 +472,9 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["linkTokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.LinkTokenInstrumentId
 	}()
@@ -506,9 +506,9 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeTokens).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeTokens
 	}()
@@ -547,9 +547,9 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["linkTokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.LinkTokenInstrumentId
 	}()
@@ -1182,9 +1182,9 @@ func (t GetTokenPrice) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -1248,9 +1248,9 @@ func (t GetTokenTransferFee) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["token"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Token).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Token
 	}()
@@ -1314,9 +1314,9 @@ func (t PriceUpdates) ToMap() map[string]any {
 	m["tokenPriceUpdates"] = func() []any {
 		res := make([]any, 0, len(t.TokenPriceUpdates))
 		for _, e := range t.TokenPriceUpdates {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1327,9 +1327,9 @@ func (t PriceUpdates) ToMap() map[string]any {
 	m["gasPriceUpdates"] = func() []any {
 		res := make([]any, 0, len(t.GasPriceUpdates))
 		for _, e := range t.GasPriceUpdates {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1382,9 +1382,9 @@ func (t QuoteGasForExec) ToMap() map[string]any {
 	m["calldataSize"] = int64(t.CalldataSize)
 
 	m["feeToken"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.FeeToken
 	}()
@@ -1494,9 +1494,9 @@ func (t RemoveFeeTokens) ToMap() map[string]any {
 	m["feeTokensToRemove"] = func() []any {
 		res := make([]any, 0, len(t.FeeTokensToRemove))
 		for _, e := range t.FeeTokensToRemove {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1541,9 +1541,9 @@ func (t RemoveFeeTokensParams) ToMap() map[string]any {
 	m["feeTokensToRemove"] = func() []any {
 		res := make([]any, 0, len(t.FeeTokensToRemove))
 		for _, e := range t.FeeTokensToRemove {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1668,9 +1668,9 @@ func (t TokenPriceUpdate) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -1758,9 +1758,9 @@ func (t UpdatePrices) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["priceUpdates"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.PriceUpdates).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.PriceUpdates
 	}()
@@ -1821,9 +1821,9 @@ func (t UpdatePricesParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["priceUpdates"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.PriceUpdates).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.PriceUpdates
 	}()

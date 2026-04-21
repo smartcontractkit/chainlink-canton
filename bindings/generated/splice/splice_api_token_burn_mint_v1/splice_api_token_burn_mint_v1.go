@@ -79,9 +79,9 @@ func (t BurnMintFactoryView) ToMap() map[string]any {
 	m["admin"] = t.Admin.ToMap()
 
 	m["meta"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Meta
 	}()
@@ -128,9 +128,9 @@ func (t BurnMintFactoryBurnMint) ToMap() map[string]any {
 	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -146,9 +146,9 @@ func (t BurnMintFactoryBurnMint) ToMap() map[string]any {
 	m["outputs"] = func() []any {
 		res := make([]any, 0, len(t.Outputs))
 		for _, e := range t.Outputs {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -165,9 +165,9 @@ func (t BurnMintFactoryBurnMint) ToMap() map[string]any {
 	}()
 
 	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExtraArgs
 	}()
@@ -294,9 +294,9 @@ func (t BurnMintOutput) ToMap() map[string]any {
 	m["amount"] = t.Amount
 
 	m["context"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Context
 	}()

@@ -76,9 +76,9 @@ func (t APSetConfig) ToMap() map[string]any {
 	m["apSigners"] = func() []any {
 		res := make([]any, 0, len(t.ApSigners))
 		for _, e := range t.ApSigners {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -327,9 +327,9 @@ func (t BypasserExecuteBatchParams) ToMap() map[string]any {
 	m["calls"] = func() []any {
 		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -376,17 +376,17 @@ func (t CanExecuteOp) ToMap() map[string]any {
 	m["submitter"] = t.Submitter.ToMap()
 
 	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TargetRole
 	}()
 
 	m["op"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Op
 	}()
@@ -466,9 +466,9 @@ func (t ExecuteOp) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TargetRole
 	}()
@@ -476,9 +476,9 @@ func (t ExecuteOp) ToMap() map[string]any {
 	m["submitter"] = t.Submitter.ToMap()
 
 	m["op"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Op
 	}()
@@ -544,9 +544,9 @@ func (t ExecuteScheduledBatch) ToMap() map[string]any {
 	m["calls"] = func() []any {
 		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -753,9 +753,9 @@ func (t GetState) ToMap() map[string]any {
 	m["submitter"] = t.Submitter.ToMap()
 
 	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TargetRole
 	}()
@@ -1018,36 +1018,36 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["proposer"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Proposer).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Proposer
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["canceller"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Canceller).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Canceller
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["bypasser"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Bypasser).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Bypasser
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["minDelay"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.MinDelay).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.MinDelay
 	}()
@@ -1056,9 +1056,9 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	args["blockedFunctions"] = func() []any {
 		res := make([]any, 0, len(t.BlockedFunctions))
 		for _, e := range t.BlockedFunctions {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1095,36 +1095,36 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["proposer"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Proposer).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Proposer
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["canceller"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Canceller).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Canceller
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["bypasser"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Bypasser).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Bypasser
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["minDelay"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.MinDelay).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.MinDelay
 	}()
@@ -1133,9 +1133,9 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	args["blockedFunctions"] = func() []any {
 		res := make([]any, 0, len(t.BlockedFunctions))
 		for _, e := range t.BlockedFunctions {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1597,9 +1597,9 @@ func (t MCMSState) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["role"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Role).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Role
 	}()
@@ -1653,9 +1653,9 @@ func (t MultisigConfig) ToMap() map[string]any {
 	m["signers"] = func() []any {
 		res := make([]any, 0, len(t.Signers))
 		for _, e := range t.Signers {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -1892,9 +1892,9 @@ func (t RoleState) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["config"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Config).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Config
 	}()
@@ -1907,17 +1907,17 @@ func (t RoleState) ToMap() map[string]any {
 	}()
 
 	m["expiringRoot"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.ExpiringRoot).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.ExpiringRoot
 	}()
 
 	m["rootMetadata"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.RootMetadata).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.RootMetadata
 	}()
@@ -2010,9 +2010,9 @@ func (t ScheduleBatchParams) ToMap() map[string]any {
 	m["calls"] = func() []any {
 		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -2065,9 +2065,9 @@ func (t SetConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TargetRole
 	}()
@@ -2075,9 +2075,9 @@ func (t SetConfig) ToMap() map[string]any {
 	m["newSigners"] = func() []any {
 		res := make([]any, 0, len(t.NewSigners))
 		for _, e := range t.NewSigners {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -2143,9 +2143,9 @@ func (t SetConfigParams) ToMap() map[string]any {
 	m["signers"] = func() []any {
 		res := make([]any, 0, len(t.Signers))
 		for _, e := range t.Signers {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}
@@ -2212,9 +2212,9 @@ func (t SetRoot) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.TargetRole
 	}()
@@ -2226,9 +2226,9 @@ func (t SetRoot) ToMap() map[string]any {
 	m["validUntil"] = t.ValidUntil
 
 	m["metadata"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Metadata).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Metadata
 	}()
@@ -2244,9 +2244,9 @@ func (t SetRoot) ToMap() map[string]any {
 	m["signatures"] = func() []any {
 		res := make([]any, 0, len(t.Signatures))
 		for _, e := range t.Signatures {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
+				res = append(res, m.ToMap())
 			} else {
 				res = append(res, e)
 			}

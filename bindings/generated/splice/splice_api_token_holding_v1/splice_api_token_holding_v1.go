@@ -75,9 +75,9 @@ func (t HoldingView) ToMap() map[string]any {
 	m["owner"] = t.Owner.ToMap()
 
 	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.InstrumentId
 	}()
@@ -96,9 +96,9 @@ func (t HoldingView) ToMap() map[string]any {
 	}
 
 	m["meta"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Meta
 	}()
