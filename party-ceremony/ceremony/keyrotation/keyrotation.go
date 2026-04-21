@@ -84,10 +84,18 @@ var KeyRotationSequence = operations.NewSequence(
 	func(b operations.Bundle, deps ceremony.CantonDeps, in KeyRotationInput) (KeyRotationOutput, error) {
 		ctx := b.GetContext()
 
+		out := KeyRotationOutput{
+			State: CeremonyState{
+				Phase:           PhaseReadState,
+				RotateNamespace: in.RotateNamespaceKey,
+				RotateDaml:      in.RotateDamlKey,
+			},
+		}
+
 		// ── Input validation ─────────────────────────────────────────────────
 		parts := strings.SplitN(in.DecentralizedPartyID, "::", 2)
 		if len(parts) != 2 || parts[1] == "" {
-			return KeyRotationOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf("invalid decentralized_party_id %q: expected format <prefix>::<namespace>",
 					in.DecentralizedPartyID),
 			)
@@ -95,13 +103,13 @@ var KeyRotationSequence = operations.NewSequence(
 		decNS := parts[1]
 
 		if !in.RotateNamespaceKey && !in.RotateDamlKey {
-			return KeyRotationOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				errors.New("at least one of rotate_namespace_key or rotate_daml_key must be true"),
 			)
 		}
 
 		if in.TargetParticipantID == "" {
-			return KeyRotationOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				errors.New("target_participant_id is required"),
 			)
 		}
@@ -112,7 +120,7 @@ var KeyRotationSequence = operations.NewSequence(
 			SynchronizerID:       in.SynchronizerID,
 		})
 		if err != nil {
-			return KeyRotationOutput{}, fmt.Errorf("read-current-state: %w", err)
+			return out, fmt.Errorf("read-current-state: %w", err)
 		}
 		currentState := stateReport.Output
 
@@ -122,12 +130,12 @@ var KeyRotationSequence = operations.NewSequence(
 		// ── Sequence-level validation ────────────────────────────────────────
 		if in.RotateNamespaceKey {
 			if in.TargetNamespaceFingerprint == "" {
-				return KeyRotationOutput{}, operations.NewUnrecoverableError(
+				return out, operations.NewUnrecoverableError(
 					errors.New("target_namespace_fingerprint is required when rotate_namespace_key is true"),
 				)
 			}
 			if !slices.Contains(currentState.DNSOwners, in.TargetNamespaceFingerprint) {
-				return KeyRotationOutput{}, operations.NewUnrecoverableError(
+				return out, operations.NewUnrecoverableError(
 					fmt.Errorf("target namespace fingerprint %q not found in DNS owners %v",
 						in.TargetNamespaceFingerprint, currentState.DNSOwners),
 				)
@@ -135,7 +143,7 @@ var KeyRotationSequence = operations.NewSequence(
 		}
 
 		if in.RotateDamlKey && len(currentState.PartySigningKeysB64) == 0 {
-			return KeyRotationOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				errors.New("DAML key rotation requested but no party signing keys found in P2P topology"),
 			)
 		}
@@ -145,6 +153,9 @@ var KeyRotationSequence = operations.NewSequence(
 		if newThreshold <= 0 {
 			newThreshold = int(currentState.DNSThreshold)
 		}
+
+		out.State.DNSThreshold = int(currentState.DNSThreshold)
+		out.State.Phase = PhaseKeyGen
 
 		// ── Step 2: Generate rotated keys (target only) ──────────────────────
 		keyReport, err := operations.ExecuteOperation(b, GenerateRotatedKeyOp, deps, GenerateRotatedKeyInput{
@@ -159,14 +170,17 @@ var KeyRotationSequence = operations.NewSequence(
 			deps.Logger.Infow("Rotated key generation pending",
 				"target", in.TargetParticipantID, "err", err)
 
-			return KeyRotationOutput{}, fmt.Errorf("%w: target participant has not generated rotated keys yet",
+			return out, fmt.Errorf("%w: target participant has not generated rotated keys yet",
 				ErrThresholdNotMet)
 		}
 		rotatedKeys := keyReport.Output
+		out.State.TargetKeyGenReady = true
 
 		// ── Steps 3-6: Namespace key rotation ────────────────────────────────
 		dnsUpdated := false
 		if in.RotateNamespaceKey {
+			out.State.Phase = PhaseNSD
+
 			// Step 3: Propose NSD for new namespace key (target only).
 			_, err = operations.ExecuteOperation(b, addparticipant.ProposeNewNSDOp, deps, addparticipant.ProposeNewNSDInput{
 				ParticipantID:  in.TargetParticipantID,
@@ -178,9 +192,10 @@ var KeyRotationSequence = operations.NewSequence(
 				deps.Logger.Infow("Rotated NSD proposal pending",
 					"target", in.TargetParticipantID, "err", err)
 
-				return KeyRotationOutput{}, fmt.Errorf("%w: target participant has not proposed rotated NSD yet",
+				return out, fmt.Errorf("%w: target participant has not proposed rotated NSD yet",
 					ErrThresholdNotMet)
 			}
+			out.State.NSDProposed = true
 
 			// Poll until NSD is visible on the synchronizer.
 			err = retry.Do(
@@ -201,11 +216,13 @@ var KeyRotationSequence = operations.NewSequence(
 				retry.Delay(500*time.Millisecond),
 			)
 			if err != nil {
-				return KeyRotationOutput{}, fmt.Errorf("waiting for rotated NSD: %w", err)
+				return out, fmt.Errorf("waiting for rotated NSD: %w", err)
 			}
 
 			deps.Logger.Infow("Rotated NSD confirmed",
 				"namespace", rotatedKeys.NewNamespaceFingerprint)
+
+			out.State.Phase = PhaseDNSProposal
 
 			// Step 4: Create DNS proposal (swap old→new fingerprint in owners).
 			proposalReport, propErr := operations.ExecuteOperation(b, CreateRotationDNSProposalOp, deps, CreateRotationDNSProposalInput{
@@ -219,9 +236,12 @@ var KeyRotationSequence = operations.NewSequence(
 				SynchronizerID:          in.SynchronizerID,
 			})
 			if propErr != nil {
-				return KeyRotationOutput{}, fmt.Errorf("create-rotation-dns-proposal: %w", propErr)
+				return out, fmt.Errorf("create-rotation-dns-proposal: %w", propErr)
 			}
 			proposal := proposalReport.Output
+			out.State.RequiredSigners = proposal.RequiredSigners
+			out.State.ProposalHash = proposal.ProposalHashSHA256
+			out.State.Phase = PhaseDNSSigning
 
 			// Step 5: Collect DNS signatures from all members.
 			var allSignedTxsB64 []string
@@ -235,10 +255,13 @@ var KeyRotationSequence = operations.NewSequence(
 				})
 				if sigErr != nil {
 					deps.Logger.Infow("DNS rotation signature pending", "signer", signerUID, "err", sigErr)
+					out.State.PendingSigners = append(out.State.PendingSigners, signerUID)
+
 					continue
 				}
 				allSignedTxsB64 = append(allSignedTxsB64, sigReport.Output.SignedDNSTxB64)
 				dnsSigCount++
+				out.State.CollectedSigners = append(out.State.CollectedSigners, signerUID)
 			}
 
 			deps.Logger.Infow("Collected rotation DNS signatures",
@@ -247,10 +270,12 @@ var KeyRotationSequence = operations.NewSequence(
 
 			// Gate: Canton requires currentThreshold signatures for serial > 1.
 			if dnsSigCount < int(currentState.DNSThreshold) {
-				return KeyRotationOutput{}, fmt.Errorf("%w: %d/%d DNS signatures collected",
+				return out, fmt.Errorf("%w: %d/%d DNS signatures collected",
 					ErrThresholdNotMet, dnsSigCount, currentState.DNSThreshold,
 				)
 			}
+
+			out.State.Phase = PhaseDNSSubmit
 
 			// Step 6: Submit the rotation DNS update.
 			_, err = operations.ExecuteOperation(
@@ -263,7 +288,7 @@ var KeyRotationSequence = operations.NewSequence(
 				operations.WithRetry[kick.SubmitKickDNSInput, ceremony.CantonDeps](),
 			)
 			if err != nil {
-				return KeyRotationOutput{}, fmt.Errorf("submit-rotation-dns: %w", err)
+				return out, fmt.Errorf("submit-rotation-dns: %w", err)
 			}
 
 			// Poll until the updated DNS is visible (new fingerprint in owners, old gone).
@@ -291,7 +316,7 @@ var KeyRotationSequence = operations.NewSequence(
 				retry.Delay(500*time.Millisecond),
 			)
 			if err != nil {
-				return KeyRotationOutput{}, fmt.Errorf("waiting for rotation DNS confirmation: %w", err)
+				return out, fmt.Errorf("waiting for rotation DNS confirmation: %w", err)
 			}
 
 			dnsUpdated = true
@@ -300,6 +325,9 @@ var KeyRotationSequence = operations.NewSequence(
 		// ── Step 7: DAML key rotation P2P update ─────────────────────────────
 		p2pUpdated := false
 		if in.RotateDamlKey {
+			out.State.Phase = PhaseP2P
+			out.State.P2PRequired = newThreshold
+
 			var p2pProposedCount int
 			for _, uid := range allParticipantUIDs {
 				_, p2pErr := operations.ExecuteOperation(b, ProposeRotationP2POp, deps, ProposeRotationP2PInput{
@@ -320,13 +348,14 @@ var KeyRotationSequence = operations.NewSequence(
 				}
 				p2pProposedCount++
 			}
+			out.State.P2PProposedCount = p2pProposedCount
 
 			deps.Logger.Infow("Collected rotation P2P proposals",
 				"collected", p2pProposedCount, "required", newThreshold,
 			)
 
 			if p2pProposedCount < newThreshold {
-				return KeyRotationOutput{}, fmt.Errorf("%w: %d/%d P2P proposals collected",
+				return out, fmt.Errorf("%w: %d/%d P2P proposals collected",
 					ErrThresholdNotMet, p2pProposedCount, newThreshold,
 				)
 			}
@@ -355,19 +384,21 @@ var KeyRotationSequence = operations.NewSequence(
 				retry.Delay(1*time.Second),
 			)
 			if err != nil {
-				return KeyRotationOutput{}, fmt.Errorf("waiting for rotation P2P confirmation: %w", err)
+				return out, fmt.Errorf("waiting for rotation P2P confirmation: %w", err)
 			}
 
 			p2pUpdated = true
 		}
 
-		return KeyRotationOutput{
-			NamespaceKeyRotated:     in.RotateNamespaceKey,
-			DamlKeyRotated:          in.RotateDamlKey,
-			NewNamespaceFingerprint: rotatedKeys.NewNamespaceFingerprint,
-			NewDamlKeyFingerprint:   rotatedKeys.NewDamlKeyFingerprint,
-			DNSUpdated:              dnsUpdated,
-			P2PUpdated:              p2pUpdated,
-		}, nil
+		out.NamespaceKeyRotated = in.RotateNamespaceKey
+		out.DamlKeyRotated = in.RotateDamlKey
+		out.NewNamespaceFingerprint = rotatedKeys.NewNamespaceFingerprint
+		out.NewDamlKeyFingerprint = rotatedKeys.NewDamlKeyFingerprint
+		out.DNSUpdated = dnsUpdated
+		out.P2PUpdated = p2pUpdated
+		out.State.Phase = PhaseCompleted
+		out.State.PendingSigners = nil
+
+		return out, nil
 	},
 )

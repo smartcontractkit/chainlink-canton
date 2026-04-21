@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"testing"
 
@@ -405,6 +406,75 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			EntityName: "CCIPMessageSent",
 		}
 	)
+
+	t.Run("returns error when fromBlock is nil", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		reader := &sourceReader{}
+
+		events, err := reader.FetchMessageSentEvents(ctx, nil, big.NewInt(1))
+		require.Nil(t, events)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "fromBlock is nil")
+	})
+
+	t.Run("returns error when fromBlock is negative", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		reader := &sourceReader{}
+
+		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(-1), big.NewInt(5))
+		require.Nil(t, events)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "fromBlock is negative")
+	})
+
+	t.Run("returns error when toBlock is negative", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		reader := &sourceReader{}
+
+		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(-3))
+		require.Nil(t, events)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "toBlock is negative")
+	})
+
+	t.Run("returns error when toBlock exceeds max Int64", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		reader := &sourceReader{}
+
+		toBlock := new(big.Int).Add(big.NewInt(math.MaxInt64), big.NewInt(1))
+		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), toBlock)
+		require.Nil(t, events)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "toBlock is larger than the max Int64 value")
+		require.ErrorContains(t, err, toBlock.String())
+	})
+
+	t.Run("returns error when fromBlock is greater than toBlock", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		reader := &sourceReader{}
+
+		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(10), big.NewInt(5))
+		require.Nil(t, events)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "fromBlock is greater than toBlock")
+	})
+
+	t.Run("returns error when exclusive begin offset exceeds max Int64", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		reader := &sourceReader{}
+
+		fromBlock := new(big.Int).Add(big.NewInt(math.MaxInt64), big.NewInt(2))
+		events, err := reader.FetchMessageSentEvents(ctx, fromBlock, nil)
+		require.Nil(t, events)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "exclusive begin offset derived from fromBlock exceeds max Int64")
+	})
 
 	t.Run("ignores event when ccipOwner does not match", func(t *testing.T) {
 		t.Parallel()

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"slices"
 	"strings"
@@ -97,15 +98,53 @@ func NewSourceReader(
 // skipped without an error log. Transport and RPC errors (GetUpdates, Recv, GetLedgerEnd
 // when toBlock is nil) still fail the entire call.
 func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, toBlock *big.Int) ([]protocol.MessageSentEvent, error) {
+	if fromBlock == nil {
+		return nil, fmt.Errorf("fromBlock is nil, it must be provided")
+	}
+
+	// Check that neither fromBlock nor toBlock are negative.
+	if fromBlock.Sign() < 0 {
+		return nil, fmt.Errorf("fromBlock is negative, cannot proceed: %s", fromBlock.String())
+	}
+	if toBlock != nil && toBlock.Sign() < 0 {
+		return nil, fmt.Errorf("toBlock is negative, cannot proceed: %s", toBlock.String())
+	}
+
+	maxInt64 := big.NewInt(math.MaxInt64)
+	if toBlock != nil {
+		if fromBlock.Cmp(toBlock) > 0 {
+			return nil, fmt.Errorf(
+				"fromBlock is greater than toBlock, cannot proceed: %s > %s",
+				fromBlock.String(),
+				toBlock.String(),
+			)
+		}
+		if toBlock.Cmp(maxInt64) > 0 {
+			return nil, fmt.Errorf(
+				"toBlock is larger than the max Int64 value, cannot proceed: %s > %d",
+				toBlock.String(),
+				math.MaxInt64,
+			)
+		}
+	}
+
 	// since begin is exclusive we need to subtract 1 from fromBlock
 	begin := new(big.Int).Sub(fromBlock, big.NewInt(1))
 	// check that begin is not negative
 	if begin.Sign() < 0 {
 		begin = big.NewInt(0)
 	}
+	if begin.Cmp(maxInt64) > 0 {
+		return nil, fmt.Errorf(
+			"exclusive begin offset derived from fromBlock exceeds max Int64, cannot proceed: %s > %d",
+			begin.String(),
+			math.MaxInt64,
+		)
+	}
 
 	var end *int64
 	if toBlock != nil {
+		// Safe to convert: toBlock is non-negative and <= max Int64.
 		e := toBlock.Int64()
 		end = &e
 	} else {
@@ -121,7 +160,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 
 	ccipMessageSentIdentifier := c.config.CCIPMessageSentTemplateID.ToLedgerIdentifier()
 	updates, err := c.updateServiceClient.GetUpdates(ctx, &ledgerv2.GetUpdatesRequest{
-		BeginExclusive: begin.Int64(),
+		BeginExclusive: begin.Int64(), // safe to convert: begin is non-negative and <= max Int64.
 		EndInclusive:   end,
 		UpdateFormat: &ledgerv2.UpdateFormat{
 			IncludeTransactions: &ledgerv2.TransactionFormat{
