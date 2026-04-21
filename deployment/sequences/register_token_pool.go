@@ -2,6 +2,7 @@ package sequences
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -44,6 +45,7 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	poolOwnerParty := input.PoolOwnerParty
 
 	// Step 1: ProposeAdministrator (CCIP acts)
+	skipAcceptAdminRole := false
 	_, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.ProposeAdministrator]{
 		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
 		Args: tokenadminregistry.ProposeAdministrator{
@@ -53,19 +55,25 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 		},
 	})
 	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to propose administrator: %w", err)
+		if strings.Contains(err.Error(), "TokenAdminRegistry_ProposeAdministrator: Admin already set") {
+			skipAcceptAdminRole = true
+		} else {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to propose administrator: %w", err)
+		}
 	}
 
 	// Step 2: AcceptAdminRole (pool owner acts). Exercise resolves current TAR contract by InstanceAddress.
-	_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.AcceptAdminRole]{
-		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
-		Args: tokenadminregistry.AcceptAdminRole{
-			InstrumentId: instrumentId,
-			Caller:       types.PARTY(poolOwnerParty),
-		},
-	})
-	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to accept admin role: %w", err)
+	if !skipAcceptAdminRole {
+		_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.AcceptAdminRole]{
+			InstanceAddress: input.TokenAdminRegistryInstanceAddress,
+			Args: tokenadminregistry.AcceptAdminRole{
+				InstrumentId: instrumentId,
+				Caller:       types.PARTY(poolOwnerParty),
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to accept admin role: %w", err)
+		}
 	}
 
 	// Step 3: SetPool (pool owner acts)
