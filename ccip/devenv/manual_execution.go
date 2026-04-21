@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
@@ -71,7 +71,7 @@ func (c *Chain) resolveTransferFactoryForExecute(
 	if err != nil {
 		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("create transfer instruction client: %w", err)
 	}
-	transferFactoryCIDRaw, transferFactoryDisclosures, transferFactoryChoiceContextValue, err := testhelpers.GetTransferFactory(
+	transferFactoryCIDRaw, transferFactoryDisclosures, transferFactoryChoiceContextRaw, err := testhelpers.GetTransferFactory(
 		ctx,
 		transferClient,
 		registryAdmin,
@@ -82,6 +82,10 @@ func (c *Chain) resolveTransferFactoryForExecute(
 		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("resolve transfer factory from scan-proxy: %w", err)
 	}
 	transferFactoryCID := types.CONTRACT_ID(transferFactoryCIDRaw)
+	transferFactoryChoiceContextValue, err := testhelpers.ChoiceContextFromData(transferFactoryChoiceContextRaw)
+	if err != nil {
+		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("parse transfer factory choice context: %w", err)
+	}
 
 	return transferFactoryCID, transferFactoryDisclosures, splice_api_token_metadata_v1.ChoiceContext{
 		Values: testhelpers.ExtractChoiceContextValues(transferFactoryChoiceContextValue),

@@ -90,10 +90,12 @@ chain_selector = "8706591216959472610"
 		type = "lockRelease"
 		party_id = "tokenPoolOwner"
 		instance_address = "0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"
+		pool_owner = "tokenPoolOwner"
 	[[token_pool_api.token_pools]]
 		type = "burnMint"
 		party_id = "tokenPoolOwner"
 		instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
+		pool_owner = "tokenPoolOwner"
 	`,
 			want: &Config{
 				ChainSelector: "8706591216959472610",
@@ -158,12 +160,14 @@ chain_selector = "8706591216959472610"
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"),
 							},
+							PoolOwner: "tokenPoolOwner",
 						}, {
 							Type: TokenPoolTypeBurnMint,
 							ContractIdentifier: ContractIdentifier{
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"),
 							},
+							PoolOwner: "tokenPoolOwner",
 						},
 					},
 				},

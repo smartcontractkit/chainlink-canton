@@ -15,7 +15,7 @@ import (
 
 type Server struct {
 	logger              zerolog.Logger //nolint:unused
-	activeContractStore store.ActiveContractStore
+	activeContractStore *store.ActiveContractStore
 
 	maxBatchLimit int
 }

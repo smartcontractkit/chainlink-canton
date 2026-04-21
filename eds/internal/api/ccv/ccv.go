@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 
@@ -20,7 +21,7 @@ type ContractConfig struct{}
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore store.ActiveContractStore
+	activeContractStore *store.ActiveContractStore
 
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
@@ -29,7 +30,7 @@ var _ oapiCCV.ServerInterface = &Server{}
 
 func NewServer(
 	logger zerolog.Logger,
-	activeContractStore store.ActiveContractStore,
+	activeContractStore *store.ActiveContractStore,
 	config config.CCVAPIConfig,
 ) *Server {
 	s := &Server{
@@ -39,6 +40,10 @@ func NewServer(
 	}
 	for _, ccv := range config.CCVs {
 		s.contractConfigs[ccv.InstanceAddress] = ContractConfig{}
+		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(ccvs.CommitteeVerifier{}),
+			PartyID:    ccv.PartyID,
+		})
 	}
 
 	return s
@@ -100,7 +105,6 @@ func (s Server) PostCCVSend(c *gin.Context, address string) {
 }
 
 func (s Server) PostCCVExecute(c *gin.Context, address string) {
-	s.logger.Info().Msg("Got request for CCVExecute")
 	var req oapiCCV.CCVExecuteRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})

@@ -20,14 +20,14 @@ import (
 
 // TokenInput The token input for the token transfer.
 type TokenInput struct {
-	ExtraArgs *struct {
-		Context  *map[string]interface{} `json:"context,omitempty"`
-		Metadata *map[string]interface{} `json:"metadata,omitempty"`
-	} `json:"extraArgs,omitempty"`
-	TokenPoolHoldings *[]externalRef0.ContractId `json:"tokenPoolHoldings,omitempty"`
+	ExtraArgs struct {
+		Context  map[string]interface{} `json:"context"`
+		Metadata map[string]interface{} `json:"metadata"`
+	} `json:"extraArgs"`
+	TokenPoolHoldings []externalRef0.ContractId `json:"tokenPoolHoldings"`
 
 	// TransferFactory The unique identifier of a contract.
-	TransferFactory *externalRef0.ContractId `json:"transferFactory,omitempty"`
+	TransferFactory externalRef0.ContractId `json:"transferFactory"`
 }
 
 // TokenPoolExecuteRequest defines model for TokenPoolExecuteRequest.
@@ -83,7 +83,7 @@ type TokenPoolSendResponse struct {
 }
 
 // PostTokenPoolExecuteJSONRequestBody defines body for PostTokenPoolExecute for application/json ContentType.
-type PostTokenPoolExecuteJSONRequestBody = TokenPoolSendRequest
+type PostTokenPoolExecuteJSONRequestBody = TokenPoolExecuteRequest
 
 // PostTokenPoolSendJSONRequestBody defines body for PostTokenPoolSend for application/json ContentType.
 type PostTokenPoolSendJSONRequestBody = TokenPoolSendRequest
@@ -371,7 +371,7 @@ type ClientWithResponsesInterface interface {
 type PostTokenPoolExecuteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *TokenPoolSendResponse
+	JSON200      *TokenPoolExecuteResponse
 	JSON400      *externalRef0.N400
 	JSON404      *externalRef0.N404
 	JSON500      *externalRef0.N500
@@ -467,7 +467,7 @@ func ParsePostTokenPoolExecuteResponse(rsp *http.Response) (*PostTokenPoolExecut
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest TokenPoolSendResponse
+		var dest TokenPoolExecuteResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

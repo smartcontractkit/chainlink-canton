@@ -4,38 +4,57 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
-
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
-type ActiveContractStore Store[contracts.InstanceAddress, *apiv2.ActiveContract]
+type ActiveContractStore struct {
+	logger zerolog.Logger
 
-// RegisteredTemplate defines a template that the ActiveContractStore will keep track of.
-// It defines a TemplateID, as well as a Party - the latter of which must be a stakeholder (signatory or observer)
-// on the contract in order for the ActiveContractStore to pick up the contract.
+	stream  *BackfilledStream
+	filters FiltersByParty
+
+	mux       sync.RWMutex
+	contracts map[contracts.InstanceAddress]*apiv2.ActiveContract
+}
+
+func NewActiveContractStore(
+	logger zerolog.Logger,
+	updateService apiv2.UpdateServiceClient,
+	stateService apiv2.StateServiceClient,
+	metrics Metrics,
+) *ActiveContractStore {
+	logger = logger.With().Str("component", "ActiveContractStore").Logger()
+	s := &ActiveContractStore{
+		logger: logger,
+		stream: &BackfilledStream{
+			logger:        logger,
+			metrics:       metrics,
+			updateService: updateService,
+			stateService:  stateService,
+		},
+		filters: make(FiltersByParty),
+		mux:     sync.RWMutex{},
+	}
+
+	return s
+}
+
 type RegisteredTemplate struct {
 	TemplateID contracts.TemplateID
 	PartyID    string
 }
 
-type ActiveContractStoreConfig struct {
-	Logger           zerolog.Logger
-	StateService     apiv2.StateServiceClient
-	UpdateService    apiv2.UpdateServiceClient
-	StreamConfig     ReliableStreamConfig
-	ReconnectBackoff time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
-}
-
-func ActiveContractStoreFilters(registeredTemplates ...RegisteredTemplate) FiltersByParty {
-	filtersByParty := make(map[string]*apiv2.Filters) // Assemble filters
-	for _, template := range registeredTemplates {
-		existingFilterForParty, ok := filtersByParty[template.PartyID]
+// RegisterTemplates registers the given templates with the ActiveContractStore.
+// RegisterTemplates must be called before any call to Run(), calling while the store is already running will lead to
+// undefined behavior.
+func (s *ActiveContractStore) RegisterTemplates(templates ...RegisteredTemplate) {
+	for _, template := range templates {
+		existingFilterForParty, ok := s.filters[template.PartyID]
 		if !ok {
 			existingFilterForParty = &apiv2.Filters{}
 		}
@@ -49,89 +68,56 @@ func ActiveContractStoreFilters(registeredTemplates ...RegisteredTemplate) Filte
 				IncludeCreatedEventBlob: true,
 			}},
 		})
-		filtersByParty[template.PartyID] = existingFilterForParty
+		s.filters[template.PartyID] = existingFilterForParty
 	}
-
-	return filtersByParty
 }
 
-// NewActiveContractStore returns a Store implementation that keeps track of active contracts by subscribing
-// to incremental ledger updates.
-// The ActiveContractStore is configured with a variable list of registeredTemplates which are the only templates is will
-// keep track of. All templates must contain an 'InstanceId' field in order to calculate their InstanceAddress.
-// For example, if configured with:
-//
-//	store.RegisteredTemplate{
-//	   TemplateID: store.TemplateID{
-//	       PackageID:  "#ccip-committeeverifier",
-//	       ModuleName: "CCIP.CommitteeVerifier",
-//	       EntityName: "CommitteeVerifier",
-//	   },
-//	   PartyID: "ccvOwnerParty::0x123567890",
-//	}
-//
-// The ActiveContractStore will list and subscribe all CommitteeVerifier contracts that the 'ccvOwnerParty' can see.
-// It will then index them by their calculated InstanceAddress using the combination of signatory + instanceId field.
-//
-// NewActiveContractStore itself will perform no RPC calls, it will immediately return.
-// In order for the ActiveContractStore to initialize and subscribe to updates, (s *ContractStore) Run() needs to be run.
-func NewActiveContractStore(
-	config ActiveContractStoreConfig,
-	metrics Metrics,
-	registeredTemplates ...RegisteredTemplate,
-) (*ContractStore[contracts.InstanceAddress, *apiv2.ActiveContract], error) {
-	filtersByParty := ActiveContractStoreFilters(registeredTemplates...)
+func (s *ActiveContractStore) Run(ctx context.Context, streamConfig StreamConfig) error {
+	s.contracts = make(map[contracts.InstanceAddress]*apiv2.ActiveContract)
 
-	return &ContractStore[contracts.InstanceAddress, *apiv2.ActiveContract]{
-		logger:           config.Logger.With().Str("component", "ActiveContractStore").Logger(),
-		updateService:    config.UpdateService,
-		stateService:     config.StateService,
-		metrics:          metrics,
-		streamConfig:     config.StreamConfig,
-		reconnectBackoff: config.ReconnectBackoff,
-		filtersByParty:   filtersByParty,
-		mux:              sync.RWMutex{},
-		ledgerEnd:        0,
-		contracts:        make(map[contracts.InstanceAddress]*apiv2.ActiveContract),
-		handleActiveContract: func(ctx context.Context, store *ContractStore[contracts.InstanceAddress, *apiv2.ActiveContract], activeContract *apiv2.ActiveContract) (updates []ContractUpdate[contracts.InstanceAddress, *apiv2.ActiveContract], err error) {
-			instanceAddresses, err := getInstanceAddresses(activeContract.GetCreatedEvent())
-			if err != nil {
-				store.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get instance addresses for active contract, skipping")
-				return nil, nil
-			}
+	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, nil, nil)
+}
 
-			updates = make([]ContractUpdate[contracts.InstanceAddress, *apiv2.ActiveContract], len(instanceAddresses))
-			for i, address := range instanceAddresses {
-				updates[i] = ContractUpdate[contracts.InstanceAddress, *apiv2.ActiveContract]{
-					Key:   address,
-					Value: activeContract,
-				}
-			}
+func (s *ActiveContractStore) Get(address contracts.InstanceAddress) (*apiv2.ActiveContract, bool) {
+	s.mux.RLock()
+	value, ok := s.contracts[address]
+	s.mux.RUnlock()
 
-			return updates, nil
-		},
-		handleCreatedEvent: func(ctx context.Context, store *ContractStore[contracts.InstanceAddress, *apiv2.ActiveContract], transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) (updates []ContractUpdate[contracts.InstanceAddress, *apiv2.ActiveContract], err error) {
-			instanceAddresses, err := getInstanceAddresses(createdEvent)
-			if err != nil {
-				store.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get instance addresses for created contract, skipping")
-				return nil, nil
-			}
+	return value, ok
+}
 
-			updates = make([]ContractUpdate[contracts.InstanceAddress, *apiv2.ActiveContract], len(instanceAddresses))
-			for i, address := range instanceAddresses {
-				updates[i] = ContractUpdate[contracts.InstanceAddress, *apiv2.ActiveContract]{
-					Key: address,
-					Value: &apiv2.ActiveContract{
-						CreatedEvent:        createdEvent,
-						SynchronizerId:      transaction.GetSynchronizerId(),
-						ReassignmentCounter: 0,
-					},
-				}
-			}
+func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContract *apiv2.ActiveContract) error {
+	instanceAddresses, err := getInstanceAddresses(activeContract.GetCreatedEvent())
+	if err != nil {
+		s.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get instance addresses for active contract, skipping")
+		return nil
+	}
+	s.mux.Lock()
+	for _, address := range instanceAddresses {
+		s.contracts[address] = activeContract
+	}
+	s.mux.Unlock()
 
-			return updates, nil
-		},
-	}, nil
+	return nil
+}
+
+func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) error {
+	instanceAddresses, err := getInstanceAddresses(createdEvent)
+	if err != nil {
+		s.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get instance addresses for created event, skipping")
+		return nil
+	}
+	s.mux.Lock()
+	for _, address := range instanceAddresses {
+		s.contracts[address] = &apiv2.ActiveContract{
+			CreatedEvent:        createdEvent,
+			SynchronizerId:      transaction.GetSynchronizerId(),
+			ReassignmentCounter: 0,
+		}
+	}
+	s.mux.Unlock()
+
+	return nil
 }
 
 // getInstanceAddresses returns all possible InstanceAddresses for a given active contract.

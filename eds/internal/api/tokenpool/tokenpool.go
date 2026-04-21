@@ -11,6 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 
@@ -23,13 +28,14 @@ import (
 )
 
 type ContractConfig struct {
-	Type config.TokenPoolType
+	Type  config.TokenPoolType
+	Owner types.PARTY
 }
 
 type Server struct {
 	logger                 zerolog.Logger
-	activeContractStore    store.ActiveContractStore
-	instrumentHoldingStore store.InstrumentHoldingStore
+	activeContractStore    *store.ActiveContractStore
+	instrumentHoldingStore *store.InstrumentHoldingStore
 
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
@@ -38,24 +44,40 @@ var _ oapiTokenPool.ServerInterface = &Server{}
 
 func NewServer(
 	logger zerolog.Logger,
-	activeContractStore store.ActiveContractStore,
-	instrumentHoldingStore store.InstrumentHoldingStore,
-	config config.TokenPoolAPIConfig,
-
-) *Server {
+	activeContractStore *store.ActiveContractStore,
+	instrumentHoldingStore *store.InstrumentHoldingStore,
+	cfg config.TokenPoolAPIConfig,
+) (*Server, error) {
 	s := &Server{
 		logger:                 logger,
 		activeContractStore:    activeContractStore,
 		instrumentHoldingStore: instrumentHoldingStore,
 		contractConfigs:        make(map[contracts.InstanceAddress]ContractConfig),
 	}
-	for _, tokenPool := range config.TokenPools {
+	for _, tokenPool := range cfg.TokenPools {
+		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(common.RateLimiter{}),
+			PartyID:    tokenPool.PartyID,
+		})
 		s.contractConfigs[tokenPool.InstanceAddress] = ContractConfig{
-			Type: tokenPool.Type,
+			Type:  tokenPool.Type,
+			Owner: types.PARTY(tokenPool.PoolOwner),
+		}
+		s.instrumentHoldingStore.RegisterParty(tokenPool.PoolOwner)
+		switch tokenPool.Type {
+		case config.TokenPoolTypeLockRelease:
+			s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
+				TemplateID: contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{}),
+				PartyID:    tokenPool.PartyID,
+			})
+		case config.TokenPoolTypeBurnMint:
+			fallthrough
+		default:
+			return nil, fmt.Errorf("unsupported token pool type: %s", tokenPool.Type)
 		}
 	}
 
-	return s
+	return s, nil
 }
 
 func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
@@ -90,6 +112,7 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 	tokenTransfer := req.Message.TokenTransfer
 	if tokenTransfer == nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "message does not contain a token transfer"})
+		return
 	}
 
 	var resp *oapiTokenPool.TokenPoolSendResponse
@@ -187,6 +210,7 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	tokenTransfer := message.TokenTransfer
 	if tokenTransfer == nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "message does not contain a token transfer"})
+		return
 	}
 
 	var resp *oapiTokenPool.TokenPoolExecuteResponse
@@ -208,6 +232,10 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 			return
 		}
 
+		contextValues := make(map[string]struct {
+			Tag   string `json:"tag"`
+			Value string `json:"value"`
+		})
 		var rateLimiter *apiv2.ActiveContract
 		if message.Finality == protocol.FinalityWaitForFinality {
 			rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
@@ -217,6 +245,10 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 
 				return
 			}
+			contextValues["inbound-rate-limiter"] = struct {
+				Tag   string `json:"tag"`
+				Value string `json:"value"`
+			}{Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()}
 		} else {
 			rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
 			if !ok {
@@ -225,6 +257,10 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 
 				return
 			}
+			contextValues["inbound-custom-block-confirmations-rate-limiter"] = struct {
+				Tag   string `json:"tag"`
+				Value string `json:"value"`
+			}{Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()}
 		}
 
 		requiredCCVs := make([]oapiCommon.RawOrHashedAddress, len(remoteChainConfig.OutboundCCVs))
@@ -232,17 +268,46 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 			requiredCCVs[i] = converters.RawInstanceAddressAsRawOrHashedAddress(v)
 		}
 
+		holdings, ok := s.instrumentHoldingStore.GetHolding(cfg.Owner, lockReleaseTokenPool.InstrumentId)
+		if !ok {
+			s.logger.Error().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Msg("no holdings found for lock release token pool")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+
+			return
+		}
+		tokenPoolHoldings := make([]oapiCommon.ContractId, len(holdings))
+		disclosedHoldings := make([]oapiCommon.DisclosedContract, len(holdings))
+		for i, holding := range holdings {
+			tokenPoolHoldings[i] = holding.GetCreatedEvent().GetContractId()
+			disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
+		}
+
 		resp = &oapiTokenPool.TokenPoolExecuteResponse{
 			ContractId:         activeTokenPoolContract.GetCreatedEvent().GetContractId(),
 			InstanceAddress:    lockReleaseTokenPool.Address.InstanceAddress().Hex(),
 			RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 			RequiredCCVs:       requiredCCVs,
-			ContextData:        nil,                        // TODO
-			TokenInput:         oapiTokenPool.TokenInput{}, // TODO
-			DisclosedContracts: []oapiCommon.DisclosedContract{
+			ContextData: map[string]any{
+				"values": contextValues,
+			},
+			TokenInput: oapiTokenPool.TokenInput{
+				TokenPoolHoldings: tokenPoolHoldings,
+				ExtraArgs: struct {
+					Context  map[string]any `json:"context"`
+					Metadata map[string]any `json:"metadata"`
+				}{
+					Context: map[string]any{
+						"values": map[string]any{},
+					},
+					Metadata: map[string]any{},
+				}, // TODO
+				TransferFactory: "", // TODO
+			},
+			DisclosedContracts: append(
+				disclosedHoldings,
 				converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
 				converters.ActiveContractToDisclosedContract(rateLimiter),
-			},
+			),
 		}
 	case config.TokenPoolTypeBurnMint:
 		fallthrough

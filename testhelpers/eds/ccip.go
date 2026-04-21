@@ -48,6 +48,23 @@ func GetPerPartyRouterFactoryDisclosures(ctx context.Context, ccipAPIClient oapi
 	return factoryCid, disclosedContracts, nil
 }
 
+func GetTokenPoolForToken(ctx context.Context, ccipAPIClient oapiCCIP.ClientWithResponsesInterface, token contracts.EncodedInstrumentID) (contracts.RawInstanceAddress, error) {
+	resp, err := ccipAPIClient.GetTokenAdminRegistryTokenWithResponse(ctx, token.String())
+	if err != nil {
+		return contracts.RawInstanceAddress(""), fmt.Errorf("failed to get token pool for token: %w", err)
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return contracts.RawInstanceAddress(""), fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+	}
+
+	tokenPoolAddress, err := contracts.RawInstanceAddressFromString(resp.JSON200.RawInstanceAddress)
+	if err != nil {
+		return contracts.RawInstanceAddress(""), fmt.Errorf("failed to parse token pool address: %w", err)
+	}
+
+	return tokenPoolAddress, nil
+}
+
 type CCIPExecuteDisclosure struct {
 	ChoiceContext      common.CCIPContext
 	DisclosedContracts []*apiv2.DisclosedContract

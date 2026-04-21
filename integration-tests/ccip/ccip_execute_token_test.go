@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -29,7 +30,13 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/freeport"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
@@ -57,7 +64,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
 	// Import to register lane adapters
@@ -74,12 +80,6 @@ type lnrTokenPoolReceiveFlowTestCase struct {
 	customInboundLimiterCapacity  string
 	expectedDefaultLimiterTokens  string
 	expectedCustomLimiterTokens   string
-}
-
-// encodeInstrumentId encodes an InstrumentId to bytes matching Daml encodeInstrumentId.
-// Format: UTF-8 bytes of "id@admin" (matches Daml's toHex(id <> "@" <> partyToText admin)).
-func encodeInstrumentId(admin, identifier string) []byte {
-	return []byte(identifier + "@" + admin)
 }
 
 // TestLnRTokenPool_FullReceiveFlow tests the complete CCIP inbound token release flow.
@@ -176,11 +176,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), tokenMetadataClient)
 	require.NoError(t, err)
 
-	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
-	}
-
 	// Token Setup
 	// Mint tokens to Token Pool Owner (these will be "locked" in the pool)
 	poolHoldingCid, err := testhelpers.MintAMT(t.Context(), tokenPoolOwnerParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partyTokenPoolOwner, "100.00")
@@ -188,10 +183,15 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	t.Logf("Minted 100 AMT to Pool Owner, Holding CID: %s", poolHoldingCid)
 
 	// Instrument ID for AMT
+	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(registryAdmin),
+		Id:    types.TEXT("Amulet"),
+	}
 	instrumentIdAmt := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 		{Label: "admin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: registryAdmin}}},
 		{Label: "id", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "Amulet"}}},
 	}}}}
+	hashedInstrumentId := contracts.EncodeInstrumentID(nativeInstrumentId)
 
 	// CCIP Deployment
 	sourceChainSelector := fmt.Sprintf("%d", chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector)
@@ -615,21 +615,25 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 							PartyID:         partyCCIP,
 							InstanceAddress: lrtpInstanceAddress,
 						},
+						PoolOwner: partyCCIP,
 					},
 				},
 			},
 		})
-		log.Info().Msg("EDS terminated")
-		if err != nil {
+		log.Info().Err(err).Msg("EDS terminated")
+		if !errors.Is(err, context.Canceled) {
 			log.Error().Err(err).Msg("EDS server exited with error")
+			require.NoError(t, err, "EDS server exited with error")
 		}
 	}()
 
 	// Create EDS clients
 	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create CCIP API client")
-	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
-	require.NoError(t, err, "Failed to create EDS client")
+	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create CCV API client")
+	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create Token Pool API client")
 
 	// Deploy and configure lane (CCIP 2.0 lanes sequence, same as ccip_execute_test)
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
@@ -684,7 +688,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	t.Log("Configured chain for lanes")
 
 	// wait for EDS to start up
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// Create PerPartyRouter for receiver via EDS
 	perPartyRouterFactoryCid, disclosedContracts, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), ccipAPIClient)
@@ -724,10 +728,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	t.Logf("Created PerPartyRouter for receiver: %s", routerCid)
 
 	// Build Message
-	// Encode instrumentId for destTokenAddress
-	encodedInstrumentId := encodeInstrumentId(registryAdmin, "Amulet")
-	hashedInstrumentId := crypto.Keccak256(encodedInstrumentId)
-
 	// Build token transfer (5 AMT in Splice Decimal format)
 	encodedTokenTransfer := buildTokenTransferV1(tc.tokenAmount, remotePoolAddress, remoteTokenAddress, hashedInstrumentId, partyReceiver, tc.sourcePoolData)
 
@@ -786,9 +786,12 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
 	// Get TransferFactory and pool holdings (needed by CCIPReceiver.Execute for token release)
-	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partyTokenPoolOwner, partyReceiver)
+	// TODO - this should be returned by EDS
+	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partyTokenPoolOwner, partyReceiver)
 	require.NoError(t, err)
 
+	choiceContext, err := edsTesthelpers.CCIPContextFromData(choiceContextRaw)
+	require.NoError(t, err)
 	poolHoldings, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
 		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
 	})
@@ -802,21 +805,42 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
 
-	executeDisclosuresEDS, err := testhelpers.GetCCIPExecuteDisclosures(
-		t.Context(),
-		encodedMessageHex,
-		edsClient,
-		[]contracts.InstanceAddress{
-			contracts.HexToInstanceAddress(committeeVerifier.Address),
-		},
-	)
+	tokenPoolAddress, err := edsTesthelpers.GetTokenPoolForToken(t.Context(), ccipAPIClient, hashedInstrumentId)
 	require.NoError(t, err)
-	require.Len(t, executeDisclosuresEDS.CCVContractIDs, 1)
+	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(t.Context(), ccipAPIClient, encodedMessageHex)
+	require.NoError(t, err)
+	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, contracts.HexToInstanceAddress(committeeVerifier.Address))
+	require.NoError(t, err)
+	tokenPoolDisclosure, err := edsTesthelpers.GetTokenPoolExecuteDisclosure(t.Context(), tokenPoolAPIClient, encodedMessageHex, tokenPoolAddress.InstanceAddress())
+	require.NoError(t, err)
 
-	executeDisclosures := slices.Concat(
-		executeDisclosuresEDS.DisclosedContracts,
-		transferFactoryDisclosures, // not from EDS
-	)
+	// TODO temp - this should be returned by EDS instead
+	tokenPoolDisclosure.TokenInput.TransferFactory = types.CONTRACT_ID(transferFactoryCid)
+	tokenPoolDisclosure.TokenInput.ExtraArgs = splice_api_token_metadata_v1.ExtraArgs{
+		Context: splice_api_token_metadata_v1.ChoiceContext{
+			Values: choiceContext.Values,
+		},
+		Meta: splice_api_token_metadata_v1.Metadata{},
+	}
+
+	executeArgs := ccipreceiver.Execute2{
+		Context:        ccipExecuteDisclosure.ChoiceContext,
+		RouterCid:      types.CONTRACT_ID(routerCid),
+		EncodedMessage: types.TEXT(encodedMessageHex),
+		TokenTransfer: &ccipreceiver.TokenTransferInput{
+			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
+			TokenReceiverParty: types.PARTY(partyReceiver),
+			TokenInput:         tokenPoolDisclosure.TokenInput,
+			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
+		},
+		CcvInputs: []ccipreceiver.CCVInput{
+			{
+				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
+				VerifierResults: types.TEXT(verifierResultsHex),
+				CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+			},
+		},
+	}
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV + Pool Verify + Execute + Release
 	// in one receiver-authored transaction with disclosed shared dependencies.
@@ -825,38 +849,19 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
-					ContractId: ccipReceiverCid,
-					Choice:     "Execute",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: executeDisclosuresEDS.ChoiceContext},
-						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
-						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
-						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: executeDisclosuresEDS.TokenPoolContractID.ContractId}}},
-							{Label: "tokenReceiverParty", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-							{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: transferFactoryCid}}},
-								{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-									{Label: "context", Value: choiceContext},
-									{Label: "meta", Value: emptyMetadata},
-								}}}}},
-								{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: executeDisclosuresEDS.TokenPoolHoldingsContractIDs}}}},
-							}}}}},
-							{Label: "poolExtraContext", Value: executeDisclosuresEDS.PoolExtraContext},
-						}}}}}}}},
-						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: executeDisclosuresEDS.CCVContractIDs[0].ContractId}}},
-								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
-								{Label: "ccvExtraContext", Value: emptyCCIPContext},
-							}}}},
-						}}}}},
-					}}}},
+					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+					ContractId:     ccipReceiverCid,
+					Choice:         "Execute",
+					ChoiceArgument: ledger.MapToValue(executeArgs),
 				}},
 			}},
-			ActAs:              []string{partyReceiver},
-			DisclosedContracts: executeDisclosures,
+			ActAs: []string{partyReceiver},
+			DisclosedContracts: slices.Concat(
+				tokenPoolDisclosure.DisclosedContracts,
+				ccipExecuteDisclosure.DisclosedContracts,
+				ccvExecuteDisclosure.DisclosedContracts,
+				transferFactoryDisclosures, // TODO - this should be returned by EDS instead
+			),
 		},
 	})
 	require.NoError(t, err)
@@ -936,8 +941,8 @@ func extractCreatedContractId(res *apiv2.SubmitAndWaitForTransactionResponse) st
 func buildTokenTransferV1(
 	amount *big.Int,
 	sourcePoolAddress,
-	sourceTokenAddress,
-	destTokenAddress []byte,
+	sourceTokenAddress []byte,
+	destTokenAddress contracts.EncodedInstrumentID,
 	tokenReceiverParty string,
 	extraData []byte,
 ) *TokenTransferV1 {
@@ -945,7 +950,7 @@ func buildTokenTransferV1(
 		Amount:             amount,
 		SourcePoolAddress:  sourcePoolAddress,
 		SourceTokenAddress: sourceTokenAddress,
-		DestTokenAddress:   destTokenAddress,
+		DestTokenAddress:   destTokenAddress.Bytes(),
 		TokenReceiver:      EncodePartyID(tokenReceiverParty),
 		ExtraData:          extraData,
 	}
@@ -982,17 +987,3 @@ func getRateLimiterInstanceID(rateLimiter *apiv2.ActiveContract) string {
 func getRateLimiterTokens(rateLimiter *apiv2.ActiveContract) string {
 	return rateLimiter.GetCreatedEvent().GetCreateArguments().GetFields()[9].GetValue().GetNumeric()
 }
-
-var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	{
-		Label: "values",
-		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
-	},
-}}}}
-
-var emptyCCIPContext = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	{
-		Label: "values",
-		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
-	},
-}}}}

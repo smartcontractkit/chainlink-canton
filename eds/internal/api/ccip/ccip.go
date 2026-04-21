@@ -12,6 +12,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 
@@ -24,7 +32,7 @@ import (
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore store.ActiveContractStore
+	activeContractStore *store.ActiveContractStore
 
 	perPartyRouterFactory contracts.InstanceAddress
 	onRamp                contracts.InstanceAddress
@@ -39,10 +47,10 @@ var _ oapiCCIP.ServerInterface = &Server{}
 
 func NewServer(
 	logger zerolog.Logger,
-	activeContractStore store.ActiveContractStore,
+	activeContractStore *store.ActiveContractStore,
 	config config.CCIPAPIConfig,
 ) *Server {
-	return &Server{
+	s := &Server{
 		logger:                logger.With().Str("component", "CCIPAPI").Logger(),
 		activeContractStore:   activeContractStore,
 		perPartyRouterFactory: config.PerPartyRouterFactory.InstanceAddress,
@@ -53,6 +61,35 @@ func NewServer(
 		rmnRemote:             config.RMNRemote.InstanceAddress,
 		feeQuoter:             config.FeeQuoter.InstanceAddress,
 	}
+
+	s.activeContractStore.RegisterTemplates(
+		[]store.RegisteredTemplate{
+			{
+				TemplateID: contracts.TemplateIDFromBinding(perpartyrouter.PerPartyRouterFactory{}),
+				PartyID:    config.OnRamp.PartyID,
+			}, {
+				TemplateID: contracts.TemplateIDFromBinding(onramp.OnRamp{}),
+				PartyID:    config.OnRamp.PartyID,
+			}, {
+				TemplateID: contracts.TemplateIDFromBinding(offramp.OffRamp{}),
+				PartyID:    config.OffRamp.PartyID,
+			}, {
+				TemplateID: contracts.TemplateIDFromBinding(common.GlobalConfig{}),
+				PartyID:    config.GlobalConfig.PartyID,
+			}, {
+				TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenAdminRegistry{}),
+				PartyID:    config.TokenAdminRegistry.PartyID,
+			}, {
+				TemplateID: contracts.TemplateIDFromBinding(rmn.RMNRemote{}),
+				PartyID:    config.RMNRemote.PartyID,
+			}, {
+				TemplateID: contracts.TemplateIDFromBinding(feequoter.FeeQuoter{}),
+				PartyID:    config.FeeQuoter.PartyID,
+			},
+		}...,
+	)
+
+	return s
 }
 
 func (s Server) PostPerPartyRouterFactory(c *gin.Context) {

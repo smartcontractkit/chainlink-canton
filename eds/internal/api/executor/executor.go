@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
+
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -19,7 +21,7 @@ type ContractConfig struct{}
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore store.ActiveContractStore
+	activeContractStore *store.ActiveContractStore
 
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
@@ -28,9 +30,8 @@ var _ oapiExecutor.ServerInterface = &Server{}
 
 func NewServer(
 	logger zerolog.Logger,
-	activeContractStore store.ActiveContractStore,
+	activeContractStore *store.ActiveContractStore,
 	config config.ExecutorAPIConfig,
-
 ) *Server {
 	s := &Server{
 		logger:              logger,
@@ -39,6 +40,10 @@ func NewServer(
 	}
 	for _, executor := range config.Executors {
 		s.contractConfigs[executor.InstanceAddress] = ContractConfig{}
+		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(executorBinding.Executor{}),
+			PartyID:    executor.PartyID,
+		})
 	}
 
 	return s

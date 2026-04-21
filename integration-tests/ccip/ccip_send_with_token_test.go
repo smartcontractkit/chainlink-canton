@@ -576,10 +576,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to get disclosed Executor")
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
-	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
+	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
 	require.NoError(t, err, "failed to get transfer factory")
-	require.NotNil(t, choiceContext, "choiceContext should not be nil")
+	require.NotNil(t, choiceContextRaw, "choiceContext should not be nil")
 
+	choiceContext, err := testhelpers.ChoiceContextFromData(choiceContextRaw)
+	require.NoError(t, err, "failed to parse choice context")
 	// Verify choiceContext has the expected structure (Record with "values" field)
 	require.NotNil(t, choiceContext.GetRecord(), "choiceContext should be a Record")
 	require.NotEmpty(t, choiceContext.GetRecord().GetFields(), "choiceContext should have fields")
@@ -631,8 +633,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		TokenPoolHoldings: []types.CONTRACT_ID{},
 	}
 
-	tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
+	tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
 	require.NoError(t, err, "failed to get token transfer factory")
+	tokenTransferChoiceContext, err := testhelpers.ChoiceContextFromData(tokenTransferChoiceContextRaw)
+	require.NoError(t, err, "failed to parse token transfer choice context")
 	tokenTransferContextValues := testhelpers.ExtractChoiceContextValues(tokenTransferChoiceContext)
 
 	// This transfer preapproval must be specified for transfer to the pool's owner to be automatically be accepted.
@@ -763,7 +767,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		// Re-fetch volatile Splice contracts (AmuletRules, transfer factories, preapproval)
 		// to avoid DSO-side races from background automation archiving/locking contracts
 		// between quote and final Send submission.
-		transferFactoryCid, transferFactoryDisclosures, choiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
+		transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
 		require.NoError(t, err, "failed to re-fetch fee transfer factory")
 		feeTokenInput = interfaces.TokenInput{
 			TransferFactory: types.CONTRACT_ID(transferFactoryCid),
@@ -775,7 +779,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		}
 		sendArgs.FeeTokenInput.TokenInput = feeTokenInput
 
-		tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
+		tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContextRaw, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
 		require.NoError(t, err, "failed to re-fetch token transfer factory")
 		disclosedPreapproval, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#splice-amulet", ModuleName: "Splice.AmuletRules", EntityName: "TransferPreapproval"})
 		require.NoError(t, err, "failed to re-fetch disclosed TransferPreapproval")

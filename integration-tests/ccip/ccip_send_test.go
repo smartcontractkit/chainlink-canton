@@ -508,10 +508,12 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("Minted Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
-	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
+	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
 	require.NoError(t, err, "failed to get transfer factory")
-	require.NotNil(t, choiceContext, "choiceContext should not be nil")
+	require.NotNil(t, choiceContextRaw, "choiceContext should not be nil")
 
+	choiceContext, err := testhelpers.ChoiceContextFromData(choiceContextRaw)
+	require.NoError(t, err, "failed to parse choice context")
 	// Verify choiceContext has the expected structure (Record with "values" field)
 	require.NotNil(t, choiceContext.GetRecord(), "choiceContext should be a Record")
 	require.NotEmpty(t, choiceContext.GetRecord().GetFields(), "choiceContext should have fields")

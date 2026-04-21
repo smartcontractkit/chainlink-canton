@@ -79,7 +79,7 @@ type CCV struct {
 
 type CCVAPIConfig struct {
 	Enabled bool  `toml:"enabled"`
-	CCVs    []CCV `toml:"ccvs" validate:"required"`
+	CCVs    []CCV `toml:"ccvs" validate:"required,dive"`
 }
 
 // Executor API
@@ -90,7 +90,7 @@ type Executor struct {
 
 type ExecutorAPIConfig struct {
 	Enabled   bool       `toml:"enabled"`
-	Executors []Executor `toml:"executors" validate:"required_if=Enabled true"`
+	Executors []Executor `toml:"executors" validate:"required_if=Enabled true,dive"`
 }
 
 // Token Pool API
@@ -105,11 +105,14 @@ const (
 type TokenPool struct {
 	ContractIdentifier
 	Type TokenPoolType `toml:"type" validate:"required,oneof=lockRelease burnMint"`
+
+	// The owner party of the token pool that is the owner of locked holdings
+	PoolOwner string `toml:"pool_owner" validate:"required"`
 }
 
 type TokenPoolAPIConfig struct {
 	Enabled    bool        `toml:"enabled"`
-	TokenPools []TokenPool `toml:"token_pools" validate:"required_if=Enabled true"`
+	TokenPools []TokenPool `toml:"token_pools" validate:"required_if=Enabled true,dive"`
 }
 
 // ContractIdentifier uniquely identifies a contract using an InstanceAddress.
