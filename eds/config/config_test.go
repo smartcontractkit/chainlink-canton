@@ -24,6 +24,7 @@ func TestRead(t *testing.T) {
 	}{
 		{
 			name: "valid config",
+			//language=toml
 			config: `
 chain_selector = "8706591216959472610"
 
