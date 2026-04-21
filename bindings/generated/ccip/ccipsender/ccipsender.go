@@ -435,6 +435,7 @@ func (t GetFee2) ToMap() map[string]any {
 	} else {
 		m["tokenTransferInput"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -446,6 +447,7 @@ func (t GetFee2) ToMap() map[string]any {
 	} else {
 		m["executorInput"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -560,6 +562,7 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 	} else {
 		m["tokenPoolCid"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -659,6 +662,7 @@ func (t Send) ToMap() map[string]any {
 	} else {
 		m["tokenTransferInput"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -670,6 +674,7 @@ func (t Send) ToMap() map[string]any {
 	} else {
 		m["executorInput"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

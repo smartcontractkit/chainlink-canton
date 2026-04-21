@@ -589,6 +589,7 @@ func (t ExecuteResult) ToMap() map[string]any {
 	} else {
 		m["tokenReceiveTicket"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -846,6 +847,7 @@ func (t GetFee) ToMap() map[string]any {
 	} else {
 		m["tokenPoolFeeQuote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -857,6 +859,7 @@ func (t GetFee) ToMap() map[string]any {
 	} else {
 		m["executorFeeQuote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2010,6 +2013,7 @@ func (t PrepareExecute2) ToMap() map[string]any {
 	} else {
 		m["tokenReceiverParty"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2303,6 +2307,7 @@ func (t SetDepsParams3) ToMap() map[string]any {
 	} else {
 		m["onRamp"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2314,6 +2319,7 @@ func (t SetDepsParams3) ToMap() map[string]any {
 	} else {
 		m["offRamp"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2325,6 +2331,7 @@ func (t SetDepsParams3) ToMap() map[string]any {
 	} else {
 		m["globalConfig"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2336,6 +2343,7 @@ func (t SetDepsParams3) ToMap() map[string]any {
 	} else {
 		m["tokenAdminRegistry"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2347,6 +2355,7 @@ func (t SetDepsParams3) ToMap() map[string]any {
 	} else {
 		m["feeQuoter"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2358,6 +2367,7 @@ func (t SetDepsParams3) ToMap() map[string]any {
 	} else {
 		m["rmnRemote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

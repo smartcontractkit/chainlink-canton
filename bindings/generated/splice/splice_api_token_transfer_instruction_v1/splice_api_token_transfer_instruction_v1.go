@@ -591,6 +591,7 @@ func (t TransferInstructionView) ToMap() map[string]any {
 	} else {
 		m["originalInstructionCid"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

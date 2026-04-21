@@ -824,6 +824,7 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 	} else {
 		m["allowListAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1229,6 +1230,7 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	} else {
 		m["rateLimitAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

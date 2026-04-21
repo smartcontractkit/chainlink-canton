@@ -477,6 +477,7 @@ func (t GetFeeFromRouter) ToMap() map[string]any {
 	} else {
 		m["tokenPoolFeeQuote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -488,6 +489,7 @@ func (t GetFeeFromRouter) ToMap() map[string]any {
 	} else {
 		m["executorFeeQuote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1123,6 +1125,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["globalConfig"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1134,6 +1137,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["rmnRemote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1145,6 +1149,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["tokenAdminRegistry"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1156,6 +1161,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["feeQuoter"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1167,6 +1173,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["ccvRegistry"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

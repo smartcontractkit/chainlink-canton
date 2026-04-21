@@ -1734,6 +1734,7 @@ func (t DestChainConfig) ToMap() map[string]any {
 	} else {
 		m["defaultExecutor"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1831,6 +1832,7 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 	} else {
 		m["defaultExecutor"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2063,6 +2065,7 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["tokenReceiver"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2163,6 +2166,7 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["inboundPoolCCVs"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2221,6 +2225,7 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 	} else {
 		args["tokenReceiver"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -2321,6 +2326,7 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 	} else {
 		args["inboundPoolCCVs"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -3087,6 +3093,7 @@ func (t FinalizeExecute) ToMap() map[string]any {
 	} else {
 		m["maybePoolOwner"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -3098,6 +3105,7 @@ func (t FinalizeExecute) ToMap() map[string]any {
 	} else {
 		m["maybeTicketReceiver"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -3109,6 +3117,7 @@ func (t FinalizeExecute) ToMap() map[string]any {
 	} else {
 		m["maybeTokenReceiver"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -3120,6 +3129,7 @@ func (t FinalizeExecute) ToMap() map[string]any {
 	} else {
 		m["maybeInstrumentId"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -3131,6 +3141,7 @@ func (t FinalizeExecute) ToMap() map[string]any {
 	} else {
 		m["maybeAmount"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -3179,6 +3190,7 @@ func (t FinalizeExecuteResult) ToMap() map[string]any {
 	} else {
 		m["tokenReceiveTicket"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -3891,6 +3903,7 @@ func (t MessageV1) ToMap() map[string]any {
 	} else {
 		m["tokenTransfer"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4301,6 +4314,7 @@ func (t Receipt) ToMap() map[string]any {
 	} else {
 		m["versionTag"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4579,6 +4593,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["requiredExecutor"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4593,6 +4608,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["executionMode"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4651,6 +4667,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["expectedTokenInstrumentId"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4662,6 +4679,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["outboundPoolCCVs"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4676,6 +4694,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["executorFee"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4720,6 +4739,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["tokenSendFee"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4748,6 +4768,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["tokenSendData"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4782,6 +4803,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	} else {
 		args["message"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4856,6 +4878,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	} else {
 		args["requiredExecutor"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4870,6 +4893,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	} else {
 		args["executionMode"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4928,6 +4952,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	} else {
 		args["expectedTokenInstrumentId"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4939,6 +4964,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	} else {
 		args["outboundPoolCCVs"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4953,6 +4979,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	} else {
 		args["executorFee"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -4997,6 +5024,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	} else {
 		args["tokenSendFee"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -5025,6 +5053,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	} else {
 		args["tokenSendData"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -5059,6 +5088,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	} else {
 		args["message"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

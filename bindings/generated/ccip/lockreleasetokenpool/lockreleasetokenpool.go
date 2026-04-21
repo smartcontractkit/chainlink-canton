@@ -831,6 +831,7 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 	} else {
 		args["rateLimitAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -916,6 +917,7 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 	} else {
 		args["rateLimitAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1812,6 +1814,7 @@ func (t SetDynamicConfig) ToMap() map[string]any {
 	} else {
 		m["rateLimitAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1857,6 +1860,7 @@ func (t SetDynamicConfigParams) ToMap() map[string]any {
 	} else {
 		m["rateLimitAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

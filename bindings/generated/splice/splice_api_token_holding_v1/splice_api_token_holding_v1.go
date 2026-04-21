@@ -92,6 +92,7 @@ func (t HoldingView) ToMap() map[string]any {
 	} else {
 		m["lock"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -195,6 +196,7 @@ func (t Lock) ToMap() map[string]any {
 	} else {
 		m["expiresAt"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -206,6 +208,7 @@ func (t Lock) ToMap() map[string]any {
 	} else {
 		m["expiresAfter"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -217,6 +220,7 @@ func (t Lock) ToMap() map[string]any {
 	} else {
 		m["context"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

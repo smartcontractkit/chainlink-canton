@@ -589,6 +589,7 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	} else {
 		args["allowListAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -671,6 +672,7 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	} else {
 		args["allowListAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1197,6 +1199,7 @@ func (t DynamicConfig) ToMap() map[string]any {
 	} else {
 		m["allowListAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1538,6 +1541,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["rmnRemote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

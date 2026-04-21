@@ -161,6 +161,7 @@ func (t ExecuteFromRouterResult) ToMap() map[string]any {
 	} else {
 		m["tokenReceiveTicket"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -665,6 +666,7 @@ func (t PrepareExecute) ToMap() map[string]any {
 	} else {
 		m["tokenReceiverParty"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -783,6 +785,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["globalConfig"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -794,6 +797,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["rmnRemote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -805,6 +809,7 @@ func (t SetDepsParams) ToMap() map[string]any {
 	} else {
 		m["tokenAdminRegistry"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

@@ -389,6 +389,7 @@ func (t DynamicConfig) ToMap() map[string]any {
 	} else {
 		m["feeAggregator"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

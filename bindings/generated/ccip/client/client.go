@@ -123,6 +123,7 @@ func (t Canton2AnyMessage) ToMap() map[string]any {
 	} else {
 		m["tokenTransfer"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

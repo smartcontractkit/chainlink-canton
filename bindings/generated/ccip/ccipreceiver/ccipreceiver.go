@@ -109,6 +109,7 @@ func (t CCIPMessageReceived) CreateCommand() *model.CreateCommand {
 	} else {
 		args["tokenReleaseResult"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -154,6 +155,7 @@ func (t CCIPMessageReceived) CreateCommandWithPackageID(packageID string) *model
 	} else {
 		args["tokenReleaseResult"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -541,6 +543,7 @@ func (t Execute2) ToMap() map[string]any {
 	} else {
 		m["tokenTransfer"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -620,6 +623,7 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 	} else {
 		m["tokenPoolCid"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 

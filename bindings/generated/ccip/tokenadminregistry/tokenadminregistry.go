@@ -995,6 +995,7 @@ func (t SetPool) ToMap() map[string]any {
 	} else {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1070,6 +1071,7 @@ func (t SetPoolParams) ToMap() map[string]any {
 	} else {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1534,6 +1536,7 @@ func (t TokenConfig) ToMap() map[string]any {
 	} else {
 		m["admin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1545,6 +1548,7 @@ func (t TokenConfig) ToMap() map[string]any {
 	} else {
 		m["pendingAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1556,6 +1560,7 @@ func (t TokenConfig) ToMap() map[string]any {
 	} else {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
