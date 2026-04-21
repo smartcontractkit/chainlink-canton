@@ -7,6 +7,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
+	"github.com/chainlink/canton-party-ceremony/ceremony"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -212,6 +213,16 @@ var SignSubmissionOp = operations.NewOperation(
 		hashBytes, err := hex.DecodeString(in.PreparedTransactionHash)
 		if err != nil {
 			return SignSubmissionOutput{}, fmt.Errorf("decoding prepared transaction hash: %w", err)
+		}
+
+		if deps.Confirmer != nil {
+			detail := ceremony.DAMLSignDetail{
+				TransactionHash: in.PreparedTransactionHash,
+				SignerIdentity:  in.ParticipantID,
+			}
+			if cErr := deps.Confirmer.ConfirmDAMLSign(ctx, detail); cErr != nil {
+				return SignSubmissionOutput{}, operations.NewUnrecoverableError(cErr)
+			}
 		}
 
 		sig, err := deps.Signer.Sign(ctx, hashBytes)
