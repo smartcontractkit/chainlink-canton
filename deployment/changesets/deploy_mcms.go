@@ -207,6 +207,7 @@ func normalizeGroups(input []types.INT64, name string) ([]types.INT64, error) {
 
 	out := make([]types.INT64, mcmsGroupCount)
 	copy(out, input)
+
 	return out, nil
 }
 
@@ -233,6 +234,7 @@ func qualifierOrDefault(qualifier string) string {
 	if qualifier != "" {
 		return qualifier
 	}
+
 	return ccipdeploymentutils.CLLQualifier
 }
 

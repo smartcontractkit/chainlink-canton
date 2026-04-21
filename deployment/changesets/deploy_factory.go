@@ -42,6 +42,7 @@ func (d DeployCCIPFactory) VerifyPreconditions(e cldf.Environment, config Canton
 	if config.Config.Params.OwnerParty == "" {
 		return fmt.Errorf("owner party is required")
 	}
+
 	return nil
 }
 
@@ -58,6 +59,7 @@ func (d DeployCCIPFactory) Apply(e cldf.Environment, config CantonCSDeps[DeployC
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to store address ref %v: %w", addrRef, err)
 		}
 	}
+
 	return cldf.ChangesetOutput{DataStore: ds, Reports: []operations.Report[any, any]{}}, nil
 }
 

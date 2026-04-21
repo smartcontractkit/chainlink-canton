@@ -239,9 +239,7 @@ func writeUvarint(buf *bytes.Buffer, value uint64) {
 }
 
 func writeInt64(buf *bytes.Buffer, value types.INT64) {
-	var scratch [8]byte
-	binary.BigEndian.PutUint64(scratch[:], uint64(value))
-	buf.Write(scratch[:])
+	_ = binary.Write(buf, binary.BigEndian, int64(value))
 }
 
 func writeBool(buf *bytes.Buffer, value types.BOOL) {

@@ -100,11 +100,13 @@ func findMCMSAddressRef(
 		if qualifier != "" {
 			return datastore.AddressRef{}, fmt.Errorf("no %s ref found on chain %d with qualifier %q", contractType, chainSelector, qualifier)
 		}
+
 		return datastore.AddressRef{}, fmt.Errorf("no %s ref found on chain %d", contractType, chainSelector)
 	default:
 		if qualifier != "" {
 			return datastore.AddressRef{}, fmt.Errorf("multiple %s refs found on chain %d with qualifier %q", contractType, chainSelector, qualifier)
 		}
+
 		return datastore.AddressRef{}, fmt.Errorf("multiple %s refs found on chain %d; specify MCMS qualifier", contractType, chainSelector)
 	}
 }
