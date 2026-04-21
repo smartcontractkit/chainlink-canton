@@ -13,14 +13,6 @@ packages:
       UpdateServiceClient:
         config:
           filename: "mock_UpdateServiceClient.go"
-  github.com/smartcontractkit/chainlink-canton/eds/internal/store:
-    interfaces:
-      ActiveContractStore:
-        config:
-          filename: "mock_ActiveContractStore.go"
-      InstrumentHoldingStore:
-        config:
-          filename: "mock_InstrumentHoldingStore.go"
   google.golang.org/grpc:
     interfaces:
       ServerStreamingClient:
