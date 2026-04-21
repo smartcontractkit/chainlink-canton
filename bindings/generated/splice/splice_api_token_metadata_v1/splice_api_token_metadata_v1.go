@@ -240,13 +240,7 @@ type ChoiceContext struct {
 func (t ChoiceContext) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["values"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Values).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Values
-	}()
+	m["values"] = model.NestedToDAMLValue(t.Values)
 
 	return m
 }
@@ -282,13 +276,7 @@ type ChoiceExecutionMetadata struct {
 func (t ChoiceExecutionMetadata) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["meta"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Meta).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Meta
-	}()
+	m["meta"] = model.NestedToDAMLValue(t.Meta)
 
 	return m
 }
@@ -325,21 +313,9 @@ type ExtraArgs struct {
 func (t ExtraArgs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Context
-	}()
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
-	m["meta"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Meta).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Meta
-	}()
+	m["meta"] = model.NestedToDAMLValue(t.Meta)
 
 	return m
 }
@@ -375,13 +351,7 @@ type Metadata struct {
 func (t Metadata) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["values"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Values).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Values
-	}()
+	m["values"] = model.NestedToDAMLValue(t.Values)
 
 	return m
 }

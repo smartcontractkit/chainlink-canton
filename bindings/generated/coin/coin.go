@@ -76,13 +76,7 @@ func (t CoinHolding) CreateCommand() *model.CreateCommand {
 	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["view"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.View).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.View
-	}()
+	args["view"] = model.NestedToDAMLValue(t.View)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["issuer"] = t.Issuer.ToMap()
@@ -98,13 +92,7 @@ func (t CoinHolding) CreateCommandWithPackageID(packageID string) *model.CreateC
 	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["view"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.View).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.View
-	}()
+	args["view"] = model.NestedToDAMLValue(t.View)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["issuer"] = t.Issuer.ToMap()
@@ -211,25 +199,13 @@ func (t CoinRegistry) CreateCommand() *model.CreateCommand {
 	args["issuer"] = t.Issuer.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instrumentId"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.InstrumentId
-	}()
+	args["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["meta"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Meta).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Meta
-	}()
+	args["meta"] = model.NestedToDAMLValue(t.Meta)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -245,25 +221,13 @@ func (t CoinRegistry) CreateCommandWithPackageID(packageID string) *model.Create
 	args["issuer"] = t.Issuer.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instrumentId"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.InstrumentId
-	}()
+	args["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["meta"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Meta).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Meta
-	}()
+	args["meta"] = model.NestedToDAMLValue(t.Meta)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -429,13 +393,7 @@ func (t CoinTransferInstruction) CreateCommand() *model.CreateCommand {
 	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["holding"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Holding).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Holding
-	}()
+	args["holding"] = model.NestedToDAMLValue(t.Holding)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["newOwner"] = t.NewOwner.ToMap()
@@ -457,13 +415,7 @@ func (t CoinTransferInstruction) CreateCommandWithPackageID(packageID string) *m
 	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["holding"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Holding).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Holding
-	}()
+	args["holding"] = model.NestedToDAMLValue(t.Holding)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["newOwner"] = t.NewOwner.ToMap()
@@ -739,13 +691,7 @@ func (t MintPreapprovalMint) ToMap() map[string]any {
 
 	m["issuer"] = t.Issuer.ToMap()
 
-	m["view"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.View).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.View
-	}()
+	m["view"] = model.NestedToDAMLValue(t.View)
 
 	return m
 }
@@ -800,13 +746,7 @@ func (t MintRole) CreateCommand() *model.CreateCommand {
 	args["minter"] = t.Minter.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["registry"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Registry).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Registry
-	}()
+	args["registry"] = model.NestedToDAMLValue(t.Registry)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -825,13 +765,7 @@ func (t MintRole) CreateCommandWithPackageID(packageID string) *model.CreateComm
 	args["minter"] = t.Minter.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["registry"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Registry).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Registry
-	}()
+	args["registry"] = model.NestedToDAMLValue(t.Registry)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -915,23 +849,12 @@ type MintRoleMint struct {
 func (t MintRoleMint) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.InstrumentId
-	}()
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	m["outputs"] = func() []any {
 		res := make([]any, 0, len(t.Outputs))
 		for _, e := range t.Outputs {
-			type mapper interface{ ToMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.ToMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()

@@ -222,29 +222,11 @@ type CCVSendInput struct {
 func (t CCVSendInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["ccvAddress"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.CcvAddress).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.CcvAddress
-	}()
+	m["ccvAddress"] = model.NestedToDAMLValue(t.CcvAddress)
 
-	m["ccvCid"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.CcvCid).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.CcvCid
-	}()
+	m["ccvCid"] = model.NestedToDAMLValue(t.CcvCid)
 
-	m["ccvExtraContext"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.CcvExtraContext).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.CcvExtraContext
-	}()
+	m["ccvExtraContext"] = model.NestedToDAMLValue(t.CcvExtraContext)
 
 	return m
 }
@@ -281,21 +263,9 @@ type ExecutorInput struct {
 func (t ExecutorInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["executorCid"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.ExecutorCid).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.ExecutorCid
-	}()
+	m["executorCid"] = model.NestedToDAMLValue(t.ExecutorCid)
 
-	m["executorExtraContext"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.ExecutorExtraContext).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.ExecutorExtraContext
-	}()
+	m["executorExtraContext"] = model.NestedToDAMLValue(t.ExecutorExtraContext)
 
 	return m
 }
@@ -340,13 +310,7 @@ func (t FeeTokenInput) ToMap() map[string]any {
 		return res
 	}()
 
-	m["tokenInput"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.TokenInput
-	}()
+	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	return m
 }
@@ -390,39 +354,16 @@ func (t GetFee2) ToMap() map[string]any {
 
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
-	m["message"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Message).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Message
-	}()
+	m["message"] = model.NestedToDAMLValue(t.Message)
 
-	m["context"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Context
-	}()
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
-	m["routerCid"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.RouterCid
-	}()
+	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
 	m["ccvSendInputs"] = func() []any {
 		res := make([]any, 0, len(t.CcvSendInputs))
 		for _, e := range t.CcvSendInputs {
-			type mapper interface{ ToMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.ToMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -430,7 +371,7 @@ func (t GetFee2) ToMap() map[string]any {
 	if t.TokenTransferInput != nil {
 		m["tokenTransferInput"] = map[string]any{
 			"_type": "optional",
-			"value": *t.TokenTransferInput,
+			"value": model.NestedToDAMLValue(*t.TokenTransferInput),
 		}
 	} else {
 		m["tokenTransferInput"] = map[string]any{
@@ -442,7 +383,7 @@ func (t GetFee2) ToMap() map[string]any {
 	if t.ExecutorInput != nil {
 		m["executorInput"] = map[string]any{
 			"_type": "optional",
-			"value": *t.ExecutorInput,
+			"value": model.NestedToDAMLValue(*t.ExecutorInput),
 		}
 	} else {
 		m["executorInput"] = map[string]any{
@@ -530,34 +471,16 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
-	m["message"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Message).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Message
-	}()
+	m["message"] = model.NestedToDAMLValue(t.Message)
 
-	m["context"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Context
-	}()
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
-	m["routerCid"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.RouterCid
-	}()
+	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
 	if t.TokenPoolCid != nil {
 		m["tokenPoolCid"] = map[string]any{
 			"_type": "optional",
-			"value": *t.TokenPoolCid,
+			"value": model.NestedToDAMLValue(*t.TokenPoolCid),
 		}
 	} else {
 		m["tokenPoolCid"] = map[string]any{
@@ -609,47 +532,18 @@ func (t Send) ToMap() map[string]any {
 
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
-	m["message"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Message).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Message
-	}()
+	m["message"] = model.NestedToDAMLValue(t.Message)
 
-	m["context"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Context
-	}()
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
-	m["routerCid"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.RouterCid).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.RouterCid
-	}()
+	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
-	m["feeTokenInput"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.FeeTokenInput).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.FeeTokenInput
-	}()
+	m["feeTokenInput"] = model.NestedToDAMLValue(t.FeeTokenInput)
 
 	m["ccvSendInputs"] = func() []any {
 		res := make([]any, 0, len(t.CcvSendInputs))
 		for _, e := range t.CcvSendInputs {
-			type mapper interface{ ToMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.ToMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -657,7 +551,7 @@ func (t Send) ToMap() map[string]any {
 	if t.TokenTransferInput != nil {
 		m["tokenTransferInput"] = map[string]any{
 			"_type": "optional",
-			"value": *t.TokenTransferInput,
+			"value": model.NestedToDAMLValue(*t.TokenTransferInput),
 		}
 	} else {
 		m["tokenTransferInput"] = map[string]any{
@@ -669,7 +563,7 @@ func (t Send) ToMap() map[string]any {
 	if t.ExecutorInput != nil {
 		m["executorInput"] = map[string]any{
 			"_type": "optional",
-			"value": *t.ExecutorInput,
+			"value": model.NestedToDAMLValue(*t.ExecutorInput),
 		}
 	} else {
 		m["executorInput"] = map[string]any{
@@ -723,29 +617,11 @@ func (t TokenTransferInput) ToMap() map[string]any {
 		return res
 	}()
 
-	m["tokenPoolCid"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.TokenPoolCid).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.TokenPoolCid
-	}()
+	m["tokenPoolCid"] = model.NestedToDAMLValue(t.TokenPoolCid)
 
-	m["poolExtraContext"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.PoolExtraContext).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.PoolExtraContext
-	}()
+	m["poolExtraContext"] = model.NestedToDAMLValue(t.PoolExtraContext)
 
-	m["tokenInput"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.TokenInput
-	}()
+	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	return m
 }

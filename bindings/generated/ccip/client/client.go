@@ -63,13 +63,7 @@ type CCVExtraArg struct {
 func (t CCVExtraArg) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["ccvAddress"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.CcvAddress).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.CcvAddress
-	}()
+	m["ccvAddress"] = model.NestedToDAMLValue(t.CcvAddress)
 
 	m["ccvArgs"] = string(t.CcvArgs)
 
@@ -118,7 +112,7 @@ func (t Canton2AnyMessage) ToMap() map[string]any {
 	if t.TokenTransfer != nil {
 		m["tokenTransfer"] = map[string]any{
 			"_type": "optional",
-			"value": *t.TokenTransfer,
+			"value": model.NestedToDAMLValue(*t.TokenTransfer),
 		}
 	} else {
 		m["tokenTransfer"] = map[string]any{
@@ -127,21 +121,9 @@ func (t Canton2AnyMessage) ToMap() map[string]any {
 		}
 	}
 
-	m["feeToken"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.FeeToken
-	}()
+	m["feeToken"] = model.NestedToDAMLValue(t.FeeToken)
 
-	m["extraArgs"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.ExtraArgs
-	}()
+	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
 
 	return m
 }
@@ -283,13 +265,7 @@ type ExecutorWithAddress struct {
 func (t ExecutorWithAddress) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["executorAddress"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.ExecutorAddress).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.ExecutorAddress
-	}()
+	m["executorAddress"] = model.NestedToDAMLValue(t.ExecutorAddress)
 
 	m["executorArgs"] = string(t.ExecutorArgs)
 
@@ -387,23 +363,12 @@ func (t GenericExtraArgsV3) ToMap() map[string]any {
 	m["ccvs"] = func() []any {
 		res := make([]any, 0, len(t.Ccvs))
 		for _, e := range t.Ccvs {
-			type mapper interface{ ToMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.ToMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
 
-	m["executor"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Executor).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Executor
-	}()
+	m["executor"] = model.NestedToDAMLValue(t.Executor)
 
 	m["tokenReceiver"] = string(t.TokenReceiver)
 
@@ -444,13 +409,7 @@ type TokenTransfer struct {
 func (t TokenTransfer) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["token"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Token).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Token
-	}()
+	m["token"] = model.NestedToDAMLValue(t.Token)
 
 	m["amount"] = t.Amount
 
