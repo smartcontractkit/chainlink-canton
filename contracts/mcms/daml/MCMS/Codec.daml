@@ -408,6 +408,9 @@ encodeSelfDispatchSetConfig : Role -> SetConfigParams -> BytesHex
 encodeSelfDispatchSetConfig role params =
   fromSome (encodeUint8 (roleToInt role)) <> encodeSetConfigParams params
 
+encodePruneSeenHashesParams : Role -> BytesHex
+encodePruneSeenHashesParams role = fromSome (encodeUint8 (roleToInt role))
+
 decodeSelfDispatchSetConfig : BytesHex -> Optional (Role, SetConfigParams)
 decodeSelfDispatchSetConfig encoded = do
   (result, _) <- decodeSelfDispatchSetConfigWithOffset encoded
