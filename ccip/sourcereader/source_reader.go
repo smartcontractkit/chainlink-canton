@@ -199,6 +199,7 @@ func extractEvents(lggr logger.Logger, transactions []*ledgerv2.Transaction, cci
 					"ledgerOffset", tx.GetOffset(),
 					"updateId", tx.GetUpdateId(),
 				)
+
 				continue
 			}
 			if messageSentEvent != nil {

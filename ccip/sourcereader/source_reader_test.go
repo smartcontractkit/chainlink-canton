@@ -511,7 +511,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		).Return(stream, nil)
 
 		reader := &sourceReader{
-			lggr:                 logger.Test(t),
+			lggr:                logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -629,7 +629,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything).Return(stream, nil)
 
 		reader := &sourceReader{
-			lggr:                 logger.Test(t),
+			lggr:                logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -658,7 +658,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		).Return(stream, nil)
 
 		reader := &sourceReader{
-			lggr:                 logger.Test(t),
+			lggr:                logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -693,7 +693,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		).Return(stream, nil)
 
 		reader := &sourceReader{
-			lggr:                 logger.Test(t),
+			lggr:                logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -868,7 +868,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything).Return(stream, nil)
 
 		reader := &sourceReader{
-			lggr:                 logger.Test(t),
+			lggr:                logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -1022,7 +1022,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything).Return(stream, nil)
 
 		reader := &sourceReader{
-			lggr:                 logger.Test(t),
+			lggr:                logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
@@ -1145,7 +1145,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything).Return(stream, nil)
 
 		reader := &sourceReader{
-			lggr:                 logger.Test(t),
+			lggr:                logger.Test(t),
 			updateServiceClient: updateClient,
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
