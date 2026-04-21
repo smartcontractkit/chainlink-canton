@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -72,13 +73,24 @@ func (c CantonTokenAdapter) SetTokenPoolRateLimits() *operations.Sequence[tokena
 }
 
 func (c CantonTokenAdapter) DeployToken() *operations.Sequence[tokenadapters.DeployTokenInput, sequences.OnChainOutput, chain.BlockChains] {
-	// TODO implement me
-	panic("implement me")
+	return operations.NewSequence(
+		"canton/token-adapter/deploy-token",
+		semver.MustParse("2.0.0"),
+		"Resolves an existing Canton instrument-backed token ref without deploying a token",
+		func(_ operations.Bundle, _ chain.BlockChains, input tokenadapters.DeployTokenInput) (sequences.OnChainOutput, error) {
+			ref, err := resolveExistingCantonTokenRef(input.ExistingDataStore, input)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+
+			return sequences.OnChainOutput{Addresses: []datastore.AddressRef{ref}}, nil
+		},
+	)
 }
 
 func (c CantonTokenAdapter) DeployTokenVerify(e deployment.Environment, in tokenadapters.DeployTokenInput) error {
-	// TODO implement me
-	panic("implement me")
+	_, err := resolveExistingCantonTokenRef(e.DataStore, in)
+	return err
 }
 
 func (c CantonTokenAdapter) DeployTokenPoolForToken() *operations.Sequence[tokenadapters.DeployTokenPoolInput, sequences.OnChainOutput, chain.BlockChains] {
@@ -86,11 +98,96 @@ func (c CantonTokenAdapter) DeployTokenPoolForToken() *operations.Sequence[token
 }
 
 func (c CantonTokenAdapter) UpdateAuthorities() *operations.Sequence[tokenadapters.UpdateAuthoritiesInput, sequences.OnChainOutput, *deployment.Environment] {
-	// TODO implement me
-	panic("implement me")
+	return operations.NewSequence(
+		"canton/token-adapter/update-authorities",
+		semver.MustParse("2.0.0"),
+		"No-op for Canton instrument-backed tokens; no token or pool ownership transfer is required",
+		func(_ operations.Bundle, _ *deployment.Environment, _ tokenadapters.UpdateAuthoritiesInput) (sequences.OnChainOutput, error) {
+			return sequences.OnChainOutput{}, nil
+		},
+	)
 }
 
 func (c CantonTokenAdapter) MigrateLockReleasePoolLiquiditySequence() *operations.Sequence[tokenadapters.MigrateLockReleasePoolLiquidityInput, sequences.OnChainOutput, chain.BlockChains] {
 	// TODO implement me
 	panic("implement me")
+}
+
+func resolveExistingCantonTokenRef(ds datastore.DataStore, in tokenadapters.DeployTokenInput) (datastore.AddressRef, error) {
+	if ds == nil {
+		return datastore.AddressRef{}, fmt.Errorf("existing datastore is required to resolve an existing Canton token")
+	}
+
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(in.ChainSelector),
+		datastore.AddressRefByType(datastore.ContractType("Token")),
+	)
+	if len(refs) == 0 {
+		return datastore.AddressRef{}, fmt.Errorf("no Canton token refs found on chain %d", in.ChainSelector)
+	}
+
+	lookupValues := uniqueNonEmpty(in.Symbol, in.Name)
+	for _, value := range lookupValues {
+		if matches := filterTokenRefs(refs, func(ref datastore.AddressRef) bool {
+			return strings.EqualFold(ref.Qualifier, value)
+		}); len(matches) == 1 {
+			return matches[0], nil
+		} else if len(matches) > 1 {
+			return datastore.AddressRef{}, fmt.Errorf("multiple Canton token refs matched qualifier %q on chain %d", value, in.ChainSelector)
+		}
+
+		label := "instrument-id:" + value
+		if matches := filterTokenRefs(refs, func(ref datastore.AddressRef) bool {
+			for _, existingLabel := range ref.Labels.List() {
+				if strings.EqualFold(existingLabel, label) {
+					return true
+				}
+			}
+			return false
+		}); len(matches) == 1 {
+			return matches[0], nil
+		} else if len(matches) > 1 {
+			return datastore.AddressRef{}, fmt.Errorf("multiple Canton token refs matched label %q on chain %d", label, in.ChainSelector)
+		}
+	}
+
+	if len(refs) == 1 {
+		return refs[0], nil
+	}
+
+	return datastore.AddressRef{}, fmt.Errorf(
+		"could not resolve a unique Canton token ref on chain %d from symbol=%q name=%q; found %d token refs",
+		in.ChainSelector,
+		in.Symbol,
+		in.Name,
+		len(refs),
+	)
+}
+
+func filterTokenRefs(refs []datastore.AddressRef, predicate func(datastore.AddressRef) bool) []datastore.AddressRef {
+	filtered := make([]datastore.AddressRef, 0, len(refs))
+	for _, ref := range refs {
+		if predicate(ref) {
+			filtered = append(filtered, ref)
+		}
+	}
+	return filtered
+}
+
+func uniqueNonEmpty(values ...string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, trimmed)
+	}
+	return result
 }
