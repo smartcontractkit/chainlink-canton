@@ -32,17 +32,41 @@ type ContractDeployInput struct {
 	ContractArgs string `json:"contract_args"`
 }
 
+// Phase represents the current execution phase of the contract deploy ceremony.
+type Phase string
+
+const (
+	PhaseVerifyParty    Phase = "verify-party"
+	PhaseFetchMembers   Phase = "fetch-members"
+	PhaseDARUpload      Phase = "dar-upload"
+	PhasePrepare        Phase = "prepare"
+	PhaseSigning        Phase = "signing"
+	PhaseExecute        Phase = "execute"
+	PhaseVerifyContract Phase = "verify-contract"
+	PhaseCompleted      Phase = "completed"
+)
+
+// CeremonyState is the live snapshot embedded in every ContractDeployOutput.
+// It is built progressively as the sequence advances, so it is always present
+// — even when the sequence returns an error (e.g. ErrThresholdNotMet).
+type CeremonyState struct {
+	Phase          Phase    `json:"phase"`
+	Participants   []string `json:"participants,omitempty"`
+	DARsUploaded   []string `json:"dars_uploaded"`
+	DARsRequired   int      `json:"dars_required"`
+	Signed         []string `json:"signed"`
+	SignRequired   int      `json:"sign_required"`
+	PreparedTxHash string   `json:"prepared_tx_hash,omitempty"`
+}
+
 // ContractDeployOutput is the final result of a completed [ContractDeploySequence].
+// State is always populated — even when ExecuteSequence returns an error —
+// making it the primary way to inspect ceremony progress.
 type ContractDeployOutput struct {
-	// PackageIDs contains the main package IDs of the uploaded DARs.
-	PackageIDs []string `json:"package_ids"`
-
-	// PreparedTransactionHash is the hex-encoded hash from PrepareSubmission.
-	// Empty until the preparation step completes.
-	PreparedTransactionHash string `json:"prepared_transaction_hash"`
-
-	// ContractID is the created contract's ID. Empty until signing is implemented.
-	ContractID string `json:"contract_id"`
+	PackageIDs              []string      `json:"package_ids"`
+	PreparedTransactionHash string        `json:"prepared_transaction_hash"`
+	ContractID              string        `json:"contract_id"`
+	State                   CeremonyState `json:"state"`
 }
 
 // ── Per-operation I/O types ──────────────────────────────────────────────────
