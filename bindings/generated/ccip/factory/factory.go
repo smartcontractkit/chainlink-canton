@@ -37,7 +37,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "3920ae7a93762672b7e9fa8d2bfad39321c438adecaeda4911a54dad7c47bdff"
+	PackageID   = "6673a596f71c05d74c7b8793466f42b2e19210e8dfc1d6896aac836b5fa2b396"
 	SDKVersion  = "3.4.10"
 )
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/chainlink/canton-party-ceremony/ceremony"
 	"github.com/chainlink/canton-party-ceremony/internal/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 )
@@ -39,6 +40,7 @@ type ContractDeployDeps struct {
 	// Wire contracts.GetDar for production usage.
 	DARLoader DARLoader
 	// Signer signs prepared transaction hashes for the interactive submission.
-	Signer client.TransactionSigner
-	Logger logger.Logger
+	Signer    client.TransactionSigner
+	Logger    logger.Logger
+	Confirmer ceremony.Confirmer // nil means no confirmation prompt
 }

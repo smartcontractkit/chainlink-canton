@@ -344,7 +344,7 @@ template OnRamp
                     Some feeDestConfig ->
                         assertMsg "onramp: payload exceeds destination maxDataBytes"
                             (byteCount message.payload <= feeDestConfig.maxDataBytes)
-                    None -> pure ()
+                    None -> abort ("onramp: no fee config for destination chain " <> show destChainSelector)
 
                 _ <- exercise feeQuoterCid CCIP.FeeQuoter.GetTokenPrice with
                     instrumentId = message.feeToken
