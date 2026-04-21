@@ -233,6 +233,16 @@ var SignKickDNSProposalOp = operations.NewOperation(
 			)
 		}
 
+		if deps.Confirmer != nil {
+			detail, sErr := ceremony.SummarizeTopologyTx(in.DNSTxB64, in.ProposalHashSHA256, in.ParticipantID)
+			if sErr != nil {
+				return SignKickDNSProposalOutput{}, fmt.Errorf("summarizing topology tx: %w", sErr)
+			}
+			if cErr := deps.Confirmer.ConfirmTopologySign(ctx, detail); cErr != nil {
+				return SignKickDNSProposalOutput{}, operations.NewUnrecoverableError(cErr)
+			}
+		}
+
 		signed, err := deps.Client.SignTransactions(ctx, []*protov30.SignedTopologyTransaction{&tx}, in.SynchronizerID)
 		if err != nil {
 			return SignKickDNSProposalOutput{}, fmt.Errorf("signing kick DNS proposal: %w", err)

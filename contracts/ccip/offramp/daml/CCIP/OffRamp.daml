@@ -31,6 +31,23 @@ lookupOffRampCid ctx = CCIP.Context.getFromContextU ctx offRampKey
 rawInstanceAddress : OffRamp -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress offRamp = RawInstanceAddress.make offRamp.instanceId offRamp.ccipOwner
 
+assertValidMessageForLane
+    : Text
+    -> Party
+    -> Numeric 0
+    -> CCIP.GlobalConfig.SourceChainConfig
+    -> CCIP.MessageCodecV1.MessageV1
+    -> Update ()
+assertValidMessageForLane instanceId ccipOwner chainSelector sourceConfig message = do
+    assertMsg "offramp: source chain disabled" sourceConfig.isEnabled
+    assertMsg "offramp: invalid source onramp"
+        (message.onRampAddress `elem` sourceConfig.onRampAddresses)
+    assertMsg "offramp: invalid destination chain selector"
+        (message.destChainSelector == chainSelector)
+    let expectedOffRampAddress = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
+    assertMsg "offramp: invalid offRampAddress"
+        (message.offRampAddress == expectedOffRampAddress)
+
 -- | OffRamp contract for PerPartyRouter architecture.
 template OffRamp
     with
@@ -166,6 +183,7 @@ template OffRamp
                 sourceConfig <- case sourceConfigOpt of
                     None -> abort "prepareExecute: unknown source chain"
                     Some c -> pure c
+                assertValidMessageForLane instanceId ccipOwner globalConfig.chainSelector sourceConfig message
 
                 let isTokenOnlyTransfer =
                         message.messageData == ""
@@ -266,12 +284,6 @@ template OffRamp
                 globalConfig <- fetch globalConfigCid
                 RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner execMsg.deps.globalConfig
-                assertMsg "offramp: invalid destination chain selector"
-                    (message.destChainSelector == globalConfig.chainSelector)
-                let expectedOffRampAddress =
-                        CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
-                assertMsg "offramp: invalid offRampAddress for this lane"
-                    (message.offRampAddress == expectedOffRampAddress)
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "offramp: tokenadminregistry instance address mismatch"
@@ -283,11 +295,8 @@ template OffRamp
                         caller = ccipOwner
                 sourceConfig <- case sourceConfigOpt of
                     None -> abort "offramp: unknown source chain"
-                    Some c -> do
-                        assertMsg "offramp: source chain disabled" c.isEnabled
-                        assertMsg "offramp: invalid source onramp"
-                            (message.onRampAddress `elem` c.onRampAddresses)
-                        pure c
+                    Some c -> pure c
+                assertValidMessageForLane instanceId ccipOwner globalConfig.chainSelector sourceConfig message
 
                 -- Token transfers must complete the pool step before execution.
                 case execMsg.tokenReceiver of

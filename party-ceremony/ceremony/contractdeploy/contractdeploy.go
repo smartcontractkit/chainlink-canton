@@ -55,25 +55,32 @@ var ContractDeploySequence = operations.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Deploy a DAML contract through a decentralized party (verify → fetch participants → DAR upload → prepare → sign → execute → verify)",
 	func(b operations.Bundle, deps ContractDeployDeps, in ContractDeployInput) (ContractDeployOutput, error) {
+		out := ContractDeployOutput{
+			State: CeremonyState{Phase: PhaseVerifyParty},
+		}
+
 		// ── Step 1: Verify party ─────────────────────────────────────────────
 		_, err := operations.ExecuteOperation(b, VerifyPartyOp, deps, VerifyPartyInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 		})
 		if err != nil {
-			return ContractDeployOutput{}, fmt.Errorf("verify-party: %w", err)
+			return out, fmt.Errorf("verify-party: %w", err)
 		}
 
 		// ── Step 2: Fetch participants ────────────────────────────────────────
-		// Derive the participant list from the live PartyToParticipant topology
+		out.State.Phase = PhaseFetchMembers
 		fetchReport, err := operations.ExecuteOperation(b, FetchParticipantsOp, deps, FetchParticipantsInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			SynchronizerID:       in.SynchronizerID,
 		})
 		if err != nil {
-			return ContractDeployOutput{}, fmt.Errorf("fetch-participants: %w", err)
+			return out, fmt.Errorf("fetch-participants: %w", err)
 		}
 
 		participants := fetchReport.Output.Participants
+		out.State.Participants = participants
+		out.State.DARsRequired = len(participants)
+		out.State.SignRequired = len(participants)
 
 		deps.Logger.Infow("Participants resolved from topology",
 			"party", in.DecentralizedPartyID,
@@ -81,10 +88,7 @@ var ContractDeploySequence = operations.NewSequence(
 		)
 
 		// ── Step 3: DAR upload ───────────────────────────────────────────────
-		// Each participant uploads all configured DARs to their node.
-		// Errors in the per-participant loop mean that participant has not yet
-		// run their step; the sequence skips them and continues. The cached
-		// successful report will be returned on the next call.
+		out.State.Phase = PhaseDARUpload
 		uploads := make([]UploadDarsOutput, 0)
 		for _, pid := range participants {
 			r, uploadErr := operations.ExecuteOperation(b, UploadDarsOp, deps, UploadDarsInput{
@@ -97,20 +101,19 @@ var ContractDeploySequence = operations.NewSequence(
 				continue
 			}
 			uploads = append(uploads, r.Output)
+			out.State.DARsUploaded = append(out.State.DARsUploaded, pid)
 		}
 
-		// Gate: all participants must have uploaded DARs before proceeding.
 		if len(uploads) < len(participants) {
 			deps.Logger.Warnw("Not all participants have uploaded DARs",
 				"uploaded", len(uploads), "required", len(participants))
 
-			return ContractDeployOutput{}, fmt.Errorf("%w: %d/%d participants have uploaded DARs",
+			return out, fmt.Errorf("%w: %d/%d participants have uploaded DARs",
 				ErrThresholdNotMet, len(uploads), len(participants))
 		}
 
-		// Collect the first participant's package IDs as the canonical set
-		// (all participants upload the same DARs, so package IDs are identical).
 		packageIDs := uploads[0].PackageIDs
+		out.PackageIDs = packageIDs
 
 		deps.Logger.Infow("All DARs uploaded",
 			"participants", len(uploads),
@@ -118,7 +121,7 @@ var ContractDeploySequence = operations.NewSequence(
 		)
 
 		// ── Step 4: Prepare submission ───────────────────────────────────────
-		// Use the first package ID as the contract's package.
+		out.State.Phase = PhasePrepare
 		pkgID := ""
 		if len(packageIDs) > 0 {
 			pkgID = packageIDs[0]
@@ -133,18 +136,19 @@ var ContractDeploySequence = operations.NewSequence(
 			ContractArgs:         in.ContractArgs,
 		})
 		if err != nil {
-			return ContractDeployOutput{}, fmt.Errorf("prepare-submission: %w", err)
+			return out, fmt.Errorf("prepare-submission: %w", err)
 		}
 
 		prep := prepReport.Output
+		out.PreparedTransactionHash = prep.PreparedTransactionHash
+		out.State.PreparedTxHash = prep.PreparedTransactionHash
 
 		deps.Logger.Infow("Submission prepared",
 			"hash", prep.PreparedTransactionHash,
 		)
 
 		// ── Step 5: Sign submission ──────────────────────────────────────────
-		// Each participant signs the prepared transaction hash with their signing key.
-		// Same skip-and-continue pattern as the DAR upload loop above.
+		out.State.Phase = PhaseSigning
 		signs := make([]SignSubmissionOutput, 0, len(participants))
 		for _, pid := range participants {
 			r, signErr := operations.ExecuteOperation(b, SignSubmissionOp, deps, SignSubmissionInput{
@@ -158,21 +162,17 @@ var ContractDeploySequence = operations.NewSequence(
 				continue
 			}
 			signs = append(signs, r.Output)
+			out.State.Signed = append(out.State.Signed, pid)
 		}
 
-		// Gate: all participants must have signed before executing.
 		if len(signs) < len(participants) {
 			deps.Logger.Warnw("Not all participants have signed",
 				"signed", len(signs), "required", len(participants))
 
-			return ContractDeployOutput{
-					PackageIDs:              packageIDs,
-					PreparedTransactionHash: prep.PreparedTransactionHash,
-				}, fmt.Errorf("%w: %d/%d participants have signed",
-					ErrThresholdNotMet, len(signs), len(participants))
+			return out, fmt.Errorf("%w: %d/%d participants have signed",
+				ErrThresholdNotMet, len(signs), len(participants))
 		}
 
-		// Collect all base64-encoded signatures.
 		sigsB64 := make([]string, len(signs))
 		for i, s := range signs {
 			sigsB64[i] = s.SignatureB64
@@ -183,6 +183,7 @@ var ContractDeploySequence = operations.NewSequence(
 		)
 
 		// ── Step 6: Execute submission ───────────────────────────────────────
+		out.State.Phase = PhaseExecute
 		executeReport, err := operations.ExecuteOperation(b, ExecuteSubmissionOp, deps, ExecuteSubmissionInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			PreparedTxB64:        prep.PreparedTxB64,
@@ -190,13 +191,11 @@ var ContractDeploySequence = operations.NewSequence(
 			HashingSchemeVersion: prep.HashingSchemeVersion,
 		})
 		if err != nil {
-			return ContractDeployOutput{
-				PackageIDs:              packageIDs,
-				PreparedTransactionHash: prep.PreparedTransactionHash,
-			}, fmt.Errorf("execute-submission: %w", err)
+			return out, fmt.Errorf("execute-submission: %w", err)
 		}
 
 		// ── Step 7: Verify contract ───────────────────────────────────────────
+		out.State.Phase = PhaseVerifyContract
 		verifyReport, err := operations.ExecuteOperation(b, VerifyContractOp, deps, VerifyContractInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			PackageID:            pkgID,
@@ -205,10 +204,7 @@ var ContractDeploySequence = operations.NewSequence(
 			ContractID:           executeReport.Output.ContractID,
 		})
 		if err != nil {
-			return ContractDeployOutput{
-				PackageIDs:              packageIDs,
-				PreparedTransactionHash: prep.PreparedTransactionHash,
-			}, fmt.Errorf("verify-contract: %w", err)
+			return out, fmt.Errorf("verify-contract: %w", err)
 		}
 
 		contractID := verifyReport.Output.ContractID
@@ -218,10 +214,9 @@ var ContractDeploySequence = operations.NewSequence(
 			"packages", len(packageIDs),
 		)
 
-		return ContractDeployOutput{
-			PackageIDs:              packageIDs,
-			PreparedTransactionHash: prep.PreparedTransactionHash,
-			ContractID:              contractID,
-		}, nil
+		out.State.Phase = PhaseCompleted
+		out.ContractID = contractID
+
+		return out, nil
 	},
 )
