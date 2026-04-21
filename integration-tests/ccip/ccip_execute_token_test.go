@@ -623,7 +623,8 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 		log.Info().Err(err).Msg("EDS terminated")
 		if !errors.Is(err, context.Canceled) {
 			log.Error().Err(err).Msg("EDS server exited with error")
-			require.NoError(t, err, "EDS server exited with error")
+			t.Fail()
+			return
 		}
 	}()
 

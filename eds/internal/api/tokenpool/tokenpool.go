@@ -303,7 +303,7 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 				}, // TODO
 				TransferFactory: "", // TODO
 			},
-			DisclosedContracts: append(
+			DisclosedContracts: append( //nolint:makezero
 				disclosedHoldings,
 				converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
 				converters.ActiveContractToDisclosedContract(rateLimiter),
