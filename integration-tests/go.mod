@@ -8,7 +8,7 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 // Pin mcms canton-main
-replace github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260410182733-0771796ef83c
+replace github.com/smartcontractkit/mcms => /Users/sish/Desktop/mcms
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
@@ -24,7 +24,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
-	github.com/smartcontractkit/go-daml v0.6.1-0.20260413170941-75a7c4be0cd9
+	github.com/smartcontractkit/go-daml v0.6.1-0.20260421005024-9fd107e97903
 	github.com/smartcontractkit/mcms v0.40.1
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0
@@ -367,3 +367,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace github.com/smartcontractkit/go-daml => /tmp/go-daml-9fd107e

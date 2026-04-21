@@ -3492,11 +3492,11 @@ func (t *GetSourceChainConfigMCMSParams) UnmarshalHex(data string) error {
 
 // GlobalConfig is a Template type
 type GlobalConfig struct {
-	InstanceId         types.TEXT    `json:"instanceId"`
-	CcipOwner          types.PARTY   `json:"ccipOwner"`
-	ChainSelector      types.NUMERIC `json:"chainSelector"`
-	DestChainConfigs   types.GENMAP  `json:"destChainConfigs"`
-	SourceChainConfigs types.GENMAP  `json:"sourceChainConfigs"`
+	InstanceId         types.TEXT                          `json:"instanceId"`
+	CcipOwner          types.PARTY                         `json:"ccipOwner"`
+	ChainSelector      types.NUMERIC                       `json:"chainSelector"`
+	DestChainConfigs   map[types.NUMERIC]DestChainConfig   `json:"destChainConfigs"`
+	SourceChainConfigs map[types.NUMERIC]SourceChainConfig `json:"sourceChainConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

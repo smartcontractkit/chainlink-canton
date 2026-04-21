@@ -394,8 +394,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Decimals:     10,
 			InstanceID:   poolInstanceID,
 			Qualifier:    "test-pool-send",
-			RemoteChainConfigs: types.GENMAP{
-				strconv.FormatUint(remoteSelector, 10): lockreleasetokenpool.RemoteChainConfig{
+			RemoteChainConfigs: map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{
+				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): lockreleasetokenpool.RemoteChainConfig{
 					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
 					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
 					InboundCCVs:        []mcms.RawInstanceAddress{},
@@ -407,13 +407,13 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				},
 			},
 			// Set a custom token transfer fee config
-			TokenTransferFeeConfigs: types.GENMAP{
-				strconv.FormatUint(remoteSelector, 10): map[string]any{
-					"isEnabled":         true,
-					"destGasOverhead":   int64(25_000),
-					"destBytesOverhead": int64(32),
-					"feeUSDCents":       types.NUMERIC(strconv.Itoa(tokenTransferFeeUSDCents)),
-					"feeBps":            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
+			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{
+				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
+					IsEnabled:         types.BOOL(true),
+					DestGasOverhead:   types.INT64(25_000),
+					DestBytesOverhead: types.INT64(32),
+					FeeUSDCents:       types.NUMERIC(strconv.Itoa(tokenTransferFeeUSDCents)),
+					FeeBps:            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
 				},
 			},
 			PoolReceiveContext: common.CCIPContext{Values: types.TEXTMAP{}},

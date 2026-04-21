@@ -95,7 +95,8 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 		)
 		updates := make([]lockreleasetokenpool.ChainUpdate, 0, len(input.RemoteChains))
 		for remoteSelector, remoteCfg := range input.RemoteChains {
-			remoteSelectorKey := strconv.FormatUint(remoteSelector, 10)
+			remoteSelectorKeyStr := strconv.FormatUint(remoteSelector, 10)
+			remoteSelectorKey := types.NUMERIC(remoteSelectorKeyStr)
 			if _, found := parsedPool.RemoteChainConfigs[remoteSelectorKey]; found {
 				return out, fmt.Errorf("remote chain %d is already configured on token pool", remoteSelector)
 			}
@@ -165,7 +166,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				input.ExistingDataStore,
 				parsedPool,
 				input.TokenPoolAddress,
-				remoteSelectorKey,
+				remoteSelectorKeyStr,
 				"outbound",
 				outboundDefaultCfg,
 				common.RateLimitModeRateLimitMode_DefaultFinality,
@@ -179,7 +180,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				input.ExistingDataStore,
 				parsedPool,
 				input.TokenPoolAddress,
-				remoteSelectorKey,
+				remoteSelectorKeyStr,
 				"inbound",
 				inboundDefaultCfg,
 				common.RateLimitModeRateLimitMode_DefaultFinality,
@@ -195,7 +196,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				input.ExistingDataStore,
 				parsedPool,
 				input.TokenPoolAddress,
-				remoteSelectorKey,
+				remoteSelectorKeyStr,
 				"inbound-custom",
 				inboundCustomCfg,
 				common.RateLimitModeRateLimitMode_CustomFinality,
@@ -363,8 +364,8 @@ var DeployTokenPoolForToken = operations.NewSequence(
 				PoolOwner:               types.PARTY(participant.PartyID),
 				InstrumentId:            instrumentID,
 				Decimals:                types.INT64(10),
-				RemoteChainConfigs:      types.GENMAP{},
-				TokenTransferFeeConfigs: types.GENMAP{},
+				RemoteChainConfigs:      map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{},
+				TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{},
 				PoolReceiveContext: common.CCIPContext{
 					Values: types.TEXTMAP{},
 				},

@@ -36,9 +36,9 @@ type DeployTokenPoolConfig struct {
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
 	TransferTimeout lockreleasetokenpool.TransferTimeout
 	// Optional; defaults to empty map.
-	RemoteChainConfigs types.GENMAP
+	RemoteChainConfigs map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig
 	// Optional; defaults to empty map.
-	TokenTransferFeeConfigs types.GENMAP
+	TokenTransferFeeConfigs map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2
 	// Optional; zero-value deps if not provided.
 	Deps lockreleasetokenpool.LockReleaseTokenPoolDeps
 	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
@@ -77,11 +77,11 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 	remoteChainConfigs := cfg.RemoteChainConfigs
 	if remoteChainConfigs == nil {
-		remoteChainConfigs = types.GENMAP{}
+		remoteChainConfigs = map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{}
 	}
 	tokenTransferFeeConfigs := cfg.TokenTransferFeeConfigs
 	if tokenTransferFeeConfigs == nil {
-		tokenTransferFeeConfigs = types.GENMAP{}
+		tokenTransferFeeConfigs = map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{}
 	}
 	qualifier := ptr.String(cfg.Qualifier)
 	if cfg.Qualifier == "" {

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
@@ -362,22 +363,10 @@ func (s *DisclosureService) getTokenPoolRelatedDisclosures(ctx context.Context, 
 
 func getRateLimiterInstanceAddresses(remoteChainSelector uint64, tpCreatedEvent *lockreleasetokenpool.LockReleaseTokenPool) (inboundRateLimiterInstanceAddress contracts.InstanceAddress, inboundCustomBlockConfirmationsRateLimiterInstanceAddress contracts.InstanceAddress, outboundRateLimiterInstanceAddress contracts.InstanceAddress, err error) {
 	// look up the remote chain config for the remoteChainSelector provided
-	remoteChainConfigAny, ok := tpCreatedEvent.RemoteChainConfigs[fmt.Sprintf("%d.", remoteChainSelector)]
+	remoteChainConfig, ok := tpCreatedEvent.RemoteChainConfigs[types.NUMERIC(strconv.FormatUint(remoteChainSelector, 10))]
 	if !ok {
 		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf(
 			"remote chain config not found for remote chain selector: %d, keys: %+v", remoteChainSelector, slices.Collect(maps.Keys(tpCreatedEvent.RemoteChainConfigs)))
-	}
-
-	remoteChainConfigMap, ok := remoteChainConfigAny.(map[string]any)
-	if !ok {
-		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("remote chain config is not a map[string]any")
-	}
-
-	// unmarshal the remote chain config using ledger.MapToStruct
-	var remoteChainConfig lockreleasetokenpool.RemoteChainConfig
-	err = ledger.MapToStruct(remoteChainConfigMap, &remoteChainConfig)
-	if err != nil {
-		return contracts.InstanceAddress{}, contracts.InstanceAddress{}, contracts.InstanceAddress{}, fmt.Errorf("failed to unmarshal remote chain config: %w", err)
 	}
 
 	// Create the instance addresses by combining with the poolOwner
@@ -413,25 +402,13 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 
 	// tokenConfigs : Map.Map BytesHex TokenConfig — keys are hex encodings of the same bytes as destTokenAddress.
 	hexNo0x := strings.TrimPrefix(expectedHashedInstrumentID.Hex(), "0x")
-	v, ok := tarCreatedEvent.TokenConfigs[hexNo0x]
+	tokenConfig, ok := tarCreatedEvent.TokenConfigs[types.TEXT(hexNo0x)]
 	if !ok {
 		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
 			"token pool instance address not found in token admin registry data (dest token address: %s): %+v",
 			expectedHashedInstrumentID.String(),
 			tarCreatedEvent.TokenConfigs,
 		)
-	}
-
-	vMap, ok := v.(map[string]any)
-	if !ok {
-		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
-			"token config for hashed instrument id %s has unexpected type %T, should be map[string]any", hexNo0x, v)
-	}
-
-	var tokenConfig tokenadminregistry.TokenConfig
-	if err := ledger.MapToStruct(vMap, &tokenConfig); err != nil {
-		return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
-			"token config for hashed instrument id %s: %w", hexNo0x, err)
 	}
 
 	poolInstanceAddress := contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).

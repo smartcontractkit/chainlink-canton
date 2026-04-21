@@ -73,7 +73,7 @@ func TestDeployTokenPool(t *testing.T) {
 		Template: tokenadminregistry.TokenAdminRegistry{
 			Owner:        types.PARTY(party),
 			InstanceId:   "",
-			TokenConfigs: types.GENMAP{},
+			TokenConfigs: map[types.TEXT]tokenadminregistry.TokenConfig{},
 		},
 		OwnerParty: types.PARTY(party),
 	})
@@ -112,46 +112,13 @@ func TestDeployTokenPool(t *testing.T) {
 	tar, err := findTARByInstanceAddress(t.Context(), participant.LedgerServices.State, party)
 	require.NoError(t, err, "find TAR contract in ACS")
 
-	// TokenConfigs is GENMAP (map); each value is a TokenConfig with optional tokenPool (PoolRegistration).
-	// poolOwner is nested: config.data["tokenPool"].data["poolOwner"] (or tokenPool may be under "value" if optional).
+	// TokenConfigs is now typed, so tokenPool can be read directly from each TokenConfig.
 	var found bool
 	for _, v := range tar.TokenConfigs {
-		configMap, ok := v.(map[string]any)
-		if !ok {
+		if v.TokenPool == nil {
 			continue
 		}
-		// Unmarshalled form may wrap fields in "data"
-		m := configMap
-		if data, ok := configMap["data"].(map[string]any); ok {
-			m = data
-		}
-		tokenPoolRaw, ok := m["tokenPool"]
-		if !ok || tokenPoolRaw == nil {
-			continue
-		}
-		// Optional: {"_type": "optional", "value": <PoolRegistration map>}
-		var tokenPoolMap map[string]any
-		if opt, ok := tokenPoolRaw.(map[string]any); ok {
-			if val, has := opt["value"]; has && val != nil {
-				tokenPoolMap, _ = val.(map[string]any)
-			}
-		}
-		if tokenPoolMap == nil {
-			tokenPoolMap, _ = tokenPoolRaw.(map[string]any)
-		}
-		if tokenPoolMap == nil {
-			continue
-		}
-		// poolOwner may be under tokenPool.data when unmarshalled
-		tokenPoolData := tokenPoolMap
-		if data, ok := tokenPoolMap["data"].(map[string]any); ok {
-			tokenPoolData = data
-		}
-		poolOwnerStr := optionalPartyStringFromMap(tokenPoolData, "poolOwner")
-		if poolOwnerStr == "" {
-			continue
-		}
-		require.Equal(t, party, poolOwnerStr, "TAR token config tokenPool.poolOwner should match pool owner")
+		require.Equal(t, party, string(v.TokenPool.PoolOwner), "TAR token config tokenPool.poolOwner should match pool owner")
 		found = true
 
 		break

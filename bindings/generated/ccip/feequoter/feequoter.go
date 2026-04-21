@@ -401,9 +401,9 @@ type FeeQuoter struct {
 	InstanceId                       types.TEXT                               `json:"instanceId"`
 	Owner                            types.PARTY                              `json:"owner"`
 	FeeTokens                        types.SET                                `json:"feeTokens"`
-	DestChainConfigs                 types.GENMAP                             `json:"destChainConfigs"`
-	TokenTransferFeeConfigs          types.GENMAP                             `json:"tokenTransferFeeConfigs"`
-	UsdPerUnitGasByDestChainSelector types.GENMAP                             `json:"usdPerUnitGasByDestChainSelector"`
+	DestChainConfigs                 map[types.NUMERIC]DestChainConfig2       `json:"destChainConfigs"`
+	TokenTransferFeeConfigs          map[types.NUMERIC]types.GENMAP           `json:"tokenTransferFeeConfigs"`
+	UsdPerUnitGasByDestChainSelector map[types.NUMERIC]TimestampedPrice       `json:"usdPerUnitGasByDestChainSelector"`
 	UsdPerToken                      types.GENMAP                             `json:"usdPerToken"`
 	LinkTokenInstrumentId            splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
 	PriceUpdaters                    []types.PARTY                            `json:"priceUpdaters"`

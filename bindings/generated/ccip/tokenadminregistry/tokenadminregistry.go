@@ -1100,9 +1100,9 @@ func (t *SetPoolParams) UnmarshalHex(data string) error {
 
 // TokenAdminRegistry is a Template type
 type TokenAdminRegistry struct {
-	InstanceId   types.TEXT   `json:"instanceId"`
-	Owner        types.PARTY  `json:"owner"`
-	TokenConfigs types.GENMAP `json:"tokenConfigs"`
+	InstanceId   types.TEXT                 `json:"instanceId"`
+	Owner        types.PARTY                `json:"owner"`
+	TokenConfigs map[types.TEXT]TokenConfig `json:"tokenConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

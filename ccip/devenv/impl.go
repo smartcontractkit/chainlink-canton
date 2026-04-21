@@ -1205,35 +1205,16 @@ func (c *Chain) buildTokenTransferSendInput(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("parse lock/release pool %s: %w", poolRef.Address, err)
 	}
-	remoteCfgAny, ok := parsedPool.RemoteChainConfigs[fmt.Sprintf("%d.", dest)]
+	remoteCfg, ok := parsedPool.RemoteChainConfigs[types.NUMERIC(fmt.Sprintf("%d.", dest))]
 	if !ok {
 		return nil, nil, nil, fmt.Errorf("missing remote chain config for %d", dest)
 	}
 	var outboundRateLimiterInstanceAddress contracts.InstanceAddress
-	switch remoteCfg := remoteCfgAny.(type) {
-	case lockreleasetokenpool.RemoteChainConfig:
-		rawOutboundRateLimiter, err := contracts.RawInstanceAddressFromString(string(remoteCfg.OutboundRateLimiter.Unpack))
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("parse outbound rate limiter raw address for %d: %w", dest, err)
-		}
-		outboundRateLimiterInstanceAddress = rawOutboundRateLimiter.InstanceAddress()
-	case map[string]any:
-		rawOutboundRateLimiter, ok := remoteCfg["outboundRateLimiter"].(map[string]any)
-		if !ok {
-			return nil, nil, nil, fmt.Errorf("missing outbound rate limiter in remote chain config for %d", dest)
-		}
-		rawOutboundRateLimiterText, ok := rawOutboundRateLimiter["unpack"].(string)
-		if !ok || rawOutboundRateLimiterText == "" {
-			return nil, nil, nil, fmt.Errorf("missing outbound rate limiter address in remote chain config for %d", dest)
-		}
-		parsedRawOutboundRateLimiter, err := contracts.RawInstanceAddressFromString(rawOutboundRateLimiterText)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("parse outbound rate limiter raw address for %d: %w", dest, err)
-		}
-		outboundRateLimiterInstanceAddress = parsedRawOutboundRateLimiter.InstanceAddress()
-	default:
-		return nil, nil, nil, fmt.Errorf("unexpected remote chain config type %T for %d", remoteCfgAny, dest)
+	rawOutboundRateLimiter, err := contracts.RawInstanceAddressFromString(string(remoteCfg.OutboundRateLimiter.Unpack))
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("parse outbound rate limiter raw address for %d: %w", dest, err)
 	}
+	outboundRateLimiterInstanceAddress = rawOutboundRateLimiter.InstanceAddress()
 	// TODO: maybe replace outboundRateLimiterInstanceAddress with value from EDS?? EDS TP rate limit is still 0x0
 	activeOutboundRateLimiter, err := contract.FindActiveContractByInstanceAddress(
 		ctx,

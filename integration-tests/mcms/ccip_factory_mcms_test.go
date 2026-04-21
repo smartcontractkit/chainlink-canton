@@ -603,8 +603,8 @@ func createCCIPFactoryWithMCMS(
 		InstanceId:                    types.TEXT(instanceID),
 		Owner:                         types.PARTY(owner),
 		McmsParty:                     types.PARTY(mcmsParty),
-		UsedInstanceIds:               types.GENMAP{},
-		DeployedContracts:             types.GENMAP{},
+		UsedInstanceIds:               map[types.TEXT]types.BOOL{},
+		DeployedContracts:             map[types.TEXT]types.CONTRACT_ID{},
 		PerPartyRouterFactoryDeployed: types.BOOL(false),
 	}
 
