@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/aws/smithy-go/ptr"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	tokenadaptersfinality "github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -357,7 +356,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 
 		relativeHours := types.INT64(24)
 		deployReport, err := operations.ExecuteOperation(b, lock_release_token_pool.Deploy, cantonChain, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
-			Qualifier: ptr.String(qualifier),
+			Qualifier: new(qualifier),
 			Template: lockreleasetokenpool.LockReleaseTokenPool{
 				CcipOwner:               types.PARTY(participant.PartyID),
 				PoolOwner:               types.PARTY(participant.PartyID),

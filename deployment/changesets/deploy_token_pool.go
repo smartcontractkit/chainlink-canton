@@ -3,7 +3,6 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -83,7 +82,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	if tokenTransferFeeConfigs == nil {
 		tokenTransferFeeConfigs = types.GENMAP{}
 	}
-	qualifier := ptr.String(cfg.Qualifier)
+	qualifier := new(cfg.Qualifier)
 	if cfg.Qualifier == "" {
 		qualifier = nil
 	}

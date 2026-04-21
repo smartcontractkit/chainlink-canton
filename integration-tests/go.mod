@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton/integration-tests
 
-go 1.25.7
+go 1.26.2
 
 replace github.com/smartcontractkit/chainlink-canton => ../
 

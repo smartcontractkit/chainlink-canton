@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,7 @@ type Server struct {
 var _ oapiExecutor.ServerInterface = &Server{}
 
 func NewServer(
+	_ context.Context,
 	logger zerolog.Logger,
 	activeContractStore *store.ActiveContractStore,
 	config config.ExecutorAPIConfig,

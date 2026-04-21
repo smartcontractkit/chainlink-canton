@@ -108,6 +108,10 @@ type TokenPool struct {
 
 	// The owner party of the token pool that is the owner of locked holdings
 	PoolOwner string `toml:"pool_owner" validate:"required"`
+	// The URL of the Token Standard API to use for this token pool.
+	// If not set, fetching the transfer factory will be disabled for this pool.
+	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"omitnil,url"`
+	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"omitnil,required"`
 }
 
 type TokenPoolAPIConfig struct {

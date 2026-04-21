@@ -34,7 +34,6 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 
@@ -616,6 +615,12 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 							InstanceAddress: lrtpInstanceAddress,
 						},
 						PoolOwner: partyCCIP,
+						// By setting the TokenStandard info, the Toke Pool API will return the necessary factory disclosures
+						TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
+						TokenStandardAuthConfig: &commonconfig.AuthConfig{
+							Type: commonconfig.AuthTypeInsecureStatic,
+							JWT:  edsToken.AccessToken,
+						},
 					},
 				},
 			},
@@ -786,19 +791,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	ccipReceiverCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
-	// Get TransferFactory and pool holdings (needed by CCIPReceiver.Execute for token release)
-	// TODO - this should be returned by EDS
-	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partyTokenPoolOwner, partyReceiver)
-	require.NoError(t, err)
-
-	choiceContext, err := edsTesthelpers.CCIPContextFromData(choiceContextRaw)
-	require.NoError(t, err)
-	poolHoldings, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
-	require.NoError(t, err)
-	require.NotEmpty(t, poolHoldings, "Pool should have holdings")
-
 	// Capture receiver's balance before execute
 	receiverHoldingsBefore, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
 		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
@@ -814,15 +806,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	tokenPoolDisclosure, err := edsTesthelpers.GetTokenPoolExecuteDisclosure(t.Context(), tokenPoolAPIClient, encodedMessageHex, tokenPoolAddress.InstanceAddress())
 	require.NoError(t, err)
-
-	// TODO temp - this should be returned by EDS instead
-	tokenPoolDisclosure.TokenInput.TransferFactory = types.CONTRACT_ID(transferFactoryCid)
-	tokenPoolDisclosure.TokenInput.ExtraArgs = splice_api_token_metadata_v1.ExtraArgs{
-		Context: splice_api_token_metadata_v1.ChoiceContext{
-			Values: choiceContext.Values,
-		},
-		Meta: splice_api_token_metadata_v1.Metadata{},
-	}
 
 	executeArgs := ccipreceiver.Execute2{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
@@ -861,7 +844,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				tokenPoolDisclosure.DisclosedContracts,
 				ccipExecuteDisclosure.DisclosedContracts,
 				ccvExecuteDisclosure.DisclosedContracts,
-				transferFactoryDisclosures, // TODO - this should be returned by EDS instead
 			),
 		},
 	})

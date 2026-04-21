@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -46,6 +47,7 @@ type Server struct {
 var _ oapiCCIP.ServerInterface = &Server{}
 
 func NewServer(
+	_ context.Context,
 	logger zerolog.Logger,
 	activeContractStore *store.ActiveContractStore,
 	config config.CCIPAPIConfig,

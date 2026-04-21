@@ -58,14 +58,14 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 		var sourceChainConfig common.SourceChainConfig
 		err = ledger.MapToStruct(sourceChainConfigMap, &sourceChainConfig)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal source chain config for selector %q: %w", chainSelector, err)
+			return nil, fmt.Errorf("failed to unmarshal source chain config for selector %d: %w", chainSelector, err)
 		}
 
 		laneMandatedCCVs := make([]contracts.RawInstanceAddress, len(sourceChainConfig.LaneMandatedCCVs))
 		for i, laneMandatedCCV := range sourceChainConfig.LaneMandatedCCVs {
 			ccvAddress, err := contracts.RawInstanceAddressFromString(string(laneMandatedCCV.Unpack))
 			if err != nil {
-				return nil, fmt.Errorf("invalid lane mandated CCV at index %d for remote chain selector %q: %w", i, chainSelector, err)
+				return nil, fmt.Errorf("invalid lane mandated CCV at index %d for remote chain selector %d: %w", i, chainSelector, err)
 			}
 			laneMandatedCCVs[i] = ccvAddress
 		}
@@ -73,7 +73,7 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 		for i, defaultCCV := range sourceChainConfig.DefaultCCVs {
 			ccvAddress, err := contracts.RawInstanceAddressFromString(string(defaultCCV.Unpack))
 			if err != nil {
-				return nil, fmt.Errorf("invalid default ccv at index %d for remote chain selector %q: %w", i, chainSelector, err)
+				return nil, fmt.Errorf("invalid default ccv at index %d for remote chain selector %d: %w", i, chainSelector, err)
 			}
 			defaultCCVs[i] = ccvAddress
 		}
@@ -103,14 +103,14 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 		var destChainConfig common.DestChainConfig
 		err = ledger.MapToStruct(destChainConfigMap, &destChainConfig)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal dest chain config for selector %q: %w", chainSelector, err)
+			return nil, fmt.Errorf("failed to unmarshal dest chain config for selector %d: %w", chainSelector, err)
 		}
 
 		laneMandatedCCVs := make([]contracts.RawInstanceAddress, len(destChainConfig.LaneMandatedCCVs))
 		for i, laneMandatedCCV := range destChainConfig.LaneMandatedCCVs {
 			ccvAddress, err := contracts.RawInstanceAddressFromString(string(laneMandatedCCV.Unpack))
 			if err != nil {
-				return nil, fmt.Errorf("invalid lane mandated CCV at index %d for remote chain selector %q: %w", i, chainSelector, err)
+				return nil, fmt.Errorf("invalid lane mandated CCV at index %d for remote chain selector %d: %w", i, chainSelector, err)
 			}
 			laneMandatedCCVs[i] = ccvAddress
 		}
@@ -118,7 +118,7 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 		for i, defaultCCV := range destChainConfig.DefaultCCVs {
 			ccvAddress, err := contracts.RawInstanceAddressFromString(string(defaultCCV.Unpack))
 			if err != nil {
-				return nil, fmt.Errorf("invalid default ccv at index %d for remote chain selector %q: %w", i, chainSelector, err)
+				return nil, fmt.Errorf("invalid default ccv at index %d for remote chain selector %d: %w", i, chainSelector, err)
 			}
 			defaultCCVs[i] = ccvAddress
 		}
@@ -127,7 +127,7 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 		if destChainConfig.DefaultExecutor != nil {
 			executor, err := contracts.RawInstanceAddressFromString(string((*destChainConfig.DefaultExecutor).Unpack))
 			if err != nil {
-				return nil, fmt.Errorf("invalid default executor for chain selector %q: %w", chainSelector, err)
+				return nil, fmt.Errorf("invalid default executor for chain selector %d: %w", chainSelector, err)
 			}
 			defaultExecutor = &executor
 		}

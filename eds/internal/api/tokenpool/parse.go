@@ -6,6 +6,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
@@ -25,6 +26,7 @@ type RemoteChainConfig struct {
 type LockReleaseTokenPool struct {
 	Address            contracts.RawInstanceAddress
 	InstrumentId       splice_api_token_holding_v1.InstrumentId
+	Decimals           types.INT64
 	RemoteChainConfigs map[uint64]RemoteChainConfig
 }
 
@@ -61,15 +63,15 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 		// Rate Limiters
 		inboundRateLimiter, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.InboundRateLimiter.Unpack))
 		if err != nil {
-			return nil, fmt.Errorf("invalid inbound rate limiter for remote chain selector %q: %w", chainSelector, err)
+			return nil, fmt.Errorf("invalid inbound rate limiter for remote chain selector %d: %w", chainSelector, err)
 		}
 		inboundCustomBlockConfirmationsRateLimiter, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter.Unpack))
 		if err != nil {
-			return nil, fmt.Errorf("invalid inbound custom block confirmations rate limiter for remote chain selector %q: %w", chainSelector, err)
+			return nil, fmt.Errorf("invalid inbound custom block confirmations rate limiter for remote chain selector %d: %w", chainSelector, err)
 		}
 		outboundRateLimiter, err := contracts.RawInstanceAddressFromString(string(remoteChainConfig.OutboundRateLimiter.Unpack))
 		if err != nil {
-			return nil, fmt.Errorf("invalid outbound rate limiter for remote chain selector %q: %w", chainSelector, err)
+			return nil, fmt.Errorf("invalid outbound rate limiter for remote chain selector %d: %w", chainSelector, err)
 		}
 
 		// CCVs
@@ -77,7 +79,7 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 		for i, inboundCCV := range remoteChainConfig.InboundCCVs {
 			inboundCCVAddress, err := contracts.RawInstanceAddressFromString(string(inboundCCV.Unpack))
 			if err != nil {
-				return nil, fmt.Errorf("invalid inbound CCV at index %d for remote chain selector %q: %w", i, chainSelector, err)
+				return nil, fmt.Errorf("invalid inbound CCV at index %d for remote chain selector %d: %w", i, chainSelector, err)
 			}
 			inboundCCVs[i] = inboundCCVAddress
 		}
@@ -85,7 +87,7 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 		for i, outboundCCV := range remoteChainConfig.OutboundCCVs {
 			outboundCCVAddress, err := contracts.RawInstanceAddressFromString(string(outboundCCV.Unpack))
 			if err != nil {
-				return nil, fmt.Errorf("invalid outbound CCV at index %d for remote chain selector %q: %w", i, chainSelector, err)
+				return nil, fmt.Errorf("invalid outbound CCV at index %d for remote chain selector %d: %w", i, chainSelector, err)
 			}
 			outboundCCVs[i] = outboundCCVAddress
 		}
@@ -103,5 +105,6 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 		Address:            address,
 		RemoteChainConfigs: remoteChainConfigs,
 		InstrumentId:       boundContract.InstrumentId,
+		Decimals:           boundContract.Decimals,
 	}, nil
 }

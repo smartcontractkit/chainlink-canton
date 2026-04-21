@@ -3,6 +3,7 @@ package eds
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -32,7 +33,7 @@ func GetCCVExecuteDisclosure(
 	if err != nil {
 		return nil, fmt.Errorf("error calling CCVExecute: %w", err)
 	}
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 	}
 
@@ -82,7 +83,7 @@ func GetCCVSendDisclosure(
 	if err != nil {
 		return nil, fmt.Errorf("error calling CCVExecute: %w", err)
 	}
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 	}
 

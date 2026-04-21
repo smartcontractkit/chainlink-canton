@@ -92,6 +92,10 @@ chain_selector = "8706591216959472610"
 		party_id = "tokenPoolOwner"
 		instance_address = "0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"
 		pool_owner = "tokenPoolOwner"
+		token_standard_url = "localhost:8545"
+		[token_pool_api.token_pools.token_standard_auth]
+			type = "insecureStatic"
+			jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
 	[[token_pool_api.token_pools]]
 		type = "burnMint"
 		party_id = "tokenPoolOwner"
@@ -161,7 +165,12 @@ chain_selector = "8706591216959472610"
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"),
 							},
-							PoolOwner: "tokenPoolOwner",
+							PoolOwner:        "tokenPoolOwner",
+							TokenStandardURL: new("localhost:8545"),
+							TokenStandardAuthConfig: &commonconfig.AuthConfig{
+								Type: commonconfig.AuthTypeInsecureStatic,
+								JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+							},
 						}, {
 							Type: TokenPoolTypeBurnMint,
 							ContractIdentifier: ContractIdentifier{

@@ -116,19 +116,19 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	router.Use(middleware.RequestMonitoringMiddleware(metrics))
 
 	if cfg.CCIPAPIConfig.Enabled {
-		ccipAPIServer := ccip.NewServer(logger, activeContractStore, cfg.CCIPAPIConfig)
+		ccipAPIServer := ccip.NewServer(ctx, logger, activeContractStore, cfg.CCIPAPIConfig)
 		oapiCCIP.RegisterHandlers(router, ccipAPIServer)
 	}
 	if cfg.CCVAPIConfig.Enabled {
-		ccvAPIServer := ccv.NewServer(logger, activeContractStore, cfg.CCVAPIConfig)
+		ccvAPIServer := ccv.NewServer(ctx, logger, activeContractStore, cfg.CCVAPIConfig)
 		oapiCCV.RegisterHandlers(router, ccvAPIServer)
 	}
 	if cfg.ExecutorAPIConfig.Enabled {
-		executorAPIServer := executor.NewServer(logger, activeContractStore, cfg.ExecutorAPIConfig)
+		executorAPIServer := executor.NewServer(ctx, logger, activeContractStore, cfg.ExecutorAPIConfig)
 		oapiExecutor.RegisterHandlers(router, executorAPIServer)
 	}
 	if cfg.TokenPoolAPIConfig.Enabled {
-		tokenPoolAPIServer, err := tokenpool.NewServer(logger, activeContractStore, instrumentHoldingStore, cfg.TokenPoolAPIConfig)
+		tokenPoolAPIServer, err := tokenpool.NewServer(ctx, logger, activeContractStore, instrumentHoldingStore, cfg.TokenPoolAPIConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create token pool API: %w", err)
 		}
