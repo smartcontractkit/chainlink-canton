@@ -69,6 +69,7 @@ func main() {
 			"chainFamilySelector": true, // Chain family selector (4 bytes)
 			"root":                true, // Merkle root hash (32 bytes)
 			"newRoot":             true, // New merkle root hash (32 bytes)
+			"versionTag":          true, // CCV version tag is a 4-byte BytesHex field
 		},
 		// hex:"bytes16" — fields that may exceed 255 bytes (uint16 length prefix)
 		BytesHexFields: map[string]bool{

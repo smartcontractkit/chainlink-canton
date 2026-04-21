@@ -39,4 +39,10 @@ func TestCeremonies(t *testing.T) {
 		s.chain = chain
 		suite.Run(t, s)
 	})
+
+	t.Run("CantonKeyRotationFlowTestSuite", func(t *testing.T) {
+		s := new(KeyRotationFlowTestSuite)
+		s.chain = chain
+		suite.Run(t, s)
+	})
 }

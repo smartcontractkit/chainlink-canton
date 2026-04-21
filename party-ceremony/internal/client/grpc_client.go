@@ -3,8 +3,11 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
+
+	"github.com/chainlink/canton-party-ceremony/internal/helpers"
 
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	cryptoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/admin/v30"
@@ -14,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -219,6 +223,121 @@ func (c *GRPCCantonClient) GetNamespaceFingerprint(ctx context.Context, keyName 
 		"no namespace delegation for key %q found; ensure propose_delegation has been submitted", keyName)
 }
 
+// GetNamespaceKeyName discovers the human-readable name of this participant's
+// NAMESPACE signing key that belongs to the decentralized namespace identified
+// by knownOwners. It lists all NAMESPACE keys in the vault (without filtering
+// by name), cross-references them with namespace delegations, and returns the
+// name of the matching key.
+func (c *GRPCCantonClient) GetNamespaceKeyName(ctx context.Context, synchronizerID string, knownOwners []string) (string, error) {
+	// Step 1: list ALL NAMESPACE signing keys in the vault (no name filter).
+	vaultResp, err := c.vault.ListMyKeys(ctx, &cryptoadminv30.ListMyKeysRequest{
+		Filters: &cryptoadminv30.ListKeysFilters{
+			Usage: []cryptov30.SigningKeyUsage{cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_NAMESPACE},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("ListMyKeys (NAMESPACE): %w", err)
+	}
+
+	type vaultEntry struct {
+		name     string
+		keyBytes []byte
+	}
+
+	var entries []vaultEntry
+	for _, km := range vaultResp.GetPrivateKeysMetadata() {
+		pkn := km.GetPublicKeyWithName()
+		if spk := pkn.GetPublicKey().GetSigningPublicKey(); spk != nil {
+			entries = append(entries, vaultEntry{
+				name:     pkn.GetName(),
+				keyBytes: spk.GetPublicKey(),
+			})
+		}
+	}
+	if len(entries) == 0 {
+		return "", fmt.Errorf("no NAMESPACE signing keys found in vault")
+	}
+
+	// Build a fast lookup set for knownOwners.
+	ownerSet := make(map[string]struct{}, len(knownOwners))
+	for _, o := range knownOwners {
+		ownerSet[o] = struct{}{}
+	}
+
+	// Step 2: list NSDs in the synchronizer store.
+	nsdResp, err := c.reader.ListNamespaceDelegation(ctx, &topoadminv30.ListNamespaceDelegationRequest{
+		BaseQuery: headStateBaseQuery(storeForSync(synchronizerID)),
+	})
+	if err != nil {
+		return "", fmt.Errorf("ListNamespaceDelegation: %w", err)
+	}
+
+	// Step 3: find the NSD whose namespace is in knownOwners AND whose
+	// target key matches one of the vault entries. Return the key's name.
+	for _, r := range nsdResp.GetResults() {
+		item := r.GetItem()
+		ns := item.GetNamespace()
+		if len(ownerSet) > 0 {
+			if _, ok := ownerSet[ns]; !ok {
+				continue
+			}
+		}
+		for _, entry := range entries {
+			if bytes.Equal(item.GetTargetKey().GetPublicKey(), entry.keyBytes) {
+				return entry.name, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no NAMESPACE key in vault matches any DNS owner in %v", knownOwners)
+}
+
+func (c *GRPCCantonClient) GetProtocolKeyFingerprint(ctx context.Context, knownSigningKeys []string) (string, string, error) {
+	// Step 1: list all PROTOCOL signing keys in the vault.
+	vaultResp, err := c.vault.ListMyKeys(ctx, &cryptoadminv30.ListMyKeysRequest{
+		Filters: &cryptoadminv30.ListKeysFilters{
+			Usage: []cryptov30.SigningKeyUsage{cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_PROTOCOL},
+		},
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("ListMyKeys (PROTOCOL): %w", err)
+	}
+
+	var vaultKeys [][]byte
+	for _, km := range vaultResp.GetPrivateKeysMetadata() {
+		if spk := km.GetPublicKeyWithName().GetPublicKey().GetSigningPublicKey(); spk != nil {
+			vaultKeys = append(vaultKeys, spk.GetPublicKey())
+		}
+	}
+	if len(vaultKeys) == 0 {
+		return "", "", fmt.Errorf("no PROTOCOL signing keys found in vault")
+	}
+
+	// Step 2: decode each known signing key and cross-reference with vault keys.
+	for _, skB64 := range knownSigningKeys {
+		skBytes, decErr := base64.StdEncoding.DecodeString(skB64)
+		if decErr != nil {
+			continue
+		}
+		var pk cryptov30.SigningPublicKey
+		if unmErr := proto.Unmarshal(skBytes, &pk); unmErr != nil {
+			continue
+		}
+		for _, vaultKeyBytes := range vaultKeys {
+			if bytes.Equal(pk.GetPublicKey(), vaultKeyBytes) {
+				fp, fpErr := helpers.GetPublicKeyFingerprint(vaultKeyBytes)
+				if fpErr != nil {
+					return "", "", fmt.Errorf("computing fingerprint: %w", fpErr)
+				}
+
+				return fp, skB64, nil
+			}
+		}
+	}
+
+	return "", "", fmt.Errorf("no PROTOCOL signing key in vault matches the party's signing keys")
+}
+
 // ── Topology Write ───────────────────────────────────────────────────────────
 
 func (c *GRPCCantonClient) Authorize(
@@ -390,11 +509,28 @@ func (c *GRPCCantonClient) GetP2P(ctx context.Context, partyUID string, synchron
 				}
 			}
 
+			var signingKeys *P2PSigningKeysInfo
+			if skwt := r.GetItem().GetPartySigningKeys(); skwt != nil && len(skwt.GetKeys()) > 0 {
+				keys := make([]string, len(skwt.GetKeys()))
+				for j, k := range skwt.GetKeys() {
+					kb, mErr := proto.Marshal(k)
+					if mErr != nil {
+						return nil, fmt.Errorf("marshalling party signing key %d: %w", j, mErr)
+					}
+					keys[j] = base64.StdEncoding.EncodeToString(kb)
+				}
+				signingKeys = &P2PSigningKeysInfo{
+					Keys:      keys,
+					Threshold: skwt.GetThreshold(),
+				}
+			}
+
 			return &P2PState{
-				Party:        r.GetItem().GetParty(),
-				Participants: participants,
-				Threshold:    r.GetItem().GetThreshold(),
-				Serial:       r.GetContext().GetSerial(),
+				Party:            r.GetItem().GetParty(),
+				Participants:     participants,
+				Threshold:        r.GetItem().GetThreshold(),
+				Serial:           r.GetContext().GetSerial(),
+				PartySigningKeys: signingKeys,
 			}, nil
 		}
 	}

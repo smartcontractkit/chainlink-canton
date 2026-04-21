@@ -11,6 +11,7 @@ import (
 	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
 	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
 	"github.com/chainlink/canton-party-ceremony/ceremony/example"
+	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
 	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
 	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
 	"github.com/chainlink/canton-party-ceremony/internal/client"
@@ -306,6 +307,87 @@ func runInitAddParticipant(cmd *cobra.Command, _ []string) error {
 	}
 
 	return executeAddParticipantSequence(cmd.Context(), cfg, input, stateDir, "")
+}
+
+// initKeyRotationCmd initialises a key rotation ceremony.
+//
+// Usage:
+//
+//	canton-party-ceremony init key-rotation \
+//	  --decentralized-party-id "prefix::namespace" \
+//	  --target-participant-id "PAR::name::fp" \
+//	  --target-namespace-fingerprint "1220abcd..." \
+//	  --synchronizer-id global \
+//	  --rotate-namespace-key \
+//	  --rotate-daml-key \
+//	  --config ./participant-config.json
+var initKeyRotationCmd = &cobra.Command{
+	Use:   "key-rotation",
+	Short: "Initialise a new key rotation ceremony",
+	Long: `Create the ceremony directory, write workflow.json, and run the first
+sequence step. The key-rotation ceremony replaces a participant's namespace
+key and/or DAML signing key in the topology. Participants are dynamically
+fetched from the current P2P topology state.`,
+	RunE: runInitKeyRotation,
+}
+
+func init() {
+	f := initKeyRotationCmd.Flags()
+
+	f.String("decentralized-party-id", "", "Full party ID in the format <prefix>::<namespace> (required)")
+	f.String("target-participant-id", "", "Canton UID of the participant whose key is being rotated (required)")
+	f.String("target-namespace-fingerprint", "", "Current namespace fingerprint of the target (required when --rotate-namespace-key)")
+	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
+	f.Bool("rotate-namespace-key", false, "Rotate the namespace signing key")
+	f.Bool("rotate-daml-key", false, "Rotate the DAML (protocol) signing key")
+	f.Int("new-threshold", 0, "Signing threshold after rotation. 0 = keep current")
+	f.String("config", "participant-config.json", "Path to participant config JSON file")
+	f.String("state-dir", "ceremonies", "Root directory under which ceremony state is stored")
+
+	_ = initKeyRotationCmd.MarkFlagRequired("decentralized-party-id")
+	_ = initKeyRotationCmd.MarkFlagRequired("target-participant-id")
+	_ = initKeyRotationCmd.MarkFlagRequired("synchronizer-id")
+
+	initCmd.AddCommand(initKeyRotationCmd)
+}
+
+func runInitKeyRotation(cmd *cobra.Command, _ []string) error {
+	f := cmd.Flags()
+
+	partyID, _ := f.GetString("decentralized-party-id")
+	targetUID, _ := f.GetString("target-participant-id")
+	targetNSFP, _ := f.GetString("target-namespace-fingerprint")
+	synchronizerID, _ := f.GetString("synchronizer-id")
+	rotateNS, _ := f.GetBool("rotate-namespace-key")
+	rotateDAML, _ := f.GetBool("rotate-daml-key")
+	newThreshold, _ := f.GetInt("new-threshold")
+	configPath, _ := f.GetString("config")
+	stateDir, _ := f.GetString("state-dir")
+
+	if !rotateNS && !rotateDAML {
+		return fmt.Errorf("at least one of --rotate-namespace-key or --rotate-daml-key must be set")
+	}
+
+	if rotateNS && targetNSFP == "" {
+		return fmt.Errorf("--target-namespace-fingerprint is required when --rotate-namespace-key is set")
+	}
+
+	cfg, err := client.LoadConfig(configPath)
+	if err != nil {
+		return err
+	}
+
+	input := keyrotation.KeyRotationInput{
+		DecentralizedPartyID:       partyID,
+		TargetParticipantID:        targetUID,
+		TargetNamespaceFingerprint: targetNSFP,
+		SynchronizerID:             synchronizerID,
+		RotateNamespaceKey:         rotateNS,
+		RotateDamlKey:              rotateDAML,
+		NewThreshold:               newThreshold,
+	}
+
+	return executeKeyRotationSequence(cmd.Context(), cfg, input, stateDir, "")
 }
 
 // splitParticipants splits a comma-separated participant string, trimming
