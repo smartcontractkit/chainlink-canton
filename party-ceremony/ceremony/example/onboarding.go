@@ -51,11 +51,38 @@ type OnboardingInput struct {
 	Threshold int `json:"threshold"`
 }
 
-// OnboardingOutput is the final result of a completed [OnboardingSequence].
+// Phase represents the current execution phase of the onboarding ceremony.
+type Phase string
+
+const (
+	PhaseInit      Phase = "init"
+	PhaseProposal  Phase = "proposal"
+	PhaseSigning   Phase = "signing"
+	PhaseSubmit    Phase = "submit"
+	PhaseCompleted Phase = "completed"
+)
+
+// CeremonyState is the live snapshot embedded in every OnboardingOutput.
+// It is built progressively as the sequence advances, so it is always present
+type CeremonyState struct {
+	Phase              Phase    `json:"phase"`
+	InitializedMembers []string `json:"initialized_members"`
+	RequiredSigners    []string `json:"required_signers,omitempty"`
+	CollectedSigners   []string `json:"collected_signers"`
+	PendingSigners     []string `json:"pending_signers"`
+	Threshold          int      `json:"threshold"`
+	ProposalHash       string   `json:"proposal_hash,omitempty"`
+}
+
+// OnboardingOutput is the result of [OnboardingSequence].
+// State is always populated — even when ExecuteSequence returns an error —
+// making it the primary way to inspect ceremony progress without any
+// post-hoc report analysis.
 type OnboardingOutput struct {
-	PartyID      string `json:"party_id"`
-	DNSConfirmed bool   `json:"dns_confirmed"`
-	P2PConfirmed bool   `json:"p2p_confirmed"`
+	PartyID      string        `json:"party_id"`
+	DNSConfirmed bool          `json:"dns_confirmed"`
+	P2PConfirmed bool          `json:"p2p_confirmed"`
+	State        CeremonyState `json:"state"`
 }
 
 // OnboardingSequence orchestrates the full four-step ceremony.  It is designed
@@ -73,6 +100,13 @@ var OnboardingSequence = operations.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Full async decentralized party-onboarding ceremony (init → propose → sign → submit)",
 	func(b operations.Bundle, deps CantonDeps, in OnboardingInput) (OnboardingOutput, error) {
+		out := OnboardingOutput{
+			State: CeremonyState{
+				Phase:     PhaseInit,
+				Threshold: in.Threshold,
+			},
+		}
+
 		// ── Step 1: Member initialisation ────────────────────────────────────
 		// All participants must have run member-init before the proposal can be
 		// created.  Each call is idempotent: if a participant has already init'd
@@ -85,18 +119,21 @@ var OnboardingSequence = operations.NewSequence(
 				ParticipantID: pid,
 			})
 			if err != nil {
-				return OnboardingOutput{}, fmt.Errorf("init-member %s: %w", pid, err)
+				return out, fmt.Errorf("init-member %s: %w", pid, err)
 			}
 			members = append(members, r.Output)
+			out.State.InitializedMembers = append(out.State.InitializedMembers, pid)
 		}
 
 		for _, m := range members {
 			if m.ParticipantUID == "" || m.NamespaceFingerprint == "" {
-				return OnboardingOutput{}, operations.NewUnrecoverableError(
+				return out, operations.NewUnrecoverableError(
 					fmt.Errorf("member %q has not completed initialisation: uid or namespace fingerprint is missing", m.ParticipantID),
 				)
 			}
 		}
+
+		out.State.Phase = PhaseProposal
 
 		// ── Step 2: Proposal creation ────────────────────────────────────────
 		// The coordinator (or anyone) creates the DNS + P2P proposals.  Idempotent: repeated
@@ -109,9 +146,13 @@ var OnboardingSequence = operations.NewSequence(
 			Threshold:      in.Threshold,
 		})
 		if err != nil {
-			return OnboardingOutput{}, fmt.Errorf("create-proposal: %w", err)
+			return out, fmt.Errorf("create-proposal: %w", err)
 		}
 		proposal := proposalReport.Output
+		out.State.ProposalHash = proposal.ProposalHashSHA256
+		out.State.RequiredSigners = proposal.RequiredSigners
+		out.State.Threshold = proposal.Threshold
+		out.State.Phase = PhaseSigning
 
 		// ── Step 3: Signature collection ─────────────────────────────────────
 		// Each required signer runs SignProposalOp with their own participant ID.
@@ -131,21 +172,28 @@ var OnboardingSequence = operations.NewSequence(
 				SynchronizerID:     in.SynchronizerID,
 			})
 			if sigErr != nil {
-				// This signer has not yet run their signing step.
+				// This signer has not yet acted; record them as pending.
 				deps.Logger.Infow("Signature pending", "signer", signerID, "err", sigErr)
+				out.State.PendingSigners = append(out.State.PendingSigners, signerID)
+
 				continue
 			}
 			collectedSigs = append(collectedSigs, sigReport.Output)
+			out.State.CollectedSigners = append(out.State.CollectedSigners, signerID)
 		}
 
 		deps.Logger.Infow("Collected signatures", "count", len(collectedSigs), "required", proposal.Threshold)
 
 		// Gate: require at least `threshold` signatures before submitting.
+		// out is returned alongside the error so the framework captures the
+		// current state snapshot in the sequence report.
 		if len(collectedSigs) < proposal.Threshold {
 			deps.Logger.Warnw("Threshold not met", "collected", len(collectedSigs), "required", proposal.Threshold)
-			return OnboardingOutput{}, fmt.Errorf("%w: %d/%d",
+			return out, fmt.Errorf("%w: %d/%d",
 				ErrThresholdNotMet, len(collectedSigs), proposal.Threshold)
 		}
+
+		out.State.Phase = PhaseSubmit
 
 		// ── Step 4: Submit ───────────────────────────────────────────────────
 		// WithRetry enables the default retry policy (10 attempts, exponential
@@ -156,13 +204,15 @@ var OnboardingSequence = operations.NewSequence(
 			operations.WithRetry[SubmitProposalInput, CantonDeps](),
 		)
 		if err != nil {
-			return OnboardingOutput{}, fmt.Errorf("submit-proposal: %w", err)
+			return out, fmt.Errorf("submit-proposal: %w", err)
 		}
 
-		return OnboardingOutput{
-			PartyID:      submitReport.Output.PartyID,
-			DNSConfirmed: submitReport.Output.DNSConfirmed,
-			P2PConfirmed: submitReport.Output.P2PConfirmed,
-		}, nil
+		out.State.Phase = PhaseCompleted
+		out.State.PendingSigners = nil // all outstanding signers are moot once submitted
+		out.PartyID = submitReport.Output.PartyID
+		out.DNSConfirmed = submitReport.Output.DNSConfirmed
+		out.P2PConfirmed = submitReport.Output.P2PConfirmed
+
+		return out, nil
 	},
 )

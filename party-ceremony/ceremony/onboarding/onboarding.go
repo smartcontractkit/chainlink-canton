@@ -58,6 +58,13 @@ var OnboardingSequence = operations.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Full async decentralized party onboarding (key-gen → NSD → DNS → sign → submit → P2P)",
 	func(b operations.Bundle, deps ceremony.CantonDeps, in OnboardingInput) (OnboardingOutput, error) {
+		out := OnboardingOutput{
+			State: CeremonyState{
+				Phase:     PhaseKeyGen,
+				Threshold: in.Threshold,
+			},
+		}
+
 		// ── Step 1: Member key generation ────────────────────────────────────
 		members := make([]CreateMemberKeyOutput, 0)
 		for _, pid := range in.Participants {
@@ -68,13 +75,14 @@ var OnboardingSequence = operations.NewSequence(
 			})
 			if err != nil {
 				if !retry.IsRecoverable(err) {
-					return OnboardingOutput{}, fmt.Errorf("create-member-key %s: %w", pid, err)
+					return out, fmt.Errorf("create-member-key %s: %w", pid, err)
 				}
 				deps.Logger.Infow("Member key pending", "participant", pid, "err", err)
 
 				continue
 			}
 			members = append(members, r.Output)
+			out.State.KeysGenerated = append(out.State.KeysGenerated, pid)
 		}
 
 		for _, m := range members {
@@ -86,13 +94,12 @@ var OnboardingSequence = operations.NewSequence(
 
 		pid, err := deps.Client.GetParticipantUID(b.GetContext())
 		if err != nil {
-			return OnboardingOutput{}, fmt.Errorf("fetching client participant ID: %w", err)
+			return out, fmt.Errorf("fetching client participant ID: %w", err)
 		}
 
 		// ── Step 2: Namespace delegation ─────────────────────────────────────
-		// Each participant publishes their namespace delegation to the synchronizer.
+		out.State.Phase = PhaseNSD
 		for _, m := range members {
-			// Can only be executed from the participant that owns the key
 			if m.ParticipantID != pid {
 				deps.Logger.Infow("Namespace delegation pending",
 					"participant", m.ParticipantID,
@@ -108,24 +115,22 @@ var OnboardingSequence = operations.NewSequence(
 				SynchronizerID: in.SynchronizerID,
 			})
 			if err != nil {
-				return OnboardingOutput{}, fmt.Errorf("propose-nsd %s: %w", m.ParticipantID, err)
+				return out, fmt.Errorf("propose-nsd %s: %w", m.ParticipantID, err)
 			}
+			out.State.NSDsProposed = append(out.State.NSDsProposed, m.ParticipantID)
 		}
 
 		// Gate: all participants must have generated their keys before the DNS
-		// proposal can be created. A partial member set would produce a wrong
-		// decentralized namespace; actors whose keys are not yet cached return
-		// ErrThresholdNotMet so callers know to retry after more actors run.
+		// proposal can be created.
 		if len(members) < len(in.Participants) {
 			deps.Logger.Warnw("Not all participants have generated their member keys",
 				"collected", len(members), "required", len(in.Participants))
 
-			return OnboardingOutput{}, fmt.Errorf("%w: %d/%d participants have generated their member keys",
+			return out, fmt.Errorf("%w: %d/%d participants have generated their member keys",
 				ErrThresholdNotMet, len(members), len(in.Participants))
 		}
 
-		// Gate: wait for all namespace delegations to be visible in the
-		// synchronizer's topology state.
+		// Gate: wait for all namespace delegations to be visible.
 		err = retry.Do(
 			func() error {
 				for _, m := range members {
@@ -146,12 +151,13 @@ var OnboardingSequence = operations.NewSequence(
 			retry.Delay(500*time.Millisecond),
 		)
 		if err != nil {
-			return OnboardingOutput{}, fmt.Errorf("waiting for namespace delegations: %w", err)
+			return out, fmt.Errorf("waiting for namespace delegations: %w", err)
 		}
 
 		deps.Logger.Infow("All namespace delegations confirmed", "count", len(members))
 
 		// ── Step 3: DNS proposal creation ────────────────────────────────────
+		out.State.Phase = PhaseDNSProposal
 		proposalReport, err := operations.ExecuteOperation(b, CreateDNSProposalOp, deps, CreateDNSProposalInput{
 			NamespaceName:  in.NamespaceName,
 			Members:        members,
@@ -159,18 +165,16 @@ var OnboardingSequence = operations.NewSequence(
 			Threshold:      in.Threshold,
 		})
 		if err != nil {
-			return OnboardingOutput{}, fmt.Errorf("create-dns-proposal: %w", err)
+			return out, fmt.Errorf("create-dns-proposal: %w", err)
 		}
 		proposal := proposalReport.Output
+		out.State.ProposalHash = proposal.ProposalHashSHA256
+		out.State.RequiredSigners = proposal.RequiredSigners
+		out.State.Threshold = proposal.Threshold
 
 		// ── Step 4: DNS signature collection ─────────────────────────────────
-		// Each required signer signs the DNS proposal independently.
-		// Signers who have not yet acted will fail here — we skip those
-		// failures and count only the successful reports.
-		// We collect ALL signed transactions so SubmitDNSOp can merge their
-		// Signature lists into one fully-authorized transaction.
+		out.State.Phase = PhaseDNSSigning
 		var allSignedTxsB64 []string
-		var collectedCount int
 		for _, signerID := range proposal.RequiredSigners {
 			sigReport, sigErr := operations.ExecuteOperation(b, SignDNSProposalOp, deps, SignDNSProposalInput{
 				ParticipantID:      signerID,
@@ -180,26 +184,28 @@ var OnboardingSequence = operations.NewSequence(
 			})
 			if sigErr != nil {
 				deps.Logger.Infow("Signature pending", "signer", signerID, "err", sigErr)
+				out.State.PendingSigners = append(out.State.PendingSigners, signerID)
+
 				continue
 			}
 			allSignedTxsB64 = append(allSignedTxsB64, sigReport.Output.SignedDNSTxB64)
-			collectedCount++
+			out.State.CollectedSigners = append(out.State.CollectedSigners, signerID)
 		}
 
 		deps.Logger.Infow("Collected DNS signatures",
-			"count", collectedCount, "required", proposal.Threshold)
+			"count", len(out.State.CollectedSigners), "required", proposal.Threshold)
 
-		// Gate: require all signatures for initial DNS creation.
-		if collectedCount < proposal.Threshold {
+		// Gate: require threshold signatures for initial DNS creation.
+		if len(out.State.CollectedSigners) < proposal.Threshold {
 			deps.Logger.Warnw("Threshold not met",
-				"collected", collectedCount, "required", proposal.Threshold)
+				"collected", len(out.State.CollectedSigners), "required", proposal.Threshold)
 
-			return OnboardingOutput{}, fmt.Errorf("%w: %d/%d",
-				ErrThresholdNotMet, collectedCount, proposal.Threshold)
+			return out, fmt.Errorf("%w: %d/%d",
+				ErrThresholdNotMet, len(out.State.CollectedSigners), proposal.Threshold)
 		}
 
 		// ── Step 5: Submit DNS ───────────────────────────────────────────────
-		// WithRetry enables the default retry policy for transient network errors.
+		out.State.Phase = PhaseDNSSubmit
 		_, err = operations.ExecuteOperation(
 			b, SubmitDNSOp, deps,
 			SubmitDNSInput{
@@ -210,7 +216,7 @@ var OnboardingSequence = operations.NewSequence(
 			operations.WithRetry[SubmitDNSInput, ceremony.CantonDeps](),
 		)
 		if err != nil {
-			return OnboardingOutput{}, fmt.Errorf("submit-dns: %w", err)
+			return out, fmt.Errorf("submit-dns: %w", err)
 		}
 
 		// Check that the DNS is confirmed in the topology state.
@@ -218,7 +224,6 @@ var OnboardingSequence = operations.NewSequence(
 		err = retry.Do(
 			func() error {
 				deps.Logger.Infow("Checking DNS confirmation", "namespace", proposal.DecentralizedNS)
-				// Poll until DNS is visible at head state.
 				exists, err := deps.Client.DNSExists(ctx, proposal.DecentralizedNS, in.SynchronizerID)
 				if err != nil {
 					return fmt.Errorf("checking DNS confirmation: %w", err)
@@ -236,17 +241,14 @@ var OnboardingSequence = operations.NewSequence(
 			retry.Delay(5*time.Second),
 		)
 		if err != nil {
-			return OnboardingOutput{}, fmt.Errorf("waiting for DNS confirmation: %w", err)
+			return out, fmt.Errorf("waiting for DNS confirmation: %w", err)
 		}
 
 		// ── Step 6: PartyToParticipant mapping ───────────────────────────────
-		// Each participant independently proposes the same P2P mapping using
-		// their own client.
-		// Canton accumulates proposals and activates the mapping once the
-		// threshold is reached.
+		out.State.Phase = PhaseP2P
 		partyID := fmt.Sprintf("%s::%s", in.PartyPrefix, proposal.DecentralizedNS)
+		out.State.P2PRequired = in.Threshold
 
-		var p2pProposedCount int
 		for _, m := range members {
 			_, p2pErr := operations.ExecuteOperation(b, ProposeP2POp, deps, ProposeP2PInput{
 				ParticipantID:  m.ParticipantID,
@@ -259,18 +261,18 @@ var OnboardingSequence = operations.NewSequence(
 				deps.Logger.Infow("P2P proposal pending", "participant", m.ParticipantID, "err", p2pErr)
 				continue
 			}
-			p2pProposedCount++
+			out.State.P2PProposedCount++
 		}
 
 		deps.Logger.Infow("Collected P2P proposals",
-			"count", p2pProposedCount, "required", in.Threshold)
+			"count", out.State.P2PProposedCount, "required", in.Threshold)
 
-		if p2pProposedCount < in.Threshold {
+		if out.State.P2PProposedCount < in.Threshold {
 			deps.Logger.Warnw("P2P threshold not met",
-				"collected", p2pProposedCount, "required", in.Threshold)
+				"collected", out.State.P2PProposedCount, "required", in.Threshold)
 
-			return OnboardingOutput{}, fmt.Errorf("%w: %d/%d P2P proposals collected",
-				ErrThresholdNotMet, p2pProposedCount, in.Threshold)
+			return out, fmt.Errorf("%w: %d/%d P2P proposals collected",
+				ErrThresholdNotMet, out.State.P2PProposedCount, in.Threshold)
 		}
 
 		// Poll until Canton activates the mapping.
@@ -292,15 +294,17 @@ var OnboardingSequence = operations.NewSequence(
 			retry.Delay(500*time.Millisecond),
 		)
 		if p2pErr != nil {
-			return OnboardingOutput{}, fmt.Errorf("waiting for P2P confirmation: %w", p2pErr)
+			return out, fmt.Errorf("waiting for P2P confirmation: %w", p2pErr)
 		}
 
 		deps.Logger.Infow("P2P mapping confirmed", "party_id", partyID)
 
-		return OnboardingOutput{
-			PartyID:      partyID,
-			DNSConfirmed: true,
-			P2PConfirmed: true,
-		}, nil
+		out.State.Phase = PhaseCompleted
+		out.State.PendingSigners = nil
+		out.PartyID = partyID
+		out.DNSConfirmed = true
+		out.P2PConfirmed = true
+
+		return out, nil
 	},
 )

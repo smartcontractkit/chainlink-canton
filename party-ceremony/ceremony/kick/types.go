@@ -30,12 +30,43 @@ type KickInput struct {
 	NewThreshold int `json:"new_threshold,omitempty"`
 }
 
+// Phase represents the current execution phase of the kick ceremony.
+type Phase string
+
+const (
+	PhaseReadState   Phase = "read-state"
+	PhaseDNSProposal Phase = "dns-proposal"
+	PhaseDNSSigning  Phase = "dns-signing"
+	PhaseDNSSubmit   Phase = "dns-submit"
+	PhaseP2P         Phase = "p2p"
+	PhaseCompleted   Phase = "completed"
+)
+
+// CeremonyState is the live snapshot embedded in every KickOutput.
+// It is built progressively as the sequence advances, so it is always present
+// — even when the sequence returns an error (e.g. ErrThresholdNotMet).
+type CeremonyState struct {
+	Phase             Phase    `json:"phase"`
+	RequiredSigners   []string `json:"required_signers,omitempty"`
+	CollectedSigners  []string `json:"collected_signers"`
+	PendingSigners    []string `json:"pending_signers"`
+	DNSThreshold      int      `json:"dns_threshold"`
+	ProposalHash      string   `json:"proposal_hash,omitempty"`
+	P2PProposedCount  int      `json:"p2p_proposed_count"`
+	P2PRequired       int      `json:"p2p_required"`
+	KickedParticipant string   `json:"kicked_participant"`
+	RemainingOwners   []string `json:"remaining_owners,omitempty"`
+}
+
 // KickOutput is the final result of a completed [KickSequence].
+// State is always populated — even when ExecuteSequence returns an error —
+// making it the primary way to inspect ceremony progress.
 type KickOutput struct {
-	DNSUpdated      bool     `json:"dns_updated"`
-	P2PUpdated      bool     `json:"p2p_updated"`
-	NewThreshold    int      `json:"new_threshold"`
-	RemainingOwners []string `json:"remaining_owners"`
+	DNSUpdated      bool          `json:"dns_updated"`
+	P2PUpdated      bool          `json:"p2p_updated"`
+	NewThreshold    int           `json:"new_threshold"`
+	RemainingOwners []string      `json:"remaining_owners"`
+	State           CeremonyState `json:"state"`
 }
 
 // ── Per-operation I/O types ──────────────────────────────────────────────────
