@@ -51,8 +51,8 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -61,7 +61,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	transferInstructionV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -1155,8 +1155,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		ReceiptIssuers: nil, // TODO: add them later, not currently needed
 	}
 	if foundEncodedMessage {
-		msg := decodedMessage
-		event.Message = &msg
+		event.Message = new(decodedMessage)
 	}
 	c.nextSeq = seqNo
 	c.lastSentDest = dest
@@ -1267,7 +1266,6 @@ func (c *Chain) buildTokenTransferSendInput(
 		},
 		TokenPoolHoldings: []types.CONTRACT_ID{},
 	}
-	outboundRateLimiterCID := types.CONTRACT_ID(activeOutboundRateLimiter.GetCreatedEvent().GetContractId())
 
 	return &ccipclient.TokenTransfer{
 			Token:  parsedPool.InstrumentId,
@@ -1277,7 +1275,7 @@ func (c *Chain) buildTokenTransferSendInput(
 			TokenPoolCid:    types.CONTRACT_ID(activePool.GetCreatedEvent().GetContractId()),
 			PoolExtraContext: common.CCIPContext{
 				Values: types.TEXTMAP{
-					"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterCID},
+					"rate-limiter": common.AnyValue{AVContractId: new(types.CONTRACT_ID(activeOutboundRateLimiter.GetCreatedEvent().GetContractId()))},
 				},
 			},
 			TokenInput: tokenInput,

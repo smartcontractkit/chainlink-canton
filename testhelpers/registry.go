@@ -14,7 +14,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
@@ -126,11 +126,9 @@ func ExtractChoiceContextValues(choiceContext *apiv2.Value) types.TEXTMAP {
 		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
 			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
 				if v := entry.GetValue().GetVariant(); v != nil {
-					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
-					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(v.GetValue().GetContractId()))}
 				} else if entry.GetValue().GetText() != "" {
-					txt := types.TEXT(entry.GetValue().GetText())
-					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: new(types.TEXT(entry.GetValue().GetText()))}
 				}
 			}
 		}

@@ -23,7 +23,7 @@ import (
 	executorbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 )
@@ -233,8 +233,7 @@ func requestedFinality(cfg finality.Config) common.FinalityConfig {
 		return waitForSafeRequested()
 	}
 	if cfg.BlockDepth > 0 {
-		depth := types.INT64(cfg.BlockDepth)
-		return common.FinalityConfig{BlockDepth: &depth}
+		return common.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
 	}
 
 	return waitForFinalityRequested()

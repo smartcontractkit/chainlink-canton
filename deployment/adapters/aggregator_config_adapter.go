@@ -136,7 +136,7 @@ func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapte
 		if thr < 0 || thr > 255 {
 			return nil, fmt.Errorf("threshold %d out of range for uint8", thr)
 		}
-		thrU8 := uint8(thr) //nolint:gosec // G115: thr is range-checked above
+		thrU8 := uint8(thr)
 
 		out = append(out, adapters.SignatureConfig{
 			SourceChainSelector: sourceSel,

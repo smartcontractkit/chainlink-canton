@@ -123,9 +123,7 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 		ledgerURL := fmt.Sprintf("localhost:%d", p.ledger)
 		conn, err := grpc.NewClient(adminURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to dial admin API for participant %d", i+1)
-		t.Cleanup(func() { _ = conn.Close() })
-		adminServices := canton.CreateAdminServiceClients(conn)
-		// UserID matches the additional-admin-user-id in simple-topology.conf.
+		t.Cleanup(func() { _ = conn.Close() }) // UserID matches the additional-admin-user-id in simple-topology.conf.
 		userID := fmt.Sprintf("user-participant%d", i+1)
 		participants[i] = canton.Participant{
 			Name: fmt.Sprintf("participant%c", 'A'+i),
@@ -133,7 +131,7 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 				AdminAPIURL:      adminURL,
 				GRPCLedgerAPIURL: ledgerURL,
 			},
-			AdminServices: &adminServices,
+			AdminServices: new(canton.CreateAdminServiceClients(conn)),
 			UserID:        userID,
 		}
 	}
