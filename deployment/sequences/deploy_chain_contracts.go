@@ -71,6 +71,10 @@ type DeployChainContractsParams struct {
 	GlobalConfig       GlobalConfigParams
 	RMNRemote          RMNRemoteParams
 	FeeQuoterConfig    FeeQuoterParams
+	// FactoryAddressRef is used by the factory-backed deploy sequence.
+	FactoryAddressRef datastore.AddressRef
+	// ProposalDriven enables MCMS proposal generation for factory-backed deploys.
+	ProposalDriven bool
 	// The InstrumentId of the native token
 	NativeInstrumentId splice_api_token_holding_v1.InstrumentId
 }
