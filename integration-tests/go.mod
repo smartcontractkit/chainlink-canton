@@ -8,7 +8,7 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 // Pin mcms canton-main
-replace github.com/smartcontractkit/mcms => /Users/sish/Desktop/mcms
+replace github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260410182733-0771796ef83c
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
