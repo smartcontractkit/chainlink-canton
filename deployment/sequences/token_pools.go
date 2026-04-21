@@ -173,6 +173,8 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			if err != nil {
 				return out, fmt.Errorf("deploy outbound rate limiter for remote chain %d: %w", remoteSelector, err)
 			}
+			out.Addresses = append(out.Addresses, outboundRef)
+
 			inboundRef, inboundRaw, err := deployTokenPoolRateLimiter(
 				b,
 				cantonChain,
@@ -187,7 +189,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			if err != nil {
 				return out, fmt.Errorf("deploy inbound rate limiter for remote chain %d: %w", remoteSelector, err)
 			}
-			out.Addresses = append(out.Addresses, outboundRef, inboundRef)
+			out.Addresses = append(out.Addresses, inboundRef)
 
 			customRef, customInboundRaw, err := deployTokenPoolRateLimiter(
 				b,
@@ -238,6 +240,10 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				},
 			})
 			if err != nil {
+				if strings.Contains(err.Error(), "ApplyChainUpdates: chain already exists:") {
+					return out, nil
+				}
+
 				return out, fmt.Errorf("apply remote chain updates to lock/release pool: %w", err)
 			}
 		}
@@ -421,8 +427,8 @@ var DeployTokenPoolForToken = operations.NewSequence(
 
 		return ccipsequences.OnChainOutput{
 			Addresses: []datastore.AddressRef{
-				deployReport.Output,
 				logicalRef,
+				deployReport.Output,
 				tokenRef,
 			},
 		}, nil
