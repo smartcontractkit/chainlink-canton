@@ -243,6 +243,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				if strings.Contains(err.Error(), "ApplyChainUpdates: chain already exists:") {
 					return out, nil
 				}
+
 				return out, fmt.Errorf("apply remote chain updates to lock/release pool: %w", err)
 			}
 		}

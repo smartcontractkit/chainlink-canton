@@ -143,6 +143,7 @@ func resolveExistingCantonTokenRef(ds datastore.DataStore, in tokenadapters.Depl
 					return true
 				}
 			}
+
 			return false
 		}); len(matches) == 1 {
 			return matches[0], nil
@@ -171,6 +172,7 @@ func filterTokenRefs(refs []datastore.AddressRef, predicate func(datastore.Addre
 			filtered = append(filtered, ref)
 		}
 	}
+
 	return filtered
 }
 
@@ -189,5 +191,6 @@ func uniqueNonEmpty(values ...string) []string {
 		seen[key] = struct{}{}
 		result = append(result, trimmed)
 	}
+
 	return result
 }
