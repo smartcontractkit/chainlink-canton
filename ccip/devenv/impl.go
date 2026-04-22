@@ -47,6 +47,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
@@ -55,8 +56,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
+	cantonchangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
+	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
@@ -71,6 +74,7 @@ var (
 	_                       ccv.ImplFactory                        = &ImplFactory{}
 	cantonTokenPoolVersion                                         = semver.MustParse("2.0.0")
 	cantonDeployDarPackages                                        = []contracts.Package{
+		contracts.CCIPFactory,
 		contracts.CCIPCommon,
 		contracts.CCIPReceiver,
 		contracts.CCIPOffRamp,
@@ -248,7 +252,20 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 		}
 	}
 
-	return datastore.NewMemoryDataStore().Seal(), nil
+	out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
+		ChainSelector: selector,
+		Participant:   0,
+		Config: cantonchangesets.DeployCCIPFactoryConfig{
+			Params: cantonchangesets.DeployCCIPFactoryParams{
+				OwnerParty: participant.PartyID,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("deploy CCIPFactory for chain %d: %w", selector, err)
+	}
+
+	return out.DataStore.Seal(), nil
 }
 
 func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (ccipChangesets.DeployChainContractsPerChainCfg, error) {
@@ -259,10 +276,61 @@ func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector
 
 	return ccipChangesets.DeployChainContractsPerChainCfg{
 		DeployerContract: fmt.Sprintf("canton:%s", chain.Participants[0].PartyID),
+		DeployerKeyOwned: true,
 	}, nil
 }
 
-func (c *Chain) PostDeployContractsForSelector(_ context.Context, _ *deployment.Environment, _ uint64, _ *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
+func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return nil, fmt.Errorf("canton chain %d not found or has no participants", selector)
+	}
+
+	feeQuoterRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(feequoterop.ContractType),
+		feequoterop.Version,
+		"",
+	))
+	if err != nil {
+		return nil, fmt.Errorf("resolve FeeQuoter for chain %d: %w", selector, err)
+	}
+
+	participant := chain.Participants[0]
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
+	if err != nil {
+		return nil, fmt.Errorf("resolve registry admin: %w", err)
+	}
+
+	feeQuoterAddress := contracts.HexToInstanceAddress(feeQuoterRef.Address)
+	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
+		InstanceAddress: feeQuoterAddress,
+		Args: feequoter.ApplyPriceUpdatersUpdate{
+			AddedPriceUpdaters: []types.PARTY{types.PARTY(participant.PartyID)},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("apply fee quoter price updaters update: %w", err)
+	}
+
+	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
+		InstanceAddress: feeQuoterAddress,
+		Args: feequoter.UpdatePrices{
+			PriceUpdates: feequoter.PriceUpdates{
+				TokenPriceUpdates: []feequoter.TokenPriceUpdate{{
+					InstrumentId: splice_api_token_holding_v1.InstrumentId{
+						Admin: types.PARTY(registryAdmin),
+						Id:    types.TEXT("Amulet"),
+					},
+					UsdPerToken: types.NUMERIC("100000000"),
+				}},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update fee quoter prices: %w", err)
+	}
+
 	return datastore.NewMemoryDataStore().Seal(), nil
 }
 

@@ -3,18 +3,19 @@ package adapters
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
+	ccipdeploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	seqcore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -23,7 +24,9 @@ import (
 	executorbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 )
@@ -68,8 +71,14 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		return seqcore.OnChainOutput{}, err
 	}
 
-	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContracts, chain, sequences.DeployChainContractsParams{
+	factoryAddressRef, err := resolveFactoryAddressRef(input.ChainSelector, input.ExistingAddresses)
+	if err != nil {
+		return seqcore.OnChainOutput{}, err
+	}
+
+	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContractsFromFactory, chain, sequences.DeployChainContractsParams{
 		CCIPOwnerParty:     ownerParty,
+		FactoryAddressRef:  factoryAddressRef,
 		CommitteeVerifiers: committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
 		GlobalConfig: sequences.GlobalConfigParams{
 			Template: common.GlobalConfig{
@@ -77,12 +86,12 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 				ChainSelector: types.NUMERIC(strconv.FormatUint(input.ChainSelector, 10)),
 			},
 		},
+		ProposalDriven:     shouldUseMCMSProposalDeployment(input),
 		NativeInstrumentId: nativeInstrumentID,
 		FeeQuoterConfig: sequences.FeeQuoterParams{
 			Template: feequoter.FeeQuoter{
 				PriceUpdaters: []types.PARTY{types.PARTY(ownerParty)},
 			},
-			USDPerNative: big.NewInt(100_000_000),
 		},
 		RMNRemote: sequences.RMNRemoteParams{
 			Template: rmn.RMNRemote{
@@ -96,7 +105,27 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		return seqcore.OnChainOutput{}, fmt.Errorf("failed to deploy canton chain contracts for selector %d: %w", input.ChainSelector, err)
 	}
 
-	return seqcore.OnChainOutput{Addresses: out.Output.Addresses}, nil
+	return seqcore.OnChainOutput{
+		Addresses: out.Output.Addresses,
+		BatchOps:  out.Output.BatchOps,
+	}, nil
+}
+
+func shouldUseMCMSProposalDeployment(input ccipadapters.DeployChainContractsInput) bool {
+	if input.DeployerKeyOwned {
+		return false
+	}
+
+	for _, ref := range input.ExistingAddresses {
+		switch ref.Type {
+		case datastore.ContractType(ccipdeploymentutils.BypasserManyChainMultisig),
+			datastore.ContractType(ccipdeploymentutils.CancellerManyChainMultisig),
+			datastore.ContractType(ccipdeploymentutils.ProposerManyChainMultisig):
+			return true
+		}
+	}
+
+	return false
 }
 
 func deployerPartyID(deployerContract string, participant canton.Participant) string {
@@ -173,7 +202,10 @@ func committeeVerifierParams(ownerParty string, verifiers []ccipadapters.Committ
 	return params
 }
 
-func executorParams(ownerParty string, executors []ccipadapters.ExecutorDeployParams) []sequences.ExecutorParams {
+func executorParams(
+	ownerParty string,
+	executors []ccipadapters.ExecutorDeployParams,
+) []sequences.ExecutorParams {
 	if len(executors) == 0 {
 		return []sequences.ExecutorParams{defaultExecutorParams(ownerParty)}
 	}
@@ -245,4 +277,40 @@ func waitForFinalityRequested() common.FinalityConfig {
 
 func waitForSafeRequested() common.FinalityConfig {
 	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
+}
+
+func resolveFactoryAddressRef(chainSelector uint64, refs []datastore.AddressRef) (datastore.AddressRef, error) {
+	matches := make([]datastore.AddressRef, 0, len(refs))
+	for _, ref := range refs {
+		if ref.ChainSelector == chainSelector && ref.Type == datastore.ContractType(factoryops.ContractType) {
+			matches = append(matches, ref)
+		}
+	}
+
+	if len(matches) == 0 {
+		return datastore.AddressRef{}, fmt.Errorf("missing CCIPFactory address ref for chain %d", chainSelector)
+	}
+	if len(matches) == 1 {
+		return matches[0], validateFactoryAddressRef(matches[0])
+	}
+
+	for _, ref := range matches {
+		if ref.Qualifier == "" {
+			return ref, validateFactoryAddressRef(ref)
+		}
+	}
+
+	return datastore.AddressRef{}, fmt.Errorf("expected exactly one CCIPFactory address ref for chain %d, found %d", chainSelector, len(matches))
+}
+
+func validateFactoryAddressRef(ref datastore.AddressRef) error {
+	labels := ref.Labels.List()
+	if len(labels) == 0 {
+		return fmt.Errorf("CCIPFactory address ref is missing raw instance address label")
+	}
+	if _, err := contracts.RawInstanceAddressFromString(labels[0]); err != nil {
+		return fmt.Errorf("parse CCIPFactory raw instance address label %q: %w", labels[0], err)
+	}
+
+	return nil
 }

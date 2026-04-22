@@ -130,7 +130,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 				return ExerciseOutput{}, fmt.Errorf("failed to parse template ID %s: %w", exerciseCommand.TemplateID, err)
 			}
 
-			choiceArgument := ledger.MapToValue(input.Args)
+			choiceArgument := ledger.MapToValue(exerciseCommand.Arguments)
 
 			submitResp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{

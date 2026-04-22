@@ -549,7 +549,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
 	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -885,17 +884,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	)
 	require.Positive(t, senderDelta.Sign(), "sender balance should decrease after send")
 
-	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
-	ccipOwnerDelta := new(big.Rat).Sub(ccipOwnerBalanceAfter, ccipOwnerBalanceBefore)
-	t.Logf(
-		"CCIP owner balance: before=%s after=%s credited=%s",
-		ccipOwnerBalanceBefore,
-		ccipOwnerBalanceAfter,
-		ccipOwnerDelta,
-	)
-
-	require.Positive(t, ccipOwnerDelta.Sign(), "ccip owner balance should increase after send")
-	require.GreaterOrEqual(t, senderDelta.Cmp(ccipOwnerDelta), 0, "sender deduction should cover ccip owner credit")
+	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
+	require.True(t, ok, "quoted fee should parse as a decimal value")
+	tokenTransferAmount, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
+	require.True(t, ok, "token transfer amount should parse as a decimal value")
+	expectedSenderDelta := new(big.Rat).Add(tokenTransferAmount, quotedFeeAmount)
+	require.Zero(t, senderDelta.Cmp(expectedSenderDelta), "sender deduction should equal token amount plus quoted fee")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
