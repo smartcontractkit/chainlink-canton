@@ -51,6 +51,21 @@ maxExecutedMessagesSize : Int
 -- setup instead of relying on script-runner limits.
 maxExecutedMessagesSize = 25000
 
+-- Cap ArchivedExecutedMessages retained per router.
+-- Without a cap, the router eventually exceeds Canton's per-tx
+-- resource envelope and becomes unusable with no on-chain recovery path.
+
+-- Replay-protection window = maxArchiveCount * maxExecutedMessagesSize
+--   = 10 * 25000 = 250,000 message IDs per party.
+--
+-- Throughput vs. retention:
+--   1k msgs/day   -> ~250 days of protection
+--   10k msgs/day  -> ~25 days
+--   100k msgs/day -> ~2.5 days
+--
+maxArchiveCount : Int
+maxArchiveCount = 10
+
 addFeeForParty : Map.Map Party Decimal -> Party -> Decimal -> Map.Map Party Decimal
 addFeeForParty allocs recipient amount =
     let existing = fromOptional 0.0 (Map.lookup recipient allocs)
@@ -641,10 +656,15 @@ template PerPartyRouter
                             perPartyRouterInstanceId = instanceId
                             archiveIndex = length archivedExecutionContractIds
                             executedMessages = executedMessages
+                        let rotated = archivedExecutionContractIds <> [archivedExecutionMessagesCid]
+                        -- Drop the oldest archive when the retention cap is exceeded.
+                        let bounded =
+                                if length rotated > maxArchiveCount
+                                then drop (length rotated - maxArchiveCount) rotated
+                                else rotated
                         create this with
                             executedMessages = Set.singleton result.messageId
-                            archivedExecutionContractIds =
-                                archivedExecutionContractIds <> [archivedExecutionMessagesCid]
+                            archivedExecutionContractIds = bounded
                     else
                         create this with
                             executedMessages = Set.insert result.messageId executedMessages

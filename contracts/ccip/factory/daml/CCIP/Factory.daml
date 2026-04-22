@@ -1,5 +1,6 @@
 module CCIP.Factory where
 
+import DA.Foldable qualified as Foldable
 import DA.Map qualified as Map
 import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, byteCount)
@@ -286,6 +287,11 @@ template CCIPFactory
                 assertFactoryIsMCMSControlled this
                 assertSingletonNotDeployed "on-ramp" deployedContracts
                 assertInstanceIdUnused contract.instanceId usedInstanceIds
+                assertCrossRefDeployed "onRamp.globalConfig" contract.deps.globalConfig usedInstanceIds
+                assertCrossRefDeployed "onRamp.rmnRemote" contract.deps.rmnRemote usedInstanceIds
+                assertCrossRefDeployed "onRamp.tokenAdminRegistry" contract.deps.tokenAdminRegistry usedInstanceIds
+                assertCrossRefDeployed "onRamp.feeQuoter" contract.deps.feeQuoter usedInstanceIds
+                assertCrossRefDeployed "onRamp.ccvRegistry" contract.deps.ccvRegistry usedInstanceIds
 
                 deployedCid <- create contract
                 newFactoryCid <- create this with
@@ -304,6 +310,9 @@ template CCIPFactory
                 assertFactoryIsMCMSControlled this
                 assertSingletonNotDeployed "off-ramp" deployedContracts
                 assertInstanceIdUnused contract.instanceId usedInstanceIds
+                assertCrossRefDeployed "offRamp.globalConfig" contract.deps.globalConfig usedInstanceIds
+                assertCrossRefDeployed "offRamp.rmnRemote" contract.deps.rmnRemote usedInstanceIds
+                assertCrossRefDeployed "offRamp.tokenAdminRegistry" contract.deps.tokenAdminRegistry usedInstanceIds
 
                 deployedCid <- create contract
                 newFactoryCid <- create this with
@@ -323,6 +332,12 @@ template CCIPFactory
                 assertMsg "E_PER_PARTY_ROUTER_FACTORY_ALREADY_DEPLOYED" (not perPartyRouterFactoryDeployed)
                 assertSingletonNotDeployed "per-party-router-factory" deployedContracts
                 assertInstanceIdUnused contract.instanceId usedInstanceIds
+                assertCrossRefDeployed "perPartyRouterFactory.onRamp" contract.deps.onRamp usedInstanceIds
+                assertCrossRefDeployed "perPartyRouterFactory.offRamp" contract.deps.offRamp usedInstanceIds
+                assertCrossRefDeployed "perPartyRouterFactory.globalConfig" contract.deps.globalConfig usedInstanceIds
+                assertCrossRefDeployed "perPartyRouterFactory.tokenAdminRegistry" contract.deps.tokenAdminRegistry usedInstanceIds
+                assertCrossRefDeployed "perPartyRouterFactory.feeQuoter" contract.deps.feeQuoter usedInstanceIds
+                assertCrossRefDeployed "perPartyRouterFactory.rmnRemote" contract.deps.rmnRemote usedInstanceIds
 
                 deployedCid <- create contract
                 newFactoryCid <- create this with
@@ -361,6 +376,7 @@ template CCIPFactory
                 let componentKey = "committee-verifier:" <> contract.instanceId
                 assertComponentNotDeployed componentKey deployedContracts
                 assertInstanceIdUnused contract.instanceId usedInstanceIds
+                assertCrossRefDeployed "committeeVerifier.rmnRemote" contract.deps.rmnRemote usedInstanceIds
 
                 deployedCid <- create contract
                 newFactoryCid <- create this with
@@ -399,6 +415,9 @@ template CCIPFactory
                 let componentKey = "lock-release-token-pool:" <> contract.instanceId
                 assertComponentNotDeployed componentKey deployedContracts
                 assertInstanceIdUnused contract.instanceId usedInstanceIds
+                assertCrossRefDeployed "lockReleaseTokenPool.tokenAdminRegistry" contract.deps.tokenAdminRegistry usedInstanceIds
+                assertCrossRefDeployed "lockReleaseTokenPool.feeQuoter" contract.deps.feeQuoter usedInstanceIds
+                assertCrossRefDeployed "lockReleaseTokenPool.rmnRemote" contract.deps.rmnRemote usedInstanceIds
 
                 deployedCid <- create contract
                 newFactoryCid <- create this with
@@ -456,6 +475,8 @@ template CCIPFactory
                 let componentKey = "ccip-receiver:" <> contract.instanceId
                 assertComponentNotDeployed componentKey deployedContracts
                 assertInstanceIdUnused contract.instanceId usedInstanceIds
+                assertCrossRefsDeployed "ccipReceiver.requiredCCVs" contract.requiredCCVs usedInstanceIds
+                assertCrossRefsDeployed "ccipReceiver.optionalCCVs" contract.optionalCCVs usedInstanceIds
 
                 deployedCid <- create contract
                 newFactoryCid <- create this with
@@ -1014,3 +1035,27 @@ assertInstanceIdUnused newInstanceId usedInstanceIds =
 reserveInstanceId : Text -> Map.Map Text Bool -> Map.Map Text Bool
 reserveInstanceId instanceId usedInstanceIds =
     Map.insert instanceId True usedInstanceIds
+
+-- Assert that a cross-contract RawInstanceAddress parameter refers
+-- to an instanceId that has been reserved by a prior deployment choice.
+-- Catches typos and wiring-before-deploy errors at deploy time rather than
+-- surfacing them as runtime failures inside the deployed contract's choices.
+assertCrossRefDeployed
+    : Text
+    -> RawInstanceAddress.RawInstanceAddress
+    -> Map.Map Text Bool
+    -> Update ()
+assertCrossRefDeployed label addr usedInstanceIds =
+    case RawInstanceAddress.parseInstanceIdText (RawInstanceAddress.toText addr) of
+        None -> abort ("factory: malformed " <> label <> " address " <> RawInstanceAddress.toText addr)
+        Some instId ->
+            assertMsg ("factory: " <> label <> " refers to unknown instanceId " <> instId)
+                (Map.member instId usedInstanceIds)
+
+assertCrossRefsDeployed
+    : Text
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Map.Map Text Bool
+    -> Update ()
+assertCrossRefsDeployed label addrs usedInstanceIds =
+    Foldable.forA_ addrs $ \a -> assertCrossRefDeployed label a usedInstanceIds

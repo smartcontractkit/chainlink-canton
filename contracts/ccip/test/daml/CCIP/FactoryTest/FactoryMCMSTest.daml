@@ -384,7 +384,12 @@ testDeployOnRamp_MCMS = script do
       instanceId = factoryInstanceId
       owner = mcmsParty
       mcmsParty
-      usedInstanceIds = Map.empty
+      -- Pre-seeded cross-refs for deploy-time validation. This test
+      -- exercises MCMS entrypoint wiring, not a real deployment flow, so the
+      -- referenced instanceIds are only declared as "used", not actually
+      -- deployed.
+      usedInstanceIds = Map.fromList
+        [ ("gc", True), ("rmn", True), ("tar", True), ("fq", True), ("ccv", True) ]
       deployedContracts = Map.empty
       perPartyRouterFactoryDeployed = False
 
@@ -420,7 +425,10 @@ testDeployOffRamp_MCMS = script do
       instanceId = factoryInstanceId
       owner = mcmsParty
       mcmsParty
-      usedInstanceIds = Map.empty
+      -- Pre-declare cross-ref instanceIds since this test exercises
+      -- MCMS entrypoint wiring rather than a full deployment sequence.
+      usedInstanceIds = Map.fromList
+        [ ("gc", True), ("rmn", True), ("tar", True) ]
       deployedContracts = Map.empty
       perPartyRouterFactoryDeployed = False
 
@@ -453,7 +461,11 @@ testDeployPerPartyRouterFactory_MCMS = script do
       instanceId = factoryInstanceId
       owner = mcmsParty
       mcmsParty
-      usedInstanceIds = Map.empty
+      -- Pre-declare cross-ref instanceIds since this test exercises
+      -- MCMS entrypoint wiring rather than a full deployment sequence.
+      usedInstanceIds = Map.fromList
+        [ ("onramp", True), ("offramp", True), ("gc", True)
+        , ("tar", True), ("fq", True), ("rmn", True) ]
       deployedContracts = Map.empty
       perPartyRouterFactoryDeployed = False
 
@@ -530,7 +542,8 @@ testDeployCommitteeVerifier_MCMS = script do
       instanceId = factoryInstanceId
       owner = mcmsParty
       mcmsParty
-      usedInstanceIds = Map.empty
+      -- Pre-declare cross-ref instanceId.
+      usedInstanceIds = Map.fromList [ ("rmn", True) ]
       deployedContracts = Map.empty
       perPartyRouterFactoryDeployed = False
 
@@ -572,7 +585,9 @@ testDeployLockReleaseTokenPool_MCMS = script do
       instanceId = factoryInstanceId
       owner = mcmsParty
       mcmsParty
-      usedInstanceIds = Map.empty
+      -- Pre-declare cross-ref instanceIds.
+      usedInstanceIds = Map.fromList
+        [ ("tar-1", True), ("fq-1", True), ("rmn-1", True) ]
       deployedContracts = Map.empty
       perPartyRouterFactoryDeployed = False
 
@@ -721,7 +736,9 @@ testDeployCCIPReceiver_MCMS = script do
       instanceId = factoryInstanceId
       owner = mcmsParty
       mcmsParty
-      usedInstanceIds = Map.empty
+      -- Pre-declare cross-ref instanceIds for required/optional CCVs.
+      usedInstanceIds = Map.fromList
+        [ ("ccv1", True), ("ccv2", True), ("ccv3", True), ("ccv4", True) ]
       deployedContracts = Map.empty
       perPartyRouterFactoryDeployed = False
 

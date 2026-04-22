@@ -587,6 +587,18 @@ testFinalizeFeeUsesEVMScaledPrices = script do
             messageId = ""
             state = SendingMessageV1.SendingMessageState_Prepared
 
+    -- Satisfy the FinalizeFee invariant that every requiredCCV has a matching
+    -- ccvFee (mirrors OnRamp.CCIPSendFromRouter). Zero-value fee keeps the
+    -- networkFeeTokenAmount assertion below untouched.
+    disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-premium"
+            feeUSDCents = cents 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+            caller = ccvOwner
+
     sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
 
     finalized <- queryContractId owner sendingMessageCid

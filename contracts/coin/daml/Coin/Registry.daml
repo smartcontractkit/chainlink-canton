@@ -135,15 +135,15 @@ mintPreapprovalContextKey : Text
 mintPreapprovalContextKey = "mint-preapproval"
 
 template MintPreapproval
-    with 
+    with
         receiver : Party
         sender : Party
     where
         signatory receiver
         observer sender
 
-        nonconsuming choice MintPreapproval_Mint : ContractId CoinHolding
-            with 
+        choice MintPreapproval_Mint : ContractId CoinHolding
+            with
                 issuer : Party
                 view : Splice.Api.Token.HoldingV1.HoldingView
             controller sender

@@ -356,6 +356,18 @@ template SendingMessageV1
                 assertMsg "fee token price must be positive" (feeTokenPrice > 0.0)
                 assertMsg "premium multiplier must be positive" (premiumMultiplier > 0.0)
 
+                -- Fail fast if any required CCV has not submitted a fee.
+                -- Mirrors the downstream check in OnRamp.CCIPSendFromRouter so the
+                -- contract cannot reach FeeFinalized in a state where the send
+                -- would later abort and strand this SendingMessageV1.
+                let allRequiredCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
+                let ccvFeeRawAddrs = map
+                        (\fee -> RawInstanceAddress.make fee.ccvInstanceId fee.ccvOwner)
+                        ccvFees
+                Foldable.forA_ allRequiredCCVs $ \req ->
+                    assertMsg ("sendingMessage: FinalizeFee missing fee for required CCV " <> show req)
+                        (req `elem` ccvFeeRawAddrs)
+
                 -- All math in Numeric 0 to avoid Canton's banker's rounding.
                 -- EVM FeeQuoter.sol line 750:
                 --   fee = (totalGas * gasPrice * 1e18 + premiumUSD) / feeTokenPrice
