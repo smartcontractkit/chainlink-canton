@@ -155,12 +155,7 @@ func (t ApplyAllowListUpdates) ToMap() map[string]any {
 	m["allowListConfigArgsItems"] = func() []any {
 		res := make([]any, 0, len(t.AllowListConfigArgsItems))
 		for _, e := range t.AllowListConfigArgsItems {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -223,12 +218,7 @@ func (t ApplyAllowListUpdatesParams) ToMap() map[string]any {
 	m["allowListConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.AllowListConfigArgs))
 		for _, e := range t.AllowListConfigArgs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -272,12 +262,7 @@ func (t ApplyRemoteChainConfigUpdates) ToMap() map[string]any {
 	m["remoteChainConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.RemoteChainConfigArgs))
 		for _, e := range t.RemoteChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -319,12 +304,7 @@ func (t ApplyRemoteChainConfigUpdatesParams) ToMap() map[string]any {
 	m["remoteChainConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.RemoteChainConfigArgs))
 		for _, e := range t.RemoteChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -375,12 +355,7 @@ func (t ApplySignatureConfigs) ToMap() map[string]any {
 	m["signatureConfigs"] = func() []any {
 		res := make([]any, 0, len(t.SignatureConfigs))
 		for _, e := range t.SignatureConfigs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -431,12 +406,7 @@ func (t ApplySignatureConfigsParams) ToMap() map[string]any {
 	m["signatureConfigs"] = func() []any {
 		res := make([]any, 0, len(t.SignatureConfigs))
 		for _, e := range t.SignatureConfigs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -477,21 +447,9 @@ type CalculateFee struct {
 func (t CalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
+	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
+	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -589,6 +547,7 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	} else {
 		args["allowListAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -633,13 +592,7 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["deps"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Deps).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Deps
-	}()
+	args["deps"] = model.NestedToDAMLValue(t.Deps)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -671,6 +624,7 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	} else {
 		args["allowListAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -715,13 +669,7 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["deps"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Deps).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Deps
-	}()
+	args["deps"] = model.NestedToDAMLValue(t.Deps)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -1146,13 +1094,7 @@ type CommitteeVerifierDeps struct {
 func (t CommitteeVerifierDeps) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemote"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemote).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemote
-	}()
+	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
 
 	return m
 }
@@ -1197,6 +1139,7 @@ func (t DynamicConfig) ToMap() map[string]any {
 	} else {
 		m["allowListAdmin"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1246,29 +1189,11 @@ type ForwardToVerifier struct {
 func (t ForwardToVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
+	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
+	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
+	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["verifierArgs"] = string(t.VerifierArgs)
 
@@ -1488,13 +1413,7 @@ type SetDeps struct {
 func (t SetDeps) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["newDeps"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.NewDeps).(mapper); ok {
-			return m.toMap()
-		}
-		return t.NewDeps
-	}()
+	m["newDeps"] = model.NestedToDAMLValue(t.NewDeps)
 
 	return m
 }
@@ -1533,11 +1452,12 @@ func (t SetDepsParams) ToMap() map[string]any {
 	if t.RmnRemote != nil {
 		m["rmnRemote"] = map[string]any{
 			"_type": "optional",
-			"value": *t.RmnRemote,
+			"value": model.NestedToDAMLValue(*t.RmnRemote),
 		}
 	} else {
 		m["rmnRemote"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -1575,13 +1495,7 @@ type SetDynamicConfig struct {
 func (t SetDynamicConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["dynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DynamicConfig).(mapper); ok {
-			return m.toMap()
-		}
-		return t.DynamicConfig
-	}()
+	m["dynamicConfig"] = model.NestedToDAMLValue(t.DynamicConfig)
 
 	return m
 }
@@ -1617,13 +1531,7 @@ type SetDynamicConfigParams struct {
 func (t SetDynamicConfigParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["dynamicConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DynamicConfig).(mapper); ok {
-			return m.toMap()
-		}
-		return t.DynamicConfig
-	}()
+	m["dynamicConfig"] = model.NestedToDAMLValue(t.DynamicConfig)
 
 	return m
 }
@@ -1867,29 +1775,11 @@ type VerifyMessage struct {
 func (t VerifyMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
+	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
+	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
-	m["executingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutingMessageCid
-	}()
+	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
 
 	m["verifierResults"] = string(t.VerifierResults)
 
