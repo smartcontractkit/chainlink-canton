@@ -557,7 +557,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Log("Configured chain for lanes")
 
 	// Create PerPartyRouter for receiver
-	perPartyRouterFactoryCid, disclosedContracts, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), ccipAPIClient)
+	perPartyRouterFactoryDisclosure, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosure(t.Context(), ccipAPIClient, partyReceiver)
 	require.NoError(t, err)
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -566,7 +566,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: perPartyRouterFactoryCid,
+					ContractId: perPartyRouterFactoryDisclosure.FactoryContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partyReceiver),
@@ -575,7 +575,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
-			DisclosedContracts: disclosedContracts,
+			DisclosedContracts: perPartyRouterFactoryDisclosure.DisclosedContracts,
 		},
 	})
 	require.NoError(t, err)

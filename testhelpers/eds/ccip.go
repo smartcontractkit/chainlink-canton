@@ -14,26 +14,35 @@ import (
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
-func GetPerPartyRouterFactoryDisclosures(ctx context.Context, ccipAPIClient oapiCCIP.ClientWithResponsesInterface) (string, []*apiv2.DisclosedContract, error) {
+type PerPartyRouterFactoryDisclosure struct {
+	FactoryContractId  string
+	DisclosedContracts []*apiv2.DisclosedContract
+}
+
+func GetPerPartyRouterFactoryDisclosure(
+	ctx context.Context,
+	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,
+	partyId string,
+) (*PerPartyRouterFactoryDisclosure, error) {
 	resp, err := ccipAPIClient.PostPerPartyRouterFactoryWithResponse(ctx, oapiCCIP.CCIPPerPartyRouterFactoryRequest{
-		PartyID: "", // Unused for now
+		PartyID: partyId, // Unused for now
 	})
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to get per party router factory: %w", err)
+		return nil, fmt.Errorf("failed to get per party router factory: %w", err)
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return "", nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
 	}
 
 	var disclosedContracts []*apiv2.DisclosedContract
 	for _, contract := range resp.JSON200.DisclosedContracts {
 		templateId, err := contracts.TemplateIDFromString(contract.TemplateId)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to parse template id: %w", err)
+			return nil, fmt.Errorf("failed to parse template id: %w", err)
 		}
 		createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to decode created event blob: %w", err)
+			return nil, fmt.Errorf("failed to decode created event blob: %w", err)
 		}
 		disclosedContracts = append(disclosedContracts, &apiv2.DisclosedContract{
 			TemplateId:       templateId.ToLedgerIdentifier(),
@@ -45,7 +54,10 @@ func GetPerPartyRouterFactoryDisclosures(ctx context.Context, ccipAPIClient oapi
 
 	factoryCid := resp.JSON200.ContractId
 
-	return factoryCid, disclosedContracts, nil
+	return &PerPartyRouterFactoryDisclosure{
+		FactoryContractId:  factoryCid,
+		DisclosedContracts: disclosedContracts,
+	}, nil
 }
 
 func GetTokenPoolForToken(ctx context.Context, ccipAPIClient oapiCCIP.ClientWithResponsesInterface, token contracts.EncodedInstrumentID) (contracts.RawInstanceAddress, error) {

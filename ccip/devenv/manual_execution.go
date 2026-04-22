@@ -9,7 +9,6 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
@@ -21,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
@@ -93,35 +91,46 @@ func (c *Chain) resolveTransferFactoryForExecute(
 
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
-func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Participant, partyId string) (routerAddress contracts.InstanceAddress, disclosedRouter *apiv2.DisclosedContract, err error) {
+func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Participant, partyId string) (routerAddress contracts.InstanceAddress, err error) {
 	// Create PerPartyRouter (ignore error if it exists already)
-	cantonPerPartyRouterFactory, err := c.getEDSPerPartyRouterFactory()
+	perPartyRouterFactoryDisclosure, err := c.GetPerPartyRouterFactoryDisclosure(ctx, partyId)
 	if err != nil {
-		return contracts.InstanceAddress{}, nil, fmt.Errorf("failed to get canton per party router factory address: %w", err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to get canton per party router factory disclosure: %w", err)
 	}
-	c.logger.Debug().Str("CantonPerPartyRouterFactory", cantonPerPartyRouterFactory.String()).Msg("Resolved per-party router factory address")
+	c.logger.Debug().Str("CantonPerPartyRouterFactory", perPartyRouterFactoryDisclosure.FactoryContractId).Msg("Resolved per-party router factory address")
 
 	// Fixed instance ID for the router, this makes the InstanceAddress deterministic.
 	routerInstanceID := contracts.InstanceID("test-router")
 	// Ignore errors, since the router might already exist if this function is called multiple times for the same party. In that case we just want to return the existing router's address.
-	_, _ = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, c.chain, contract.ChoiceInput[perpartyrouter.CreateRouter]{
-		InstanceAddress: cantonPerPartyRouterFactory,
-		Args: perpartyrouter.CreateRouter{
-			PartyOwner: types.PARTY(partyId),
-			InstanceId: types.TEXT(routerInstanceID.String()),
+	_, _ = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					ContractId: perPartyRouterFactoryDisclosure.FactoryContractId,
+					Choice:     "CreateRouter",
+					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
+						PartyOwner: types.PARTY(partyId),
+						InstanceId: types.TEXT(routerInstanceID),
+					}),
+				}},
+			}},
+			ActAs:              []string{partyId},
+			DisclosedContracts: perPartyRouterFactoryDisclosure.DisclosedContracts,
 		},
 	})
 	routerAddress = routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
 
-	// Get disclosure and contract id of the router
-	disclosedRouter, err = testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
+	// Try to get the PerPartyRouter, to ensure that is actually exists
+	_, err = testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
 	if err != nil {
-		return contracts.InstanceAddress{}, nil, fmt.Errorf("failed to get disclosed router: %w", err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to find per-party router: %w", err)
 	}
 
-	return routerAddress, disclosedRouter, nil
+	return routerAddress, nil
 }
 
 func (c *Chain) DeployCCIPReceiver(partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
@@ -162,7 +171,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Deploy PerPartyRouter for the receiver party
-	routerAddress, _, err := c.DeployPerPartyRouter(ctx, participant, executingParty)
+	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, executingParty)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
@@ -184,57 +193,64 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		ccvs[i] = contracts.HexToInstanceAddress(verifier.String())
 	}
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
-	executeDisclosures, err := c.GetDisclosuresForExecution(ctx, encodedMessageHex, ccvs)
-	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get disclosures for execution: %w", err)
-	}
-	disclosedContracts := executeDisclosures.DisclosedContracts
-	tokenTransferArg := &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}
-	if message.TokenTransfer != nil {
-		transferFactoryCID, transferFactoryDisclosures, transferFactoryChoiceContext, tfErr := c.resolveTransferFactoryForExecute(ctx, participant, executingParty, message)
-		if tfErr != nil {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("resolve transfer factory for execute: %w", tfErr)
-		}
-		disclosedContracts = append(disclosedContracts, transferFactoryDisclosures...)
-		if executeDisclosures.TokenPoolContractID == nil {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing token pool disclosure from EDS")
-		}
-		if executeDisclosures.PoolExtraContext == nil {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing pool extra context from EDS")
-		}
-		if len(executeDisclosures.TokenPoolHoldingsContractIDs) == 0 {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("missing token pool holdings from EDS")
-		}
 
-		tokenTransferRecord := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-			{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: executeDisclosures.TokenPoolContractID.ContractId}}},
-			{Label: "tokenReceiverParty", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: executingParty}}},
-			{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: string(transferFactoryCID)}}},
-				{Label: "extraArgs", Value: ledger.MapToValue(splice_api_token_metadata_v1.ExtraArgs{
-					Context: transferFactoryChoiceContext,
-					Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
-				})},
-				{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: executeDisclosures.TokenPoolHoldingsContractIDs}}}},
-			}}}}},
-			{Label: "poolExtraContext", Value: executeDisclosures.PoolExtraContext},
-		}}}}
-		tokenTransferArg = &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: tokenTransferRecord}}
-	}
-	disclosedContracts = testhelpers.DeduplicateDisclosedContracts(disclosedContracts...)
-
-	// Resolve all necessary contracts
 	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get router contract ID: %w", err)
 	}
 	c.logger.Debug().Str("InstanceAddress", routerAddress.String()).Str("ContractId", routerCid).Msg("Resolved PerPartyRouter contract")
 
-	receiverCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, ccipreceiver.CCIPReceiver{}.GetTemplateID(), receiverAddress)
+	// Collect disclosures
+	// CCIP
+	ccipExecuteDisclosure, err := c.GetCCIPExecuteDisclosure(ctx, encodedMessageHex)
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get receiver contract ID: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCIP execute disclosure: %w", err)
 	}
-	c.logger.Debug().Str("InstanceAddress", receiverAddress.String()).Str("ContractId", receiverCid).Msg("Resolved CCIPReceiver contract")
+	executeArgs := ccipreceiver.Execute2{
+		Context:        ccipExecuteDisclosure.ChoiceContext,
+		RouterCid:      types.CONTRACT_ID(routerCid),
+		EncodedMessage: types.TEXT(encodedMessageHex),
+		TokenTransfer:  nil,
+		CcvInputs:      make([]ccipreceiver.CCVInput, len(verifiers)),
+	}
+	disclosedContracts := ccipExecuteDisclosure.DisclosedContracts
+
+	// CCVs
+	for i, verifier := range ccvs {
+		ccvExecuteDisclosure, err := c.GetCCVExecuteDisclosure(ctx, encodedMessageHex, verifier)
+		if err != nil {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCV execute disclosure for verifier %s: %w", verifier.String(), err)
+		}
+
+		executeArgs.CcvInputs[i] = ccipreceiver.CCVInput{
+			CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
+			VerifierResults: types.TEXT(hex.EncodeToString(verifierResults[i])),
+			CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+		}
+		disclosedContracts = append(disclosedContracts, ccvExecuteDisclosure.DisclosedContracts...)
+	}
+
+	// Token Pool
+	if message.TokenTransfer != nil {
+		hashedInstrumentId := contracts.BytesToEncodedInstrumentID(message.TokenTransfer.DestTokenAddress)
+		tokenPoolAddress, err := c.GetTokenPoolForToken(ctx, hashedInstrumentId)
+		if err != nil {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get token pool for token %s: %w", hashedInstrumentId.String(), err)
+		}
+
+		tokenPoolDisclosure, err := c.GetTokenPoolExecuteDisclosure(ctx, encodedMessageHex, tokenPoolAddress.InstanceAddress())
+		if err != nil {
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get token pool execute disclosure: %w", err)
+		}
+
+		executeArgs.TokenTransfer = &ccipreceiver.TokenTransferInput{
+			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
+			TokenReceiverParty: types.PARTY(executingParty),
+			TokenInput:         tokenPoolDisclosure.TokenInput,
+			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
+		}
+		disclosedContracts = append(disclosedContracts, tokenPoolDisclosure.DisclosedContracts...)
+	}
 
 	// Execute message
 	c.logger.Debug().
@@ -243,68 +259,17 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		Str("Receiver", hex.EncodeToString(message.Receiver)).
 		Msg("Executing message...")
 
-	emptyCCIPCtx := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
-	}}}}
-	ccvElements := make([]*apiv2.Value, len(verifiers))
-	for i, ccvCid := range executeDisclosures.CCVContractIDs {
-		ccvElements[i] = &apiv2.Value{
-			Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvCid}},
-				{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(verifierResults[i])}}},
-				{Label: "ccvExtraContext", Value: emptyCCIPCtx},
-			}}},
-		}
-	}
-	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
-					ContractId: receiverCid,
-					Choice:     "Execute",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: executeDisclosures.ChoiceContext},
-						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
-						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
-						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: tokenTransferArg}},
-						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: ccvElements}}}},
-					}}}},
-				}},
-			}},
-			ActAs:              []string{executingParty},
-			DisclosedContracts: disclosedContracts,
-		},
+	executeReport, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Execute, c.chain, contract.ChoiceInput[ccipreceiver.Execute2]{
+		InstanceAddress:    receiverAddress,
+		Args:               executeArgs,
+		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),
 	})
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to execute message: %w", err)
 	}
-	c.logger.Debug().Str("UpdateID", res.GetTransaction().GetUpdateId()).Msg("Executed message")
-	if message.TokenTransfer != nil {
-		pendingTransferInstructionCID := ""
-		for _, event := range res.GetTransaction().GetEvents() {
-			if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-				templateName := e.Created.GetTemplateId().GetEntityName()
-				if strings.Contains(templateName, "TransferInstruction") {
-					pendingTransferInstructionCID = e.Created.GetContractId()
-				}
-			}
-		}
-		if pendingTransferInstructionCID != "" {
-			_, _, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
-			if err != nil {
-				return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("create transfer instruction client: %w", err)
-			}
-			if err := testhelpers.AcceptPendingTransferInstruction(ctx, participant, transferClient, executingParty, pendingTransferInstructionCID); err != nil {
-				return cciptestinterfaces.ExecutionStateChangedEvent{}, err
-			}
-		}
-	}
-
-	// Get Update
-	updateRes, err := participant.LedgerServices.Update.GetUpdateById(ctx, &apiv2.GetUpdateByIdRequest{
-		UpdateId: res.GetTransaction().GetUpdateId(),
+	c.logger.Info().Str("UpdateID", executeReport.Output.ExecInfo.UpdateID).Msg("Message executed")
+	update, err := participant.LedgerServices.Update.GetUpdateById(ctx, &apiv2.GetUpdateByIdRequest{
+		UpdateId: executeReport.Output.ExecInfo.UpdateID,
 		UpdateFormat: &apiv2.UpdateFormat{
 			IncludeTransactions: &apiv2.TransactionFormat{
 				TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
@@ -328,12 +293,33 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		},
 	})
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get update by UpdateId %q: %w", res.GetTransaction().GetUpdateId(), err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get update %q: %w", executeReport.Output.ExecInfo.UpdateID, err)
+	}
+	c.logger.Debug().Str("UpdateID", update.GetTransaction().GetUpdateId()).Msg("Executed message")
+	if message.TokenTransfer != nil {
+		pendingTransferInstructionCID := ""
+		for _, event := range update.GetTransaction().GetEvents() {
+			if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+				templateName := e.Created.GetTemplateId().GetEntityName()
+				if strings.Contains(templateName, "TransferInstruction") {
+					pendingTransferInstructionCID = e.Created.GetContractId()
+				}
+			}
+		}
+		if pendingTransferInstructionCID != "" {
+			_, _, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
+			if err != nil {
+				return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("create transfer instruction client: %w", err)
+			}
+			if err := testhelpers.AcceptPendingTransferInstruction(ctx, participant, transferClient, executingParty, pendingTransferInstructionCID); err != nil {
+				return cciptestinterfaces.ExecutionStateChangedEvent{}, err
+			}
+		}
 	}
 
 	// Get ExecutionStateChangedEvent from events
 	expectedTemplateID := common.ExecutionStateChanged{}.GetTemplateID()
-	for _, event := range updateRes.GetTransaction().GetEvents() {
+	for _, event := range update.GetTransaction().GetEvents() {
 		//nolint:nestif // need to check if all of these are nil
 		if createdEvent := event.GetCreated(); createdEvent != nil {
 			if templateId := createdEvent.GetTemplateId(); templateId != nil {
@@ -353,7 +339,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// No event found in the update, return an error
-	return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no ExecutionStateChanged event found in update %s", res.GetTransaction().GetUpdateId())
+	return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no ExecutionStateChanged event found in update %s", update.GetTransaction().GetUpdateId())
 }
 
 // parseExecutionStateChangedEvent parses a common.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.

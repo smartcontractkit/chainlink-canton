@@ -38,6 +38,33 @@ func (o ExerciseOutput) Executed() bool {
 	return o.ExecInfo != nil
 }
 
+// DisclosedContract copies the regenerated protobuf message.
+// The generated protobufs cannot be used as an operation's input since they contain unexported fields.
+type DisclosedContract struct {
+	TemplateId       contracts.TemplateID `json:"template_id,omitempty"`
+	ContractId       string               `json:"contract_id,omitempty"`
+	CreatedEventBlob []byte               `json:"created_event_blob,omitempty"`
+	SynchronizerId   string               `json:"synchronizer_id,omitempty"`
+}
+
+func DisclosedContractsFromProto(dcs []*apiv2.DisclosedContract) []DisclosedContract {
+	disclosedContracts := make([]DisclosedContract, len(dcs))
+	for i, dc := range dcs {
+		disclosedContracts[i] = DisclosedContract{
+			TemplateId: contracts.TemplateID{
+				PackageID:  dc.TemplateId.PackageId,
+				ModuleName: dc.TemplateId.ModuleName,
+				EntityName: dc.TemplateId.EntityName,
+			},
+			ContractId:       dc.ContractId,
+			CreatedEventBlob: dc.CreatedEventBlob,
+			SynchronizerId:   dc.SynchronizerId,
+		}
+	}
+
+	return disclosedContracts
+}
+
 type ChoiceInput[ARGS any] struct {
 	// The InstanceAddress this operation is targeting. Will be resolved to an active contract.
 	InstanceAddress contracts.InstanceAddress `json:"instanceAddress"`
@@ -46,6 +73,7 @@ type ChoiceInput[ARGS any] struct {
 	RawInstanceAddress string `json:"rawInstanceAddress,omitempty"`
 	Args               ARGS   `json:"args"`
 	MCMSEnabled        bool   `json:"mcmsEnabled,omitempty"`
+	DisclosedContracts []DisclosedContract
 }
 
 type ExerciseParams[ARGS any] struct {
@@ -132,6 +160,16 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 
 			choiceArgument := ledger.MapToValue(exerciseCommand.Arguments)
 
+			disclosedContracts := make([]*apiv2.DisclosedContract, len(input.DisclosedContracts))
+			for i, contract := range input.DisclosedContracts {
+				disclosedContracts[i] = &apiv2.DisclosedContract{
+					TemplateId:       contract.TemplateId.ToLedgerIdentifier(),
+					ContractId:       contract.ContractId,
+					CreatedEventBlob: contract.CreatedEventBlob,
+					SynchronizerId:   contract.SynchronizerId,
+				}
+			}
+
 			submitResp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{
 					CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -150,6 +188,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 							},
 						},
 					}},
+					DisclosedContracts: disclosedContracts,
 				},
 			})
 			if err != nil {

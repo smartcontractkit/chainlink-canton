@@ -420,7 +420,7 @@ func TestCCIPSend(t *testing.T) {
 	// Apply FeeQuoter dest chain config (needed by OnRamp.FinalizeFeeFromRouter)
 	// Create PerPartyRouter for sender
 	// Create PerPartyRouter for receiver
-	perPartyRouterFactoryCid, disclosedContracts, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), ccipAPIClient)
+	perPartyRouterFactoryDisclosure, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosure(t.Context(), ccipAPIClient, partySender)
 	require.NoError(t, err)
 
 	// TODO use operation to deploy PerPartyRouter
@@ -430,7 +430,7 @@ func TestCCIPSend(t *testing.T) {
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: perPartyRouterFactoryCid,
+					ContractId: perPartyRouterFactoryDisclosure.FactoryContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partySender),
@@ -439,7 +439,7 @@ func TestCCIPSend(t *testing.T) {
 				}},
 			}},
 			ActAs:              []string{partySender},
-			DisclosedContracts: disclosedContracts,
+			DisclosedContracts: perPartyRouterFactoryDisclosure.DisclosedContracts,
 		},
 	})
 	require.NoError(t, err)
