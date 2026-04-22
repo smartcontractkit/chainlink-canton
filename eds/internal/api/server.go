@@ -152,8 +152,7 @@ func (s Server) CcipExecute(c *gin.Context) {
 	for address, contract := range disclosures.CCVs {
 		var disclosedContract *edsv1.DisclosedContract
 		if contract != nil {
-			d := convertDisclosedContract(contract)
-			disclosedContract = &d
+			disclosedContract = new(convertDisclosedContract(contract))
 		}
 
 		resp.Ccvs[address.String()] = edsv1.OptionalDisclosure{
@@ -242,8 +241,7 @@ func (s Server) CcipSend(c *gin.Context) {
 	for address, contract := range disclosures.CCVs {
 		var disclosedContract *edsv1.DisclosedContract
 		if contract != nil {
-			d := convertDisclosedContract(contract)
-			disclosedContract = &d
+			disclosedContract = new(convertDisclosedContract(contract))
 		}
 
 		resp.Ccvs[address.String()] = edsv1.OptionalDisclosure{

@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
@@ -49,8 +49,7 @@ func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error)
 	case finality > 0xFFFF:
 		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
 	default:
-		depth := types.INT64(finality)
-		return common.FinalityConfig{BlockDepth: &depth}, nil
+		return common.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}
 }
 

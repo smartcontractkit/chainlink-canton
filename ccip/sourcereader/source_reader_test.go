@@ -64,7 +64,7 @@ func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
 		}
 
 		latest, finalized, err := reader.LatestAndFinalizedBlock(ctx)
-		offsetUint64 := uint64(offset) //nolint:gosec // offset is always non-negative
+		offsetUint64 := uint64(offset)
 		require.NoError(t, err)
 		require.NotNil(t, latest)
 		require.NotNil(t, finalized)

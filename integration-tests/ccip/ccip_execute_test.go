@@ -117,28 +117,28 @@ func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
 	buf.Write(msg.CCVAndExecutorHash[:])
 
 	// Length-prefixed fields (1-byte length)
-	buf.WriteByte(uint8(len(msg.OnRampAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(msg.OnRampAddress)))
 	buf.Write(msg.OnRampAddress)
-	buf.WriteByte(uint8(len(msg.OffRampAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(msg.OffRampAddress)))
 	buf.Write(msg.OffRampAddress)
-	buf.WriteByte(uint8(len(msg.Sender))) //nolint:gosec
+	buf.WriteByte(uint8(len(msg.Sender)))
 	buf.Write(msg.Sender)
-	buf.WriteByte(uint8(len(msg.Receiver))) //nolint:gosec
+	buf.WriteByte(uint8(len(msg.Receiver)))
 	buf.Write(msg.Receiver)
 
 	// 2-byte length prefixed fields
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob))) //nolint:gosec
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob)))
 	buf.Write(msg.DestBlob)
 
 	if msg.TokenTransfer != nil {
 		tokenBytes := encodeTokenTransferV1(msg.TokenTransfer)
-		_ = binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes))) //nolint:gosec
+		_ = binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes)))
 		buf.Write(tokenBytes)
 	} else {
 		_ = binary.Write(&buf, binary.BigEndian, uint16(0))
 	}
 
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData))) //nolint:gosec
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData)))
 	buf.Write(msg.MessageData)
 
 	return buf.Bytes(), nil
@@ -176,16 +176,16 @@ func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
 	}
 	buf.Write(amountBytes)
 
-	buf.WriteByte(uint8(len(tt.SourcePoolAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(tt.SourcePoolAddress)))
 	buf.Write(tt.SourcePoolAddress)
-	buf.WriteByte(uint8(len(tt.SourceTokenAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(tt.SourceTokenAddress)))
 	buf.Write(tt.SourceTokenAddress)
-	buf.WriteByte(uint8(len(tt.DestTokenAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(tt.DestTokenAddress)))
 	buf.Write(tt.DestTokenAddress)
-	buf.WriteByte(uint8(len(tt.TokenReceiver))) //nolint:gosec
+	buf.WriteByte(uint8(len(tt.TokenReceiver)))
 	buf.Write(tt.TokenReceiver)
 
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData))) //nolint:gosec
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData)))
 	buf.Write(tt.ExtraData)
 
 	return buf.Bytes()
@@ -211,7 +211,7 @@ func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.Private
 
 	var result bytes.Buffer
 	result.Write(versionTag)
-	_ = binary.Write(&result, binary.BigEndian, uint16(len(signatures))) //nolint:gosec
+	_ = binary.Write(&result, binary.BigEndian, uint16(len(signatures)))
 	result.Write(signatures)
 
 	return result.Bytes(), nil
@@ -434,7 +434,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
 			Server: config.ServerConfig{
 				Host: "0.0.0.0",
-				Port: uint16(edsPort), //nolint:gosec // this is a port number
+				Port: uint16(edsPort),
 			},
 			Node: config.NodeConfig{
 				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,

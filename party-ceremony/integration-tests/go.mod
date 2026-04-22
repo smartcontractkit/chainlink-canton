@@ -1,6 +1,6 @@
 module github.com/chainlink/canton-party-ceremony/integration-tests
 
-go 1.25.6
+go 1.26.2
 
 replace github.com/chainlink/canton-party-ceremony => ../
 

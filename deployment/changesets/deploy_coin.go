@@ -3,7 +3,6 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -43,7 +42,7 @@ func (d DeployCoin) Apply(e cldf.Environment, config CantonCSDeps[DeployCoinConf
 
 	party := chain.Participants[config.Participant].PartyID
 	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, coin.Deploy, chain, contract.DeployInput[coinBinding.CoinRegistry]{
-		Qualifier: ptr.String(config.Config.Symbol),
+		Qualifier: new(config.Config.Symbol),
 		Template: coinBinding.CoinRegistry{
 			Issuer: types.PARTY(party),
 			InstrumentId: splice_api_token_holding_v1.InstrumentId{

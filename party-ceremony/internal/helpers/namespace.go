@@ -29,7 +29,7 @@ func ComputeDecentralizedNamespace(owners []string) string {
 	for _, ns := range sorted {
 		b := []byte(ns)
 		l := len(b)
-		h.Write([]byte{byte(l >> 24), byte(l >> 16), byte(l >> 8), byte(l)})
+		h.Write([]byte{byte(l >> 24), byte(l >> 16), byte(l >> 8), byte(l)}) //nolint:gosec // TODO
 		h.Write(b)
 	}
 

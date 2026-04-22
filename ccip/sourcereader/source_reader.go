@@ -145,8 +145,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 	var end *int64
 	if toBlock != nil {
 		// Safe to convert: toBlock is non-negative and <= max Int64.
-		e := toBlock.Int64()
-		end = &e
+		end = new(toBlock.Int64())
 	} else {
 		// If toBlock is nil, we need to get the latest ledger end to avoid streaming indefinitely
 		// and to ensure we return a slice as expected by the interface.
@@ -154,8 +153,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 		if err != nil {
 			return nil, fmt.Errorf("failed to get ledger end for open-ended query: %w", err)
 		}
-		e := ledgerEnd.GetOffset()
-		end = &e
+		end = new(ledgerEnd.GetOffset())
 	}
 
 	ccipMessageSentIdentifier := c.config.CCIPMessageSentTemplateID.ToLedgerIdentifier()

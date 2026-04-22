@@ -212,8 +212,7 @@ func GetCCIPSendDisclosures(
 			return nil, fmt.Errorf("entry is not a map[string]any")
 		}
 		value := entryMap["value"].(string)
-		valueContractID := types.CONTRACT_ID(value)
-		values[contractKey] = common.AnyValue{AVContractId: &valueContractID}
+		values[contractKey] = common.AnyValue{AVContractId: new(types.CONTRACT_ID(value))}
 	}
 	sendContext := common.CCIPContext{Values: values}
 

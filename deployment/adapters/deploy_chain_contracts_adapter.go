@@ -265,8 +265,7 @@ func requestedFinality(cfg finality.Config) common.FinalityConfig {
 		return waitForSafeRequested()
 	}
 	if cfg.BlockDepth > 0 {
-		depth := types.INT64(cfg.BlockDepth)
-		return common.FinalityConfig{BlockDepth: &depth}
+		return common.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
 	}
 
 	return waitForFinalityRequested()
