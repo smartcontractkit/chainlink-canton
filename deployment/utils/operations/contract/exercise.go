@@ -41,10 +41,10 @@ func (o ExerciseOutput) Executed() bool {
 // DisclosedContract copies the regenerated protobuf message.
 // The generated protobufs cannot be used as an operation's input since they contain unexported fields.
 type DisclosedContract struct {
-	TemplateId       contracts.TemplateID `json:"template_id,omitempty"`
-	ContractId       string               `json:"contract_id,omitempty"`
-	CreatedEventBlob []byte               `json:"created_event_blob,omitempty"`
-	SynchronizerId   string               `json:"synchronizer_id,omitempty"`
+	TemplateId       contracts.TemplateID `json:"template_id"`
+	ContractId       string               `json:"contract_id"`
+	CreatedEventBlob []byte               `json:"created_event_blob"`
+	SynchronizerId   string               `json:"synchronizer_id"`
 }
 
 func DisclosedContractsFromProto(dcs []*apiv2.DisclosedContract) []DisclosedContract {

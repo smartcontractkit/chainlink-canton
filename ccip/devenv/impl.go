@@ -22,10 +22,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -45,13 +43,11 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
@@ -63,9 +59,10 @@ import (
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -90,11 +87,6 @@ var (
 		contracts.CCIPTest,
 		contracts.CCIPLockReleaseTokenPool,
 	}
-)
-
-const (
-	// #nosec G101 -- fixed test datastore qualifier, not a credential
-	cantonDestTokenQualifier = "TEST (LockReleaseTokenPool 2.0.0 [default] to BurnMintTokenPool 2.0.0 [default])"
 )
 
 type poolConfigKey struct {
@@ -576,28 +568,6 @@ func mintTwoAmuletHoldings(
 		disclosedFeeHolding,
 		disclosedTokenHolding,
 	}, nil
-}
-
-func mintAmuletHolding(
-	ctx context.Context,
-	participant canton.Participant,
-	ownerParty string,
-	amount string,
-) (types.CONTRACT_ID, *ledgerv2.DisclosedContract, error) {
-	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
-	if err != nil {
-		return "", nil, err
-	}
-	holdingCID, err := testhelpers.MintAMT(ctx, participant, metadataClient, transferClient, scanClient, ownerParty, amount)
-	if err != nil {
-		return "", nil, fmt.Errorf("mint fee holding: %w", err)
-	}
-	disclosedHolding, err := testhelpers.GetDisclosedContractById(ctx, participant, holdingCID)
-	if err != nil {
-		return "", nil, fmt.Errorf("get disclosed holding by id: %w", err)
-	}
-
-	return types.CONTRACT_ID(holdingCID), disclosedHolding, nil
 }
 
 func (c *Chain) GetTokenTransferConfigs(
@@ -1110,7 +1080,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			executorAddress = contracts.HexToInstanceAddress(*ccipSendDisclosure.Executor)
 		}
 
-		executorSendDisclosure, err := c.GetExecutorSendDisclosure(ctx, outgoingMessage, executorAddress, nil) // TODO CCVs
+		executorSendDisclosure, err := c.GetExecutorSendDisclosure(ctx, outgoingMessage, executorAddress, allCCVs)
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Executor Send disclosure for Executor %q: %w", *ccipSendDisclosure.Executor, err)
 		}
@@ -1246,143 +1216,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	return event, nil
 }
 
-func (c *Chain) buildTokenTransferSendInput(
-	ctx context.Context,
-	participant canton.Participant,
-	transferClient transferInstructionV1.ClientWithResponsesInterface,
-	registryAdmin string,
-	party string,
-	dest uint64,
-	senderInputCID types.CONTRACT_ID,
-) (*ccipclient.TokenTransfer, *ccipsender.TokenTransferInput, []*ledgerv2.DisclosedContract, error) {
-	const tokenTransferAmountDecimal = "0.0000001000"
-
-	poolRefs := c.e.DataStore.Addresses().Filter(
-		datastore.AddressRefByChainSelector(c.chainDetails.ChainSelector),
-		datastore.AddressRefByType(datastore.ContractType("LockReleaseTokenPool")),
-		datastore.AddressRefByQualifier(cantonDestTokenQualifier),
-	)
-	if len(poolRefs) != 1 {
-		return nil, nil, nil, fmt.Errorf("expected exactly one LockReleaseTokenPool, got %d", len(poolRefs))
-	}
-	poolRef := poolRefs[0]
-	// TODO: replace with EDS ccipSend token disclosure whenever available
-	activePool, err := contract.FindActiveContractByInstanceAddress(
-		ctx,
-		participant.LedgerServices.State,
-		participant.PartyID,
-		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-		contracts.HexToInstanceAddress(poolRef.Address),
-	)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("resolve lock/release pool %s: %w", poolRef.Address, err)
-	}
-	parsedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("parse lock/release pool %s: %w", poolRef.Address, err)
-	}
-	remoteCfgAny, ok := parsedPool.RemoteChainConfigs[fmt.Sprintf("%d.", dest)]
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("missing remote chain config for %d", dest)
-	}
-	var outboundRateLimiterInstanceAddress contracts.InstanceAddress
-	switch remoteCfg := remoteCfgAny.(type) {
-	case lockreleasetokenpool.RemoteChainConfig:
-		rawOutboundRateLimiter, err := contracts.RawInstanceAddressFromString(string(remoteCfg.OutboundRateLimiter.Unpack))
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("parse outbound rate limiter raw address for %d: %w", dest, err)
-		}
-		outboundRateLimiterInstanceAddress = rawOutboundRateLimiter.InstanceAddress()
-	case map[string]any:
-		rawOutboundRateLimiter, ok := remoteCfg["outboundRateLimiter"].(map[string]any)
-		if !ok {
-			return nil, nil, nil, fmt.Errorf("missing outbound rate limiter in remote chain config for %d", dest)
-		}
-		rawOutboundRateLimiterText, ok := rawOutboundRateLimiter["unpack"].(string)
-		if !ok || rawOutboundRateLimiterText == "" {
-			return nil, nil, nil, fmt.Errorf("missing outbound rate limiter address in remote chain config for %d", dest)
-		}
-		parsedRawOutboundRateLimiter, err := contracts.RawInstanceAddressFromString(rawOutboundRateLimiterText)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("parse outbound rate limiter raw address for %d: %w", dest, err)
-		}
-		outboundRateLimiterInstanceAddress = parsedRawOutboundRateLimiter.InstanceAddress()
-	default:
-		return nil, nil, nil, fmt.Errorf("unexpected remote chain config type %T for %d", remoteCfgAny, dest)
-	}
-	// TODO: maybe replace outboundRateLimiterInstanceAddress with value from EDS?? EDS TP rate limit is still 0x0
-	activeOutboundRateLimiter, err := contract.FindActiveContractByInstanceAddress(
-		ctx,
-		participant.LedgerServices.State,
-		participant.PartyID,
-		common.RateLimiter{}.GetTemplateID(),
-		outboundRateLimiterInstanceAddress,
-	)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("resolve outbound rate limiter contract: %w", err)
-	}
-	transferFactoryCIDRaw, transferFactoryDisclosures, transferFactoryChoiceContextRaw, err := testhelpers.GetTransferFactory(
-		ctx,
-		transferClient,
-		registryAdmin,
-		party,
-		party,
-	)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("resolve token transfer factory from scan-proxy: %w", err)
-	}
-	transferFactoryCID := types.CONTRACT_ID(transferFactoryCIDRaw)
-	transferFactoryChoiceContextValue, err := testhelpers.ChoiceContextFromData(transferFactoryChoiceContextRaw)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("parse token transfer factory choice context: %w", err)
-	}
-	transferFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
-		Values: testhelpers.ExtractChoiceContextValues(transferFactoryChoiceContextValue),
-	}
-	tokenInput := interfaces.TokenInput{
-		TransferFactory: transferFactoryCID,
-		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: transferFactoryContext,
-			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
-		},
-		TokenPoolHoldings: []types.CONTRACT_ID{},
-	}
-
-	return &ccipclient.TokenTransfer{
-			Token:  parsedPool.InstrumentId,
-			Amount: types.NUMERIC(tokenTransferAmountDecimal),
-		}, &ccipsender.TokenTransferInput{
-			SenderInputCids: []types.CONTRACT_ID{senderInputCID},
-			TokenPoolCid:    types.CONTRACT_ID(activePool.GetCreatedEvent().GetContractId()),
-			PoolExtraContext: common.CCIPContext{
-				Values: types.TEXTMAP{
-					"rate-limiter": common.AnyValue{AVContractId: new(types.CONTRACT_ID(activeOutboundRateLimiter.GetCreatedEvent().GetContractId()))},
-				},
-			},
-			TokenInput: tokenInput,
-		}, append(
-			[]*ledgerv2.DisclosedContract{
-				convertToDisclosedContract(activePool),
-				convertToDisclosedContract(activeOutboundRateLimiter),
-			},
-			transferFactoryDisclosures...,
-		), nil
-}
-
-func getByAddress(ds datastore.DataStore, address string) (datastore.AddressRef, error) {
-	all, err := ds.Addresses().Fetch()
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("failed to fetch addresses: %w", err)
-	}
-	for _, addr := range all {
-		if addr.Address == address {
-			return addr, nil
-		}
-	}
-
-	return datastore.AddressRef{}, fmt.Errorf("address %s not found", address)
-}
-
 // SendMessageWithNonce implements cciptestinterfaces.CCIP17.
 func (c *Chain) SendMessageWithNonce(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions, sender *bind.TransactOpts, nonce *uint64, disableTokenAmountCheck bool) (cciptestinterfaces.MessageSentEvent, error) {
 	return c.SendMessage(ctx, dest, fields, opts)
@@ -1411,20 +1244,5 @@ func (c *Chain) WaitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, tim
 			return cciptestinterfaces.MessageSentEvent{}, ctx.Err()
 		case <-time.After(200 * time.Millisecond):
 		}
-	}
-}
-
-func convertToDisclosedContract(active *ledgerv2.ActiveContract) *ledgerv2.DisclosedContract {
-	if active == nil || active.GetCreatedEvent() == nil {
-		return nil
-	}
-
-	created := active.GetCreatedEvent()
-
-	return &ledgerv2.DisclosedContract{
-		TemplateId:       created.GetTemplateId(),
-		ContractId:       created.GetContractId(),
-		CreatedEventBlob: created.GetCreatedEventBlob(),
-		SynchronizerId:   active.GetSynchronizerId(),
 	}
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -49,44 +48,6 @@ func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error)
 	default:
 		return common.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}
-}
-
-func (c *Chain) resolveTransferFactoryForExecute(
-	ctx context.Context,
-	participant canton.Participant,
-	executingParty string,
-	message protocol.Message,
-) (types.CONTRACT_ID, []*apiv2.DisclosedContract, splice_api_token_metadata_v1.ChoiceContext, error) {
-	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
-	if err != nil {
-		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("resolve registry admin: %w", err)
-	}
-	if message.TokenTransfer == nil || message.TokenTransfer.Amount == nil {
-		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("token transfer amount is required")
-	}
-	_, _, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
-	if err != nil {
-		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("create transfer instruction client: %w", err)
-	}
-	transferFactoryCIDRaw, transferFactoryDisclosures, transferFactoryChoiceContextRaw, err := testhelpers.GetTransferFactory(
-		ctx,
-		transferClient,
-		registryAdmin,
-		executingParty,
-		executingParty,
-	)
-	if err != nil {
-		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("resolve transfer factory from scan-proxy: %w", err)
-	}
-	transferFactoryCID := types.CONTRACT_ID(transferFactoryCIDRaw)
-	transferFactoryChoiceContextValue, err := testhelpers.ChoiceContextFromData(transferFactoryChoiceContextRaw)
-	if err != nil {
-		return "", nil, splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("parse transfer factory choice context: %w", err)
-	}
-
-	return transferFactoryCID, transferFactoryDisclosures, splice_api_token_metadata_v1.ChoiceContext{
-		Values: testhelpers.ExtractChoiceContextValues(transferFactoryChoiceContextValue),
-	}, nil
 }
 
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
