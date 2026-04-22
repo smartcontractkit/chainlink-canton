@@ -621,13 +621,11 @@ func parseTokenConfig(t *testing.T, value *apiv2.Value) *tokenadminregistry.Toke
 		switch field.GetLabel() {
 		case "admin":
 			if opt := field.GetValue().GetOptional(); opt != nil && opt.GetValue() != nil {
-				admin := types.PARTY(opt.GetValue().GetParty())
-				config.Admin = &admin
+				config.Admin = new(types.PARTY(opt.GetValue().GetParty()))
 			}
 		case "pendingAdmin":
 			if opt := field.GetValue().GetOptional(); opt != nil && opt.GetValue() != nil {
-				pending := types.PARTY(opt.GetValue().GetParty())
-				config.PendingAdmin = &pending
+				config.PendingAdmin = new(types.PARTY(opt.GetValue().GetParty()))
 			}
 		case "tokenPool":
 			if opt := field.GetValue().GetOptional(); opt != nil && opt.GetValue() != nil {

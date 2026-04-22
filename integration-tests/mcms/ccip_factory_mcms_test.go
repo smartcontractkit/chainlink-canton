@@ -806,10 +806,3 @@ func extractBypasserOpCount(t *testing.T, record *apiv2.Record) int64 {
 
 	return 0
 }
-
-// ptr returns a pointer to the given value.
-//
-//go:fix inline
-func ptr[T any](v T) *T {
-	return new(v)
-}

@@ -214,7 +214,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					Template: feequoter.FeeQuoter{
 						PriceUpdaters: []types.PARTY{types.PARTY(partyCCIP)},
 					},
-					//nolint:gosec
+
 					USDPerNative: big.NewInt(int64(1 * tokenPriceExponentUSD)), // $1
 				},
 				NativeInstrumentId: nativeInstrumentId,
@@ -542,14 +542,13 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	// Fund separate holdings for fee payment and token transfer input.
 	// The mint amount here follows the existing test's usd8-sized quantity setup.
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
-	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
+	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
 	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -653,23 +652,17 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 
 	// Build the main Send context with CCIP contract IDs (matching execute test pattern)
-	onRampCid := types.CONTRACT_ID(disclosedOnRamp.ContractId)
-	globalConfigCid := types.CONTRACT_ID(disclosedGlobalConfig.ContractId)
-	tarCid := types.CONTRACT_ID(disclosedTar.ContractId)
-	feeQuoterCid := types.CONTRACT_ID(disclosedFeeQuoter.ContractId)
-	rmnRemoteCid := types.CONTRACT_ID(disclosedRmnRemote.ContractId)
 	sendContext := common.CCIPContext{
 		Values: types.TEXTMAP{
-			"on-ramp":              common.AnyValue{AVContractId: &onRampCid},
-			"global-config":        common.AnyValue{AVContractId: &globalConfigCid},
-			"token-admin-registry": common.AnyValue{AVContractId: &tarCid},
-			"fee-quoter":           common.AnyValue{AVContractId: &feeQuoterCid},
-			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
+			"on-ramp":              common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOnRamp.ContractId))},
+			"global-config":        common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedGlobalConfig.ContractId))},
+			"token-admin-registry": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTar.ContractId))},
+			"fee-quoter":           common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedFeeQuoter.ContractId))},
+			"rmn-remote":           common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedRmnRemote.ContractId))},
 		},
 	}
 
 	const tokenTransferAmountDecimal = "0.0000010000"
-	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
 	executorCid := types.CONTRACT_ID(disclosedExecutor.ContractId)
 
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
@@ -725,7 +718,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TokenPoolCid:    types.CONTRACT_ID(disclosedPool.ContractId),
 			PoolExtraContext: common.CCIPContext{
 				Values: types.TEXTMAP{
-					"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterContractID},
+					"rate-limiter": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId))},
 				},
 			},
 			TokenInput: tokenTransferInput,
@@ -895,17 +888,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	)
 	require.Positive(t, senderDelta.Sign(), "sender balance should decrease after send")
 
-	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
-	ccipOwnerDelta := new(big.Rat).Sub(ccipOwnerBalanceAfter, ccipOwnerBalanceBefore)
-	t.Logf(
-		"CCIP owner balance: before=%s after=%s credited=%s",
-		ccipOwnerBalanceBefore,
-		ccipOwnerBalanceAfter,
-		ccipOwnerDelta,
-	)
-
-	require.Positive(t, ccipOwnerDelta.Sign(), "ccip owner balance should increase after send")
-	require.GreaterOrEqual(t, senderDelta.Cmp(ccipOwnerDelta), 0, "sender deduction should cover ccip owner credit")
+	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
+	require.True(t, ok, "quoted fee should parse as a decimal value")
+	tokenTransferAmount, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
+	require.True(t, ok, "token transfer amount should parse as a decimal value")
+	expectedSenderDelta := new(big.Rat).Add(tokenTransferAmount, quotedFeeAmount)
+	require.Zero(t, senderDelta.Cmp(expectedSenderDelta), "sender deduction should equal token amount plus quoted fee")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)

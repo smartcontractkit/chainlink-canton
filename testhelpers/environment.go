@@ -48,7 +48,7 @@ type ParticipantConfig struct {
 }
 
 func LoadChainFromFile(t *testing.T, path string) (*canton.Chain, error) {
-	content, err := os.ReadFile(filepath.Join(".", path))
+	content, err := os.ReadFile(filepath.Join(".", path)) //nolint:gosec // test helper
 	if err != nil {
 		return nil, fmt.Errorf("error reading participant input file: %w", err)
 	}

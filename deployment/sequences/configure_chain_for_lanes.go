@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -68,7 +68,6 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("getting default executor: %w", err)
 		}
-		defaultExecutorBinding := defaultExecutor.Binding()
 		laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
 		for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
 			outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
@@ -99,7 +98,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 						TokenReceiverAllowed:      true, // TODO: missing from input
 						BaseExecutionGasCost:      types.INT64(destChain.BaseExecutionGasCost),
 						OffRampAddress:            types.TEXT(hex.EncodeToString(destChain.OffRamp)),
-						DefaultExecutor:           &defaultExecutorBinding,
+						DefaultExecutor:           new(defaultExecutor.Binding()),
 						LaneMandatedCCVs:          laneMandatedOutboundCCVs,
 						DefaultCCVs:               defaultOutboundCCVs,
 						MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatUint(uint64(destChain.MessageNetworkFeeUSDCents), 10)),

@@ -127,9 +127,10 @@ linters:
       - legacy
       - std-error-handling
     rules:
-      - linters:
+      - path: _test\.go
+        linters:
           - goconst
-        path: (.+)_test\.go
+          - gosec
       - linters:
           - revive
         text: "avoid meaningless package names"

@@ -148,8 +148,7 @@ func main() {
 			out, err := cmd.CombinedOutput()
 			var exitCode int
 			if err != nil {
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
+				if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 					exitCode = exitErr.ExitCode()
 				} else {
 					panic(err)
@@ -169,7 +168,7 @@ func main() {
 	}
 	wg.Wait()
 
-	var summaries []string //nolint:prealloc
+	var summaries []string
 	log.Println("Raw Outputs:")
 	for _, r := range results {
 		log.Println("==============================")
@@ -207,9 +206,9 @@ func main() {
 			summary = stripAnsi(strings.TrimSpace(summary))
 			test, status, contracts, transactions := parseTestSummary(summary)
 			if status == "ok" {
-				markdownSummary.WriteString(fmt.Sprintf("|🟢 %s|%s|%s|%s|\n", status, test, contracts, transactions))
+				fmt.Fprintf(&markdownSummary, "|🟢 %s|%s|%s|%s|\n", status, test, contracts, transactions)
 			} else {
-				markdownSummary.WriteString(fmt.Sprintf("|🔴 %s|%s|  |  |\n", status, test))
+				fmt.Fprintf(&markdownSummary, "|🔴 %s|%s|  |  |\n", status, test)
 			}
 		}
 		_ = os.WriteFile(*summaryOutput, []byte(markdownSummary.String()), 0600)

@@ -23,11 +23,11 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
-	lock_release_token_pool "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
@@ -104,8 +104,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				var matchedRef *datastore.AddressRef
 				for _, ccvRef := range committeeVerifierRefs {
 					if strings.EqualFold(ccvRef.Address, inboundCCVAddress) {
-						refCopy := ccvRef
-						matchedRef = &refCopy
+						matchedRef = new(ccvRef)
 
 						break
 					}
@@ -125,8 +124,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				var matchedRef *datastore.AddressRef
 				for _, ccvRef := range committeeVerifierRefs {
 					if strings.EqualFold(ccvRef.Address, outboundCCVAddress) {
-						refCopy := ccvRef
-						matchedRef = &refCopy
+						matchedRef = new(ccvRef)
 
 						break
 					}
@@ -360,7 +358,6 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			return ccipsequences.OnChainOutput{}, err
 		}
 
-		relativeHours := types.INT64(24)
 		deployReport, err := operations.ExecuteOperation(b, lock_release_token_pool.Deploy, cantonChain, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
 			Qualifier: new(qualifier),
 			Template: lockreleasetokenpool.LockReleaseTokenPool{
@@ -374,7 +371,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 					Values: types.TEXTMAP{},
 				},
 				TransferTimeout: lockreleasetokenpool.TransferTimeout{
-					RelativeHours: &relativeHours,
+					RelativeHours: new(types.INT64(24)),
 				},
 				Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
 					TokenAdminRegistry: tokenAdminRegistryRaw.Binding(),
@@ -441,8 +438,7 @@ func toCantonFinalityConfig(cfg tokenadaptersfinality.Config) common.FinalityCon
 	case cfg.WaitForSafe:
 		return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
 	case cfg.BlockDepth > 0:
-		depth := types.INT64(cfg.BlockDepth)
-		return common.FinalityConfig{BlockDepth: &depth}
+		return common.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
 	default:
 		return common.FinalityConfig{}
 	}
@@ -475,9 +471,8 @@ func deployTokenPoolRateLimiter(
 		rate = types.NUMERIC(cfg.Rate.String())
 	}
 
-	qualifier := fmt.Sprintf("%s-%s-%s", tokenPoolAddress, direction, remoteSelectorKey)
 	report, err := operations.ExecuteOperation(b, deployOp, cantonChain, contract.DeployInput[common.RateLimiter]{
-		Qualifier: &qualifier,
+		Qualifier: new(fmt.Sprintf("%s-%s-%s", tokenPoolAddress, direction, remoteSelectorKey)),
 		Template: common.RateLimiter{
 			PoolInstanceId:      parsedPool.InstanceId,
 			PoolOwner:           parsedPool.PoolOwner,

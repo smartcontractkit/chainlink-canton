@@ -86,6 +86,17 @@ func NewSourceReader(
 }
 
 // FetchMessageSentEvents implements chainaccess.SourceReader.
+//
+// It streams ledger updates in the requested offset range and collects CCIPMessageSent created
+// events that pass the configured node-operator filter, template id match, and signatory
+// checks (including ccipOwner alignment with the configured CCIP owner party).
+//
+// Resilience: after those checks, if decoding or validation fails for a single event (message
+// payload, receipts, verifier blobs, transaction update id, cross-field checks, etc.), the
+// failure is logged at error level with ledger context and that event is skipped. Other events
+// in the same range are still returned. Metadata mismatches (wrong owner / template) are
+// skipped without an error log. Transport and RPC errors (GetUpdates, Recv, GetLedgerEnd
+// when toBlock is nil) still fail the entire call.
 func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, toBlock *big.Int) ([]protocol.MessageSentEvent, error) {
 	if fromBlock == nil {
 		return nil, fmt.Errorf("fromBlock is nil, it must be provided")
@@ -134,8 +145,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 	var end *int64
 	if toBlock != nil {
 		// Safe to convert: toBlock is non-negative and <= max Int64.
-		e := toBlock.Int64()
-		end = &e
+		end = new(toBlock.Int64())
 	} else {
 		// If toBlock is nil, we need to get the latest ledger end to avoid streaming indefinitely
 		// and to ensure we return a slice as expected by the interface.
@@ -143,8 +153,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 		if err != nil {
 			return nil, fmt.Errorf("failed to get ledger end for open-ended query: %w", err)
 		}
-		e := ledgerEnd.GetOffset()
-		end = &e
+		end = new(ledgerEnd.GetOffset())
 	}
 
 	ccipMessageSentIdentifier := c.config.CCIPMessageSentTemplateID.ToLedgerIdentifier()
@@ -191,15 +200,14 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 		transactions = append(transactions, update.GetTransaction())
 	}
 
-	events, err := extractEvents(transactions, c.config.CCIPOwnerParty, ccipMessageSentIdentifier)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract events: %w", err)
-	}
-
-	return events, nil
+	return extractEvents(c.lggr, transactions, c.config.CCIPOwnerParty, ccipMessageSentIdentifier), nil
 }
 
-func extractEvents(transactions []*ledgerv2.Transaction, ccipOwnerParty string, ccipMessageSentTemplateID *ledgerv2.Identifier) ([]protocol.MessageSentEvent, error) {
+func extractEvents(lggr logger.Logger, transactions []*ledgerv2.Transaction, ccipOwnerParty string, ccipMessageSentTemplateID *ledgerv2.Identifier) []protocol.MessageSentEvent {
+	if lggr == nil {
+		lggr = logger.Nop()
+	}
+
 	var events []protocol.MessageSentEvent
 	for _, tx := range transactions {
 		if tx == nil {
@@ -222,7 +230,14 @@ func extractEvents(transactions []*ledgerv2.Transaction, ccipOwnerParty string, 
 					continue
 				}
 
-				return nil, err
+				lggr.Errorw(
+					"skipping CCIPMessageSent created event after post-filter processing failed",
+					"err", err,
+					"ledgerOffset", tx.GetOffset(),
+					"updateId", tx.GetUpdateId(),
+				)
+
+				continue
 			}
 			if messageSentEvent != nil {
 				events = append(events, *messageSentEvent)
@@ -230,7 +245,7 @@ func extractEvents(transactions []*ledgerv2.Transaction, ccipOwnerParty string, 
 		}
 	}
 
-	return events, nil
+	return events
 }
 
 // This is a sentinel error that is returned in the event of a metadata mismatch

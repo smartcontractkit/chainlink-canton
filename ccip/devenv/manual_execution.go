@@ -49,8 +49,7 @@ func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error)
 	case finality > 0xFFFF:
 		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
 	default:
-		depth := types.INT64(finality)
-		return common.FinalityConfig{BlockDepth: &depth}, nil
+		return common.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}
 }
 
