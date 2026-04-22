@@ -1,12 +1,11 @@
 package contractdeploy
 
+import "github.com/chainlink/canton-party-ceremony/ceremony/ops/ledger"
+
 // PackageRef identifies a DAML package by its registered name and version.
 // The name corresponds to a [contracts.Package] constant (e.g. "mcms") and the
 // version to a registered version string (e.g. "current" or "0.0.1").
-type PackageRef struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-}
+type PackageRef = ledger.PackageRef
 
 // ContractDeployInput is the top-level input to [ContractDeploySequence].
 type ContractDeployInput struct {
@@ -68,8 +67,6 @@ type ContractDeployOutput struct {
 	ContractID              string        `json:"contract_id"`
 	State                   CeremonyState `json:"state"`
 }
-
-// ── Per-operation I/O types ──────────────────────────────────────────────────
 
 // FetchParticipantsInput is the input to [FetchParticipantsOp].
 type FetchParticipantsInput struct {

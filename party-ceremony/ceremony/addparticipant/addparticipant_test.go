@@ -20,6 +20,8 @@ import (
 
 	"github.com/chainlink/canton-party-ceremony/ceremony"
 	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
+	"github.com/chainlink/canton-party-ceremony/ceremony/ops/keys"
+	"github.com/chainlink/canton-party-ceremony/ceremony/ops/topology"
 	"github.com/chainlink/canton-party-ceremony/internal/client"
 )
 
@@ -478,7 +480,7 @@ func TestGenerateNewMemberKeyOp_ParticipantMismatch(t *testing.T) {
 	t.Parallel()
 	b := optest.NewBundle(t)
 
-	_, err := operations.ExecuteOperation(b, addparticipant.GenerateNewMemberKeyOp, newDeps("p1"), addparticipant.GenerateNewMemberKeyInput{
+	_, err := operations.ExecuteOperation(b, keys.CreateMemberKeyOp, newDeps("p1"), keys.CreateMemberKeyInput{
 		NamespaceName: testNSName,
 		ParticipantID: "p2", // mismatch: client is p1 but input says p2
 	})
@@ -491,7 +493,7 @@ func TestGenerateNewMemberKeyOp_Success(t *testing.T) {
 	t.Parallel()
 	b := optest.NewBundle(t)
 
-	r, err := operations.ExecuteOperation(b, addparticipant.GenerateNewMemberKeyOp, newDeps(testNewUID), addparticipant.GenerateNewMemberKeyInput{
+	r, err := operations.ExecuteOperation(b, keys.CreateMemberKeyOp, newDeps(testNewUID), keys.CreateMemberKeyInput{
 		NamespaceName: testNSName,
 		ParticipantID: testNewUID,
 	})
@@ -516,7 +518,7 @@ func TestReadCurrentStateOp_InvalidPartyID(t *testing.T) {
 	t.Parallel()
 	b := optest.NewBundle(t)
 
-	_, err := operations.ExecuteOperation(b, addparticipant.ReadCurrentStateOp, newDeps("p1"), addparticipant.ReadCurrentStateInput{
+	_, err := operations.ExecuteOperation(b, topology.ReadCurrentStateOp, newDeps("p1"), topology.ReadCurrentStateInput{
 		DecentralizedPartyID: "no-separator",
 		SynchronizerID:       testSyncID,
 	})
@@ -539,7 +541,7 @@ func TestSignAddDNSProposalOp_ParticipantMismatch(t *testing.T) {
 	txB64 := base64.StdEncoding.EncodeToString(txBytes)
 	hash := sha256.Sum256(txBytes)
 
-	_, err := operations.ExecuteOperation(b, addparticipant.SignAddDNSProposalOp, newDeps("p1"), addparticipant.SignAddDNSProposalInput{
+	_, err := operations.ExecuteOperation(b, topology.SignDNSProposalOp, newDeps("p1"), topology.SignDNSProposalInput{
 		ParticipantID:      "p2", // mismatch
 		ProposalHashSHA256: fmt.Sprintf("%x", hash),
 		DNSTxB64:           txB64,

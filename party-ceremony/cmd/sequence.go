@@ -13,6 +13,7 @@ import (
 	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
 	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
 	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
+	"github.com/chainlink/canton-party-ceremony/ceremony/ops/ledger"
 	"github.com/chainlink/canton-party-ceremony/internal/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
@@ -337,12 +338,12 @@ func executeContractDeploySequence(
 	}
 	defer ledgerConn.Close()
 
-	deps := contractdeploy.ContractDeployDeps{
+	deps := ledger.ContractDeployDeps{
 		AdminClient:  client.NewGRPCClient(adminConn),
 		LedgerClient: client.NewGRPCLedgerClient(ledgerConn),
 		// DARLoader reads DAR bytes by package name and version.
 		// Callers that embed the contracts FS can swap this for contracts.GetDar.
-		DARLoader: contractdeploy.FileDARLoader("dars"),
+		DARLoader: ledger.FileDARLoader("dars"),
 		Logger:    lggr,
 		Confirmer: confirmer,
 	}

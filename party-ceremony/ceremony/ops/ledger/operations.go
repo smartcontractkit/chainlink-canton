@@ -1,4 +1,4 @@
-package contractdeploy
+package ledger
 
 import (
 	"encoding/base64"
@@ -17,10 +17,9 @@ import (
 )
 
 // FetchParticipantsOp queries the Canton topology store for the participant UIDs
-// that currently host the decentralized party. The result drives the upload and
-// signing loops in [ContractDeploySequence].
+// that currently host the decentralized party.
 var FetchParticipantsOp = operations.NewOperation(
-	"contract-deploy/canton-ceremony/fetch-participants",
+	"canton-ceremony/ledger/fetch-participants",
 	semver.MustParse("1.0.0"),
 	"Fetch participant UIDs for the decentralized party from the topology store",
 	func(b operations.Bundle, deps ContractDeployDeps, in FetchParticipantsInput) (FetchParticipantsOutput, error) {
@@ -53,13 +52,12 @@ var FetchParticipantsOp = operations.NewOperation(
 // Each participant runs this operation independently. The operation is
 // idempotent: re-uploading the same DAR returns the same package ID.
 var UploadDarsOp = operations.NewOperation(
-	"contract-deploy/canton-ceremony/upload-dars",
+	"canton-ceremony/ledger/upload-dars",
 	semver.MustParse("1.0.0"),
 	"Upload DAR files to a participant via PackageService",
 	func(b operations.Bundle, deps ContractDeployDeps, in UploadDarsInput) (UploadDarsOutput, error) {
 		ctx := b.GetContext()
 
-		// Only the participant that owns this node can upload DARs for it.
 		uid, err := deps.AdminClient.GetParticipantUID(ctx)
 		if err != nil {
 			return UploadDarsOutput{}, fmt.Errorf("fetching participant UID: %w", err)
@@ -98,10 +96,8 @@ var UploadDarsOp = operations.NewOperation(
 )
 
 // VerifyPartyOp checks that the decentralized party is visible on the Ledger API.
-// This confirms that the onboarding ceremony completed successfully and the
-// party can be used for contract transactions.
 var VerifyPartyOp = operations.NewOperation(
-	"contract-deploy/canton-ceremony/verify-party",
+	"canton-ceremony/ledger/verify-party",
 	semver.MustParse("1.0.0"),
 	"Verify decentralized party exists on the Ledger API",
 	func(b operations.Bundle, deps ContractDeployDeps, in VerifyPartyInput) (VerifyPartyOutput, error) {
@@ -126,17 +122,14 @@ var VerifyPartyOp = operations.NewOperation(
 )
 
 // PrepareSubmissionOp prepares a contract creation transaction via the
-// InteractiveSubmissionService. The coordinator builds a CreateCommand from
-// the contract arguments and calls PrepareSubmission. The returned hash is
-// what each signer must sign in the next step.
+// InteractiveSubmissionService.
 var PrepareSubmissionOp = operations.NewOperation(
-	"contract-deploy/canton-ceremony/prepare-submission",
+	"canton-ceremony/ledger/prepare-submission",
 	semver.MustParse("1.0.0"),
 	"Prepare contract creation via InteractiveSubmissionService",
 	func(b operations.Bundle, deps ContractDeployDeps, in PrepareSubmissionInput) (PrepareSubmissionOutput, error) {
 		ctx := b.GetContext()
 
-		// Parse contract arguments from proto JSON into a DAML Record.
 		var record apiv2.Record
 		if err := protojson.Unmarshal([]byte(in.ContractArgs), &record); err != nil {
 			return PrepareSubmissionOutput{}, fmt.Errorf("parsing contract args: %w", err)
@@ -168,7 +161,6 @@ var PrepareSubmissionOp = operations.NewOperation(
 
 		hashHex := hex.EncodeToString(resp.GetPreparedTransactionHash())
 
-		// Serialize the prepared transaction for distribution to signers.
 		txBytes, err := proto.Marshal(resp.GetPreparedTransaction())
 		if err != nil {
 			return PrepareSubmissionOutput{}, fmt.Errorf("marshalling prepared transaction: %w", err)
@@ -190,17 +182,13 @@ var PrepareSubmissionOp = operations.NewOperation(
 
 // SignSubmissionOp signs the prepared transaction hash with the participant's
 // signing key via [ContractDeployDeps.Signer].
-//
-// The resulting [v2.Signature] proto is serialised to base64 so it can be
-// stored in the framework reporter and later deserialised by [ExecuteSubmissionOp].
 var SignSubmissionOp = operations.NewOperation(
-	"contract-deploy/canton-ceremony/sign-submission",
+	"canton-ceremony/ledger/sign-submission",
 	semver.MustParse("1.0.0"),
 	"Sign prepared transaction hash with participant's signing key",
 	func(b operations.Bundle, deps ContractDeployDeps, in SignSubmissionInput) (SignSubmissionOutput, error) {
 		ctx := b.GetContext()
 
-		// Only the expected participant signs — same participant-gate pattern as UploadDarsOp.
 		uid, err := deps.AdminClient.GetParticipantUID(ctx)
 		if err != nil {
 			return SignSubmissionOutput{}, fmt.Errorf("getting participant UID: %w", err)
@@ -250,17 +238,13 @@ var SignSubmissionOp = operations.NewOperation(
 
 // ExecuteSubmissionOp aggregates all participant signatures and submits the
 // prepared transaction via InteractiveSubmissionService.ExecuteSubmission.
-//
-// All participants' signatures are grouped under a single [interactive.SinglePartySignatures]
-// entry for the decentralized party (each participant signs on behalf of the party).
 var ExecuteSubmissionOp = operations.NewOperation(
-	"contract-deploy/canton-ceremony/execute-submission",
+	"canton-ceremony/ledger/execute-submission",
 	semver.MustParse("1.0.0"),
 	"Execute signed submission via InteractiveSubmissionService",
 	func(b operations.Bundle, deps ContractDeployDeps, in ExecuteSubmissionInput) (ExecuteSubmissionOutput, error) {
 		ctx := b.GetContext()
 
-		// Deserialise the prepared transaction proto.
 		txBytes, err := base64.StdEncoding.DecodeString(in.PreparedTxB64)
 		if err != nil {
 			return ExecuteSubmissionOutput{}, fmt.Errorf("decoding prepared transaction: %w", err)
@@ -270,7 +254,6 @@ var ExecuteSubmissionOp = operations.NewOperation(
 			return ExecuteSubmissionOutput{}, fmt.Errorf("unmarshalling prepared transaction: %w", err)
 		}
 
-		// Deserialise each participant's signature.
 		sigs := make([]*apiv2.Signature, 0, len(in.SignaturesB64))
 		for i, sigB64 := range in.SignaturesB64 {
 			sigBytes, err := base64.StdEncoding.DecodeString(sigB64)
@@ -308,9 +291,9 @@ var ExecuteSubmissionOp = operations.NewOperation(
 )
 
 // VerifyContractOp confirms the contract ID returned by [ExecuteSubmissionOp]
-// is non-empty, proving the transaction was committed and created a contract.
+// is non-empty.
 var VerifyContractOp = operations.NewOperation(
-	"contract-deploy/canton-ceremony/verify-contract",
+	"canton-ceremony/ledger/verify-contract",
 	semver.MustParse("1.0.0"),
 	"Verify contract exists in Active Contract Set",
 	func(b operations.Bundle, deps ContractDeployDeps, in VerifyContractInput) (VerifyContractOutput, error) {

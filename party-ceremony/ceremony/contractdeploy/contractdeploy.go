@@ -30,6 +30,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/chainlink/canton-party-ceremony/ceremony/ops/ledger"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -54,13 +55,13 @@ var ContractDeploySequence = operations.NewSequence(
 	"contract-deploy/canton-ceremony/deploy-contract",
 	semver.MustParse("1.0.0"),
 	"Deploy a DAML contract through a decentralized party (verify → fetch participants → DAR upload → prepare → sign → execute → verify)",
-	func(b operations.Bundle, deps ContractDeployDeps, in ContractDeployInput) (ContractDeployOutput, error) {
+	func(b operations.Bundle, deps ledger.ContractDeployDeps, in ContractDeployInput) (ContractDeployOutput, error) {
 		out := ContractDeployOutput{
 			State: CeremonyState{Phase: PhaseVerifyParty},
 		}
 
 		// ── Step 1: Verify party ─────────────────────────────────────────────
-		_, err := operations.ExecuteOperation(b, VerifyPartyOp, deps, VerifyPartyInput{
+		_, err := operations.ExecuteOperation(b, ledger.VerifyPartyOp, deps, ledger.VerifyPartyInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 		})
 		if err != nil {
@@ -69,7 +70,7 @@ var ContractDeploySequence = operations.NewSequence(
 
 		// ── Step 2: Fetch participants ────────────────────────────────────────
 		out.State.Phase = PhaseFetchMembers
-		fetchReport, err := operations.ExecuteOperation(b, FetchParticipantsOp, deps, FetchParticipantsInput{
+		fetchReport, err := operations.ExecuteOperation(b, ledger.FetchParticipantsOp, deps, ledger.FetchParticipantsInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			SynchronizerID:       in.SynchronizerID,
 		})
@@ -89,9 +90,9 @@ var ContractDeploySequence = operations.NewSequence(
 
 		// ── Step 3: DAR upload ───────────────────────────────────────────────
 		out.State.Phase = PhaseDARUpload
-		uploads := make([]UploadDarsOutput, 0)
+		uploads := make([]ledger.UploadDarsOutput, 0)
 		for _, pid := range participants {
-			r, uploadErr := operations.ExecuteOperation(b, UploadDarsOp, deps, UploadDarsInput{
+			r, uploadErr := operations.ExecuteOperation(b, ledger.UploadDarsOp, deps, ledger.UploadDarsInput{
 				ParticipantID: pid,
 				Packages:      in.Packages,
 			})
@@ -127,7 +128,7 @@ var ContractDeploySequence = operations.NewSequence(
 			pkgID = packageIDs[0]
 		}
 
-		prepReport, err := operations.ExecuteOperation(b, PrepareSubmissionOp, deps, PrepareSubmissionInput{
+		prepReport, err := operations.ExecuteOperation(b, ledger.PrepareSubmissionOp, deps, ledger.PrepareSubmissionInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			SynchronizerID:       in.SynchronizerID,
 			PackageID:            pkgID,
@@ -149,9 +150,9 @@ var ContractDeploySequence = operations.NewSequence(
 
 		// ── Step 5: Sign submission ──────────────────────────────────────────
 		out.State.Phase = PhaseSigning
-		signs := make([]SignSubmissionOutput, 0, len(participants))
+		signs := make([]ledger.SignSubmissionOutput, 0, len(participants))
 		for _, pid := range participants {
-			r, signErr := operations.ExecuteOperation(b, SignSubmissionOp, deps, SignSubmissionInput{
+			r, signErr := operations.ExecuteOperation(b, ledger.SignSubmissionOp, deps, ledger.SignSubmissionInput{
 				ParticipantID:           pid,
 				PreparedTransactionHash: prep.PreparedTransactionHash,
 				PreparedTxB64:           prep.PreparedTxB64,
@@ -184,7 +185,7 @@ var ContractDeploySequence = operations.NewSequence(
 
 		// ── Step 6: Execute submission ───────────────────────────────────────
 		out.State.Phase = PhaseExecute
-		executeReport, err := operations.ExecuteOperation(b, ExecuteSubmissionOp, deps, ExecuteSubmissionInput{
+		executeReport, err := operations.ExecuteOperation(b, ledger.ExecuteSubmissionOp, deps, ledger.ExecuteSubmissionInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			PreparedTxB64:        prep.PreparedTxB64,
 			SignaturesB64:        sigsB64,
@@ -196,7 +197,7 @@ var ContractDeploySequence = operations.NewSequence(
 
 		// ── Step 7: Verify contract ───────────────────────────────────────────
 		out.State.Phase = PhaseVerifyContract
-		verifyReport, err := operations.ExecuteOperation(b, VerifyContractOp, deps, VerifyContractInput{
+		verifyReport, err := operations.ExecuteOperation(b, ledger.VerifyContractOp, deps, ledger.VerifyContractInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			PackageID:            pkgID,
 			TemplateModule:       in.TemplateModule,
