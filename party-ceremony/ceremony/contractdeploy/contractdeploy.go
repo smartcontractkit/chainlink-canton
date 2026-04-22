@@ -88,10 +88,23 @@ var ContractDeploySequence = operations.NewSequence(
 			"count", len(participants),
 		)
 
-		// ── Step 3: DAR upload ───────────────────────────────────────────────
+		// ── Step 3: Grant party rights + DAR upload ─────────────────────────
 		out.State.Phase = PhaseDARUpload
 		uploads := make([]ledger.UploadDarsOutput, 0)
+		grants := 0
 		for _, pid := range participants {
+			// Grant actAs/readAs rights for this participant's user. In no-auth
+			// environments (deps.UserID=="") this is a no-op that always succeeds.
+			if _, grantErr := operations.ExecuteOperation(b, ledger.GrantPartyRightsOp, deps, ledger.GrantPartyRightsInput{
+				ParticipantID:        pid,
+				UserID:               deps.UserID,
+				DecentralizedPartyID: in.DecentralizedPartyID,
+			}); grantErr != nil {
+				deps.Logger.Infow("Party rights grant pending", "participant", pid, "err", grantErr)
+			} else {
+				grants++
+			}
+
 			r, uploadErr := operations.ExecuteOperation(b, ledger.UploadDarsOp, deps, ledger.UploadDarsInput{
 				ParticipantID: pid,
 				Packages:      in.Packages,
@@ -111,6 +124,14 @@ var ContractDeploySequence = operations.NewSequence(
 
 			return out, fmt.Errorf("%w: %d/%d participants have uploaded DARs",
 				ErrThresholdNotMet, len(uploads), len(participants))
+		}
+
+		if grants < len(participants) {
+			deps.Logger.Warnw("Not all participants have granted party rights",
+				"granted", grants, "required", len(participants))
+
+			return out, fmt.Errorf("%w: %d/%d participants have granted party rights",
+				ErrThresholdNotMet, grants, len(participants))
 		}
 
 		packageIDs := uploads[0].PackageIDs

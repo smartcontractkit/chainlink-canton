@@ -138,6 +138,9 @@ func (m *mockLedgerClient) GetActiveContractsByTemplate(
 ) ([]*apiv2.CreatedEvent, error) {
 	return []*apiv2.CreatedEvent{{ContractId: "fake-contract-0xdeadbeef"}}, nil
 }
+func (m *mockLedgerClient) GrantPartyRights(_ context.Context, _, _ string) error {
+	return nil
+}
 
 // ── Mock Signer ──────────────────────────────────────────────────────────────
 

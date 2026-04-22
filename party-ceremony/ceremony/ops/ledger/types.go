@@ -19,6 +19,26 @@ type FetchParticipantsOutput struct {
 	Participants []string `json:"participants"`
 }
 
+// ── GrantPartyRights ─────────────────────────────────────────────────────────
+
+// GrantPartyRightsInput is the input to [GrantPartyRightsOp].
+type GrantPartyRightsInput struct {
+	// ParticipantID makes the cache key unique per participant so each actor
+	// grants rights on their own Ledger API connection.
+	ParticipantID        string `json:"participant_id"`
+	UserID               string `json:"user_id"`
+	DecentralizedPartyID string `json:"decentralized_party_id"`
+}
+
+// GrantPartyRightsOutput is the output of [GrantPartyRightsOp].
+type GrantPartyRightsOutput struct {
+	ParticipantID string `json:"participant_id"`
+	UserID        string `json:"user_id"`
+	// Granted is true when rights were actively granted; false when skipped
+	// because UserID was empty (no-auth environment).
+	Granted bool `json:"granted"`
+}
+
 // ── UploadDars ───────────────────────────────────────────────────────────────
 
 // UploadDarsInput is the input to [UploadDarsOp].

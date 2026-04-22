@@ -16,6 +16,51 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+// GrantPartyRightsOp grants actAs and readAs Ledger API rights for the
+// decentralized party to the configured user. In no-auth environments
+// (deps.UserID is empty) the operation is a no-op and returns immediately.
+// In JWT-auth environments, only the participant whose UID matches the
+// connected node will execute the grant; all others return an error so
+// the caller can track per-participant completion.
+var GrantPartyRightsOp = operations.NewOperation(
+	"canton-ceremony/ledger/grant-party-rights",
+	semver.MustParse("1.0.0"),
+	"Grant actAs and readAs Ledger API rights for the decentralized party to the configured user",
+	func(b operations.Bundle, deps ContractDeployDeps, in GrantPartyRightsInput) (GrantPartyRightsOutput, error) {
+		// No-auth environments: skip the grant entirely.
+		if in.UserID == "" {
+			return GrantPartyRightsOutput{ParticipantID: in.ParticipantID, Granted: false}, nil
+		}
+
+		ctx := b.GetContext()
+
+		uid, err := deps.AdminClient.GetParticipantUID(ctx)
+		if err != nil {
+			return GrantPartyRightsOutput{}, fmt.Errorf("getting participant UID: %w", err)
+		}
+		if uid != in.ParticipantID {
+			return GrantPartyRightsOutput{}, fmt.Errorf("participant ID mismatch: expected %s, got %s",
+				in.ParticipantID, uid)
+		}
+
+		if err := deps.LedgerClient.GrantPartyRights(ctx, in.UserID, in.DecentralizedPartyID); err != nil {
+			return GrantPartyRightsOutput{}, fmt.Errorf("granting party rights for user %q: %w", in.UserID, err)
+		}
+
+		deps.Logger.Infow("Party rights granted",
+			"participant", in.ParticipantID,
+			"user", in.UserID,
+			"party", in.DecentralizedPartyID,
+		)
+
+		return GrantPartyRightsOutput{
+			ParticipantID: in.ParticipantID,
+			UserID:        in.UserID,
+			Granted:       true,
+		}, nil
+	},
+)
+
 // FetchParticipantsOp queries the Canton topology store for the participant UIDs
 // that currently host the decentralized party.
 var FetchParticipantsOp = operations.NewOperation(

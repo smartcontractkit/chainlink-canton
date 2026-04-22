@@ -43,4 +43,7 @@ type ContractDeployDeps struct {
 	Signer    client.TransactionSigner
 	Logger    logger.Logger
 	Confirmer ceremony.Confirmer // nil means no confirmation prompt
+	// UserID is the Ledger API user to grant actAs/readAs rights for the
+	// decentralized party. When empty the grant step is a no-op (no-auth environments).
+	UserID string
 }

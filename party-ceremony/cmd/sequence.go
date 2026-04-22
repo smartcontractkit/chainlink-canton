@@ -346,6 +346,7 @@ func executeContractDeploySequence(
 		DARLoader: ledger.FileDARLoader("dars"),
 		Logger:    lggr,
 		Confirmer: confirmer,
+		UserID:    cfg.UserID,
 	}
 
 	lggr.Infow("Running contract-deploy sequence",
