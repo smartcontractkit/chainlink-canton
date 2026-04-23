@@ -66,29 +66,9 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 			return nil, fmt.Errorf("invalid source chain config selector %q: %w", chainSelectorString, err)
 		}
 
-		sourceChainConfigMap, ok := sourceChainConfigAny.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("source chain config for chain selector %d is not a map", chainSelector)
-		}
-		var sourceChainConfig common.SourceChainConfig
-		err = ledger.MapToStruct(sourceChainConfigMap, &sourceChainConfig)
+		sourceChainConfigs[chainSelector], err = parseSourceChainConfig(sourceChainConfigAny)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal source chain config for selector %d: %w", chainSelector, err)
-		}
-
-		laneMandatedCCVs, err := parse.RawInstanceAddressList(sourceChainConfig.LaneMandatedCCVs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse lane mandated CCVs for source chain selector %d: %w", chainSelector, err)
-		}
-		defaultCCVs, err := parse.RawInstanceAddressList(sourceChainConfig.DefaultCCVs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse default CCVs for source chain selector %d: %w", chainSelector, err)
-		}
-
-		sourceChainConfigs[chainSelector] = SourceChainConfig{
-			IsEnabled:        bool(sourceChainConfig.IsEnabled),
-			LaneMandatedCCVs: laneMandatedCCVs,
-			DefaultCCVs:      defaultCCVs,
+			return nil, fmt.Errorf("failed to parse source chain config for selector %d: %w", chainSelector, err)
 		}
 	}
 
@@ -99,39 +79,9 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 			return nil, fmt.Errorf("invalid dest chain config selector %q: %w", chainSelectorString, err)
 		}
 
-		destChainConfigMap, ok := destChainConfigAny.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("dest chain config for chain selector %d is not a map", chainSelector)
-		}
-		var destChainConfig common.DestChainConfig
-		err = ledger.MapToStruct(destChainConfigMap, &destChainConfig)
+		destChainConfigs[chainSelector], err = parseDestChainConfig(destChainConfigAny)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal dest chain config for selector %d: %w", chainSelector, err)
-		}
-
-		laneMandatedCCVs, err := parse.RawInstanceAddressList(destChainConfig.LaneMandatedCCVs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse lane mandated CCVs for dest chain selector %d: %w", chainSelector, err)
-		}
-		defaultCCVs, err := parse.RawInstanceAddressList(destChainConfig.DefaultCCVs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse default CCVs for dest chain selector %d: %w", chainSelector, err)
-		}
-
-		var defaultExecutor *contracts.RawInstanceAddress
-		if destChainConfig.DefaultExecutor != nil {
-			executor, err := parse.RawInstanceAddress(*destChainConfig.DefaultExecutor)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse default executor for dest chain selector %d: %w", chainSelector, err)
-			}
-			defaultExecutor = &executor
-		}
-
-		destChainConfigs[chainSelector] = DestChainConfig{
-			IsEnabled:        bool(destChainConfig.IsEnabled),
-			DefaultExecutor:  defaultExecutor,
-			LaneMandatedCCVs: laneMandatedCCVs,
-			DefaultCCVs:      defaultCCVs,
+			return nil, fmt.Errorf("failed to parse dest chain config for selector %d: %w", chainSelector, err)
 		}
 	}
 
@@ -139,6 +89,68 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 		Address:            address,
 		SourceChainConfigs: sourceChainConfigs,
 		DestChainConfigs:   destChainConfigs,
+	}, nil
+}
+
+func parseSourceChainConfig(cfg any) (SourceChainConfig, error) {
+	sourceChainConfigMap, ok := cfg.(map[string]any)
+	if !ok {
+		return SourceChainConfig{}, fmt.Errorf("not a map")
+	}
+	var sourceChainConfig common.SourceChainConfig
+	if err := ledger.MapToStruct(sourceChainConfigMap, &sourceChainConfig); err != nil {
+		return SourceChainConfig{}, fmt.Errorf("failed to unmarshal: %w", err)
+	}
+
+	laneMandatedCCVs, err := parse.RawInstanceAddressList(sourceChainConfig.LaneMandatedCCVs)
+	if err != nil {
+		return SourceChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)
+	}
+	defaultCCVs, err := parse.RawInstanceAddressList(sourceChainConfig.DefaultCCVs)
+	if err != nil {
+		return SourceChainConfig{}, fmt.Errorf("failed to parse default CCVs: %w", err)
+	}
+
+	return SourceChainConfig{
+		IsEnabled:        bool(sourceChainConfig.IsEnabled),
+		LaneMandatedCCVs: laneMandatedCCVs,
+		DefaultCCVs:      defaultCCVs,
+	}, nil
+}
+
+func parseDestChainConfig(cfg any) (DestChainConfig, error) {
+	destChainConfigMap, ok := cfg.(map[string]any)
+	if !ok {
+		return DestChainConfig{}, fmt.Errorf("not a map")
+	}
+	var destChainConfig common.DestChainConfig
+	if err := ledger.MapToStruct(destChainConfigMap, &destChainConfig); err != nil {
+		return DestChainConfig{}, fmt.Errorf("failed to unmarshal: %w", err)
+	}
+
+	laneMandatedCCVs, err := parse.RawInstanceAddressList(destChainConfig.LaneMandatedCCVs)
+	if err != nil {
+		return DestChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)
+	}
+	defaultCCVs, err := parse.RawInstanceAddressList(destChainConfig.DefaultCCVs)
+	if err != nil {
+		return DestChainConfig{}, fmt.Errorf("failed to parse default CCVs: %w", err)
+	}
+
+	var defaultExecutor *contracts.RawInstanceAddress
+	if destChainConfig.DefaultExecutor != nil {
+		executor, err := parse.RawInstanceAddress(*destChainConfig.DefaultExecutor)
+		if err != nil {
+			return DestChainConfig{}, fmt.Errorf("failed to parse default executor: %w", err)
+		}
+		defaultExecutor = &executor
+	}
+
+	return DestChainConfig{
+		IsEnabled:        bool(destChainConfig.IsEnabled),
+		DefaultExecutor:  defaultExecutor,
+		LaneMandatedCCVs: laneMandatedCCVs,
+		DefaultCCVs:      defaultCCVs,
 	}, nil
 }
 
