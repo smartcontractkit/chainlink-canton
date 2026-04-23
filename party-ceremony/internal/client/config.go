@@ -38,6 +38,11 @@ type ClientConfig struct {
 
 	// LedgerJWT is the Bearer token for the Canton Ledger API (optional).
 	LedgerJWT string `json:"ledger_jwt,omitempty"`
+
+	// UserID is the Ledger API user ID that the contract-deploy ceremony will
+	// grant actAs/readAs rights for the decentralized party.
+	// Only required in JWT-auth environments. Leave empty for no-auth setups.
+	UserID string `json:"user_id,omitempty"`
 }
 
 // LoadConfig reads a ClientConfig from the given JSON file path.

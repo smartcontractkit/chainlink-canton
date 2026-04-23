@@ -64,8 +64,6 @@ type AddParticipantOutput struct {
 	State        CeremonyState `json:"state"`
 }
 
-// ── Per-operation I/O types ──────────────────────────────────────────────────
-
 // GenerateNewMemberKeyInput is the input to [GenerateNewMemberKeyOp].
 type GenerateNewMemberKeyInput struct {
 	NamespaceName string `json:"namespace_name"`
