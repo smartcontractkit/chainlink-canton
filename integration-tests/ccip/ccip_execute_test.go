@@ -423,8 +423,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err, "failed to get RMNRemote address")
 	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
-	// executorAddress, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(executor.ContractType), executor.Version, devenvcommon.DefaultExecutorQualifier))
-	// require.NoError(t, err, "failed to get Executor address")
 
 	// Run EDS
 	edsParticipant := env.Chain.Participants[0]
@@ -566,7 +564,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: perPartyRouterFactoryDisclosure.FactoryContractId,
+					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partyReceiver),

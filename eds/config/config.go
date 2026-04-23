@@ -22,7 +22,10 @@ func DefaultConfig() *Config {
 		GlobalAPIConfig: GlobalAPIConfig{
 			MaxBatchSize: 1024,
 		},
-		CCIPAPIConfig: CCIPAPIConfig{},
+		CCIPAPIConfig:      CCIPAPIConfig{},
+		CCVAPIConfig:       CCVAPIConfig{},
+		ExecutorAPIConfig:  ExecutorAPIConfig{},
+		TokenPoolAPIConfig: TokenPoolAPIConfig{},
 	}
 }
 
@@ -54,6 +57,7 @@ type NodeConfig struct {
 // Global API
 
 type GlobalAPIConfig struct {
+	// The maximum number of disclosures that can be requested in a single batch request.
 	MaxBatchSize int `toml:"max_batch_size" validate:"required"`
 }
 

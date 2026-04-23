@@ -2,7 +2,6 @@ package eds
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 
@@ -15,7 +14,8 @@ import (
 )
 
 type PerPartyRouterFactoryDisclosure struct {
-	FactoryContractId  string
+	ContractId         string
+	Address            contracts.RawInstanceAddress
 	DisclosedContracts []*apiv2.DisclosedContract
 }
 
@@ -36,26 +36,21 @@ func GetPerPartyRouterFactoryDisclosure(
 
 	var disclosedContracts []*apiv2.DisclosedContract
 	for _, contract := range resp.JSON200.DisclosedContracts {
-		templateId, err := contracts.TemplateIDFromString(contract.TemplateId)
+		disclosedContract, err := DisclosedContractToProto(contract)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse template id: %w", err)
+			return nil, err
 		}
-		createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode created event blob: %w", err)
-		}
-		disclosedContracts = append(disclosedContracts, &apiv2.DisclosedContract{
-			TemplateId:       templateId.ToLedgerIdentifier(),
-			ContractId:       contract.ContractId,
-			CreatedEventBlob: createdEventBlob,
-			SynchronizerId:   contract.SynchronizerId,
-		})
+		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	factoryCid := resp.JSON200.ContractId
+	address, err := contracts.RawInstanceAddressFromString(resp.JSON200.RawInstanceAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse PerPartyRouterFactory address: %w", err)
+	}
 
 	return &PerPartyRouterFactoryDisclosure{
-		FactoryContractId:  factoryCid,
+		ContractId:         resp.JSON200.ContractId,
+		Address:            address,
 		DisclosedContracts: disclosedContracts,
 	}, nil
 }

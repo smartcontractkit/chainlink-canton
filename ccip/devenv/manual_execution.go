@@ -8,10 +8,8 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/google/uuid"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
@@ -19,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
@@ -58,27 +57,16 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to get canton per party router factory disclosure: %w", err)
 	}
-	c.logger.Debug().Str("CantonPerPartyRouterFactory", perPartyRouterFactoryDisclosure.FactoryContractId).Msg("Resolved per-party router factory address")
+	c.logger.Debug().Str("ContractId", perPartyRouterFactoryDisclosure.ContractId).Msg("Resolved per-party router factory address")
 
 	// Fixed instance ID for the router, this makes the InstanceAddress deterministic.
 	routerInstanceID := contracts.InstanceID("test-router")
 	// Ignore errors, since the router might already exist if this function is called multiple times for the same party. In that case we just want to return the existing router's address.
-	_, _ = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: perPartyRouterFactoryDisclosure.FactoryContractId,
-					Choice:     "CreateRouter",
-					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
-						PartyOwner: types.PARTY(partyId),
-						InstanceId: types.TEXT(routerInstanceID),
-					}),
-				}},
-			}},
-			ActAs:              []string{partyId},
-			DisclosedContracts: perPartyRouterFactoryDisclosure.DisclosedContracts,
+	_, _ = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, c.chain, contract.ChoiceInput[perpartyrouter.CreateRouter]{
+		InstanceAddress: perPartyRouterFactoryDisclosure.Address.InstanceAddress(),
+		Args: perpartyrouter.CreateRouter{
+			PartyOwner: types.PARTY(partyId),
+			InstanceId: types.TEXT(routerInstanceID.String()),
 		},
 	})
 	routerAddress = routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()

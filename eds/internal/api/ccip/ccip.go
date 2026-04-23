@@ -10,8 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
@@ -20,13 +21,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
-
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
-
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
@@ -51,7 +49,7 @@ func NewServer(
 	logger zerolog.Logger,
 	activeContractStore *store.ActiveContractStore,
 	config config.CCIPAPIConfig,
-) *Server {
+) (*Server, error) {
 	s := &Server{
 		logger:                logger.With().Str("component", "CCIPAPI").Logger(),
 		activeContractStore:   activeContractStore,
@@ -91,7 +89,7 @@ func NewServer(
 		}...,
 	)
 
-	return s
+	return s, nil
 }
 
 func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
@@ -105,12 +103,20 @@ func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
 	if !ok {
 		s.logger.Error().Stringer("address", s.perPartyRouterFactory).Msg("active per-party router factory contract not found")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
 
+	parsedPerPartyRouterFactory, err := ParsePerPartyRouterFactory(activePerPartyRouterFactoryContract.GetCreatedEvent())
+	if err != nil {
+		s.logger.Err(err).Stringer("address", s.perPartyRouterFactory).Msg("failed to parse per-party router factory contract")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
 
 	resp := &oapiCCIP.CCIPPerPartyRouterFactoryResponse{
-		ContractId: activePerPartyRouterFactoryContract.GetCreatedEvent().GetContractId(),
+		ContractId:         activePerPartyRouterFactoryContract.GetCreatedEvent().GetContractId(),
+		InstanceAddress:    parsedPerPartyRouterFactory.Address.InstanceID(),
+		RawInstanceAddress: parsedPerPartyRouterFactory.Address.String(),
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activePerPartyRouterFactoryContract),
 		},

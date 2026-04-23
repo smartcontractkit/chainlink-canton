@@ -8,12 +8,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
-
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
@@ -34,9 +32,9 @@ func NewServer(
 	logger zerolog.Logger,
 	activeContractStore *store.ActiveContractStore,
 	config config.CCVAPIConfig,
-) *Server {
+) (*Server, error) {
 	s := &Server{
-		logger:              logger,
+		logger:              logger.With().Str("component", "CCVAPI").Logger(),
 		activeContractStore: activeContractStore,
 		contractConfigs:     make(map[contracts.InstanceAddress]ContractConfig),
 	}
@@ -48,7 +46,7 @@ func NewServer(
 		})
 	}
 
-	return s
+	return s, nil
 }
 
 func (s Server) PostCCVSend(c *gin.Context, address string) {

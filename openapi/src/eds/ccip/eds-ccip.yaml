@@ -135,10 +135,16 @@ components:
       type: object
       required:
         - contractId
+        - instanceAddress
+        - rawInstanceAddress
         - disclosedContracts
       properties:
         contractId:
-          $ref: '../common/eds-common.yaml#/components/schemas/ContractId'
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
         disclosedContracts:
           description: Disclosures for all contracts required for the caller to instantiate a PerPartyRouter
           type: array

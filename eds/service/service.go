@@ -10,6 +10,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
+
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/ccv"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/executor"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
@@ -115,22 +118,36 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	router := gin.Default()
 	router.Use(middleware.RequestMonitoringMiddleware(metrics))
 
+	globalAPIServer, err := global.NewServer(ctx, logger, activeContractStore, cfg.GlobalAPIConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create Global API: %w", err)
+	}
+	oapiGlobal.RegisterHandlers(router, globalAPIServer)
 	if cfg.CCIPAPIConfig.Enabled {
-		ccipAPIServer := ccip.NewServer(ctx, logger, activeContractStore, cfg.CCIPAPIConfig)
+		ccipAPIServer, err := ccip.NewServer(ctx, logger, activeContractStore, cfg.CCIPAPIConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create CCIP API: %w", err)
+		}
 		oapiCCIP.RegisterHandlers(router, ccipAPIServer)
 	}
 	if cfg.CCVAPIConfig.Enabled {
-		ccvAPIServer := ccv.NewServer(ctx, logger, activeContractStore, cfg.CCVAPIConfig)
+		ccvAPIServer, err := ccv.NewServer(ctx, logger, activeContractStore, cfg.CCVAPIConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create CCV API: %w", err)
+		}
 		oapiCCV.RegisterHandlers(router, ccvAPIServer)
 	}
 	if cfg.ExecutorAPIConfig.Enabled {
-		executorAPIServer := executor.NewServer(ctx, logger, activeContractStore, cfg.ExecutorAPIConfig)
+		executorAPIServer, err := executor.NewServer(ctx, logger, activeContractStore, cfg.ExecutorAPIConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create Executor API: %w", err)
+		}
 		oapiExecutor.RegisterHandlers(router, executorAPIServer)
 	}
 	if cfg.TokenPoolAPIConfig.Enabled {
 		tokenPoolAPIServer, err := tokenpool.NewServer(ctx, logger, activeContractStore, instrumentHoldingStore, cfg.TokenPoolAPIConfig)
 		if err != nil {
-			return fmt.Errorf("failed to create token pool API: %w", err)
+			return fmt.Errorf("failed to create TokenPool API: %w", err)
 		}
 		oapiTokenPool.RegisterHandlers(router, tokenPoolAPIServer)
 	}

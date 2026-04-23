@@ -47,6 +47,12 @@ type CCIPPerPartyRouterFactoryResponse struct {
 
 	// DisclosedContracts Disclosures for all contracts required for the caller to instantiate a PerPartyRouter
 	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
+
+	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
+	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
+
+	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
+	RawInstanceAddress externalRef0.RawInstanceAddress `json:"rawInstanceAddress"`
 }
 
 // CCIPSendRequest defines model for CCIPSendRequest.

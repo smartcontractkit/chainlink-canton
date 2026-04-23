@@ -1,26 +1,47 @@
 package global
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
+	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 )
 
 type Server struct {
-	logger              zerolog.Logger //nolint:unused
+	logger              zerolog.Logger
 	activeContractStore *store.ActiveContractStore
 
 	maxBatchLimit int
 }
 
 var _ oapiGlobal.ServerInterface = &Server{}
+
+func NewServer(
+	_ context.Context,
+	logger zerolog.Logger,
+	activeContractStore *store.ActiveContractStore,
+	config config.GlobalAPIConfig,
+) (*Server, error) {
+	s := &Server{
+		logger:              logger.With().Str("component", "GlobalAPI").Logger(),
+		activeContractStore: activeContractStore,
+		maxBatchLimit:       config.MaxBatchSize,
+	}
+
+	if config.MaxBatchSize <= 0 {
+		return nil, fmt.Errorf("MaxBatchSize must be greater than zero")
+	}
+
+	return s, nil
+}
 
 // PostGetExplicitDisclosureBatch (POST /ccip/v1/global/disclosure/batch)
 func (s Server) PostGetExplicitDisclosureBatch(c *gin.Context) {

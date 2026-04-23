@@ -8,12 +8,10 @@ import (
 	"github.com/rs/zerolog"
 
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
 )
@@ -34,9 +32,9 @@ func NewServer(
 	logger zerolog.Logger,
 	activeContractStore *store.ActiveContractStore,
 	config config.ExecutorAPIConfig,
-) *Server {
+) (*Server, error) {
 	s := &Server{
-		logger:              logger,
+		logger:              logger.With().Str("component", "ExecutorAPI").Logger(),
 		activeContractStore: activeContractStore,
 		contractConfigs:     make(map[contracts.InstanceAddress]ContractConfig),
 	}
@@ -48,7 +46,7 @@ func NewServer(
 		})
 	}
 
-	return s
+	return s, nil
 }
 
 func (s *Server) PostExecutorSend(c *gin.Context, address string) {
