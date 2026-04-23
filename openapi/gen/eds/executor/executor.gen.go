@@ -20,26 +20,26 @@ import (
 
 // ExecutorSendRequest defines model for ExecutorSendRequest.
 type ExecutorSendRequest struct {
-	Ccvs *[]externalRef0.RawOrHashedAddress `json:"ccvs,omitempty"`
+	Ccvs []externalRef0.RawOrHashedAddress `json:"ccvs"`
 
 	// Message A message to be sent from Canton.
-	Message *externalRef0.Message `json:"message,omitempty"`
+	Message externalRef0.Message `json:"message"`
 }
 
 // ExecutorSendResponse defines model for ExecutorSendResponse.
 type ExecutorSendResponse struct {
 	// ContextData The context to be passed along to the Executor.
-	ContextData *map[string]interface{} `json:"contextData,omitempty"`
+	ContextData map[string]interface{} `json:"contextData"`
 
 	// ContractId The unique identifier of a contract.
-	ContractId         *externalRef0.ContractId          `json:"contractId,omitempty"`
-	DisclosedContracts *[]externalRef0.DisclosedContract `json:"disclosedContracts,omitempty"`
+	ContractId         externalRef0.ContractId          `json:"contractId"`
+	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
 
 	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-	InstanceAddress *externalRef0.InstanceAddress `json:"instanceAddress,omitempty"`
+	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
 
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-	RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
+	RawInstanceAddress externalRef0.RawInstanceAddress `json:"rawInstanceAddress"`
 }
 
 // PostExecutorSendJSONRequestBody defines body for PostExecutorSend for application/json ContentType.
@@ -119,12 +119,12 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 	// PostExecutorSendWithBody request with any body
-	PostExecutorSendWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostExecutorSendWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostExecutorSend(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostExecutorSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostExecutorSend(ctx context.Context, address string, body PostExecutorSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) PostExecutorSendWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostExecutorSendWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostExecutorSendRequestWithBody(c.Server, address, contentType, body)
 	if err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func (c *Client) PostExecutorSendWithBody(ctx context.Context, address externalR
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostExecutorSend(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostExecutorSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostExecutorSend(ctx context.Context, address string, body PostExecutorSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostExecutorSendRequest(c.Server, address, body)
 	if err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func (c *Client) PostExecutorSend(ctx context.Context, address externalRef0.RawO
 }
 
 // NewPostExecutorSendRequest calls the generic PostExecutorSend builder with application/json body
-func NewPostExecutorSendRequest(server string, address externalRef0.RawOrHashedAddress, body PostExecutorSendJSONRequestBody) (*http.Request, error) {
+func NewPostExecutorSendRequest(server string, address string, body PostExecutorSendJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
@@ -160,7 +160,7 @@ func NewPostExecutorSendRequest(server string, address externalRef0.RawOrHashedA
 }
 
 // NewPostExecutorSendRequestWithBody generates requests for PostExecutorSend with any type of body
-func NewPostExecutorSendRequestWithBody(server string, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader) (*http.Request, error) {
+func NewPostExecutorSendRequestWithBody(server string, address string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -239,9 +239,9 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// PostExecutorSendWithBodyWithResponse request with any body
-	PostExecutorSendWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostExecutorSendResponse, error)
+	PostExecutorSendWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostExecutorSendResponse, error)
 
-	PostExecutorSendWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostExecutorSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostExecutorSendResponse, error)
+	PostExecutorSendWithResponse(ctx context.Context, address string, body PostExecutorSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostExecutorSendResponse, error)
 }
 
 type PostExecutorSendResponse struct {
@@ -270,7 +270,7 @@ func (r PostExecutorSendResponse) StatusCode() int {
 }
 
 // PostExecutorSendWithBodyWithResponse request with arbitrary body returning *PostExecutorSendResponse
-func (c *ClientWithResponses) PostExecutorSendWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostExecutorSendResponse, error) {
+func (c *ClientWithResponses) PostExecutorSendWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostExecutorSendResponse, error) {
 	rsp, err := c.PostExecutorSendWithBody(ctx, address, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -278,7 +278,7 @@ func (c *ClientWithResponses) PostExecutorSendWithBodyWithResponse(ctx context.C
 	return ParsePostExecutorSendResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostExecutorSendWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostExecutorSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostExecutorSendResponse, error) {
+func (c *ClientWithResponses) PostExecutorSendWithResponse(ctx context.Context, address string, body PostExecutorSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostExecutorSendResponse, error) {
 	rsp, err := c.PostExecutorSend(ctx, address, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -337,7 +337,7 @@ func ParsePostExecutorSendResponse(rsp *http.Response) (*PostExecutorSendRespons
 type ServerInterface interface {
 
 	// (POST /ccip/v1/external/executor/{address}/send)
-	PostExecutorSend(c *gin.Context, address externalRef0.RawOrHashedAddress)
+	PostExecutorSend(c *gin.Context, address string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -355,7 +355,7 @@ func (siw *ServerInterfaceWrapper) PostExecutorSend(c *gin.Context) {
 	var err error
 
 	// ------------- Path parameter "address" -------------
-	var address externalRef0.RawOrHashedAddress
+	var address string
 
 	err = runtime.BindStyledParameterWithOptions("simple", "address", c.Param("address"), &address, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {

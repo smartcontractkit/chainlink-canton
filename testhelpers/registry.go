@@ -158,7 +158,7 @@ func GetRegistryAdmin(ctx context.Context, metadataClient tokenMetadataV1.Client
 	return registryInfoResponse.JSON200.AdminId, nil
 }
 
-func GetTransferFactory(ctx context.Context, transferInstructionClient transferInstructionV1.ClientWithResponsesInterface, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, *apiv2.Value, error) {
+func GetTransferFactory(ctx context.Context, transferInstructionClient transferInstructionV1.ClientWithResponsesInterface, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, map[string]any, error) {
 	transferFactoryResponse, err := transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
 			"expectedAdmin": registryAdmin,
@@ -213,12 +213,8 @@ func GetTransferFactory(ctx context.Context, transferInstructionClient transferI
 			SynchronizerId:   contract.SynchronizerId,
 		})
 	}
-	choiceContext, err := ChoiceContextFromData(transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to convert choice context: %w", err)
-	}
 
-	return transferFactoryResponse.JSON200.FactoryId, disclosedContracts, choiceContext, nil
+	return transferFactoryResponse.JSON200.FactoryId, disclosedContracts, transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData, nil
 }
 
 func AcceptPendingTransferInstruction(

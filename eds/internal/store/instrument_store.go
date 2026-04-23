@@ -4,155 +4,197 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
-
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 )
 
-var holdingInterfaceId = &apiv2.Identifier{
-	// PackageId seems to be the hashed package ID, not the human-readable one.
-	// We probably shouldn't check against a specific hash, so we ignore that part of the interface ID.
-	// PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
-	ModuleName: "Splice.Api.Token.HoldingV1",
-	EntityName: "Holding",
-}
+type InstrumentHoldingStore struct {
+	logger zerolog.Logger
 
-type InstrumentHoldingStore Store[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]
+	stream  *BackfilledStream
+	filters FiltersByParty
 
-type InstrumentHoldingStoreConfig struct {
-	Logger           zerolog.Logger
-	Owner            types.PARTY
-	StateService     apiv2.StateServiceClient
-	UpdateService    apiv2.UpdateServiceClient
-	StreamConfig     ReliableStreamConfig
-	ReconnectBackoff time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
+	mux sync.RWMutex
+	// Party -> InstrumentId -> ContractId -> Holding
+	holdings        map[types.PARTY]map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract
+	activeContracts map[types.CONTRACT_ID]splice_api_token_holding_v1.HoldingView
 }
 
 func NewInstrumentHoldingStore(
-	config InstrumentHoldingStoreConfig,
+	logger zerolog.Logger,
+	updateService apiv2.UpdateServiceClient,
+	stateService apiv2.StateServiceClient,
 	metrics Metrics,
-) *ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract] {
-	owner := config.Owner
+) *InstrumentHoldingStore {
+	logger = logger.With().Str("component", "InstrumentHoldingStore").Logger()
+	s := &InstrumentHoldingStore{
+		logger: zerolog.Logger{},
+		stream: &BackfilledStream{
+			logger:        logger,
+			metrics:       metrics,
+			updateService: updateService,
+			stateService:  stateService,
+		},
+		filters: make(FiltersByParty),
+		mux:     sync.RWMutex{},
+	}
 
-	return &ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]{
-		logger:           config.Logger.With().Str("component", "InstrumentHoldingStore").Logger(),
-		updateService:    config.UpdateService,
-		stateService:     config.StateService,
-		metrics:          metrics,
-		streamConfig:     config.StreamConfig,
-		reconnectBackoff: config.ReconnectBackoff,
-		filtersByParty: map[string]*apiv2.Filters{
-			string(config.Owner): {
-				Cumulative: []*apiv2.CumulativeFilter{
-					{
-						IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
-							InterfaceId: &apiv2.Identifier{
-								PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
-								ModuleName: "Splice.Api.Token.HoldingV1",
-								EntityName: "Holding",
-							},
-							IncludeInterfaceView:    true,
-							IncludeCreatedEventBlob: true,
-						}},
-					},
+	return s
+}
+
+func (s *InstrumentHoldingStore) RegisterParty(parties ...string) {
+	for _, party := range parties {
+		s.filters[party] = &apiv2.Filters{
+			Cumulative: []*apiv2.CumulativeFilter{
+				{
+					IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
+						InterfaceId: &apiv2.Identifier{
+							PackageId:  "#splice-api-token-holding-v1",
+							ModuleName: "Splice.Api.Token.HoldingV1",
+							EntityName: "Holding",
+						},
+						IncludeInterfaceView:    true,
+						IncludeCreatedEventBlob: true,
+					}},
 				},
 			},
-		},
-		mux:       sync.RWMutex{},
-		ledgerEnd: 0,
-		contracts: make(map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract),
-		handleActiveContract: func(ctx context.Context, store *ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract], activeContract *apiv2.ActiveContract) (updates []ContractUpdate[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract], err error) {
-			relevantView, err := getRelevantInterfaceViewValue(activeContract.GetCreatedEvent().GetInterfaceViews(), holdingInterfaceId)
-			if err != nil {
-				store.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get relevant interface view value, skipping")
-				return nil, nil
-			}
-			holdingView, err := getHoldingView(owner, relevantView)
-			if err != nil {
-				store.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get holding disclosure for active contract, skipping")
-				return nil, nil
-			}
-
-			// create the disclosure
-			holdingDisclosure := &apiv2.DisclosedContract{
-				TemplateId:       activeContract.GetCreatedEvent().GetTemplateId(),
-				ContractId:       activeContract.GetCreatedEvent().GetContractId(),
-				CreatedEventBlob: activeContract.GetCreatedEvent().GetCreatedEventBlob(),
-				SynchronizerId:   activeContract.GetSynchronizerId(),
-			}
-			store.logger.Info().
-				Any("holdingView", holdingView).
-				Any("holdingDisclosure", holdingDisclosure).
-				Msg("Recording holding disclosure")
-
-			return []ContractUpdate[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]{{
-				Key:   holdingView.InstrumentId,
-				Value: holdingDisclosure,
-			}}, nil
-		},
-		handleCreatedEvent: func(ctx context.Context, store *ContractStore[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract], transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) (updates []ContractUpdate[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract], err error) {
-			relevantView, err := getRelevantInterfaceViewValue(createdEvent.GetInterfaceViews(), holdingInterfaceId)
-			if err != nil {
-				store.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get relevant interface view value, skipping")
-				return nil, nil
-			}
-
-			holdingView, err := getHoldingView(owner, relevantView)
-			if err != nil {
-				store.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get holding disclosure for created event, skipping")
-				return nil, nil
-			}
-
-			// create the disclosure
-			holdingDisclosure := &apiv2.DisclosedContract{
-				TemplateId:       createdEvent.GetTemplateId(),
-				ContractId:       createdEvent.GetContractId(),
-				CreatedEventBlob: createdEvent.GetCreatedEventBlob(),
-				SynchronizerId:   transaction.GetSynchronizerId(),
-			}
-			store.logger.Info().
-				Any("holdingView", holdingView).
-				Any("holdingDisclosure", holdingDisclosure).
-				Msg("Recording holding disclosure")
-
-			return []ContractUpdate[splice_api_token_holding_v1.InstrumentId, *apiv2.DisclosedContract]{{
-				Key:   holdingView.InstrumentId,
-				Value: holdingDisclosure,
-			}}, nil
-		},
+		}
 	}
 }
 
-func getHoldingView(expectedOwner types.PARTY, record *apiv2.Record) (*splice_api_token_holding_v1.HoldingView, error) {
-	var holdingView splice_api_token_holding_v1.HoldingView
-	err := ledger.RecordToStruct(record, &holdingView)
+func (s *InstrumentHoldingStore) Run(ctx context.Context, streamConfig StreamConfig) error {
+	s.holdings = make(map[types.PARTY]map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract)
+	s.activeContracts = make(map[types.CONTRACT_ID]splice_api_token_holding_v1.HoldingView)
+
+	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, s.onArchivedEvent, nil)
+}
+
+func (s *InstrumentHoldingStore) GetHolding(party types.PARTY, instrumentId splice_api_token_holding_v1.InstrumentId) ([]*apiv2.ActiveContract, bool) {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+
+	partyHoldings, ok := s.holdings[party]
+	if !ok {
+		return nil, false
+	}
+	instrumentHoldings, ok := partyHoldings[instrumentId]
+	if !ok {
+		return nil, false
+	}
+	holdings := maps.Values(instrumentHoldings)
+	if len(holdings) == 0 {
+		return nil, false
+	}
+
+	return holdings, true
+}
+
+func (s *InstrumentHoldingStore) onActiveContract(ctx context.Context, activeContract *apiv2.ActiveContract) error {
+	holdingViews, err := getHoldingViews(activeContract.GetCreatedEvent())
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert record to holding view: %w", err)
+		s.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get HoldingViews for active contract, skipping")
+		return nil
 	}
 
-	// At this point we have an active holding contract, we should form the disclosure for it.
-	if holdingView.Owner != expectedOwner {
-		return nil, fmt.Errorf("holding owner %v does not match expected owner %v", holdingView.Owner, expectedOwner)
-	}
+	s.mux.Lock()
+	for _, view := range holdingViews {
+		partyHoldings := s.holdings[view.Owner]
+		if partyHoldings == nil {
+			partyHoldings = make(map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract)
+		}
 
-	return &holdingView, nil
+		instrumentHoldings := partyHoldings[view.InstrumentId]
+		if instrumentHoldings == nil {
+			instrumentHoldings = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+		}
+
+		s.activeContracts[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = view
+		instrumentHoldings[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
+		partyHoldings[view.InstrumentId] = instrumentHoldings
+		s.holdings[view.Owner] = partyHoldings
+	}
+	s.mux.Unlock()
+
+	return nil
 }
 
-func getRelevantInterfaceViewValue(interfaceViews []*apiv2.InterfaceView, expectedInterfaceId *apiv2.Identifier) (*apiv2.Record, error) {
-	for _, interfaceView := range interfaceViews {
+func (s *InstrumentHoldingStore) onCreatedEvent(ctx context.Context, transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) error {
+	holdingViews, err := getHoldingViews(createdEvent)
+	if err != nil {
+		s.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get HoldingViews for active contract, skipping")
+		return nil
+	}
+
+	s.mux.Lock()
+	for _, view := range holdingViews {
+		partyHoldings := s.holdings[view.Owner]
+		if partyHoldings == nil {
+			partyHoldings = make(map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract)
+		}
+
+		instrumentHoldings := partyHoldings[view.InstrumentId]
+		if instrumentHoldings == nil {
+			instrumentHoldings = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+		}
+
+		s.activeContracts[types.CONTRACT_ID(createdEvent.GetContractId())] = view
+		instrumentHoldings[types.CONTRACT_ID(createdEvent.GetContractId())] = &apiv2.ActiveContract{
+			CreatedEvent:        createdEvent,
+			SynchronizerId:      transaction.GetSynchronizerId(),
+			ReassignmentCounter: 0,
+		}
+		partyHoldings[view.InstrumentId] = instrumentHoldings
+		s.holdings[view.Owner] = partyHoldings
+	}
+	s.mux.Unlock()
+
+	return nil
+}
+
+func (s *InstrumentHoldingStore) onArchivedEvent(ctx context.Context, transaction *apiv2.Transaction, archivedEvent *apiv2.ArchivedEvent) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	holdingView, ok := s.activeContracts[types.CONTRACT_ID(archivedEvent.GetContractId())]
+	if !ok {
+		return fmt.Errorf("archived event for contract %v with no active contract record", archivedEvent.GetContractId())
+	}
+	partyHoldings, ok := s.holdings[holdingView.Owner]
+	if !ok {
+		return fmt.Errorf("archived event for contract %v with no holdings for owner %v", archivedEvent.GetContractId(), holdingView.Owner)
+	}
+	instrumentHoldings, ok := partyHoldings[holdingView.InstrumentId]
+	if !ok {
+		return fmt.Errorf("archived event for contract %v with no holdings for instrument %v for owner %v", archivedEvent.GetContractId(), holdingView.InstrumentId, holdingView.Owner)
+	}
+	delete(s.activeContracts, types.CONTRACT_ID(archivedEvent.GetContractId()))
+	delete(instrumentHoldings, types.CONTRACT_ID(archivedEvent.GetContractId()))
+	partyHoldings[holdingView.InstrumentId] = instrumentHoldings
+	s.holdings[holdingView.Owner] = partyHoldings
+
+	return nil
+}
+
+func getHoldingViews(createdEvent *apiv2.CreatedEvent) ([]splice_api_token_holding_v1.HoldingView, error) {
+	var holdingViews []splice_api_token_holding_v1.HoldingView
+	for _, interfaceView := range createdEvent.GetInterfaceViews() {
 		// PackageId seems to be the hashed package ID, not the human-readable one.
 		// We probably shouldn't check against a specific hash, so we ignore that part of the interface ID.
-		if interfaceView.GetInterfaceId().GetModuleName() == expectedInterfaceId.GetModuleName() &&
-			interfaceView.GetInterfaceId().GetEntityName() == expectedInterfaceId.GetEntityName() {
-			return interfaceView.GetViewValue(), nil
+		if interfaceView.GetInterfaceId().GetModuleName() == "Splice.Api.Token.HoldingV1" &&
+			interfaceView.GetInterfaceId().GetEntityName() == "Holding" {
+			var holdingView splice_api_token_holding_v1.HoldingView
+			if err := ledger.RecordToStruct(interfaceView.GetViewValue(), &holdingView); err != nil {
+				return nil, fmt.Errorf("failed to parse HoldingView: %w", err)
+			}
+			holdingViews = append(holdingViews, holdingView)
 		}
 	}
 
-	return nil, fmt.Errorf("no interface view found for interface id: %s", expectedInterfaceId.String())
+	return holdingViews, nil
 }

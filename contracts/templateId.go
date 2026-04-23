@@ -33,13 +33,25 @@ func ReplacePackageIdWithNameInTemplateID(templateID, packageName string) string
 
 // TemplateIDFromBinding is a convenience function to get a TemplateID from a generated binding.
 func TemplateIDFromBinding(template common.Template) TemplateID {
-	split := strings.Split(template.GetTemplateID(), ":")
+	templateId, err := TemplateIDFromString(template.GetTemplateID())
+	if err != nil {
+		panic(err)
+	}
+
+	return templateId
+}
+
+func TemplateIDFromString(s string) (TemplateID, error) {
+	split := strings.Split(s, ":")
+	if len(split) != 3 {
+		return TemplateID{}, fmt.Errorf("invalid template id format: %s", s)
+	}
 
 	return TemplateID{
 		PackageID:  split[0],
 		ModuleName: split[1],
 		EntityName: split[2],
-	}
+	}, nil
 }
 
 // TemplateID uniquely identifies a template.

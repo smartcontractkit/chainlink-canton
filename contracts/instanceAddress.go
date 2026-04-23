@@ -3,6 +3,7 @@ package contracts
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -11,10 +12,16 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+
 	mcms_bindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 )
 
 type RawInstanceAddress string
+
+func NewRawInstanceAddress(instanceId InstanceID, owner types.PARTY) RawInstanceAddress {
+	return RawInstanceAddress(fmt.Sprintf("%s@%s", instanceId, owner))
+}
 
 func RawInstanceAddressFromString(s string) (RawInstanceAddress, error) {
 	// Validate that s is a valid raw instance address by checking if it contains exactly one '@'
@@ -165,4 +172,45 @@ func (p *HashedParty) SetBytes(b []byte) {
 	}
 
 	copy(p[HashedPartyLength-len(b):], b)
+}
+
+// EncodedInstrumentIDLength is the length in bytes of an EncodedInstrumentID
+const EncodedInstrumentIDLength = 32
+
+// EncodedInstrumentID represents the 32 byte Keccak256 hash of an Instrument ID.
+type EncodedInstrumentID [EncodedInstrumentIDLength]byte
+
+func BytesToEncodedInstrumentID(b []byte) EncodedInstrumentID {
+	var instrumentID EncodedInstrumentID
+	instrumentID.SetBytes(b)
+
+	return instrumentID
+}
+
+// HexToEncodedInstrumentID converts a hex string to an EncodedInstrumentID.
+// s may be prefixed with "0x"
+func HexToEncodedInstrumentID(s string) EncodedInstrumentID {
+	return BytesToEncodedInstrumentID(common.FromHex(s))
+}
+
+// EncodeInstrumentID takes the given InstrumentId and returns its EncodedInstrumentID.
+func EncodeInstrumentID(id splice_api_token_holding_v1.InstrumentId) EncodedInstrumentID {
+	h := sha3.NewLegacyKeccak256()
+	fmt.Fprintf(h, "%s@%s", id.Id, id.Admin)
+
+	return EncodedInstrumentID(h.Sum(nil))
+}
+
+func (i EncodedInstrumentID) Bytes() []byte { return i[:] }
+
+func (i EncodedInstrumentID) Hex() string { return hexutil.Encode(i[:]) }
+
+func (i EncodedInstrumentID) String() string { return i.Hex() }
+
+func (i *EncodedInstrumentID) SetBytes(b []byte) {
+	if len(b) > len(i) {
+		b = b[len(b)-EncodedInstrumentIDLength:]
+	}
+
+	copy(i[EncodedInstrumentIDLength-len(b):], b)
 }
