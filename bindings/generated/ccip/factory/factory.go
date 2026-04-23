@@ -555,7 +555,13 @@ type DeployCCIPReceiver struct {
 func (t DeployCCIPReceiver) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -603,7 +609,12 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 	m["requiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -611,14 +622,25 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 	m["optionalCCVs"] = func() []any {
 		res := make([]any, 0, len(t.OptionalCCVs))
 		for _, e := range t.OptionalCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
 
 	m["optionalThreshold"] = int64(t.OptionalThreshold)
 
-	m["receiverFinalityConfig"] = model.NestedToDAMLValue(t.ReceiverFinalityConfig)
+	m["receiverFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ReceiverFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ReceiverFinalityConfig
+	}()
 
 	return m
 }
@@ -654,7 +676,13 @@ type DeployCCIPSender struct {
 func (t DeployCCIPSender) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -729,7 +757,13 @@ type DeployCommitteeVerifier struct {
 func (t DeployCommitteeVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -790,7 +824,6 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 	} else {
 		m["allowListAdmin"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
@@ -802,7 +835,13 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 		return res
 	}()
 
-	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
 
 	m["storageLocations"] = func() []any {
 		res := make([]any, 0, len(t.StorageLocations))
@@ -850,7 +889,13 @@ type DeployExecutor struct {
 func (t DeployExecutor) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -896,7 +941,13 @@ func (t DeployExecutorParams) ToMap() map[string]any {
 
 	m["maxCCVsPerMsg"] = int64(t.MaxCCVsPerMsg)
 
-	m["allowedFinalityConfig"] = model.NestedToDAMLValue(t.AllowedFinalityConfig)
+	m["allowedFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.AllowedFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.AllowedFinalityConfig
+	}()
 
 	m["ccvAllowlistEnabled"] = bool(t.CcvAllowlistEnabled)
 
@@ -934,7 +985,13 @@ type DeployFeeQuoter struct {
 func (t DeployFeeQuoter) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -973,7 +1030,13 @@ func (t DeployFeeQuoterParams) ToMap() map[string]any {
 
 	m["instanceId"] = string(t.InstanceId)
 
-	m["linkTokenInstrumentId"] = model.NestedToDAMLValue(t.LinkTokenInstrumentId)
+	m["linkTokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.LinkTokenInstrumentId
+	}()
 
 	return m
 }
@@ -1009,7 +1072,13 @@ type DeployGlobalConfig struct {
 func (t DeployGlobalConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1084,7 +1153,13 @@ type DeployLockReleaseTokenPool struct {
 func (t DeployLockReleaseTokenPool) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1136,7 +1211,13 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["decimals"] = int64(t.Decimals)
 
@@ -1148,19 +1229,48 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	} else {
 		m["rateLimitAdmin"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
-	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
 
-	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
 
-	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
 
-	m["poolReceiveContext"] = model.NestedToDAMLValue(t.PoolReceiveContext)
+	m["poolReceiveContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.PoolReceiveContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.PoolReceiveContext
+	}()
 
-	m["transferTimeout"] = model.NestedToDAMLValue(t.TransferTimeout)
+	m["transferTimeout"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TransferTimeout).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TransferTimeout
+	}()
 
 	return m
 }
@@ -1196,7 +1306,13 @@ type DeployOffRamp struct {
 func (t DeployOffRamp) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1237,11 +1353,29 @@ func (t DeployOffRampParams) ToMap() map[string]any {
 
 	m["instanceId"] = string(t.InstanceId)
 
-	m["globalConfig"] = model.NestedToDAMLValue(t.GlobalConfig)
+	m["globalConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfig
+	}()
 
-	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
 
-	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
 
 	return m
 }
@@ -1277,7 +1411,13 @@ type DeployOnRamp struct {
 func (t DeployOnRamp) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1321,15 +1461,45 @@ func (t DeployOnRampParams) ToMap() map[string]any {
 
 	m["instanceId"] = string(t.InstanceId)
 
-	m["globalConfig"] = model.NestedToDAMLValue(t.GlobalConfig)
+	m["globalConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfig
+	}()
 
-	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
 
-	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
 
-	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
 
-	m["ccvRegistry"] = model.NestedToDAMLValue(t.CcvRegistry)
+	m["ccvRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.CcvRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvRegistry
+	}()
 
 	m["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
 
@@ -1367,7 +1537,13 @@ type DeployPerPartyRouterFactory struct {
 func (t DeployPerPartyRouterFactory) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1411,17 +1587,53 @@ func (t DeployPerPartyRouterFactoryParams) ToMap() map[string]any {
 
 	m["instanceId"] = string(t.InstanceId)
 
-	m["onRamp"] = model.NestedToDAMLValue(t.OnRamp)
+	m["onRamp"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.OnRamp).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRamp
+	}()
 
-	m["offRamp"] = model.NestedToDAMLValue(t.OffRamp)
+	m["offRamp"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.OffRamp).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OffRamp
+	}()
 
-	m["globalConfig"] = model.NestedToDAMLValue(t.GlobalConfig)
+	m["globalConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfig
+	}()
 
-	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
 
-	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
 
-	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
 
 	return m
 }
@@ -1457,7 +1669,13 @@ type DeployRMNRemote struct {
 func (t DeployRMNRemote) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1553,7 +1771,13 @@ type DeployRateLimiter struct {
 func (t DeployRateLimiter) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }
@@ -1605,9 +1829,21 @@ func (t DeployRateLimiterParams) ToMap() map[string]any {
 
 	m["remoteChainSelector"] = t.RemoteChainSelector
 
-	m["direction"] = model.NestedToDAMLValue(t.Direction)
+	m["direction"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Direction).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Direction
+	}()
 
-	m["mode"] = model.NestedToDAMLValue(t.Mode)
+	m["mode"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Mode).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Mode
+	}()
 
 	m["isEnabled"] = bool(t.IsEnabled)
 
@@ -1650,9 +1886,21 @@ type DeployResult struct {
 func (t DeployResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["factoryCid"] = model.NestedToDAMLValue(t.FactoryCid)
+	m["factoryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FactoryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FactoryCid
+	}()
 
-	m["deployedCid"] = model.NestedToDAMLValue(t.DeployedCid)
+	m["deployedCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DeployedCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DeployedCid
+	}()
 
 	return m
 }
@@ -1688,7 +1936,13 @@ type DeployTokenAdminRegistry struct {
 func (t DeployTokenAdminRegistry) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["contract"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Contract).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Contract
+	}()
 
 	return m
 }

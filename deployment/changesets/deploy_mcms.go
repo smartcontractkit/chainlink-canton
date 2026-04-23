@@ -120,7 +120,7 @@ var deployAndConfigureMCMSSequence = operations.NewSequence(
 				Bypasser:           roleState,
 				MinDelay:           types.RELTIME(input.MinDelay),
 				BlockedFunctions:   input.BlockedFunctions,
-				TimelockTimestamps: types.GENMAP{},
+				TimelockTimestamps: map[types.TEXT]types.TIMESTAMP{},
 			},
 			OwnerParty: ownerParty,
 		})
@@ -214,7 +214,7 @@ func normalizeGroups(input []types.INT64, name string) ([]types.INT64, error) {
 func emptyRoleState(config mcmsbindings.MultisigConfig) mcmsbindings.RoleState {
 	return mcmsbindings.RoleState{
 		Config:     config,
-		SeenHashes: types.GENMAP{},
+		SeenHashes: map[types.TEXT]types.BOOL{},
 		ExpiringRoot: mcmsbindings.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),

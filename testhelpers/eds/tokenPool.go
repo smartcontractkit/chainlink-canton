@@ -77,9 +77,7 @@ func GetTokenPoolExecuteDisclosure(
 	tokenInput := interfaces.TokenInput{
 		TransferFactory: types.CONTRACT_ID(resp.JSON200.TokenInput.TransferFactory),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: splice_api_token_metadata_v1.ChoiceContext{
-				Values: tokenInputContext.Values,
-			},
+			Context: CCIPContextToChoiceContext(tokenInputContext),
 			Meta: splice_api_token_metadata_v1.Metadata{},
 		},
 		TokenPoolHoldings: tokenPoolHoldings,
@@ -152,9 +150,7 @@ func GetTokenPoolSendDisclosure(
 	tokenInput := interfaces.TokenInput{
 		TransferFactory: types.CONTRACT_ID(resp.JSON200.TokenInput.TransferFactory),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: splice_api_token_metadata_v1.ChoiceContext{
-				Values: tokenInputContext.Values,
-			},
+			Context: CCIPContextToChoiceContext(tokenInputContext),
 			Meta: splice_api_token_metadata_v1.Metadata{},
 		},
 	}

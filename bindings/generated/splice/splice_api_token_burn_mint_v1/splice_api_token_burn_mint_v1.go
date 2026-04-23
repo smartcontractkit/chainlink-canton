@@ -78,7 +78,13 @@ func (t BurnMintFactoryView) ToMap() map[string]any {
 
 	m["admin"] = t.Admin.ToMap()
 
-	m["meta"] = model.NestedToDAMLValue(t.Meta)
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
 
 	return m
 }
@@ -121,7 +127,13 @@ func (t BurnMintFactoryBurnMint) ToMap() map[string]any {
 
 	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["inputHoldingCids"] = func() []any {
 		res := make([]any, 0, len(t.InputHoldingCids))
@@ -134,7 +146,12 @@ func (t BurnMintFactoryBurnMint) ToMap() map[string]any {
 	m["outputs"] = func() []any {
 		res := make([]any, 0, len(t.Outputs))
 		for _, e := range t.Outputs {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -147,7 +164,13 @@ func (t BurnMintFactoryBurnMint) ToMap() map[string]any {
 		return res
 	}()
 
-	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
 
 	return m
 }
@@ -270,7 +293,13 @@ func (t BurnMintOutput) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["context"] = model.NestedToDAMLValue(t.Context)
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
 
 	return m
 }

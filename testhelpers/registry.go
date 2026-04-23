@@ -117,10 +117,10 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 	}}}}, nil
 }
 
-// ExtractChoiceContextValues converts a Splice ChoiceContext proto value into a TEXTMAP
-// suitable for use as TokenInput.ExtraArgs.Context.Values.
-func ExtractChoiceContextValues(choiceContext *apiv2.Value) types.TEXTMAP {
-	contextValues := make(types.TEXTMAP)
+// ExtractChoiceContextValues converts a Splice ChoiceContext proto value into
+// the typed map expected by TokenInput.ExtraArgs.Context.Values.
+func ExtractChoiceContextValues(choiceContext *apiv2.Value) map[string]splice_api_token_metadata_v1.AnyValue {
+	contextValues := make(map[string]splice_api_token_metadata_v1.AnyValue)
 	if rec := choiceContext.GetRecord(); rec != nil && len(rec.Fields) > 0 {
 		valuesField := rec.Fields[0]
 		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {

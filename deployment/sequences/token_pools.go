@@ -369,7 +369,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 				RemoteChainConfigs:      map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{},
 				TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{},
 				PoolReceiveContext: common.CCIPContext{
-					Values: types.TEXTMAP{},
+					Values: map[string]common.AnyValue{},
 				},
 				TransferTimeout: lockreleasetokenpool.TransferTimeout{
 					RelativeHours: new(types.INT64(24)),

@@ -107,7 +107,13 @@ func (t Transfer) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["requestedAt"] = t.RequestedAt
 
@@ -121,7 +127,13 @@ func (t Transfer) ToMap() map[string]any {
 		return res
 	}()
 
-	m["meta"] = model.NestedToDAMLValue(t.Meta)
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
 
 	return m
 }
@@ -160,7 +172,13 @@ func (t TransferFactoryView) ToMap() map[string]any {
 
 	m["admin"] = t.Admin.ToMap()
 
-	m["meta"] = model.NestedToDAMLValue(t.Meta)
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
 
 	return m
 }
@@ -239,9 +257,21 @@ func (t TransferFactoryTransfer) ToMap() map[string]any {
 
 	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
 
-	m["transfer"] = model.NestedToDAMLValue(t.Transfer)
+	m["transfer"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Transfer).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Transfer
+	}()
 
-	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
 
 	return m
 }
@@ -279,7 +309,13 @@ type TransferInstructionResult struct {
 func (t TransferInstructionResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["output"] = model.NestedToDAMLValue(t.Output)
+	m["output"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Output).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Output
+	}()
 
 	m["senderChangeCids"] = func() []any {
 		res := make([]any, 0, len(t.SenderChangeCids))
@@ -289,7 +325,13 @@ func (t TransferInstructionResult) ToMap() map[string]any {
 		return res
 	}()
 
-	m["meta"] = model.NestedToDAMLValue(t.Meta)
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
 
 	return m
 }
@@ -436,7 +478,13 @@ type TransferInstructionResultPending struct {
 func (t TransferInstructionResultPending) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["transferInstructionCid"] = model.NestedToDAMLValue(t.TransferInstructionCid)
+	m["transferInstructionCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TransferInstructionCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TransferInstructionCid
+	}()
 
 	return m
 }
@@ -538,20 +586,37 @@ func (t TransferInstructionView) ToMap() map[string]any {
 	if t.OriginalInstructionCid != nil {
 		m["originalInstructionCid"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.OriginalInstructionCid),
+			"value": *t.OriginalInstructionCid,
 		}
 	} else {
 		m["originalInstructionCid"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
-	m["transfer"] = model.NestedToDAMLValue(t.Transfer)
+	m["transfer"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Transfer).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Transfer
+	}()
 
-	m["status"] = model.NestedToDAMLValue(t.Status)
+	m["status"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Status).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Status
+	}()
 
-	m["meta"] = model.NestedToDAMLValue(t.Meta)
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
 
 	return m
 }
@@ -587,7 +652,13 @@ type TransferInstructionAccept struct {
 func (t TransferInstructionAccept) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
 
 	return m
 }
@@ -623,7 +694,13 @@ type TransferInstructionReject struct {
 func (t TransferInstructionReject) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
 
 	return m
 }
@@ -668,7 +745,13 @@ func (t TransferInstructionUpdate) ToMap() map[string]any {
 		return res
 	}()
 
-	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
 
 	return m
 }
@@ -704,7 +787,13 @@ type TransferInstructionWithdraw struct {
 func (t TransferInstructionWithdraw) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
 
 	return m
 }

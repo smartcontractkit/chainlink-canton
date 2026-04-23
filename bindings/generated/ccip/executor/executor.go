@@ -67,7 +67,12 @@ func (t ApplyAllowedCCVUpdates) ToMap() map[string]any {
 	m["ccvsToRemove"] = func() []any {
 		res := make([]any, 0, len(t.CcvsToRemove))
 		for _, e := range t.CcvsToRemove {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -75,7 +80,12 @@ func (t ApplyAllowedCCVUpdates) ToMap() map[string]any {
 	m["ccvsToAdd"] = func() []any {
 		res := make([]any, 0, len(t.CcvsToAdd))
 		for _, e := range t.CcvsToAdd {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -121,7 +131,12 @@ func (t ApplyAllowedCCVUpdatesParams) ToMap() map[string]any {
 	m["ccvsToRemove"] = func() []any {
 		res := make([]any, 0, len(t.CcvsToRemove))
 		for _, e := range t.CcvsToRemove {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -129,7 +144,12 @@ func (t ApplyAllowedCCVUpdatesParams) ToMap() map[string]any {
 	m["ccvsToAdd"] = func() []any {
 		res := make([]any, 0, len(t.CcvsToAdd))
 		for _, e := range t.CcvsToAdd {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -182,7 +202,12 @@ func (t ApplyDestChainUpdates) ToMap() map[string]any {
 	m["destChainSelectorsToAdd"] = func() []any {
 		res := make([]any, 0, len(t.DestChainSelectorsToAdd))
 		for _, e := range t.DestChainSelectorsToAdd {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -233,7 +258,12 @@ func (t ApplyDestChainUpdatesParams) ToMap() map[string]any {
 	m["destChainSelectorsToAdd"] = func() []any {
 		res := make([]any, 0, len(t.DestChainSelectorsToAdd))
 		for _, e := range t.DestChainSelectorsToAdd {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -275,11 +305,23 @@ type CalculateFee struct {
 func (t CalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
 
 	m["executorArgs"] = string(t.ExecutorArgs)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -347,11 +389,16 @@ func (t DynamicConfig) ToMap() map[string]any {
 	} else {
 		m["feeAggregator"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
-	m["allowedFinalityConfig"] = model.NestedToDAMLValue(t.AllowedFinalityConfig)
+	m["allowedFinalityConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.AllowedFinalityConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.AllowedFinalityConfig
+	}()
 
 	m["ccvAllowlistEnabled"] = bool(t.CcvAllowlistEnabled)
 
@@ -414,13 +461,24 @@ func (t Executor) CreateCommand() *model.CreateCommand {
 	args["maxCCVsPerMsg"] = int64(t.MaxCCVsPerMsg)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["dynamicConfig"] = model.NestedToDAMLValue(t.DynamicConfig)
+	args["dynamicConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DynamicConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DynamicConfig
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["allowedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.AllowedCCVs))
 		for _, e := range t.AllowedCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -453,13 +511,24 @@ func (t Executor) CreateCommandWithPackageID(packageID string) *model.CreateComm
 	args["maxCCVsPerMsg"] = int64(t.MaxCCVsPerMsg)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["dynamicConfig"] = model.NestedToDAMLValue(t.DynamicConfig)
+	args["dynamicConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DynamicConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DynamicConfig
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["allowedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.AllowedCCVs))
 		for _, e := range t.AllowedCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -1030,7 +1099,12 @@ func (t GetFee) ToMap() map[string]any {
 	m["requiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -1185,7 +1259,13 @@ func (t RemoteChainConfigArgs) ToMap() map[string]any {
 
 	m["destChainSelector"] = t.DestChainSelector
 
-	m["config"] = model.NestedToDAMLValue(t.Config)
+	m["config"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Config).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Config
+	}()
 
 	return m
 }
@@ -1221,7 +1301,13 @@ type SetDynamicConfig struct {
 func (t SetDynamicConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["newDynamicConfig"] = model.NestedToDAMLValue(t.NewDynamicConfig)
+	m["newDynamicConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.NewDynamicConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewDynamicConfig
+	}()
 
 	return m
 }
@@ -1257,7 +1343,13 @@ type SetDynamicConfigParams struct {
 func (t SetDynamicConfigParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["newDynamicConfig"] = model.NestedToDAMLValue(t.NewDynamicConfig)
+	m["newDynamicConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.NewDynamicConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewDynamicConfig
+	}()
 
 	return m
 }

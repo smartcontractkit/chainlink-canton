@@ -62,7 +62,13 @@ type AcceptAdminParams struct {
 func (t AcceptAdminParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	return m
 }
@@ -99,7 +105,13 @@ type AcceptAdminRole struct {
 func (t AcceptAdminRole) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -161,11 +173,23 @@ type AddTokenSend2 struct {
 func (t AddTokenSend2) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
 
 	m["poolInstanceId"] = string(t.PoolInstanceId)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["amount"] = t.Amount
 
@@ -237,7 +261,13 @@ type AddTokenSendFee2 struct {
 func (t AddTokenSendFee2) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
 
 	m["poolInstanceId"] = string(t.PoolInstanceId)
 
@@ -307,9 +337,21 @@ type ConsumeReceiveTicket struct {
 func (t ConsumeReceiveTicket) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["ticketCid"] = model.NestedToDAMLValue(t.TicketCid)
+	m["ticketCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TicketCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TicketCid
+	}()
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -369,7 +411,13 @@ type FinalizeExecute2 struct {
 func (t FinalizeExecute2) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
+	m["executingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutingMessageCid
+	}()
 
 	m["ticketReceiver"] = t.TicketReceiver.ToMap()
 
@@ -485,7 +533,13 @@ type GetTokenConfig struct {
 func (t GetTokenConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -543,7 +597,13 @@ type IsAdministrator struct {
 func (t IsAdministrator) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["administrator"] = t.Administrator.ToMap()
 
@@ -642,7 +702,13 @@ type ProposeAdminParams struct {
 func (t ProposeAdminParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["newAdmin"] = t.NewAdmin.ToMap()
 
@@ -682,7 +748,13 @@ type ProposeAdministrator struct {
 func (t ProposeAdministrator) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["newAdmin"] = t.NewAdmin.ToMap()
 
@@ -744,14 +816,25 @@ type SetInboundPoolCCVs2 struct {
 func (t SetInboundPoolCCVs2) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
+	m["executingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutingMessageCid
+	}()
 
 	m["poolInstanceId"] = string(t.PoolInstanceId)
 
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
 		for _, e := range t.PoolCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -815,14 +898,25 @@ type SetOutboundPoolCCVs2 struct {
 func (t SetOutboundPoolCCVs2) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
 
 	m["poolInstanceId"] = string(t.PoolInstanceId)
 
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
 		for _, e := range t.PoolCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -885,17 +979,22 @@ type SetPool struct {
 func (t SetPool) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	if t.TokenPool != nil {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenPool),
+			"value": *t.TokenPool,
 		}
 	} else {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
@@ -955,17 +1054,22 @@ type SetPoolParams struct {
 func (t SetPoolParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	if t.TokenPool != nil {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenPool),
+			"value": *t.TokenPool,
 		}
 	} else {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
@@ -1414,7 +1518,13 @@ type TokenConfig struct {
 func (t TokenConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	if t.Admin != nil {
 		m["admin"] = map[string]any{
@@ -1424,7 +1534,6 @@ func (t TokenConfig) ToMap() map[string]any {
 	} else {
 		m["admin"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
@@ -1436,19 +1545,17 @@ func (t TokenConfig) ToMap() map[string]any {
 	} else {
 		m["pendingAdmin"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
 	if t.TokenPool != nil {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenPool),
+			"value": *t.TokenPool,
 		}
 	} else {
 		m["tokenPool"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
@@ -1487,7 +1594,13 @@ type TransferAdminParams struct {
 func (t TransferAdminParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["newAdmin"] = t.NewAdmin.ToMap()
 
@@ -1527,7 +1640,13 @@ type TransferAdminRole struct {
 func (t TransferAdminRole) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["newAdmin"] = t.NewAdmin.ToMap()
 

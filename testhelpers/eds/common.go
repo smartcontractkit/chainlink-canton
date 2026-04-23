@@ -6,12 +6,13 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error) {
@@ -20,7 +21,7 @@ func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error)
 		return common.CCIPContext{}, fmt.Errorf("no values found in context")
 	}
 
-	values := types.TEXTMAP{}
+	values := map[string]common.AnyValue{}
 	for k, v := range valuesIn {
 		f := v.(map[string]any)
 		tag := f["tag"].(string)
@@ -105,6 +106,45 @@ func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error)
 	return common.CCIPContext{
 		Values: values,
 	}, nil
+}
+
+func CCIPContextToChoiceContext(ctx common.CCIPContext) splice_api_token_metadata_v1.ChoiceContext {
+	values := make(map[string]splice_api_token_metadata_v1.AnyValue, len(ctx.Values))
+	for key, value := range ctx.Values {
+		values[key] = commonAnyValueToSplice(value)
+	}
+
+	return splice_api_token_metadata_v1.ChoiceContext{Values: values}
+}
+
+func commonAnyValueToSplice(value common.AnyValue) splice_api_token_metadata_v1.AnyValue {
+	var result splice_api_token_metadata_v1.AnyValue
+	result.AVText = value.AVText
+	result.AVInt = value.AVInt
+	result.AVDecimal = value.AVDecimal
+	result.AVBool = value.AVBool
+	result.AVDate = value.AVDate
+	result.AVTime = value.AVTime
+	result.AVRelTime = value.AVRelTime
+	result.AVParty = value.AVParty
+	result.AVContractId = value.AVContractId
+
+	if value.AVList != nil {
+		list := make([]splice_api_token_metadata_v1.AnyValue, len(*value.AVList))
+		for i, item := range *value.AVList {
+			list[i] = commonAnyValueToSplice(item)
+		}
+		result.AVList = &list
+	}
+	if value.AVMap != nil {
+		mapped := make(map[string]splice_api_token_metadata_v1.AnyValue, len(*value.AVMap))
+		for key, item := range *value.AVMap {
+			mapped[key] = commonAnyValueToSplice(item)
+		}
+		result.AVMap = &mapped
+	}
+
+	return result
 }
 
 func DisclosedContractToProto(contract oapiCommon.DisclosedContract) (*apiv2.DisclosedContract, error) {

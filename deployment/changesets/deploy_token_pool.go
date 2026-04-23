@@ -67,7 +67,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	cfg := config.Config
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
-		poolReceiveContext = common.CCIPContext{Values: types.TEXTMAP{}}
+		poolReceiveContext = common.CCIPContext{Values: map[string]common.AnyValue{}}
 	}
 	transferTimeout := cfg.TransferTimeout
 	if transferTimeout.RelativeHours == nil && transferTimeout.Indefinite == nil {

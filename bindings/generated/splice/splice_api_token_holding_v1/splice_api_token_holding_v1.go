@@ -74,23 +74,34 @@ func (t HoldingView) ToMap() map[string]any {
 
 	m["owner"] = t.Owner.ToMap()
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	m["amount"] = t.Amount
 
 	if t.Lock != nil {
 		m["lock"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.Lock),
+			"value": *t.Lock,
 		}
 	} else {
 		m["lock"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
-	m["meta"] = model.NestedToDAMLValue(t.Meta)
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
 
 	return m
 }
@@ -184,19 +195,17 @@ func (t Lock) ToMap() map[string]any {
 	} else {
 		m["expiresAt"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
 	if t.ExpiresAfter != nil {
 		m["expiresAfter"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.ExpiresAfter),
+			"value": *t.ExpiresAfter,
 		}
 	} else {
 		m["expiresAfter"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
@@ -208,7 +217,6 @@ func (t Lock) ToMap() map[string]any {
 	} else {
 		m["context"] = map[string]any{
 			"_type": "optional",
-			"value": nil,
 		}
 	}
 
