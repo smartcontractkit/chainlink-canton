@@ -21,8 +21,8 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
-	github.com/smartcontractkit/go-daml v0.6.1-0.20260423193219-c633889da58e
-	github.com/smartcontractkit/mcms v0.41.2-0.20260423195457-32c2a97a62c4
+	github.com/smartcontractkit/go-daml v0.6.1-0.20260423204100-e85c80a46d8d
+	github.com/smartcontractkit/mcms v0.41.2-0.20260423204345-3cd8c2672428
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0
 )

@@ -8,13 +8,12 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
 func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error) {
@@ -142,6 +141,9 @@ func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error)
 	}, nil
 }
 
+// Token metadata bindings generate a separate ChoiceContext/AnyValue type from
+// the CCIP bindings, so we still need an explicit adapter until codegen emits a
+// shared canonical type.
 func CCIPContextToChoiceContext(ctx common.CCIPContext) (splice_api_token_metadata_v1.ChoiceContext, error) {
 	var result splice_api_token_metadata_v1.ChoiceContext
 

@@ -82,7 +82,7 @@ func GetTokenPoolExecuteDisclosure(
 		TransferFactory: types.CONTRACT_ID(resp.JSON200.TokenInput.TransferFactory),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 			Context: tokenMetadataContext,
-			Meta: splice_api_token_metadata_v1.Metadata{},
+			Meta:    splice_api_token_metadata_v1.Metadata{},
 		},
 		TokenPoolHoldings: tokenPoolHoldings,
 	}
@@ -159,7 +159,7 @@ func GetTokenPoolSendDisclosure(
 		TransferFactory: types.CONTRACT_ID(resp.JSON200.TokenInput.TransferFactory),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 			Context: tokenMetadataContext,
-			Meta: splice_api_token_metadata_v1.Metadata{},
+			Meta:    splice_api_token_metadata_v1.Metadata{},
 		},
 	}
 

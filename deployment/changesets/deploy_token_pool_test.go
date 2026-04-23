@@ -126,26 +126,6 @@ func TestDeployTokenPool(t *testing.T) {
 	require.True(t, found, "TAR should have a TokenConfig with tokenPool.poolOwner set (pool registered)")
 }
 
-// optionalPartyStringFromMap gets an optional party from a map: either direct string or {"value": "<party>"}.
-func optionalPartyStringFromMap(m map[string]any, key string) string {
-	raw, ok := m[key]
-	if !ok || raw == nil {
-		return ""
-	}
-	if s, ok := raw.(string); ok {
-		return s
-	}
-	if opt, ok := raw.(map[string]any); ok {
-		if v, ok := opt["value"]; ok {
-			if s, ok := v.(string); ok {
-				return s
-			}
-		}
-	}
-
-	return ""
-}
-
 // findTARByInstanceAddress streams GetActiveContracts for TokenAdminRegistry and returns the ActiveContract whose instanceId matches the given instance address.
 func findTARByInstanceAddress(ctx context.Context, stateClient apiv2.StateServiceClient, party string) (*tokenadminregistry.TokenAdminRegistry, error) {
 	ledgerEndResp, err := stateClient.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
