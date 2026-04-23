@@ -54,11 +54,21 @@ jobs:
         run: |
           echo "=== getent hosts canton-devnet.bcy-v.metalhosts.com ==="
           getent hosts canton-devnet.bcy-v.metalhosts.com || true
+      - name: "[DEBUG] 4 - Get route to canton-devnet.bcy-v.metalhosts.com IP"
+        run: |
+          echo "=== route get 35.182.74.119 ==="
+          route get 35.182.74.119 || true
 
-      - name: "[DEBUG] 4 - Wait 15s for app connector route advertisement"
+      - name: "[DEBUG] 5 - DNS resolution (LB IPs returned by app connector DoH)"
+        run: |
+          echo "=== getent hosts canton-devnet.bcy-v.metalhosts.com ==="
+          getent hosts canton-devnet.bcy-v.metalhosts.com || true
+
+
+      - name: "[DEBUG] 6 - Wait 15s for app connector route advertisement"
         run: sleep 15
 
-      - name: "[DEBUG] 5 - Routes (expect LB IPs via tailscale0, but they are MISSING)"
+      - name: "[DEBUG] 7 - Routes (expect LB IPs via tailscale0, but they are MISSING)"
         run: |
           echo "=== All routes via tailscale ==="
           ip route show table all | grep tailscale || echo "(no tailscale routes found)"
@@ -66,7 +76,7 @@ jobs:
           echo "=== Full routing table ==="
           ip route show table all
 
-      - name: "[DEBUG] 6 - Connectivity test (403 = reached ALB via public internet, not via app connector)"
+      - name: "[DEBUG] 8 - Connectivity test (403 = reached ALB via public internet, not via app connector)"
         run: |
           curl -v --connect-timeout 30 -H "Content-Type: application/json" \
             https://canton-devnet.bcy-v.metalhosts.com/metrics/participant 2>&1 || true
