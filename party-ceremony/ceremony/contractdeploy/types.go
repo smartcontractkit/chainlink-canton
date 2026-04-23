@@ -1,6 +1,6 @@
 package contractdeploy
 
-import "github.com/chainlink/canton-party-ceremony/ceremony/ops/ledger"
+import "github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
 
 // PackageRef identifies a DAML package by its registered name and version.
 // The name corresponds to a [contracts.Package] constant (e.g. "mcms") and the

@@ -1,7 +1,7 @@
 package keyrotation
 
 import (
-	"github.com/chainlink/canton-party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 

@@ -4,7 +4,7 @@ package tests
 import (
 	"testing"
 
-	integrationtests "github.com/chainlink/canton-party-ceremony/integration-tests"
+	integrationtests "github.com/smartcontractkit/chainlink-canton/party-ceremony/integration-tests"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )

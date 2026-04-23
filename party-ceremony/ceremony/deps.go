@@ -1,7 +1,7 @@
 package ceremony
 
 import (
-	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 )
 

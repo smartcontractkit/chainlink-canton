@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/chainlink/canton-party-ceremony/internal/helpers"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
 	"github.com/stretchr/testify/assert"
 )
 

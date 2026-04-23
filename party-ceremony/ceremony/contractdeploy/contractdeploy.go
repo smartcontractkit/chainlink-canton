@@ -30,7 +30,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/chainlink/canton-party-ceremony/ceremony/ops/ledger"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )

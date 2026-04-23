@@ -12,7 +12,7 @@ import (
 	versionv1 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/version/v1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/chainlink/canton-party-ceremony/internal/helpers"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
 )
 
 // VaultSigner implements [TransactionSigner] by exporting a signing key from

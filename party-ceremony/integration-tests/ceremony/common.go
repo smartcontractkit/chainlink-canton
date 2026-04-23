@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/chainlink/canton-party-ceremony/internal/client"
 	interactivepb "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

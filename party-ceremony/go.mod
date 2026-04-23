@@ -1,4 +1,4 @@
-module github.com/chainlink/canton-party-ceremony
+module github.com/smartcontractkit/chainlink-canton/party-ceremony
 
 go 1.26.2
 
