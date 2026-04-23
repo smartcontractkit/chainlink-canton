@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
-	github.com/smartcontractkit/chainlink-canton v0.0.0-20260406090817-ed7fd0be9763
+	github.com/smartcontractkit/chainlink-canton v0.0.0-20260423182618-78ffd32b7eb5
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260410105708-4e8133b0b504
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260410105708-4e8133b0b504
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260414185437-e41e205c8bfa
@@ -22,7 +22,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.6.1-0.20260423193219-c633889da58e
-	github.com/smartcontractkit/mcms v0.41.2-0.20260421105842-8df2ee5770b3
+	github.com/smartcontractkit/mcms v0.41.2-0.20260423195457-32c2a97a62c4
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0
 )
