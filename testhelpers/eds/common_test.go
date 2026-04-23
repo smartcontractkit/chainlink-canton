@@ -9,9 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/go-daml/pkg/types"
-
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 func TestCCIPContextFromData(t *testing.T) {
@@ -24,32 +23,32 @@ func TestCCIPContextFromData(t *testing.T) {
 		{
 			name: "all values",
 			ccipContext: common.CCIPContext{
-				Values: types.TEXTMAP{
-					"text": common.AnyValue{
+				Values: map[string]common.AnyValue{
+					"text": {
 						AVText: new(types.TEXT("Hello, world!")),
 					},
-					"int": common.AnyValue{
+					"int": {
 						AVInt: new(types.INT64(42)),
 					},
-					"decimal": common.AnyValue{
+					"decimal": {
 						AVDecimal: new(types.NUMERIC("123.456")),
 					},
-					"bool": common.AnyValue{
+					"bool": {
 						AVBool: new(types.BOOL(true)),
 					},
-					"date": common.AnyValue{
+					"date": {
 						AVDate: new(types.DATE(time.Now())),
 					},
-					"time": common.AnyValue{
+					"time": {
 						AVTime: new(types.TIMESTAMP(time.Now())),
 					},
-					"reltime": common.AnyValue{
+					"reltime": {
 						AVRelTime: new(types.RELTIME(time.Second * 777)),
 					},
-					"party": common.AnyValue{
+					"party": {
 						AVParty: new(types.PARTY("party123")),
 					},
-					"contractId": common.AnyValue{
+					"contractId": {
 						AVContractId: new(types.CONTRACT_ID("00929f6a675c128bb54bef77a8cad8d330badd4330cf71f6a19b596b01f4b66b2dca121220cd655ce27fae64bdf6a203fcd987727de81c3762e46b1882ce2c2fbf0a72c64f")),
 					},
 					// TODO add lists and maps

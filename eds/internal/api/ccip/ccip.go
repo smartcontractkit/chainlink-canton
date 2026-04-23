@@ -298,20 +298,20 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 	}
 
 	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: types.TEXTMAP{
-			"on-ramp": common.AnyValue{
+		Values: map[string]common.AnyValue{
+			"on-ramp": {
 				AVContractId: new(types.CONTRACT_ID(activeOnRampContract.GetCreatedEvent().GetContractId())),
 			},
-			"global-config": common.AnyValue{
+			"global-config": {
 				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
 			},
-			"token-admin-registry": common.AnyValue{
+			"token-admin-registry": {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			"rmn-remote": common.AnyValue{
+			"rmn-remote": {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
-			"fee-quoter": common.AnyValue{
+			"fee-quoter": {
 				AVContractId: new(types.CONTRACT_ID(activeFeeQuoterContract.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -407,17 +407,17 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 	}
 
 	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: types.TEXTMAP{
-			"off-ramp": common.AnyValue{
+		Values: map[string]common.AnyValue{
+			"off-ramp": {
 				AVContractId: new(types.CONTRACT_ID(activeOffRampContract.GetCreatedEvent().GetContractId())),
 			},
-			"global-config": common.AnyValue{
+			"global-config": {
 				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
 			},
-			"token-admin-registry": common.AnyValue{
+			"token-admin-registry": {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			"rmn-remote": common.AnyValue{
+			"rmn-remote": {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
 		},

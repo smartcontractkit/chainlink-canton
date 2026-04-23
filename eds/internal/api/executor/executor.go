@@ -7,8 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
-	"github.com/smartcontractkit/go-daml/pkg/types"
-
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -88,7 +86,7 @@ func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 	}
 
 	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: types.TEXTMAP{
+		Values: map[string]common.AnyValue{
 			// Empty for now
 		},
 	})

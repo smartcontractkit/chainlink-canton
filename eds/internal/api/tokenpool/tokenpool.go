@@ -168,8 +168,8 @@ func (s Server) lockReleaseTokenPoolSend(
 	}
 
 	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: types.TEXTMAP{
-			"rate-limiter": common.AnyValue{
+		Values: map[string]common.AnyValue{
+			"rate-limiter": {
 				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -303,7 +303,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 	}
 
 	ccipContext := common.CCIPContext{
-		Values: types.TEXTMAP{},
+		Values: map[string]common.AnyValue{},
 	}
 	var rateLimiter *apiv2.ActiveContract
 	if message.Finality == protocol.FinalityWaitForFinality {
