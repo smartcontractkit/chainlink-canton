@@ -17,9 +17,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations/optest"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
-	"github.com/chainlink/canton-party-ceremony/ceremony/ops/ledger"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // ── Mock Canton client (Admin API) ──────────────────────────────────────────

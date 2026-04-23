@@ -3,7 +3,7 @@ package topology
 import (
 	"time"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony/ops/keys"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
 )
 
 // ── ProposeNamespaceDelegation (NSD) ─────────────────────────────────────────

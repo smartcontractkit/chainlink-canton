@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/chainlink/canton-party-ceremony/internal/helpers"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
 )
 
 func TestComputeDecentralizedNamespace(t *testing.T) {

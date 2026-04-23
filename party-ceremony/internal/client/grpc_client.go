@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chainlink/canton-party-ceremony/internal/helpers"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
 
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	cryptoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/admin/v30"

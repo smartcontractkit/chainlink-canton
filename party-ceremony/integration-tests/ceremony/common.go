@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/chainlink/canton-party-ceremony/internal/client"
 	interactivepb "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -14,6 +13,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 type Actor struct {

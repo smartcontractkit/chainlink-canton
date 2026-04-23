@@ -1,8 +1,9 @@
 package example
 
 import (
-	"github.com/chainlink/canton-party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 )
 
 // LatestSequenceState returns the CeremonyState from the most recent run of

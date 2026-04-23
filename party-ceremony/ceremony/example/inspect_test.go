@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 
-	ceremony "github.com/chainlink/canton-party-ceremony/ceremony/example"
+	ceremony "github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
 )
 
 func bundleWith(t *testing.T, r operations.Reporter) operations.Bundle {

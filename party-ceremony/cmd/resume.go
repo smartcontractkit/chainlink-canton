@@ -5,14 +5,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
-	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
-	"github.com/chainlink/canton-party-ceremony/ceremony/example"
-	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
-	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
-	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // resumeCmd resumes an existing ceremony from its persisted state.
