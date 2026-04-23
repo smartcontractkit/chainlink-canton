@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/chainlink/canton-party-ceremony/ceremony"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 
 	cryptov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/v30"
 	protov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"

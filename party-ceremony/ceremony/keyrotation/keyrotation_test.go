@@ -18,12 +18,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
-	"github.com/chainlink/canton-party-ceremony/ceremony/ops/keys"
-	"github.com/chainlink/canton-party-ceremony/ceremony/ops/topology"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
-	"github.com/chainlink/canton-party-ceremony/internal/helpers"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
 )
 
 // ── Constants shared across tests ────────────────────────────────────────────

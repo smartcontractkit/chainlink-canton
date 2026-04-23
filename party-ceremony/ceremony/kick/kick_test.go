@@ -18,9 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // ── Constants shared across tests ────────────────────────────────────────────

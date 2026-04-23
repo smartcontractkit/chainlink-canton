@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // queryPartiesCmd queries and displays all decentralized namespace definitions

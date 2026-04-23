@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
-	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
 )
 
 // AddParticipantFlowTestSuite validates adding a participant back to a

@@ -1,15 +1,15 @@
-module github.com/chainlink/canton-party-ceremony/integration-tests
+module github.com/smartcontractkit/chainlink-canton/party-ceremony/integration-tests
 
 go 1.26.2
 
-replace github.com/chainlink/canton-party-ceremony => ../
+replace github.com/smartcontractkit/chainlink-canton/party-ceremony => ../
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 require (
-	github.com/chainlink/canton-party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
+	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0

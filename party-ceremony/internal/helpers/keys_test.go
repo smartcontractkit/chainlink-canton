@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/chainlink/canton-party-ceremony/internal/helpers"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
 )
 
 // TestGetPublicKeyFingerprint_KnownVector uses the example from the Canton docs:

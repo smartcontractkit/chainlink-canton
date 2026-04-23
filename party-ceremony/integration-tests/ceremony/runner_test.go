@@ -4,9 +4,10 @@ package tests
 import (
 	"testing"
 
-	integrationtests "github.com/chainlink/canton-party-ceremony/integration-tests"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	integrationtests "github.com/smartcontractkit/chainlink-canton/party-ceremony/integration-tests"
 )
 
 func TestCeremonies(t *testing.T) {

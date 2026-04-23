@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations/optest"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 
-	ceremony "github.com/chainlink/canton-party-ceremony/ceremony/example"
+	ceremony "github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
 )
 
 // newDeps wraps the mock client in a CantonDeps value.
