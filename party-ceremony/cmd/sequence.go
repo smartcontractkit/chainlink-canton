@@ -6,6 +6,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
@@ -15,8 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 )
 
 // executeSequence is the shared execution kernel used by both init and resume.

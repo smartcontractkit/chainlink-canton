@@ -1,8 +1,9 @@
 package ceremony
 
 import (
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // CantonDeps is the dependency container passed to every operation handler.

@@ -32,6 +32,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
+
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"

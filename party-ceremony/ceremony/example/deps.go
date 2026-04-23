@@ -1,8 +1,9 @@
 package example
 
 import (
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 )
 
 // ── Dependency types ─────────────────────────────────────────────────────────

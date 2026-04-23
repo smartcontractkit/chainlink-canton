@@ -5,9 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
-	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 )
 
 // DARLoader fetches the raw bytes of a DAR by package name and version.

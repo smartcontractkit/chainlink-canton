@@ -9,6 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
@@ -16,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 var inspectCmd = &cobra.Command{
