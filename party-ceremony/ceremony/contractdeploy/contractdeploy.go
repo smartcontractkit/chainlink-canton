@@ -97,7 +97,6 @@ var ContractDeploySequence = operations.NewSequence(
 			// environments (deps.UserID=="") this is a no-op that always succeeds.
 			if _, grantErr := operations.ExecuteOperation(b, ledger.GrantPartyRightsOp, deps, ledger.GrantPartyRightsInput{
 				ParticipantID:        pid,
-				UserID:               deps.UserID,
 				DecentralizedPartyID: in.DecentralizedPartyID,
 			}); grantErr != nil {
 				deps.Logger.Infow("Party rights grant pending", "participant", pid, "err", grantErr)

@@ -28,7 +28,7 @@ var GrantPartyRightsOp = operations.NewOperation(
 	"Grant actAs and readAs Ledger API rights for the decentralized party to the configured user",
 	func(b operations.Bundle, deps ContractDeployDeps, in GrantPartyRightsInput) (GrantPartyRightsOutput, error) {
 		// No-auth environments: skip the grant entirely.
-		if in.UserID == "" {
+		if deps.UserID == "" {
 			return GrantPartyRightsOutput{ParticipantID: in.ParticipantID, Granted: false}, nil
 		}
 
@@ -43,19 +43,19 @@ var GrantPartyRightsOp = operations.NewOperation(
 				in.ParticipantID, uid)
 		}
 
-		if err := deps.LedgerClient.GrantPartyRights(ctx, in.UserID, in.DecentralizedPartyID); err != nil {
-			return GrantPartyRightsOutput{}, fmt.Errorf("granting party rights for user %q: %w", in.UserID, err)
+		if err := deps.LedgerClient.GrantPartyRights(ctx, deps.UserID, in.DecentralizedPartyID); err != nil {
+			return GrantPartyRightsOutput{}, fmt.Errorf("granting party rights for user %q: %w", deps.UserID, err)
 		}
 
 		deps.Logger.Infow("Party rights granted",
 			"participant", in.ParticipantID,
-			"user", in.UserID,
+			"user", deps.UserID,
 			"party", in.DecentralizedPartyID,
 		)
 
 		return GrantPartyRightsOutput{
 			ParticipantID: in.ParticipantID,
-			UserID:        in.UserID,
+			UserID:        deps.UserID,
 			Granted:       true,
 		}, nil
 	},

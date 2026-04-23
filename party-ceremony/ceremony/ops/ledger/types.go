@@ -26,7 +26,6 @@ type GrantPartyRightsInput struct {
 	// ParticipantID makes the cache key unique per participant so each actor
 	// grants rights on their own Ledger API connection.
 	ParticipantID        string `json:"participant_id"`
-	UserID               string `json:"user_id"`
 	DecentralizedPartyID string `json:"decentralized_party_id"`
 }
 
