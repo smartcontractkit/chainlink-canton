@@ -166,11 +166,18 @@ func (s Server) lockReleaseTokenPoolSend(
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
-	contextValues := map[string]struct {
-		Tag   string `json:"tag"`
-		Value string `json:"value"`
-	}{
-		"rate-limiter": {Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()},
+
+	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
+		Values: types.TEXTMAP{
+			"rate-limiter": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
+			},
+		},
+	})
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
 	}
 
 	requiredCCVs := make([]oapiCommon.RawOrHashedAddress, len(remoteChainConfig.OutboundCCVs))
@@ -198,9 +205,7 @@ func (s Server) lockReleaseTokenPoolSend(
 		InstanceAddress:    lockReleaseTokenPool.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
-		ContextData: map[string]any{
-			"values": contextValues,
-		},
+		ContextData:        ccipContext,
 		TokenInput: oapiTokenPool.TokenInput{
 			ExtraArgs: struct {
 				Context  map[string]any `json:"context"`
@@ -297,10 +302,9 @@ func (s Server) lockReleaseTokenPoolExecute(
 		return
 	}
 
-	contextValues := make(map[string]struct {
-		Tag   string `json:"tag"`
-		Value string `json:"value"`
-	})
+	ccipContext := common.CCIPContext{
+		Values: types.TEXTMAP{},
+	}
 	var rateLimiter *apiv2.ActiveContract
 	if message.Finality == protocol.FinalityWaitForFinality {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
@@ -309,10 +313,9 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		contextValues["inbound-rate-limiter"] = struct {
-			Tag   string `json:"tag"`
-			Value string `json:"value"`
-		}{Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()}
+		ccipContext.Values["inbound-rate-limiter"] = common.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
+		}
 	} else {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
 		if !ok {
@@ -320,10 +323,16 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		contextValues["inbound-custom-block-confirmations-rate-limiter"] = struct {
-			Tag   string `json:"tag"`
-			Value string `json:"value"`
-		}{Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()}
+		ccipContext.Values["inbound-custom-block-confirmations-rate-limiter"] = common.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
+		}
+	}
+
+	serializedContext, err := converters.SerializeCCIPContext(ccipContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
 	}
 
 	requiredCCVs := make([]oapiCommon.RawOrHashedAddress, len(remoteChainConfig.InboundCCVs))
@@ -364,9 +373,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 		InstanceAddress:    lockReleaseTokenPool.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
-		ContextData: map[string]any{
-			"values": contextValues,
-		},
+		ContextData:        serializedContext,
 		TokenInput: oapiTokenPool.TokenInput{
 			TokenPoolHoldings: tokenPoolHoldings,
 			ExtraArgs: struct {

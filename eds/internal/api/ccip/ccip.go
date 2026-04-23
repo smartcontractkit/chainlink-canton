@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
@@ -289,44 +290,42 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		// Default Executor
 		// If set to none, the default executor is the no-exec executor
 		if destChainConfig.DefaultExecutor != nil {
-			defaultExecutor := converters.RawInstanceAddressAsRawOrHashedAddress(*destChainConfig.DefaultExecutor)
-			executor = &defaultExecutor
+			executor = new(converters.RawInstanceAddressAsRawOrHashedAddress(*destChainConfig.DefaultExecutor))
 		}
 	case oapiCommon.WithAddress:
 		// Use the specified executor
 		executor = req.Message.Executor.Address
 	}
 
-	resp := &oapiCCIP.CCIPSendResponse{
-		Ccvs: maps.Values(resolvedCCVs),
-		ContextData: map[string]any{
-			"values": map[string]struct {
-				Tag   string `json:"tag"`
-				Value string `json:"value"`
-			}{
-				"on-ramp": {
-					Tag:   "AV_ContractId",
-					Value: activeOnRampContract.GetCreatedEvent().GetContractId(),
-				},
-				"global-config": {
-					Tag:   "AV_ContractId",
-					Value: activeGlobalConfigContract.GetCreatedEvent().GetContractId(),
-				},
-				"token-admin-registry": {
-					Tag:   "AV_ContractId",
-					Value: activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId(),
-				},
-				"rmn-remote": {
-					Tag:   "AV_ContractId",
-					Value: activeRMNRemoteContract.GetCreatedEvent().GetContractId(),
-				},
-				"fee-quoter": {
-					Tag:   "AV_ContractId",
-					Value: activeFeeQuoterContract.GetCreatedEvent().GetContractId(),
-				},
+	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
+		Values: types.TEXTMAP{
+			"on-ramp": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeOnRampContract.GetCreatedEvent().GetContractId())),
+			},
+			"global-config": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
+			},
+			"token-admin-registry": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
+			},
+			"rmn-remote": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
+			},
+			"fee-quoter": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeFeeQuoterContract.GetCreatedEvent().GetContractId())),
 			},
 		},
-		Executor: executor,
+	})
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	resp := &oapiCCIP.CCIPSendResponse{
+		Ccvs:        maps.Values(resolvedCCVs),
+		ContextData: ccipContext,
+		Executor:    executor,
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activeOnRampContract),
 			converters.ActiveContractToDisclosedContract(activeGlobalConfigContract),
@@ -404,34 +403,33 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token pool registered for token: %s", destTokenAddress.Hex())})
 			return
 		}
-		tokenPoolRawInstanceAddress := oapiCommon.RawInstanceAddress(contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).RawInstanceAddress(tokenConfig.TokenPool.PoolOwner))
-		tokenPool = &tokenPoolRawInstanceAddress
+		tokenPool = new(oapiCommon.RawInstanceAddress(contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).RawInstanceAddress(tokenConfig.TokenPool.PoolOwner)))
+	}
+
+	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
+		Values: types.TEXTMAP{
+			"off-ramp": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeOffRampContract.GetCreatedEvent().GetContractId())),
+			},
+			"global-config": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
+			},
+			"token-admin-registry": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
+			},
+			"rmn-remote": common.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
+			},
+		},
+	})
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
 	}
 
 	resp := &oapiCCIP.CCIPExecuteResponse{
-		ContextData: map[string]any{
-			"values": map[string]struct {
-				Tag   string `json:"tag"`
-				Value string `json:"value"`
-			}{
-				"off-ramp": {
-					Tag:   "AV_ContractId",
-					Value: activeOffRampContract.GetCreatedEvent().GetContractId(),
-				},
-				"global-config": {
-					Tag:   "AV_ContractId",
-					Value: activeGlobalConfigContract.GetCreatedEvent().GetContractId(),
-				},
-				"token-admin-registry": {
-					Tag:   "AV_ContractId",
-					Value: activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId(),
-				},
-				"rmn-remote": {
-					Tag:   "AV_ContractId",
-					Value: activeRMNRemoteContract.GetCreatedEvent().GetContractId(),
-				},
-			},
-		},
+		ContextData: ccipContext,
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activeOffRampContract),
 			converters.ActiveContractToDisclosedContract(activeGlobalConfigContract),
