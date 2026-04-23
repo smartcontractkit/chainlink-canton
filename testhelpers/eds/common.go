@@ -2,7 +2,9 @@ package eds
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -33,42 +35,53 @@ func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error)
 			if !ok {
 				return common.CCIPContext{}, fmt.Errorf("AV_Text value is not a string: %T", rawValue)
 			}
-			vText := types.TEXT(valueString)
-			value.AVText = &vText
+			value.AVText = new(types.TEXT(valueString))
 		case "AV_Int":
-			// JSON numbers come as float64
-			valueFloat, ok := rawValue.(float64)
-			if !ok {
-				return common.CCIPContext{}, fmt.Errorf("AV_Int value is not a number: %T", rawValue)
+			// Int64s are encoded as JSON numbers or strings, depending on the encoder settings
+			switch val := rawValue.(type) {
+			case string:
+				valueInt, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					return common.CCIPContext{}, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+				}
+				value.AVInt = new(types.INT64(valueInt))
+			case json.Number:
+				valueInt, err := strconv.ParseInt(val.String(), 10, 64)
+				if err != nil {
+					return common.CCIPContext{}, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+				}
+				value.AVInt = new(types.INT64(valueInt))
+			case float64:
+				// Some encoders may encode int64s as JSON numbers, which are float64s in Go. This can cause precision loss for large int64s, but we can still parse them if they fit within uint64.
+				if val < 0 || val > float64(^uint64(0)) {
+					return common.CCIPContext{}, fmt.Errorf("AV_Int value is out of range for uint64: %f", val)
+				}
+				value.AVInt = new(types.INT64(int64(val)))
+			default:
+				return common.CCIPContext{}, fmt.Errorf("AV_Int value is not a string or number: %T", rawValue)
 			}
-			// TODO
-			vInt := types.INT64(int64(valueFloat))
-			value.AVInt = &vInt
 		case "AV_Decimal":
 			valueString, ok := rawValue.(string)
 			if !ok {
 				return common.CCIPContext{}, fmt.Errorf("AV_Decimal value is not a string: %T", rawValue)
 			}
-			vNumeric := types.NUMERIC(valueString)
-			value.AVDecimal = &vNumeric
+			value.AVDecimal = new(types.NUMERIC(valueString))
 		case "AV_Bool":
 			valueBool, ok := rawValue.(bool)
 			if !ok {
 				return common.CCIPContext{}, fmt.Errorf("AV_Bool value is not a bool: %T", rawValue)
 			}
-			vBool := types.BOOL(valueBool)
-			value.AVBool = &vBool
+			value.AVBool = new(types.BOOL(valueBool))
 		case "AV_Date":
 			valueString, ok := rawValue.(string)
 			if !ok {
 				return common.CCIPContext{}, fmt.Errorf("AV_Date value is not a string: %T", rawValue)
 			}
-			t, err := time.Parse(time.RFC3339, valueString)
+			t, err := time.Parse(time.DateOnly, valueString)
 			if err != nil {
-				return common.CCIPContext{}, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
+				return common.CCIPContext{}, fmt.Errorf("AV_Date value is not a DateOnly time: %s", valueString)
 			}
-			vDate := types.DATE(t)
-			value.AVDate = &vDate
+			value.AVDate = new(types.DATE(t))
 		case "AV_Time":
 			valueString, ok := rawValue.(string)
 			if !ok {
@@ -78,24 +91,45 @@ func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error)
 			if err != nil {
 				return common.CCIPContext{}, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
 			}
-			vTime := types.TIMESTAMP(t)
-			value.AVTime = &vTime
+			value.AVTime = new(types.TIMESTAMP(t))
 		case "AV_RelTime":
-			valueFloat, ok := rawValue.(float64)
-			if !ok {
-				return common.CCIPContext{}, fmt.Errorf("AV_RelTime value is not a number: %T", rawValue)
+			// Int64s are encoded as JSON numbers or strings, depending on the encoder settings
+			switch val := rawValue.(type) {
+			case string:
+				valueInt, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					return common.CCIPContext{}, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+				}
+				value.AVRelTime = new(types.RELTIME(time.Duration(valueInt) * time.Microsecond))
+			case json.Number:
+				valueInt, err := strconv.ParseInt(val.String(), 10, 64)
+				if err != nil {
+					return common.CCIPContext{}, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+				}
+				value.AVRelTime = new(types.RELTIME(time.Duration(valueInt) * time.Microsecond))
+			case float64:
+				// Some encoders may encode int64s as JSON numbers, which are float64s in Go. This can cause precision loss for large int64s, but we can still parse them if they fit within uint64.
+				if val < 0 || val > float64(^uint64(0)) {
+					return common.CCIPContext{}, fmt.Errorf("AV_Int value is out of range for uint64: %f", val)
+				}
+				value.AVRelTime = new(types.RELTIME(time.Duration(int64(val)) * time.Microsecond))
+			default:
+				return common.CCIPContext{}, fmt.Errorf("AV_Int value is not a string or number: %T", rawValue)
 			}
-			vRelTime := types.RELTIME(time.Duration(int64(valueFloat)) * time.Microsecond)
-			value.AVRelTime = &vRelTime
+		case "AV_Party":
+			valueString, ok := rawValue.(string)
+			if !ok {
+				return common.CCIPContext{}, fmt.Errorf("AV_Party value is not a string: %T", rawValue)
+			}
+			value.AVParty = new(types.PARTY(valueString))
 		case "AV_ContractId":
 			valueString, ok := rawValue.(string)
 			if !ok {
 				return common.CCIPContext{}, fmt.Errorf("AV_ContractId value is not a string: %T", rawValue)
 			}
-			vContractId := types.CONTRACT_ID(valueString)
-			value.AVContractId = &vContractId
+			value.AVContractId = new(types.CONTRACT_ID(valueString))
 		default:
-			// Add lists and maps
+			// TODO Add lists and maps
 			return common.CCIPContext{}, fmt.Errorf("unimplemented tag: %v", tag)
 		}
 

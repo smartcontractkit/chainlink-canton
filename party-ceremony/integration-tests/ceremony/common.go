@@ -123,7 +123,6 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 		conn, err := grpc.NewClient(adminURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to dial admin API for participant %d", i+1)
 		t.Cleanup(func() { _ = conn.Close() })
-		adminServices := canton.CreateAdminServiceClients(conn)
 		ledgerConn, err := grpc.NewClient(ledgerURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to dial ledger API for participant %d", i+1)
 		t.Cleanup(func() { _ = ledgerConn.Close() })
@@ -136,7 +135,7 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 				AdminAPIURL:      adminURL,
 				GRPCLedgerAPIURL: ledgerURL,
 			},
-			AdminServices:  &adminServices,
+			AdminServices:  new(canton.CreateAdminServiceClients(conn)),
 			LedgerServices: ledgerServices,
 			UserID:         userID,
 		}

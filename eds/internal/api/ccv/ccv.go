@@ -7,7 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -84,18 +87,22 @@ func (s Server) PostCCVSend(c *gin.Context, address string) {
 		return
 	}
 
-	// TODO check if destination chain is configured on the CCV
+	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
+		Values: types.TEXTMAP{
+			// Empty for now
+		},
+	})
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
 
 	resp := oapiCCV.CCVSendResponse{
 		ContractId:         activeCCVContract.GetCreatedEvent().GetContractId(),
 		InstanceAddress:    parsedCommitteeVerifierContract.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: parsedCommitteeVerifierContract.Address.String(),
-		ContextData: map[string]any{
-			"values": map[string]struct {
-				Tag   string `json:"tag"`
-				Value string `json:"value"`
-			}{},
-		},
+		ContextData:        ccipContext,
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activeCCVContract),
 		},
@@ -139,16 +146,22 @@ func (s Server) PostCCVExecute(c *gin.Context, address string) {
 		return
 	}
 
+	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
+		Values: types.TEXTMAP{
+			// Empty for now
+		},
+	})
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
 	resp := oapiCCV.CCVExecuteResponse{
 		ContractId:         activeCCVContract.GetCreatedEvent().GetContractId(),
 		InstanceAddress:    parsedCommitteeVerifierContract.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: parsedCommitteeVerifierContract.Address.String(),
-		ContextData: map[string]any{
-			"values": map[string]struct {
-				Tag   string `json:"tag"`
-				Value string `json:"value"`
-			}{},
-		},
+		ContextData:        ccipContext,
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activeCCVContract),
 		},
