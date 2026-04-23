@@ -37,7 +37,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260410105708-4e8133b0b504
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260410105708-4e8133b0b504
-	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260414185437-e41e205c8bfa
+	github.com/smartcontractkit/chainlink-ccv v0.0.1
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260414185437-e41e205c8bfa
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
@@ -66,6 +66,7 @@ require (
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260401162955-be2bc6b5264b // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20260410144512-ca02ad6ed16a // indirect
 	github.com/smartcontractkit/chainlink-protos/op-catalog v0.0.4 // indirect
+	github.com/smartcontractkit/chainlink-protos/svr v1.1.1-0.20260203131522-bb8bc5c423b3 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/viper v1.21.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
