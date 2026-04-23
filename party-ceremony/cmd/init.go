@@ -8,13 +8,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
-	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
-	"github.com/chainlink/canton-party-ceremony/ceremony/example"
-	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
-	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
-	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // initCmd is the parent command for all ceremony-type initialisers.
@@ -97,7 +97,7 @@ func runInitOnboarding(cmd *cobra.Command, _ []string) error {
 		Threshold:      threshold,
 	}
 
-	return executeOnboardingSequence(cmd.Context(), cfg, input, stateDir, "")
+	return executeOnboardingSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
 }
 
 var initExampleCmd = &cobra.Command{
@@ -160,7 +160,7 @@ func runInitExample(cmd *cobra.Command, _ []string) error {
 		Threshold:      threshold,
 	}
 
-	return executeExampleOnboardingSequence(cmd.Context(), cfg, input, stateDir, "")
+	return executeExampleOnboardingSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
 }
 
 // initKickCmd initialises a decentralized-party kick ceremony.
@@ -240,7 +240,7 @@ func runInitKick(cmd *cobra.Command, _ []string) error {
 		NewThreshold:               newThreshold,
 	}
 
-	return executeKickSequence(cmd.Context(), cfg, input, stateDir, "")
+	return executeKickSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
 }
 
 // initAddParticipantCmd initialises an add-participant ceremony.
@@ -306,7 +306,7 @@ func runInitAddParticipant(cmd *cobra.Command, _ []string) error {
 		NewThreshold:         newThreshold,
 	}
 
-	return executeAddParticipantSequence(cmd.Context(), cfg, input, stateDir, "")
+	return executeAddParticipantSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
 }
 
 // initKeyRotationCmd initialises a key rotation ceremony.
@@ -387,7 +387,7 @@ func runInitKeyRotation(cmd *cobra.Command, _ []string) error {
 		NewThreshold:               newThreshold,
 	}
 
-	return executeKeyRotationSequence(cmd.Context(), cfg, input, stateDir, "")
+	return executeKeyRotationSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
 }
 
 // splitParticipants splits a comma-separated participant string, trimming
@@ -513,7 +513,7 @@ func runInitContractDeploy(cmd *cobra.Command, _ []string) error {
 		ContractArgs:         contractArgs,
 	}
 
-	return executeContractDeploySequence(cmd.Context(), cfg, input, stateDir, "")
+	return executeContractDeploySequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
 }
 
 // readFileBytes reads a file and returns its contents as a byte slice.

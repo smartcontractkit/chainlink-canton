@@ -38,7 +38,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
-	"github.com/chainlink/canton-party-ceremony/ceremony"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -64,11 +67,14 @@ var AddParticipantSequence = operations.NewSequence(
 	"Async decentralized party add-participant (key-gen → NSD → read state → propose DNS update → sign → submit → P2P update)",
 	func(b operations.Bundle, deps ceremony.CantonDeps, in AddParticipantInput) (AddParticipantOutput, error) {
 		ctx := b.GetContext()
+		out := AddParticipantOutput{
+			State: CeremonyState{Phase: PhaseKeyGen},
+		}
 
 		// Validate party ID format up front.
 		parts := strings.SplitN(in.DecentralizedPartyID, "::", 2)
 		if len(parts) != 2 || parts[1] == "" {
-			return AddParticipantOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf("invalid decentralized_party_id %q: expected format <prefix>::<namespace>",
 					in.DecentralizedPartyID),
 			)
@@ -76,7 +82,7 @@ var AddParticipantSequence = operations.NewSequence(
 		decNS := parts[1]
 
 		// ── Step 1: New participant generates keys ───────────────────────────
-		keyReport, err := operations.ExecuteOperation(b, GenerateNewMemberKeyOp, deps, GenerateNewMemberKeyInput{
+		keyReport, err := operations.ExecuteOperation(b, keys.CreateMemberKeyOp, deps, keys.CreateMemberKeyInput{
 			NamespaceName: in.NamespaceName,
 			ParticipantID: in.NewParticipantID,
 		})
@@ -84,13 +90,15 @@ var AddParticipantSequence = operations.NewSequence(
 			deps.Logger.Infow("New member key generation pending",
 				"new_participant", in.NewParticipantID, "err", err)
 
-			return AddParticipantOutput{}, fmt.Errorf("%w: new participant has not generated keys yet",
+			return out, fmt.Errorf("%w: new participant has not generated keys yet",
 				ErrThresholdNotMet)
 		}
 		newMember := keyReport.Output
+		out.State.NewMemberKeyReady = true
 
 		// ── Step 2: New participant publishes NSD ────────────────────────────
-		_, err = operations.ExecuteOperation(b, ProposeNewNSDOp, deps, ProposeNewNSDInput{
+		out.State.Phase = PhaseNSD
+		_, err = operations.ExecuteOperation(b, topology.ProposeNamespaceDelegationOp, deps, topology.ProposeNSDInput{
 			ParticipantID:  in.NewParticipantID,
 			SigningKeyB64:  newMember.SigningKeyB64,
 			Namespace:      newMember.NamespaceFingerprint,
@@ -100,9 +108,10 @@ var AddParticipantSequence = operations.NewSequence(
 			deps.Logger.Infow("NSD proposal pending",
 				"new_participant", in.NewParticipantID, "err", err)
 
-			return AddParticipantOutput{}, fmt.Errorf("%w: new participant has not proposed NSD yet",
+			return out, fmt.Errorf("%w: new participant has not proposed NSD yet",
 				ErrThresholdNotMet)
 		}
+		out.State.NSDProposed = true
 
 		// Poll until NSD is visible on the synchronizer.
 		err = retry.Do(
@@ -123,48 +132,45 @@ var AddParticipantSequence = operations.NewSequence(
 			retry.Delay(500*time.Millisecond),
 		)
 		if err != nil {
-			return AddParticipantOutput{}, fmt.Errorf("waiting for new participant NSD: %w", err)
+			return out, fmt.Errorf("waiting for new participant NSD: %w", err)
 		}
 
 		deps.Logger.Infow("New participant NSD confirmed",
 			"namespace", newMember.NamespaceFingerprint)
 
 		// ── Step 3: Read current topology state ──────────────────────────────
-		stateReport, err := operations.ExecuteOperation(b, ReadCurrentStateOp, deps, ReadCurrentStateInput{
+		out.State.Phase = PhaseReadState
+		stateReport, err := operations.ExecuteOperation(b, topology.ReadCurrentStateOp, deps, topology.ReadCurrentStateInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			SynchronizerID:       in.SynchronizerID,
 		})
 		if err != nil {
-			return AddParticipantOutput{}, fmt.Errorf("read-current-state: %w", err)
+			return out, fmt.Errorf("read-current-state: %w", err)
 		}
 		currentState := stateReport.Output
 
 		// ── Sequence-level validation ────────────────────────────────────────
-		// Verify the new participant is NOT already in DNS owners.
 		if slices.Contains(currentState.DNSOwners, newMember.NamespaceFingerprint) {
-			return AddParticipantOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf("new participant namespace fingerprint %q already exists in DNS owners %v",
 					newMember.NamespaceFingerprint, currentState.DNSOwners),
 			)
 		}
 
-		// Verify the new participant is NOT already in P2P.
 		if slices.Contains(currentState.P2PParticipantUIDs, in.NewParticipantID) {
-			return AddParticipantOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf("new participant %q already exists in P2P mapping %v",
 					in.NewParticipantID, currentState.P2PParticipantUIDs),
 			)
 		}
 
-		// Compute post-add threshold: keep current unless overridden.
 		newThreshold := in.NewThreshold
 		if newThreshold <= 0 {
 			newThreshold = int(currentState.DNSThreshold)
 		}
 
-		// Verify existing participants can reach the current DNS threshold.
 		if len(currentState.P2PParticipantUIDs) < int(currentState.DNSThreshold) {
-			return AddParticipantOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf(
 					"add is impossible: %d existing participants cannot reach current DNS threshold of %d",
 					len(currentState.P2PParticipantUIDs), currentState.DNSThreshold,
@@ -172,8 +178,11 @@ var AddParticipantSequence = operations.NewSequence(
 			)
 		}
 
+		out.State.DNSThreshold = int(currentState.DNSThreshold)
+
 		// ── Step 4: Create add DNS proposal ──────────────────────────────────
-		proposalReport, err := operations.ExecuteOperation(b, CreateAddDNSProposalOp, deps, CreateAddDNSProposalInput{
+		out.State.Phase = PhaseDNSProposal
+		proposalReport, err := operations.ExecuteOperation(b, topology.CreateAddDNSProposalOp, deps, topology.CreateAddDNSProposalInput{
 			DecentralizedNamespace:  decNS,
 			CurrentOwners:           currentState.DNSOwners,
 			NewOwnerFingerprint:     newMember.NamespaceFingerprint,
@@ -183,15 +192,18 @@ var AddParticipantSequence = operations.NewSequence(
 			SynchronizerID:          in.SynchronizerID,
 		})
 		if err != nil {
-			return AddParticipantOutput{}, fmt.Errorf("create-add-dns-proposal: %w", err)
+			return out, fmt.Errorf("create-add-dns-proposal: %w", err)
 		}
 		proposal := proposalReport.Output
+		out.State.ProposalHash = proposal.ProposalHashSHA256
+		out.State.RequiredSigners = proposal.RequiredSigners
+		out.State.AllOwners = proposal.NewOwners
 
 		// ── Step 5: Collect DNS signatures from existing participants ─────────
+		out.State.Phase = PhaseDNSSigning
 		var allSignedTxsB64 []string
-		var dnsSigCount int
 		for _, signerUID := range proposal.RequiredSigners {
-			sigReport, sigErr := operations.ExecuteOperation(b, SignAddDNSProposalOp, deps, SignAddDNSProposalInput{
+			sigReport, sigErr := operations.ExecuteOperation(b, topology.SignDNSProposalOp, deps, topology.SignDNSProposalInput{
 				ParticipantID:      signerUID,
 				ProposalHashSHA256: proposal.ProposalHashSHA256,
 				DNSTxB64:           proposal.DNSTxB64,
@@ -199,38 +211,39 @@ var AddParticipantSequence = operations.NewSequence(
 			})
 			if sigErr != nil {
 				deps.Logger.Infow("DNS add signature pending", "signer", signerUID, "err", sigErr)
+				out.State.PendingSigners = append(out.State.PendingSigners, signerUID)
+
 				continue
 			}
 			allSignedTxsB64 = append(allSignedTxsB64, sigReport.Output.SignedDNSTxB64)
-			dnsSigCount++
+			out.State.CollectedSigners = append(out.State.CollectedSigners, signerUID)
 		}
 
 		deps.Logger.Infow("Collected add DNS signatures",
-			"collected", dnsSigCount, "required", currentState.DNSThreshold,
+			"collected", len(out.State.CollectedSigners), "required", currentState.DNSThreshold,
 		)
 
-		// Gate: Canton requires currentThreshold signatures for serial > 1.
-		if dnsSigCount < int(currentState.DNSThreshold) {
-			return AddParticipantOutput{}, fmt.Errorf("%w: %d/%d DNS signatures collected",
-				ErrThresholdNotMet, dnsSigCount, currentState.DNSThreshold,
+		if len(out.State.CollectedSigners) < int(currentState.DNSThreshold) {
+			return out, fmt.Errorf("%w: %d/%d DNS signatures collected",
+				ErrThresholdNotMet, len(out.State.CollectedSigners), currentState.DNSThreshold,
 			)
 		}
 
 		// ── Step 6: Submit the add DNS update ─────────────────────────────────
+		out.State.Phase = PhaseDNSSubmit
 		_, err = operations.ExecuteOperation(
-			b, SubmitAddDNSOp, deps,
-			SubmitAddDNSInput{
+			b, topology.SubmitDNSOp, deps,
+			topology.SubmitDNSInput{
 				SignedDNSTxsB64: allSignedTxsB64,
 				SynchronizerID:  in.SynchronizerID,
 				FilterNamespace: decNS,
 			},
-			operations.WithRetry[SubmitAddDNSInput, ceremony.CantonDeps](),
+			operations.WithRetry[topology.SubmitDNSInput, ceremony.CantonDeps](),
 		)
 		if err != nil {
-			return AddParticipantOutput{}, fmt.Errorf("submit-add-dns: %w", err)
+			return out, fmt.Errorf("submit-add-dns: %w", err)
 		}
 
-		// Poll until the updated DNS is visible (owner count increased).
 		expectedOwnerCount := len(currentState.DNSOwners) + 1
 		err = retry.Do(
 			func() error {
@@ -252,22 +265,17 @@ var AddParticipantSequence = operations.NewSequence(
 			retry.Delay(500*time.Millisecond),
 		)
 		if err != nil {
-			return AddParticipantOutput{}, fmt.Errorf("waiting for add DNS confirmation: %w", err)
+			return out, fmt.Errorf("waiting for add DNS confirmation: %w", err)
 		}
 
 		// ── Step 7: P2P proposals from existing participants + new participant consent ──
-		// Existing members propose the updated P2P mapping for namespace authority
-		// (Canton requires threshold-of-current-owners signatures).
-		// The new participant must ALSO call Authorize to consent to hosting the party
-		// on their node — Canton requires participant consent independently of the
-		// namespace threshold, same as in the onboarding ceremony.
+		out.State.Phase = PhaseP2P
+		out.State.P2PExistingRequired = int(currentState.DNSThreshold)
 
-		// Build full participant UID list (existing + new).
 		allParticipantUIDs := append(append([]string{}, currentState.P2PParticipantUIDs...), newMember.ParticipantUID)
 
-		var existingProposedCount int
 		for _, uid := range currentState.P2PParticipantUIDs {
-			_, p2pErr := operations.ExecuteOperation(b, ProposeAddP2POp, deps, ProposeAddP2PInput{
+			_, p2pErr := operations.ExecuteOperation(b, topology.ProposeAddP2POp, deps, topology.ProposeAddP2PInput{
 				ParticipantID:      uid,
 				PartyID:            in.DecentralizedPartyID,
 				AllParticipantUIDs: allParticipantUIDs,
@@ -279,11 +287,10 @@ var AddParticipantSequence = operations.NewSequence(
 				deps.Logger.Infow("P2P add proposal pending", "participant", uid, "err", p2pErr)
 				continue
 			}
-			existingProposedCount++
+			out.State.P2PExistingProposed++
 		}
 
-		// New participant must consent to hosting by proposing the same P2P mapping.
-		_, newConsentErr := operations.ExecuteOperation(b, ProposeAddP2POp, deps, ProposeAddP2PInput{
+		_, newConsentErr := operations.ExecuteOperation(b, topology.ProposeAddP2POp, deps, topology.ProposeAddP2PInput{
 			ParticipantID:      in.NewParticipantID,
 			PartyID:            in.DecentralizedPartyID,
 			AllParticipantUIDs: allParticipantUIDs,
@@ -291,25 +298,25 @@ var AddParticipantSequence = operations.NewSequence(
 			CurrentP2PSerial:   int(currentState.P2PSerial),
 			SynchronizerID:     in.SynchronizerID,
 		})
-		newParticipantProposed := newConsentErr == nil
+		out.State.NewParticipantConsented = newConsentErr == nil
 		if newConsentErr != nil {
 			deps.Logger.Infow("New participant P2P consent pending",
 				"participant", in.NewParticipantID, "err", newConsentErr)
 		}
 
 		deps.Logger.Infow("Collected add P2P proposals",
-			"existing", existingProposedCount, "existing_required", currentState.DNSThreshold,
-			"new_participant_proposed", newParticipantProposed,
+			"existing", out.State.P2PExistingProposed, "existing_required", currentState.DNSThreshold,
+			"new_participant_proposed", out.State.NewParticipantConsented,
 		)
 
-		if existingProposedCount < int(currentState.DNSThreshold) {
-			return AddParticipantOutput{}, fmt.Errorf("%w: %d/%d P2P proposals collected from existing participants",
-				ErrThresholdNotMet, existingProposedCount, currentState.DNSThreshold,
+		if out.State.P2PExistingProposed < int(currentState.DNSThreshold) {
+			return out, fmt.Errorf("%w: %d/%d P2P proposals collected from existing participants",
+				ErrThresholdNotMet, out.State.P2PExistingProposed, currentState.DNSThreshold,
 			)
 		}
 
-		if !newParticipantProposed {
-			return AddParticipantOutput{}, fmt.Errorf("%w: new participant has not yet consented to P2P hosting",
+		if !out.State.NewParticipantConsented {
+			return out, fmt.Errorf("%w: new participant has not yet consented to P2P hosting",
 				ErrThresholdNotMet)
 		}
 
@@ -340,14 +347,16 @@ var AddParticipantSequence = operations.NewSequence(
 			retry.Delay(1*time.Second),
 		)
 		if err != nil {
-			return AddParticipantOutput{}, fmt.Errorf("waiting for add P2P confirmation: %w", err)
+			return out, fmt.Errorf("waiting for add P2P confirmation: %w", err)
 		}
 
-		return AddParticipantOutput{
-			DNSUpdated:   true,
-			P2PUpdated:   true,
-			NewThreshold: newThreshold,
-			AllOwners:    proposal.NewOwners,
-		}, nil
+		out.State.Phase = PhaseCompleted
+		out.State.PendingSigners = nil
+		out.DNSUpdated = true
+		out.P2PUpdated = true
+		out.NewThreshold = newThreshold
+		out.AllOwners = proposal.NewOwners
+
+		return out, nil
 	},
 )

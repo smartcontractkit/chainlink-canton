@@ -1,12 +1,11 @@
 package contractdeploy
 
+import "github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
+
 // PackageRef identifies a DAML package by its registered name and version.
 // The name corresponds to a [contracts.Package] constant (e.g. "mcms") and the
 // version to a registered version string (e.g. "current" or "0.0.1").
-type PackageRef struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-}
+type PackageRef = ledger.PackageRef
 
 // ContractDeployInput is the top-level input to [ContractDeploySequence].
 type ContractDeployInput struct {
@@ -32,20 +31,42 @@ type ContractDeployInput struct {
 	ContractArgs string `json:"contract_args"`
 }
 
-// ContractDeployOutput is the final result of a completed [ContractDeploySequence].
-type ContractDeployOutput struct {
-	// PackageIDs contains the main package IDs of the uploaded DARs.
-	PackageIDs []string `json:"package_ids"`
+// Phase represents the current execution phase of the contract deploy ceremony.
+type Phase string
 
-	// PreparedTransactionHash is the hex-encoded hash from PrepareSubmission.
-	// Empty until the preparation step completes.
-	PreparedTransactionHash string `json:"prepared_transaction_hash"`
+const (
+	PhaseVerifyParty    Phase = "verify-party"
+	PhaseFetchMembers   Phase = "fetch-members"
+	PhaseDARUpload      Phase = "dar-upload"
+	PhasePrepare        Phase = "prepare"
+	PhaseSigning        Phase = "signing"
+	PhaseExecute        Phase = "execute"
+	PhaseVerifyContract Phase = "verify-contract"
+	PhaseCompleted      Phase = "completed"
+)
 
-	// ContractID is the created contract's ID. Empty until signing is implemented.
-	ContractID string `json:"contract_id"`
+// CeremonyState is the live snapshot embedded in every ContractDeployOutput.
+// It is built progressively as the sequence advances, so it is always present
+// — even when the sequence returns an error (e.g. ErrThresholdNotMet).
+type CeremonyState struct {
+	Phase          Phase    `json:"phase"`
+	Participants   []string `json:"participants,omitempty"`
+	DARsUploaded   []string `json:"dars_uploaded"`
+	DARsRequired   int      `json:"dars_required"`
+	Signed         []string `json:"signed"`
+	SignRequired   int      `json:"sign_required"`
+	PreparedTxHash string   `json:"prepared_tx_hash,omitempty"`
 }
 
-// ── Per-operation I/O types ──────────────────────────────────────────────────
+// ContractDeployOutput is the final result of a completed [ContractDeploySequence].
+// State is always populated — even when ExecuteSequence returns an error —
+// making it the primary way to inspect ceremony progress.
+type ContractDeployOutput struct {
+	PackageIDs              []string      `json:"package_ids"`
+	PreparedTransactionHash string        `json:"prepared_transaction_hash"`
+	ContractID              string        `json:"contract_id"`
+	State                   CeremonyState `json:"state"`
+}
 
 // FetchParticipantsInput is the input to [FetchParticipantsOp].
 type FetchParticipantsInput struct {

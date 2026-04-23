@@ -10,6 +10,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 )
 
 type InitMemberInput struct {
@@ -193,6 +195,16 @@ var SignProposalOp = operations.NewOperation(
 		}
 		if in.ParticipantID != clientID {
 			return SignProposalOutput{}, errors.New("sign-proposal: participant ID does not match client identity")
+		}
+
+		if deps.Confirmer != nil {
+			detail := ceremony.DAMLSignDetail{
+				TransactionHash: in.ProposalHashSHA256,
+				SignerIdentity:  in.ParticipantID,
+			}
+			if cErr := deps.Confirmer.ConfirmDAMLSign(b.GetContext(), detail); cErr != nil {
+				return SignProposalOutput{}, operations.NewUnrecoverableError(cErr)
+			}
 		}
 
 		sig, err := deps.Client.SignTransactions(SignTransactionsRequest{

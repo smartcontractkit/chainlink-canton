@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
@@ -31,8 +30,11 @@ type GenerateEDSConfigInput struct {
 }
 
 type GenerateEDSConfigOutput struct {
-	NodeConfig edsConfig.NodeConfig
-	Contracts  edsConfig.Contracts
+	NodeConfig         edsConfig.NodeConfig
+	CCIPAPIConfig      edsConfig.CCIPAPIConfig
+	CCVAPIConfig       edsConfig.CCVAPIConfig
+	ExecutorAPIConfig  edsConfig.ExecutorAPIConfig
+	TokenPoolAPIConfig edsConfig.TokenPoolAPIConfig
 }
 
 type BuildConfigDeps struct {
@@ -89,6 +91,34 @@ var BuildConfig = operations.NewOperation(
 			return GenerateEDSConfigOutput{}, fmt.Errorf("failed to get Executor address: %w", err)
 		}
 
+		// Node Config
+		var nodeConfig edsConfig.NodeConfig
+		var validatorAPIEndpoint string
+		if participant.InternalEndpoints == nil {
+			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
+			nodeConfig = edsConfig.NodeConfig{
+				URL: participant.Endpoints.GRPCLedgerAPIURL,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   commonconfig.AuthTypeInsecureStatic,
+					UserID: participant.UserID,
+					JWT:    jwt.AccessToken,
+				},
+				MaxRetries: 0,
+			}
+			validatorAPIEndpoint = participant.Endpoints.ValidatorAPIURL
+		} else {
+			nodeConfig = edsConfig.NodeConfig{
+				URL: participant.InternalEndpoints.GRPCLedgerAPIURL,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   commonconfig.AuthTypeInsecureStatic,
+					UserID: participant.UserID,
+					JWT:    jwt.AccessToken,
+				},
+				MaxRetries: 0,
+			}
+			validatorAPIEndpoint = participant.InternalEndpoints.ValidatorAPIURL
+		}
+
 		// CCVs
 		refs := env.DataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
@@ -97,11 +127,13 @@ var BuildConfig = operations.NewOperation(
 		if len(refs) == 0 {
 			return GenerateEDSConfigOutput{}, fmt.Errorf("no CommitteeVerifier contracts found in datastore")
 		}
-		ccvs := make([]edsConfig.ContractIdentifier, len(refs))
+		ccvs := make([]edsConfig.CCV, len(refs))
 		for i, ref := range refs {
-			ccvs[i] = edsConfig.ContractIdentifier{
-				PartyID:         participant.PartyID,
-				InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+			ccvs[i] = edsConfig.CCV{
+				ContractIdentifier: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+				},
 			}
 		}
 
@@ -118,102 +150,25 @@ var BuildConfig = operations.NewOperation(
 			filteredRefs = append(filteredRefs, ref)
 		}
 		refs = filteredRefs
-		inboundRLRefs := env.DataStore.Addresses().Filter(
-			datastore.AddressRefByChainSelector(input.ChainSelector),
-			datastore.AddressRefByType(datastore.ContractType(rate_limiter.ContractTypeInbound)),
-		)
-		outboundRLRefs := env.DataStore.Addresses().Filter(
-			datastore.AddressRefByChainSelector(input.ChainSelector),
-			datastore.AddressRefByType(datastore.ContractType(rate_limiter.ContractTypeOutbound)),
-		)
-		tokenPools := make([]edsConfig.TokenPoolContracts, 0, len(refs))
+		tokenPools := make([]edsConfig.TokenPool, 0, len(refs))
 		for _, ref := range refs {
-			inboundPrefix := ref.Address + "-inbound-"
-			customPrefix := ref.Address + "-inbound-custom-"
-			outboundPrefix := ref.Address + "-outbound-"
-			foundRemote := false
-
-			for _, inboundRLRef := range inboundRLRefs {
-				if strings.HasPrefix(inboundRLRef.Qualifier, customPrefix) || !strings.HasPrefix(inboundRLRef.Qualifier, inboundPrefix) {
-					continue
-				}
-
-				foundRemote = true
-				remoteSelector := strings.TrimPrefix(inboundRLRef.Qualifier, inboundPrefix)
-
-				var customRLRef, outboundRLRef *datastore.AddressRef
-				for i := range inboundRLRefs {
-					if inboundRLRefs[i].Qualifier == customPrefix+remoteSelector {
-						customRLRef = &inboundRLRefs[i]
-						break
-					}
-				}
-
-				for i := range outboundRLRefs {
-					if outboundRLRefs[i].Qualifier == outboundPrefix+remoteSelector {
-						outboundRLRef = &outboundRLRefs[i]
-						break
-					}
-				}
-				if customRLRef == nil {
-					return GenerateEDSConfigOutput{}, fmt.Errorf("missing custom inbound rate limiter ref for token pool %s remote %s", ref.Address, remoteSelector)
-				}
-				if outboundRLRef == nil {
-					return GenerateEDSConfigOutput{}, fmt.Errorf("missing outbound rate limiter ref for token pool %s remote %s", ref.Address, remoteSelector)
-				}
-
-				tokenPools = append(tokenPools, edsConfig.TokenPoolContracts{
-					TokenPool: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
-					},
-					InboundRateLimiter: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(inboundRLRef.Address),
-					},
-					InboundCustomBlockConfirmationsRateLimiter: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(customRLRef.Address),
-					},
-					OutboundRateLimiter: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(outboundRLRef.Address),
-					},
-				})
-			}
-
-			if !foundRemote {
-				return GenerateEDSConfigOutput{}, fmt.Errorf("no rate limiter refs found for token pool %s", ref.Address)
-			}
-		}
-
-		var nodeConfig edsConfig.NodeConfig
-		if participant.InternalEndpoints == nil {
-			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
-			nodeConfig = edsConfig.NodeConfig{
-				URL: participant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
-					UserID: participant.UserID,
-					JWT:    jwt.AccessToken,
+			tokenPools = append(tokenPools, edsConfig.TokenPool{
+				ContractIdentifier: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
 				},
-				MaxRetries: 0,
-			}
-		} else {
-			nodeConfig = edsConfig.NodeConfig{
-				URL: participant.InternalEndpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
-					UserID: participant.UserID,
-					JWT:    jwt.AccessToken,
-				},
-				MaxRetries: 0,
-			}
+				Type:      edsConfig.TokenPoolTypeLockRelease,
+				PoolOwner: participant.PartyID,
+				// TODO This only works while we're using Nativ/Amulet for Token testing
+				TokenStandardURL:        new(fmt.Sprintf("%s/v0/scan-proxy", validatorAPIEndpoint)),
+				TokenStandardAuthConfig: &nodeConfig.AuthConfig,
+			})
 		}
 
 		return GenerateEDSConfigOutput{
 			NodeConfig: nodeConfig,
-			Contracts: edsConfig.Contracts{
+			CCIPAPIConfig: edsConfig.CCIPAPIConfig{
+				Enabled: true,
 				PerPartyRouterFactory: edsConfig.ContractIdentifier{
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
@@ -242,13 +197,25 @@ var BuildConfig = operations.NewOperation(
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
-				DefaultExecutor: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
+			},
+			CCVAPIConfig: edsConfig.CCVAPIConfig{
+				Enabled: len(ccvs) > 0,
+				CCVs:    ccvs,
+			},
+			ExecutorAPIConfig: edsConfig.ExecutorAPIConfig{
+				Enabled: true,
+				Executors: []edsConfig.Executor{
+					{
+						ContractIdentifier: edsConfig.ContractIdentifier{
+							PartyID:         participant.PartyID,
+							InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
+						},
+					},
 				},
-				CCVs:               ccvs,
-				TokenPoolContracts: tokenPools,
-				PoolOwner:          participant.PartyID,
+			},
+			TokenPoolAPIConfig: edsConfig.TokenPoolAPIConfig{
+				Enabled:    len(tokenPools) > 0,
+				TokenPools: tokenPools,
 			},
 		}, nil
 	},

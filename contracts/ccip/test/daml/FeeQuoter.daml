@@ -427,8 +427,8 @@ testFeeQuoter_ApplyPriceUpdatersUpdate = script do
             linkTokenInstrumentId = instrumentIdLINK
             priceUpdaters = []
 
-    -- try updating prices as the owner, without being a price updater, should fail
-    submitMustFail owner do
+    -- owner can update prices directly without being in priceUpdaters
+    fq <- submit owner do
         exerciseCmd fq UpdatePrices with
             priceUpdates = PriceUpdates with
                 tokenPriceUpdates = []

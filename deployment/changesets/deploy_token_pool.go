@@ -3,7 +3,6 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -14,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	lock_release_token_pool "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -72,8 +71,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 	transferTimeout := cfg.TransferTimeout
 	if transferTimeout.RelativeHours == nil && transferTimeout.Indefinite == nil {
-		h := types.INT64(24)
-		transferTimeout = lockreleasetokenpool.TransferTimeout{RelativeHours: &h}
+		transferTimeout = lockreleasetokenpool.TransferTimeout{RelativeHours: new(types.INT64(24))}
 	}
 	remoteChainConfigs := cfg.RemoteChainConfigs
 	if remoteChainConfigs == nil {
@@ -83,7 +81,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	if tokenTransferFeeConfigs == nil {
 		tokenTransferFeeConfigs = map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{}
 	}
-	qualifier := ptr.String(cfg.Qualifier)
+	qualifier := new(cfg.Qualifier)
 	if cfg.Qualifier == "" {
 		qualifier = nil
 	}

@@ -17,7 +17,7 @@ paths:
           name: address
           required: true
           schema:
-            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+            type: string
           description: |
             The address of the CCV instance to forward the message to.
             Can be either a RawInstanceAddress or an InstanceAddress.
@@ -53,7 +53,7 @@ paths:
           name: address
           required: true
           schema:
-            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+            type: string
           description: |
             The address of the CCV instance that should verify this message.
             Can be either a RawInstanceAddress or an InstanceAddress.
@@ -88,12 +88,18 @@ components:
     CCVSendRequest:
       type: object
       required:
+        - message
       properties:
         message:
           $ref: "../common/eds-common.yaml#/components/schemas/Message"
     CCVSendResponse:
       type: object
       required:
+        - contractId
+        - instanceAddress
+        - rawInstanceAddress
+        - contextData
+        - disclosedContracts
       properties:
         contractId:
           $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
@@ -112,6 +118,7 @@ components:
     CCVExecuteRequest:
       type: object
       required:
+        - encodedMessage
       properties:
         encodedMessage:
           type: string
@@ -119,6 +126,11 @@ components:
     CCVExecuteResponse:
       type: object
       required:
+        - contractId
+        - instanceAddress
+        - rawInstanceAddress
+        - contextData
+        - disclosedContracts
       properties:
         contractId:
           $ref: "../common/eds-common.yaml#/components/schemas/ContractId"

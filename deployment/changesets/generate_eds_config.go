@@ -49,8 +49,11 @@ func (c GenerateEDSConfig) Apply(e cldf.Environment, config CantonCSDeps[edsConf
 		}
 	}
 
-	config.Config.Contracts = out.Output.Contracts
 	config.Config.Node = out.Output.NodeConfig
+	config.Config.CCIPAPIConfig = out.Output.CCIPAPIConfig
+	config.Config.CCVAPIConfig = out.Output.CCVAPIConfig
+	config.Config.ExecutorAPIConfig = out.Output.ExecutorAPIConfig
+	config.Config.TokenPoolAPIConfig = out.Output.TokenPoolAPIConfig
 
 	if err := deployment.SaveEDSConfig(ds, &config.Config); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save EDS config: %w", err)

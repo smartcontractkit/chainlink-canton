@@ -6,16 +6,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
-	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
-	"github.com/chainlink/canton-party-ceremony/ceremony/example"
-	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
-	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
-	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // executeSequence is the shared execution kernel used by both init and resume.
@@ -33,6 +35,7 @@ func executeExampleOnboardingSequence(
 	input example.OnboardingInput,
 	stateDir string,
 	workflowId string,
+	confirmer ceremony.Confirmer,
 ) error {
 	lggr, err := newCLILogger()
 	if err != nil {
@@ -62,7 +65,7 @@ func executeExampleOnboardingSequence(
 	// NewMockCantonClientFromConfig is the injection point: swap this for a real
 	// gRPC client once the Canton admin API integration is ready.
 	client := example.NewMockCantonClientFromConfig(cfg)
-	deps := example.CantonDeps{Client: client, Logger: lggr}
+	deps := example.CantonDeps{Client: client, Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running onboarding sequence",
 		"ceremony", input.NamespaceName,
@@ -125,6 +128,7 @@ func executeOnboardingSequence(
 	input onboarding.OnboardingInput,
 	stateDir string,
 	workflowId string,
+	confirmer ceremony.Confirmer,
 ) error {
 	lggr, err := newCLILogger()
 	if err != nil {
@@ -155,7 +159,7 @@ func executeOnboardingSequence(
 	defer conn.Close()
 
 	grpcClient := client.NewGRPCClient(conn)
-	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr}
+	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running onboarding sequence (real)",
 		"ceremony", input.NamespaceName,
@@ -213,6 +217,7 @@ func executeKickSequence(
 	input kick.KickInput,
 	stateDir string,
 	workflowId string,
+	confirmer ceremony.Confirmer,
 ) error {
 	lggr, err := newCLILogger()
 	if err != nil {
@@ -242,7 +247,7 @@ func executeKickSequence(
 	defer conn.Close()
 
 	grpcClient := client.NewGRPCClient(conn)
-	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr}
+	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running kick sequence",
 		"party", input.DecentralizedPartyID,
@@ -297,6 +302,7 @@ func executeContractDeploySequence(
 	input contractdeploy.ContractDeployInput,
 	stateDir string,
 	workflowId string,
+	confirmer ceremony.Confirmer,
 ) error {
 	lggr, err := newCLILogger()
 	if err != nil {
@@ -333,13 +339,15 @@ func executeContractDeploySequence(
 	}
 	defer ledgerConn.Close()
 
-	deps := contractdeploy.ContractDeployDeps{
+	deps := ledger.ContractDeployDeps{
 		AdminClient:  client.NewGRPCClient(adminConn),
 		LedgerClient: client.NewGRPCLedgerClient(ledgerConn),
 		// DARLoader reads DAR bytes by package name and version.
 		// Callers that embed the contracts FS can swap this for contracts.GetDar.
-		DARLoader: contractdeploy.FileDARLoader("dars"),
+		DARLoader: ledger.FileDARLoader("dars"),
 		Logger:    lggr,
+		Confirmer: confirmer,
+		UserID:    cfg.UserID,
 	}
 
 	lggr.Infow("Running contract-deploy sequence",
@@ -395,6 +403,7 @@ func executeAddParticipantSequence(
 	input addparticipant.AddParticipantInput,
 	stateDir string,
 	workflowId string,
+	confirmer ceremony.Confirmer,
 ) error {
 	lggr, err := newCLILogger()
 	if err != nil {
@@ -424,7 +433,7 @@ func executeAddParticipantSequence(
 	defer conn.Close()
 
 	grpcClient := client.NewGRPCClient(conn)
-	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr}
+	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running add-participant sequence",
 		"party", input.DecentralizedPartyID,
@@ -477,6 +486,7 @@ func executeKeyRotationSequence(
 	input keyrotation.KeyRotationInput,
 	stateDir string,
 	workflowId string,
+	confirmer ceremony.Confirmer,
 ) error {
 	lggr, err := newCLILogger()
 	if err != nil {
@@ -506,7 +516,7 @@ func executeKeyRotationSequence(
 	defer conn.Close()
 
 	grpcClient := client.NewGRPCClient(conn)
-	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr}
+	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running key-rotation sequence",
 		"party", input.DecentralizedPartyID,

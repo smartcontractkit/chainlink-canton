@@ -14,7 +14,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
@@ -126,11 +126,9 @@ func ExtractChoiceContextValues(choiceContext *apiv2.Value) types.TEXTMAP {
 		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
 			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
 				if v := entry.GetValue().GetVariant(); v != nil {
-					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
-					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(v.GetValue().GetContractId()))}
 				} else if entry.GetValue().GetText() != "" {
-					txt := types.TEXT(entry.GetValue().GetText())
-					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: new(types.TEXT(entry.GetValue().GetText()))}
 				}
 			}
 		}
@@ -160,7 +158,7 @@ func GetRegistryAdmin(ctx context.Context, metadataClient tokenMetadataV1.Client
 	return registryInfoResponse.JSON200.AdminId, nil
 }
 
-func GetTransferFactory(ctx context.Context, transferInstructionClient transferInstructionV1.ClientWithResponsesInterface, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, *apiv2.Value, error) {
+func GetTransferFactory(ctx context.Context, transferInstructionClient transferInstructionV1.ClientWithResponsesInterface, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, map[string]any, error) {
 	transferFactoryResponse, err := transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
 			"expectedAdmin": registryAdmin,
@@ -215,12 +213,8 @@ func GetTransferFactory(ctx context.Context, transferInstructionClient transferI
 			SynchronizerId:   contract.SynchronizerId,
 		})
 	}
-	choiceContext, err := ChoiceContextFromData(transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to convert choice context: %w", err)
-	}
 
-	return transferFactoryResponse.JSON200.FactoryId, disclosedContracts, choiceContext, nil
+	return transferFactoryResponse.JSON200.FactoryId, disclosedContracts, transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData, nil
 }
 
 func AcceptPendingTransferInstruction(

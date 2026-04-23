@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "a1b83b7b15b82e41824f82b09ae60899e5e702c4b96205e74a860ae4d6093e4e"
+	PackageID   = "9c27fde3dc7b96748debeed08e37e8e3dcc73ae8c6df9cc53f24b4694fcb59f3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -107,12 +107,7 @@ func (t ApplyDestChainConfigUpdates2) ToMap() map[string]any {
 	m["destChainConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.DestChainConfigArgs))
 		for _, e := range t.DestChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -154,12 +149,7 @@ func (t ApplyDestChainConfigUpdatesParams2) ToMap() map[string]any {
 	m["destChainConfigArgs"] = func() []any {
 		res := make([]any, 0, len(t.DestChainConfigArgs))
 		for _, e := range t.DestChainConfigArgs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -363,13 +353,7 @@ func (t DestChainConfigArgs2) ToMap() map[string]any {
 
 	m["destChainSelector"] = t.DestChainSelector
 
-	m["destChainConfig"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DestChainConfig).(mapper); ok {
-			return m.toMap()
-		}
-		return t.DestChainConfig
-	}()
+	m["destChainConfig"] = model.NestedToDAMLValue(t.DestChainConfig)
 
 	return m
 }
@@ -430,13 +414,7 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["feeTokens"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeTokens).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeTokens
-	}()
+	args["feeTokens"] = model.NestedToDAMLValue(t.FeeTokens)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["destChainConfigs"] = func() any {
@@ -471,13 +449,7 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["linkTokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.LinkTokenInstrumentId
-	}()
+	args["linkTokenInstrumentId"] = model.NestedToDAMLValue(t.LinkTokenInstrumentId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -505,13 +477,7 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["feeTokens"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeTokens).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeTokens
-	}()
+	args["feeTokens"] = model.NestedToDAMLValue(t.FeeTokens)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["destChainConfigs"] = func() any {
@@ -546,13 +512,7 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["linkTokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.LinkTokenInstrumentId
-	}()
+	args["linkTokenInstrumentId"] = model.NestedToDAMLValue(t.LinkTokenInstrumentId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -1181,13 +1141,7 @@ type GetTokenPrice struct {
 func (t GetTokenPrice) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.InstrumentId
-	}()
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1247,13 +1201,7 @@ func (t GetTokenTransferFee) ToMap() map[string]any {
 
 	m["destChainSelector"] = t.DestChainSelector
 
-	m["token"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Token).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Token
-	}()
+	m["token"] = model.NestedToDAMLValue(t.Token)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1314,12 +1262,7 @@ func (t PriceUpdates) ToMap() map[string]any {
 	m["tokenPriceUpdates"] = func() []any {
 		res := make([]any, 0, len(t.TokenPriceUpdates))
 		for _, e := range t.TokenPriceUpdates {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -1327,12 +1270,7 @@ func (t PriceUpdates) ToMap() map[string]any {
 	m["gasPriceUpdates"] = func() []any {
 		res := make([]any, 0, len(t.GasPriceUpdates))
 		for _, e := range t.GasPriceUpdates {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -1381,13 +1319,7 @@ func (t QuoteGasForExec) ToMap() map[string]any {
 
 	m["calldataSize"] = int64(t.CalldataSize)
 
-	m["feeToken"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeToken
-	}()
+	m["feeToken"] = model.NestedToDAMLValue(t.FeeToken)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1494,12 +1426,7 @@ func (t RemoveFeeTokens) ToMap() map[string]any {
 	m["feeTokensToRemove"] = func() []any {
 		res := make([]any, 0, len(t.FeeTokensToRemove))
 		for _, e := range t.FeeTokensToRemove {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -1541,12 +1468,7 @@ func (t RemoveFeeTokensParams) ToMap() map[string]any {
 	m["feeTokensToRemove"] = func() []any {
 		res := make([]any, 0, len(t.FeeTokensToRemove))
 		for _, e := range t.FeeTokensToRemove {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -1667,13 +1589,7 @@ type TokenPriceUpdate struct {
 func (t TokenPriceUpdate) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.InstrumentId
-	}()
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	m["usdPerToken"] = t.UsdPerToken
 
@@ -1757,13 +1673,7 @@ type UpdatePrices struct {
 func (t UpdatePrices) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["priceUpdates"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.PriceUpdates).(mapper); ok {
-			return m.toMap()
-		}
-		return t.PriceUpdates
-	}()
+	m["priceUpdates"] = model.NestedToDAMLValue(t.PriceUpdates)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1820,13 +1730,7 @@ type UpdatePricesParams struct {
 func (t UpdatePricesParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["priceUpdates"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.PriceUpdates).(mapper); ok {
-			return m.toMap()
-		}
-		return t.PriceUpdates
-	}()
+	m["priceUpdates"] = model.NestedToDAMLValue(t.PriceUpdates)
 
 	m["caller"] = t.Caller.ToMap()
 

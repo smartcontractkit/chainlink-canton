@@ -36,7 +36,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
-	"github.com/chainlink/canton-party-ceremony/ceremony"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -64,11 +66,17 @@ var KickSequence = operations.NewSequence(
 	"Async decentralized party kick (read state → propose DNS update → sign → submit → P2P update)",
 	func(b operations.Bundle, deps ceremony.CantonDeps, in KickInput) (KickOutput, error) {
 		ctx := b.GetContext()
+		out := KickOutput{
+			State: CeremonyState{
+				Phase:             PhaseReadState,
+				KickedParticipant: in.KickedParticipantID,
+			},
+		}
 
 		// Validate party ID format up front — this is not operation-specific.
 		parts := strings.SplitN(in.DecentralizedPartyID, "::", 2)
 		if len(parts) != 2 || parts[1] == "" {
-			return KickOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf("invalid decentralized_party_id %q: expected format <prefix>::<namespace>",
 					in.DecentralizedPartyID),
 			)
@@ -76,36 +84,31 @@ var KickSequence = operations.NewSequence(
 		decNS := parts[1]
 
 		// ── Step 1: Read current topology state ──────────────────────────────
-		stateReport, err := operations.ExecuteOperation(b, ReadCurrentStateOp, deps, ReadCurrentStateInput{
+		stateReport, err := operations.ExecuteOperation(b, topology.ReadCurrentStateOp, deps, topology.ReadCurrentStateInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			SynchronizerID:       in.SynchronizerID,
 		})
 		if err != nil {
-			return KickOutput{}, fmt.Errorf("read-current-state: %w", err)
+			return out, fmt.Errorf("read-current-state: %w", err)
 		}
 		currentState := stateReport.Output
 
 		// ── Sequence-level validation ─────────────────────────────────────────
-		// Build the new owner list by removing the kicked fingerprint.
 		newOwners := removeOwner(currentState.DNSOwners, in.KickedNamespaceFingerprint)
 		if len(newOwners) == len(currentState.DNSOwners) {
-			return KickOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf("kicked namespace fingerprint %q not found in DNS owners %v",
 					in.KickedNamespaceFingerprint, currentState.DNSOwners),
 			)
 		}
 		if len(newOwners) < 2 {
-			return KickOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf("kick would reduce owners to %d (minimum 2)", len(newOwners)),
 			)
 		}
 
-		// For serial > 1 DNS updates Canton requires currentThreshold-of-current-owners.
-		// The kicked participant CAN still sign (they remain a current DNS owner until
-		// the update is confirmed), so the effective signer pool is
-		// len(RemainingParticipants)+1.
 		if int(currentState.DNSThreshold) > len(in.RemainingParticipants)+1 {
-			return KickOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf(
 					"kick is impossible: DNS signing threshold (%d) exceeds available signers (%d remaining + 1 kicked)",
 					currentState.DNSThreshold, len(in.RemainingParticipants),
@@ -113,26 +116,21 @@ var KickSequence = operations.NewSequence(
 			)
 		}
 
-		// Verify the kicked participant is present in the P2P mapping.
 		kickedInP2P := slices.Contains(currentState.P2PParticipantUIDs, in.KickedParticipantID)
 		if !kickedInP2P {
-			return KickOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf("kicked participant %q not found in P2P mapping participants %v",
 					in.KickedParticipantID, currentState.P2PParticipantUIDs),
 			)
 		}
 
-		// Compute post-kick threshold: strict majority of new owners unless overridden.
 		newThreshold := in.NewThreshold
 		if newThreshold <= 0 {
 			newThreshold = int(currentState.DNSThreshold)
 		}
 
-		// Verify the remaining participants can reach the post-kick P2P threshold.
-		// The kicked participant is excluded from P2P proposals, so only
-		// len(RemainingParticipants) actors are available.
 		if len(in.RemainingParticipants) < newThreshold {
-			return KickOutput{}, operations.NewUnrecoverableError(
+			return out, operations.NewUnrecoverableError(
 				fmt.Errorf(
 					"kick is impossible: %d remaining participants cannot reach P2P threshold of %d",
 					len(in.RemainingParticipants), newThreshold,
@@ -140,8 +138,12 @@ var KickSequence = operations.NewSequence(
 			)
 		}
 
+		out.State.DNSThreshold = int(currentState.DNSThreshold)
+		out.State.RemainingOwners = newOwners
+
 		// ── Step 2: Create kick DNS proposal ─────────────────────────────────
-		proposalReport, err := operations.ExecuteOperation(b, CreateKickDNSProposalOp, deps, CreateKickDNSProposalInput{
+		out.State.Phase = PhaseDNSProposal
+		proposalReport, err := operations.ExecuteOperation(b, topology.CreateKickDNSProposalOp, deps, topology.CreateKickDNSProposalInput{
 			DecentralizedNamespace:     decNS,
 			CurrentOwners:              currentState.DNSOwners,
 			KickedNamespaceFingerprint: in.KickedNamespaceFingerprint,
@@ -152,16 +154,17 @@ var KickSequence = operations.NewSequence(
 			SynchronizerID:             in.SynchronizerID,
 		})
 		if err != nil {
-			return KickOutput{}, fmt.Errorf("create-kick-dns-proposal: %w", err)
+			return out, fmt.Errorf("create-kick-dns-proposal: %w", err)
 		}
 		proposal := proposalReport.Output
+		out.State.ProposalHash = proposal.ProposalHashSHA256
+		out.State.RequiredSigners = proposal.RequiredSigners
 
-		// ── Step 3: Collect DNS signatures from remaining participants ────────
-		// Canton requires threshold-of-current-owners for serial > 1 updates.
+		// ── Step 3: Collect DNS signatures ────────────────────────────────────
+		out.State.Phase = PhaseDNSSigning
 		var allSignedTxsB64 []string
-		var dnsSigCount int
 		for _, signerUID := range proposal.RequiredSigners {
-			sigReport, sigErr := operations.ExecuteOperation(b, SignKickDNSProposalOp, deps, SignKickDNSProposalInput{
+			sigReport, sigErr := operations.ExecuteOperation(b, topology.SignDNSProposalOp, deps, topology.SignDNSProposalInput{
 				ParticipantID:      signerUID,
 				ProposalHashSHA256: proposal.ProposalHashSHA256,
 				DNSTxB64:           proposal.DNSTxB64,
@@ -169,39 +172,39 @@ var KickSequence = operations.NewSequence(
 			})
 			if sigErr != nil {
 				deps.Logger.Infow("DNS kick signature pending", "signer", signerUID, "err", sigErr)
+				out.State.PendingSigners = append(out.State.PendingSigners, signerUID)
+
 				continue
 			}
 			allSignedTxsB64 = append(allSignedTxsB64, sigReport.Output.SignedDNSTxB64)
-			dnsSigCount++
+			out.State.CollectedSigners = append(out.State.CollectedSigners, signerUID)
 		}
 
 		deps.Logger.Infow("Collected kick DNS signatures",
-			"collected", dnsSigCount, "required", currentState.DNSThreshold,
+			"collected", len(out.State.CollectedSigners), "required", currentState.DNSThreshold,
 		)
 
-		// Gate: Canton requires currentThreshold signatures for serial > 1.
-		if dnsSigCount < int(currentState.DNSThreshold) {
-			return KickOutput{}, fmt.Errorf("%w: %d/%d DNS signatures collected",
-				ErrThresholdNotMet, dnsSigCount, currentState.DNSThreshold,
+		if len(out.State.CollectedSigners) < int(currentState.DNSThreshold) {
+			return out, fmt.Errorf("%w: %d/%d DNS signatures collected",
+				ErrThresholdNotMet, len(out.State.CollectedSigners), currentState.DNSThreshold,
 			)
 		}
 
 		// ── Step 4: Submit the kicked DNS update ──────────────────────────────
+		out.State.Phase = PhaseDNSSubmit
 		_, err = operations.ExecuteOperation(
-			b, SubmitKickDNSOp, deps,
-			SubmitKickDNSInput{
+			b, topology.SubmitDNSOp, deps,
+			topology.SubmitDNSInput{
 				SignedDNSTxsB64: allSignedTxsB64,
 				SynchronizerID:  in.SynchronizerID,
 				FilterNamespace: decNS,
 			},
-			operations.WithRetry[SubmitKickDNSInput, ceremony.CantonDeps](),
+			operations.WithRetry[topology.SubmitDNSInput, ceremony.CantonDeps](),
 		)
 		if err != nil {
-			return KickOutput{}, fmt.Errorf("submit-kick-dns: %w", err)
+			return out, fmt.Errorf("submit-kick-dns: %w", err)
 		}
 
-		// Poll until the updated DNS is visible at head state. We verify by
-		// checking that the owner count decreased from the previous value.
 		expectedOwnerCount := len(newOwners)
 		err = retry.Do(
 			func() error {
@@ -223,26 +226,24 @@ var KickSequence = operations.NewSequence(
 			retry.Delay(500*time.Millisecond),
 		)
 		if err != nil {
-			return KickOutput{}, fmt.Errorf("waiting for kick DNS confirmation: %w", err)
+			return out, fmt.Errorf("waiting for kick DNS confirmation: %w", err)
 		}
 
 		// ── Step 5: Each remaining participant proposes the updated P2P mapping ──
-		// Only remaining (non-kicked) participants propose the new P2P mapping.
-		// The kicked participant is intentionally excluded: they must not
-		// contribute to the P2P proposal count, and their node no longer has
-		// authority over the updated decentralized namespace.
+		out.State.Phase = PhaseP2P
+		out.State.P2PRequired = newThreshold
+
 		runnerUID, err := deps.Client.GetParticipantUID(ctx)
 		if err != nil {
-			return KickOutput{}, fmt.Errorf("fetching runner participant UID: %w", err)
+			return out, fmt.Errorf("fetching runner participant UID: %w", err)
 		}
 		if runnerUID == in.KickedParticipantID {
-			return KickOutput{}, fmt.Errorf("%w: kicked participant may not propose P2P update",
+			return out, fmt.Errorf("%w: kicked participant may not propose P2P update",
 				ErrThresholdNotMet)
 		}
 		allP2PProposers := in.RemainingParticipants
-		var p2pProposedCount int
 		for _, uid := range allP2PProposers {
-			_, p2pErr := operations.ExecuteOperation(b, ProposeKickP2POp, deps, ProposeKickP2PInput{
+			_, p2pErr := operations.ExecuteOperation(b, topology.ProposeKickP2POp, deps, topology.ProposeKickP2PInput{
 				ParticipantID:         uid,
 				PartyID:               in.DecentralizedPartyID,
 				RemainingParticipants: in.RemainingParticipants,
@@ -254,16 +255,16 @@ var KickSequence = operations.NewSequence(
 				deps.Logger.Infow("P2P kick proposal pending", "participant", uid, "err", p2pErr)
 				continue
 			}
-			p2pProposedCount++
+			out.State.P2PProposedCount++
 		}
 
 		deps.Logger.Infow("Collected kick P2P proposals",
-			"collected", p2pProposedCount, "required", newThreshold,
+			"collected", out.State.P2PProposedCount, "required", newThreshold,
 		)
 
-		if p2pProposedCount < newThreshold {
-			return KickOutput{}, fmt.Errorf("%w: %d/%d P2P proposals collected",
-				ErrThresholdNotMet, p2pProposedCount, newThreshold,
+		if out.State.P2PProposedCount < newThreshold {
+			return out, fmt.Errorf("%w: %d/%d P2P proposals collected",
+				ErrThresholdNotMet, out.State.P2PProposedCount, newThreshold,
 			)
 		}
 
@@ -289,15 +290,17 @@ var KickSequence = operations.NewSequence(
 			retry.Delay(1*time.Second),
 		)
 		if err != nil {
-			return KickOutput{}, fmt.Errorf("waiting for kick P2P confirmation: %w", err)
+			return out, fmt.Errorf("waiting for kick P2P confirmation: %w", err)
 		}
 
-		return KickOutput{
-			DNSUpdated:      true,
-			P2PUpdated:      true,
-			NewThreshold:    newThreshold,
-			RemainingOwners: newOwners,
-		}, nil
+		out.State.Phase = PhaseCompleted
+		out.State.PendingSigners = nil
+		out.DNSUpdated = true
+		out.P2PUpdated = true
+		out.NewThreshold = newThreshold
+		out.RemainingOwners = newOwners
+
+		return out, nil
 	},
 )
 

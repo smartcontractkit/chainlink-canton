@@ -33,17 +33,50 @@ type KeyRotationInput struct {
 	NewThreshold int `json:"new_threshold,omitempty"`
 }
 
-// KeyRotationOutput is the final result of a completed [KeyRotationSequence].
-type KeyRotationOutput struct {
-	NamespaceKeyRotated     bool   `json:"namespace_key_rotated"`
-	DamlKeyRotated          bool   `json:"daml_key_rotated"`
-	NewNamespaceFingerprint string `json:"new_namespace_fingerprint,omitempty"`
-	NewDamlKeyFingerprint   string `json:"new_daml_key_fingerprint,omitempty"`
-	DNSUpdated              bool   `json:"dns_updated"`
-	P2PUpdated              bool   `json:"p2p_updated"`
+// Phase represents the current execution phase of the key rotation ceremony.
+type Phase string
+
+const (
+	PhaseReadState   Phase = "read-state"
+	PhaseKeyGen      Phase = "key-gen"
+	PhaseNSD         Phase = "nsd"
+	PhaseDNSProposal Phase = "dns-proposal"
+	PhaseDNSSigning  Phase = "dns-signing"
+	PhaseDNSSubmit   Phase = "dns-submit"
+	PhaseP2P         Phase = "p2p"
+	PhaseCompleted   Phase = "completed"
+)
+
+// CeremonyState is the live snapshot embedded in every KeyRotationOutput.
+// It is built progressively as the sequence advances, so it is always present
+// — even when the sequence returns an error (e.g. ErrThresholdNotMet).
+type CeremonyState struct {
+	Phase             Phase    `json:"phase"`
+	TargetKeyGenReady bool     `json:"target_key_gen_ready"`
+	NSDProposed       bool     `json:"nsd_proposed"`
+	RequiredSigners   []string `json:"required_signers,omitempty"`
+	CollectedSigners  []string `json:"collected_signers"`
+	PendingSigners    []string `json:"pending_signers"`
+	DNSThreshold      int      `json:"dns_threshold"`
+	ProposalHash      string   `json:"proposal_hash,omitempty"`
+	P2PProposedCount  int      `json:"p2p_proposed_count"`
+	P2PRequired       int      `json:"p2p_required"`
+	RotateNamespace   bool     `json:"rotate_namespace"`
+	RotateDaml        bool     `json:"rotate_daml"`
 }
 
-// ── Per-operation I/O types ──────────────────────────────────────────────────
+// KeyRotationOutput is the final result of a completed [KeyRotationSequence].
+// State is always populated — even when ExecuteSequence returns an error —
+// making it the primary way to inspect ceremony progress.
+type KeyRotationOutput struct {
+	NamespaceKeyRotated     bool          `json:"namespace_key_rotated"`
+	DamlKeyRotated          bool          `json:"daml_key_rotated"`
+	NewNamespaceFingerprint string        `json:"new_namespace_fingerprint,omitempty"`
+	NewDamlKeyFingerprint   string        `json:"new_daml_key_fingerprint,omitempty"`
+	DNSUpdated              bool          `json:"dns_updated"`
+	P2PUpdated              bool          `json:"p2p_updated"`
+	State                   CeremonyState `json:"state"`
+}
 
 // GenerateRotatedKeyInput is the input to [GenerateRotatedKeyOp].
 type GenerateRotatedKeyInput struct {

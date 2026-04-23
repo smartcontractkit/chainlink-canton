@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "4c2e704c11ea35512632a54f9d232e19b87f03a03361f2adbb1a54458e9a36c4"
+	PackageID   = "31d97d43e7d731a92ee608fac79c7f45215a5a52f70db818a35201b06ababc29"
 	SDKVersion  = "3.4.10"
 )
 
@@ -109,13 +109,7 @@ func (t LockOrBurnResult) ToMap() map[string]any {
 		return res
 	}()
 
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
+	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	return m
 }
@@ -153,13 +147,7 @@ type ReleaseOrMintResult struct {
 func (t ReleaseOrMintResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["output"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Output).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Output
-	}()
+	m["output"] = model.NestedToDAMLValue(t.Output)
 
 	m["poolChangeCids"] = func() []any {
 		res := make([]any, 0, len(t.PoolChangeCids))
@@ -169,13 +157,7 @@ func (t ReleaseOrMintResult) ToMap() map[string]any {
 		return res
 	}()
 
-	m["claimedEventCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ClaimedEventCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ClaimedEventCid
-	}()
+	m["claimedEventCid"] = model.NestedToDAMLValue(t.ClaimedEventCid)
 
 	return m
 }
@@ -313,13 +295,7 @@ type ReleaseOrMintResultPending struct {
 func (t ReleaseOrMintResultPending) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["transferInstructionCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TransferInstructionCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TransferInstructionCid
-	}()
+	m["transferInstructionCid"] = model.NestedToDAMLValue(t.TransferInstructionCid)
 
 	return m
 }
@@ -357,21 +333,9 @@ type TokenInput struct {
 func (t TokenInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["transferFactory"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TransferFactory).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TransferFactory
-	}()
+	m["transferFactory"] = model.NestedToDAMLValue(t.TransferFactory)
 
-	m["extraArgs"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraArgs
-	}()
+	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
 
 	m["tokenPoolHoldings"] = func() []any {
 		res := make([]any, 0, len(t.TokenPoolHoldings))
@@ -475,13 +439,7 @@ func (t TokenPoolView) ToMap() map[string]any {
 
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
-	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.InstrumentId
-	}()
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	return m
 }
@@ -522,45 +480,15 @@ type TokenPoolCalculateFee struct {
 func (t TokenPoolCalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
+	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
 
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
+	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
+	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
-	m["feeQuoterCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeQuoterCid
-	}()
+	m["feeQuoterCid"] = model.NestedToDAMLValue(t.FeeQuoterCid)
 
-	m["tokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInstrumentId
-	}()
+	m["tokenInstrumentId"] = model.NestedToDAMLValue(t.TokenInstrumentId)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -601,23 +529,11 @@ type TokenPoolGetFee struct {
 func (t TokenPoolGetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["feeQuoterCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeQuoterCid
-	}()
+	m["feeQuoterCid"] = model.NestedToDAMLValue(t.FeeQuoterCid)
 
 	m["destChainSelector"] = t.DestChainSelector
 
-	m["tokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInstrumentId
-	}()
+	m["tokenInstrumentId"] = model.NestedToDAMLValue(t.TokenInstrumentId)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -664,23 +580,11 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["finality"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Finality).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Finality
-	}()
+	m["finality"] = model.NestedToDAMLValue(t.Finality)
 
 	m["extraData"] = string(t.ExtraData)
 
-	m["direction"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Direction).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Direction
-	}()
+	m["direction"] = model.NestedToDAMLValue(t.Direction)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -725,45 +629,15 @@ type TokenPoolLockOrBurn struct {
 func (t TokenPoolLockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
+	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
 
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
+	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
+	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
+	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
-	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInput
-	}()
+	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	m["senderInputCids"] = func() []any {
 		res := make([]any, 0, len(t.SenderInputCids))
@@ -816,45 +690,15 @@ type TokenPoolReleaseFromTicket struct {
 func (t TokenPoolReleaseFromTicket) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
+	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
 
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
+	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
+	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
-	m["tokenReceiveTicketCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenReceiveTicketCid
-	}()
+	m["tokenReceiveTicketCid"] = model.NestedToDAMLValue(t.TokenReceiveTicketCid)
 
-	m["tokenInput"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenInput).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenInput
-	}()
+	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -895,29 +739,11 @@ type TokenPoolVerifyInboundMessage struct {
 func (t TokenPoolVerifyInboundMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
+	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
 
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
+	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
-	m["executingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutingMessageCid
-	}()
+	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -959,29 +785,11 @@ type TokenPoolVerifyOutboundCCVs struct {
 func (t TokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
+	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
 
-	m["extraContext"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExtraContext).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraContext
-	}()
+	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
+	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["amount"] = t.Amount
 

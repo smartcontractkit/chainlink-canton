@@ -76,12 +76,7 @@ func (t APSetConfig) ToMap() map[string]any {
 	m["apSigners"] = func() []any {
 		res := make([]any, 0, len(t.ApSigners))
 		for _, e := range t.ApSigners {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -327,12 +322,7 @@ func (t BypasserExecuteBatchParams) ToMap() map[string]any {
 	m["calls"] = func() []any {
 		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -375,21 +365,9 @@ func (t CanExecuteOp) ToMap() map[string]any {
 
 	m["submitter"] = t.Submitter.ToMap()
 
-	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TargetRole
-	}()
+	m["targetRole"] = model.NestedToDAMLValue(t.TargetRole)
 
-	m["op"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Op
-	}()
+	m["op"] = model.NestedToDAMLValue(t.Op)
 
 	return m
 }
@@ -465,23 +443,11 @@ type ExecuteOp struct {
 func (t ExecuteOp) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TargetRole
-	}()
+	m["targetRole"] = model.NestedToDAMLValue(t.TargetRole)
 
 	m["submitter"] = t.Submitter.ToMap()
 
-	m["op"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Op
-	}()
+	m["op"] = model.NestedToDAMLValue(t.Op)
 
 	m["opProof"] = func() []any {
 		res := make([]any, 0, len(t.OpProof))
@@ -544,12 +510,7 @@ func (t ExecuteScheduledBatch) ToMap() map[string]any {
 	m["calls"] = func() []any {
 		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -752,13 +713,7 @@ func (t GetState) ToMap() map[string]any {
 
 	m["submitter"] = t.Submitter.ToMap()
 
-	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TargetRole
-	}()
+	m["targetRole"] = model.NestedToDAMLValue(t.TargetRole)
 
 	return m
 }
@@ -1017,51 +972,22 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	args["chainId"] = int64(t.ChainId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["proposer"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Proposer).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Proposer
-	}()
+	args["proposer"] = model.NestedToDAMLValue(t.Proposer)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["canceller"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Canceller).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Canceller
-	}()
+	args["canceller"] = model.NestedToDAMLValue(t.Canceller)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["bypasser"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Bypasser).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Bypasser
-	}()
+	args["bypasser"] = model.NestedToDAMLValue(t.Bypasser)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minDelay"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.MinDelay).(mapper); ok {
-			return m.toMap()
-		}
-		return t.MinDelay
-	}()
+	args["minDelay"] = model.NestedToDAMLValue(t.MinDelay)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["blockedFunctions"] = func() []any {
 		res := make([]any, 0, len(t.BlockedFunctions))
 		for _, e := range t.BlockedFunctions {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -1094,51 +1020,22 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	args["chainId"] = int64(t.ChainId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["proposer"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Proposer).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Proposer
-	}()
+	args["proposer"] = model.NestedToDAMLValue(t.Proposer)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["canceller"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Canceller).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Canceller
-	}()
+	args["canceller"] = model.NestedToDAMLValue(t.Canceller)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["bypasser"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Bypasser).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Bypasser
-	}()
+	args["bypasser"] = model.NestedToDAMLValue(t.Bypasser)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minDelay"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.MinDelay).(mapper); ok {
-			return m.toMap()
-		}
-		return t.MinDelay
-	}()
+	args["minDelay"] = model.NestedToDAMLValue(t.MinDelay)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["blockedFunctions"] = func() []any {
 		res := make([]any, 0, len(t.BlockedFunctions))
 		for _, e := range t.BlockedFunctions {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -1596,13 +1493,7 @@ type MCMSState struct {
 func (t MCMSState) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["role"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Role).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Role
-	}()
+	m["role"] = model.NestedToDAMLValue(t.Role)
 
 	m["opCount"] = int64(t.OpCount)
 
@@ -1653,12 +1544,7 @@ func (t MultisigConfig) ToMap() map[string]any {
 	m["signers"] = func() []any {
 		res := make([]any, 0, len(t.Signers))
 		for _, e := range t.Signers {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -1891,13 +1777,7 @@ type RoleState struct {
 func (t RoleState) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["config"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Config).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Config
-	}()
+	m["config"] = model.NestedToDAMLValue(t.Config)
 
 	m["seenHashes"] = func() any {
 		if t.SeenHashes == nil {
@@ -1906,21 +1786,9 @@ func (t RoleState) ToMap() map[string]any {
 		return map[string]any{"_type": "genmap", "value": t.SeenHashes}
 	}()
 
-	m["expiringRoot"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExpiringRoot).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExpiringRoot
-	}()
+	m["expiringRoot"] = model.NestedToDAMLValue(t.ExpiringRoot)
 
-	m["rootMetadata"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RootMetadata).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RootMetadata
-	}()
+	m["rootMetadata"] = model.NestedToDAMLValue(t.RootMetadata)
 
 	return m
 }
@@ -2010,12 +1878,7 @@ func (t ScheduleBatchParams) ToMap() map[string]any {
 	m["calls"] = func() []any {
 		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -2064,23 +1927,12 @@ type SetConfig struct {
 func (t SetConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TargetRole
-	}()
+	m["targetRole"] = model.NestedToDAMLValue(t.TargetRole)
 
 	m["newSigners"] = func() []any {
 		res := make([]any, 0, len(t.NewSigners))
 		for _, e := range t.NewSigners {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -2143,12 +1995,7 @@ func (t SetConfigParams) ToMap() map[string]any {
 	m["signers"] = func() []any {
 		res := make([]any, 0, len(t.Signers))
 		for _, e := range t.Signers {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()
@@ -2211,13 +2058,7 @@ type SetRoot struct {
 func (t SetRoot) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["targetRole"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TargetRole
-	}()
+	m["targetRole"] = model.NestedToDAMLValue(t.TargetRole)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -2225,13 +2066,7 @@ func (t SetRoot) ToMap() map[string]any {
 
 	m["validUntil"] = t.ValidUntil
 
-	m["metadata"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Metadata).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Metadata
-	}()
+	m["metadata"] = model.NestedToDAMLValue(t.Metadata)
 
 	m["metadataProof"] = func() []any {
 		res := make([]any, 0, len(t.MetadataProof))
@@ -2244,12 +2079,7 @@ func (t SetRoot) ToMap() map[string]any {
 	m["signatures"] = func() []any {
 		res := make([]any, 0, len(t.Signatures))
 		for _, e := range t.Signatures {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
 	}()

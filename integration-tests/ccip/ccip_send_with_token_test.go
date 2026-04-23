@@ -214,7 +214,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					Template: feequoter.FeeQuoter{
 						PriceUpdaters: []types.PARTY{types.PARTY(partyCCIP)},
 					},
-					//nolint:gosec
+
 					USDPerNative: big.NewInt(int64(1 * tokenPriceExponentUSD)), // $1
 				},
 				NativeInstrumentId: nativeInstrumentId,
@@ -542,14 +542,13 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	// Fund separate holdings for fee payment and token transfer input.
 	// The mint amount here follows the existing test's usd8-sized quantity setup.
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
-	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD))) //nolint:gosec
+	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
 	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
-	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -576,10 +575,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to get disclosed Executor")
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
-	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
+	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
 	require.NoError(t, err, "failed to get transfer factory")
-	require.NotNil(t, choiceContext, "choiceContext should not be nil")
+	require.NotNil(t, choiceContextRaw, "choiceContext should not be nil")
 
+	choiceContext, err := testhelpers.ChoiceContextFromData(choiceContextRaw)
+	require.NoError(t, err, "failed to parse choice context")
 	// Verify choiceContext has the expected structure (Record with "values" field)
 	require.NotNil(t, choiceContext.GetRecord(), "choiceContext should be a Record")
 	require.NotEmpty(t, choiceContext.GetRecord().GetFields(), "choiceContext should have fields")
@@ -631,8 +632,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		TokenPoolHoldings: []types.CONTRACT_ID{},
 	}
 
-	tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
+	tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
 	require.NoError(t, err, "failed to get token transfer factory")
+	tokenTransferChoiceContext, err := testhelpers.ChoiceContextFromData(tokenTransferChoiceContextRaw)
+	require.NoError(t, err, "failed to parse token transfer choice context")
 	tokenTransferContextValues := testhelpers.ExtractChoiceContextValues(tokenTransferChoiceContext)
 
 	// This transfer preapproval must be specified for transfer to the pool's owner to be automatically be accepted.
@@ -649,23 +652,17 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 
 	// Build the main Send context with CCIP contract IDs (matching execute test pattern)
-	onRampCid := types.CONTRACT_ID(disclosedOnRamp.ContractId)
-	globalConfigCid := types.CONTRACT_ID(disclosedGlobalConfig.ContractId)
-	tarCid := types.CONTRACT_ID(disclosedTar.ContractId)
-	feeQuoterCid := types.CONTRACT_ID(disclosedFeeQuoter.ContractId)
-	rmnRemoteCid := types.CONTRACT_ID(disclosedRmnRemote.ContractId)
 	sendContext := common.CCIPContext{
 		Values: types.TEXTMAP{
-			"on-ramp":              common.AnyValue{AVContractId: &onRampCid},
-			"global-config":        common.AnyValue{AVContractId: &globalConfigCid},
-			"token-admin-registry": common.AnyValue{AVContractId: &tarCid},
-			"fee-quoter":           common.AnyValue{AVContractId: &feeQuoterCid},
-			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
+			"on-ramp":              common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOnRamp.ContractId))},
+			"global-config":        common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedGlobalConfig.ContractId))},
+			"token-admin-registry": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTar.ContractId))},
+			"fee-quoter":           common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedFeeQuoter.ContractId))},
+			"rmn-remote":           common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedRmnRemote.ContractId))},
 		},
 	}
 
 	const tokenTransferAmountDecimal = "0.0000010000"
-	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
 	executorCid := types.CONTRACT_ID(disclosedExecutor.ContractId)
 
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
@@ -721,7 +718,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TokenPoolCid:    types.CONTRACT_ID(disclosedPool.ContractId),
 			PoolExtraContext: common.CCIPContext{
 				Values: types.TEXTMAP{
-					"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterContractID},
+					"rate-limiter": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId))},
 				},
 			},
 			TokenInput: tokenTransferInput,
@@ -763,7 +760,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		// Re-fetch volatile Splice contracts (AmuletRules, transfer factories, preapproval)
 		// to avoid DSO-side races from background automation archiving/locking contracts
 		// between quote and final Send submission.
-		transferFactoryCid, transferFactoryDisclosures, choiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
+		transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
 		require.NoError(t, err, "failed to re-fetch fee transfer factory")
 		feeTokenInput = interfaces.TokenInput{
 			TransferFactory: types.CONTRACT_ID(transferFactoryCid),
@@ -775,7 +772,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		}
 		sendArgs.FeeTokenInput.TokenInput = feeTokenInput
 
-		tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContext, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
+		tokenTransferFactoryCid, tokenTransferFactoryDisclosures, tokenTransferChoiceContextRaw, err = testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partySender)
 		require.NoError(t, err, "failed to re-fetch token transfer factory")
 		disclosedPreapproval, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#splice-amulet", ModuleName: "Splice.AmuletRules", EntityName: "TransferPreapproval"})
 		require.NoError(t, err, "failed to re-fetch disclosed TransferPreapproval")
@@ -891,17 +888,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	)
 	require.Positive(t, senderDelta.Sign(), "sender balance should decrease after send")
 
-	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), ccipParticipant)
-	ccipOwnerDelta := new(big.Rat).Sub(ccipOwnerBalanceAfter, ccipOwnerBalanceBefore)
-	t.Logf(
-		"CCIP owner balance: before=%s after=%s credited=%s",
-		ccipOwnerBalanceBefore,
-		ccipOwnerBalanceAfter,
-		ccipOwnerDelta,
-	)
-
-	require.Positive(t, ccipOwnerDelta.Sign(), "ccip owner balance should increase after send")
-	require.GreaterOrEqual(t, senderDelta.Cmp(ccipOwnerDelta), 0, "sender deduction should cover ccip owner credit")
+	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
+	require.True(t, ok, "quoted fee should parse as a decimal value")
+	tokenTransferAmount, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
+	require.True(t, ok, "token transfer amount should parse as a decimal value")
+	expectedSenderDelta := new(big.Rat).Add(tokenTransferAmount, quotedFeeAmount)
+	require.Zero(t, senderDelta.Cmp(expectedSenderDelta), "sender deduction should equal token amount plus quoted fee")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)

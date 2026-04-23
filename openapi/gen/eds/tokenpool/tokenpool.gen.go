@@ -18,78 +18,72 @@ import (
 	externalRef0 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
+// TokenInput The token input for the token transfer.
+type TokenInput struct {
+	ExtraArgs struct {
+		Context  map[string]interface{} `json:"context"`
+		Metadata map[string]interface{} `json:"metadata"`
+	} `json:"extraArgs"`
+	TokenPoolHoldings []externalRef0.ContractId `json:"tokenPoolHoldings"`
+
+	// TransferFactory The unique identifier of a contract.
+	TransferFactory externalRef0.ContractId `json:"transferFactory"`
+}
+
 // TokenPoolExecuteRequest defines model for TokenPoolExecuteRequest.
 type TokenPoolExecuteRequest struct {
 	// EncodedMessage The CCIP message to be executed, encoded as a hex string.
-	EncodedMessage *string `json:"encodedMessage,omitempty"`
+	EncodedMessage string `json:"encodedMessage"`
 }
 
 // TokenPoolExecuteResponse defines model for TokenPoolExecuteResponse.
 type TokenPoolExecuteResponse struct {
 	// ContextData The context to be passed along to the token pool.
-	ContextData *map[string]interface{} `json:"contextData,omitempty"`
+	ContextData map[string]interface{} `json:"contextData"`
 
 	// ContractId The unique identifier of a contract.
-	ContractId         *externalRef0.ContractId          `json:"contractId,omitempty"`
-	DisclosedContracts *[]externalRef0.DisclosedContract `json:"disclosedContracts,omitempty"`
+	ContractId         externalRef0.ContractId          `json:"contractId"`
+	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
 
 	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-	InstanceAddress *externalRef0.InstanceAddress `json:"instanceAddress,omitempty"`
+	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
 
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-	RawInstanceAddress *externalRef0.RawInstanceAddress   `json:"rawInstanceAddress,omitempty"`
-	RequiredCCVs       *[]externalRef0.RawOrHashedAddress `json:"requiredCCVs,omitempty"`
+	RawInstanceAddress externalRef0.RawInstanceAddress   `json:"rawInstanceAddress"`
+	RequiredCCVs       []externalRef0.RawOrHashedAddress `json:"requiredCCVs"`
 
 	// TokenInput The token input for the token transfer.
-	TokenInput *struct {
-		ExtraArgs *struct {
-			Context  *map[string]interface{} `json:"context,omitempty"`
-			Metadata *map[string]interface{} `json:"metadata,omitempty"`
-		} `json:"extraArgs,omitempty"`
-		TokenPoolHoldings *[]externalRef0.ContractId `json:"tokenPoolHoldings,omitempty"`
-
-		// TransferFactory The unique identifier of a contract.
-		TransferFactory *externalRef0.ContractId `json:"transferFactory,omitempty"`
-	} `json:"tokenInput,omitempty"`
+	TokenInput TokenInput `json:"tokenInput"`
 }
 
 // TokenPoolSendRequest defines model for TokenPoolSendRequest.
 type TokenPoolSendRequest struct {
 	// Message A message to be sent from Canton.
-	Message *externalRef0.Message `json:"message,omitempty"`
+	Message externalRef0.Message `json:"message"`
 }
 
 // TokenPoolSendResponse defines model for TokenPoolSendResponse.
 type TokenPoolSendResponse struct {
 	// ContextData The context to be passed along to the token pool.
-	ContextData *map[string]interface{} `json:"contextData,omitempty"`
+	ContextData map[string]interface{} `json:"contextData"`
 
 	// ContractId The unique identifier of a contract.
-	ContractId         *externalRef0.ContractId          `json:"contractId,omitempty"`
-	DisclosedContracts *[]externalRef0.DisclosedContract `json:"disclosedContracts,omitempty"`
+	ContractId         externalRef0.ContractId          `json:"contractId"`
+	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
 
 	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-	InstanceAddress *externalRef0.InstanceAddress `json:"instanceAddress,omitempty"`
+	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
 
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-	RawInstanceAddress *externalRef0.RawInstanceAddress   `json:"rawInstanceAddress,omitempty"`
-	RequiredCCVs       *[]externalRef0.RawOrHashedAddress `json:"requiredCCVs,omitempty"`
+	RawInstanceAddress externalRef0.RawInstanceAddress   `json:"rawInstanceAddress"`
+	RequiredCCVs       []externalRef0.RawOrHashedAddress `json:"requiredCCVs"`
 
 	// TokenInput The token input for the token transfer.
-	TokenInput *struct {
-		ExtraArgs *struct {
-			Context  *map[string]interface{} `json:"context,omitempty"`
-			Metadata *map[string]interface{} `json:"metadata,omitempty"`
-		} `json:"extraArgs,omitempty"`
-		TokenPoolHoldings *[]externalRef0.ContractId `json:"tokenPoolHoldings,omitempty"`
-
-		// TransferFactory The unique identifier of a contract.
-		TransferFactory *externalRef0.ContractId `json:"transferFactory,omitempty"`
-	} `json:"tokenInput,omitempty"`
+	TokenInput TokenInput `json:"tokenInput"`
 }
 
 // PostTokenPoolExecuteJSONRequestBody defines body for PostTokenPoolExecute for application/json ContentType.
-type PostTokenPoolExecuteJSONRequestBody = TokenPoolSendRequest
+type PostTokenPoolExecuteJSONRequestBody = TokenPoolExecuteRequest
 
 // PostTokenPoolSendJSONRequestBody defines body for PostTokenPoolSend for application/json ContentType.
 type PostTokenPoolSendJSONRequestBody = TokenPoolSendRequest
@@ -168,17 +162,17 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 	// PostTokenPoolExecuteWithBody request with any body
-	PostTokenPoolExecuteWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostTokenPoolExecuteWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostTokenPoolExecute(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostTokenPoolExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostTokenPoolExecute(ctx context.Context, address string, body PostTokenPoolExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PostTokenPoolSendWithBody request with any body
-	PostTokenPoolSendWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostTokenPoolSendWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostTokenPoolSend(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostTokenPoolSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostTokenPoolSend(ctx context.Context, address string, body PostTokenPoolSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) PostTokenPoolExecuteWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostTokenPoolExecuteWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostTokenPoolExecuteRequestWithBody(c.Server, address, contentType, body)
 	if err != nil {
 		return nil, err
@@ -190,7 +184,7 @@ func (c *Client) PostTokenPoolExecuteWithBody(ctx context.Context, address exter
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostTokenPoolExecute(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostTokenPoolExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostTokenPoolExecute(ctx context.Context, address string, body PostTokenPoolExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostTokenPoolExecuteRequest(c.Server, address, body)
 	if err != nil {
 		return nil, err
@@ -202,7 +196,7 @@ func (c *Client) PostTokenPoolExecute(ctx context.Context, address externalRef0.
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostTokenPoolSendWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostTokenPoolSendWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostTokenPoolSendRequestWithBody(c.Server, address, contentType, body)
 	if err != nil {
 		return nil, err
@@ -214,7 +208,7 @@ func (c *Client) PostTokenPoolSendWithBody(ctx context.Context, address external
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostTokenPoolSend(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostTokenPoolSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostTokenPoolSend(ctx context.Context, address string, body PostTokenPoolSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostTokenPoolSendRequest(c.Server, address, body)
 	if err != nil {
 		return nil, err
@@ -227,7 +221,7 @@ func (c *Client) PostTokenPoolSend(ctx context.Context, address externalRef0.Raw
 }
 
 // NewPostTokenPoolExecuteRequest calls the generic PostTokenPoolExecute builder with application/json body
-func NewPostTokenPoolExecuteRequest(server string, address externalRef0.RawOrHashedAddress, body PostTokenPoolExecuteJSONRequestBody) (*http.Request, error) {
+func NewPostTokenPoolExecuteRequest(server string, address string, body PostTokenPoolExecuteJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
@@ -238,7 +232,7 @@ func NewPostTokenPoolExecuteRequest(server string, address externalRef0.RawOrHas
 }
 
 // NewPostTokenPoolExecuteRequestWithBody generates requests for PostTokenPoolExecute with any type of body
-func NewPostTokenPoolExecuteRequestWithBody(server string, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader) (*http.Request, error) {
+func NewPostTokenPoolExecuteRequestWithBody(server string, address string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -274,7 +268,7 @@ func NewPostTokenPoolExecuteRequestWithBody(server string, address externalRef0.
 }
 
 // NewPostTokenPoolSendRequest calls the generic PostTokenPoolSend builder with application/json body
-func NewPostTokenPoolSendRequest(server string, address externalRef0.RawOrHashedAddress, body PostTokenPoolSendJSONRequestBody) (*http.Request, error) {
+func NewPostTokenPoolSendRequest(server string, address string, body PostTokenPoolSendJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
@@ -285,7 +279,7 @@ func NewPostTokenPoolSendRequest(server string, address externalRef0.RawOrHashed
 }
 
 // NewPostTokenPoolSendRequestWithBody generates requests for PostTokenPoolSend with any type of body
-func NewPostTokenPoolSendRequestWithBody(server string, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader) (*http.Request, error) {
+func NewPostTokenPoolSendRequestWithBody(server string, address string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -364,20 +358,20 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// PostTokenPoolExecuteWithBodyWithResponse request with any body
-	PostTokenPoolExecuteWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTokenPoolExecuteResponse, error)
+	PostTokenPoolExecuteWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTokenPoolExecuteResponse, error)
 
-	PostTokenPoolExecuteWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostTokenPoolExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTokenPoolExecuteResponse, error)
+	PostTokenPoolExecuteWithResponse(ctx context.Context, address string, body PostTokenPoolExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTokenPoolExecuteResponse, error)
 
 	// PostTokenPoolSendWithBodyWithResponse request with any body
-	PostTokenPoolSendWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTokenPoolSendResponse, error)
+	PostTokenPoolSendWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTokenPoolSendResponse, error)
 
-	PostTokenPoolSendWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostTokenPoolSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTokenPoolSendResponse, error)
+	PostTokenPoolSendWithResponse(ctx context.Context, address string, body PostTokenPoolSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTokenPoolSendResponse, error)
 }
 
 type PostTokenPoolExecuteResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *TokenPoolSendResponse
+	JSON200      *TokenPoolExecuteResponse
 	JSON400      *externalRef0.N400
 	JSON404      *externalRef0.N404
 	JSON500      *externalRef0.N500
@@ -425,7 +419,7 @@ func (r PostTokenPoolSendResponse) StatusCode() int {
 }
 
 // PostTokenPoolExecuteWithBodyWithResponse request with arbitrary body returning *PostTokenPoolExecuteResponse
-func (c *ClientWithResponses) PostTokenPoolExecuteWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTokenPoolExecuteResponse, error) {
+func (c *ClientWithResponses) PostTokenPoolExecuteWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTokenPoolExecuteResponse, error) {
 	rsp, err := c.PostTokenPoolExecuteWithBody(ctx, address, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -433,7 +427,7 @@ func (c *ClientWithResponses) PostTokenPoolExecuteWithBodyWithResponse(ctx conte
 	return ParsePostTokenPoolExecuteResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostTokenPoolExecuteWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostTokenPoolExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTokenPoolExecuteResponse, error) {
+func (c *ClientWithResponses) PostTokenPoolExecuteWithResponse(ctx context.Context, address string, body PostTokenPoolExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTokenPoolExecuteResponse, error) {
 	rsp, err := c.PostTokenPoolExecute(ctx, address, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -442,7 +436,7 @@ func (c *ClientWithResponses) PostTokenPoolExecuteWithResponse(ctx context.Conte
 }
 
 // PostTokenPoolSendWithBodyWithResponse request with arbitrary body returning *PostTokenPoolSendResponse
-func (c *ClientWithResponses) PostTokenPoolSendWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTokenPoolSendResponse, error) {
+func (c *ClientWithResponses) PostTokenPoolSendWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTokenPoolSendResponse, error) {
 	rsp, err := c.PostTokenPoolSendWithBody(ctx, address, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -450,7 +444,7 @@ func (c *ClientWithResponses) PostTokenPoolSendWithBodyWithResponse(ctx context.
 	return ParsePostTokenPoolSendResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostTokenPoolSendWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostTokenPoolSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTokenPoolSendResponse, error) {
+func (c *ClientWithResponses) PostTokenPoolSendWithResponse(ctx context.Context, address string, body PostTokenPoolSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTokenPoolSendResponse, error) {
 	rsp, err := c.PostTokenPoolSend(ctx, address, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -473,7 +467,7 @@ func ParsePostTokenPoolExecuteResponse(rsp *http.Response) (*PostTokenPoolExecut
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest TokenPoolSendResponse
+		var dest TokenPoolExecuteResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -556,10 +550,10 @@ func ParsePostTokenPoolSendResponse(rsp *http.Response) (*PostTokenPoolSendRespo
 type ServerInterface interface {
 
 	// (POST /ccip/v1/external/tokenPool/{address}/execute)
-	PostTokenPoolExecute(c *gin.Context, address externalRef0.RawOrHashedAddress)
+	PostTokenPoolExecute(c *gin.Context, address string)
 
 	// (POST /ccip/v1/external/tokenPool/{address}/send)
-	PostTokenPoolSend(c *gin.Context, address externalRef0.RawOrHashedAddress)
+	PostTokenPoolSend(c *gin.Context, address string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -577,7 +571,7 @@ func (siw *ServerInterfaceWrapper) PostTokenPoolExecute(c *gin.Context) {
 	var err error
 
 	// ------------- Path parameter "address" -------------
-	var address externalRef0.RawOrHashedAddress
+	var address string
 
 	err = runtime.BindStyledParameterWithOptions("simple", "address", c.Param("address"), &address, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -601,7 +595,7 @@ func (siw *ServerInterfaceWrapper) PostTokenPoolSend(c *gin.Context) {
 	var err error
 
 	// ------------- Path parameter "address" -------------
-	var address externalRef0.RawOrHashedAddress
+	var address string
 
 	err = runtime.BindStyledParameterWithOptions("simple", "address", c.Param("address"), &address, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {

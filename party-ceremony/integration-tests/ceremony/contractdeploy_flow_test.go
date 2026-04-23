@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	cryptoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/admin/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
@@ -15,9 +14,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
-	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 type ContractDeployFlowTestSuite struct {
@@ -40,27 +40,6 @@ func (s *ContractDeployFlowTestSuite) SetupSuite() {
 
 	chain := s.chain
 
-	// In JWT-auth environments (CTF), decentralized parties created via topology
-	// are not automatically granted to any user. Grant actAs+readAs rights so that
-	// PrepareSubmission and related Ledger API calls are authorized.
-	for i, p := range chain.Participants {
-		if p.UserID == "" {
-			continue // no-auth env; rights enforced
-		}
-		_, err := p.LedgerServices.Admin.UserManagement.GrantUserRights(
-			t.Context(),
-			&adminv2.GrantUserRightsRequest{
-				UserId: p.UserID,
-				Rights: []*adminv2.Right{
-					{Kind: &adminv2.Right_CanActAs_{CanActAs: &adminv2.Right_CanActAs{Party: s.PartyID}}},
-					{Kind: &adminv2.Right_CanReadAs_{CanReadAs: &adminv2.Right_CanReadAs{Party: s.PartyID}}},
-				},
-			},
-		)
-		require.NoError(t, err, "failed to grant party rights for participant %d (user=%s, party=%s)", i+1, p.UserID, s.PartyID)
-		t.Logf("Participant %d (%s): granted actAs+readAs for party %s", i+1, p.UserID, s.PartyID)
-	}
-
 	ledgerClients := make([]client.LedgerClient, len(chain.Participants))
 	for i, p := range chain.Participants {
 		lc, conn := s.NewLedgerClient(p)
@@ -76,10 +55,10 @@ func (s *ContractDeployFlowTestSuite) SetupSuite() {
 	allReports, err := onboardingReporter.GetReports()
 	require.NoError(t, err, "getting onboarding reports")
 	for _, r := range allReports {
-		if r.Def.ID != "onboarding/canton-ceremony/create-member-key" {
+		if r.Def.ID != "canton-ceremony/keys/create-member-key" {
 			continue
 		}
-		if out, ok := r.Output.(onboarding.CreateMemberKeyOutput); ok && out.DamlKeyFingerprint != "" {
+		if out, ok := r.Output.(keys.CreateMemberKeyOutput); ok && out.DamlKeyFingerprint != "" {
 			damlFingerprints[out.ParticipantID] = out.DamlKeyFingerprint
 		}
 	}
@@ -138,17 +117,17 @@ func (s *ContractDeployFlowTestSuite) TestContractDeployFlow() {
 	}
 
 	darDir := filepath.Join("..", "..", "..", "contracts", "dars")
-	darLoader := contractdeploy.FileDARLoader(darDir)
+	darLoader := ledger.FileDARLoader(darDir)
 
 	sharedReporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle {
 		return operations.NewBundle(t.Context, logger.Test(t), sharedReporter)
 	}
 
-	deps := [3]contractdeploy.ContractDeployDeps{
-		{AdminClient: s.Actors[0].client, LedgerClient: s.LedgerClients[0], DARLoader: darLoader, Signer: s.Signers[0], Logger: logger.Test(t)},
-		{AdminClient: s.Actors[1].client, LedgerClient: s.LedgerClients[1], DARLoader: darLoader, Signer: s.Signers[1], Logger: logger.Test(t)},
-		{AdminClient: s.Actors[2].client, LedgerClient: s.LedgerClients[2], DARLoader: darLoader, Signer: s.Signers[2], Logger: logger.Test(t)},
+	deps := [3]ledger.ContractDeployDeps{
+		{AdminClient: s.Actors[0].client, LedgerClient: s.LedgerClients[0], DARLoader: darLoader, Signer: s.Signers[0], Logger: logger.Test(t), UserID: s.chain.Participants[0].UserID},
+		{AdminClient: s.Actors[1].client, LedgerClient: s.LedgerClients[1], DARLoader: darLoader, Signer: s.Signers[1], Logger: logger.Test(t), UserID: s.chain.Participants[1].UserID},
+		{AdminClient: s.Actors[2].client, LedgerClient: s.LedgerClients[2], DARLoader: darLoader, Signer: s.Signers[2], Logger: logger.Test(t), UserID: s.chain.Participants[2].UserID},
 	}
 
 	// Run 1 (p1): uploads DARs (1/3) → threshold not met
