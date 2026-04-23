@@ -7,10 +7,6 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
-replace github.com/smartcontractkit/go-daml => /Users/sish/Desktop/go-daml
-
-replace github.com/smartcontractkit/mcms => /Users/sish/Desktop/mcms
-
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/digital-asset/dazl-client/v8 v8.9.0
@@ -25,8 +21,8 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
-	github.com/smartcontractkit/go-daml v0.6.1-0.20260421180615-05c0e7d6d13e
-	github.com/smartcontractkit/mcms v0.40.1
+	github.com/smartcontractkit/go-daml v0.6.1-0.20260423193219-c633889da58e
+	github.com/smartcontractkit/mcms v0.41.2-0.20260421105842-8df2ee5770b3
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0
 )

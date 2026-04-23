@@ -930,10 +930,14 @@ github.com/smartcontractkit/chainlink/v2 v2.29.0 h1:MyvQ/LAhHw//yDXgo2EvH7jq4NH3
 github.com/smartcontractkit/chainlink/v2 v2.29.0/go.mod h1:6SHH9QHlKh1mKuEhG8Y7nGutUzhQwu1Qrpp/0qLzaR0=
 github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad h1:lgHxTHuzJIF3Vj6LSMOnjhqKgRqYW+0MV2SExtCYL1Q=
 github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad/go.mod h1:T4zH9R8R8lVWKfU7tUvYz2o2jMv1OpGCdpY2j2QZXzU=
+github.com/smartcontractkit/go-daml v0.6.1-0.20260423193219-c633889da58e h1:poIzAk850gYzb7DEU8rGXtcv++NqMSTuxbSogkcpFdc=
+github.com/smartcontractkit/go-daml v0.6.1-0.20260423193219-c633889da58e/go.mod h1:SqWfl3Bp9NleC9jhzFUaOGzOZeKfldpY4QOW6A6NSNM=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12ijqMM9tvYVEm+nR826WsrNi6zCKpwBhuApq127wHs=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20260304194147-a03701e2c02e h1:poXTj5cFVM6XfC4HICIDYkDVc/A6OYB0eeID0wU2JQE=
 github.com/smartcontractkit/libocr v0.0.0-20260304194147-a03701e2c02e/go.mod h1:PLdNK6GlqfxIWXzziPkU7dCAVlVFeYkyyW7AQY0R+4Q=
+github.com/smartcontractkit/mcms v0.41.2-0.20260421105842-8df2ee5770b3 h1:peocJ/W50ZVuyGycIkXoUTcsDM+dPAA+fXb0RdL1B3Y=
+github.com/smartcontractkit/mcms v0.41.2-0.20260421105842-8df2ee5770b3/go.mod h1:ytgg+cpICsSkqEUUIoAp4zUAdtQ7hO90rnLX03oxHjM=
 github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 h1:zxcODLrFytOKmAd8ty8S/XK6WcIEJEgRBaL7sY/7l4Y=
 github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945/go.mod h1:m3pdp17i4bD50XgktkzWetcV5yaLsi7Gunbv4ZgN6qg=
 github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 h1:+jumHNA0Wrelhe64i8F6HNlS8pkoyMv5sreGx2Ry5Rw=
