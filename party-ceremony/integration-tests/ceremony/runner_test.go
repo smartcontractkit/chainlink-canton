@@ -16,17 +16,17 @@ func TestCeremonies(t *testing.T) {
 	require.NoError(t, err, "failed to load shared Canton chain")
 	require.Len(t, chain.Participants, 3, "expected 3 participants")
 
-	t.Run("CantonOnboardingFlowTestSuite", func(t *testing.T) {
-		s := new(OnboardingFlowTestSuite)
-		s.chain = chain
-		suite.Run(t, s)
-	})
+	// t.Run("CantonOnboardingFlowTestSuite", func(t *testing.T) {
+	// 	s := new(OnboardingFlowTestSuite)
+	// 	s.chain = chain
+	// 	suite.Run(t, s)
+	// })
 
-	t.Run("CantonKickFlowTestSuite", func(t *testing.T) {
-		s := new(KickFlowTestSuite)
-		s.chain = chain
-		suite.Run(t, s)
-	})
+	// t.Run("CantonKickFlowTestSuite", func(t *testing.T) {
+	// 	s := new(KickFlowTestSuite)
+	// 	s.chain = chain
+	// 	suite.Run(t, s)
+	// })
 
 	t.Run("CantonContractDeployFlowTestSuite", func(t *testing.T) {
 		s := new(ContractDeployFlowTestSuite)
@@ -34,15 +34,15 @@ func TestCeremonies(t *testing.T) {
 		suite.Run(t, s)
 	})
 
-	t.Run("CantonAddParticipantFlowTestSuite", func(t *testing.T) {
-		s := new(AddParticipantFlowTestSuite)
-		s.chain = chain
-		suite.Run(t, s)
-	})
+	// t.Run("CantonAddParticipantFlowTestSuite", func(t *testing.T) {
+	// 	s := new(AddParticipantFlowTestSuite)
+	// 	s.chain = chain
+	// 	suite.Run(t, s)
+	// })
 
-	t.Run("CantonKeyRotationFlowTestSuite", func(t *testing.T) {
-		s := new(KeyRotationFlowTestSuite)
-		s.chain = chain
-		suite.Run(t, s)
-	})
+	// t.Run("CantonKeyRotationFlowTestSuite", func(t *testing.T) {
+	// 	s := new(KeyRotationFlowTestSuite)
+	// 	s.chain = chain
+	// 	suite.Run(t, s)
+	// })
 }

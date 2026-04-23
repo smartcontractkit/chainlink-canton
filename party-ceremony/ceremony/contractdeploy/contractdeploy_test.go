@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 
 	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
+	"github.com/chainlink/canton-party-ceremony/ceremony/ops/ledger"
 	"github.com/chainlink/canton-party-ceremony/internal/client"
 )
 
@@ -137,6 +138,9 @@ func (m *mockLedgerClient) GetActiveContractsByTemplate(
 ) ([]*apiv2.CreatedEvent, error) {
 	return []*apiv2.CreatedEvent{{ContractId: "fake-contract-0xdeadbeef"}}, nil
 }
+func (m *mockLedgerClient) GrantPartyRights(_ context.Context, _, _ string) error {
+	return nil
+}
 
 // ── Mock Signer ──────────────────────────────────────────────────────────────
 
@@ -153,14 +157,14 @@ func (m *mockSigner) Sign(_ context.Context, hash []byte) (*apiv2.Signature, err
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-func fakeDARLoader() contractdeploy.DARLoader {
+func fakeDARLoader() ledger.DARLoader {
 	return func(name, version string) ([]byte, error) {
 		return fmt.Appendf(nil, "fake-dar-%s-%s", name, version), nil
 	}
 }
 
-func newDeps(participantID string, partyExists bool) contractdeploy.ContractDeployDeps {
-	return contractdeploy.ContractDeployDeps{
+func newDeps(participantID string, partyExists bool) ledger.ContractDeployDeps {
+	return ledger.ContractDeployDeps{
 		AdminClient:  newMockAdminClient(participantID),
 		LedgerClient: &mockLedgerClient{partyExists: partyExists},
 		DARLoader:    fakeDARLoader(),

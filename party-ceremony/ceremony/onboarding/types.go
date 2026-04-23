@@ -53,8 +53,6 @@ type OnboardingOutput struct {
 	State        CeremonyState `json:"state"`
 }
 
-// ── Per-operation I/O types ──────────────────────────────────────────────────
-
 // CreateMemberKeyInput is the input to [CreateMemberKeyOp].
 type CreateMemberKeyInput struct {
 	NamespaceName string `json:"namespace_name"`

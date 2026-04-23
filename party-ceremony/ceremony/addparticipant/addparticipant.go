@@ -39,6 +39,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
 	"github.com/chainlink/canton-party-ceremony/ceremony"
+	"github.com/chainlink/canton-party-ceremony/ceremony/ops/keys"
+	"github.com/chainlink/canton-party-ceremony/ceremony/ops/topology"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -79,7 +81,7 @@ var AddParticipantSequence = operations.NewSequence(
 		decNS := parts[1]
 
 		// ── Step 1: New participant generates keys ───────────────────────────
-		keyReport, err := operations.ExecuteOperation(b, GenerateNewMemberKeyOp, deps, GenerateNewMemberKeyInput{
+		keyReport, err := operations.ExecuteOperation(b, keys.CreateMemberKeyOp, deps, keys.CreateMemberKeyInput{
 			NamespaceName: in.NamespaceName,
 			ParticipantID: in.NewParticipantID,
 		})
@@ -95,7 +97,7 @@ var AddParticipantSequence = operations.NewSequence(
 
 		// ── Step 2: New participant publishes NSD ────────────────────────────
 		out.State.Phase = PhaseNSD
-		_, err = operations.ExecuteOperation(b, ProposeNewNSDOp, deps, ProposeNewNSDInput{
+		_, err = operations.ExecuteOperation(b, topology.ProposeNamespaceDelegationOp, deps, topology.ProposeNSDInput{
 			ParticipantID:  in.NewParticipantID,
 			SigningKeyB64:  newMember.SigningKeyB64,
 			Namespace:      newMember.NamespaceFingerprint,
@@ -137,7 +139,7 @@ var AddParticipantSequence = operations.NewSequence(
 
 		// ── Step 3: Read current topology state ──────────────────────────────
 		out.State.Phase = PhaseReadState
-		stateReport, err := operations.ExecuteOperation(b, ReadCurrentStateOp, deps, ReadCurrentStateInput{
+		stateReport, err := operations.ExecuteOperation(b, topology.ReadCurrentStateOp, deps, topology.ReadCurrentStateInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			SynchronizerID:       in.SynchronizerID,
 		})
@@ -179,7 +181,7 @@ var AddParticipantSequence = operations.NewSequence(
 
 		// ── Step 4: Create add DNS proposal ──────────────────────────────────
 		out.State.Phase = PhaseDNSProposal
-		proposalReport, err := operations.ExecuteOperation(b, CreateAddDNSProposalOp, deps, CreateAddDNSProposalInput{
+		proposalReport, err := operations.ExecuteOperation(b, topology.CreateAddDNSProposalOp, deps, topology.CreateAddDNSProposalInput{
 			DecentralizedNamespace:  decNS,
 			CurrentOwners:           currentState.DNSOwners,
 			NewOwnerFingerprint:     newMember.NamespaceFingerprint,
@@ -200,7 +202,7 @@ var AddParticipantSequence = operations.NewSequence(
 		out.State.Phase = PhaseDNSSigning
 		var allSignedTxsB64 []string
 		for _, signerUID := range proposal.RequiredSigners {
-			sigReport, sigErr := operations.ExecuteOperation(b, SignAddDNSProposalOp, deps, SignAddDNSProposalInput{
+			sigReport, sigErr := operations.ExecuteOperation(b, topology.SignDNSProposalOp, deps, topology.SignDNSProposalInput{
 				ParticipantID:      signerUID,
 				ProposalHashSHA256: proposal.ProposalHashSHA256,
 				DNSTxB64:           proposal.DNSTxB64,
@@ -229,13 +231,13 @@ var AddParticipantSequence = operations.NewSequence(
 		// ── Step 6: Submit the add DNS update ─────────────────────────────────
 		out.State.Phase = PhaseDNSSubmit
 		_, err = operations.ExecuteOperation(
-			b, SubmitAddDNSOp, deps,
-			SubmitAddDNSInput{
+			b, topology.SubmitDNSOp, deps,
+			topology.SubmitDNSInput{
 				SignedDNSTxsB64: allSignedTxsB64,
 				SynchronizerID:  in.SynchronizerID,
 				FilterNamespace: decNS,
 			},
-			operations.WithRetry[SubmitAddDNSInput, ceremony.CantonDeps](),
+			operations.WithRetry[topology.SubmitDNSInput, ceremony.CantonDeps](),
 		)
 		if err != nil {
 			return out, fmt.Errorf("submit-add-dns: %w", err)
@@ -272,7 +274,7 @@ var AddParticipantSequence = operations.NewSequence(
 		allParticipantUIDs := append(append([]string{}, currentState.P2PParticipantUIDs...), newMember.ParticipantUID)
 
 		for _, uid := range currentState.P2PParticipantUIDs {
-			_, p2pErr := operations.ExecuteOperation(b, ProposeAddP2POp, deps, ProposeAddP2PInput{
+			_, p2pErr := operations.ExecuteOperation(b, topology.ProposeAddP2POp, deps, topology.ProposeAddP2PInput{
 				ParticipantID:      uid,
 				PartyID:            in.DecentralizedPartyID,
 				AllParticipantUIDs: allParticipantUIDs,
@@ -287,7 +289,7 @@ var AddParticipantSequence = operations.NewSequence(
 			out.State.P2PExistingProposed++
 		}
 
-		_, newConsentErr := operations.ExecuteOperation(b, ProposeAddP2POp, deps, ProposeAddP2PInput{
+		_, newConsentErr := operations.ExecuteOperation(b, topology.ProposeAddP2POp, deps, topology.ProposeAddP2PInput{
 			ParticipantID:      in.NewParticipantID,
 			PartyID:            in.DecentralizedPartyID,
 			AllParticipantUIDs: allParticipantUIDs,

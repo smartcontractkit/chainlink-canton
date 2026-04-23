@@ -50,17 +50,19 @@ func DialLedger(cfg ClientConfig) (*grpc.ClientConn, error) {
 
 // GRPCLedgerClient implements [LedgerClient] using real Canton Ledger gRPC APIs.
 type GRPCLedgerClient struct {
-	interactive interactive.InteractiveSubmissionServiceClient
-	party       apiv2admin.PartyManagementServiceClient
-	state       apiv2.StateServiceClient
+	interactive    interactive.InteractiveSubmissionServiceClient
+	party          apiv2admin.PartyManagementServiceClient
+	userManagement apiv2admin.UserManagementServiceClient
+	state          apiv2.StateServiceClient
 }
 
 // NewGRPCLedgerClient creates a new [GRPCLedgerClient] from an established gRPC connection.
 func NewGRPCLedgerClient(conn *grpc.ClientConn) *GRPCLedgerClient {
 	return &GRPCLedgerClient{
-		interactive: interactive.NewInteractiveSubmissionServiceClient(conn),
-		party:       apiv2admin.NewPartyManagementServiceClient(conn),
-		state:       apiv2.NewStateServiceClient(conn),
+		interactive:    interactive.NewInteractiveSubmissionServiceClient(conn),
+		party:          apiv2admin.NewPartyManagementServiceClient(conn),
+		userManagement: apiv2admin.NewUserManagementServiceClient(conn),
+		state:          apiv2.NewStateServiceClient(conn),
 	}
 }
 
@@ -181,4 +183,19 @@ func (c *GRPCLedgerClient) ExecuteSubmission(
 	}
 
 	return "", nil
+}
+
+func (c *GRPCLedgerClient) GrantPartyRights(ctx context.Context, userID, partyID string) error {
+	_, err := c.userManagement.GrantUserRights(ctx, &apiv2admin.GrantUserRightsRequest{
+		UserId: userID,
+		Rights: []*apiv2admin.Right{
+			{Kind: &apiv2admin.Right_CanActAs_{CanActAs: &apiv2admin.Right_CanActAs{Party: partyID}}},
+			{Kind: &apiv2admin.Right_CanReadAs_{CanReadAs: &apiv2admin.Right_CanReadAs{Party: partyID}}},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("GrantUserRights for user %q party %q: %w", userID, partyID, err)
+	}
+
+	return nil
 }
