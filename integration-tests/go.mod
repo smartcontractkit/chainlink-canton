@@ -22,7 +22,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260410105708-4e8133b0b504
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260414185437-e41e205c8bfa
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
-	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.98.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.6.1-0.20260421180615-05c0e7d6d13e
 	github.com/smartcontractkit/mcms v0.40.1
@@ -208,7 +208,7 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
-	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
@@ -271,7 +271,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9 // indirect
 	github.com/smartcontractkit/chainlink-protos/op-catalog v0.0.4 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260205175622-33e65031f9a9 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.17 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.18 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20260408074447-0acfdcb19338 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
