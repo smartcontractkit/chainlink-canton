@@ -14,7 +14,7 @@ import (
 // https://datatracker.ietf.org/doc/html/rfc8414#section-2
 type AuthorizationServerMetadata struct {
 	// The authorization server's issuer identifier, which is a URL.
-	// Contrary to RFC 8414, this is not checked to be using the "https" scheme.
+	// GetAuthorizationServerMetadata validates the issuer (including scheme http or https) matches the request.
 	Issuer string `json:"issuer"`
 	// URL of the authorization server's authorization endpoint.
 	AuthorizationEndpoint string `json:"authorization_endpoint"`

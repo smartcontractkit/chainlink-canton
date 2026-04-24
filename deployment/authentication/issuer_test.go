@@ -176,6 +176,18 @@ func TestIssuerEquals(t *testing.T) {
 			b:     "https://idp.example.com",
 			equal: false,
 		},
+		{
+			name:  "scheme_must_be_http_or_https",
+			a:     "https://idp.example.com",
+			b:     "ftp://idp.example.com",
+			equal: false,
+		},
+		{
+			name:  "scheme_ftp_both_rejected",
+			a:     "ftp://idp.example.com",
+			b:     "ftp://idp.example.com",
+			equal: false,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -199,5 +211,10 @@ func TestParseAbsoluteIssuerURL(t *testing.T) {
 		t.Parallel()
 		_, err := parseAbsoluteIssuerURL("/x")
 		require.ErrorIs(t, err, errNotAbsoluteIssuerURL)
+	})
+	t.Run("scheme_not_http_s", func(t *testing.T) {
+		t.Parallel()
+		_, err := parseAbsoluteIssuerURL("ftp://host.example/issuer")
+		require.ErrorIs(t, err, errInvalidIssuerScheme)
 	})
 }
