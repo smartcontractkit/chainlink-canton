@@ -66,6 +66,7 @@ func parseAbsoluteIssuerURL(s string) (*url.URL, error) {
 	default:
 		return nil, errInvalidIssuerScheme
 	}
+
 	return u, nil
 }
 
