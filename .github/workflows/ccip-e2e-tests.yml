@@ -8,7 +8,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve-ref:
+    name: Resolve CCV ref
+    runs-on: ubuntu-latest
+    outputs:
+      pinned: ${{ steps.refs.outputs.pinned }}
+    steps:
+      - name: Check out chainlink-canton
+        uses: actions/checkout@v6
+        with:
+          repository: smartcontractkit/chainlink-canton
+          path: chainlink-canton
+
+      - name: Read pinned ccv ref
+        id: refs
+        working-directory: chainlink-canton
+        run: bash ./scripts/ci/ccv-ref.sh read pinned
+
   test-ccip-e2e:
+    needs: resolve-ref
     permissions:
       id-token: write
       contents: read
@@ -33,7 +51,7 @@ jobs:
         with:
           repository: smartcontractkit/chainlink-ccv
           path: chainlink-ccv
-          ref: e41e205c8bfa6033e6c66ad2ea7d0969bac99ff1
+          ref: ${{ needs.resolve-ref.outputs.pinned }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -55,6 +73,16 @@ jobs:
           cache: true
           go-version-file: chainlink-canton/go.mod
           cache-dependency-path: chainlink-canton/go.sum
+
+      - name: Validate ccv-ref consistency
+        working-directory: chainlink-canton
+        run: make validate-ccv
+
+      - name: Pin go.mod to checked-out ccv ref
+        working-directory: chainlink-canton
+        run: |
+          CCV_SHA=$(cd ../chainlink-ccv && git rev-parse HEAD)
+          make pin-ccv-all REF="$CCV_SHA"
 
       - name: Download Go dependencies
         working-directory: chainlink-canton

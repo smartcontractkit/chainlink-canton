@@ -32,6 +32,22 @@ go-generate:
 gomodtidy: ## Run go mod tidy on all modules.
 	go run github.com/jmank88/gomods@v0.1.7 tidy
 
+# CCV dependency management — see scripts/ci/ccv-ref.yaml for config.
+.PHONY: pin-ccv
+pin-ccv: ## Pin root chainlink-ccv module. Usage: make pin-ccv REF=<commit>
+	bash ./scripts/ci/ccv-ref.sh pin $(REF)
+
+.PHONY: pin-ccv-devenv
+pin-ccv-devenv: ## Pin configured chainlink-ccv submodules to the root pseudo-version.
+	bash ./scripts/ci/ccv-ref.sh pin-devenv
+
+.PHONY: pin-ccv-all
+pin-ccv-all: pin-ccv pin-ccv-devenv ## Pin both chainlink-ccv and build/devenv. Usage: make pin-ccv-all REF=<commit>
+
+.PHONY: validate-ccv
+validate-ccv: ## Check that go.mod files match the pinned ccv ref.
+	bash ./scripts/ci/ccv-ref.sh validate
+
 .PHONY: test-daml-contracts
 test-daml-contracts:
 	go run ./contracts/cmd/test --root ./contracts

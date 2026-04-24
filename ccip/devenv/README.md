@@ -9,6 +9,13 @@ Make sure to checkout [chainlink-ccv](https://github.com/smartcontractkit/chainl
 i.e. so that chainlink-canton and chainlink-ccv have the same parent directory. This is needed so that we can build
 needed docker images.
 
+The pinned CCV commit used by CI lives in `scripts/ci/ccv-ref.yaml`. To repin locally after an upstream change, run:
+
+```bash
+make pin-ccv-all REF=<chainlink-ccv-commit>
+make validate-ccv
+```
+
 ## Spin up an environment
 
 The quickest way to run the EVM/Canton environment is from the root of the repo:
