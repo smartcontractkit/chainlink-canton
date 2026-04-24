@@ -651,7 +651,7 @@ func (t *TokenTransferInput) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	GetFee2(args GetFee2) (*bind.EncodedChoice, error)
+	GetFee(args GetFee2) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
 	Send(args Send) (*bind.EncodedChoice, error)
 }
@@ -683,9 +683,9 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// GetFee2 encodes parameters for the GetFee2 choice.
-func (e *encoder) GetFee2(args GetFee2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetFee2", args)
+// GetFee encodes parameters for the GetFee choice.
+func (e *encoder) GetFee(args GetFee2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
 }
 
 // GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.

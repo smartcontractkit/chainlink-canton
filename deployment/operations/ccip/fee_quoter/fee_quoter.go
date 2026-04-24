@@ -97,5 +97,5 @@ var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[f
 	},
 	Template:     feequoter.FeeQuoter{},
 	Method:       feequoter.FeeQuoter{}.ApplyDestChainConfigUpdates,
-	EncodeMethod: feeQuoterEncoder.ApplyDestChainConfigUpdates2,
+	EncodeMethod: feeQuoterEncoder.ApplyDestChainConfigUpdates,
 })

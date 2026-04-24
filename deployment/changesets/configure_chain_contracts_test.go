@@ -252,7 +252,7 @@ func deployMCMSContract(t *testing.T, bundle cld_ops.Bundle, chain canton.Chain,
 			GroupQuorums: make([]types.INT64, 32),
 			GroupParents: make([]types.INT64, 32),
 		},
-		SeenHashes: map[types.TEXT]types.BOOL{},
+		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
 		ExpiringRoot: mcms_bindings.ExpiringRoot{
 			Root:    "",
 			OpCount: 0,
