@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       pinned: ${{ steps.refs.outputs.pinned }}
+      tracking: ${{ steps.refs.outputs.tracking }}
+      selected: ${{ steps.select.outputs.selected }}
     steps:
       - name: Check out chainlink-canton
         uses: actions/checkout@v6
@@ -20,10 +22,22 @@ jobs:
           repository: smartcontractkit/chainlink-canton
           path: chainlink-canton
 
-      - name: Read pinned ccv ref
+      - name: Read configured ccv refs
         id: refs
         working-directory: chainlink-canton
-        run: bash ./scripts/ci/ccv-ref.sh read pinned
+        run: bash ./scripts/ci/ccv-ref.sh read pinned tracking
+
+      - name: Select ccv ref
+        id: select
+        env:
+          PINNED: ${{ steps.refs.outputs.pinned }}
+          TRACKING: ${{ steps.refs.outputs.tracking }}
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "sish/detect-upstream-changes" || "${GITHUB_HEAD_REF}" == "sish/detect-upstream-changes" ]]; then
+            echo "selected=${TRACKING}" >> "$GITHUB_OUTPUT"
+          else
+            echo "selected=${PINNED}" >> "$GITHUB_OUTPUT"
+          fi
 
   test-ccip-e2e:
     needs: resolve-ref
@@ -51,7 +65,7 @@ jobs:
         with:
           repository: smartcontractkit/chainlink-ccv
           path: chainlink-ccv
-          ref: ${{ needs.resolve-ref.outputs.pinned }}
+          ref: ${{ needs.resolve-ref.outputs.selected }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
