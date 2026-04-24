@@ -50,7 +50,7 @@ func buildMCMSBindingFromConfig(config MCMSConfig, owner, instanceID string, cha
 
 	roleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: types.GENMAP{},
+		SeenHashes: map[types.TEXT]types.BOOL{},
 		ExpiringRoot: mcms.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
@@ -74,7 +74,7 @@ func buildMCMSBindingFromConfig(config MCMSConfig, owner, instanceID string, cha
 		Bypasser:           roleState,
 		MinDelay:           types.RELTIME(0),
 		BlockedFunctions:   []mcms.BlockedFunction{},
-		TimelockTimestamps: types.GENMAP{},
+		TimelockTimestamps: map[types.TEXT]types.TIMESTAMP{},
 	}
 }
 
@@ -268,7 +268,7 @@ func testExecuteOpFlow(
 
 	roleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: types.GENMAP{},
+		SeenHashes: map[types.TEXT]types.BOOL{},
 		ExpiringRoot: mcms.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
@@ -292,7 +292,7 @@ func testExecuteOpFlow(
 		Bypasser:           roleState,
 		MinDelay:           types.RELTIME(0),
 		BlockedFunctions:   []mcms.BlockedFunction{},
-		TimelockTimestamps: types.GENMAP{},
+		TimelockTimestamps: map[types.TEXT]types.TIMESTAMP{},
 	}
 
 	mcmsCreateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -496,8 +496,10 @@ func testExecuteOpFlow(
 			FunctionName:          types.TEXT(op.FunctionName),
 			OperationData:         types.TEXT(op.OperationData),
 		},
-		OpProof:    opProofTexts,
-		TargetCids: types.GENMAP{counterInstanceAddr: types.CONTRACT_ID(counterCid)},
+		OpProof: opProofTexts,
+		TargetCids: map[types.TEXT]types.CONTRACT_ID{
+			types.TEXT(counterInstanceAddr): types.CONTRACT_ID(counterCid),
+		},
 	}
 
 	executeOpRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1010,7 +1012,7 @@ func testExecuteMCMSOp(
 			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: types.GENMAP{},
+		TargetCids: map[types.TEXT]types.CONTRACT_ID{},
 	}
 
 	// No separate params - params are encoded in op.operationData (like Aptos BCS)

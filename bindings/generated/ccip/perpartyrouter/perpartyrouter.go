@@ -1014,14 +1014,14 @@ func (t *IsExecuted) UnmarshalHex(data string) error {
 
 // PerPartyRouter is a Template type
 type PerPartyRouter struct {
-	InstanceId                   types.TEXT          `json:"instanceId"`
-	CcipOwner                    types.PARTY         `json:"ccipOwner"`
-	PartyOwner                   types.PARTY         `json:"partyOwner"`
-	Deps                         PerPartyRouterDeps  `json:"deps"`
-	OutboundSequenceNumbers      types.GENMAP        `json:"outboundSequenceNumbers"`
-	ExecutedMessages             types.SET           `json:"executedMessages"`
-	ArchivedExecutionContractIds []types.CONTRACT_ID `json:"archivedExecutionContractIds"`
-	CustomObservers              []types.PARTY       `json:"customObservers"`
+	InstanceId                   types.TEXT                      `json:"instanceId"`
+	CcipOwner                    types.PARTY                     `json:"ccipOwner"`
+	PartyOwner                   types.PARTY                     `json:"partyOwner"`
+	Deps                         PerPartyRouterDeps              `json:"deps"`
+	OutboundSequenceNumbers      map[types.NUMERIC]types.NUMERIC `json:"outboundSequenceNumbers"`
+	ExecutedMessages             types.SET                       `json:"executedMessages"`
+	ArchivedExecutionContractIds []types.CONTRACT_ID             `json:"archivedExecutionContractIds"`
+	CustomObservers              []types.PARTY                   `json:"customObservers"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1532,10 +1532,10 @@ func (t *PerPartyRouterDeps) UnmarshalHex(data string) error {
 
 // PerPartyRouterFactory is a Template type
 type PerPartyRouterFactory struct {
-	InstanceId        types.TEXT         `json:"instanceId"`
-	CcipOwner         types.PARTY        `json:"ccipOwner"`
-	Deps              PerPartyRouterDeps `json:"deps"`
-	RegisteredRouters types.GENMAP       `json:"registeredRouters"`
+	InstanceId        types.TEXT                 `json:"instanceId"`
+	CcipOwner         types.PARTY                `json:"ccipOwner"`
+	Deps              PerPartyRouterDeps         `json:"deps"`
+	RegisteredRouters map[types.PARTY]types.TEXT `json:"registeredRouters"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

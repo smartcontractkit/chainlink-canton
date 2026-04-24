@@ -73,14 +73,16 @@ func GetTokenPoolExecuteDisclosure(
 	for i, id := range resp.JSON200.TokenInput.TokenPoolHoldings {
 		tokenPoolHoldings[i] = types.CONTRACT_ID(id)
 	}
+	tokenMetadataContext, err := CCIPContextToChoiceContext(tokenInputContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert token metadata choice context: %w", err)
+	}
 
 	tokenInput := interfaces.TokenInput{
 		TransferFactory: types.CONTRACT_ID(resp.JSON200.TokenInput.TransferFactory),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: splice_api_token_metadata_v1.ChoiceContext{
-				Values: tokenInputContext.Values,
-			},
-			Meta: splice_api_token_metadata_v1.Metadata{},
+			Context: tokenMetadataContext,
+			Meta:    splice_api_token_metadata_v1.Metadata{},
 		},
 		TokenPoolHoldings: tokenPoolHoldings,
 	}
@@ -148,14 +150,16 @@ func GetTokenPoolSendDisclosure(
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token input choice context: %w", err)
 	}
+	tokenMetadataContext, err := CCIPContextToChoiceContext(tokenInputContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert token metadata choice context: %w", err)
+	}
 
 	tokenInput := interfaces.TokenInput{
 		TransferFactory: types.CONTRACT_ID(resp.JSON200.TokenInput.TransferFactory),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: splice_api_token_metadata_v1.ChoiceContext{
-				Values: tokenInputContext.Values,
-			},
-			Meta: splice_api_token_metadata_v1.Metadata{},
+			Context: tokenMetadataContext,
+			Meta:    splice_api_token_metadata_v1.Metadata{},
 		},
 	}
 

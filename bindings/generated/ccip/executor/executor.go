@@ -382,12 +382,12 @@ func (t *DynamicConfig) UnmarshalHex(data string) error {
 
 // Executor is a Template type
 type Executor struct {
-	InstanceId         types.TEXT                `json:"instanceId"`
-	Owner              types.PARTY               `json:"owner"`
-	MaxCCVsPerMsg      types.INT64               `json:"maxCCVsPerMsg"`
-	DynamicConfig      DynamicConfig             `json:"dynamicConfig"`
-	AllowedCCVs        []mcms.RawInstanceAddress `json:"allowedCCVs"`
-	RemoteChainConfigs types.GENMAP              `json:"remoteChainConfigs"`
+	InstanceId         types.TEXT                          `json:"instanceId"`
+	Owner              types.PARTY                         `json:"owner"`
+	MaxCCVsPerMsg      types.INT64                         `json:"maxCCVsPerMsg"`
+	DynamicConfig      DynamicConfig                       `json:"dynamicConfig"`
+	AllowedCCVs        []mcms.RawInstanceAddress           `json:"allowedCCVs"`
+	RemoteChainConfigs map[types.NUMERIC]RemoteChainConfig `json:"remoteChainConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

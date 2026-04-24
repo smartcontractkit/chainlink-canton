@@ -637,17 +637,17 @@ func (t *LockOrBurnMCMSParams) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPool is a Template type
 type LockReleaseTokenPool struct {
-	InstanceId              types.TEXT                               `json:"instanceId"`
-	PoolOwner               types.PARTY                              `json:"poolOwner"`
-	CcipOwner               types.PARTY                              `json:"ccipOwner"`
-	InstrumentId            splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals                types.INT64                              `json:"decimals"`
-	RateLimitAdmin          *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
-	RemoteChainConfigs      types.GENMAP                             `json:"remoteChainConfigs"`
-	TokenTransferFeeConfigs types.GENMAP                             `json:"tokenTransferFeeConfigs"`
-	PoolReceiveContext      common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout         TransferTimeout                          `json:"transferTimeout"`
-	Deps                    LockReleaseTokenPoolDeps                 `json:"deps"`
+	InstanceId              types.TEXT                                `json:"instanceId"`
+	PoolOwner               types.PARTY                               `json:"poolOwner"`
+	CcipOwner               types.PARTY                               `json:"ccipOwner"`
+	InstrumentId            splice_api_token_holding_v1.InstrumentId  `json:"instrumentId"`
+	Decimals                types.INT64                               `json:"decimals"`
+	RateLimitAdmin          *types.PARTY                              `json:"rateLimitAdmin" hex:"optional"`
+	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig       `json:"remoteChainConfigs"`
+	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig2 `json:"tokenTransferFeeConfigs"`
+	PoolReceiveContext      common.CCIPContext                        `json:"poolReceiveContext"`
+	TransferTimeout         TransferTimeout                           `json:"transferTimeout"`
+	Deps                    LockReleaseTokenPoolDeps                  `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

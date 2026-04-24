@@ -499,18 +499,18 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 
 // CommitteeVerifier is a Template type
 type CommitteeVerifier struct {
-	InstanceId                   types.TEXT            `json:"instanceId"`
-	Owner                        types.PARTY           `json:"owner"`
-	CcipOwner                    types.PARTY           `json:"ccipOwner"`
-	VersionTag                   types.TEXT            `json:"versionTag" hex:"bytes"`
-	AllowListAdmin               *types.PARTY          `json:"allowListAdmin" hex:"optional"`
-	MessageSentObservers         []types.PARTY         `json:"messageSentObservers"`
-	StorageLocations             []types.TEXT          `json:"storageLocations"`
-	StorageLocationsAdmin        types.PARTY           `json:"storageLocationsAdmin"`
-	PendingStorageLocationsAdmin types.PARTY           `json:"pendingStorageLocationsAdmin"`
-	RemoteChainConfigs           types.GENMAP          `json:"remoteChainConfigs"`
-	SignerConfigs                types.GENMAP          `json:"signerConfigs"`
-	Deps                         CommitteeVerifierDeps `json:"deps"`
+	InstanceId                   types.TEXT                          `json:"instanceId"`
+	Owner                        types.PARTY                         `json:"owner"`
+	CcipOwner                    types.PARTY                         `json:"ccipOwner"`
+	VersionTag                   types.TEXT                          `json:"versionTag" hex:"bytes"`
+	AllowListAdmin               *types.PARTY                        `json:"allowListAdmin" hex:"optional"`
+	MessageSentObservers         []types.PARTY                       `json:"messageSentObservers"`
+	StorageLocations             []types.TEXT                        `json:"storageLocations"`
+	StorageLocationsAdmin        types.PARTY                         `json:"storageLocationsAdmin"`
+	PendingStorageLocationsAdmin types.PARTY                         `json:"pendingStorageLocationsAdmin"`
+	RemoteChainConfigs           map[types.NUMERIC]RemoteChainConfig `json:"remoteChainConfigs"`
+	SignerConfigs                map[types.NUMERIC]SignatureConfig   `json:"signerConfigs"`
+	Deps                         CommitteeVerifierDeps               `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
