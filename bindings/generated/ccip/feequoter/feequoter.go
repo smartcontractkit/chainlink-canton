@@ -1763,13 +1763,14 @@ func (t *UpdatePricesParams) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	AddPriceUpdaters(args AddPriceUpdaters) (*bind.EncodedChoice, error)
-	ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error)
+	ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error)
+	ApplyDestChainConfigUpdatesParams(args ApplyDestChainConfigUpdatesParams2) (*bind.EncodedChoice, error)
 	ApplyPriceUpdatersUpdate(args ApplyPriceUpdatersUpdate) (*bind.EncodedChoice, error)
 	ApplyPriceUpdatersUpdateParams(args ApplyPriceUpdatersUpdateParams) (*bind.EncodedChoice, error)
 	Get(args Get) (*bind.EncodedChoice, error)
 	GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error)
-	GetDestChainConfig2(args GetDestChainConfig2) (*bind.EncodedChoice, error)
-	GetDestChainConfig2MCMSParams(args GetDestChainConfig2MCMSParams) (*bind.EncodedChoice, error)
+	GetDestChainConfig(args GetDestChainConfig2) (*bind.EncodedChoice, error)
+	GetDestChainConfigMCMSParams(args GetDestChainConfig2MCMSParams) (*bind.EncodedChoice, error)
 	GetDestinationChainGasPrice(args GetDestinationChainGasPrice) (*bind.EncodedChoice, error)
 	GetDestinationChainGasPriceMCMSParams(args GetDestinationChainGasPriceMCMSParams) (*bind.EncodedChoice, error)
 	GetFeeTokens(args GetFeeTokens) (*bind.EncodedChoice, error)
@@ -1820,9 +1821,14 @@ func (e *encoder) AddPriceUpdaters(args AddPriceUpdaters) (*bind.EncodedChoice, 
 	return e.EncodeChoiceArgs("AddPriceUpdaters", args)
 }
 
-// ApplyDestChainConfigUpdates2 encodes parameters for the ApplyDestChainConfigUpdates2 choice.
-func (e *encoder) ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates2", args)
+// ApplyDestChainConfigUpdates encodes parameters for the ApplyDestChainConfigUpdates choice.
+func (e *encoder) ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates", args)
+}
+
+// ApplyDestChainConfigUpdatesParams encodes parameters for the ApplyDestChainConfigUpdates choice.
+func (e *encoder) ApplyDestChainConfigUpdatesParams(args ApplyDestChainConfigUpdatesParams2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates", args)
 }
 
 // ApplyPriceUpdatersUpdate encodes parameters for the ApplyPriceUpdatersUpdate choice.
@@ -1845,14 +1851,14 @@ func (e *encoder) GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error)
 	return e.EncodeChoiceArgs("Get", args)
 }
 
-// GetDestChainConfig2 encodes parameters for the GetDestChainConfig2 choice.
-func (e *encoder) GetDestChainConfig2(args GetDestChainConfig2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetDestChainConfig2", args)
+// GetDestChainConfig encodes parameters for the GetDestChainConfig choice.
+func (e *encoder) GetDestChainConfig(args GetDestChainConfig2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDestChainConfig", args)
 }
 
-// GetDestChainConfig2MCMSParams encodes MCMS parameters (without Caller) for the GetDestChainConfig2 choice.
-func (e *encoder) GetDestChainConfig2MCMSParams(args GetDestChainConfig2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetDestChainConfig2", args)
+// GetDestChainConfigMCMSParams encodes MCMS parameters (without Caller) for the GetDestChainConfig choice.
+func (e *encoder) GetDestChainConfigMCMSParams(args GetDestChainConfig2MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDestChainConfig", args)
 }
 
 // GetDestinationChainGasPrice encodes parameters for the GetDestinationChainGasPrice choice.

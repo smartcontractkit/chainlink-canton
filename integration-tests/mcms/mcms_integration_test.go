@@ -50,7 +50,7 @@ func buildMCMSBindingFromConfig(config MCMSConfig, owner, instanceID string, cha
 
 	roleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: map[types.TEXT]types.BOOL{},
+		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
 		ExpiringRoot: mcms.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
@@ -268,7 +268,7 @@ func testExecuteOpFlow(
 
 	roleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: map[types.TEXT]types.BOOL{},
+		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
 		ExpiringRoot: mcms.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),

@@ -878,7 +878,7 @@ func EncodeSelfDispatchSetConfig(role MCMSRole, params mcms.SetConfigParams) (st
 // EncodePruneSeenHashesParams encodes the role byte for a PruneSeenHashes self-dispatch call.
 // PruneTimelockTimestamps takes no parameters — pass "" as operationData.
 func EncodePruneSeenHashesParams(role MCMSRole) string {
-	return hex.EncodeToString([]byte{byte(role)})
+	return hex.EncodeToString([]byte{byte(role)}) //nolint:gosec // MCMSole is a controlled value
 }
 
 // ===========================================================================

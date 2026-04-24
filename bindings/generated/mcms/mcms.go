@@ -1877,10 +1877,10 @@ var _ types.ENUM = Role("")
 
 // RoleState is a Record type
 type RoleState struct {
-	Config       MultisigConfig            `json:"config"`
-	SeenHashes   map[types.TEXT]types.BOOL `json:"seenHashes"`
-	ExpiringRoot ExpiringRoot              `json:"expiringRoot"`
-	RootMetadata RootMetadata              `json:"rootMetadata"`
+	Config       MultisigConfig                 `json:"config"`
+	SeenHashes   map[types.TEXT]types.TIMESTAMP `json:"seenHashes"`
+	ExpiringRoot ExpiringRoot                   `json:"expiringRoot"`
+	RootMetadata RootMetadata                   `json:"rootMetadata"`
 }
 
 // ToMap converts RoleState to a map for DAML arguments

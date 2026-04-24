@@ -645,7 +645,7 @@ func (t *UpdateRequiredCCVs) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	Execute2(args Execute2) (*bind.EncodedChoice, error)
+	Execute(args Execute2) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
 	UpdateRequiredCCVs(args UpdateRequiredCCVs) (*bind.EncodedChoice, error)
 }
@@ -677,9 +677,9 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// Execute2 encodes parameters for the Execute2 choice.
-func (e *encoder) Execute2(args Execute2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("Execute2", args)
+// Execute encodes parameters for the Execute choice.
+func (e *encoder) Execute(args Execute2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Execute", args)
 }
 
 // GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.
