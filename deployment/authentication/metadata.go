@@ -54,7 +54,7 @@ func GetAuthorizationServerMetadata(ctx context.Context, authorizationServerURL 
 	}
 
 	// Validate that the response contains the authorization server URL as an Issuer
-	if metadata.Issuer != authorizationServerURL {
+	if !issuerEquals(authorizationServerURL, metadata.Issuer) {
 		return nil, fmt.Errorf("metadata: unexpected issuer: %s", metadata.Issuer)
 	}
 
