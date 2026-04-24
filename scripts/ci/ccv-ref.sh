@@ -117,6 +117,9 @@ apply_local_replaces() {
     dir=$(dirname "$gomod")
     while IFS='|' read -r module_path module_dir; do
       [[ -n "$module_path" && -n "$module_dir" ]] || continue
+      if [[ "$module_path" == "$MODULE" ]]; then
+        continue
+      fi
       (cd "$dir" && go mod edit -replace="${module_path}=${module_dir}")
     done < <(find_local_ccv_modules)
   done < <(find_gomods)
