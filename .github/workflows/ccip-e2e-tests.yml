@@ -94,6 +94,8 @@ jobs:
 
       - name: Pin go.mod to checked-out ccv ref
         working-directory: chainlink-canton
+        env:
+          CCV_USE_LOCAL_CHECKOUT: ${{ needs.resolve-ref.outputs.selected != needs.resolve-ref.outputs.pinned }}
         run: |
           CCV_SHA=$(cd ../chainlink-ccv && git rev-parse HEAD)
           make pin-ccv-all REF="$CCV_SHA"

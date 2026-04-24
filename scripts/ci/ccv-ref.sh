@@ -83,6 +83,45 @@ find_gomods() {
   find "$REPO_DIR" -name "go.mod"
 }
 
+use_local_checkout() {
+  local flag="${CCV_USE_LOCAL_CHECKOUT:-}"
+  [[ -n "$flag" && "$flag" != "0" && "$flag" != "false" ]]
+}
+
+find_local_ccv_modules() {
+  if [[ ! -d "$CCV_DIR" ]]; then
+    return 0
+  fi
+
+  find "$CCV_DIR" -name "go.mod" | while IFS= read -r gomod; do
+    local module_path
+    module_path=$(awk '/^module / {print $2; exit}' "$gomod")
+    if [[ -n "$module_path" ]]; then
+      printf '%s|%s\n' "$module_path" "$(dirname "$gomod")"
+    fi
+  done
+}
+
+apply_local_replaces() {
+  if ! use_local_checkout; then
+    return 0
+  fi
+  if [[ ! -d "$CCV_DIR" ]]; then
+    echo "ERROR: CCV_USE_LOCAL_CHECKOUT is set but $CCV_DIR does not exist" >&2
+    exit 1
+  fi
+
+  local gomod dir module_path module_dir
+  echo "Applying local chainlink-ccv replaces from $CCV_DIR..."
+  while IFS= read -r gomod; do
+    dir=$(dirname "$gomod")
+    while IFS='|' read -r module_path module_dir; do
+      [[ -n "$module_path" && -n "$module_dir" ]] || continue
+      (cd "$dir" && go mod edit -replace="${module_path}=${module_dir}")
+    done < <(find_local_ccv_modules)
+  done < <(find_gomods)
+}
+
 has_module() {
   local gomod="$1"
   local module_path="$2"
@@ -123,6 +162,8 @@ pin() {
     (cd "$CCV_DIR" && git fetch origin && git checkout "$sha" 2>/dev/null) \
       || echo "  WARNING: could not checkout ../chainlink-ccv at $sha" >&2
   fi
+
+  apply_local_replaces
 
   if [[ "${#SUBMODULES[@]}" -gt 0 ]]; then
     pin_devenv
