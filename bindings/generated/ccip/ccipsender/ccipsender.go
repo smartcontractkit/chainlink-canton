@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "4587995dad1665dcf604f41771ef1803eacdb45895d07eacf282f3f2a79706b4"
+	PackageID   = "0136b29abdf52dcce450c8528177cbfdc322aa09cbd18b4d51dbefdcf3fe4db3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -651,7 +651,7 @@ func (t *TokenTransferInput) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	GetFee2(args GetFee2) (*bind.EncodedChoice, error)
+	GetFee(args GetFee2) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
 	Send(args Send) (*bind.EncodedChoice, error)
 }
@@ -683,9 +683,9 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// GetFee2 encodes parameters for the GetFee2 choice.
-func (e *encoder) GetFee2(args GetFee2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetFee2", args)
+// GetFee encodes parameters for the GetFee choice.
+func (e *encoder) GetFee(args GetFee2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee", args)
 }
 
 // GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.

@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "370c5ce8852b367e8c153278435566b5020746b986885a2454bc1be53b258e6d"
+	PackageID   = "1ba294670f2be4a145e3019722408cb429960910fec40f771bcbb6de12af49db"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1580,34 +1580,31 @@ func (t *TransferAdminRoleMCMSParams) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	AcceptAdmin(args AcceptAdminParams) (*bind.EncodedChoice, error)
 	AcceptAdminRole(args AcceptAdminRole) (*bind.EncodedChoice, error)
 	AcceptAdminRoleMCMSParams(args AcceptAdminRoleMCMSParams) (*bind.EncodedChoice, error)
-	AddTokenSend2(args AddTokenSend2) (*bind.EncodedChoice, error)
-	AddTokenSend2MCMSParams(args AddTokenSend2MCMSParams) (*bind.EncodedChoice, error)
-	AddTokenSendFee2(args AddTokenSendFee2) (*bind.EncodedChoice, error)
-	AddTokenSendFee2MCMSParams(args AddTokenSendFee2MCMSParams) (*bind.EncodedChoice, error)
+	AddTokenSend(args AddTokenSend2) (*bind.EncodedChoice, error)
+	AddTokenSendMCMSParams(args AddTokenSend2MCMSParams) (*bind.EncodedChoice, error)
+	AddTokenSendFee(args AddTokenSendFee2) (*bind.EncodedChoice, error)
+	AddTokenSendFeeMCMSParams(args AddTokenSendFee2MCMSParams) (*bind.EncodedChoice, error)
 	ConsumeReceiveTicket(args ConsumeReceiveTicket) (*bind.EncodedChoice, error)
 	ConsumeReceiveTicketMCMSParams(args ConsumeReceiveTicketMCMSParams) (*bind.EncodedChoice, error)
-	FinalizeExecute2(args FinalizeExecute2) (*bind.EncodedChoice, error)
-	FinalizeExecute2MCMSParams(args FinalizeExecute2MCMSParams) (*bind.EncodedChoice, error)
-	Get2(args Get2) (*bind.EncodedChoice, error)
-	Get2MCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error)
+	FinalizeExecute(args FinalizeExecute2) (*bind.EncodedChoice, error)
+	FinalizeExecuteMCMSParams(args FinalizeExecute2MCMSParams) (*bind.EncodedChoice, error)
+	Get(args Get2) (*bind.EncodedChoice, error)
+	GetMCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error)
 	GetTokenConfig(args GetTokenConfig) (*bind.EncodedChoice, error)
 	GetTokenConfigMCMSParams(args GetTokenConfigMCMSParams) (*bind.EncodedChoice, error)
 	IsAdministrator(args IsAdministrator) (*bind.EncodedChoice, error)
 	IsAdministratorMCMSParams(args IsAdministratorMCMSParams) (*bind.EncodedChoice, error)
-	ProposeAdmin(args ProposeAdminParams) (*bind.EncodedChoice, error)
 	ProposeAdministrator(args ProposeAdministrator) (*bind.EncodedChoice, error)
 	ProposeAdministratorMCMSParams(args ProposeAdministratorMCMSParams) (*bind.EncodedChoice, error)
-	SetInboundPoolCCVs2(args SetInboundPoolCCVs2) (*bind.EncodedChoice, error)
-	SetInboundPoolCCVs2MCMSParams(args SetInboundPoolCCVs2MCMSParams) (*bind.EncodedChoice, error)
-	SetOutboundPoolCCVs2(args SetOutboundPoolCCVs2) (*bind.EncodedChoice, error)
-	SetOutboundPoolCCVs2MCMSParams(args SetOutboundPoolCCVs2MCMSParams) (*bind.EncodedChoice, error)
+	SetInboundPoolCCVs(args SetInboundPoolCCVs2) (*bind.EncodedChoice, error)
+	SetInboundPoolCCVsMCMSParams(args SetInboundPoolCCVs2MCMSParams) (*bind.EncodedChoice, error)
+	SetOutboundPoolCCVs(args SetOutboundPoolCCVs2) (*bind.EncodedChoice, error)
+	SetOutboundPoolCCVsMCMSParams(args SetOutboundPoolCCVs2MCMSParams) (*bind.EncodedChoice, error)
 	SetPool(args SetPool) (*bind.EncodedChoice, error)
 	SetPoolMCMSParams(args SetPoolMCMSParams) (*bind.EncodedChoice, error)
 	SetPoolParams(args SetPoolParams) (*bind.EncodedChoice, error)
-	TransferAdmin(args TransferAdminParams) (*bind.EncodedChoice, error)
 	TransferAdminRole(args TransferAdminRole) (*bind.EncodedChoice, error)
 	TransferAdminRoleMCMSParams(args TransferAdminRoleMCMSParams) (*bind.EncodedChoice, error)
 }
@@ -1639,11 +1636,6 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// AcceptAdmin encodes parameters for the AcceptAdmin choice.
-func (e *encoder) AcceptAdmin(args AcceptAdminParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AcceptAdmin", args)
-}
-
 // AcceptAdminRole encodes parameters for the AcceptAdminRole choice.
 func (e *encoder) AcceptAdminRole(args AcceptAdminRole) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AcceptAdminRole", args)
@@ -1654,24 +1646,24 @@ func (e *encoder) AcceptAdminRoleMCMSParams(args AcceptAdminRoleMCMSParams) (*bi
 	return e.EncodeChoiceArgs("AcceptAdminRole", args)
 }
 
-// AddTokenSend2 encodes parameters for the AddTokenSend2 choice.
-func (e *encoder) AddTokenSend2(args AddTokenSend2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddTokenSend2", args)
+// AddTokenSend encodes parameters for the AddTokenSend choice.
+func (e *encoder) AddTokenSend(args AddTokenSend2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddTokenSend", args)
 }
 
-// AddTokenSend2MCMSParams encodes MCMS parameters (without Caller) for the AddTokenSend2 choice.
-func (e *encoder) AddTokenSend2MCMSParams(args AddTokenSend2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddTokenSend2", args)
+// AddTokenSendMCMSParams encodes MCMS parameters (without Caller) for the AddTokenSend choice.
+func (e *encoder) AddTokenSendMCMSParams(args AddTokenSend2MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddTokenSend", args)
 }
 
-// AddTokenSendFee2 encodes parameters for the AddTokenSendFee2 choice.
-func (e *encoder) AddTokenSendFee2(args AddTokenSendFee2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddTokenSendFee2", args)
+// AddTokenSendFee encodes parameters for the AddTokenSendFee choice.
+func (e *encoder) AddTokenSendFee(args AddTokenSendFee2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddTokenSendFee", args)
 }
 
-// AddTokenSendFee2MCMSParams encodes MCMS parameters (without Caller) for the AddTokenSendFee2 choice.
-func (e *encoder) AddTokenSendFee2MCMSParams(args AddTokenSendFee2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddTokenSendFee2", args)
+// AddTokenSendFeeMCMSParams encodes MCMS parameters (without Caller) for the AddTokenSendFee choice.
+func (e *encoder) AddTokenSendFeeMCMSParams(args AddTokenSendFee2MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddTokenSendFee", args)
 }
 
 // ConsumeReceiveTicket encodes parameters for the ConsumeReceiveTicket choice.
@@ -1684,24 +1676,24 @@ func (e *encoder) ConsumeReceiveTicketMCMSParams(args ConsumeReceiveTicketMCMSPa
 	return e.EncodeChoiceArgs("ConsumeReceiveTicket", args)
 }
 
-// FinalizeExecute2 encodes parameters for the FinalizeExecute2 choice.
-func (e *encoder) FinalizeExecute2(args FinalizeExecute2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FinalizeExecute2", args)
+// FinalizeExecute encodes parameters for the FinalizeExecute choice.
+func (e *encoder) FinalizeExecute(args FinalizeExecute2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FinalizeExecute", args)
 }
 
-// FinalizeExecute2MCMSParams encodes MCMS parameters (without Caller) for the FinalizeExecute2 choice.
-func (e *encoder) FinalizeExecute2MCMSParams(args FinalizeExecute2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FinalizeExecute2", args)
+// FinalizeExecuteMCMSParams encodes MCMS parameters (without Caller) for the FinalizeExecute choice.
+func (e *encoder) FinalizeExecuteMCMSParams(args FinalizeExecute2MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FinalizeExecute", args)
 }
 
-// Get2 encodes parameters for the Get2 choice.
-func (e *encoder) Get2(args Get2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("Get2", args)
+// Get encodes parameters for the Get choice.
+func (e *encoder) Get(args Get2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Get", args)
 }
 
-// Get2MCMSParams encodes MCMS parameters (without Caller) for the Get2 choice.
-func (e *encoder) Get2MCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("Get2", args)
+// GetMCMSParams encodes MCMS parameters (without Caller) for the Get choice.
+func (e *encoder) GetMCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Get", args)
 }
 
 // GetTokenConfig encodes parameters for the GetTokenConfig choice.
@@ -1724,11 +1716,6 @@ func (e *encoder) IsAdministratorMCMSParams(args IsAdministratorMCMSParams) (*bi
 	return e.EncodeChoiceArgs("IsAdministrator", args)
 }
 
-// ProposeAdmin encodes parameters for the ProposeAdmin choice.
-func (e *encoder) ProposeAdmin(args ProposeAdminParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ProposeAdmin", args)
-}
-
 // ProposeAdministrator encodes parameters for the ProposeAdministrator choice.
 func (e *encoder) ProposeAdministrator(args ProposeAdministrator) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ProposeAdministrator", args)
@@ -1739,24 +1726,24 @@ func (e *encoder) ProposeAdministratorMCMSParams(args ProposeAdministratorMCMSPa
 	return e.EncodeChoiceArgs("ProposeAdministrator", args)
 }
 
-// SetInboundPoolCCVs2 encodes parameters for the SetInboundPoolCCVs2 choice.
-func (e *encoder) SetInboundPoolCCVs2(args SetInboundPoolCCVs2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetInboundPoolCCVs2", args)
+// SetInboundPoolCCVs encodes parameters for the SetInboundPoolCCVs choice.
+func (e *encoder) SetInboundPoolCCVs(args SetInboundPoolCCVs2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetInboundPoolCCVs", args)
 }
 
-// SetInboundPoolCCVs2MCMSParams encodes MCMS parameters (without Caller) for the SetInboundPoolCCVs2 choice.
-func (e *encoder) SetInboundPoolCCVs2MCMSParams(args SetInboundPoolCCVs2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetInboundPoolCCVs2", args)
+// SetInboundPoolCCVsMCMSParams encodes MCMS parameters (without Caller) for the SetInboundPoolCCVs choice.
+func (e *encoder) SetInboundPoolCCVsMCMSParams(args SetInboundPoolCCVs2MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetInboundPoolCCVs", args)
 }
 
-// SetOutboundPoolCCVs2 encodes parameters for the SetOutboundPoolCCVs2 choice.
-func (e *encoder) SetOutboundPoolCCVs2(args SetOutboundPoolCCVs2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetOutboundPoolCCVs2", args)
+// SetOutboundPoolCCVs encodes parameters for the SetOutboundPoolCCVs choice.
+func (e *encoder) SetOutboundPoolCCVs(args SetOutboundPoolCCVs2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetOutboundPoolCCVs", args)
 }
 
-// SetOutboundPoolCCVs2MCMSParams encodes MCMS parameters (without Caller) for the SetOutboundPoolCCVs2 choice.
-func (e *encoder) SetOutboundPoolCCVs2MCMSParams(args SetOutboundPoolCCVs2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetOutboundPoolCCVs2", args)
+// SetOutboundPoolCCVsMCMSParams encodes MCMS parameters (without Caller) for the SetOutboundPoolCCVs choice.
+func (e *encoder) SetOutboundPoolCCVsMCMSParams(args SetOutboundPoolCCVs2MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetOutboundPoolCCVs", args)
 }
 
 // SetPool encodes parameters for the SetPool choice.
@@ -1772,11 +1759,6 @@ func (e *encoder) SetPoolMCMSParams(args SetPoolMCMSParams) (*bind.EncodedChoice
 // SetPoolParams encodes parameters for the SetPool choice.
 func (e *encoder) SetPoolParams(args SetPoolParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetPool", args)
-}
-
-// TransferAdmin encodes parameters for the TransferAdmin choice.
-func (e *encoder) TransferAdmin(args TransferAdminParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("TransferAdmin", args)
 }
 
 // TransferAdminRole encodes parameters for the TransferAdminRole choice.

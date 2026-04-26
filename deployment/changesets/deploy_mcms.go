@@ -214,7 +214,7 @@ func normalizeGroups(input []types.INT64, name string) ([]types.INT64, error) {
 func emptyRoleState(config mcmsbindings.MultisigConfig) mcmsbindings.RoleState {
 	return mcmsbindings.RoleState{
 		Config:     config,
-		SeenHashes: map[types.TEXT]types.BOOL{},
+		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
 		ExpiringRoot: mcmsbindings.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),

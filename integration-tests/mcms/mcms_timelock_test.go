@@ -291,7 +291,7 @@ func createMCMSMultiRole(
 	// Build empty RoleState (same for all roles initially)
 	roleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: map[types.TEXT]types.BOOL{},
+		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
 		ExpiringRoot: mcms.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
