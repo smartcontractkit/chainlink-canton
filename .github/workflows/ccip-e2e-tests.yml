@@ -95,6 +95,9 @@ jobs:
       - name: Pin go.mod to checked-out ccv ref
         working-directory: chainlink-canton
         env:
+          # Tracking runs need the checked-out CCV workspace because some CCV
+          # submodules still rely on local replace/v0.0.0 wiring that is not
+          # fully consumable from the module proxy alone.
           CCV_USE_LOCAL_CHECKOUT: ${{ needs.resolve-ref.outputs.selected != needs.resolve-ref.outputs.pinned }}
         run: |
           CCV_SHA=$(cd ../chainlink-ccv && git rev-parse HEAD)

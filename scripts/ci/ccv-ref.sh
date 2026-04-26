@@ -117,6 +117,8 @@ apply_local_replaces() {
     dir=$(dirname "$gomod")
     while IFS='|' read -r module_path module_dir; do
       [[ -n "$module_path" && -n "$module_dir" ]] || continue
+      # Keep the root module versioned via go get @<sha>; only submodules need
+      # local filesystem replaces to bypass unresolved CCV v0.0.0 wiring.
       if [[ "$module_path" == "$MODULE" ]]; then
         continue
       fi

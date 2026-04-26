@@ -1,0 +1,118 @@
+name: Auto-bump pinned CCV
+
+on:
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: auto-bump-ccv
+  cancel-in-progress: true
+
+jobs:
+  resolve-ref:
+    name: Resolve tracking ref
+    runs-on: ubuntu-latest
+    outputs:
+      tracking: ${{ steps.refs.outputs.tracking }}
+      pinned: ${{ steps.refs.outputs.pinned }}
+      module: ${{ steps.refs.outputs.module }}
+      tracking_sha: ${{ steps.tracking_sha.outputs.sha }}
+      should_bump: ${{ steps.compare.outputs.should_bump }}
+      short_sha: ${{ steps.compare.outputs.short_sha }}
+      compare_url: ${{ steps.compare.outputs.compare_url }}
+    steps:
+      - name: Check out chainlink-canton
+        uses: actions/checkout@v6
+        with:
+          repository: smartcontractkit/chainlink-canton
+          path: chainlink-canton
+
+      - name: Read configured ccv refs
+        id: refs
+        working-directory: chainlink-canton
+        run: bash ./scripts/ci/ccv-ref.sh read tracking pinned module
+
+      - name: Check out chainlink-ccv tracking ref
+        uses: actions/checkout@v6
+        with:
+          repository: smartcontractkit/chainlink-ccv
+          path: chainlink-ccv
+          ref: ${{ steps.refs.outputs.tracking }}
+
+      - name: Resolve tracking SHA
+        id: tracking_sha
+        working-directory: chainlink-ccv
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Compare tracking and pinned refs
+        id: compare
+        env:
+          MODULE: ${{ steps.refs.outputs.module }}
+          PINNED: ${{ steps.refs.outputs.pinned }}
+          TRACKING_SHA: ${{ steps.tracking_sha.outputs.sha }}
+        run: |
+          if [[ "$TRACKING_SHA" == "$PINNED" ]]; then
+            echo "should_bump=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_bump=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "short_sha=${TRACKING_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          echo "compare_url=https://github.com/${MODULE#*/}/compare/${PINNED}...${TRACKING_SHA}" >> "$GITHUB_OUTPUT"
+
+  bump-pr:
+    name: Open bump PR
+    needs: resolve-ref
+    if: needs.resolve-ref.outputs.should_bump == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out chainlink-canton
+        uses: actions/checkout@v6
+        with:
+          repository: smartcontractkit/chainlink-canton
+          path: chainlink-canton
+
+      - name: Check out chainlink-ccv tracking ref
+        uses: actions/checkout@v6
+        with:
+          repository: smartcontractkit/chainlink-ccv
+          path: chainlink-ccv
+          ref: ${{ needs.resolve-ref.outputs.tracking_sha }}
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: chainlink-canton/go.mod
+          cache-dependency-path: chainlink-canton/go.sum
+
+      - name: Repin chainlink-canton to tracking SHA
+        working-directory: chainlink-canton
+        env:
+          # Upstream CCV still has some local replace / v0.0.0 submodule wiring,
+          # so bump PR generation uses the checked-out CCV workspace directly.
+          CCV_USE_LOCAL_CHECKOUT: "true"
+          TRACKING_SHA: ${{ needs.resolve-ref.outputs.tracking_sha }}
+        run: |
+          make pin-ccv-all REF="$TRACKING_SHA"
+          make validate-ccv
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          path: chainlink-canton
+          branch: auto/bump-ccv-pinned
+          delete-branch: true
+          commit-message: "chore(ci): bump pinned ccv to ${{ needs.resolve-ref.outputs.short_sha }}"
+          title: "[TEST] chore(ci): bump pinned ccv to ${{ needs.resolve-ref.outputs.short_sha }}"
+          body: |
+            Auto-bump: upstream `${{ needs.resolve-ref.outputs.tracking }}` moved past the currently pinned SHA.
+
+            CCV diff: `${{ needs.resolve-ref.outputs.pinned }}` -> `${{ needs.resolve-ref.outputs.tracking_sha }}`
+
+            Compare: ${{ needs.resolve-ref.outputs.compare_url }}
+          labels: |
+            auto-bump
