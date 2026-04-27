@@ -16,6 +16,8 @@ import CCIP.GlobalConfigTypes (
     ApplyDestChainConfigUpdatesParams(..),
     ApplySourceChainConfigUpdatesParams(..),
     validateDefaultAndMandatedCCVs,
+    assertSourceChainMandatedCCVsNonEmpty,
+    isSourceChainConfigCCVsValid,
     )
 import CCIP.GlobalConfigCodecGen (decodeApplyDestChainConfigUpdatesParamsAt, decodeApplySourceChainConfigUpdatesParamsAt)
 import MCMS.RawInstanceAddress (assertValidInstanceId)
@@ -39,6 +41,7 @@ template GlobalConfig
             && chainSelector > 0.0 -- Local chain selector must be greater than zero
             && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)  -- All destination chain selectors must be greater than zero and not equal to the local chain selector
             && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)  -- All source chain selectors must be greater than zero and not equal to the local chain selector
+            && all isSourceChainConfigCCVsValid (Map.values sourceChainConfigs)
 
         nonconsuming choice GetDestChainConfig : Optional DestChainConfig
             with
@@ -99,6 +102,7 @@ template GlobalConfig
                     assertMsg "InvalidChainSelector: source chain selector must not be the same as the local chain selector" (sourceChainSelector /= chainSelector)
                     forA_ onRampAddresses $ \addr -> assertValidHex "onRampAddress" addr
                     validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
+                    assertSourceChainMandatedCCVsNonEmpty laneMandatedCCVs
 
                 -- Update
                 let newConfigs = foldl

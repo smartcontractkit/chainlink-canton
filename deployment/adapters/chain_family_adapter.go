@@ -126,6 +126,10 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 				if err != nil {
 					return out, fmt.Errorf("resolve lane mandated inbound ccvs for remote chain %d: %w", remoteSelector, err)
 				}
+				defaultInboundCCVs, laneMandatedInboundCCVs, err = normalizeCantonInboundCCVs(defaultInboundCCVs, laneMandatedInboundCCVs)
+				if err != nil {
+					return out, fmt.Errorf("normalize inbound ccvs for remote chain %d on local chain %d: %w", remoteSelector, input.ChainSelector, err)
+				}
 				defaultOutboundCCVs, err := resolveContractRefsByAddresses(
 					ds,
 					input.ChainSelector,
@@ -199,6 +203,17 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 			return out, nil
 		},
 	)
+}
+
+func normalizeCantonInboundCCVs(defaultInboundCCVs, laneMandatedInboundCCVs []datastore.AddressRef) ([]datastore.AddressRef, []datastore.AddressRef, error) {
+	if len(laneMandatedInboundCCVs) > 0 {
+		return defaultInboundCCVs, laneMandatedInboundCCVs, nil
+	}
+	if len(defaultInboundCCVs) > 0 {
+		return nil, defaultInboundCCVs, nil
+	}
+
+	return nil, nil, fmt.Errorf("at least one lane-mandated inbound CCV is required for Canton source-chain config")
 }
 
 func (a *CantonChainFamilyAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {

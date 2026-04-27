@@ -76,6 +76,24 @@ validateDefaultAndMandatedCCVs defaultCCV laneMandatedCCVs = do
   assertNoDuplicates combined
   validateNoEmptyAddresses combined
 
+areDefaultAndMandatedCCVsValid : [RawInstanceAddress] -> [RawInstanceAddress] -> Bool
+areDefaultAndMandatedCCVsValid defaultCCVs laneMandatedCCVs =
+  let combined = defaultCCVs <> laneMandatedCCVs
+  in length combined > 0
+    && all (\address -> address /= RawInstanceAddress "") combined
+    && all (\address -> length (List.filter (== address) combined) == 1) combined
+
+isSourceChainConfigCCVsValid : SourceChainConfig -> Bool
+isSourceChainConfigCCVsValid SourceChainConfig{defaultCCVs, laneMandatedCCVs} =
+  length laneMandatedCCVs > 0
+    && areDefaultAndMandatedCCVsValid defaultCCVs laneMandatedCCVs
+
+-- | Source-chain-specific strict check: every inbound lane must enforce at least one protocol-controlled
+-- | verifier so message authenticity cannot be satisfied purely by receiver-chosen defaults.
+assertSourceChainMandatedCCVsNonEmpty : [RawInstanceAddress] -> Update ()
+assertSourceChainMandatedCCVsNonEmpty laneMandatedCCVs =
+  assertMsg "laneMandatedCCVs: at least one lane-mandated CCV required for source chain" (not (null laneMandatedCCVs))
+
 -- | Asserts that there are no duplicate addresses within a list of RawInstanceAddresses.
 assertNoDuplicates : [RawInstanceAddress] -> Update ()
 assertNoDuplicates addresses = do

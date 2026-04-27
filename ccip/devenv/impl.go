@@ -341,6 +341,13 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("resolve registry admin for token prices: %w", err)
 	}
 
+	defaultCommitteeVerifier := datastore.AddressRef{
+		ChainSelector: selector,
+		Type:          datastore.ContractType(committee_verifier.ContractType),
+		Version:       committee_verifier.Version,
+		Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
+	}
+
 	chainDefinition := lanes.ChainDefinition{
 		Selector:           selector,
 		AddressBytesLength: 32,
@@ -356,23 +363,9 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 		ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
 			Enabled: false,
 		},
-		DefaultInboundCCVs: []datastore.AddressRef{
-			{
-				ChainSelector: selector,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       committee_verifier.Version,
-				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
-			},
-		},
-		DefaultOutboundCCVs: []datastore.AddressRef{
-			{
-				ChainSelector: selector,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       committee_verifier.Version,
-				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
-			},
-		},
-		BaseExecutionGasCost: 1,
+		LaneMandatedInboundCCVs: []datastore.AddressRef{defaultCommitteeVerifier},
+		DefaultOutboundCCVs:     []datastore.AddressRef{defaultCommitteeVerifier},
+		BaseExecutionGasCost:    1,
 		CantonLaneConfig: &lanes.CantonLaneConfig{
 			GlobalConfig: globalConfig,
 		},

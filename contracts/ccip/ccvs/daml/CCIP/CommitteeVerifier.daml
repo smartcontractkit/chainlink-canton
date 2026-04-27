@@ -168,22 +168,19 @@ template CommitteeVerifier
                     assertMsg ("ApplyAllowListUpdates: invalid chain selector: " <> show args.destChainSelector ) (args.destChainSelector >= 0.0)
                     DA.Action.unless args.allowListEnabled $ do
                         assertMsg "ApplyAllowListUpdates: cannot add allowed senders if allowlist is not enabled" (null args.addedAllowListedSenders)
-                -- Update
+                -- Update. allowListAdmin can only mutate allow-list fields on an already-onboarded
+                -- chain; new chains must be onboarded through ApplyRemoteChainConfigUpdates (owner-only)
+                -- so allowListAdmin cannot create configs with zeroed fees, gas, and payload size
                 let updatedRemoteChainConfigs = foldl
-                        (\configs args -> do
-                            let remoteChainConfig = case Map.lookup args.destChainSelector configs of
-                                    Some config -> config with
-                                                allowListEnabled = args.allowListEnabled
-                                                -- remove senders in removedAllowListedSenders from the existing list, then add senders in addedAllowListedSenders, and dedup the final list
-                                                allowedSendersList = dedup ((config.allowedSendersList \\ args.removedAllowListedSenders) <> args.addedAllowListedSenders)
-                                    None -> RemoteChainConfig with
-                                                feeUSDCents = 0.0
-                                                gasForVerification = 0
-                                                payloadSizeBytes = 0
-                                                allowListEnabled = args.allowListEnabled
-                                                -- no need to remove from the existing list since it doesn't exist, just add senders in addedAllowListedSenders and dedup
-                                                allowedSendersList = dedup (args.addedAllowListedSenders)
-                            Map.insert args.destChainSelector remoteChainConfig configs
+                        (\configs args ->
+                            case Map.lookup args.destChainSelector configs of
+                                Some config ->
+                                    let updated = config with
+                                                    allowListEnabled = args.allowListEnabled
+                                                    -- remove senders in removedAllowListedSenders from the existing list, then add senders in addedAllowListedSenders, and dedup the final list
+                                                    allowedSendersList = dedup ((config.allowedSendersList \\ args.removedAllowListedSenders) <> args.addedAllowListedSenders)
+                                    in Map.insert args.destChainSelector updated configs
+                                None -> error ("ApplyAllowListUpdates: destChainSelector not configured (onboard via ApplyRemoteChainConfigUpdates first): " <> show args.destChainSelector)
                             ) remoteChainConfigs allowListConfigArgsItems
                 create this with
                     remoteChainConfigs = updatedRemoteChainConfigs
@@ -296,6 +293,21 @@ template CommitteeVerifier
             controller caller
             do
                 execMsg <- fetch executingMessageCid
+
+                -- Domain separation: the verifier and the executing message must share a ccipOwner.
+                -- Without this, a verification produced under a different ccipOwner domain could still
+                -- satisfy the executing message's required verifier set because AddCCVVerification
+                -- records identity as (ccvInstanceId, ccvOwner) only.
+                assertMsg "verifier: executing message ccipOwner mismatch"
+                    (execMsg.ccipOwner == ccipOwner)
+
+                -- Restrict the verification entrypoint to the party that prepared the execution.
+                -- Otherwise a third party could call VerifyMessage directly with valid inputs,
+                -- consuming the active ExecutingMessageV1 and invalidating the executingMessageCid
+                -- held by the legitimate executor.
+                assertMsg "verifier: caller is not authorized for this executing message"
+                    (caller == execMsg.executor)
+
                 let message = execMsg.message
 
                 -- Get source chain signature config

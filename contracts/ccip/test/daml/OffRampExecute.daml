@@ -241,8 +241,8 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
-                defaultCCVs = [defaultCCV])]
+                laneMandatedCCVs = [defaultCCV]
+                defaultCCVs = [])]
 
     rmnRemote <- submit rmnOwner do
         createCmd RMNRemote.RMNRemote with
@@ -348,7 +348,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             optionalCCVs = []
             optionalCCVThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
-            sourceDefaultCCVs = [defaultCCV]
+            sourceDefaultCCVs = []
             inboundPoolCCVs = Some []
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampAddr
@@ -422,8 +422,8 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
-                defaultCCVs = [ccv1RawAddress, ccv2RawAddress])]
+                laneMandatedCCVs = [ccv1RawAddress]
+                defaultCCVs = [ccv2RawAddress])]
 
     -- Deploy RMNRemote
     rmnRemote <- submit rmnOwner do
@@ -600,8 +600,8 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
-                defaultCCVs = [ccv1RawAddress, ccv2RawAddress])]
+                laneMandatedCCVs = [ccv1RawAddress]
+                defaultCCVs = [ccv2RawAddress])]
 
     -- Deploy RMNRemote
     rmnRemote <- submit rmnOwner do
@@ -783,8 +783,8 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
-                defaultCCVs = [ccv1RawAddress])]
+                laneMandatedCCVs = [ccv1RawAddress]
+                defaultCCVs = [])]
 
     -- Deploy RMNRemote
     rmnRemote <- submit rmnOwner do
@@ -971,7 +971,7 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
+                laneMandatedCCVs = [receiverCCV]
                 defaultCCVs = [])]
 
     rmnRemote <- submit rmnOwner do
@@ -1095,7 +1095,7 @@ testPrepareExecuteAllowsSafeFinalityConfig = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
+                laneMandatedCCVs = [RawInstanceAddress.make "safe-lane-ccv" ccipOwner]
                 defaultCCVs = [])]
 
     rmnRemote <- submit rmnOwner do
@@ -1341,7 +1341,7 @@ testExecuteWrongReceiver = script do
     let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
-    -- Deploy GlobalConfig (no CCV requirements for simplicity)
+    -- Deploy GlobalConfig with the minimum lane CCV required by source-chain invariants.
     globalConfig <- submit ccipOwner do
         createCmd GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
@@ -1351,7 +1351,7 @@ testExecuteWrongReceiver = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
+                laneMandatedCCVs = [RawInstanceAddress.make "wrongrecv-lane-ccv" ccipOwner]
                 defaultCCVs = [])]
 
     -- Deploy RMNRemote
@@ -1477,8 +1477,8 @@ testExecuteAllowsMultipleOnRamps = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = [primaryOnRamp, rotatedOnRamp]
-                laneMandatedCCVs = []
-                defaultCCVs = [ccvInstanceAddress])]
+                laneMandatedCCVs = [ccvInstanceAddress]
+                defaultCCVs = [])]
 
     rmnRemote <- submit rmnOwner do
         createCmd RMNRemote.RMNRemote with
@@ -1610,7 +1610,7 @@ testExecuteRejectsUnconfiguredOnRamp = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = [allowedOnRamp]
-                laneMandatedCCVs = []
+                laneMandatedCCVs = [RawInstanceAddress.make "badonramp-lane-ccv" ccipOwner]
                 defaultCCVs = [])]
 
     rmnRemote <- submit rmnOwner do

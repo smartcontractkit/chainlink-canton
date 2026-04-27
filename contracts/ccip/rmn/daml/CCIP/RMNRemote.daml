@@ -164,6 +164,10 @@ template RMNRemote
             controller caller
             do
                 let chainSubject = chainSelectorToSubject chainSelector
+                -- Reject any selector that would alias the global subject
+                -- so chain and global curse states remain independent.
+                assertMsg "rmn: chain selector maps to reserved global curse subject"
+                    (chainSubject /= globalCurseSubject)
                 pure (globalCurseSubject `elem` cursedSubjects
                       || chainSubject `elem` cursedSubjects)
 
@@ -213,6 +217,10 @@ template RMNRemote
             controller rmnOwner
             do
                 let subject = chainSelectorToSubject chainSelector
+                -- Reject such selectors so per-chain curse handling
+                -- cannot overwrite global curse state.
+                assertMsg "rmn: chain selector maps to reserved global curse subject"
+                    (subject /= globalCurseSubject)
                 assertMsg "rmn: chain already cursed" (subject `notElem` cursedSubjects)
                 create this with cursedSubjects = subject :: cursedSubjects
 
@@ -223,6 +231,8 @@ template RMNRemote
             controller rmnOwner
             do
                 let subject = chainSelectorToSubject chainSelector
+                assertMsg "rmn: chain selector maps to reserved global curse subject"
+                    (subject /= globalCurseSubject)
                 assertMsg "rmn: chain not cursed" (subject `elem` cursedSubjects)
                 create this with cursedSubjects = filter (/= subject) cursedSubjects
 

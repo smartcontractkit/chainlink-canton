@@ -494,8 +494,8 @@ testCCIPExecute = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, CCIP.GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
-                defaultCCVs = [ccvInstanceAddress])]
+                laneMandatedCCVs = [ccvInstanceAddress]
+                defaultCCVs = [])]
 
     -- Deploy RMNRemote
     rmnRemote <- submit rmnOwner do
@@ -1098,8 +1098,8 @@ testExecuteRollsOverExecutedMessages = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, CCIP.GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000001"]
-                laneMandatedCCVs = []
-                defaultCCVs = [ccvInstanceAddress])]
+                laneMandatedCCVs = [ccvInstanceAddress]
+                defaultCCVs = [])]
 
     rmnRemote <- submit rmnOwner do
         createCmd CCIP.RMNRemote.RMNRemote with

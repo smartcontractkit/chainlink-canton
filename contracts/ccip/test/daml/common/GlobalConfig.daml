@@ -64,8 +64,8 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
                 sourceChainSelector = 789.0
                 isEnabled = False
                 onRampAddresses = ["343434"]
-                defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
-                laneMandatedCCVs = []
+                defaultCCVs = [RawInstanceAddress "0x567"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123"]
             ,CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 123123.0
                 isEnabled = True
@@ -138,6 +138,21 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
                 onRampAddresses = ["1111111111111111"]
                 -- Empty default and mandated CCV lists, which is invalid since at least one CCV must be provided
                 defaultCCVs = []
+                laneMandatedCCVs = []
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    -- defaultCCVs populated but laneMandatedCCVs empty is invalid —
+    -- every lane must enforce at least one protocol-controlled verifier so message
+    -- authenticity cannot be satisfied purely by receiver-chosen defaults.
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 111.0
+                isEnabled = True
+                onRampAddresses = ["1111111111111111"]
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = []
             ]
     submitMustFail owner do
@@ -250,6 +265,18 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
                     onRampAddresses = ["1111111111111111"]
                     defaultCCVs = [RawInstanceAddress "0xabc"]
                     laneMandatedCCVs = [RawInstanceAddress "0x123"]
+                )]
+    submitMustFail owner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = instanceId
+            ccipOwner = owner
+            chainSelector = 123.0
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(456.0, CCIP.GlobalConfigTypes.SourceChainConfig with
+                    isEnabled = True
+                    onRampAddresses = ["1111111111111111"]
+                    defaultCCVs = [RawInstanceAddress "0xabc"]
+                    laneMandatedCCVs = []
                 )]
 
     pure()

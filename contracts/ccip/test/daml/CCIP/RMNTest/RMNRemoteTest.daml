@@ -100,3 +100,77 @@ testRMNRemote_UncurseMultipleRejectsAllNotCursed = script do
       subjects = ["01000000000000000000000000000001"]
 
   pure ()
+
+-- ===========================================================================
+-- CURSE SUBJECT COLLISION TESTS
+-- ===========================================================================
+-- The chain-selector-to-subject conversion produces
+-- bytes16(uint128(chainSelector)), and selector 1329227995784915872903807060280344577
+-- maps exactly to globalCurseSubject. The CurseChain/UncurseChain/IsCursedForChain
+-- paths must reject this selector so per-chain curse state cannot collide with
+-- the global curse subject.
+
+collidingChainSelector : Numeric 0
+collidingChainSelector = 1329227995784915872903807060280344577.0
+
+-- | CurseChain rejects the selector whose subject aliases globalCurseSubject.
+testRMNRemote_CurseChainRejectsGlobalCollision : Script ()
+testRMNRemote_CurseChainRejectsGlobalCollision = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-curse-collision-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid CurseChain with
+      chainSelector = collidingChainSelector
+
+  pure ()
+
+-- | UncurseChain rejects the colliding selector even if its subject happens to be present.
+testRMNRemote_UncurseChainRejectsGlobalCollision : Script ()
+testRMNRemote_UncurseChainRejectsGlobalCollision = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-uncurse-collision-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = [globalCurseSubject]
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid UncurseChain with
+      chainSelector = collidingChainSelector
+
+  pure ()
+
+-- | IsCursedForChain rejects the colliding selector rather than silently conflating
+-- global curse status with a per-chain query.
+testRMNRemote_IsCursedForChainRejectsGlobalCollision : Script ()
+testRMNRemote_IsCursedForChainRejectsGlobalCollision = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-iscursed-collision-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid IsCursedForChain with
+      caller = rmnOwner
+      chainSelector = collidingChainSelector
+
+  pure ()

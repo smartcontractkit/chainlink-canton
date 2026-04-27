@@ -246,8 +246,8 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 			SourceChainSelector: remoteChainSelector,
 			IsEnabled:           types.BOOL(true),
 			OnRampAddresses:     []types.TEXT{"0000000000000000000000000000000000000000000000000000000000abcdef"},
-			DefaultCCVs:         []mcms.RawInstanceAddress{{Unpack: types.TEXT(ccvInstanceAddr)}},
-			LaneMandatedCCVs:    []mcms.RawInstanceAddress{},
+			DefaultCCVs:         []mcms.RawInstanceAddress{},
+			LaneMandatedCCVs:    []mcms.RawInstanceAddress{{Unpack: types.TEXT(ccvInstanceAddr)}},
 		}},
 	}
 	sourceEncoded, err := gcEncoder.ApplySourceChainConfigUpdates(sourceConfigArgs)
