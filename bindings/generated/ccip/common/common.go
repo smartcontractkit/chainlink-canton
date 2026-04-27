@@ -66,6 +66,21 @@ type IIExecutor interface {
 	ExecutorGetFee(contractID string, args ExecutorGetFee) *model.ExerciseCommand
 }
 
+const (
+	UsdPerUsdCent                                 = types.NUMERIC("100000000.")
+	PremiumIdentity                               = types.NUMERIC("10000000000.")
+	JuelsPerLocalLink                             = types.NUMERIC("10000000000.")
+	BaseNumeric                                   = types.NUMERIC("100000000.")
+	BaseInt                                       = types.INT64(100000000)
+	RmnRemoteKey                                  = types.TEXT("rmn-remote")
+	WaitForFinalityFlag                           = types.TEXT("00000000")
+	FinalityConfigByteLength                      = types.INT64(4)
+	GlobalConfigKey                               = types.TEXT("global-config")
+	RateLimiterKey                                = types.TEXT("rate-limiter")
+	InboundRateLimiterKey                         = types.TEXT("inbound-rate-limiter")
+	InboundCustomBlockConfirmationsRateLimiterKey = types.TEXT("inbound-custom-block-confirmations-rate-limiter")
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

@@ -36,6 +36,10 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	BpsDenominator = types.NUMERIC("10000.")
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}
