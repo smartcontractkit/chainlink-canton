@@ -508,6 +508,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err)
 	disclosedTar, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"})
 	require.NoError(t, err)
+	disclosedTokenConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenConfig"})
+	require.NoError(t, err)
 	disclosedRmnRemote, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-rmn", ModuleName: "CCIP.RMNRemote", EntityName: "RMNRemote"})
 	require.NoError(t, err)
 	disclosedFeeQuoter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"})
@@ -522,6 +524,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NotEmpty(t, disclosedOnRamp.ContractId, "OnRamp disclosure missing/empty")
 	require.NotEmpty(t, disclosedGlobalConfig.ContractId, "GlobalConfig disclosure missing/empty")
 	require.NotEmpty(t, disclosedTar.ContractId, "TAR disclosure missing/empty")
+	require.NotEmpty(t, disclosedTokenConfig.ContractId, "TokenConfig disclosure missing/empty")
 	require.NotEmpty(t, disclosedRmnRemote.ContractId, "RMNRemote disclosure missing/empty")
 	require.NotEmpty(t, disclosedFeeQuoter.ContractId, "FeeQuoter disclosure missing/empty")
 	require.NotEmpty(t, disclosedPreapproval.ContractId, "Preapproval disclosure missing/empty")
@@ -535,6 +538,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("disclosedOnRamp.ContractId=%q", disclosedOnRamp.ContractId)
 	t.Logf("disclosedGlobalConfig.ContractId=%q", disclosedGlobalConfig.ContractId)
 	t.Logf("disclosedTar.ContractId=%q", disclosedTar.ContractId)
+	t.Logf("disclosedTokenConfig.ContractId=%q", disclosedTokenConfig.ContractId)
 	t.Logf("disclosedRmnRemote.ContractId=%q", disclosedRmnRemote.ContractId)
 	t.Logf("disclosedFeeQuoter.ContractId=%q", disclosedFeeQuoter.ContractId)
 
@@ -657,6 +661,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			"on-ramp":              common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOnRamp.ContractId))},
 			"global-config":        common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedGlobalConfig.ContractId))},
 			"token-admin-registry": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTar.ContractId))},
+			"token-config":         common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTokenConfig.ContractId))},
 			"fee-quoter":           common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedFeeQuoter.ContractId))},
 			"rmn-remote":           common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedRmnRemote.ContractId))},
 		},
@@ -719,6 +724,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			PoolExtraContext: common.CCIPContext{
 				Values: map[string]common.AnyValue{
 					"rate-limiter": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId))},
+					"token-config": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTokenConfig.ContractId))},
 				},
 			},
 			TokenInput: tokenTransferInput,
@@ -742,6 +748,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			disclosedTokenTransferHolding,
 			disclosedCCV,
 			disclosedPool,
+			disclosedTokenConfig,
 			disclosedOutboundRateLimiter,
 			disclosedPreapproval,
 			disclosedExecutor,
@@ -801,6 +808,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				disclosedTokenTransferHolding,
 				disclosedCCV,
 				disclosedPool,
+				disclosedTokenConfig,
 				disclosedOutboundRateLimiter,
 				disclosedPreapproval,
 				disclosedExecutor,
