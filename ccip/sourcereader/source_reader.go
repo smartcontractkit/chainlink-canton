@@ -71,6 +71,7 @@ func NewSourceReader(
 		opts = append(opts, grpc.WithAuthority(config.Authority))
 	}
 
+	// The default idle timeout is 30 minutes, after which the connection will be closed.
 	conn, err := grpc.NewClient(grpcEndpoint, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gRPC connection to canton node: %w", err)
