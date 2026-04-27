@@ -985,7 +985,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				TransferFactory: types.CONTRACT_ID(feeTransferFactorycid),
 				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 					Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(feeTransferFactoryChoiceContextValue)},
-					Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+					Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 				},
 				TokenPoolHoldings: []types.CONTRACT_ID{},
 			},

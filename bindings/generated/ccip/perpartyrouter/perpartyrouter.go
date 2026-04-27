@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "1d16d2ccb63f40e014ca26c19a180a01e38c246b5cee5be554124be341f61ca2"
+	PackageID   = "40f3594309626643c91deab8e0bd74b4dfa688e009bb1bdae54847bacec97880"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1014,14 +1014,14 @@ func (t *IsExecuted) UnmarshalHex(data string) error {
 
 // PerPartyRouter is a Template type
 type PerPartyRouter struct {
-	InstanceId                   types.TEXT          `json:"instanceId"`
-	CcipOwner                    types.PARTY         `json:"ccipOwner"`
-	PartyOwner                   types.PARTY         `json:"partyOwner"`
-	Deps                         PerPartyRouterDeps  `json:"deps"`
-	OutboundSequenceNumbers      types.GENMAP        `json:"outboundSequenceNumbers"`
-	ExecutedMessages             types.SET           `json:"executedMessages"`
-	ArchivedExecutionContractIds []types.CONTRACT_ID `json:"archivedExecutionContractIds"`
-	CustomObservers              []types.PARTY       `json:"customObservers"`
+	InstanceId                   types.TEXT                      `json:"instanceId"`
+	CcipOwner                    types.PARTY                     `json:"ccipOwner"`
+	PartyOwner                   types.PARTY                     `json:"partyOwner"`
+	Deps                         PerPartyRouterDeps              `json:"deps"`
+	OutboundSequenceNumbers      map[types.NUMERIC]types.NUMERIC `json:"outboundSequenceNumbers"`
+	ExecutedMessages             types.SET                       `json:"executedMessages"`
+	ArchivedExecutionContractIds []types.CONTRACT_ID             `json:"archivedExecutionContractIds"`
+	CustomObservers              []types.PARTY                   `json:"customObservers"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1532,10 +1532,10 @@ func (t *PerPartyRouterDeps) UnmarshalHex(data string) error {
 
 // PerPartyRouterFactory is a Template type
 type PerPartyRouterFactory struct {
-	InstanceId        types.TEXT         `json:"instanceId"`
-	CcipOwner         types.PARTY        `json:"ccipOwner"`
-	Deps              PerPartyRouterDeps `json:"deps"`
-	RegisteredRouters types.GENMAP       `json:"registeredRouters"`
+	InstanceId        types.TEXT                 `json:"instanceId"`
+	CcipOwner         types.PARTY                `json:"ccipOwner"`
+	Deps              PerPartyRouterDeps         `json:"deps"`
+	RegisteredRouters map[types.PARTY]types.TEXT `json:"registeredRouters"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -2124,7 +2124,7 @@ type MCMSEncoder interface {
 	CreateRouter(args CreateRouter) (*bind.EncodedChoice, error)
 	Execute(args Execute) (*bind.EncodedChoice, error)
 	FactorySetDeps(args FactorySetDeps) (*bind.EncodedChoice, error)
-	FinalizeFee2(args FinalizeFee2) (*bind.EncodedChoice, error)
+	FinalizeFee(args FinalizeFee2) (*bind.EncodedChoice, error)
 	GetExecutionState(args GetExecutionState) (*bind.EncodedChoice, error)
 	GetExecutionStateMCMSParams(args GetExecutionStateMCMSParams) (*bind.EncodedChoice, error)
 	GetFee(args GetFee) (*bind.EncodedChoice, error)
@@ -2134,12 +2134,13 @@ type MCMSEncoder interface {
 	HasRouter(args HasRouter) (*bind.EncodedChoice, error)
 	HasRouterMCMSParams(args HasRouterMCMSParams) (*bind.EncodedChoice, error)
 	IsExecuted(args IsExecuted) (*bind.EncodedChoice, error)
-	PrepareExecute2(args PrepareExecute2) (*bind.EncodedChoice, error)
-	PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error)
+	PrepareExecute(args PrepareExecute2) (*bind.EncodedChoice, error)
+	PrepareExecuteMCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error)
 	PrepareSend(args PrepareSend) (*bind.EncodedChoice, error)
 	RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error)
 	RemoveCustomObserversParams(args RemoveCustomObserversParams) (*bind.EncodedChoice, error)
-	SetDeps3(args SetDeps3) (*bind.EncodedChoice, error)
+	SetDeps(args SetDeps3) (*bind.EncodedChoice, error)
+	SetDepsParams(args SetDepsParams3) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -2199,9 +2200,9 @@ func (e *encoder) FactorySetDeps(args FactorySetDeps) (*bind.EncodedChoice, erro
 	return e.EncodeChoiceArgs("FactorySetDeps", args)
 }
 
-// FinalizeFee2 encodes parameters for the FinalizeFee2 choice.
-func (e *encoder) FinalizeFee2(args FinalizeFee2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FinalizeFee2", args)
+// FinalizeFee encodes parameters for the FinalizeFee choice.
+func (e *encoder) FinalizeFee(args FinalizeFee2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FinalizeFee", args)
 }
 
 // GetExecutionState encodes parameters for the GetExecutionState choice.
@@ -2249,14 +2250,14 @@ func (e *encoder) IsExecuted(args IsExecuted) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("IsExecuted", args)
 }
 
-// PrepareExecute2 encodes parameters for the PrepareExecute2 choice.
-func (e *encoder) PrepareExecute2(args PrepareExecute2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("PrepareExecute2", args)
+// PrepareExecute encodes parameters for the PrepareExecute choice.
+func (e *encoder) PrepareExecute(args PrepareExecute2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PrepareExecute", args)
 }
 
-// PrepareExecute2MCMSParams encodes MCMS parameters (without Caller) for the PrepareExecute2 choice.
-func (e *encoder) PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("PrepareExecute2", args)
+// PrepareExecuteMCMSParams encodes MCMS parameters (without Caller) for the PrepareExecute choice.
+func (e *encoder) PrepareExecuteMCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PrepareExecute", args)
 }
 
 // PrepareSend encodes parameters for the PrepareSend choice.
@@ -2274,9 +2275,14 @@ func (e *encoder) RemoveCustomObserversParams(args RemoveCustomObserversParams) 
 	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
 }
 
-// SetDeps3 encodes parameters for the SetDeps3 choice.
-func (e *encoder) SetDeps3(args SetDeps3) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetDeps3", args)
+// SetDeps encodes parameters for the SetDeps choice.
+func (e *encoder) SetDeps(args SetDeps3) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDeps", args)
+}
+
+// SetDepsParams encodes parameters for the SetDeps choice.
+func (e *encoder) SetDepsParams(args SetDepsParams3) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDeps", args)
 }
 
 // Verify MCMSEncoder interface implementation

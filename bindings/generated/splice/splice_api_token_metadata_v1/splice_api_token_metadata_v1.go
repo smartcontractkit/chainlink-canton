@@ -92,17 +92,17 @@ func (t *AnyContractView) UnmarshalHex(data string) error {
 
 // AnyValue is a variant/union type
 type AnyValue struct {
-	AVText       *types.TEXT        `json:"AV_Text,omitempty"`
-	AVInt        *types.INT64       `json:"AV_Int,omitempty"`
-	AVDecimal    *types.NUMERIC     `json:"AV_Decimal,omitempty"`
-	AVBool       *types.BOOL        `json:"AV_Bool,omitempty"`
-	AVDate       *types.DATE        `json:"AV_Date,omitempty"`
-	AVTime       *types.TIMESTAMP   `json:"AV_Time,omitempty"`
-	AVRelTime    *types.RELTIME     `json:"AV_RelTime,omitempty"`
-	AVParty      *types.PARTY       `json:"AV_Party,omitempty"`
-	AVContractId *types.CONTRACT_ID `json:"AV_ContractId,omitempty"`
-	AVList       *[]AnyValue        `json:"AV_List,omitempty"`
-	AVMap        *types.TEXTMAP     `json:"AV_Map,omitempty"`
+	AVText       *types.TEXT          `json:"AV_Text,omitempty"`
+	AVInt        *types.INT64         `json:"AV_Int,omitempty"`
+	AVDecimal    *types.NUMERIC       `json:"AV_Decimal,omitempty"`
+	AVBool       *types.BOOL          `json:"AV_Bool,omitempty"`
+	AVDate       *types.DATE          `json:"AV_Date,omitempty"`
+	AVTime       *types.TIMESTAMP     `json:"AV_Time,omitempty"`
+	AVRelTime    *types.RELTIME       `json:"AV_RelTime,omitempty"`
+	AVParty      *types.PARTY         `json:"AV_Party,omitempty"`
+	AVContractId *types.CONTRACT_ID   `json:"AV_ContractId,omitempty"`
+	AVList       *[]AnyValue          `json:"AV_List,omitempty"`
+	AVMap        *map[string]AnyValue `json:"AV_Map,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for AnyValue
@@ -233,14 +233,19 @@ var _ types.VARIANT = (*AnyValue)(nil)
 
 // ChoiceContext is a Record type
 type ChoiceContext struct {
-	Values types.TEXTMAP `json:"values"`
+	Values map[string]AnyValue `json:"values"`
 }
 
 // ToMap converts ChoiceContext to a map for DAML arguments
 func (t ChoiceContext) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["values"] = model.NestedToDAMLValue(t.Values)
+	m["values"] = func() any {
+		if t.Values == nil {
+			return map[string]any{"_type": "textmap", "value": map[string]any{}}
+		}
+		return map[string]any{"_type": "textmap", "value": t.Values}
+	}()
 
 	return m
 }
@@ -344,14 +349,19 @@ func (t *ExtraArgs) UnmarshalHex(data string) error {
 
 // Metadata is a Record type
 type Metadata struct {
-	Values types.TEXTMAP `json:"values"`
+	Values map[string]types.TEXT `json:"values"`
 }
 
 // ToMap converts Metadata to a map for DAML arguments
 func (t Metadata) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["values"] = model.NestedToDAMLValue(t.Values)
+	m["values"] = func() any {
+		if t.Values == nil {
+			return map[string]any{"_type": "textmap", "value": map[string]any{}}
+		}
+		return map[string]any{"_type": "textmap", "value": t.Values}
+	}()
 
 	return m
 }

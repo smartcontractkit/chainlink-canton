@@ -36,6 +36,7 @@ import MCMS.Types
   , doneTimestamp
   , TimelockCall(..)
   , BlockedFunction(..)
+  , intToRole
   )
 import MCMS.GroupVoting
 import MCMS.Crypto
@@ -49,6 +50,8 @@ import MCMS.Codec
   , decodeBypasserExecuteBatchParamsWithOffset
   , decodeCancelBatchParamsWithOffset
   , decodeInt64At
+  , extractBytes
+  , decodeUint8
   )
 import DA.Crypto.Text (byteCount)
 
@@ -227,11 +230,16 @@ template MCMS
 
         -- 10. Update per-role state
         let newRs = rs with
-              seenHashes = Map.insert signedHash True rs.seenHashes
+              seenHashes = Map.insert signedHash validUntil rs.seenHashes
               expiringRoot = ExpiringRoot newRoot validUntil rs.expiringRoot.opCount
               rootMetadata = metadata
-
-        create (setRoleState targetRole newRs this)
+        let staged = setRoleState targetRole newRs this
+        -- Clear pending timelock ops when overriding root so stale ops
+        -- from the previous quorum cannot execute under the new root.
+        let finalMcms = if metadata.overridePreviousRoot
+              then staged with timelockTimestamps = Map.filter (== doneTimestamp) staged.timelockTimestamps
+              else staged
+        create finalMcms
 
     -- =========================================================================
     -- EXECUTE OPERATION (Main Entry Point - Dispatcher)
@@ -506,6 +514,28 @@ template MCMS
       controller submitter
       do pure $ length blockedFunctions
 
+    -- Remove seenHashes entries whose validUntil has passed.
+    -- Safe to prune: expired roots are independently rejected by the validUntil check in SetRoot,
+    -- so removing a hash entry after expiry cannot re-enable replay.
+    choice PruneSeenHashes : ContractId MCMS
+      with
+        targetRole : Role
+      controller owner
+      do
+        now <- getTime
+        let rs = getRoleState targetRole this
+            pruned = Map.filter (> now) rs.seenHashes
+            newRs = rs with seenHashes = pruned
+        create (setRoleState targetRole newRs this)
+
+    -- Remove timelockTimestamps entries that equal doneTimestamp (already executed).
+    -- Pending and ready entries are preserved so they can still be executed or cancelled.
+    choice PruneTimelockTimestamps : ContractId MCMS
+      controller owner
+      do
+        let pruned = Map.filter (/= doneTimestamp) timelockTimestamps
+        create this with timelockTimestamps = pruned
+
 -- ===========================================================================
 -- VIEW TYPES
 -- ===========================================================================
@@ -598,7 +628,8 @@ validateTargetCidsSize mcmsInstanceAddress calls targetCids = do
 --      Security: Bypasser's merkle proof validated the calls.
 --
 -- Supported functions: UpdateMinDelay, BlockFunction, UnblockFunction,
---                      SetConfig, ScheduleBatch, CancelBatch
+--                      SetConfig, ScheduleBatch, CancelBatch,
+--                      PruneSeenHashes, PruneTimelockTimestamps
 executeSelfDispatch : MCMS -> TimelockCall -> Update MCMS
 executeSelfDispatch mcms call =
   case call.functionName of
@@ -683,6 +714,29 @@ executeSelfDispatch mcms call =
             Some readyTime -> do
               assertMsg "mcms: operation already executed" $ readyTime /= doneTimestamp
               pure $ mcms with timelockTimestamps = Map.delete params.opId mcms.timelockTimestamps
+
+    "PruneSeenHashes" ->
+      case do
+        roleHex <- extractBytes call.operationData 0 1
+        roleInt <- decodeUint8 roleHex
+        role <- intToRole roleInt
+        Some (role, 1)
+      of
+        None -> abort "mcms: failed to decode PruneSeenHashes parameters"
+        Some (targetRole, finalOffset) -> do
+          assertMsg "mcms: trailing bytes in PruneSeenHashes operationData" $
+            finalOffset == byteCount call.operationData
+          now <- getTime
+          let rs = getRoleState targetRole mcms
+              pruned = Map.filter (> now) rs.seenHashes
+              newRs = rs with seenHashes = pruned
+          pure $ setRoleState targetRole newRs mcms
+
+    "PruneTimelockTimestamps" -> do
+      assertMsg "mcms: PruneTimelockTimestamps operationData must be empty" $
+        byteCount call.operationData == 0
+      let pruned = Map.filter (/= doneTimestamp) mcms.timelockTimestamps
+      pure $ mcms with timelockTimestamps = pruned
 
     _ -> abort $ "mcms: unknown self-dispatch function: " <> call.functionName
 
@@ -791,6 +845,10 @@ processCallsLoopInternal ownerParty cidMap mcms (call :: rest) = do
       None -> abort "mcms: invalid address format, expected instanceId@partyId"
       Some partyId -> pure partyId
 
+    expectedParty <- case partyFromText expectedPartyText of
+      None -> abort $ "mcms: invalid party in target address: " <> expectedPartyText
+      Some p -> pure p
+
     -- Fetch and validate target contract
     target <- fetch targetCid
     let targetView = view target
@@ -804,7 +862,7 @@ processCallsLoopInternal ownerParty cidMap mcms (call :: rest) = do
     case signatory target of
       [singleSig] ->
         assertMsg "mcms: target signatory does not match expected party" $
-          partyToText singleSig == expectedPartyText
+          singleSig == expectedParty
       _ -> abort "mcms: target must have exactly one signatory"
 
     -- Execute call and get updated map from entrypoint
