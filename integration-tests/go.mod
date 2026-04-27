@@ -12,7 +12,7 @@ require (
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/ethereum/go-ethereum v1.17.2
 	github.com/google/uuid v1.6.0
-	github.com/rs/zerolog v1.35.0
+	github.com/rs/zerolog v1.35.1
 	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-canton v0.0.0-20260423182618-78ffd32b7eb5
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260410105708-4e8133b0b504
