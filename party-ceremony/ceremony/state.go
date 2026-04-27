@@ -232,6 +232,7 @@ func (idx *dedupIndex) isDuplicateOwnershipMismatch(r operations.Report[any, any
 		return true
 	}
 	idx.ownershipMismatches[key] = struct{}{}
+
 	return false
 }
 
@@ -247,6 +248,7 @@ func (idx *dedupIndex) isDuplicateThresholdSequence(r operations.Report[any, any
 		return true
 	}
 	idx.thresholdErrors[key] = struct{}{}
+
 	return false
 }
 
@@ -259,6 +261,7 @@ func (idx *dedupIndex) filterPersistedChildren(childIDs []string) []string {
 			kept = append(kept, id)
 		}
 	}
+
 	return kept
 }
 
@@ -267,6 +270,7 @@ func isOwnershipMismatchErr(r operations.Report[any, any]) bool {
 		return false
 	}
 	msg := r.Err.Message
+
 	return strings.Contains(msg, "participant ID mismatch") ||
 		strings.Contains(msg, "does not match client identity")
 }
@@ -360,6 +364,7 @@ func appendReportsAtomic(path string, reports []operations.Report[any, any]) err
 	updated = append(updated, existing[closeIdx:]...)
 
 	tmp := path + ".tmp"
+	// #nosec G703 -- tmp path is constructed from validated ceremonyDir passed by caller
 	if err := os.WriteFile(tmp, updated, 0o600); err != nil {
 		return fmt.Errorf("writing %q: %w", tmp, err)
 	}

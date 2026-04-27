@@ -19,6 +19,7 @@ func TestDeduplicateReports_DropsRepeatedMismatchAndStaleSequence(t *testing.T) 
 	prevP3 := ownershipMismatchReport("old-p3", "p3")
 	prevSeq := thresholdSequenceReport("old-seq", 2, "1/2")
 	prevSeq.ChildOperationReports = []string{prevP2.ID, prevP3.ID}
+	//nolint:prealloc // test fixture with literal elements
 	previous := []operations.Report[any, any]{prevP2, prevP3, prevSeq}
 
 	newP2 := ownershipMismatchReport("new-p2", "p2")
@@ -36,6 +37,7 @@ func TestDeduplicateReports_RewritesChildrenAfterFiltering(t *testing.T) {
 	prevP2 := ownershipMismatchReport("old-p2", "p2")
 	prevP3 := ownershipMismatchReport("old-p3", "p3")
 	prevSeq := thresholdSequenceReport("old-seq", 3, "1/3")
+	//nolint:prealloc // test fixture with literal elements
 	previous := []operations.Report[any, any]{prevP2, prevP3, prevSeq}
 
 	newP2Success := successReport("new-p2-ok", "example/sign", map[string]any{"participant_id": "p2"}, map[string]any{"signed": true})
@@ -56,6 +58,7 @@ func TestSaveReportUpdates_NoOpPreservesBytes(t *testing.T) {
 	prevP2 := ownershipMismatchReport("old-p2", "p2")
 	prevSeq := thresholdSequenceReport("old-seq", 2, "1/2")
 	prevSeq.ChildOperationReports = []string{prevP2.ID}
+	//nolint:prealloc // test fixture with literal elements
 	previous := []operations.Report[any, any]{prevP2, prevSeq}
 	require.NoError(t, SaveReports(dir, previous))
 
@@ -77,6 +80,7 @@ func TestSaveReportUpdates_AppendsPreservingPrefix(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
+	//nolint:prealloc // test fixture with literal elements
 	prev := []operations.Report[any, any]{
 		ownershipMismatchReport("old-p2", "p2"),
 	}
