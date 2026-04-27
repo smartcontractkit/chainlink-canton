@@ -38,7 +38,7 @@ func main() {
 	for i, s := range paths {
 		s := strings.TrimSpace(s)
 		logger.Info().Str("file", s).Int("index", i).Msg("Reading config...")
-		cfgReader, err := os.Open(s)
+		cfgReader, err := os.Open(s) //nolint:gosec
 		if err != nil {
 			logger.Fatal().Err(err).Str("file", s).Int("index", i).Msg("failed to open config file")
 		}

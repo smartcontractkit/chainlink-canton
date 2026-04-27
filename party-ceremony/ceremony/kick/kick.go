@@ -36,7 +36,9 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
-	"github.com/chainlink/canton-party-ceremony/ceremony"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -82,7 +84,7 @@ var KickSequence = operations.NewSequence(
 		decNS := parts[1]
 
 		// ── Step 1: Read current topology state ──────────────────────────────
-		stateReport, err := operations.ExecuteOperation(b, ReadCurrentStateOp, deps, ReadCurrentStateInput{
+		stateReport, err := operations.ExecuteOperation(b, topology.ReadCurrentStateOp, deps, topology.ReadCurrentStateInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			SynchronizerID:       in.SynchronizerID,
 		})
@@ -141,7 +143,7 @@ var KickSequence = operations.NewSequence(
 
 		// ── Step 2: Create kick DNS proposal ─────────────────────────────────
 		out.State.Phase = PhaseDNSProposal
-		proposalReport, err := operations.ExecuteOperation(b, CreateKickDNSProposalOp, deps, CreateKickDNSProposalInput{
+		proposalReport, err := operations.ExecuteOperation(b, topology.CreateKickDNSProposalOp, deps, topology.CreateKickDNSProposalInput{
 			DecentralizedNamespace:     decNS,
 			CurrentOwners:              currentState.DNSOwners,
 			KickedNamespaceFingerprint: in.KickedNamespaceFingerprint,
@@ -162,7 +164,7 @@ var KickSequence = operations.NewSequence(
 		out.State.Phase = PhaseDNSSigning
 		var allSignedTxsB64 []string
 		for _, signerUID := range proposal.RequiredSigners {
-			sigReport, sigErr := operations.ExecuteOperation(b, SignKickDNSProposalOp, deps, SignKickDNSProposalInput{
+			sigReport, sigErr := operations.ExecuteOperation(b, topology.SignDNSProposalOp, deps, topology.SignDNSProposalInput{
 				ParticipantID:      signerUID,
 				ProposalHashSHA256: proposal.ProposalHashSHA256,
 				DNSTxB64:           proposal.DNSTxB64,
@@ -191,13 +193,13 @@ var KickSequence = operations.NewSequence(
 		// ── Step 4: Submit the kicked DNS update ──────────────────────────────
 		out.State.Phase = PhaseDNSSubmit
 		_, err = operations.ExecuteOperation(
-			b, SubmitKickDNSOp, deps,
-			SubmitKickDNSInput{
+			b, topology.SubmitDNSOp, deps,
+			topology.SubmitDNSInput{
 				SignedDNSTxsB64: allSignedTxsB64,
 				SynchronizerID:  in.SynchronizerID,
 				FilterNamespace: decNS,
 			},
-			operations.WithRetry[SubmitKickDNSInput, ceremony.CantonDeps](),
+			operations.WithRetry[topology.SubmitDNSInput, ceremony.CantonDeps](),
 		)
 		if err != nil {
 			return out, fmt.Errorf("submit-kick-dns: %w", err)
@@ -241,7 +243,7 @@ var KickSequence = operations.NewSequence(
 		}
 		allP2PProposers := in.RemainingParticipants
 		for _, uid := range allP2PProposers {
-			_, p2pErr := operations.ExecuteOperation(b, ProposeKickP2POp, deps, ProposeKickP2PInput{
+			_, p2pErr := operations.ExecuteOperation(b, topology.ProposeKickP2POp, deps, topology.ProposeKickP2PInput{
 				ParticipantID:         uid,
 				PartyID:               in.DecentralizedPartyID,
 				RemainingParticipants: in.RemainingParticipants,

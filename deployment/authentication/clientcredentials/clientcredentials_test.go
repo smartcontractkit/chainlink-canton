@@ -117,7 +117,6 @@ func TestNewProvider_UsesOptionsAndTokenSource(t *testing.T) {
 	server := newTokenServer(t, "scope-a scope-b")
 	t.Cleanup(server.Close)
 
-	//nolint:gosec // This is just a test
 	customCreds := credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})
 
 	provider, err := NewProvider(

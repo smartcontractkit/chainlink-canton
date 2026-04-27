@@ -18,10 +18,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
-	"github.com/chainlink/canton-party-ceremony/internal/helpers"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
 )
 
 // ── Constants shared across tests ────────────────────────────────────────────
@@ -627,7 +629,7 @@ func TestGenerateRotatedKeyOp_ParticipantMismatch(t *testing.T) {
 	t.Parallel()
 	b := optest.NewBundle(t)
 
-	_, err := operations.ExecuteOperation(b, keyrotation.GenerateRotatedKeyOp, newDeps("p1"), keyrotation.GenerateRotatedKeyInput{
+	_, err := operations.ExecuteOperation(b, keys.GenerateRotatedKeyOp, newDeps("p1"), keys.GenerateRotatedKeyInput{
 		ParticipantID:      "p2", // mismatch: client is p1 but input says p2
 		SynchronizerID:     testSyncID,
 		DNSOwners:          []string{testTargetNSFP, "fp-owner-p2"},
@@ -643,7 +645,7 @@ func TestGenerateRotatedKeyOp_Success(t *testing.T) {
 	t.Parallel()
 	b := optest.NewBundle(t)
 
-	r, err := operations.ExecuteOperation(b, keyrotation.GenerateRotatedKeyOp, newDeps(testTargetUID), keyrotation.GenerateRotatedKeyInput{
+	r, err := operations.ExecuteOperation(b, keys.GenerateRotatedKeyOp, newDeps(testTargetUID), keys.GenerateRotatedKeyInput{
 		ParticipantID:       testTargetUID,
 		SynchronizerID:      testSyncID,
 		DNSOwners:           []string{testTargetNSFP, "fp-owner-p2"},
@@ -674,7 +676,7 @@ func TestProposeRotationP2POp_ParticipantMismatch(t *testing.T) {
 	t.Parallel()
 	b := optest.NewBundle(t)
 
-	_, err := operations.ExecuteOperation(b, keyrotation.ProposeRotationP2POp, newDeps("p1"), keyrotation.ProposeRotationP2PInput{
+	_, err := operations.ExecuteOperation(b, topology.ProposeRotationP2POp, newDeps("p1"), topology.ProposeRotationP2PInput{
 		ParticipantID:         "p2", // mismatch
 		PartyID:               testPartyID,
 		AllParticipantUIDs:    []string{"p1", "p2"},

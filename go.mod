@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton
 
-go 1.25.7
+go 1.26.2
 
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
@@ -8,8 +8,6 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 replace (
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
-	// Pin mcms canton-main (TargetCid resolution); https://github.com/smartcontractkit/mcms/commit/0771796ef83c32ae52ca411a56d3b570a35b8aae
-	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.34.1-0.20260410182733-0771796ef83c
 	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
 	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )
@@ -32,7 +30,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/oapi-codegen/runtime v1.4.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rs/zerolog v1.35.0
+	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
 	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260410105708-4e8133b0b504
@@ -41,8 +39,8 @@ require (
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260414185437-e41e205c8bfa
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.17
-	github.com/smartcontractkit/go-daml v0.6.1-0.20260421180615-05c0e7d6d13e
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.18
+	github.com/smartcontractkit/go-daml v0.6.1-0.20260424200436-2d7753bfaa32
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.41.0
 	go.opentelemetry.io/otel v1.43.0
@@ -193,7 +191,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grafana/pyroscope-go v1.2.8 // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.9 // indirect
@@ -325,7 +323,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b // indirect
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9 // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.10.0 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20260205175622-33e65031f9a9 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20260409162403-8bca8f7c9de5 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20260408074447-0acfdcb19338 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
@@ -334,7 +332,7 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20260304194147-a03701e2c02e // indirect
-	github.com/smartcontractkit/mcms v0.40.1
+	github.com/smartcontractkit/mcms v0.41.2-0.20260423204345-3cd8c2672428
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.0 // indirect

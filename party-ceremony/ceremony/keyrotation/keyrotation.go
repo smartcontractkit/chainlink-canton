@@ -53,9 +53,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
-	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -115,7 +116,7 @@ var KeyRotationSequence = operations.NewSequence(
 		}
 
 		// ── Step 1: Read current topology state ──────────────────────────────
-		stateReport, err := operations.ExecuteOperation(b, kick.ReadCurrentStateOp, deps, kick.ReadCurrentStateInput{
+		stateReport, err := operations.ExecuteOperation(b, topology.ReadCurrentStateOp, deps, topology.ReadCurrentStateInput{
 			DecentralizedPartyID: in.DecentralizedPartyID,
 			SynchronizerID:       in.SynchronizerID,
 		})
@@ -158,7 +159,7 @@ var KeyRotationSequence = operations.NewSequence(
 		out.State.Phase = PhaseKeyGen
 
 		// ── Step 2: Generate rotated keys (target only) ──────────────────────
-		keyReport, err := operations.ExecuteOperation(b, GenerateRotatedKeyOp, deps, GenerateRotatedKeyInput{
+		keyReport, err := operations.ExecuteOperation(b, keys.GenerateRotatedKeyOp, deps, keys.GenerateRotatedKeyInput{
 			ParticipantID:       in.TargetParticipantID,
 			SynchronizerID:      in.SynchronizerID,
 			DNSOwners:           currentState.DNSOwners,
@@ -182,7 +183,7 @@ var KeyRotationSequence = operations.NewSequence(
 			out.State.Phase = PhaseNSD
 
 			// Step 3: Propose NSD for new namespace key (target only).
-			_, err = operations.ExecuteOperation(b, addparticipant.ProposeNewNSDOp, deps, addparticipant.ProposeNewNSDInput{
+			_, err = operations.ExecuteOperation(b, topology.ProposeNamespaceDelegationOp, deps, topology.ProposeNSDInput{
 				ParticipantID:  in.TargetParticipantID,
 				SigningKeyB64:  rotatedKeys.NewNamespaceKeyB64,
 				Namespace:      rotatedKeys.NewNamespaceFingerprint,
@@ -225,7 +226,7 @@ var KeyRotationSequence = operations.NewSequence(
 			out.State.Phase = PhaseDNSProposal
 
 			// Step 4: Create DNS proposal (swap old→new fingerprint in owners).
-			proposalReport, propErr := operations.ExecuteOperation(b, CreateRotationDNSProposalOp, deps, CreateRotationDNSProposalInput{
+			proposalReport, propErr := operations.ExecuteOperation(b, topology.CreateRotationDNSProposalOp, deps, topology.CreateRotationDNSProposalInput{
 				DecentralizedNamespace:  decNS,
 				CurrentOwners:           currentState.DNSOwners,
 				OldNamespaceFingerprint: in.TargetNamespaceFingerprint,
@@ -247,7 +248,7 @@ var KeyRotationSequence = operations.NewSequence(
 			var allSignedTxsB64 []string
 			var dnsSigCount int
 			for _, signerUID := range proposal.RequiredSigners {
-				sigReport, sigErr := operations.ExecuteOperation(b, kick.SignKickDNSProposalOp, deps, kick.SignKickDNSProposalInput{
+				sigReport, sigErr := operations.ExecuteOperation(b, topology.SignDNSProposalOp, deps, topology.SignDNSProposalInput{
 					ParticipantID:      signerUID,
 					ProposalHashSHA256: proposal.ProposalHashSHA256,
 					DNSTxB64:           proposal.DNSTxB64,
@@ -279,13 +280,13 @@ var KeyRotationSequence = operations.NewSequence(
 
 			// Step 6: Submit the rotation DNS update.
 			_, err = operations.ExecuteOperation(
-				b, kick.SubmitKickDNSOp, deps,
-				kick.SubmitKickDNSInput{
+				b, topology.SubmitDNSOp, deps,
+				topology.SubmitDNSInput{
 					SignedDNSTxsB64: allSignedTxsB64,
 					SynchronizerID:  in.SynchronizerID,
 					FilterNamespace: decNS,
 				},
-				operations.WithRetry[kick.SubmitKickDNSInput, ceremony.CantonDeps](),
+				operations.WithRetry[topology.SubmitDNSInput, ceremony.CantonDeps](),
 			)
 			if err != nil {
 				return out, fmt.Errorf("submit-rotation-dns: %w", err)
@@ -330,7 +331,7 @@ var KeyRotationSequence = operations.NewSequence(
 
 			var p2pProposedCount int
 			for _, uid := range allParticipantUIDs {
-				_, p2pErr := operations.ExecuteOperation(b, ProposeRotationP2POp, deps, ProposeRotationP2PInput{
+				_, p2pErr := operations.ExecuteOperation(b, topology.ProposeRotationP2POp, deps, topology.ProposeRotationP2PInput{
 					ParticipantID:         uid,
 					PartyID:               in.DecentralizedPartyID,
 					AllParticipantUIDs:    allParticipantUIDs,

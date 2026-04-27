@@ -21,45 +21,45 @@ import (
 // CCVExecuteRequest defines model for CCVExecuteRequest.
 type CCVExecuteRequest struct {
 	// EncodedMessage The CCIP message to be executed, encoded as a hex string.
-	EncodedMessage *string `json:"encodedMessage,omitempty"`
+	EncodedMessage string `json:"encodedMessage"`
 }
 
 // CCVExecuteResponse defines model for CCVExecuteResponse.
 type CCVExecuteResponse struct {
 	// ContextData The context to be passed along to the verifier.
-	ContextData *map[string]interface{} `json:"contextData,omitempty"`
+	ContextData map[string]interface{} `json:"contextData"`
 
 	// ContractId The unique identifier of a contract.
-	ContractId         *externalRef0.ContractId          `json:"contractId,omitempty"`
-	DisclosedContracts *[]externalRef0.DisclosedContract `json:"disclosedContracts,omitempty"`
+	ContractId         externalRef0.ContractId          `json:"contractId"`
+	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
 
 	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-	InstanceAddress *externalRef0.InstanceAddress `json:"instanceAddress,omitempty"`
+	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
 
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-	RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
+	RawInstanceAddress externalRef0.RawInstanceAddress `json:"rawInstanceAddress"`
 }
 
 // CCVSendRequest defines model for CCVSendRequest.
 type CCVSendRequest struct {
 	// Message A message to be sent from Canton.
-	Message *externalRef0.Message `json:"message,omitempty"`
+	Message externalRef0.Message `json:"message"`
 }
 
 // CCVSendResponse defines model for CCVSendResponse.
 type CCVSendResponse struct {
 	// ContextData The context to be passed along to the verifier.
-	ContextData *map[string]interface{} `json:"contextData,omitempty"`
+	ContextData map[string]interface{} `json:"contextData"`
 
 	// ContractId The unique identifier of a contract.
-	ContractId         *externalRef0.ContractId          `json:"contractId,omitempty"`
-	DisclosedContracts *[]externalRef0.DisclosedContract `json:"disclosedContracts,omitempty"`
+	ContractId         externalRef0.ContractId          `json:"contractId"`
+	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
 
 	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
-	InstanceAddress *externalRef0.InstanceAddress `json:"instanceAddress,omitempty"`
+	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
 
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
-	RawInstanceAddress *externalRef0.RawInstanceAddress `json:"rawInstanceAddress,omitempty"`
+	RawInstanceAddress externalRef0.RawInstanceAddress `json:"rawInstanceAddress"`
 }
 
 // PostCCVExecuteJSONRequestBody defines body for PostCCVExecute for application/json ContentType.
@@ -142,17 +142,17 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 	// PostCCVExecuteWithBody request with any body
-	PostCCVExecuteWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostCCVExecuteWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostCCVExecute(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostCCVExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostCCVExecute(ctx context.Context, address string, body PostCCVExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PostCCVSendWithBody request with any body
-	PostCCVSendWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostCCVSendWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	PostCCVSend(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostCCVSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	PostCCVSend(ctx context.Context, address string, body PostCCVSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) PostCCVExecuteWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostCCVExecuteWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostCCVExecuteRequestWithBody(c.Server, address, contentType, body)
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func (c *Client) PostCCVExecuteWithBody(ctx context.Context, address externalRef
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostCCVExecute(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostCCVExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostCCVExecute(ctx context.Context, address string, body PostCCVExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostCCVExecuteRequest(c.Server, address, body)
 	if err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (c *Client) PostCCVExecute(ctx context.Context, address externalRef0.RawOrH
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostCCVSendWithBody(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostCCVSendWithBody(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostCCVSendRequestWithBody(c.Server, address, contentType, body)
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (c *Client) PostCCVSendWithBody(ctx context.Context, address externalRef0.R
 	return c.Client.Do(req)
 }
 
-func (c *Client) PostCCVSend(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostCCVSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) PostCCVSend(ctx context.Context, address string, body PostCCVSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostCCVSendRequest(c.Server, address, body)
 	if err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func (c *Client) PostCCVSend(ctx context.Context, address externalRef0.RawOrHash
 }
 
 // NewPostCCVExecuteRequest calls the generic PostCCVExecute builder with application/json body
-func NewPostCCVExecuteRequest(server string, address externalRef0.RawOrHashedAddress, body PostCCVExecuteJSONRequestBody) (*http.Request, error) {
+func NewPostCCVExecuteRequest(server string, address string, body PostCCVExecuteJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
@@ -212,7 +212,7 @@ func NewPostCCVExecuteRequest(server string, address externalRef0.RawOrHashedAdd
 }
 
 // NewPostCCVExecuteRequestWithBody generates requests for PostCCVExecute with any type of body
-func NewPostCCVExecuteRequestWithBody(server string, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader) (*http.Request, error) {
+func NewPostCCVExecuteRequestWithBody(server string, address string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -248,7 +248,7 @@ func NewPostCCVExecuteRequestWithBody(server string, address externalRef0.RawOrH
 }
 
 // NewPostCCVSendRequest calls the generic PostCCVSend builder with application/json body
-func NewPostCCVSendRequest(server string, address externalRef0.RawOrHashedAddress, body PostCCVSendJSONRequestBody) (*http.Request, error) {
+func NewPostCCVSendRequest(server string, address string, body PostCCVSendJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
@@ -259,7 +259,7 @@ func NewPostCCVSendRequest(server string, address externalRef0.RawOrHashedAddres
 }
 
 // NewPostCCVSendRequestWithBody generates requests for PostCCVSend with any type of body
-func NewPostCCVSendRequestWithBody(server string, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader) (*http.Request, error) {
+func NewPostCCVSendRequestWithBody(server string, address string, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -338,14 +338,14 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// PostCCVExecuteWithBodyWithResponse request with any body
-	PostCCVExecuteWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCVExecuteResponse, error)
+	PostCCVExecuteWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCVExecuteResponse, error)
 
-	PostCCVExecuteWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostCCVExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCVExecuteResponse, error)
+	PostCCVExecuteWithResponse(ctx context.Context, address string, body PostCCVExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCVExecuteResponse, error)
 
 	// PostCCVSendWithBodyWithResponse request with any body
-	PostCCVSendWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCVSendResponse, error)
+	PostCCVSendWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCVSendResponse, error)
 
-	PostCCVSendWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostCCVSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCVSendResponse, error)
+	PostCCVSendWithResponse(ctx context.Context, address string, body PostCCVSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCVSendResponse, error)
 }
 
 type PostCCVExecuteResponse struct {
@@ -399,7 +399,7 @@ func (r PostCCVSendResponse) StatusCode() int {
 }
 
 // PostCCVExecuteWithBodyWithResponse request with arbitrary body returning *PostCCVExecuteResponse
-func (c *ClientWithResponses) PostCCVExecuteWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCVExecuteResponse, error) {
+func (c *ClientWithResponses) PostCCVExecuteWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCVExecuteResponse, error) {
 	rsp, err := c.PostCCVExecuteWithBody(ctx, address, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -407,7 +407,7 @@ func (c *ClientWithResponses) PostCCVExecuteWithBodyWithResponse(ctx context.Con
 	return ParsePostCCVExecuteResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostCCVExecuteWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostCCVExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCVExecuteResponse, error) {
+func (c *ClientWithResponses) PostCCVExecuteWithResponse(ctx context.Context, address string, body PostCCVExecuteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCVExecuteResponse, error) {
 	rsp, err := c.PostCCVExecute(ctx, address, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -416,7 +416,7 @@ func (c *ClientWithResponses) PostCCVExecuteWithResponse(ctx context.Context, ad
 }
 
 // PostCCVSendWithBodyWithResponse request with arbitrary body returning *PostCCVSendResponse
-func (c *ClientWithResponses) PostCCVSendWithBodyWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCVSendResponse, error) {
+func (c *ClientWithResponses) PostCCVSendWithBodyWithResponse(ctx context.Context, address string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCCVSendResponse, error) {
 	rsp, err := c.PostCCVSendWithBody(ctx, address, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -424,7 +424,7 @@ func (c *ClientWithResponses) PostCCVSendWithBodyWithResponse(ctx context.Contex
 	return ParsePostCCVSendResponse(rsp)
 }
 
-func (c *ClientWithResponses) PostCCVSendWithResponse(ctx context.Context, address externalRef0.RawOrHashedAddress, body PostCCVSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCVSendResponse, error) {
+func (c *ClientWithResponses) PostCCVSendWithResponse(ctx context.Context, address string, body PostCCVSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCVSendResponse, error) {
 	rsp, err := c.PostCCVSend(ctx, address, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -530,10 +530,10 @@ func ParsePostCCVSendResponse(rsp *http.Response) (*PostCCVSendResponse, error) 
 type ServerInterface interface {
 
 	// (POST /ccip/v1/external/ccv/{address}/execute)
-	PostCCVExecute(c *gin.Context, address externalRef0.RawOrHashedAddress)
+	PostCCVExecute(c *gin.Context, address string)
 
 	// (POST /ccip/v1/external/ccv/{address}/send)
-	PostCCVSend(c *gin.Context, address externalRef0.RawOrHashedAddress)
+	PostCCVSend(c *gin.Context, address string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -551,7 +551,7 @@ func (siw *ServerInterfaceWrapper) PostCCVExecute(c *gin.Context) {
 	var err error
 
 	// ------------- Path parameter "address" -------------
-	var address externalRef0.RawOrHashedAddress
+	var address string
 
 	err = runtime.BindStyledParameterWithOptions("simple", "address", c.Param("address"), &address, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -575,7 +575,7 @@ func (siw *ServerInterfaceWrapper) PostCCVSend(c *gin.Context) {
 	var err error
 
 	// ------------- Path parameter "address" -------------
-	var address externalRef0.RawOrHashedAddress
+	var address string
 
 	err = runtime.BindStyledParameterWithOptions("simple", "address", c.Param("address"), &address, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {

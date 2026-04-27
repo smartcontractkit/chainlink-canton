@@ -16,9 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // ── Minimal mock Canton client for signing tests ────────────────────────────
@@ -137,14 +137,14 @@ func TestSignDNSProposalOp_ConfirmRejected(t *testing.T) {
 	}
 	bundle := operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter())
 
-	input := onboarding.SignDNSProposalInput{
+	input := topology.SignDNSProposalInput{
 		ParticipantID:      "p1",
 		ProposalHashSHA256: txHash(txB64),
 		DNSTxB64:           txB64,
 		SynchronizerID:     "global",
 	}
 
-	_, err := operations.ExecuteOperation(bundle, onboarding.SignDNSProposalOp, deps, input)
+	_, err := operations.ExecuteOperation(bundle, topology.SignDNSProposalOp, deps, input)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), ceremony.ErrUserRejected.Error())
 	assert.False(t, mockClient.signCalled, "SignTransactions must NOT be called when user rejects")
@@ -162,14 +162,14 @@ func TestSignDNSProposalOp_ConfirmAccepted(t *testing.T) {
 	}
 	bundle := operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter())
 
-	input := onboarding.SignDNSProposalInput{
+	input := topology.SignDNSProposalInput{
 		ParticipantID:      "p1",
 		ProposalHashSHA256: txHash(txB64),
 		DNSTxB64:           txB64,
 		SynchronizerID:     "global",
 	}
 
-	out, err := operations.ExecuteOperation(bundle, onboarding.SignDNSProposalOp, deps, input)
+	out, err := operations.ExecuteOperation(bundle, topology.SignDNSProposalOp, deps, input)
 	require.NoError(t, err)
 	assert.True(t, mockClient.signCalled, "SignTransactions must be called when user accepts")
 	assert.Equal(t, "p1", out.Output.ParticipantID)
@@ -187,14 +187,14 @@ func TestSignDNSProposalOp_NilConfirmerSkipsPrompt(t *testing.T) {
 	}
 	bundle := operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter())
 
-	input := onboarding.SignDNSProposalInput{
+	input := topology.SignDNSProposalInput{
 		ParticipantID:      "p1",
 		ProposalHashSHA256: txHash(txB64),
 		DNSTxB64:           txB64,
 		SynchronizerID:     "global",
 	}
 
-	_, err := operations.ExecuteOperation(bundle, onboarding.SignDNSProposalOp, deps, input)
+	_, err := operations.ExecuteOperation(bundle, topology.SignDNSProposalOp, deps, input)
 	require.NoError(t, err)
 	assert.True(t, mockClient.signCalled)
 }

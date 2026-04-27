@@ -32,10 +32,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -44,8 +45,8 @@ import (
 	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
@@ -56,7 +57,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
@@ -67,9 +67,11 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/service"
-	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
+	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 
 	// Import to register adapters
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
@@ -117,28 +119,28 @@ func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
 	buf.Write(msg.CCVAndExecutorHash[:])
 
 	// Length-prefixed fields (1-byte length)
-	buf.WriteByte(uint8(len(msg.OnRampAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(msg.OnRampAddress)))
 	buf.Write(msg.OnRampAddress)
-	buf.WriteByte(uint8(len(msg.OffRampAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(msg.OffRampAddress)))
 	buf.Write(msg.OffRampAddress)
-	buf.WriteByte(uint8(len(msg.Sender))) //nolint:gosec
+	buf.WriteByte(uint8(len(msg.Sender)))
 	buf.Write(msg.Sender)
-	buf.WriteByte(uint8(len(msg.Receiver))) //nolint:gosec
+	buf.WriteByte(uint8(len(msg.Receiver)))
 	buf.Write(msg.Receiver)
 
 	// 2-byte length prefixed fields
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob))) //nolint:gosec
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob)))
 	buf.Write(msg.DestBlob)
 
 	if msg.TokenTransfer != nil {
 		tokenBytes := encodeTokenTransferV1(msg.TokenTransfer)
-		_ = binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes))) //nolint:gosec
+		_ = binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes)))
 		buf.Write(tokenBytes)
 	} else {
 		_ = binary.Write(&buf, binary.BigEndian, uint16(0))
 	}
 
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData))) //nolint:gosec
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData)))
 	buf.Write(msg.MessageData)
 
 	return buf.Bytes(), nil
@@ -176,16 +178,16 @@ func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
 	}
 	buf.Write(amountBytes)
 
-	buf.WriteByte(uint8(len(tt.SourcePoolAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(tt.SourcePoolAddress)))
 	buf.Write(tt.SourcePoolAddress)
-	buf.WriteByte(uint8(len(tt.SourceTokenAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(tt.SourceTokenAddress)))
 	buf.Write(tt.SourceTokenAddress)
-	buf.WriteByte(uint8(len(tt.DestTokenAddress))) //nolint:gosec
+	buf.WriteByte(uint8(len(tt.DestTokenAddress)))
 	buf.Write(tt.DestTokenAddress)
-	buf.WriteByte(uint8(len(tt.TokenReceiver))) //nolint:gosec
+	buf.WriteByte(uint8(len(tt.TokenReceiver)))
 	buf.Write(tt.TokenReceiver)
 
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData))) //nolint:gosec
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData)))
 	buf.Write(tt.ExtraData)
 
 	return buf.Bytes()
@@ -211,7 +213,7 @@ func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.Private
 
 	var result bytes.Buffer
 	result.Write(versionTag)
-	_ = binary.Write(&result, binary.BigEndian, uint16(len(signatures))) //nolint:gosec
+	_ = binary.Write(&result, binary.BigEndian, uint16(len(signatures)))
 	result.Write(signatures)
 
 	return result.Bytes(), nil
@@ -421,8 +423,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err, "failed to get RMNRemote address")
 	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
-	executorAddress, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(executor.ContractType), executor.Version, devenvcommon.DefaultExecutorQualifier))
-	require.NoError(t, err, "failed to get Executor address")
 
 	// Run EDS
 	edsParticipant := env.Chain.Participants[0]
@@ -434,7 +434,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
 			Server: config.ServerConfig{
 				Host: "0.0.0.0",
-				Port: uint16(edsPort), //nolint:gosec // this is a port number
+				Port: uint16(edsPort),
 			},
 			Node: config.NodeConfig{
 				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
@@ -445,7 +445,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				},
 				MaxRetries: 0,
 			},
-			Contracts: config.Contracts{
+			CCIPAPIConfig: config.CCIPAPIConfig{
+				Enabled: true,
 				PerPartyRouterFactory: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
@@ -474,14 +475,15 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
-				DefaultExecutor: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(executorAddress.Address),
-				},
-				CCVs: []config.ContractIdentifier{
+			},
+			CCVAPIConfig: config.CCVAPIConfig{
+				Enabled: true,
+				CCVs: []config.CCV{
 					{
-						PartyID:         partyCCIP,
-						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+						},
 					},
 				},
 			},
@@ -492,11 +494,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 
-	// Create EDS client
-	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
-	require.NoError(t, err, "Failed to create EDS client")
+	// Create EDS clients
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create CCIP API client")
+	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create CCV API client")
 
 	// Deploy and configure lane
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
@@ -551,7 +555,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Log("Configured chain for lanes")
 
 	// Create PerPartyRouter for receiver
-	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)
+	perPartyRouterFactoryDisclosure, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosure(t.Context(), ccipAPIClient, partyReceiver)
 	require.NoError(t, err)
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -560,7 +564,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: perPartyRouterFactoryCid,
+					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partyReceiver),
@@ -569,7 +573,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
-			DisclosedContracts: disclosedContracts,
+			DisclosedContracts: perPartyRouterFactoryDisclosure.DisclosedContracts,
 		},
 	})
 	require.NoError(t, err)
@@ -644,9 +648,24 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
 	// receiver-only; ccip-owned dependencies are only provided via disclosure.
-	executeDisclosuresEDS, err := testhelpers.GetCCIPExecuteDisclosures(t.Context(), encodedMessageHex, edsClient, []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)})
+	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(t.Context(), ccipAPIClient, encodedMessageHex)
 	require.NoError(t, err)
-	require.Len(t, executeDisclosuresEDS.CCVContractIDs, 1)
+	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, contracts.HexToInstanceAddress(committeeVerifier.Address))
+	require.NoError(t, err)
+
+	executeArgs := ccipreceiver.Execute2{
+		Context:        ccipExecuteDisclosure.ChoiceContext,
+		RouterCid:      types.CONTRACT_ID(routerCid),
+		EncodedMessage: types.TEXT(encodedMessageHex),
+		TokenTransfer:  nil,
+		CcvInputs: []ccipreceiver.CCVInput{
+			{
+				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
+				VerifierResults: types.TEXT(verifierResultsHex),
+				CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+			},
+		},
+	}
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one
 	// receiver-authored transaction with disclosures for off-ramp dependencies.
@@ -655,28 +674,16 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
-					ContractId: ccipReceiverCid,
-					Choice:     "Execute",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: executeDisclosuresEDS.ChoiceContext},
-						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
-						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
-						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
-						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "ccvCid", Value: &apiv2.Value{Sum: executeDisclosuresEDS.CCVContractIDs[0]}},
-								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
-								{Label: "ccvExtraContext", Value: emptyCCIPContext},
-							}}}},
-						}}}}},
-					}}}},
+					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+					ContractId:     ccipReceiverCid,
+					Choice:         "Execute",
+					ChoiceArgument: ledger.MapToValue(executeArgs),
 				}},
 			}},
 			ActAs: []string{partyReceiver},
 			DisclosedContracts: slices.Concat(
-				disclosedContracts,
-				executeDisclosuresEDS.DisclosedContracts,
+				ccipExecuteDisclosure.DisclosedContracts,
+				ccvExecuteDisclosure.DisclosedContracts,
 			),
 		},
 	})

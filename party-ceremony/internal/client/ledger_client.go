@@ -52,4 +52,10 @@ type LedgerClient interface {
 		partySignatures *interactive.PartySignatures,
 		hashingSchemeVersion interactive.HashingSchemeVersion,
 	) (string, error)
+
+	// GrantPartyRights grants actAs and readAs Ledger API rights for partyID
+	// to the given userID. This is required in JWT-auth environments where
+	// decentralized parties created via topology are not automatically visible
+	// to any user. It is idempotent: granting an already-granted right is safe.
+	GrantPartyRights(ctx context.Context, userID, partyID string) error
 }

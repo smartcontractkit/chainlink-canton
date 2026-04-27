@@ -253,7 +253,7 @@ func NewMCMSSignerFromSeed(seed int64) (*MCMSSigner, error) {
 
 	keyBytes := make([]byte, 32)
 	for i := range keyBytes {
-		keyBytes[i] = byte(rng.Intn(256))
+		keyBytes[i] = byte(rng.Intn(256)) //nolint:gosec // intentional overflow
 	}
 
 	privateKey, err := crypto.ToECDSA(keyBytes)
@@ -866,7 +866,7 @@ func MustEncodeBlockedFunction(t testing.TB, bf mcms.BlockedFunction) string {
 //
 //	uint8(roleToInt(role)) <> encodeSetConfigParams(params)
 func EncodeSelfDispatchSetConfig(role MCMSRole, params mcms.SetConfigParams) (string, error) {
-	roleByte := hex.EncodeToString([]byte{byte(role)})
+	roleByte := hex.EncodeToString([]byte{byte(role)}) //nolint:gosec // MCMSole is a controlled value
 	encoded, err := params.MarshalHex()
 	if err != nil {
 		return "", fmt.Errorf("MarshalHex failed: %w", err)
@@ -878,7 +878,7 @@ func EncodeSelfDispatchSetConfig(role MCMSRole, params mcms.SetConfigParams) (st
 // EncodePruneSeenHashesParams encodes the role byte for a PruneSeenHashes self-dispatch call.
 // PruneTimelockTimestamps takes no parameters — pass "" as operationData.
 func EncodePruneSeenHashesParams(role MCMSRole) string {
-	return hex.EncodeToString([]byte{byte(role)})
+	return hex.EncodeToString([]byte{byte(role)}) //nolint:gosec // MCMSole is a controlled value
 }
 
 // ===========================================================================
@@ -909,7 +909,7 @@ type CancelBatchParams struct {
 func encodeText(s string) []byte {
 	textBytes := []byte(s)
 	buf := make([]byte, 0, 1+len(textBytes))
-	buf = append(buf, byte(len(textBytes)))
+	buf = append(buf, byte(len(textBytes))) //nolint:gosec
 	buf = append(buf, textBytes...)
 
 	return buf
@@ -922,6 +922,7 @@ func encodeTextUint16(s string) []byte {
 	textBytes := []byte(s)
 	byteCount := len(textBytes) / 2 // Hex string: 2 chars per byte
 	buf := make([]byte, 0, 2+len(textBytes))
+	//nolint:gosec
 	buf = append(buf, byte(byteCount>>8), byte(byteCount&0xff)) // uint16 big-endian
 	buf = append(buf, textBytes...)
 
@@ -954,7 +955,7 @@ func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
 	buf := make([]byte, 0, estimatedSize)
 
 	// Encode calls list: uint8(numCalls) + encoded calls
-	buf = append(buf, byte(len(params.Calls)))
+	buf = append(buf, byte(len(params.Calls))) //nolint:gosec
 	for _, call := range params.Calls {
 		buf = append(buf, encodeTimelockCall(call)...)
 	}
@@ -985,7 +986,7 @@ func EncodeBypasserExecuteBatchParams(params BypasserExecuteBatchParams) string 
 	buf := make([]byte, 0, estimatedSize)
 
 	// Encode calls list: uint8(numCalls) + encoded calls
-	buf = append(buf, byte(len(params.Calls)))
+	buf = append(buf, byte(len(params.Calls))) //nolint:gosec
 	for _, call := range params.Calls {
 		buf = append(buf, encodeTimelockCall(call)...)
 	}

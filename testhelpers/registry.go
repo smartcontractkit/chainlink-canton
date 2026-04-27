@@ -3,18 +3,20 @@ package testhelpers
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/exp/maps"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
@@ -43,12 +45,29 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 			}
 			value = &apiv2.Value{Sum: &apiv2.Value_Text{Text: valueString}}
 		case "AV_Int":
-			// JSON numbers come as float64
-			valueFloat, ok := rawValue.(float64)
-			if !ok {
-				return nil, fmt.Errorf("AV_Int value is not a number: %T", rawValue)
+			// Int64s are encoded as JSON numbers or strings, depending on the encoder settings
+			switch val := rawValue.(type) {
+			case string:
+				valueInt, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+				}
+				value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}
+			case json.Number:
+				valueInt, err := strconv.ParseInt(val.String(), 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+				}
+				value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}
+			case float64:
+				// Some encoders may encode int64s as JSON numbers, which are float64s in Go. This can cause precision loss for large int64s, but we can still parse them if they fit within uint64.
+				if val < 0 || val > float64(^uint64(0)) {
+					return nil, fmt.Errorf("AV_Int value is out of range for uint64: %f", val)
+				}
+				value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(val)}}
+			default:
+				return nil, fmt.Errorf("AV_Int value is not a string or number: %T", rawValue)
 			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}
 		case "AV_Decimal":
 			valueString, ok := rawValue.(string)
 			if !ok {
@@ -66,9 +85,9 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 			if !ok {
 				return nil, fmt.Errorf("AV_Date value is not a string: %T", rawValue)
 			}
-			t, err := time.Parse(time.RFC3339, valueString)
+			t, err := time.Parse(time.DateOnly, valueString)
 			if err != nil {
-				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
+				return nil, fmt.Errorf("AV_Date value is not a DateOnly time: %s", valueString)
 			}
 			value = &apiv2.Value{Sum: &apiv2.Value_Date{Date: int32(t.Unix() / 86400)}} //nolint:gosec // days since epoch
 		case "AV_Time":
@@ -82,13 +101,41 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 			}
 			value = &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: t.UnixMicro()}}
 		case "AV_RelTime":
-			valueFloat, ok := rawValue.(float64)
-			if !ok {
-				return nil, fmt.Errorf("AV_RelTime value is not a number: %T", rawValue)
+			// Int64s are encoded as JSON numbers or strings, depending on the encoder settings
+			switch val := rawValue.(type) {
+			case string:
+				valueInt, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+				}
+				value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+					{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}},
+				}}}}
+			case json.Number:
+				valueInt, err := strconv.ParseInt(val.String(), 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+				}
+				value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+					{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}},
+				}}}}
+			case float64:
+				// Some encoders may encode int64s as JSON numbers, which are float64s in Go. This can cause precision loss for large int64s, but we can still parse them if they fit within uint64.
+				if val < 0 || val > float64(^uint64(0)) {
+					return nil, fmt.Errorf("AV_Int value is out of range for uint64: %f", val)
+				}
+				value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+					{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(val)}}},
+				}}}}
+			default:
+				return nil, fmt.Errorf("AV_Int value is not a string or number: %T", rawValue)
 			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}},
-			}}}}
+		case "AV_Party":
+			valueString, ok := rawValue.(string)
+			if !ok {
+				return nil, fmt.Errorf("AV_Party is not a string: %T", rawValue)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_Party{Party: valueString}}
 		case "AV_ContractId":
 			valueString, ok := rawValue.(string)
 			if !ok {
@@ -96,7 +143,7 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 			}
 			value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: valueString}}
 		default:
-			// Add lists and maps
+			// TODO Add lists and maps
 			return nil, fmt.Errorf("unimplemented tag: %v", tag)
 		}
 
@@ -117,20 +164,18 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 	}}}}, nil
 }
 
-// ExtractChoiceContextValues converts a Splice ChoiceContext proto value into a TEXTMAP
-// suitable for use as TokenInput.ExtraArgs.Context.Values.
-func ExtractChoiceContextValues(choiceContext *apiv2.Value) types.TEXTMAP {
-	contextValues := make(types.TEXTMAP)
+// ExtractChoiceContextValues converts a Splice ChoiceContext proto value into
+// the typed map expected by TokenInput.ExtraArgs.Context.Values.
+func ExtractChoiceContextValues(choiceContext *apiv2.Value) map[string]splice_api_token_metadata_v1.AnyValue {
+	contextValues := make(map[string]splice_api_token_metadata_v1.AnyValue)
 	if rec := choiceContext.GetRecord(); rec != nil && len(rec.Fields) > 0 {
 		valuesField := rec.Fields[0]
 		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
 			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
 				if v := entry.GetValue().GetVariant(); v != nil {
-					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
-					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(v.GetValue().GetContractId()))}
 				} else if entry.GetValue().GetText() != "" {
-					txt := types.TEXT(entry.GetValue().GetText())
-					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
+					contextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: new(types.TEXT(entry.GetValue().GetText()))}
 				}
 			}
 		}
@@ -160,7 +205,7 @@ func GetRegistryAdmin(ctx context.Context, metadataClient tokenMetadataV1.Client
 	return registryInfoResponse.JSON200.AdminId, nil
 }
 
-func GetTransferFactory(ctx context.Context, transferInstructionClient transferInstructionV1.ClientWithResponsesInterface, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, *apiv2.Value, error) {
+func GetTransferFactory(ctx context.Context, transferInstructionClient transferInstructionV1.ClientWithResponsesInterface, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, map[string]any, error) {
 	transferFactoryResponse, err := transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
 			"expectedAdmin": registryAdmin,
@@ -215,12 +260,8 @@ func GetTransferFactory(ctx context.Context, transferInstructionClient transferI
 			SynchronizerId:   contract.SynchronizerId,
 		})
 	}
-	choiceContext, err := ChoiceContextFromData(transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to convert choice context: %w", err)
-	}
 
-	return transferFactoryResponse.JSON200.FactoryId, disclosedContracts, choiceContext, nil
+	return transferFactoryResponse.JSON200.FactoryId, disclosedContracts, transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData, nil
 }
 
 func AcceptPendingTransferInstruction(

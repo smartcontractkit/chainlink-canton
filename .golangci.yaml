@@ -80,7 +80,7 @@ linters:
     govet:
       enable: []
     nlreturn:
-      block-size: 2
+      block-size: 3
     nolintlint:
       require-specific: true
     revive:
@@ -127,9 +127,10 @@ linters:
       - legacy
       - std-error-handling
     rules:
-      - linters:
+      - path: _test\.go
+        linters:
           - goconst
-        path: (.+)_test\.go
+          - gosec
       - linters:
           - revive
         text: "avoid meaningless package names"

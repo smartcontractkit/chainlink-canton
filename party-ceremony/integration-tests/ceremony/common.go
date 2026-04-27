@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	integrationtests "github.com/chainlink/canton-party-ceremony/integration-tests"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
 	interactivepb "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -15,6 +13,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 type Actor struct {
@@ -36,12 +36,12 @@ func (s *CeremonyTestSuite) SetupSuite() {
 
 	if s.chain == nil {
 		// Uncomment to use local Canton environment for faster test runs (requires local setup).
-		// chain, err := s.NewLocalEnv()
-		// require.NoError(t, err, "failed to create local environment")
+		chain, err := s.NewLocalEnv()
+		require.NoError(t, err, "failed to create local environment")
 
-		chain, err := integrationtests.LoadChainWithCTF(t, 3)
-		require.NoError(t, err, "failed to load chain with CTF")
-		require.Len(t, chain.Participants, 3, "expected 3 participants")
+		// chain, err := integrationtests.LoadChainWithCTF(t, 3)
+		// require.NoError(t, err, "failed to load chain with CTF")
+		// require.Len(t, chain.Participants, 3, "expected 3 participants")
 		s.chain = chain
 	}
 
@@ -124,7 +124,10 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 		conn, err := grpc.NewClient(adminURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to dial admin API for participant %d", i+1)
 		t.Cleanup(func() { _ = conn.Close() })
-		adminServices := canton.CreateAdminServiceClients(conn)
+		ledgerConn, err := grpc.NewClient(ledgerURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		require.NoError(t, err, "failed to dial ledger API for participant %d", i+1)
+		t.Cleanup(func() { _ = ledgerConn.Close() })
+		ledgerServices := canton.CreateLedgerServiceClients(ledgerConn)
 		// UserID matches the additional-admin-user-id in simple-topology.conf.
 		userID := fmt.Sprintf("user-participant%d", i+1)
 		participants[i] = canton.Participant{
@@ -133,8 +136,9 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 				AdminAPIURL:      adminURL,
 				GRPCLedgerAPIURL: ledgerURL,
 			},
-			AdminServices: &adminServices,
-			UserID:        userID,
+			AdminServices:  new(canton.CreateAdminServiceClients(conn)),
+			LedgerServices: ledgerServices,
+			UserID:         userID,
 		}
 	}
 

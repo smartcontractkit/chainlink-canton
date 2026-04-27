@@ -1,13 +1,14 @@
-package contractdeploy
+package ledger
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // DARLoader fetches the raw bytes of a DAR by package name and version.
@@ -43,4 +44,7 @@ type ContractDeployDeps struct {
 	Signer    client.TransactionSigner
 	Logger    logger.Logger
 	Confirmer ceremony.Confirmer // nil means no confirmation prompt
+	// UserID is the Ledger API user to grant actAs/readAs rights for the
+	// decentralized party. When empty the grant step is a no-op (no-auth environments).
+	UserID string
 }

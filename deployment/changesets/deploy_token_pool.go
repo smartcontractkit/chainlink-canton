@@ -3,7 +3,6 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -14,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	lock_release_token_pool "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -36,9 +35,9 @@ type DeployTokenPoolConfig struct {
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
 	TransferTimeout lockreleasetokenpool.TransferTimeout
 	// Optional; defaults to empty map.
-	RemoteChainConfigs types.GENMAP
+	RemoteChainConfigs map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig
 	// Optional; defaults to empty map.
-	TokenTransferFeeConfigs types.GENMAP
+	TokenTransferFeeConfigs map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2
 	// Optional; zero-value deps if not provided.
 	Deps lockreleasetokenpool.LockReleaseTokenPoolDeps
 	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
@@ -68,22 +67,21 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	cfg := config.Config
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
-		poolReceiveContext = common.CCIPContext{Values: types.TEXTMAP{}}
+		poolReceiveContext = common.CCIPContext{Values: map[string]common.AnyValue{}}
 	}
 	transferTimeout := cfg.TransferTimeout
 	if transferTimeout.RelativeHours == nil && transferTimeout.Indefinite == nil {
-		h := types.INT64(24)
-		transferTimeout = lockreleasetokenpool.TransferTimeout{RelativeHours: &h}
+		transferTimeout = lockreleasetokenpool.TransferTimeout{RelativeHours: new(types.INT64(24))}
 	}
 	remoteChainConfigs := cfg.RemoteChainConfigs
 	if remoteChainConfigs == nil {
-		remoteChainConfigs = types.GENMAP{}
+		remoteChainConfigs = map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{}
 	}
 	tokenTransferFeeConfigs := cfg.TokenTransferFeeConfigs
 	if tokenTransferFeeConfigs == nil {
-		tokenTransferFeeConfigs = types.GENMAP{}
+		tokenTransferFeeConfigs = map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{}
 	}
-	qualifier := ptr.String(cfg.Qualifier)
+	qualifier := new(cfg.Qualifier)
 	if cfg.Qualifier == "" {
 		qualifier = nil
 	}

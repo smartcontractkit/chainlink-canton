@@ -6,16 +6,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
-	"github.com/chainlink/canton-party-ceremony/ceremony/addparticipant"
-	"github.com/chainlink/canton-party-ceremony/ceremony/contractdeploy"
-	"github.com/chainlink/canton-party-ceremony/ceremony/example"
-	"github.com/chainlink/canton-party-ceremony/ceremony/keyrotation"
-	"github.com/chainlink/canton-party-ceremony/ceremony/kick"
-	"github.com/chainlink/canton-party-ceremony/ceremony/onboarding"
-	"github.com/chainlink/canton-party-ceremony/internal/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // executeSequence is the shared execution kernel used by both init and resume.
@@ -51,6 +53,7 @@ func executeExampleOnboardingSequence(
 	if err != nil {
 		return fmt.Errorf("loading reports: %w", err)
 	}
+	initialRun := workflowId == ""
 	// ── Build bundle ──────────────────────────────────────────────────────────
 	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
 	bundle := operations.NewBundle(
@@ -85,21 +88,26 @@ func executeExampleOnboardingSequence(
 			"err", err,
 		)
 	}
-	allReports, _ := reporter.GetReports()
-	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+	allReports, reportErr := reporter.GetReports()
+	if reportErr != nil {
+		lggr.Errorw("Failed to collect reports — progress may be lost on next resume", "err", reportErr)
+	}
+	if saveErr := ceremony.SaveReportUpdates(ceremonyDir, previousReports, allReports); saveErr != nil {
 		lggr.Errorw("Failed to save reports — progress may be lost on next resume",
 			"err", saveErr)
 	}
 
 	// Store workflow.json on first run so resume can verify the input matches on subsequent runs.
-	state := ceremony.WorkflowState[example.OnboardingInput]{
-		CeremonyID: workflowId,
-		Type:       ceremony.WorkflowTypeExample,
-		Input:      input,
-	}
-	if err := ceremony.SaveWorkflow(ceremonyDir, state); err != nil {
-		lggr.Errorw("Failed to save workflow.json — resume may fail if input cannot be reconstructed",
-			"err", err)
+	if initialRun {
+		state := ceremony.WorkflowState[example.OnboardingInput]{
+			CeremonyID: workflowId,
+			Type:       ceremony.WorkflowTypeExample,
+			Input:      input,
+		}
+		if err := ceremony.SaveWorkflow(ceremonyDir, state); err != nil {
+			lggr.Errorw("Failed to save workflow.json — resume may fail if input cannot be reconstructed",
+				"err", err)
+		}
 	}
 
 	if seqErr != nil {
@@ -141,6 +149,7 @@ func executeOnboardingSequence(
 			return fmt.Errorf("loading previous reports: %w", err)
 		}
 	}
+	initialRun := workflowId == ""
 
 	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
 	bundle := operations.NewBundle(
@@ -175,18 +184,23 @@ func executeOnboardingSequence(
 	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
 		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
 	}
-	allReports, _ := reporter.GetReports()
-	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+	allReports, reportErr := reporter.GetReports()
+	if reportErr != nil {
+		lggr.Errorw("Failed to collect reports", "err", reportErr)
+	}
+	if saveErr := ceremony.SaveReportUpdates(ceremonyDir, previousReports, allReports); saveErr != nil {
 		lggr.Errorw("Failed to save reports", "err", saveErr)
 	}
 
-	state := ceremony.WorkflowState[onboarding.OnboardingInput]{
-		CeremonyID: workflowId,
-		Type:       ceremony.WorkflowTypeOnboarding,
-		Input:      input,
-	}
-	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
-		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	if initialRun {
+		state := ceremony.WorkflowState[onboarding.OnboardingInput]{
+			CeremonyID: workflowId,
+			Type:       ceremony.WorkflowTypeOnboarding,
+			Input:      input,
+		}
+		if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+			lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+		}
 	}
 
 	if seqErr != nil {
@@ -230,6 +244,7 @@ func executeKickSequence(
 			return fmt.Errorf("loading previous reports: %w", err)
 		}
 	}
+	initialRun := workflowId == ""
 
 	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
 	bundle := operations.NewBundle(
@@ -263,18 +278,23 @@ func executeKickSequence(
 	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
 		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
 	}
-	allReports, _ := reporter.GetReports()
-	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+	allReports, reportErr := reporter.GetReports()
+	if reportErr != nil {
+		lggr.Errorw("Failed to collect reports", "err", reportErr)
+	}
+	if saveErr := ceremony.SaveReportUpdates(ceremonyDir, previousReports, allReports); saveErr != nil {
 		lggr.Errorw("Failed to save reports", "err", saveErr)
 	}
 
-	state := ceremony.WorkflowState[kick.KickInput]{
-		CeremonyID: workflowId,
-		Type:       ceremony.WorkflowTypeKick,
-		Input:      input,
-	}
-	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
-		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	if initialRun {
+		state := ceremony.WorkflowState[kick.KickInput]{
+			CeremonyID: workflowId,
+			Type:       ceremony.WorkflowTypeKick,
+			Input:      input,
+		}
+		if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+			lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+		}
 	}
 
 	if seqErr != nil {
@@ -315,6 +335,7 @@ func executeContractDeploySequence(
 			return fmt.Errorf("loading previous reports: %w", err)
 		}
 	}
+	initialRun := workflowId == ""
 
 	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
 	bundle := operations.NewBundle(
@@ -337,14 +358,15 @@ func executeContractDeploySequence(
 	}
 	defer ledgerConn.Close()
 
-	deps := contractdeploy.ContractDeployDeps{
+	deps := ledger.ContractDeployDeps{
 		AdminClient:  client.NewGRPCClient(adminConn),
 		LedgerClient: client.NewGRPCLedgerClient(ledgerConn),
 		// DARLoader reads DAR bytes by package name and version.
 		// Callers that embed the contracts FS can swap this for contracts.GetDar.
-		DARLoader: contractdeploy.FileDARLoader("dars"),
+		DARLoader: ledger.FileDARLoader("dars"),
 		Logger:    lggr,
 		Confirmer: confirmer,
+		UserID:    cfg.UserID,
 	}
 
 	lggr.Infow("Running contract-deploy sequence",
@@ -364,18 +386,23 @@ func executeContractDeploySequence(
 	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
 		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
 	}
-	allReports, _ := reporter.GetReports()
-	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+	allReports, reportErr := reporter.GetReports()
+	if reportErr != nil {
+		lggr.Errorw("Failed to collect reports", "err", reportErr)
+	}
+	if saveErr := ceremony.SaveReportUpdates(ceremonyDir, previousReports, allReports); saveErr != nil {
 		lggr.Errorw("Failed to save reports", "err", saveErr)
 	}
 
-	state := ceremony.WorkflowState[contractdeploy.ContractDeployInput]{
-		CeremonyID: workflowId,
-		Type:       ceremony.WorkflowTypeContractDeploy,
-		Input:      input,
-	}
-	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
-		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	if initialRun {
+		state := ceremony.WorkflowState[contractdeploy.ContractDeployInput]{
+			CeremonyID: workflowId,
+			Type:       ceremony.WorkflowTypeContractDeploy,
+			Input:      input,
+		}
+		if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+			lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+		}
 	}
 
 	if seqErr != nil {
@@ -415,6 +442,7 @@ func executeAddParticipantSequence(
 			return fmt.Errorf("loading previous reports: %w", err)
 		}
 	}
+	initialRun := workflowId == ""
 
 	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
 	bundle := operations.NewBundle(
@@ -447,18 +475,23 @@ func executeAddParticipantSequence(
 	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
 		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
 	}
-	allReports, _ := reporter.GetReports()
-	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+	allReports, reportErr := reporter.GetReports()
+	if reportErr != nil {
+		lggr.Errorw("Failed to collect reports", "err", reportErr)
+	}
+	if saveErr := ceremony.SaveReportUpdates(ceremonyDir, previousReports, allReports); saveErr != nil {
 		lggr.Errorw("Failed to save reports", "err", saveErr)
 	}
 
-	state := ceremony.WorkflowState[addparticipant.AddParticipantInput]{
-		CeremonyID: workflowId,
-		Type:       ceremony.WorkflowTypeAddParticipant,
-		Input:      input,
-	}
-	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
-		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	if initialRun {
+		state := ceremony.WorkflowState[addparticipant.AddParticipantInput]{
+			CeremonyID: workflowId,
+			Type:       ceremony.WorkflowTypeAddParticipant,
+			Input:      input,
+		}
+		if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+			lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+		}
 	}
 
 	if seqErr != nil {
@@ -498,6 +531,7 @@ func executeKeyRotationSequence(
 			return fmt.Errorf("loading previous reports: %w", err)
 		}
 	}
+	initialRun := workflowId == ""
 
 	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
 	bundle := operations.NewBundle(
@@ -532,18 +566,23 @@ func executeKeyRotationSequence(
 	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
 		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
 	}
-	allReports, _ := reporter.GetReports()
-	if saveErr := ceremony.SaveReports(ceremonyDir, allReports); saveErr != nil {
+	allReports, reportErr := reporter.GetReports()
+	if reportErr != nil {
+		lggr.Errorw("Failed to collect reports", "err", reportErr)
+	}
+	if saveErr := ceremony.SaveReportUpdates(ceremonyDir, previousReports, allReports); saveErr != nil {
 		lggr.Errorw("Failed to save reports", "err", saveErr)
 	}
 
-	state := ceremony.WorkflowState[keyrotation.KeyRotationInput]{
-		CeremonyID: workflowId,
-		Type:       ceremony.WorkflowTypeKeyRotation,
-		Input:      input,
-	}
-	if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
-		lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+	if initialRun {
+		state := ceremony.WorkflowState[keyrotation.KeyRotationInput]{
+			CeremonyID: workflowId,
+			Type:       ceremony.WorkflowTypeKeyRotation,
+			Input:      input,
+		}
+		if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+			lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+		}
 	}
 
 	if seqErr != nil {

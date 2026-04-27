@@ -32,7 +32,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	retry "github.com/avast/retry-go/v4"
-	"github.com/chainlink/canton-party-ceremony/ceremony"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -66,10 +69,10 @@ var OnboardingSequence = operations.NewSequence(
 		}
 
 		// ── Step 1: Member key generation ────────────────────────────────────
-		members := make([]CreateMemberKeyOutput, 0)
+		members := make([]keys.CreateMemberKeyOutput, 0)
 		for _, pid := range in.Participants {
 			deps.Logger.Info("creating key for participant", pid)
-			r, err := operations.ExecuteOperation(b, CreateMemberKeyOp, deps, CreateMemberKeyInput{
+			r, err := operations.ExecuteOperation(b, keys.CreateMemberKeyOp, deps, keys.CreateMemberKeyInput{
 				NamespaceName: in.NamespaceName,
 				ParticipantID: pid,
 			})
@@ -108,7 +111,7 @@ var OnboardingSequence = operations.NewSequence(
 
 				continue
 			}
-			_, err := operations.ExecuteOperation(b, ProposeNamespaceDelegationOp, deps, ProposeNSDInput{
+			_, err := operations.ExecuteOperation(b, topology.ProposeNamespaceDelegationOp, deps, topology.ProposeNSDInput{
 				ParticipantID:  m.ParticipantID,
 				SigningKeyB64:  m.SigningKeyB64,
 				Namespace:      m.NamespaceFingerprint,
@@ -158,7 +161,7 @@ var OnboardingSequence = operations.NewSequence(
 
 		// ── Step 3: DNS proposal creation ────────────────────────────────────
 		out.State.Phase = PhaseDNSProposal
-		proposalReport, err := operations.ExecuteOperation(b, CreateDNSProposalOp, deps, CreateDNSProposalInput{
+		proposalReport, err := operations.ExecuteOperation(b, topology.CreateDNSProposalOp, deps, topology.CreateDNSProposalInput{
 			NamespaceName:  in.NamespaceName,
 			Members:        members,
 			SynchronizerID: in.SynchronizerID,
@@ -176,7 +179,7 @@ var OnboardingSequence = operations.NewSequence(
 		out.State.Phase = PhaseDNSSigning
 		var allSignedTxsB64 []string
 		for _, signerID := range proposal.RequiredSigners {
-			sigReport, sigErr := operations.ExecuteOperation(b, SignDNSProposalOp, deps, SignDNSProposalInput{
+			sigReport, sigErr := operations.ExecuteOperation(b, topology.SignDNSProposalOp, deps, topology.SignDNSProposalInput{
 				ParticipantID:      signerID,
 				ProposalHashSHA256: proposal.ProposalHashSHA256,
 				DNSTxB64:           proposal.DNSTxB64,
@@ -207,13 +210,13 @@ var OnboardingSequence = operations.NewSequence(
 		// ── Step 5: Submit DNS ───────────────────────────────────────────────
 		out.State.Phase = PhaseDNSSubmit
 		_, err = operations.ExecuteOperation(
-			b, SubmitDNSOp, deps,
-			SubmitDNSInput{
+			b, topology.SubmitDNSOp, deps,
+			topology.SubmitDNSInput{
 				SignedDNSTxsB64: allSignedTxsB64,
 				SynchronizerID:  in.SynchronizerID,
 				FilterNamespace: proposal.DecentralizedNS,
 			},
-			operations.WithRetry[SubmitDNSInput, ceremony.CantonDeps](),
+			operations.WithRetry[topology.SubmitDNSInput, ceremony.CantonDeps](),
 		)
 		if err != nil {
 			return out, fmt.Errorf("submit-dns: %w", err)
@@ -250,7 +253,7 @@ var OnboardingSequence = operations.NewSequence(
 		out.State.P2PRequired = in.Threshold
 
 		for _, m := range members {
-			_, p2pErr := operations.ExecuteOperation(b, ProposeP2POp, deps, ProposeP2PInput{
+			_, p2pErr := operations.ExecuteOperation(b, topology.ProposeP2POp, deps, topology.ProposeP2PInput{
 				ParticipantID:  m.ParticipantID,
 				PartyID:        partyID,
 				Members:        members,

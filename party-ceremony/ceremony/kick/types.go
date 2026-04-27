@@ -69,8 +69,6 @@ type KickOutput struct {
 	State           CeremonyState `json:"state"`
 }
 
-// ── Per-operation I/O types ──────────────────────────────────────────────────
-
 // ReadCurrentStateInput is the input to [ReadCurrentStateOp].
 type ReadCurrentStateInput struct {
 	DecentralizedPartyID string `json:"decentralized_party_id"`

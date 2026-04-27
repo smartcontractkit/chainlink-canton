@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 )
 
-// UnmarshalActiveContract unmarshals a Canton ActiveContract response into a typed DAML binding struct.
+// UnmarshalActiveContract unmarshalls a Canton ActiveContract response into a typed DAML binding struct.
 // This provides type-safe access to contract fields instead of manual string-based field parsing.
 //
 // Example usage:
@@ -32,7 +32,7 @@ func UnmarshalActiveContract[T any](ac *apiv2.GetActiveContractsResponse_ActiveC
 	return UnmarshalCreatedEvent[T](createdEvent)
 }
 
-// UnmarshalCreatedEvent unmarshals a CreatedEvent into a typed DAML binding struct.
+// UnmarshalCreatedEvent unmarshalls a CreatedEvent into a typed DAML binding struct.
 // This is useful when you have a CreatedEvent directly (e.g., from transaction events).
 func UnmarshalCreatedEvent[T any](event *apiv2.CreatedEvent) (*T, error) {
 	if event == nil {

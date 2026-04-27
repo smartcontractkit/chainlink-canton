@@ -432,11 +432,11 @@ func (t *CancelBatchParams) UnmarshalHex(data string) error {
 
 // ExecuteOp is a Record type
 type ExecuteOp struct {
-	TargetRole Role         `json:"targetRole"`
-	Submitter  types.PARTY  `json:"submitter"`
-	Op         Op           `json:"op"`
-	OpProof    []types.TEXT `json:"opProof"`
-	TargetCids types.GENMAP `json:"targetCids"`
+	TargetRole Role                             `json:"targetRole"`
+	Submitter  types.PARTY                      `json:"submitter"`
+	Op         Op                               `json:"op"`
+	OpProof    []types.TEXT                     `json:"opProof"`
+	TargetCids map[types.TEXT]types.CONTRACT_ID `json:"targetCids"`
 }
 
 // ToMap converts ExecuteOp to a map for DAML arguments
@@ -491,12 +491,12 @@ func (t *ExecuteOp) UnmarshalHex(data string) error {
 
 // ExecuteScheduledBatch is a Record type
 type ExecuteScheduledBatch struct {
-	Submitter   types.PARTY    `json:"submitter"`
-	OpId        types.TEXT     `json:"opId"`
-	Calls       []TimelockCall `json:"calls"`
-	Predecessor types.TEXT     `json:"predecessor" hex:"bytes16"`
-	Salt        types.TEXT     `json:"salt" hex:"bytes16"`
-	TargetCids  types.GENMAP   `json:"targetCids"`
+	Submitter   types.PARTY                      `json:"submitter"`
+	OpId        types.TEXT                       `json:"opId"`
+	Calls       []TimelockCall                   `json:"calls"`
+	Predecessor types.TEXT                       `json:"predecessor" hex:"bytes16"`
+	Salt        types.TEXT                       `json:"salt" hex:"bytes16"`
+	TargetCids  map[types.TEXT]types.CONTRACT_ID `json:"targetCids"`
 }
 
 // ToMap converts ExecuteScheduledBatch to a map for DAML arguments
@@ -937,15 +937,15 @@ func (t *IsOperationReady) UnmarshalHex(data string) error {
 
 // MCMS is a Template type
 type MCMS struct {
-	Owner              types.PARTY       `json:"owner"`
-	InstanceId         types.TEXT        `json:"instanceId"`
-	ChainId            types.INT64       `json:"chainId"`
-	Proposer           RoleState         `json:"proposer"`
-	Canceller          RoleState         `json:"canceller"`
-	Bypasser           RoleState         `json:"bypasser"`
-	MinDelay           types.RELTIME     `json:"minDelay"`
-	BlockedFunctions   []BlockedFunction `json:"blockedFunctions"`
-	TimelockTimestamps types.GENMAP      `json:"timelockTimestamps"`
+	Owner              types.PARTY                    `json:"owner"`
+	InstanceId         types.TEXT                     `json:"instanceId"`
+	ChainId            types.INT64                    `json:"chainId"`
+	Proposer           RoleState                      `json:"proposer"`
+	Canceller          RoleState                      `json:"canceller"`
+	Bypasser           RoleState                      `json:"bypasser"`
+	MinDelay           types.RELTIME                  `json:"minDelay"`
+	BlockedFunctions   []BlockedFunction              `json:"blockedFunctions"`
+	TimelockTimestamps map[types.TEXT]types.TIMESTAMP `json:"timelockTimestamps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1476,9 +1476,9 @@ func (t *MCMSReceiverView) UnmarshalHex(data string) error {
 
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
-	FunctionName  types.TEXT   `json:"functionName"`
-	OperationData types.TEXT   `json:"operationData" hex:"bytes16"`
-	ContractIds   types.GENMAP `json:"contractIds"`
+	FunctionName  types.TEXT                       `json:"functionName"`
+	OperationData types.TEXT                       `json:"operationData" hex:"bytes16"`
+	ContractIds   map[types.TEXT]types.CONTRACT_ID `json:"contractIds"`
 }
 
 // ToMap converts MCMSReceiverEntrypoint to a map for DAML arguments
@@ -1877,10 +1877,10 @@ var _ types.ENUM = Role("")
 
 // RoleState is a Record type
 type RoleState struct {
-	Config       MultisigConfig `json:"config"`
-	SeenHashes   types.GENMAP   `json:"seenHashes"`
-	ExpiringRoot ExpiringRoot   `json:"expiringRoot"`
-	RootMetadata RootMetadata   `json:"rootMetadata"`
+	Config       MultisigConfig                 `json:"config"`
+	SeenHashes   map[types.TEXT]types.TIMESTAMP `json:"seenHashes"`
+	ExpiringRoot ExpiringRoot                   `json:"expiringRoot"`
+	RootMetadata RootMetadata                   `json:"rootMetadata"`
 }
 
 // ToMap converts RoleState to a map for DAML arguments

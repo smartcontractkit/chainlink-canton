@@ -1,6 +1,6 @@
 package main
 
-import "github.com/chainlink/canton-party-ceremony/cmd"
+import "github.com/smartcontractkit/chainlink-canton/party-ceremony/cmd"
 
 func main() {
 	cmd.Execute()

@@ -267,7 +267,7 @@ func TestNewProvider_FlowCompletes(t *testing.T) {
 	require.NotEmpty(t, state, "state not found in auth URL")
 
 	callbackURL := "http://" + callbackHost + "/callback?code=code123&state=" + url.QueryEscape(state)
-	response, err := http.Get(callbackURL) //nolint:gosec,noctx
+	response, err := http.Get(callbackURL) //nolint:noctx
 	require.NoError(t, err, "requesting callback")
 	require.NoError(t, response.Body.Close())
 

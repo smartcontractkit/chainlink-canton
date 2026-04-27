@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "b6d996c383b2c35fa3e97d693683b1bca399d02d1008d7562f1a4b9d389ea2da"
+	PackageID   = "597c8c8d8e79ab00a2fb3c89782b998a9ee59bc971e75a1206f6e83a2d13f65b"
 	SDKVersion  = "3.4.10"
 )
 
@@ -456,17 +456,17 @@ func (t *AddVerifierDataMCMSParams) UnmarshalHex(data string) error {
 
 // AnyValue is a variant/union type
 type AnyValue struct {
-	AVText       *types.TEXT        `json:"AV_Text,omitempty"`
-	AVInt        *types.INT64       `json:"AV_Int,omitempty"`
-	AVDecimal    *types.NUMERIC     `json:"AV_Decimal,omitempty"`
-	AVBool       *types.BOOL        `json:"AV_Bool,omitempty"`
-	AVDate       *types.DATE        `json:"AV_Date,omitempty"`
-	AVTime       *types.TIMESTAMP   `json:"AV_Time,omitempty"`
-	AVRelTime    *types.RELTIME     `json:"AV_RelTime,omitempty"`
-	AVParty      *types.PARTY       `json:"AV_Party,omitempty"`
-	AVContractId *types.CONTRACT_ID `json:"AV_ContractId,omitempty"`
-	AVList       *[]AnyValue        `json:"AV_List,omitempty"`
-	AVMap        *types.TEXTMAP     `json:"AV_Map,omitempty"`
+	AVText       *types.TEXT          `json:"AV_Text,omitempty"`
+	AVInt        *types.INT64         `json:"AV_Int,omitempty"`
+	AVDecimal    *types.NUMERIC       `json:"AV_Decimal,omitempty"`
+	AVBool       *types.BOOL          `json:"AV_Bool,omitempty"`
+	AVDate       *types.DATE          `json:"AV_Date,omitempty"`
+	AVTime       *types.TIMESTAMP     `json:"AV_Time,omitempty"`
+	AVRelTime    *types.RELTIME       `json:"AV_RelTime,omitempty"`
+	AVParty      *types.PARTY         `json:"AV_Party,omitempty"`
+	AVContractId *types.CONTRACT_ID   `json:"AV_ContractId,omitempty"`
+	AVList       *[]AnyValue          `json:"AV_List,omitempty"`
+	AVMap        *map[string]AnyValue `json:"AV_Map,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for AnyValue
@@ -818,14 +818,19 @@ func (t *BuildMessageMCMSParams) UnmarshalHex(data string) error {
 
 // CCIPContext is a Record type
 type CCIPContext struct {
-	Values types.TEXTMAP `json:"values"`
+	Values map[string]AnyValue `json:"values"`
 }
 
 // ToMap converts CCIPContext to a map for DAML arguments
 func (t CCIPContext) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["values"] = model.NestedToDAMLValue(t.Values)
+	m["values"] = func() any {
+		if t.Values == nil {
+			return map[string]any{"_type": "textmap", "value": map[string]any{}}
+		}
+		return map[string]any{"_type": "textmap", "value": t.Values}
+	}()
 
 	return m
 }
@@ -3211,11 +3216,11 @@ func (t *GetSourceChainConfigMCMSParams) UnmarshalHex(data string) error {
 
 // GlobalConfig is a Template type
 type GlobalConfig struct {
-	InstanceId         types.TEXT    `json:"instanceId"`
-	CcipOwner          types.PARTY   `json:"ccipOwner"`
-	ChainSelector      types.NUMERIC `json:"chainSelector"`
-	DestChainConfigs   types.GENMAP  `json:"destChainConfigs"`
-	SourceChainConfigs types.GENMAP  `json:"sourceChainConfigs"`
+	InstanceId         types.TEXT                          `json:"instanceId"`
+	CcipOwner          types.PARTY                         `json:"ccipOwner"`
+	ChainSelector      types.NUMERIC                       `json:"chainSelector"`
+	DestChainConfigs   map[types.NUMERIC]DestChainConfig   `json:"destChainConfigs"`
+	SourceChainConfigs map[types.NUMERIC]SourceChainConfig `json:"sourceChainConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

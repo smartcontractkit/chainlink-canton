@@ -43,5 +43,5 @@ var Execute = contract.NewExercise(contract.ExerciseParams[ccipreceiver.Execute2
 	},
 	Template:     ccipreceiver.CCIPReceiver{},
 	Method:       ccipreceiver.CCIPReceiver{}.Execute,
-	EncodeMethod: receiverEncoder.Execute2,
+	EncodeMethod: receiverEncoder.Execute,
 })

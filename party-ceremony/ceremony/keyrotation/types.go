@@ -78,8 +78,6 @@ type KeyRotationOutput struct {
 	State                   CeremonyState `json:"state"`
 }
 
-// ── Per-operation I/O types ──────────────────────────────────────────────────
-
 // GenerateRotatedKeyInput is the input to [GenerateRotatedKeyOp].
 type GenerateRotatedKeyInput struct {
 	// ParticipantID identifies the target participant. Only this participant's

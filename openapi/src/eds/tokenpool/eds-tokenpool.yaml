@@ -17,7 +17,7 @@ paths:
           name: address
           required: true
           schema:
-            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+            type: string
           description: |
             The address of the Token Pool instance to forward the message to.
             Can be either a RawInstanceAddress or an InstanceAddress.
@@ -53,7 +53,7 @@ paths:
           name: address
           required: true
           schema:
-            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedAddress'
+            type: string
           description: |
             The address of the Token Pool instance to forward the message to.
             Can be either a RawInstanceAddress or an InstanceAddress.
@@ -62,14 +62,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenPoolSendRequest'
+              $ref: '#/components/schemas/TokenPoolExecuteRequest'
       responses:
         '200':
           description: ok
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPoolSendResponse'
+                $ref: '#/components/schemas/TokenPoolExecuteResponse'
         '400':
           $ref: '../common/eds-common.yaml#/components/responses/400'
         '404':
@@ -85,15 +85,48 @@ tags:
 
 components:
   schemas:
+    TokenInput:
+      type: object
+      description: The token input for the token transfer.
+      required:
+        - transferFactory
+        - extraArgs
+        - tokenPoolHoldings
+      properties:
+        transferFactory:
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        extraArgs:
+          type: object
+          required:
+            - metadata
+            - context
+          properties:
+            metadata:
+              type: object
+            context:
+              type: object
+        tokenPoolHoldings:
+          type: array
+          items:
+            $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+
     TokenPoolSendRequest:
       type: object
       required:
+        - message
       properties:
         message:
           $ref: "../common/eds-common.yaml#/components/schemas/Message"
     TokenPoolSendResponse:
       type: object
       required:
+        - contractId
+        - instanceAddress
+        - rawInstanceAddress
+        - requiredCCVs
+        - contextData
+        - tokenInput
+        - disclosedContracts
       properties:
         contractId:
           $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
@@ -109,22 +142,7 @@ components:
           type: object
           description: The context to be passed along to the token pool.
         tokenInput:
-          type: object
-          description: The token input for the token transfer.
-          properties:
-            transferFactory:
-              $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
-            extraArgs:
-              type: object
-              properties:
-                metadata:
-                  type: object
-                context:
-                  type: object
-            tokenPoolHoldings:
-              type: array
-              items:
-                $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+          $ref: "#/components/schemas/TokenInput"
         disclosedContracts:
           type: array
           items:
@@ -133,6 +151,7 @@ components:
     TokenPoolExecuteRequest:
       type: object
       required:
+        - encodedMessage
       properties:
         encodedMessage:
           type: string
@@ -140,6 +159,13 @@ components:
     TokenPoolExecuteResponse:
       type: object
       required:
+        - contractId
+        - instanceAddress
+        - rawInstanceAddress
+        - requiredCCVs
+        - contextData
+        - tokenInput
+        - disclosedContracts
       properties:
         contractId:
           $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
@@ -155,22 +181,7 @@ components:
           type: object
           description: The context to be passed along to the token pool.
         tokenInput:
-          type: object
-          description: The token input for the token transfer.
-          properties:
-            transferFactory:
-              $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
-            extraArgs:
-              type: object
-              properties:
-                metadata:
-                  type: object
-                context:
-                  type: object
-            tokenPoolHoldings:
-              type: array
-              items:
-                $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+          $ref: "#/components/schemas/TokenInput"
         disclosedContracts:
           type: array
           items:

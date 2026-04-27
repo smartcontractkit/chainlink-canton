@@ -10,7 +10,7 @@ import (
 
 	protov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"
 
-	"github.com/chainlink/canton-party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 )
 
 // buildDNSTransactionB64 creates a base64-encoded SignedTopologyTransaction

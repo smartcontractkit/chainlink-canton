@@ -115,7 +115,7 @@ func discoverTargets(root string) ([]codecTarget, error) {
 		}
 
 		// Parse to extract the module name
-		f, err := os.Open(path)
+		f, err := os.Open(path) //nolint:gosec // Only used during compilation
 		if err != nil {
 			return fmt.Errorf("opening %s: %w", path, err)
 		}

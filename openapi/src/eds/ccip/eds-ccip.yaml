@@ -44,8 +44,8 @@ paths:
           name: instrumentId
           required: true
           schema:
-            $ref: '../common/eds-common.yaml#/components/schemas/RawOrHashedInstrumentId'
-          description: The InstrumentId or the asset, either as a raw or hashed value, to look up in the token admin registry.
+            $ref: '../common/eds-common.yaml#/components/schemas/HashedInstrumentId'
+          description: The InstrumentId of the asset, as a hashed value, to look up in the token admin registry.
       responses:
         '200':
           description: ok
@@ -135,10 +135,16 @@ components:
       type: object
       required:
         - contractId
+        - instanceAddress
+        - rawInstanceAddress
         - disclosedContracts
       properties:
         contractId:
-          $ref: '../common/eds-common.yaml#/components/schemas/ContractId'
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
         disclosedContracts:
           description: Disclosures for all contracts required for the caller to instantiate a PerPartyRouter
           type: array
@@ -148,10 +154,8 @@ components:
     LookupTokenPoolResponse:
       type: object
       required:
-          - instanceAddress
+        - rawInstanceAddress
       properties:
-        instanceAddress:
-          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
         rawInstanceAddress:
           $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
 
@@ -190,43 +194,26 @@ components:
             A list of requested CCVs containing their addresses.
             If default CCVs apply, this list might contain more CCVs than originally requested.
           items:
-            type: object
-            required:
-              - instanceAddress
-            properties:
-              instanceAddress:
-                $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
-              rawInstanceAddress:
-                $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+            $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
           example:
-            - instanceAddress: "0x27a9f20250528c5cc710c2ae48ac9dcf2b3339d657befd3ccc4df86d0d1516f3"
-              rawInstanceAddress: "committeeverifier-abcde@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
-            - instanceAddress: "0x4bed5af0e77b4d7a552a1f933b13c275bbdc231b8499b2e14edcc634a6869a5f"
+            - "committeeverifier-abcde@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+            - "0x4bed5af0e77b4d7a552a1f933b13c275bbdc231b8499b2e14edcc634a6869a5f"
         executor:
-          type: object
-          description: |
-            The address of the requested executor.
-            If "noExecutor" has been requested, this will not be returned.
-            If a default executor applies, this might be returned even if it was not explicitly requested.
-          required:
-            - instanceAddress
-          properties:
-            instanceAddress:
-              $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
-            rawInstanceAddress:
-              $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
-          example:
-            instanceAddress: "0x390b4a68b330097e97deebf6ae6784653e6210d8fd202985afb6480e2dca9a2a"
-            rawInstanceAddress: "executor-abcde@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+          $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
 
     CCIPExecuteRequest:
       type: object
+      required:
+        - encodedMessage
       properties:
         encodedMessage:
           type: string
           description: The CCIP message to be executed, encoded as a hex string.
     CCIPExecuteResponse:
       type: object
+      required:
+        - contextData
+        - disclosedContracts
       properties:
         contextData:
           type: object
@@ -236,15 +223,4 @@ components:
           items:
             $ref: '../common/eds-common.yaml#/components/schemas/DisclosedContract'
         tokenPool:
-          type: object
-          description: |
-            The address of the token pool which this message belongs to.
-            If the message does not contain a token transfer, this may be empty.
-          properties:
-            instanceAddress:
-              $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
-            rawInstanceAddress:
-              $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
-          example:
-            instanceAddress: "0x390b4a68b330097e97deebf6ae6784653e6210d8fd202985afb6480e2dca9a2a"
-            rawInstanceAddress: "tokenpool-abcde@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce"
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
