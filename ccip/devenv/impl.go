@@ -940,6 +940,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	// Collect Disclosures
+	hasTokenTransfer := fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 	outgoingMessage := oapiCommon.Message{
 		DestinationChainSelector: strconv.FormatUint(dest, 10),
 		FeeToken: oapiCommon.InstrumentId{
@@ -952,10 +953,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}{Type: oapiCommon.Empty}, // Using default Executor
 		Payload:  hex.EncodeToString(fields.Data),
 		Receiver: hex.EncodeToString(fields.Receiver),
-		TokenTransfer: &oapiCommon.TokenTransfer{
-			Amount: nil,
-			Token:  nil,
-		},
+	}
+	if hasTokenTransfer {
+		outgoingMessage.TokenTransfer = &oapiCommon.TokenTransfer{
+			Amount: "0.0000001000",
+			Token: oapiCommon.InstrumentId{
+				Admin: oapiCommon.PartyId(feeTokenInstrument.Admin),
+				Id:    string(feeTokenInstrument.Id),
+			},
+		}
 	}
 	// TODO come up with a better way of doing this
 	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
@@ -1000,7 +1006,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	// Token Pool
 	var tokenPoolRequiredCCVs []string
-	hasTokenTransfer := fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 	if hasTokenTransfer {
 		// TODO - use different instrument?
 		// Mint holding to be used for token transfer
@@ -1022,8 +1027,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Token Pool Send disclosure for token pool at address %s: %w", tokenPoolAddress.String(), err)
 		}
 		sendArgs.Message.TokenTransfer = &ccipclient.TokenTransfer{
-			Token:  feeTokenInstrument,
-			Amount: "0.0000001000",
+			Token: splice_api_token_holding_v1.InstrumentId{
+				Admin: types.PARTY(outgoingMessage.TokenTransfer.Token.Admin),
+				Id:    types.TEXT(outgoingMessage.TokenTransfer.Token.Id),
+			},
+			Amount: types.NUMERIC(outgoingMessage.TokenTransfer.Amount),
 		}
 		sendArgs.TokenTransferInput = &ccipsender.TokenTransferInput{
 			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},

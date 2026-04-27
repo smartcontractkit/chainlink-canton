@@ -413,6 +413,7 @@ template PerPartyRouter
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
+                tokenConfigCid <- CCIP.TokenAdminRegistry.lookupOptionalTokenConfigCid context
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
@@ -512,6 +513,7 @@ template PerPartyRouter
                     rmnRemoteCid
                     globalConfigCid
                     tokenAdminRegistryCid
+                    tokenConfigCid
                     sendingMessageCid
 
                 let newSeqNumbers = Map.insert
@@ -598,6 +600,7 @@ template PerPartyRouter
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
+                tokenConfigCid <- CCIP.TokenAdminRegistry.lookupOptionalTokenConfigCid context
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
@@ -632,6 +635,7 @@ template PerPartyRouter
                     rmnRemoteCid = rmnRemoteCid
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid
+                    tokenConfigCid = tokenConfigCid
 
                 routerCid <-
                     if Set.size executedMessages >= maxExecutedMessagesSize then do
