@@ -2,8 +2,7 @@ package changesets
 
 import (
 	"context"
-	"errors"
-	"io"
+	"encoding/hex"
 	"sync"
 	"testing"
 
@@ -71,9 +70,9 @@ func TestDeployTokenPool(t *testing.T) {
 	// Deploy TAR so we have an instance address for register-with-TAR
 	tarAddrRef, err := cld_ops.ExecuteOperation(bundle, token_admin_registry.Deploy, *cantonChain, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
 		Template: tokenadminregistry.TokenAdminRegistry{
-			Owner:        types.PARTY(party),
-			InstanceId:   "",
-			TokenConfigs: map[types.TEXT]tokenadminregistry.TokenConfig{},
+			Owner:      types.PARTY(party),
+			InstanceId: "",
+			EntryCount: 0,
 		},
 		OwnerParty: types.PARTY(party),
 	})
@@ -108,78 +107,28 @@ func TestDeployTokenPool(t *testing.T) {
 	})
 	require.NoError(t, err, "deploy token pool and register with TAR")
 
-	// Verify TAR config: fetch TAR from ACS and unmarshal with UnmarshalActiveContract (uses UnmarshalCreatedEvent)
-	tar, err := findTARByInstanceAddress(t.Context(), participant.LedgerServices.State, party)
-	require.NoError(t, err, "find TAR contract in ACS")
-
-	// TokenConfigs is now typed, so tokenPool can be read directly from each TokenConfig.
-	var found bool
-	for _, v := range tar.TokenConfigs {
-		if v.TokenPool == nil {
-			continue
-		}
-		require.Equal(t, party, string(v.TokenPool.PoolOwner), "TAR token config tokenPool.poolOwner should match pool owner")
-		found = true
-
-		break
-	}
-	require.True(t, found, "TAR should have a TokenConfig with tokenPool.poolOwner set (pool registered)")
+	tokenConfig, err := findTokenConfigByInstanceAddress(t.Context(), participant.LedgerServices.State, party, instrumentId)
+	require.NoError(t, err, "find TokenConfig contract in ACS")
+	require.NotNil(t, tokenConfig.TokenPool, "TokenConfig should have a registered token pool")
+	require.Equal(t, types.PARTY(party), tokenConfig.TokenPool.PoolOwner, "TokenConfig tokenPool.poolOwner should match pool owner")
 }
 
-// findTARByInstanceAddress streams GetActiveContracts for TokenAdminRegistry and returns the ActiveContract whose instanceId matches the given instance address.
-func findTARByInstanceAddress(ctx context.Context, stateClient apiv2.StateServiceClient, party string) (*tokenadminregistry.TokenAdminRegistry, error) {
-	ledgerEndResp, err := stateClient.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+func findTokenConfigByInstanceAddress(
+	ctx context.Context,
+	stateClient apiv2.StateServiceClient,
+	ccipParty string,
+	instrumentId splice_api_token_holding_v1.InstrumentId,
+) (*tokenadminregistry.TokenConfig, error) {
+	activeContract, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		stateClient,
+		ccipParty,
+		tokenadminregistry.TokenConfig{}.GetTemplateID(),
+		contracts.InstanceID(hex.EncodeToString(contracts.EncodeInstrumentID(instrumentId).Bytes())).RawInstanceAddress(types.PARTY(ccipParty)).InstanceAddress(),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	stream, err := stateClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEndResp.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				party: {
-					Cumulative: []*apiv2.CumulativeFilter{{
-						IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-							TemplateFilter: &apiv2.TemplateFilter{
-								TemplateId: &apiv2.Identifier{
-									PackageId:  "#ccip-tokenadminregistry",
-									ModuleName: "CCIP.TokenAdminRegistry",
-									EntityName: "TokenAdminRegistry",
-								},
-								IncludeCreatedEventBlob: true,
-							},
-						},
-					}},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer stream.CloseSend()
-	for {
-		ac, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok {
-			continue
-		}
-
-		if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() != bindings.GetEntityName(tokenadminregistry.TokenAdminRegistry{}.GetTemplateID()) {
-			continue
-		}
-		tar, err := bindings.UnmarshalActiveContract[tokenadminregistry.TokenAdminRegistry](c)
-		if err != nil {
-			return nil, err
-		}
-		if tar != nil {
-			return tar, nil
-		}
-	}
-
-	return nil, errors.New("no active TAR contract found for instance address")
+	return bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenConfig](activeContract.GetCreatedEvent())
 }

@@ -488,6 +488,10 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
 	})
 	require.NoError(t, err)
+	disclosedTokenConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenConfig",
+	})
+	require.NoError(t, err)
 
 	_, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -498,13 +502,14 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 					ContractId: disclosedTar.ContractId,
 					Choice:     "AcceptAdminRole",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "tokenConfigCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedTokenConfig.ContractId}}},
 						{Label: "instrumentId", Value: instrumentIdAmt},
 						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
 					}}}},
 				}},
 			}},
 			ActAs:              []string{partyTokenPoolOwner},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTar},
+			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTar, disclosedTokenConfig},
 		},
 	})
 	require.NoError(t, err)
@@ -514,6 +519,10 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	time.Sleep(500 * time.Millisecond)
 	disclosedTar, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
+	})
+	require.NoError(t, err)
+	disclosedTokenConfig, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenConfig",
 	})
 	require.NoError(t, err)
 
@@ -526,6 +535,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 					ContractId: disclosedTar.ContractId,
 					Choice:     "SetPool",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "tokenConfigCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedTokenConfig.ContractId}}},
 						{Label: "instrumentId", Value: instrumentIdAmt},
 						{Label: "tokenPool", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
@@ -536,7 +546,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				}},
 			}},
 			ActAs:              []string{partyTokenPoolOwner},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTar},
+			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTar, disclosedTokenConfig},
 		},
 	})
 	require.NoError(t, err)

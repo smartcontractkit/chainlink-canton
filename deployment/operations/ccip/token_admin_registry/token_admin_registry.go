@@ -19,26 +19,6 @@ var Version = semver.MustParse("0.1.0")
 
 var tarEncoder = tokenadminregistry.NewContract("", "CCIP.TokenAdminRegistry", "TokenAdminRegistry").Encoder()
 
-func encodeProposeAdministratorMCMS(args tokenadminregistry.ProposeAdministrator) (*bind.EncodedChoice, error) {
-	return tarEncoder.ProposeAdministratorMCMSParams(tokenadminregistry.ProposeAdministratorMCMSParams{
-		InstrumentId: args.InstrumentId,
-		NewAdmin:     args.NewAdmin,
-	})
-}
-
-func encodeAcceptAdminRoleMCMS(args tokenadminregistry.AcceptAdminRole) (*bind.EncodedChoice, error) {
-	return tarEncoder.AcceptAdminRoleMCMSParams(tokenadminregistry.AcceptAdminRoleMCMSParams{
-		InstrumentId: args.InstrumentId,
-	})
-}
-
-func encodeSetPoolMCMS(args tokenadminregistry.SetPool) (*bind.EncodedChoice, error) {
-	return tarEncoder.SetPoolMCMSParams(tokenadminregistry.SetPoolMCMSParams{
-		InstrumentId: args.InstrumentId,
-		TokenPool:    args.TokenPool,
-	})
-}
-
 var Deploy = contract.NewDeploy(contract.DeployParams[tokenadminregistry.TokenAdminRegistry]{
 	Name:           "canton/ccip/token_admin_registry/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
@@ -62,9 +42,15 @@ var ProposeAdministrator = contract.NewExercise(contract.ExerciseParams[tokenadm
 	Validate: func(input tokenadminregistry.ProposeAdministrator) error {
 		return nil
 	},
-	Template:     tokenadminregistry.TokenAdminRegistry{},
-	Method:       tokenadminregistry.TokenAdminRegistry{}.ProposeAdministrator,
-	EncodeMethod: encodeProposeAdministratorMCMS,
+	Template: tokenadminregistry.TokenAdminRegistry{},
+	Method:   tokenadminregistry.TokenAdminRegistry{}.ProposeAdministrator,
+	EncodeMethod: func(args tokenadminregistry.ProposeAdministrator) (*bind.EncodedChoice, error) {
+		return tarEncoder.ProposeAdministratorMCMSParams(tokenadminregistry.ProposeAdministratorMCMSParams{
+			TokenConfigCid: args.TokenConfigCid,
+			InstrumentId:   args.InstrumentId,
+			NewAdmin:       args.NewAdmin,
+		})
+	},
 })
 
 var AcceptAdminRole = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.AcceptAdminRole]{
@@ -75,9 +61,14 @@ var AcceptAdminRole = contract.NewExercise(contract.ExerciseParams[tokenadminreg
 	Validate: func(input tokenadminregistry.AcceptAdminRole) error {
 		return nil
 	},
-	Template:     tokenadminregistry.TokenAdminRegistry{},
-	Method:       tokenadminregistry.TokenAdminRegistry{}.AcceptAdminRole,
-	EncodeMethod: encodeAcceptAdminRoleMCMS,
+	Template: tokenadminregistry.TokenAdminRegistry{},
+	Method:   tokenadminregistry.TokenAdminRegistry{}.AcceptAdminRole,
+	EncodeMethod: func(args tokenadminregistry.AcceptAdminRole) (*bind.EncodedChoice, error) {
+		return tarEncoder.AcceptAdminRoleMCMSParams(tokenadminregistry.AcceptAdminRoleMCMSParams{
+			TokenConfigCid: args.TokenConfigCid,
+			InstrumentId:   args.InstrumentId,
+		})
+	},
 })
 
 var SetPool = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.SetPool]{
@@ -88,7 +79,13 @@ var SetPool = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.Se
 	Validate: func(input tokenadminregistry.SetPool) error {
 		return nil
 	},
-	Template:     tokenadminregistry.TokenAdminRegistry{},
-	Method:       tokenadminregistry.TokenAdminRegistry{}.SetPool,
-	EncodeMethod: encodeSetPoolMCMS,
+	Template: tokenadminregistry.TokenAdminRegistry{},
+	Method:   tokenadminregistry.TokenAdminRegistry{}.SetPool,
+	EncodeMethod: func(args tokenadminregistry.SetPool) (*bind.EncodedChoice, error) {
+		return tarEncoder.SetPoolMCMSParams(tokenadminregistry.SetPoolMCMSParams{
+			TokenConfigCid: args.TokenConfigCid,
+			InstrumentId:   args.InstrumentId,
+			TokenPool:      args.TokenPool,
+		})
+	},
 })

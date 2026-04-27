@@ -84,7 +84,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     let globalConfigAddr = RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteAddr = RawInstanceAddress.make rmnInstanceId rmnOwner
@@ -219,7 +219,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     let globalConfigAddr = RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteAddr = RawInstanceAddress.make rmnInstanceId rmnOwner

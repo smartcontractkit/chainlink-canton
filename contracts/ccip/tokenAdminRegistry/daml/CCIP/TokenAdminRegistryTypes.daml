@@ -2,7 +2,6 @@
 -- Separate module to enable auto-generated codec via go-daml
 module CCIP.TokenAdminRegistryTypes
   ( PoolRegistration(..)
-  , TokenConfig(..)
   , SetPoolParams(..)
   , ProposeAdminParams(..)
   , TransferAdminParams(..)
@@ -16,14 +15,6 @@ data PoolRegistration = PoolRegistration
     with
         poolOwner : Party
         poolInstanceId : Text
-    deriving (Eq, Show)
-
-data TokenConfig = TokenConfig
-    with
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        admin : Optional Party
-        pendingAdmin : Optional Party
-        tokenPool : Optional PoolRegistration
     deriving (Eq, Show)
 
 -- ===========================================================================
