@@ -548,7 +548,7 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	// Extract transfer factory context values (e.g. amulet-rules) for the fee token input
-	transferFactoryContextValues := make(types.TEXTMAP)
+	transferFactoryContextValues := make(map[string]splice_api_token_metadata_v1.AnyValue)
 	if choiceContextRecord := choiceContext.GetRecord(); choiceContextRecord != nil && len(choiceContextRecord.Fields) > 0 {
 		valuesField := choiceContextRecord.Fields[0]
 		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
@@ -567,7 +567,7 @@ func TestCCIPSend(t *testing.T) {
 			Values: transferFactoryContextValues,
 		},
 		Meta: splice_api_token_metadata_v1.Metadata{
-			Values: types.TEXTMAP{},
+			Values: map[string]types.TEXT{},
 		},
 	}
 

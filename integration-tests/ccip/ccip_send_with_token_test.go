@@ -394,8 +394,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Decimals:     10,
 			InstanceID:   poolInstanceID,
 			Qualifier:    "test-pool-send",
-			RemoteChainConfigs: types.GENMAP{
-				strconv.FormatUint(remoteSelector, 10): lockreleasetokenpool.RemoteChainConfig{
+			RemoteChainConfigs: map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{
+				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): lockreleasetokenpool.RemoteChainConfig{
 					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
 					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
 					InboundCCVs:        []mcms.RawInstanceAddress{},
@@ -407,16 +407,16 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				},
 			},
 			// Set a custom token transfer fee config
-			TokenTransferFeeConfigs: types.GENMAP{
-				strconv.FormatUint(remoteSelector, 10): map[string]any{
-					"isEnabled":         true,
-					"destGasOverhead":   int64(25_000),
-					"destBytesOverhead": int64(32),
-					"feeUSDCents":       types.NUMERIC(strconv.Itoa(tokenTransferFeeUSDCents)),
-					"feeBps":            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
+			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{
+				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
+					IsEnabled:         types.BOOL(true),
+					DestGasOverhead:   types.INT64(25_000),
+					DestBytesOverhead: types.INT64(32),
+					FeeUSDCents:       types.NUMERIC(strconv.Itoa(tokenTransferFeeUSDCents)),
+					FeeBps:            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
 				},
 			},
-			PoolReceiveContext: common.CCIPContext{Values: types.TEXTMAP{}},
+			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
 			TransferTimeout: lockreleasetokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
@@ -622,7 +622,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Values: transferFactoryContextValues,
 		},
 		Meta: splice_api_token_metadata_v1.Metadata{
-			Values: types.TEXTMAP{},
+			Values: map[string]types.TEXT{},
 		},
 	}
 
@@ -646,14 +646,14 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		TransferFactory: types.CONTRACT_ID(tokenTransferFactoryCid),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 			Context: splice_api_token_metadata_v1.ChoiceContext{Values: tokenTransferContextValues},
-			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+			Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 		},
 		TokenPoolHoldings: []types.CONTRACT_ID{},
 	}
 
 	// Build the main Send context with CCIP contract IDs (matching execute test pattern)
 	sendContext := common.CCIPContext{
-		Values: types.TEXTMAP{
+		Values: map[string]common.AnyValue{
 			"on-ramp":              common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOnRamp.ContractId))},
 			"global-config":        common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedGlobalConfig.ContractId))},
 			"token-admin-registry": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTar.ContractId))},
@@ -717,7 +717,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
 			TokenPoolCid:    types.CONTRACT_ID(disclosedPool.ContractId),
 			PoolExtraContext: common.CCIPContext{
-				Values: types.TEXTMAP{
+				Values: map[string]common.AnyValue{
 					"rate-limiter": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId))},
 				},
 			},
@@ -766,7 +766,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TransferFactory: types.CONTRACT_ID(transferFactoryCid),
 			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(choiceContext)},
-				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+				Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 			},
 			TokenPoolHoldings: []types.CONTRACT_ID{},
 		}
@@ -783,7 +783,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TransferFactory: types.CONTRACT_ID(tokenTransferFactoryCid),
 			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{Values: tokenTransferContextValues},
-				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+				Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 			},
 			TokenPoolHoldings: []types.CONTRACT_ID{},
 		}

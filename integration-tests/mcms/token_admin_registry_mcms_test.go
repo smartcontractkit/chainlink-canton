@@ -314,7 +314,7 @@ func createTokenAdminRegistryEmpty(
 	tarContract := tokenadminregistry.TokenAdminRegistry{
 		InstanceId:   types.TEXT(instanceID),
 		Owner:        types.PARTY(owner),
-		TokenConfigs: types.GENMAP{}, // Empty initially
+		TokenConfigs: map[types.TEXT]tokenadminregistry.TokenConfig{}, // Empty initially
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{

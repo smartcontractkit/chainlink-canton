@@ -5,7 +5,6 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
@@ -40,20 +39,10 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.PoolOwner)
 
 	remoteChainConfigs := make(map[uint64]RemoteChainConfig, len(boundContract.RemoteChainConfigs))
-	for chainSelectorString, remoteChainConfigAny := range boundContract.RemoteChainConfigs {
-		chainSelector, err := parse.Uint64Checked(chainSelectorString)
+	for chainSelectorString, remoteChainConfig := range boundContract.RemoteChainConfigs {
+		chainSelector, err := parse.Uint64Checked(string(chainSelectorString))
 		if err != nil {
 			return nil, fmt.Errorf("invalid chain selector %q: %w", chainSelectorString, err)
-		}
-
-		remoteChainConfigMap, ok := remoteChainConfigAny.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("remote chain config for chain selector %d is not a map", chainSelector)
-		}
-		var remoteChainConfig lockreleasetokenpool.RemoteChainConfig
-		err = ledger.MapToStruct(remoteChainConfigMap, &remoteChainConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal remote chain config: %w", err)
 		}
 
 		// Rate Limiters

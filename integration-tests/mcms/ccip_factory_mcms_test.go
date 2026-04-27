@@ -198,7 +198,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
 		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
 		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		PoolReceiveContext: common.CCIPContext{Values: types.TEXTMAP{}},
+		PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
 		TransferTimeout:    lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT{})},
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLockReleaseTokenPoolParams", lrtpParams)
@@ -217,7 +217,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
 		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
 		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		PoolReceiveContext: common.CCIPContext{Values: types.TEXTMAP{}},
+		PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
 		TransferTimeout:    lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT{})},
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLockReleaseTokenPoolParams", lrtp2Params)
@@ -603,8 +603,8 @@ func createCCIPFactoryWithMCMS(
 		InstanceId:                    types.TEXT(instanceID),
 		Owner:                         types.PARTY(owner),
 		McmsParty:                     types.PARTY(mcmsParty),
-		UsedInstanceIds:               types.GENMAP{},
-		DeployedContracts:             types.GENMAP{},
+		UsedInstanceIds:               map[types.TEXT]types.BOOL{},
+		DeployedContracts:             map[types.TEXT]types.CONTRACT_ID{},
 		PerPartyRouterFactoryDeployed: types.BOOL(false),
 	}
 

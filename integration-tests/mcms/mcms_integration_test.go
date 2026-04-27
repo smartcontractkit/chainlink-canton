@@ -50,7 +50,7 @@ func buildMCMSBindingFromConfig(config MCMSConfig, owner, instanceID string, cha
 
 	roleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: types.GENMAP{},
+		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
 		ExpiringRoot: mcms.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
@@ -74,7 +74,7 @@ func buildMCMSBindingFromConfig(config MCMSConfig, owner, instanceID string, cha
 		Bypasser:           roleState,
 		MinDelay:           types.RELTIME(0),
 		BlockedFunctions:   []mcms.BlockedFunction{},
-		TimelockTimestamps: types.GENMAP{},
+		TimelockTimestamps: map[types.TEXT]types.TIMESTAMP{},
 	}
 }
 
@@ -268,7 +268,7 @@ func testExecuteOpFlow(
 
 	roleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: types.GENMAP{},
+		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
 		ExpiringRoot: mcms.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
@@ -292,7 +292,7 @@ func testExecuteOpFlow(
 		Bypasser:           roleState,
 		MinDelay:           types.RELTIME(0),
 		BlockedFunctions:   []mcms.BlockedFunction{},
-		TimelockTimestamps: types.GENMAP{},
+		TimelockTimestamps: map[types.TEXT]types.TIMESTAMP{},
 	}
 
 	mcmsCreateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -496,8 +496,10 @@ func testExecuteOpFlow(
 			FunctionName:          types.TEXT(op.FunctionName),
 			OperationData:         types.TEXT(op.OperationData),
 		},
-		OpProof:    opProofTexts,
-		TargetCids: types.GENMAP{counterInstanceAddr: types.CONTRACT_ID(counterCid)},
+		OpProof: opProofTexts,
+		TargetCids: map[types.TEXT]types.CONTRACT_ID{
+			types.TEXT(counterInstanceAddr): types.CONTRACT_ID(counterCid),
+		},
 	}
 
 	executeOpRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1010,7 +1012,7 @@ func testExecuteMCMSOp(
 			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: types.GENMAP{},
+		TargetCids: map[types.TEXT]types.CONTRACT_ID{},
 	}
 
 	// No separate params - params are encoded in op.operationData (like Aptos BCS)
@@ -2105,6 +2107,76 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Log("")
 	t.Logf("externalScheduleSalt : Text")
 	t.Logf("externalScheduleSalt = \"%s\"", externalScheduleParams.Salt)
+	t.Log("")
+
+	// ======================================================================
+	// SetRoot with overridePreviousRoot = True
+	// These are used in SelfDispatchTest.daml testOverridePreviousRootClearsPending
+	// ======================================================================
+
+	overrideProposal := NewMCMSProposal(chainId, proposerMultisigId, 0, true).
+		AddOperation(timelockInstanceAddr, scheduleChoice.Choice, scheduleChoice.OperationData).
+		Build()
+	overrideRoot := overrideProposal.GetRoot()
+	overrideMetadataProof, err := overrideProposal.GetMetadataProof()
+	require.NoError(t, err)
+	overrideSignatures, err := overrideProposal.Sign(validUntil, sortedSigners[:2])
+	require.NoError(t, err)
+
+	t.Log("-- ===========================================================================")
+	t.Log("-- OVERRIDE VECTORS (Proposer, overridePreviousRoot=true)")
+	t.Log("-- Copy/paste into SelfDispatchTest.daml")
+	t.Log("-- ===========================================================================")
+	t.Log("")
+	t.Log("overrideMetadata : RootMetadata")
+	t.Log("overrideMetadata = RootMetadata")
+	t.Logf("  { chainId = %d", overrideProposal.Metadata.ChainId)
+	t.Logf("  , multisigId = \"%s\"", overrideProposal.Metadata.MultisigId)
+	t.Logf("  , preOpCount = %d", overrideProposal.Metadata.PreOpCount)
+	t.Logf("  , postOpCount = %d", overrideProposal.Metadata.PostOpCount)
+	t.Logf("  , overridePreviousRoot = %v", overrideProposal.Metadata.OverridePreviousRoot)
+	t.Log("  }")
+	t.Log("")
+	t.Logf("overrideRoot : Text")
+	t.Logf("overrideRoot = \"%s\"", overrideRoot)
+	t.Log("")
+	t.Log("overrideMetadataProof : [Text]")
+	if len(overrideMetadataProof) == 0 {
+		t.Log("overrideMetadataProof = []")
+	} else {
+		t.Log("overrideMetadataProof =")
+		for i, p := range overrideMetadataProof {
+			comma := ","
+			if i == len(overrideMetadataProof)-1 {
+				comma = ""
+			}
+			bracket := " "
+			if i == 0 {
+				bracket = "["
+			}
+			t.Logf("  %s \"%s\"%s", bracket, p, comma)
+		}
+		t.Log("  ]")
+	}
+	t.Log("")
+	t.Log("overrideSignatures : [RawSignature]")
+	t.Log("overrideSignatures =")
+	for i, sig := range overrideSignatures {
+		comma := ","
+		if i == len(overrideSignatures)-1 {
+			comma = ""
+		}
+		bracket := " "
+		if i == 0 {
+			bracket = "["
+		}
+		t.Logf("  %s RawSignature", bracket)
+		t.Logf("      { publicKey = \"%s\"", sig.PublicKey)
+		t.Logf("      , r = \"%s\"", sig.R)
+		t.Logf("      , s = \"%s\"", sig.S)
+		t.Logf("      }%s", comma)
+	}
+	t.Log("  ]")
 	t.Log("")
 
 	t.Log("=======================================================================")
