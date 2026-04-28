@@ -9,9 +9,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/token_standard"
 
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
+	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/ccv"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/executor"
@@ -161,6 +164,14 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 				errChan <- fmt.Errorf("failed to run instrument holding store: %w", err)
 			}
 		}(errChan)
+	}
+	if cfg.TokenStandardAPIConfig.Enabled {
+		tokenStandardAPIServer, err := token_standard.NewServer(ctx, logger, activeContractStore, cfg.TokenStandardAPIConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create TokenStandard API: %w", err)
+		}
+		oapiTokenMetadataV1.RegisterHandlers(router, tokenStandardAPIServer)
+		oapiTransferInstruction.RegisterHandlers(router, tokenStandardAPIServer)
 	}
 
 	// Run update store in the background

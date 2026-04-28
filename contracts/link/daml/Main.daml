@@ -33,7 +33,7 @@ testTransferUsesKeyedPreapproval = script do
     createCmd LinkRegistry with
       registryAdmin = admin
       registryInstrumentId = instrumentId
-      registryInstanceId = "link-registry"
+      instanceId = "link-registry"
       registryMeta = MetadataV1.emptyMetadata
       transferPreapprovals = Map.empty
 
@@ -103,7 +103,7 @@ testTransferFallsBackToPending = script do
     createCmd LinkRegistry with
       registryAdmin = admin
       registryInstrumentId = instrumentId
-      registryInstanceId = "link-registry-no-pa"
+      instanceId = "link-registry-no-pa"
       registryMeta = MetadataV1.emptyMetadata
       transferPreapprovals = Map.empty
 
@@ -169,7 +169,7 @@ testBurnMintRequiresActors = script do
     createCmd LinkRegistry with
       registryAdmin = admin
       registryInstrumentId = instrumentId
-      registryInstanceId = "link-registry-bm"
+      instanceId = "link-registry-bm"
       registryMeta = MetadataV1.emptyMetadata
       transferPreapprovals = Map.empty
 

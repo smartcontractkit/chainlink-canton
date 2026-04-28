@@ -167,8 +167,7 @@ func GetTokenPoolSendDisclosure(
 		},
 	}
 	if resp.JSON200.TokenInput.BurnMintFactory != nil {
-		burnMintFactory := types.CONTRACT_ID(*resp.JSON200.TokenInput.BurnMintFactory)
-		tokenInput.BurnMintFactory = &burnMintFactory
+		tokenInput.BurnMintFactory = new(types.CONTRACT_ID(*resp.JSON200.TokenInput.BurnMintFactory))
 	}
 
 	return &TokenPoolSendDisclosure{

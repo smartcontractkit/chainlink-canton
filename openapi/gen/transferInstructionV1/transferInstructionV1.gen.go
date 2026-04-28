@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/oapi-codegen/runtime"
 )
 
@@ -896,4 +897,147 @@ func ParseGetTransferInstructionWithdrawContextResp(rsp *http.Response) (*GetTra
 	}
 
 	return response, nil
+}
+
+// ServerInterface represents all server handlers.
+type ServerInterface interface {
+
+	// (POST /registry/transfer-instruction/v1/transfer-factory)
+	GetTransferFactory(c *gin.Context)
+
+	// (POST /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/accept)
+	GetTransferInstructionAcceptContext(c *gin.Context, transferInstructionId string)
+
+	// (POST /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/reject)
+	GetTransferInstructionRejectContext(c *gin.Context, transferInstructionId string)
+
+	// (POST /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/withdraw)
+	GetTransferInstructionWithdrawContext(c *gin.Context, transferInstructionId string)
+}
+
+// ServerInterfaceWrapper converts contexts to parameters.
+type ServerInterfaceWrapper struct {
+	Handler            ServerInterface
+	HandlerMiddlewares []MiddlewareFunc
+	ErrorHandler       func(*gin.Context, error, int)
+}
+
+type MiddlewareFunc func(c *gin.Context)
+
+// GetTransferFactory operation middleware
+func (siw *ServerInterfaceWrapper) GetTransferFactory(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTransferFactory(c)
+}
+
+// GetTransferInstructionAcceptContext operation middleware
+func (siw *ServerInterfaceWrapper) GetTransferInstructionAcceptContext(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "transferInstructionId" -------------
+	var transferInstructionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "transferInstructionId", c.Param("transferInstructionId"), &transferInstructionId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter transferInstructionId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTransferInstructionAcceptContext(c, transferInstructionId)
+}
+
+// GetTransferInstructionRejectContext operation middleware
+func (siw *ServerInterfaceWrapper) GetTransferInstructionRejectContext(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "transferInstructionId" -------------
+	var transferInstructionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "transferInstructionId", c.Param("transferInstructionId"), &transferInstructionId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter transferInstructionId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTransferInstructionRejectContext(c, transferInstructionId)
+}
+
+// GetTransferInstructionWithdrawContext operation middleware
+func (siw *ServerInterfaceWrapper) GetTransferInstructionWithdrawContext(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "transferInstructionId" -------------
+	var transferInstructionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "transferInstructionId", c.Param("transferInstructionId"), &transferInstructionId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter transferInstructionId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTransferInstructionWithdrawContext(c, transferInstructionId)
+}
+
+// GinServerOptions provides options for the Gin server.
+type GinServerOptions struct {
+	BaseURL      string
+	Middlewares  []MiddlewareFunc
+	ErrorHandler func(*gin.Context, error, int)
+}
+
+// RegisterHandlers creates http.Handler with routing matching OpenAPI spec.
+func RegisterHandlers(router gin.IRouter, si ServerInterface) {
+	RegisterHandlersWithOptions(router, si, GinServerOptions{})
+}
+
+// RegisterHandlersWithOptions creates http.Handler with additional options
+func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options GinServerOptions) {
+	errorHandler := options.ErrorHandler
+	if errorHandler == nil {
+		errorHandler = func(c *gin.Context, err error, statusCode int) {
+			c.JSON(statusCode, gin.H{"msg": err.Error()})
+		}
+	}
+
+	wrapper := ServerInterfaceWrapper{
+		Handler:            si,
+		HandlerMiddlewares: options.Middlewares,
+		ErrorHandler:       errorHandler,
+	}
+
+	router.POST(options.BaseURL+"/registry/transfer-instruction/v1/transfer-factory", wrapper.GetTransferFactory)
+	router.POST(options.BaseURL+"/registry/transfer-instruction/v1/:transferInstructionId/choice-contexts/accept", wrapper.GetTransferInstructionAcceptContext)
+	router.POST(options.BaseURL+"/registry/transfer-instruction/v1/:transferInstructionId/choice-contexts/reject", wrapper.GetTransferInstructionRejectContext)
+	router.POST(options.BaseURL+"/registry/transfer-instruction/v1/:transferInstructionId/choice-contexts/withdraw", wrapper.GetTransferInstructionWithdrawContext)
 }

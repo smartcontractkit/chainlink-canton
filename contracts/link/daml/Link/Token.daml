@@ -129,14 +129,14 @@ template LinkRegistry
   with
     registryAdmin : Party
     registryInstrumentId : HoldingV1.InstrumentId
-    registryInstanceId : Text
+    instanceId : Text
     registryMeta : MetadataV1.Metadata
     transferPreapprovals : Map.Map Party (ContractId LinkTransferPreapproval)
   where
     signatory registryAdmin
     ensure registryInstrumentId.admin == registryAdmin
-      && registryInstanceId /= ""
-      && not (T.isInfixOf "@" registryInstanceId)
+      && instanceId /= ""
+      && not (T.isInfixOf "@" instanceId)
 
     interface instance TransferV1.TransferFactory for LinkRegistry where
       view = TransferV1.TransferFactoryView with

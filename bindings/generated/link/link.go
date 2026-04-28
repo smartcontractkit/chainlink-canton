@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "link"
-	PackageID   = "36740fa179cae872e8d640d7c283850cbd857ffe1ee8649ca11cff657daec071"
+	PackageID   = "fa46d964d09d31eca1ebc0b971d080a65a384ba6e061af4eb4dcb9bd01e33f2e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -212,7 +212,7 @@ var _ splice_api_token_holding_v1.IHolding = (*LinkHolding)(nil)
 type LinkRegistry struct {
 	RegistryAdmin        types.PARTY                              `json:"registryAdmin"`
 	RegistryInstrumentId splice_api_token_holding_v1.InstrumentId `json:"registryInstrumentId"`
-	RegistryInstanceId   types.TEXT                               `json:"registryInstanceId"`
+	InstanceId           types.TEXT                               `json:"instanceId"`
 	RegistryMeta         splice_api_token_metadata_v1.Metadata    `json:"registryMeta"`
 	TransferPreapprovals map[types.PARTY]types.CONTRACT_ID        `json:"transferPreapprovals"`
 }
@@ -238,7 +238,7 @@ func (t LinkRegistry) CreateCommand() *model.CreateCommand {
 	args["registryInstrumentId"] = model.NestedToDAMLValue(t.RegistryInstrumentId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["registryInstanceId"] = string(t.RegistryInstanceId)
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["registryMeta"] = model.NestedToDAMLValue(t.RegistryMeta)
@@ -268,7 +268,7 @@ func (t LinkRegistry) CreateCommandWithPackageID(packageID string) *model.Create
 	args["registryInstrumentId"] = model.NestedToDAMLValue(t.RegistryInstrumentId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["registryInstanceId"] = string(t.RegistryInstanceId)
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["registryMeta"] = model.NestedToDAMLValue(t.RegistryMeta)

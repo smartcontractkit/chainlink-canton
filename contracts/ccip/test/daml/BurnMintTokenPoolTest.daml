@@ -117,7 +117,7 @@ createLinkRegistry admin instrumentId registryInstanceId =
     createCmd Link.LinkRegistry with
       registryAdmin = admin
       registryInstrumentId = instrumentId
-      registryInstanceId
+      instanceId = registryInstanceId
       registryMeta = MetadataV1.emptyMetadata
       transferPreapprovals = Map.empty
 

@@ -167,10 +167,13 @@ var BuildConfig = operations.NewOperation(
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
 				},
-				Type:                    tokenPoolType,
-				PoolOwner:               participant.PartyID,
-				TokenStandardURL:        tokenStandardURL,
-				TokenStandardAuthConfig: tokenStandardAuthConfig,
+				Type:      tokenPoolType,
+				PoolOwner: participant.PartyID,
+				TransferFactory: &edsConfig.TransferFactory{
+					Type:                    edsConfig.FactoryTypeURL,
+					TokenStandardURL:        tokenStandardURL,
+					TokenStandardAuthConfig: tokenStandardAuthConfig,
+				},
 			})
 		}
 

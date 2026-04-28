@@ -432,10 +432,10 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
-	out, err = changesets.DeployTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployTokenPoolConfig]{
+	out, err = changesets.DeployLockReleaseTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployLockReleaseTokenPoolConfig]{
 		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   0,
-		Config: changesets.DeployTokenPoolConfig{
+		Config: changesets.DeployLockReleaseTokenPoolConfig{
 			CcipOwner:          partyCCIP,
 			PoolOwner:          partyTokenPoolOwner,
 			InstrumentId:       nativeInstrumentId,
@@ -549,11 +549,14 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partyCCIP,
-						// By setting the TokenStandard info, the Toke Pool API will return the necessary factory disclosures
-						TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
-						TokenStandardAuthConfig: &commonconfig.AuthConfig{
-							Type: commonconfig.AuthTypeInsecureStatic,
-							JWT:  edsToken.AccessToken,
+						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
+						TransferFactory: &config.TransferFactory{
+							Type:             config.FactoryTypeURL,
+							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
+							TokenStandardAuthConfig: &commonconfig.AuthConfig{
+								Type: commonconfig.AuthTypeInsecureStatic,
+								JWT:  edsToken.AccessToken,
+							},
 						},
 					},
 				},

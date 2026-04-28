@@ -36,11 +36,12 @@ type Config struct {
 	Monitoring    MonitoringConfig `toml:"monitoring"`
 
 	// API Configs
-	GlobalAPIConfig    GlobalAPIConfig    `toml:"global_api"`
-	CCIPAPIConfig      CCIPAPIConfig      `toml:"ccip_api"`
-	CCVAPIConfig       CCVAPIConfig       `toml:"ccv_api"`
-	ExecutorAPIConfig  ExecutorAPIConfig  `toml:"executor_api"`
-	TokenPoolAPIConfig TokenPoolAPIConfig `toml:"token_pool_api"`
+	GlobalAPIConfig        GlobalAPIConfig        `toml:"global_api"`
+	CCIPAPIConfig          CCIPAPIConfig          `toml:"ccip_api"`
+	CCVAPIConfig           CCVAPIConfig           `toml:"ccv_api"`
+	ExecutorAPIConfig      ExecutorAPIConfig      `toml:"executor_api"`
+	TokenPoolAPIConfig     TokenPoolAPIConfig     `toml:"token_pool_api"`
+	TokenStandardAPIConfig TokenStandardAPIConfig `toml:"token_standard_api"`
 }
 
 type ServerConfig struct {
@@ -106,17 +107,43 @@ const (
 	TokenPoolTypeBurnMint    TokenPoolType = "burnMint"
 )
 
+type FactoryType string
+
+const (
+	FactoryTypeDisabled FactoryType = ""
+	FactoryTypeAddress  FactoryType = "address"
+	FactoryTypeURL      FactoryType = "url"
+)
+
+type TransferFactory struct {
+	Type FactoryType `toml:"type" validate:"oneof=address url"`
+
+	TemplateId *string                    `toml:"template_id" validate:"required_if=Type address"`
+	Party      *string                    `toml:"party" validate:"required_if=Type address"`
+	Address    *contracts.InstanceAddress `toml:"address" validate:"required_if=Type address"`
+
+	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"required_if=Type url,url"`
+	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url"`
+}
+
+type BurnMintFactory struct {
+	Type FactoryType `toml:"type" validate:"oneof=address"`
+
+	TemplateId *string                    `toml:"template_id" validate:"required_if=Type address"`
+	Party      *string                    `toml:"party" validate:"required_if=Type address"`
+	Address    *contracts.InstanceAddress `toml:"address" validate:"required_if=Type address"`
+}
+
 type TokenPool struct {
 	ContractIdentifier
 	Type TokenPoolType `toml:"type" validate:"required,oneof=lockRelease burnMint"`
 
 	// The owner party of the token pool.
 	PoolOwner string `toml:"pool_owner" validate:"required"`
-	// The URL of the Token Standard API to use for this token pool.
-	// If not set, fetching the transfer factory will be disabled for this pool.
-	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"omitnil,url"`
-	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"omitnil,required"`
-	TransferPreapproval     *TransferPreapproval     `toml:"transfer_preapproval" validate:"omitnil,required"`
+
+	TransferFactory     *TransferFactory     `toml:"transfer_factory" validate:"excluded_unless=Type lockRelease"`
+	BurnMintFactory     *BurnMintFactory     `toml:"burn_mint_factory" validate:"excluded_unless=Type burnMint"`
+	TransferPreapproval *TransferPreapproval `toml:"transfer_preapproval" validate:"omitnil,required"`
 }
 
 type TransferPreapproval struct {
@@ -127,6 +154,26 @@ type TransferPreapproval struct {
 type TokenPoolAPIConfig struct {
 	Enabled    bool        `toml:"enabled"`
 	TokenPools []TokenPool `toml:"token_pools" validate:"required_if=Enabled true,dive"`
+}
+
+// Token Standard API
+
+type TokenType string
+
+const (
+	TokenTypeLINK TokenType = "LINK"
+)
+
+type Registry struct {
+	ContractIdentifier
+	TokenType TokenType `toml:"token_type" validate:"required,oneof=LINK"`
+	TokenId   string    `toml:"token_id" validate:"required"`
+}
+
+type TokenStandardAPIConfig struct {
+	Enabled    bool                `toml:"enabled"`
+	Admin      string              `toml:"admin" validate:"required_if=Enabled true"`
+	Registries map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
 }
 
 // ContractIdentifier uniquely identifies a contract using an InstanceAddress.
