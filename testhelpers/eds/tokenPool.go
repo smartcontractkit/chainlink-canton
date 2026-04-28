@@ -84,6 +84,10 @@ func GetTokenPoolExecuteDisclosure(
 		},
 		TokenPoolHoldings: tokenPoolHoldings,
 	}
+	if resp.JSON200.TokenInput.BurnMintFactory != nil {
+		burnMintFactory := types.CONTRACT_ID(*resp.JSON200.TokenInput.BurnMintFactory)
+		tokenInput.BurnMintFactory = &burnMintFactory
+	}
 
 	return &TokenPoolExecuteDisclosure{
 		ContractId:         resp.JSON200.ContractId,
@@ -157,6 +161,10 @@ func GetTokenPoolSendDisclosure(
 			},
 			Meta: splice_api_token_metadata_v1.Metadata{},
 		},
+	}
+	if resp.JSON200.TokenInput.BurnMintFactory != nil {
+		burnMintFactory := types.CONTRACT_ID(*resp.JSON200.TokenInput.BurnMintFactory)
+		tokenInput.BurnMintFactory = &burnMintFactory
 	}
 
 	return &TokenPoolSendDisclosure{
