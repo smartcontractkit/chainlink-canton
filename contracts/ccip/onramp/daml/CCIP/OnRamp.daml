@@ -658,6 +658,7 @@ template OnRamp
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : Optional (ContractId CCIP.TokenAdminRegistry.TokenConfig)
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             controller ccipOwner
             do
@@ -741,15 +742,17 @@ template OnRamp
                 -- Cross-validate tokenSendData against message.tokenTransfer via TAR
                 case (theMessage.tokenTransfer, sendingMsg.tokenSendData) of
                     (Some tt, Some tsd) -> do
-                        configOpt <- exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.GetTokenConfig with
+                        configCid <- case tokenConfigCid of
+                            None -> abort "onramp: missing token config CID"
+                            Some cid -> pure cid
+                        config <- exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                                tokenConfigCid = configCid
                                 instrumentId = tsd.instrumentId
                                 caller = ccipOwner
-                        pool <- case configOpt of
-                            None -> abort "no token config for instrument"
-                            Some config -> case config.tokenPool of
-                                None -> abort "no pool registered"
-                                Some p -> pure p
+                        pool <- case config.tokenPool of
+                            None -> abort "no pool registered"
+                            Some p -> pure p
                         let expectedPoolAddr = CCIP.MessageCodecV1.encodeInstanceAddress
                                 pool.poolInstanceId pool.poolOwner
                         let expectedTokenAddr = CCIP.MessageCodecV1.encodeInstrumentId

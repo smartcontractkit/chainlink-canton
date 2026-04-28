@@ -4,8 +4,7 @@ import (
 	"fmt"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -60,26 +59,26 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.CcipOwner)
 
 	sourceChainConfigs := make(map[uint64]SourceChainConfig, len(boundContract.SourceChainConfigs))
-	for chainSelectorString, sourceChainConfigAny := range boundContract.SourceChainConfigs {
-		chainSelector, err := parse.Uint64Checked(chainSelectorString)
+	for chainSelectorString, sourceChainConfig := range boundContract.SourceChainConfigs {
+		chainSelector, err := parse.Uint64Checked(string(chainSelectorString))
 		if err != nil {
 			return nil, fmt.Errorf("invalid source chain config selector %q: %w", chainSelectorString, err)
 		}
 
-		sourceChainConfigs[chainSelector], err = parseSourceChainConfig(sourceChainConfigAny)
+		sourceChainConfigs[chainSelector], err = parseSourceChainConfig(sourceChainConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse source chain config for selector %d: %w", chainSelector, err)
 		}
 	}
 
 	destChainConfigs := make(map[uint64]DestChainConfig, len(boundContract.DestChainConfigs))
-	for chainSelectorString, destChainConfigAny := range boundContract.DestChainConfigs {
-		chainSelector, err := parse.Uint64Checked(chainSelectorString)
+	for chainSelectorString, destChainConfig := range boundContract.DestChainConfigs {
+		chainSelector, err := parse.Uint64Checked(string(chainSelectorString))
 		if err != nil {
 			return nil, fmt.Errorf("invalid dest chain config selector %q: %w", chainSelectorString, err)
 		}
 
-		destChainConfigs[chainSelector], err = parseDestChainConfig(destChainConfigAny)
+		destChainConfigs[chainSelector], err = parseDestChainConfig(destChainConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse dest chain config for selector %d: %w", chainSelector, err)
 		}
@@ -92,16 +91,7 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 	}, nil
 }
 
-func parseSourceChainConfig(cfg any) (SourceChainConfig, error) {
-	sourceChainConfigMap, ok := cfg.(map[string]any)
-	if !ok {
-		return SourceChainConfig{}, fmt.Errorf("not a map")
-	}
-	var sourceChainConfig common.SourceChainConfig
-	if err := ledger.MapToStruct(sourceChainConfigMap, &sourceChainConfig); err != nil {
-		return SourceChainConfig{}, fmt.Errorf("failed to unmarshal: %w", err)
-	}
-
+func parseSourceChainConfig(sourceChainConfig common.SourceChainConfig) (SourceChainConfig, error) {
 	laneMandatedCCVs, err := parse.RawInstanceAddressList(sourceChainConfig.LaneMandatedCCVs)
 	if err != nil {
 		return SourceChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)
@@ -118,16 +108,7 @@ func parseSourceChainConfig(cfg any) (SourceChainConfig, error) {
 	}, nil
 }
 
-func parseDestChainConfig(cfg any) (DestChainConfig, error) {
-	destChainConfigMap, ok := cfg.(map[string]any)
-	if !ok {
-		return DestChainConfig{}, fmt.Errorf("not a map")
-	}
-	var destChainConfig common.DestChainConfig
-	if err := ledger.MapToStruct(destChainConfigMap, &destChainConfig); err != nil {
-		return DestChainConfig{}, fmt.Errorf("failed to unmarshal: %w", err)
-	}
-
+func parseDestChainConfig(destChainConfig common.DestChainConfig) (DestChainConfig, error) {
 	laneMandatedCCVs, err := parse.RawInstanceAddressList(destChainConfig.LaneMandatedCCVs)
 	if err != nil {
 		return DestChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)
@@ -155,8 +136,8 @@ func parseDestChainConfig(cfg any) (DestChainConfig, error) {
 }
 
 type TokenAdminRegistry struct {
-	Address      contracts.RawInstanceAddress
-	TokenConfigs map[contracts.EncodedInstrumentID]tokenadminregistry.TokenConfig
+	Address    contracts.RawInstanceAddress
+	EntryCount types.INT64
 }
 
 func ParseTokenAdminRegistry(createdEvent *apiv2.CreatedEvent) (*TokenAdminRegistry, error) {
@@ -167,25 +148,37 @@ func ParseTokenAdminRegistry(createdEvent *apiv2.CreatedEvent) (*TokenAdminRegis
 
 	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.Owner)
 
-	tokenConfigs := make(map[contracts.EncodedInstrumentID]tokenadminregistry.TokenConfig, len(boundContract.TokenConfigs))
-	for encodedInstrumentIdString, tokenConfigAny := range boundContract.TokenConfigs {
-		encodedInstrumentId := contracts.HexToEncodedInstrumentID(encodedInstrumentIdString)
+	return &TokenAdminRegistry{
+		Address:    address,
+		EntryCount: boundContract.EntryCount,
+	}, nil
+}
 
-		tokenConfigMap, ok := tokenConfigAny.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("token config for encoded instrument ID %s is not a map", encodedInstrumentIdString)
-		}
-		var tokenConfig tokenadminregistry.TokenConfig
-		err = ledger.MapToStruct(tokenConfigMap, &tokenConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal token config for encoded instrument ID %s: %w", encodedInstrumentIdString, err)
-		}
+type TokenConfig struct {
+	Address         contracts.RawInstanceAddress
+	RegistryAddress contracts.RawInstanceAddress
+	Index           types.INT64
+	InstrumentId    contracts.EncodedInstrumentID
+	IsCCIPManaged   types.BOOL
+	Pool            *tokenadminregistry.PoolRegistration
+}
 
-		tokenConfigs[encodedInstrumentId] = tokenConfig
+func ParseTokenConfig(createdEvent *apiv2.CreatedEvent) (*TokenConfig, error) {
+	boundContract, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenConfig](createdEvent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal TokenConfig: %w", err)
 	}
 
-	return &TokenAdminRegistry{
-		Address:      address,
-		TokenConfigs: tokenConfigs,
+	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.RegistryOwner)
+	registryAddress := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.RegistryInstanceId), boundContract.RegistryOwner)
+	instrumentId := contracts.EncodeInstrumentID(boundContract.InstrumentId)
+
+	return &TokenConfig{
+		Address:         address,
+		RegistryAddress: registryAddress,
+		Index:           boundContract.Index,
+		InstrumentId:    instrumentId,
+		IsCCIPManaged:   boundContract.IsCCIPManaged,
+		Pool:            boundContract.TokenPool,
 	}, nil
 }

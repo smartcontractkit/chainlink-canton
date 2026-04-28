@@ -4,7 +4,7 @@ module CCIP.TokenAdminRegistryCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
 
 import MCMS.Codec (
     decodeOptional,
@@ -32,26 +32,6 @@ decodePoolRegistrationAt encoded offset = do
     (poolOwner, offset) <- decodePartyAt encoded offset
     (poolInstanceId, offset) <- decodeTextAt encoded offset
     Some (PoolRegistration{..}, offset)
-
-
--- ===============================================
--- |              TokenConfig
--- ===============================================
-
-encodeTokenConfig : TokenConfig -> BytesHex
-encodeTokenConfig params =
-    encodeInstrumentId params.instrumentId
-    <> encodeOptional params.admin encodeParty
-    <> encodeOptional params.pendingAdmin encodeParty
-    <> encodeOptional params.tokenPool encodePoolRegistration
-
-decodeTokenConfigAt : BytesHex -> Int -> Optional (TokenConfig, Int)
-decodeTokenConfigAt encoded offset = do
-    (instrumentId, offset) <- decodeInstrumentId encoded offset
-    (admin, offset) <- decodeOptional encoded offset decodePartyAt
-    (pendingAdmin, offset) <- decodeOptional encoded offset decodePartyAt
-    (tokenPool, offset) <- decodeOptional encoded offset decodePoolRegistrationAt
-    Some (TokenConfig{..}, offset)
 
 
 -- ===============================================

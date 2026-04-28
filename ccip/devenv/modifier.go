@@ -9,14 +9,15 @@ import (
 
 	"github.com/BurntSushi/toml"
 	ledgerv2admin "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
+	"github.com/testcontainers/testcontainers-go"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/go-daml/pkg/auth"
-	"github.com/testcontainers/testcontainers-go"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"

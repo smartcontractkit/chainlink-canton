@@ -10,10 +10,10 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 )
 
 func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error) {
@@ -22,7 +22,7 @@ func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error)
 		return common.CCIPContext{}, fmt.Errorf("no values found in context")
 	}
 
-	values := types.TEXTMAP{}
+	values := map[string]common.AnyValue{}
 	for k, v := range valuesIn {
 		f := v.(map[string]any)
 		tag := f["tag"].(string)
@@ -139,6 +139,23 @@ func CCIPContextFromData(contextData map[string]any) (common.CCIPContext, error)
 	return common.CCIPContext{
 		Values: values,
 	}, nil
+}
+
+// Token metadata bindings generate a separate ChoiceContext/AnyValue type from
+// the CCIP bindings, so we still need an explicit adapter until codegen emits a
+// shared canonical type.
+func CCIPContextToChoiceContext(ctx common.CCIPContext) (splice_api_token_metadata_v1.ChoiceContext, error) {
+	var result splice_api_token_metadata_v1.ChoiceContext
+
+	payload, err := json.Marshal(ctx)
+	if err != nil {
+		return splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("marshal CCIPContext: %w", err)
+	}
+	if err := json.Unmarshal(payload, &result); err != nil {
+		return splice_api_token_metadata_v1.ChoiceContext{}, fmt.Errorf("unmarshal ChoiceContext: %w", err)
+	}
+
+	return result, nil
 }
 
 func DisclosedContractToProto(contract oapiCommon.DisclosedContract) (*apiv2.DisclosedContract, error) {

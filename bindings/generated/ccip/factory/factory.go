@@ -37,7 +37,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "6673a596f71c05d74c7b8793466f42b2e19210e8dfc1d6896aac836b5fa2b396"
+	PackageID   = "7237ad0f0d5c7fefdbbde9e7f3fc1a8ec38a4a18a72bf07a617e0b71f94c8207"
 	SDKVersion  = "3.4.10"
 )
 
@@ -67,12 +67,12 @@ func argsToMap(args any) map[string]any {
 
 // CCIPFactory is a Template type
 type CCIPFactory struct {
-	InstanceId                    types.TEXT   `json:"instanceId"`
-	Owner                         types.PARTY  `json:"owner"`
-	McmsParty                     types.PARTY  `json:"mcmsParty"`
-	UsedInstanceIds               types.GENMAP `json:"usedInstanceIds"`
-	DeployedContracts             types.GENMAP `json:"deployedContracts"`
-	PerPartyRouterFactoryDeployed types.BOOL   `json:"perPartyRouterFactoryDeployed"`
+	InstanceId                    types.TEXT                       `json:"instanceId"`
+	Owner                         types.PARTY                      `json:"owner"`
+	McmsParty                     types.PARTY                      `json:"mcmsParty"`
+	UsedInstanceIds               map[types.TEXT]types.BOOL        `json:"usedInstanceIds"`
+	DeployedContracts             map[types.TEXT]types.CONTRACT_ID `json:"deployedContracts"`
+	PerPartyRouterFactoryDeployed types.BOOL                       `json:"perPartyRouterFactoryDeployed"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1753,12 +1753,12 @@ func (t *DeployTokenAdminRegistryParams) UnmarshalHex(data string) error {
 
 // FactoryState is a Record type
 type FactoryState struct {
-	InstanceId                    types.TEXT   `json:"instanceId"`
-	Owner                         types.PARTY  `json:"owner"`
-	McmsParty                     types.PARTY  `json:"mcmsParty"`
-	UsedInstanceIds               types.GENMAP `json:"usedInstanceIds"`
-	DeployedContracts             types.GENMAP `json:"deployedContracts"`
-	PerPartyRouterFactoryDeployed types.BOOL   `json:"perPartyRouterFactoryDeployed"`
+	InstanceId                    types.TEXT                       `json:"instanceId"`
+	Owner                         types.PARTY                      `json:"owner"`
+	McmsParty                     types.PARTY                      `json:"mcmsParty"`
+	UsedInstanceIds               map[types.TEXT]types.BOOL        `json:"usedInstanceIds"`
+	DeployedContracts             map[types.TEXT]types.CONTRACT_ID `json:"deployedContracts"`
+	PerPartyRouterFactoryDeployed types.BOOL                       `json:"perPartyRouterFactoryDeployed"`
 }
 
 // ToMap converts FactoryState to a map for DAML arguments

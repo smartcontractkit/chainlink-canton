@@ -21,49 +21,51 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
-
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
-
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
+	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/service"
-
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
+	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 
 	// Import to register lane adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
@@ -129,6 +131,12 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	receiverParticipant := env.Chain.Participants[1]
 	tokenPoolOwnerParticipant := env.Chain.Participants[0]
 
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		testhelpers.ContractCleanup(t, ctx, env.Chain.Participants)
+	})
+
 	// DAR Uploading
 	// Read DARs
 	rmnDar, err := contracts.GetDar(contracts.CCIPRMN, contracts.CurrentVersion)
@@ -186,10 +194,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 		Admin: types.PARTY(registryAdmin),
 		Id:    types.TEXT("Amulet"),
 	}
-	instrumentIdAmt := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Label: "admin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: registryAdmin}}},
-		{Label: "id", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "Amulet"}}},
-	}}}}
 	hashedInstrumentId := contracts.EncodeInstrumentID(nativeInstrumentId)
 
 	// CCIP Deployment
@@ -292,255 +296,185 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	}
 
 	// Resolve contracts
-	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(global_config.ContractType), global_config.Version, ""))
+	globalConfigRef, globalConfigAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_config.ContractType, global_config.Version, "")
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
+	_, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
 	require.NoError(t, err, "failed to get FeeQuoter address")
-	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(onramp.ContractType), onramp.Version, ""))
+	_, onRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), onramp.ContractType, onramp.Version, "")
 	require.NoError(t, err, "failed to get OnRamp address")
-	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(offramp.ContractType), offramp.Version, ""))
+	_, offRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), offramp.ContractType, offramp.Version, "")
 	require.NoError(t, err, "failed to get OffRamp address")
-	committeeVerifier, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
+	committeeVerifierRef, committeeVerifierAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), committee_verifier.ContractType, committee_verifier.Version, ccvQualifier)
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
-	tokenAdminRegistry, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(token_admin_registry.ContractType), token_admin_registry.Version, ""))
+	_, tokenAdminRegistryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), token_admin_registry.ContractType, token_admin_registry.Version, "")
 	require.NoError(t, err, "failed to get TokenAdminRegistry address")
-	rmnRemote, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	_, rmnRemoteAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), rmn_remote.ContractType, rmn_remote.Version, "")
 	require.NoError(t, err, "failed to get RMNRemote address")
-	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
+	_, perPartyRouterFactoryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), per_party_router_factory.ContractType, per_party_router_factory.Version, "")
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+
+	// Deploy and configure lane (CCIP 2.0 lanes sequence, same as ccip_execute_test)
+	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
+	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
+	require.Truef(t, ok, "failed to get Canton Lane adapter")
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsDest(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
+		Source: &lanes.ChainDefinition{
+			Selector: remoteSelector,
+			OnRamp:   hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+			OffRamp:  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+		},
+		Dest: &lanes.ChainDefinition{
+			Selector: env.Chain.ChainSelector(),
+			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+				{
+					CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
+					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+						remoteSelector: {
+							AllowlistEnabled:          false,
+							AddedAllowlistedSenders:   nil,
+							RemovedAllowlistedSenders: nil,
+							FeeUSDCents:               50,
+							GasForVerification:        50_000,
+							PayloadSizeBytes:          6*64 + 2*32,
+							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+								Signers:   ccvSignerPubKeys,
+								Threshold: 2,
+							},
+						},
+					},
+				},
+			},
+			LaneMandatedInboundCCVs: []datastore.AddressRef{committeeVerifierRef},
+			DefaultInboundCCVs:      nil,
+			CantonLaneConfig: &lanes.CantonLaneConfig{
+				GlobalConfig: globalConfigRef,
+			},
+		},
+		IsDisabled:   false,
+		TestRouter:   false,
+		ExtraConfigs: lanes.ExtraConfigs{},
+	})
+	require.NoErrorf(t, err, "Failed to configure chain for lanes")
+	runningDs := datastore.NewMemoryDataStore()
+	for _, address := range deployLaneLegReport.Output.Addresses {
+		err = runningDs.Addresses().Add(address)
+		require.NoErrorf(t, err, "Failed to add address %s", address.Address)
+	}
+	err = runningDs.Merge(cldfEnv.DataStore)
+	require.NoErrorf(t, err, "Failed to merge datastore")
+	cldfEnv.DataStore = runningDs.Seal()
+	t.Log("Configured chain for lanes")
 
 	// Token Pool Setup
 	// Deploy default inbound RateLimiter required by ReleaseFromTicket receive flow.
 	// Keep it enabled but lower-capacity so the test fails if the default-finality limiter
 	// is selected for this FTF transfer instead of the custom-finality limiter.
-	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
-	res, err := tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: inboundRateLimiterInstanceID}}},
-						{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
-						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
-						{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
-						{Label: "direction", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
-						{Label: "mode", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitMode_DefaultFinality"}}}},
-						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
-						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: tc.defaultInboundLimiterCapacity}}},
-						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: tc.defaultInboundLimiterCapacity}}},
-						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: tc.defaultInboundLimiterCapacity}}},
-						{Label: "lastUpdated", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().UnixMicro()}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyTokenPoolOwner},
+	poolInstanceId := "test-pool-receive"
+	inboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployInbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
+		OwnerParty: types.PARTY(partyTokenPoolOwner),
+		Template: common.RateLimiter{
+			PoolInstanceId:      types.TEXT(poolInstanceId),
+			PoolOwner:           types.PARTY(partyTokenPoolOwner),
+			RemoteChainSelector: types.NUMERIC(sourceChainSelector),
+			Direction:           common.RateLimitDirectionRateLimitDirection_Inbound,
+			Mode:                common.RateLimitModeRateLimitMode_DefaultFinality,
+			IsEnabled:           true,
+			Capacity:            types.NUMERIC(tc.defaultInboundLimiterCapacity),
+			Rate:                types.NUMERIC(tc.defaultInboundLimiterCapacity),
+			Tokens:              types.NUMERIC(tc.defaultInboundLimiterCapacity),
+			LastUpdated:         types.TIMESTAMP(time.Now()),
 		},
 	})
-	require.NoError(t, err)
-	inboundRateLimiterCid := extractCreatedContractId(res)
-	t.Logf("Deployed default inbound RateLimiter: %s", inboundRateLimiterCid)
-	inboundCustomBlockConfirmationsRateLimiterInstanceID := "test-pool-receive-inbound-custom-rl"
-	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: inboundCustomBlockConfirmationsRateLimiterInstanceID}}},
-						{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
-						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
-						{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
-						{Label: "direction", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
-						{Label: "mode", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitMode_CustomFinality"}}}},
-						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
-						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: tc.customInboundLimiterCapacity}}},
-						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: tc.customInboundLimiterCapacity}}},
-						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: tc.customInboundLimiterCapacity}}},
-						{Label: "lastUpdated", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().UnixMicro()}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyTokenPoolOwner},
+	require.NoError(t, err, "failed to deploy inbound rate limiter")
+	inboundRateLimiterRawAddr := inboundRateLimiterOut.Output.Labels.List()[0]
+	inboundRateLimiterAddr, err := contracts.RawInstanceAddressFromString(inboundRateLimiterRawAddr)
+	require.NoError(t, err, "failed to parse inbound rate limiter address")
+
+	inboundCustomRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployInbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
+		OwnerParty: types.PARTY(partyTokenPoolOwner),
+		Template: common.RateLimiter{
+			PoolInstanceId:      types.TEXT(poolInstanceId),
+			PoolOwner:           types.PARTY(partyTokenPoolOwner),
+			RemoteChainSelector: types.NUMERIC(sourceChainSelector),
+			Direction:           common.RateLimitDirectionRateLimitDirection_Inbound,
+			Mode:                common.RateLimitModeRateLimitMode_CustomFinality,
+			IsEnabled:           true,
+			Capacity:            types.NUMERIC(tc.customInboundLimiterCapacity),
+			Rate:                types.NUMERIC(tc.customInboundLimiterCapacity),
+			Tokens:              types.NUMERIC(tc.customInboundLimiterCapacity),
+			LastUpdated:         types.TIMESTAMP(time.Now()),
 		},
 	})
-	require.NoError(t, err)
-	inboundCustomBlockConfirmationsRateLimiterCid := extractCreatedContractId(res)
-	t.Logf("Deployed custom-finality inbound RateLimiter: %s", inboundCustomBlockConfirmationsRateLimiterCid)
-	outboundRateLimiterInstanceID := "test-pool-receive-outbound-rl"
-	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: outboundRateLimiterInstanceID}}},
-						{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
-						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
-						{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
-						{Label: "direction", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
-						{Label: "mode", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitMode_DefaultFinality"}}}},
-						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
-						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "lastUpdated", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().UnixMicro()}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyTokenPoolOwner},
+	require.NoError(t, err, "failed to deploy inbound custom rate limiter")
+	inboundCustomRateLimiterRawAddr := inboundCustomRateLimiterOut.Output.Labels.List()[0]
+	inboundCustomRateLimiterAddr, err := contracts.RawInstanceAddressFromString(inboundCustomRateLimiterRawAddr)
+	require.NoError(t, err, "failed to parse inbound custom rate limiter address")
+
+	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
+		OwnerParty: types.PARTY(partyTokenPoolOwner),
+		Template: common.RateLimiter{
+			PoolInstanceId:      types.TEXT(poolInstanceId),
+			PoolOwner:           types.PARTY(partyTokenPoolOwner),
+			RemoteChainSelector: types.NUMERIC(sourceChainSelector),
+			Direction:           common.RateLimitDirectionRateLimitDirection_Outbound,
+			Mode:                common.RateLimitModeRateLimitMode_DefaultFinality,
+			IsEnabled:           false,
+			Capacity:            types.NUMERIC("0"),
+			Rate:                types.NUMERIC("0"),
+			Tokens:              types.NUMERIC("0"),
+			LastUpdated:         types.TIMESTAMP(time.Now()),
 		},
 	})
-	require.NoError(t, err)
-	outboundRateLimiterCid := extractCreatedContractId(res)
-	t.Logf("Deployed outbound RateLimiter: %s", outboundRateLimiterCid)
+	require.NoError(t, err, "failed to deploy outbound rate limiter")
+	outboundRateLimiterRawAddr := outboundRateLimiterOut.Output.Labels.List()[0]
+	outboundRateLimiterAddr, err := contracts.RawInstanceAddressFromString(outboundRateLimiterRawAddr)
+	require.NoError(t, err, "failed to parse outbound rate limiter address")
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
-
-	// Deploy LockReleaseTokenPool
-	lrtpInstanceAddress := contracts.InstanceID("test-pool-receive").RawInstanceAddress(types.PARTY(partyTokenPoolOwner)).InstanceAddress()
-	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-lockreleasetokenpool", ModuleName: "CCIP.LockReleaseTokenPool", EntityName: "LockReleaseTokenPool"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
-						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
-						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "instrumentId", Value: instrumentIdAmt},
-						{Label: "decimals", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 10}}},
-						{Label: "rateLimitAdmin", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}},
-						{Label: "remoteChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
-							Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
-							Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "remotePools", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-									{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(remotePoolAddress)}},
-								}}}}},
-								{Label: "remoteTokenAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(remoteTokenAddress)}}},
-								{Label: "inboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-								{Label: "outboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-								{Label: "finalityConfig", Value: finalityConfigValueFromBlockConfirmations(2000)},
-								{Label: "inboundRateLimiter", Value: rawInstanceAddress(inboundRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
-								{Label: "inboundCustomBlockConfirmationsRateLimiter", Value: rawInstanceAddress(inboundCustomBlockConfirmationsRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
-								{Label: "outboundRateLimiter", Value: rawInstanceAddress(outboundRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
-							}}}},
-						}}}}}},
-						{Label: "tokenTransferFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
-						{Label: "poolReceiveContext", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
-						}}}}},
-						// Use RelativeHours 24 for Amulet tokens (have expiry constraints)
-						{Label: "transferTimeout", Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-							Constructor: "RelativeHours",
-							Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 24}},
-						}}}},
-						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "tokenAdminRegistry", Value: rawInstanceAddress(tokenAdminRegistry.Labels.List()[0])},
-							{Label: "rmnRemote", Value: rawInstanceAddress(rmnRemote.Labels.List()[0])},
-							{Label: "feeQuoter", Value: rawInstanceAddress(feeQuoter.Labels.List()[0])},
-						}}}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyTokenPoolOwner},
+	out, err = changesets.DeployTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployTokenPoolConfig]{
+		ChainSelector: env.Chain.ChainSelector(),
+		Participant:   0,
+		Config: changesets.DeployTokenPoolConfig{
+			CcipOwner:          partyCCIP,
+			PoolOwner:          partyTokenPoolOwner,
+			InstrumentId:       nativeInstrumentId,
+			Decimals:           10,
+			InstanceID:         poolInstanceId,
+			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+			TransferTimeout: lockreleasetokenpool.TransferTimeout{
+				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
+			},
+			RemoteChainConfigs: map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{
+				types.NUMERIC(sourceChainSelector): {
+					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
+					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
+					InboundCCVs:        []mcms.RawInstanceAddress{},
+					OutboundCCVs:       []mcms.RawInstanceAddress{},
+					FinalityConfig: common.FinalityConfig{
+						BlockDepth: new(types.INT64(2000)),
+					},
+					InboundRateLimiter:                         inboundRateLimiterAddr.Binding(),
+					InboundCustomBlockConfirmationsRateLimiter: inboundCustomRateLimiterAddr.Binding(),
+					OutboundRateLimiter:                        outboundRateLimiterAddr.Binding(),
+				},
+			},
+			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{},
+			Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
+				TokenAdminRegistry: tokenAdminRegistryAddress.Binding(),
+				RmnRemote:          rmnRemoteAddress.Binding(),
+				FeeQuoter:          feeQuoterAddress.Binding(),
+			},
+			// By setting the TAR address, the CS will automatically register the newly deployed pool with the TAR
+			TokenAdminRegistryInstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 		},
 	})
+	require.NoError(t, err, "Failed to deploy Token Pool")
+	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
-	tokenPoolCid := extractCreatedContractId(res)
-	t.Logf("Deployed LockReleaseTokenPool: %s", tokenPoolCid)
-
-	// Register pool in TokenAdminRegistry (ProposeAdministrator -> AcceptAdminRole -> SetPool)
-	disclosedTar, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
-	})
-	require.NoError(t, err)
-	// Step 1: ProposeAdministrator
-	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
-					ContractId: disclosedTar.ContractId,
-					Choice:     "ProposeAdministrator",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instrumentId", Value: instrumentIdAmt},
-						{Label: "newAdmin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
-						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-					}}}},
-				}},
-			}},
-			ActAs: []string{partyCCIP},
-		},
-	})
-	require.NoError(t, err)
-	t.Log("Called ProposeAdministrator")
-
-	// Step 2: AcceptAdminRole
-	time.Sleep(500 * time.Millisecond)
-	disclosedTar, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
-	})
-	require.NoError(t, err)
-
-	_, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
-					ContractId: disclosedTar.ContractId,
-					Choice:     "AcceptAdminRole",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instrumentId", Value: instrumentIdAmt},
-						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
-					}}}},
-				}},
-			}},
-			ActAs:              []string{partyTokenPoolOwner},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTar},
-		},
-	})
-	require.NoError(t, err)
-	t.Log("Called AcceptAdminRole")
-
-	// Step 3: SetPool
-	time.Sleep(500 * time.Millisecond)
-	disclosedTar, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
-	})
-	require.NoError(t, err)
-
-	_, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
-					ContractId: disclosedTar.ContractId,
-					Choice:     "SetPool",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instrumentId", Value: instrumentIdAmt},
-						{Label: "tokenPool", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
-							{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
-						}}}}}}}},
-						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
-					}}}},
-				}},
-			}},
-			ActAs:              []string{partyTokenPoolOwner},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTar},
-		},
-	})
-	require.NoError(t, err)
-	t.Log("Called SetPool")
+	cldfEnv.DataStore = out.DataStore.Seal()
+	_, tokenPoolAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), lock_release_token_pool.ContractType, lock_release_token_pool.Version, "")
+	require.NoError(t, err, "failed to get Token Pool address")
 
 	// Run EDS
 	edsParticipant := env.Chain.Participants[0]
@@ -567,31 +501,31 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				Enabled: true,
 				PerPartyRouterFactory: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
+					InstanceAddress: perPartyRouterFactoryAddress.InstanceAddress(),
 				},
 				OnRamp: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(onRamp.Address),
+					InstanceAddress: onRampAddress.InstanceAddress(),
 				},
 				OffRamp: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(offRamp.Address),
+					InstanceAddress: offRampAddress.InstanceAddress(),
 				},
 				GlobalConfig: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(globalConfig.Address),
+					InstanceAddress: globalConfigAddress.InstanceAddress(),
 				},
 				TokenAdminRegistry: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
+					InstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 				},
 				RMNRemote: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
+					InstanceAddress: rmnRemoteAddress.InstanceAddress(),
 				},
 				FeeQuoter: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
+					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
@@ -600,7 +534,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 					{
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
-							InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+							InstanceAddress: committeeVerifierAddress.InstanceAddress(),
 						},
 					},
 				},
@@ -612,7 +546,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 						Type: config.TokenPoolTypeLockRelease,
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
-							InstanceAddress: lrtpInstanceAddress,
+							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partyCCIP,
 						// By setting the TokenStandard info, the Toke Pool API will return the necessary factory disclosures
@@ -641,58 +575,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create Token Pool API client")
 
-	// Deploy and configure lane (CCIP 2.0 lanes sequence, same as ccip_execute_test)
-	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
-	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
-	require.Truef(t, ok, "failed to get Canton Lane adapter")
-	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsDest(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
-		Source: &lanes.ChainDefinition{
-			Selector: remoteSelector,
-			OnRamp:   hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
-			OffRamp:  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
-		},
-		Dest: &lanes.ChainDefinition{
-			Selector: env.Chain.ChainSelector(),
-			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-				{
-					CommitteeVerifier: []datastore.AddressRef{committeeVerifier},
-					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						remoteSelector: {
-							AllowlistEnabled:          false,
-							AddedAllowlistedSenders:   nil,
-							RemovedAllowlistedSenders: nil,
-							FeeUSDCents:               50,
-							GasForVerification:        50_000,
-							PayloadSizeBytes:          6*64 + 2*32,
-							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
-								Signers:   ccvSignerPubKeys,
-								Threshold: 2,
-							},
-						},
-					},
-				},
-			},
-			LaneMandatedInboundCCVs: []datastore.AddressRef{committeeVerifier},
-			DefaultInboundCCVs:      nil,
-			CantonLaneConfig: &lanes.CantonLaneConfig{
-				GlobalConfig: globalConfig,
-			},
-		},
-		IsDisabled:   false,
-		TestRouter:   false,
-		ExtraConfigs: lanes.ExtraConfigs{},
-	})
-	require.NoErrorf(t, err, "Failed to configure chain for lanes")
-	runningDs := datastore.NewMemoryDataStore()
-	for _, address := range deployLaneLegReport.Output.Addresses {
-		err = runningDs.Addresses().Add(address)
-		require.NoErrorf(t, err, "Failed to add address %s", address.Address)
-	}
-	err = runningDs.Merge(cldfEnv.DataStore)
-	require.NoErrorf(t, err, "Failed to merge datastore")
-	cldfEnv.DataStore = runningDs.Seal()
-	t.Log("Configured chain for lanes")
-
 	// wait for EDS to start up
 	time.Sleep(1 * time.Second)
 
@@ -702,7 +584,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	t.Logf("disclosed contracts: %v", perPartyRouterFactoryDisclosure.DisclosedContracts)
 	t.Logf("per party router factory cid: %s", perPartyRouterFactoryDisclosure.ContractId)
 
-	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -747,9 +629,9 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 		Finality:            finalityConfigFromBlockConfirmations(2000),
 		CCVAndExecutorHash:  [32]byte{},
 		OnRampAddress:       gethcommon.LeftPadBytes(hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"), 32),
-		OffRampAddress:      contracts.HexToInstanceAddress(offRamp.Address).Bytes(),
+		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
-		Receiver:            EncodePartyID(partyReceiver),
+		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
 		DestBlob:            []byte{},
 		TokenTransfer:       encodedTokenTransfer,
 		MessageData:         []byte{},
@@ -798,13 +680,13 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
 
-	tokenPoolAddress, err := edsTesthelpers.GetTokenPoolForToken(t.Context(), ccipAPIClient, hashedInstrumentId)
+	tokenPoolAddressEDS, err := edsTesthelpers.GetTokenPoolForToken(t.Context(), ccipAPIClient, hashedInstrumentId)
 	require.NoError(t, err)
 	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(t.Context(), ccipAPIClient, encodedMessageHex)
 	require.NoError(t, err)
-	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, contracts.HexToInstanceAddress(committeeVerifier.Address))
+	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress())
 	require.NoError(t, err)
-	tokenPoolDisclosure, err := edsTesthelpers.GetTokenPoolExecuteDisclosure(t.Context(), tokenPoolAPIClient, encodedMessageHex, tokenPoolAddress.InstanceAddress())
+	tokenPoolDisclosure, err := edsTesthelpers.GetTokenPoolExecuteDisclosure(t.Context(), tokenPoolAPIClient, encodedMessageHex, tokenPoolAddressEDS.InstanceAddress())
 	require.NoError(t, err)
 
 	executeArgs := ccipreceiver.Execute2{
@@ -884,15 +766,17 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	t.Logf("Receiver balance: %.2f -> %.2f AMT (transferred %.2f)", receiverBalanceBefore, receiverBalanceAfter, actualTransferAmount)
 
 	if tc.expectedDefaultLimiterTokens != "" {
-		defaultRateLimiter, err := findActiveRateLimiterByInstanceID(t.Context(), tokenPoolOwnerParticipant, inboundRateLimiterInstanceID)
+		defaultRateLimiter, err := findActiveRateLimiterByInstanceID(t.Context(), tokenPoolOwnerParticipant, inboundRateLimiterAddr.InstanceID())
 		require.NoError(t, err)
 		require.Equal(t, tc.expectedDefaultLimiterTokens, getRateLimiterTokens(defaultRateLimiter))
 	}
 	if tc.expectedCustomLimiterTokens != "" {
-		customRateLimiter, err := findActiveRateLimiterByInstanceID(t.Context(), tokenPoolOwnerParticipant, inboundCustomBlockConfirmationsRateLimiterInstanceID)
+		customRateLimiter, err := findActiveRateLimiterByInstanceID(t.Context(), tokenPoolOwnerParticipant, inboundCustomRateLimiterAddr.InstanceID())
 		require.NoError(t, err)
 		require.Equal(t, tc.expectedCustomLimiterTokens, getRateLimiterTokens(customRateLimiter))
 	}
+
+	t.Logf("✅ Success")
 }
 
 // getHoldingsBalance returns total balance across all holdings
@@ -934,7 +818,7 @@ func buildTokenTransferV1(
 		SourcePoolAddress:  sourcePoolAddress,
 		SourceTokenAddress: sourceTokenAddress,
 		DestTokenAddress:   destTokenAddress.Bytes(),
-		TokenReceiver:      EncodePartyID(tokenReceiverParty),
+		TokenReceiver:      contracts.HashedPartyFromString(tokenReceiverParty).Bytes(),
 		ExtraData:          extraData,
 	}
 }

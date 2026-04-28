@@ -733,7 +733,7 @@ func (t *TransferInstructionWithdraw) UnmarshalHex(data string) error {
 
 // TransferPendingInternalWorkflow is a Record type
 type TransferPendingInternalWorkflow struct {
-	PendingActions types.GENMAP `json:"pendingActions"`
+	PendingActions map[types.PARTY]types.TEXT `json:"pendingActions"`
 }
 
 // ToMap converts TransferPendingInternalWorkflow to a map for DAML arguments
