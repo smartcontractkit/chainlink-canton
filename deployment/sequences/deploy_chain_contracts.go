@@ -122,8 +122,8 @@ var DeployChainContracts = operations.NewSequence(
 		// Deploy Token Admin Registry
 		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, token_admin_registry.Deploy, deps, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
 			Template: tokenadminregistry.TokenAdminRegistry{
-				Owner:        types.PARTY(input.CCIPOwnerParty),
-				TokenConfigs: nil,
+				Owner:      types.PARTY(input.CCIPOwnerParty),
+				EntryCount: 0,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})

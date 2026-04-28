@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
@@ -81,6 +82,12 @@ func TestCCIPSend(t *testing.T) {
 
 	ccipParticipant := env.Chain.Participants[0]
 	senderParticipant := env.Chain.Participants[1]
+
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		testhelpers.ContractCleanup(t, ctx, env.Chain.Participants)
+	})
 
 	// Upload DARs
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
@@ -548,7 +555,7 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	// Extract transfer factory context values (e.g. amulet-rules) for the fee token input
-	transferFactoryContextValues := make(types.TEXTMAP)
+	transferFactoryContextValues := make(map[string]splice_api_token_metadata_v1.AnyValue)
 	if choiceContextRecord := choiceContext.GetRecord(); choiceContextRecord != nil && len(choiceContextRecord.Fields) > 0 {
 		valuesField := choiceContextRecord.Fields[0]
 		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
@@ -567,7 +574,7 @@ func TestCCIPSend(t *testing.T) {
 			Values: transferFactoryContextValues,
 		},
 		Meta: splice_api_token_metadata_v1.Metadata{
-			Values: types.TEXTMAP{},
+			Values: map[string]types.TEXT{},
 		},
 	}
 
@@ -729,4 +736,6 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 	t.Logf("  Encoded message: %s", returnedEncodedMessage)
+
+	t.Logf("✅ Success")
 }

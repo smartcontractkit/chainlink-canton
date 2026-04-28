@@ -2,13 +2,36 @@ module CCIP.TokenAdminRegistryTest.TokenAdminRegistryTest where
 
 import Daml.Script
 import DA.Assert ((===))
-import DA.Map qualified as Map
 import DA.Optional (fromSome)
 
 import qualified Splice.Api.Token.HoldingV1
-import qualified CCIP.MessageCodecV1
 import CCIP.TokenAdminRegistry
-import CCIP.TokenAdminRegistryTypes (TokenConfig(..))
+
+createRegistryWithAdmin
+    : Party
+    -> Text
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> Script (ContractId TokenAdminRegistry, ContractId TokenConfig)
+createRegistryWithAdmin owner instanceId instrumentId = do
+  tarCid <- submit owner do
+    createCmd TokenAdminRegistry with
+      instanceId
+      owner
+      entryCount = 1
+
+  configCid <- submit owner do
+    createCmd TokenConfig with
+      instanceId = tokenConfigInstanceId instrumentId
+      registryInstanceId = instanceId
+      registryOwner = owner
+      index = 0
+      isCCIPManaged = False
+      instrumentId
+      admin = Some owner
+      pendingAdmin = None
+      tokenPool = None
+
+  pure (tarCid, configCid)
 
 testTransferAdminRoleRequiresAcceptance : Script ()
 testTransferAdminRoleRequiresAcceptance = script do
@@ -18,47 +41,30 @@ testTransferAdminRoleRequiresAcceptance = script do
 
   let instanceId = "tar-transfer-direct-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "WBTC"
-      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
-  tarCid <- submit owner do
-    createCmd TokenAdminRegistry with
-      instanceId
-      owner
-      tokenConfigs = Map.fromList [
-        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
-        ]
+  (tarCid, configCid0) <- createRegistryWithAdmin owner instanceId instrumentId
 
-  tarCid <- submit owner do
+  configCid1 <- submit owner do
     exerciseCmd tarCid TransferAdminRole with
+      tokenConfigCid = configCid0
       instrumentId
       newAdmin
       caller = owner
 
-  contractsAfterTransfer <- query @TokenAdminRegistry owner
-  case filter (\(_, tar) -> tar.instanceId == instanceId) contractsAfterTransfer of
-    [(_, tar)] ->
-      case Map.lookup encodedInstrumentId tar.tokenConfigs of
-        None -> abort "Expected token config after transfer"
-        Some config -> do
-          config.admin === Some owner
-          config.pendingAdmin === Some newAdmin
-    _ -> abort "Expected exactly one TokenAdminRegistry contract after transfer"
+  Some configAfterTransfer <- queryContractId owner configCid1
+  configAfterTransfer.admin === Some owner
+  configAfterTransfer.pendingAdmin === Some newAdmin
 
   disclosedTar <- fromSome <$> queryDisclosure owner tarCid
-  tarCid <- submit (actAs newAdmin <> disclose disclosedTar) do
+  configCid2 <- submit (actAs newAdmin <> disclose disclosedTar) do
     exerciseCmd tarCid AcceptAdminRole with
+      tokenConfigCid = configCid1
       instrumentId
       caller = newAdmin
 
-  contractsAfterAccept <- query @TokenAdminRegistry owner
-  case filter (\(_, tar) -> tar.instanceId == instanceId) contractsAfterAccept of
-    [(_, tar)] ->
-      case Map.lookup encodedInstrumentId tar.tokenConfigs of
-        None -> abort "Expected token config after acceptance"
-        Some config -> do
-          config.admin === Some newAdmin
-          config.pendingAdmin === None
-    _ -> abort "Expected exactly one TokenAdminRegistry contract after acceptance"
+  Some configAfterAccept <- queryContractId owner configCid2
+  configAfterAccept.admin === Some newAdmin
+  configAfterAccept.pendingAdmin === None
 
   pure ()
 
@@ -69,30 +75,18 @@ testTransferAdminRoleRejectsSameAdmin = script do
 
   let instanceId = "tar-transfer-same-admin-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
-  tarCid <- submit owner do
-    createCmd TokenAdminRegistry with
-      instanceId
-      owner
-      tokenConfigs = Map.fromList [
-        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
-        ]
+  (tarCid, configCid) <- createRegistryWithAdmin owner instanceId instrumentId
 
   submitMustFail owner do
     exerciseCmd tarCid TransferAdminRole with
+      tokenConfigCid = configCid
       instrumentId
       newAdmin = owner
       caller = owner
 
-  contracts <- query @TokenAdminRegistry owner
-  case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
-    [(_, tar)] ->
-      case Map.lookup encodedInstrumentId tar.tokenConfigs of
-        None -> abort "Expected token config to remain unchanged"
-        Some config -> do
-          config.admin === Some owner
-          config.pendingAdmin === None
-    _ -> abort "Expected exactly one TokenAdminRegistry contract after rejected transfer"
+  Some config <- queryContractId owner configCid
+  config.admin === Some owner
+  config.pendingAdmin === None
 
   pure ()

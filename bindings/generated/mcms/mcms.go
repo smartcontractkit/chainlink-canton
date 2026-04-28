@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "73a12fdab8d8ca9bb5d1873decd71e40f85901c5cd45ee059a0d8f9aa505f405"
+	PackageID   = "bdde1cf58c8d4b136d8502520f1d115e409580bd219eed849af40002bd11c073"
 	SDKVersion  = "3.4.10"
 )
 
@@ -432,11 +432,11 @@ func (t *CancelBatchParams) UnmarshalHex(data string) error {
 
 // ExecuteOp is a Record type
 type ExecuteOp struct {
-	TargetRole Role         `json:"targetRole"`
-	Submitter  types.PARTY  `json:"submitter"`
-	Op         Op           `json:"op"`
-	OpProof    []types.TEXT `json:"opProof"`
-	TargetCids types.GENMAP `json:"targetCids"`
+	TargetRole Role                             `json:"targetRole"`
+	Submitter  types.PARTY                      `json:"submitter"`
+	Op         Op                               `json:"op"`
+	OpProof    []types.TEXT                     `json:"opProof"`
+	TargetCids map[types.TEXT]types.CONTRACT_ID `json:"targetCids"`
 }
 
 // ToMap converts ExecuteOp to a map for DAML arguments
@@ -491,12 +491,12 @@ func (t *ExecuteOp) UnmarshalHex(data string) error {
 
 // ExecuteScheduledBatch is a Record type
 type ExecuteScheduledBatch struct {
-	Submitter   types.PARTY    `json:"submitter"`
-	OpId        types.TEXT     `json:"opId"`
-	Calls       []TimelockCall `json:"calls"`
-	Predecessor types.TEXT     `json:"predecessor" hex:"bytes16"`
-	Salt        types.TEXT     `json:"salt" hex:"bytes16"`
-	TargetCids  types.GENMAP   `json:"targetCids"`
+	Submitter   types.PARTY                      `json:"submitter"`
+	OpId        types.TEXT                       `json:"opId"`
+	Calls       []TimelockCall                   `json:"calls"`
+	Predecessor types.TEXT                       `json:"predecessor" hex:"bytes16"`
+	Salt        types.TEXT                       `json:"salt" hex:"bytes16"`
+	TargetCids  map[types.TEXT]types.CONTRACT_ID `json:"targetCids"`
 }
 
 // ToMap converts ExecuteScheduledBatch to a map for DAML arguments
@@ -937,15 +937,15 @@ func (t *IsOperationReady) UnmarshalHex(data string) error {
 
 // MCMS is a Template type
 type MCMS struct {
-	Owner              types.PARTY       `json:"owner"`
-	InstanceId         types.TEXT        `json:"instanceId"`
-	ChainId            types.INT64       `json:"chainId"`
-	Proposer           RoleState         `json:"proposer"`
-	Canceller          RoleState         `json:"canceller"`
-	Bypasser           RoleState         `json:"bypasser"`
-	MinDelay           types.RELTIME     `json:"minDelay"`
-	BlockedFunctions   []BlockedFunction `json:"blockedFunctions"`
-	TimelockTimestamps types.GENMAP      `json:"timelockTimestamps"`
+	Owner              types.PARTY                    `json:"owner"`
+	InstanceId         types.TEXT                     `json:"instanceId"`
+	ChainId            types.INT64                    `json:"chainId"`
+	Proposer           RoleState                      `json:"proposer"`
+	Canceller          RoleState                      `json:"canceller"`
+	Bypasser           RoleState                      `json:"bypasser"`
+	MinDelay           types.RELTIME                  `json:"minDelay"`
+	BlockedFunctions   []BlockedFunction              `json:"blockedFunctions"`
+	TimelockTimestamps map[types.TEXT]types.TIMESTAMP `json:"timelockTimestamps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1309,6 +1309,48 @@ func (t MCMS) GetTimestampWithPackageID(contractID string, packageID string, arg
 	}
 }
 
+// PruneSeenHashes exercises the PruneSeenHashes choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) PruneSeenHashes(contractID string, args PruneSeenHashes) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "PruneSeenHashes",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PruneSeenHashesWithPackageID exercises the PruneSeenHashes choice using the provided package ID instead of package name
+func (t MCMS) PruneSeenHashesWithPackageID(contractID string, packageID string, args PruneSeenHashes) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "PruneSeenHashes",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PruneTimelockTimestamps exercises the PruneTimelockTimestamps choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) PruneTimelockTimestamps(contractID string, args PruneTimelockTimestamps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "PruneTimelockTimestamps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PruneTimelockTimestampsWithPackageID exercises the PruneTimelockTimestamps choice using the provided package ID instead of package name
+func (t MCMS) PruneTimelockTimestampsWithPackageID(contractID string, packageID string, args PruneTimelockTimestamps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "PruneTimelockTimestamps",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Archive exercises the Archive choice on this MCMS contract
 // This method uses the package name in the template ID
 func (t MCMS) Archive(contractID string) *model.ExerciseCommand {
@@ -1434,9 +1476,9 @@ func (t *MCMSReceiverView) UnmarshalHex(data string) error {
 
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
-	FunctionName  types.TEXT   `json:"functionName"`
-	OperationData types.TEXT   `json:"operationData" hex:"bytes16"`
-	ContractIds   types.GENMAP `json:"contractIds"`
+	FunctionName  types.TEXT                       `json:"functionName"`
+	OperationData types.TEXT                       `json:"operationData" hex:"bytes16"`
+	ContractIds   map[types.TEXT]types.CONTRACT_ID `json:"contractIds"`
 }
 
 // ToMap converts MCMSReceiverEntrypoint to a map for DAML arguments
@@ -1641,6 +1683,74 @@ func (t *Op) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// PruneSeenHashes is a Record type
+type PruneSeenHashes struct {
+	TargetRole Role `json:"targetRole"`
+}
+
+// ToMap converts PruneSeenHashes to a map for DAML arguments
+func (t PruneSeenHashes) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["targetRole"] = model.NestedToDAMLValue(t.TargetRole)
+
+	return m
+}
+
+func (t PruneSeenHashes) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *PruneSeenHashes) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes PruneSeenHashes to hex string (Canton MCMS format)
+func (t PruneSeenHashes) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PruneSeenHashes from hex string (Canton MCMS format)
+func (t *PruneSeenHashes) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// PruneTimelockTimestamps is a Record type
+type PruneTimelockTimestamps struct {
+}
+
+// ToMap converts PruneTimelockTimestamps to a map for DAML arguments
+func (t PruneTimelockTimestamps) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t PruneTimelockTimestamps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *PruneTimelockTimestamps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes PruneTimelockTimestamps to hex string (Canton MCMS format)
+func (t PruneTimelockTimestamps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PruneTimelockTimestamps from hex string (Canton MCMS format)
+func (t *PruneTimelockTimestamps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // RawInstanceAddress is a Record type
 type RawInstanceAddress struct {
 	Unpack types.TEXT `json:"unpack"`
@@ -1767,10 +1877,10 @@ var _ types.ENUM = Role("")
 
 // RoleState is a Record type
 type RoleState struct {
-	Config       MultisigConfig `json:"config"`
-	SeenHashes   types.GENMAP   `json:"seenHashes"`
-	ExpiringRoot ExpiringRoot   `json:"expiringRoot"`
-	RootMetadata RootMetadata   `json:"rootMetadata"`
+	Config       MultisigConfig                 `json:"config"`
+	SeenHashes   map[types.TEXT]types.TIMESTAMP `json:"seenHashes"`
+	ExpiringRoot ExpiringRoot                   `json:"expiringRoot"`
+	RootMetadata RootMetadata                   `json:"rootMetadata"`
 }
 
 // ToMap converts RoleState to a map for DAML arguments
@@ -2220,6 +2330,8 @@ type MCMSEncoder interface {
 	IsOperationDone(args IsOperationDone) (*bind.EncodedChoice, error)
 	IsOperationPending(args IsOperationPending) (*bind.EncodedChoice, error)
 	IsOperationReady(args IsOperationReady) (*bind.EncodedChoice, error)
+	PruneSeenHashes(args PruneSeenHashes) (*bind.EncodedChoice, error)
+	PruneTimelockTimestamps(args PruneTimelockTimestamps) (*bind.EncodedChoice, error)
 	ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error)
 	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
 	SetConfigParams(args SetConfigParams) (*bind.EncodedChoice, error)
@@ -2321,6 +2433,16 @@ func (e *encoder) IsOperationPending(args IsOperationPending) (*bind.EncodedChoi
 // IsOperationReady encodes parameters for the IsOperationReady choice.
 func (e *encoder) IsOperationReady(args IsOperationReady) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("IsOperationReady", args)
+}
+
+// PruneSeenHashes encodes parameters for the PruneSeenHashes choice.
+func (e *encoder) PruneSeenHashes(args PruneSeenHashes) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PruneSeenHashes", args)
+}
+
+// PruneTimelockTimestamps encodes parameters for the PruneTimelockTimestamps choice.
+func (e *encoder) PruneTimelockTimestamps(args PruneTimelockTimestamps) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PruneTimelockTimestamps", args)
 }
 
 // ScheduleBatch encodes parameters for the ScheduleBatch choice.

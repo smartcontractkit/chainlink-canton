@@ -149,12 +149,15 @@ template CCIPReceiver
                 -- Token transfers must resolve pool CCVs before any CCV can contribute.
                 emCid <- case tokenTransfer of
                     None -> pure emCid
-                    Some tt -> exercise tt.tokenPoolCid
-                        CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            extraContext = tt.poolExtraContext
-                            executingMessageCid = emCid
-                            caller = owner
+                    Some tt -> do
+                        tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
+                        exercise tt.tokenPoolCid
+                            CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
+                                tokenAdminRegistryCid = tokenAdminRegistryCid
+                                tokenConfigCid = tokenConfigCid
+                                extraContext = tt.poolExtraContext
+                                executingMessageCid = emCid
+                                caller = owner
 
                 -- CCV verification: thread executingMessageCid through each CCV
                 emCid <- foldlA (\cid input ->
@@ -175,14 +178,15 @@ template CCIPReceiver
                 -- Token release
                 tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of
                     (Some tt, Some ticketCid) -> do
-                        releaseResult <- exercise tt.tokenPoolCid
-                            CCIP.Interfaces.TokenPool.TokenPool_ReleaseFromTicket with
-                                tokenAdminRegistryCid = tokenAdminRegistryCid
-                                rmnRemoteCid = rmnRemoteCid
-                                extraContext = tt.poolExtraContext
-                                tokenReceiveTicketCid = ticketCid
-                                tokenInput = tt.tokenInput
-                                caller = owner
+                        tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
+                        releaseResult <- exercise tt.tokenPoolCid CCIP.Interfaces.TokenPool.TokenPool_ReleaseFromTicket with
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            tokenConfigCid = tokenConfigCid
+                            rmnRemoteCid = rmnRemoteCid
+                            extraContext = tt.poolExtraContext
+                            tokenReceiveTicketCid = ticketCid
+                            tokenInput = tt.tokenInput
+                            caller = owner
                         pure (Some releaseResult)
                     _ -> pure None
 

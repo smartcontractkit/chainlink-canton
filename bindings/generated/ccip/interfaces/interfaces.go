@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "31d97d43e7d731a92ee608fac79c7f45215a5a52f70db818a35201b06ababc29"
+	PackageID   = "d453b4c1a5b5c2bcace695d848f632c52687d397524ba52ab6a2b28664eaa9e6"
 	SDKVersion  = "3.4.10"
 )
 
@@ -469,6 +469,7 @@ func (t *TokenPoolView) UnmarshalHex(data string) error {
 // TokenPoolCalculateFee is a Record type
 type TokenPoolCalculateFee struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext                       `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
 	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
@@ -481,6 +482,8 @@ func (t TokenPoolCalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
@@ -616,6 +619,7 @@ func (t *TokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 // TokenPoolLockOrBurn is a Record type
 type TokenPoolLockOrBurn struct {
 	TokenAdminRegistryCid types.CONTRACT_ID   `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID   `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID   `json:"rmnRemoteCid"`
 	ExtraContext          common.CCIPContext  `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID   `json:"sendingMessageCid"`
@@ -630,6 +634,8 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
@@ -679,6 +685,7 @@ func (t *TokenPoolLockOrBurn) UnmarshalHex(data string) error {
 // TokenPoolReleaseFromTicket is a Record type
 type TokenPoolReleaseFromTicket struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID  `json:"rmnRemoteCid"`
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	TokenReceiveTicketCid types.CONTRACT_ID  `json:"tokenReceiveTicketCid"`
@@ -691,6 +698,8 @@ func (t TokenPoolReleaseFromTicket) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
@@ -730,6 +739,7 @@ func (t *TokenPoolReleaseFromTicket) UnmarshalHex(data string) error {
 // TokenPoolVerifyInboundMessage is a Record type
 type TokenPoolVerifyInboundMessage struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
 	Caller                types.PARTY        `json:"caller"`
@@ -740,6 +750,8 @@ func (t TokenPoolVerifyInboundMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
@@ -775,6 +787,7 @@ func (t *TokenPoolVerifyInboundMessage) UnmarshalHex(data string) error {
 // TokenPoolVerifyOutboundCCVs is a Record type
 type TokenPoolVerifyOutboundCCVs struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
 	Amount                types.NUMERIC      `json:"amount"`
@@ -786,6 +799,8 @@ func (t TokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 

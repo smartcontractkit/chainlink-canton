@@ -1,10 +1,14 @@
 package tests
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"math/big"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,6 +20,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -39,25 +46,31 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/service"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
+	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 
 	// Import to register adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
@@ -74,6 +87,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	ccipParticipant := env.Chain.Participants[0]
 	senderParticipant := env.Chain.Participants[1]
+
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		testhelpers.ContractCleanup(t, ctx, env.Chain.Participants)
+	})
 
 	// Upload DARs
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
@@ -222,7 +241,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		},
 	})
 	require.NoErrorf(t, err, "Failed to deploy CCIP contracts: %v", err)
-
 	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
 	cldfEnv.DataStore = out.DataStore.Seal()
@@ -234,26 +252,24 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 
 	// Resolve contracts
-	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(global_config.ContractType), global_config.Version, ""))
+	globalConfigRef, globalConfigAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_config.ContractType, global_config.Version, "")
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
+	_, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
 	require.NoError(t, err, "failed to get FeeQuoter address")
-	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(onramp.ContractType), onramp.Version, ""))
+	_, onRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), onramp.ContractType, onramp.Version, "")
 	require.NoError(t, err, "failed to get OnRamp address")
-	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(offramp.ContractType), offramp.Version, ""))
+	_, offRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), offramp.ContractType, offramp.Version, "")
 	require.NoError(t, err, "failed to get OffRamp address")
-	committeeVerifier, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
+	committeeVerifierRef, committeeVerifierAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), committee_verifier.ContractType, committee_verifier.Version, ccvQualifier)
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
-	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
-	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
-	tokenAdminRegistry, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(token_admin_registry.ContractType), token_admin_registry.Version, ""))
+	_, tokenAdminRegistryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), token_admin_registry.ContractType, token_admin_registry.Version, "")
 	require.NoError(t, err, "failed to get TokenAdminRegistry address")
-	rmnRemote, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	_, rmnRemoteAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), rmn_remote.ContractType, rmn_remote.Version, "")
 	require.NoError(t, err, "failed to get RMNRemote address")
-	executorAddress, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(executor.ContractType), executor.Version, devenvcommon.DefaultExecutorQualifier))
+	_, perPartyRouterFactoryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), per_party_router_factory.ContractType, per_party_router_factory.Version, "")
+	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+	executorRef, executorAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), executor.ContractType, executor.Version, devenvcommon.DefaultExecutorQualifier)
 	require.NoError(t, err, "failed to get Executor address")
-	executorRawAddr, err := contracts.RawInstanceAddressFromString(executorAddress.Labels.List()[0])
-	require.NoError(t, err, "failed to parse Executor raw address")
 
 	// Deploy and configure lane for outbound sends
 	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
@@ -285,7 +301,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Selector: env.Chain.ChainSelector(),
 			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 				{
-					CommitteeVerifier: []datastore.AddressRef{committeeVerifier},
+					CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
 					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 						remoteSelector: {
 							AllowlistEnabled:          false,
@@ -302,15 +318,15 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					},
 				},
 			},
-			LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifier},
+			LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifierRef},
 			DefaultOutboundCCVs:      nil,
 			CantonLaneConfig: &lanes.CantonLaneConfig{
-				GlobalConfig: globalConfig,
+				GlobalConfig: globalConfigRef,
 			},
-			DefaultExecutor: executorAddress,
-			FeeQuoter:       contracts.HexToInstanceAddress(feeQuoter.Address).Bytes(),
-			OnRamp:          contracts.HexToInstanceAddress(onRamp.Address).Bytes(),
-			OffRamp:         contracts.HexToInstanceAddress(offRamp.Address).Bytes(),
+			DefaultExecutor: executorRef,
+			FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
+			OnRamp:          onRampAddress.InstanceAddress().Bytes(),
+			OffRamp:         offRampAddress.InstanceAddress().Bytes(),
 		},
 		Dest: &lanes.ChainDefinition{
 			Selector:                 remoteSelector,
@@ -340,13 +356,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Log("Configured chain for lanes")
 
 	// Setup token pool for outbound token transfer in Send.
-	tokenAdminRegistryRawAddr, err := contracts.RawInstanceAddressFromString(tokenAdminRegistry.Labels.List()[0])
-	require.NoError(t, err, "failed to parse TokenAdminRegistry raw address")
-	rmnRemoteRawAddr, err := contracts.RawInstanceAddressFromString(rmnRemote.Labels.List()[0])
-	require.NoError(t, err, "failed to parse RMNRemote raw address")
-	feeQuoterRawAddr, err := contracts.RawInstanceAddressFromString(feeQuoter.Labels.List()[0])
-	require.NoError(t, err, "failed to parse FeeQuoter raw address")
-
 	poolInstanceID := "test-pool-send"
 	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
 		OwnerParty: types.PARTY(partyCCIP),
@@ -393,9 +402,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			InstrumentId: nativeInstrumentId,
 			Decimals:     10,
 			InstanceID:   poolInstanceID,
-			Qualifier:    "test-pool-send",
-			RemoteChainConfigs: types.GENMAP{
-				strconv.FormatUint(remoteSelector, 10): lockreleasetokenpool.RemoteChainConfig{
+			RemoteChainConfigs: map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{
+				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): lockreleasetokenpool.RemoteChainConfig{
 					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
 					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
 					InboundCCVs:        []mcms.RawInstanceAddress{},
@@ -407,56 +415,159 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				},
 			},
 			// Set a custom token transfer fee config
-			TokenTransferFeeConfigs: types.GENMAP{
-				strconv.FormatUint(remoteSelector, 10): map[string]any{
-					"isEnabled":         true,
-					"destGasOverhead":   int64(25_000),
-					"destBytesOverhead": int64(32),
-					"feeUSDCents":       types.NUMERIC(strconv.Itoa(tokenTransferFeeUSDCents)),
-					"feeBps":            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
+			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{
+				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
+					IsEnabled:         types.BOOL(true),
+					DestGasOverhead:   types.INT64(25_000),
+					DestBytesOverhead: types.INT64(32),
+					FeeUSDCents:       types.NUMERIC(strconv.Itoa(tokenTransferFeeUSDCents)),
+					FeeBps:            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
 				},
 			},
-			PoolReceiveContext: common.CCIPContext{Values: types.TEXTMAP{}},
+			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
 			TransferTimeout: lockreleasetokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
-			// By setting the TAR address, the CS will automatically register the newly deployed pool with the TAR
-			TokenAdminRegistryInstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
 			Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
-				TokenAdminRegistry: tokenAdminRegistryRawAddr.Binding(),
-				RmnRemote:          rmnRemoteRawAddr.Binding(),
-				FeeQuoter:          feeQuoterRawAddr.Binding(),
+				TokenAdminRegistry: tokenAdminRegistryAddress.Binding(),
+				RmnRemote:          rmnRemoteAddress.Binding(),
+				FeeQuoter:          feeQuoterAddress.Binding(),
 			},
+			// By setting the TAR address, the CS will automatically register the newly deployed pool with the TAR
+			TokenAdminRegistryInstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 		},
 	})
 	require.NoError(t, err, "failed to deploy lock release token pool via changeset")
 	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
 	cldfEnv.DataStore = out.DataStore.Seal()
+	_, tokenPoolAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), lock_release_token_pool.ContractType, lock_release_token_pool.Version, "")
+	require.NoError(t, err, "failed to get Token Pool address")
 
-	// Create PerPartyRouter for sender
-	var res *apiv2.SubmitAndWaitForTransactionResponse
-	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
-	})
+	// Run EDS
+	edsParticipant := env.Chain.Participants[0]
+	edsToken, _ := edsParticipant.TokenSource.Token()
+	edsPort := freeport.GetOne(t)
+	go func() {
+		log.Info().Msg("Running EDS...")
+		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
+			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
+			Server: config.ServerConfig{
+				Host: "0.0.0.0",
+				Port: uint16(edsPort),
+			},
+			Node: config.NodeConfig{
+				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   commonconfig.AuthTypeInsecureStatic,
+					UserID: edsParticipant.UserID,
+					JWT:    edsToken.AccessToken,
+				},
+				MaxRetries: 0,
+			},
+			CCIPAPIConfig: config.CCIPAPIConfig{
+				Enabled: true,
+				PerPartyRouterFactory: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: perPartyRouterFactoryAddress.InstanceAddress(),
+				},
+				OnRamp: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: onRampAddress.InstanceAddress(),
+				},
+				OffRamp: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: offRampAddress.InstanceAddress(),
+				},
+				GlobalConfig: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: globalConfigAddress.InstanceAddress(),
+				},
+				TokenAdminRegistry: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
+				},
+				RMNRemote: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: rmnRemoteAddress.InstanceAddress(),
+				},
+				FeeQuoter: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: feeQuoterAddress.InstanceAddress(),
+				},
+			},
+			CCVAPIConfig: config.CCVAPIConfig{
+				Enabled: true,
+				CCVs: []config.CCV{
+					{
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: committeeVerifierAddress.InstanceAddress(),
+						},
+					},
+				},
+			},
+			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
+				Enabled: true,
+				TokenPools: []config.TokenPool{
+					{
+						Type: config.TokenPoolTypeLockRelease,
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: tokenPoolAddress.InstanceAddress(),
+						},
+						PoolOwner: partyCCIP,
+						// By setting the TokenStandard info, the Toke Pool API will return the necessary factory disclosures
+						TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
+						TokenStandardAuthConfig: &commonconfig.AuthConfig{
+							Type: commonconfig.AuthTypeInsecureStatic,
+							JWT:  edsToken.AccessToken,
+						},
+					},
+				},
+			},
+		})
+		log.Info().Err(err).Msg("EDS terminated")
+		if !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msg("EDS server exited with error")
+			t.Fail()
+			return
+		}
+	}()
+
+	// Create EDS clients
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create CCIP API client")
+	// ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	// require.NoError(t, err, "Failed to create CCV API client")
+	// tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	// require.NoError(t, err, "Failed to create Token Pool API client")
+
+	// wait for EDS to start up
+	time.Sleep(1 * time.Second)
+
+	// Create PerPartyRouter for sender via EDS
+	perPartyRouterFactoryDisclosure, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosure(t.Context(), ccipAPIClient, partySender)
 	require.NoError(t, err)
+	t.Logf("disclosed contracts: %v", perPartyRouterFactoryDisclosure.DisclosedContracts)
+	t.Logf("per party router factory cid: %s", perPartyRouterFactoryDisclosure.ContractId)
 
-	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: disclosedFactory.ContractId,
+					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
-					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
-						PartyOwner: types.PARTY(partySender),
-						InstanceId: "router-sender",
-					}),
+					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "partyOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partySender}}},
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-router-receiver"}}},
+					}}}},
 				}},
 			}},
 			ActAs:              []string{partySender},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFactory},
+			DisclosedContracts: perPartyRouterFactoryDisclosure.DisclosedContracts,
 		},
 	})
 	require.NoError(t, err)
@@ -508,6 +619,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err)
 	disclosedTar, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"})
 	require.NoError(t, err)
+	disclosedTokenConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenConfig"})
+	require.NoError(t, err)
 	disclosedRmnRemote, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-rmn", ModuleName: "CCIP.RMNRemote", EntityName: "RMNRemote"})
 	require.NoError(t, err)
 	disclosedFeeQuoter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"})
@@ -522,6 +635,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NotEmpty(t, disclosedOnRamp.ContractId, "OnRamp disclosure missing/empty")
 	require.NotEmpty(t, disclosedGlobalConfig.ContractId, "GlobalConfig disclosure missing/empty")
 	require.NotEmpty(t, disclosedTar.ContractId, "TAR disclosure missing/empty")
+	require.NotEmpty(t, disclosedTokenConfig.ContractId, "TokenConfig disclosure missing/empty")
 	require.NotEmpty(t, disclosedRmnRemote.ContractId, "RMNRemote disclosure missing/empty")
 	require.NotEmpty(t, disclosedFeeQuoter.ContractId, "FeeQuoter disclosure missing/empty")
 	require.NotEmpty(t, disclosedPreapproval.ContractId, "Preapproval disclosure missing/empty")
@@ -535,6 +649,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("disclosedOnRamp.ContractId=%q", disclosedOnRamp.ContractId)
 	t.Logf("disclosedGlobalConfig.ContractId=%q", disclosedGlobalConfig.ContractId)
 	t.Logf("disclosedTar.ContractId=%q", disclosedTar.ContractId)
+	t.Logf("disclosedTokenConfig.ContractId=%q", disclosedTokenConfig.ContractId)
 	t.Logf("disclosedRmnRemote.ContractId=%q", disclosedRmnRemote.ContractId)
 	t.Logf("disclosedFeeQuoter.ContractId=%q", disclosedFeeQuoter.ContractId)
 
@@ -622,7 +737,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Values: transferFactoryContextValues,
 		},
 		Meta: splice_api_token_metadata_v1.Metadata{
-			Values: types.TEXTMAP{},
+			Values: map[string]types.TEXT{},
 		},
 	}
 
@@ -646,17 +761,18 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		TransferFactory: types.CONTRACT_ID(tokenTransferFactoryCid),
 		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 			Context: splice_api_token_metadata_v1.ChoiceContext{Values: tokenTransferContextValues},
-			Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+			Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 		},
 		TokenPoolHoldings: []types.CONTRACT_ID{},
 	}
 
 	// Build the main Send context with CCIP contract IDs (matching execute test pattern)
 	sendContext := common.CCIPContext{
-		Values: types.TEXTMAP{
+		Values: map[string]common.AnyValue{
 			"on-ramp":              common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOnRamp.ContractId))},
 			"global-config":        common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedGlobalConfig.ContractId))},
 			"token-admin-registry": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTar.ContractId))},
+			"token-config":         common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTokenConfig.ContractId))},
 			"fee-quoter":           common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedFeeQuoter.ContractId))},
 			"rmn-remote":           common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedRmnRemote.ContractId))},
 		},
@@ -668,8 +784,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
 	// after 5% pool fee the bridged amount should be 9,500.
-	ccvRawAddr := mcms.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierRawAddr.String())}
-	execMcmsAddr := mcms.RawInstanceAddress{Unpack: types.TEXT(executorRawAddr.String())}
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -687,13 +801,13 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					GasLimit: 0,
 					Ccvs: []ccipclient.CCVExtraArg{
 						{
-							CcvAddress: ccvRawAddr,
+							CcvAddress: committeeVerifierAddress.Binding(),
 							CcvArgs:    types.TEXT(""),
 						},
 					},
 					Executor: ccipclient.ExecutorExtraArg{
 						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
-							ExecutorAddress: execMcmsAddr,
+							ExecutorAddress: executorAddress.Binding(),
 							ExecutorArgs:    types.TEXT(""),
 						},
 					},
@@ -708,7 +822,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		},
 		CcvSendInputs: []ccipsender.CCVSendInput{
 			{
-				CcvAddress:      ccvRawAddr,
+				CcvAddress:      committeeVerifierAddress.Binding(),
 				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
 				CcvExtraContext: common.CCIPContext{},
 			},
@@ -717,8 +831,9 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
 			TokenPoolCid:    types.CONTRACT_ID(disclosedPool.ContractId),
 			PoolExtraContext: common.CCIPContext{
-				Values: types.TEXTMAP{
+				Values: map[string]common.AnyValue{
 					"rate-limiter": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId))},
+					"token-config": common.AnyValue{AVContractId: new(types.CONTRACT_ID(disclosedTokenConfig.ContractId))},
 				},
 			},
 			TokenInput: tokenTransferInput,
@@ -742,6 +857,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			disclosedTokenTransferHolding,
 			disclosedCCV,
 			disclosedPool,
+			disclosedTokenConfig,
 			disclosedOutboundRateLimiter,
 			disclosedPreapproval,
 			disclosedExecutor,
@@ -766,7 +882,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TransferFactory: types.CONTRACT_ID(transferFactoryCid),
 			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(choiceContext)},
-				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+				Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 			},
 			TokenPoolHoldings: []types.CONTRACT_ID{},
 		}
@@ -783,7 +899,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TransferFactory: types.CONTRACT_ID(tokenTransferFactoryCid),
 			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{Values: tokenTransferContextValues},
-				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+				Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 			},
 			TokenPoolHoldings: []types.CONTRACT_ID{},
 		}
@@ -801,6 +917,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				disclosedTokenTransferHolding,
 				disclosedCCV,
 				disclosedPool,
+				disclosedTokenConfig,
 				disclosedOutboundRateLimiter,
 				disclosedPreapproval,
 				disclosedExecutor,
@@ -898,6 +1015,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
+
+	t.Logf("✅ Success")
 }
 
 // extractTokenTransferAmountFromEncodedMessageHex decodes encodedMessage and returns

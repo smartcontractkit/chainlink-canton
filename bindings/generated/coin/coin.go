@@ -955,14 +955,14 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// MintPreapprovalMint encodes parameters for the MintPreapprovalMint choice.
+// MintPreapprovalMint encodes parameters for the MintPreapproval_Mint choice.
 func (e *encoder) MintPreapprovalMint(args MintPreapprovalMint) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("MintPreapprovalMint", args)
+	return e.EncodeChoiceArgs("MintPreapproval_Mint", args)
 }
 
-// MintRoleMint encodes parameters for the MintRoleMint choice.
+// MintRoleMint encodes parameters for the MintRole_Mint choice.
 func (e *encoder) MintRoleMint(args MintRoleMint) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("MintRoleMint", args)
+	return e.EncodeChoiceArgs("MintRole_Mint", args)
 }
 
 // Transfer encodes parameters for the Transfer choice.
