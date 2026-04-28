@@ -103,7 +103,7 @@ func NewServer(
 
 func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
 	var req oapiCCIP.CCIPPerPartyRouterFactoryRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -182,7 +182,7 @@ func (s Server) GetTokenAdminRegistryToken(c *gin.Context, instrumentId oapiComm
 
 func (s Server) PostCCIPSend(c *gin.Context) {
 	var req oapiCCIP.CCIPSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -413,7 +413,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 
 func (s Server) PostCCIPExecute(c *gin.Context) {
 	var req oapiCCIP.CCIPExecuteRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
