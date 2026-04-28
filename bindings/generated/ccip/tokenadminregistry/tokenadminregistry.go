@@ -35,6 +35,7 @@ type Template interface {
 }
 
 const (
+	TokenConfigKey        = types.TEXT("token-config")
 	TokenAdminRegistryKey = types.TEXT("token-admin-registry")
 )
 
