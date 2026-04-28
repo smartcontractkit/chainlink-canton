@@ -9,19 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/token_standard"
-
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
-	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
-	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
-
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/ccv"
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/executor"
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
@@ -31,10 +18,21 @@ import (
 	edsCommon "github.com/smartcontractkit/chainlink-canton/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/ccip"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/ccv"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/executor"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/token_standard"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	"github.com/smartcontractkit/chainlink-canton/eds/monitoring"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
+	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
 func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) error {

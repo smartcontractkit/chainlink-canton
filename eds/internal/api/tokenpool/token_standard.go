@@ -6,15 +6,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-canton/eds/config"
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
@@ -23,6 +22,8 @@ type transferFactory func(ctx context.Context, instrumentId splice_api_token_hol
 
 func getTransferFactory(ctx context.Context, poolOwner types.PARTY, acs *store.ActiveContractStore, cfg config.TransferFactory) (transferFactory, error) {
 	switch cfg.Type {
+	case config.FactoryTypeDisabled:
+		return nil, nil //nolint:nilnil
 	case config.FactoryTypeAddress:
 		factoryAddress := *cfg.Address
 
@@ -127,13 +128,17 @@ func getTransferFactory(ctx context.Context, poolOwner types.PARTY, acs *store.A
 		}, nil
 	}
 
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
 type burnMintFactory func(ctx context.Context) (string, []oapiCommon.DisclosedContract, error)
 
 func getBurnMintFactory(acs *store.ActiveContractStore, cfg config.BurnMintFactory) (burnMintFactory, error) {
 	switch cfg.Type {
+	case config.FactoryTypeDisabled:
+		return nil, nil //nolint:nilnil
+	case config.FactoryTypeURL:
+		return nil, fmt.Errorf("unsupported factory type: %s", cfg.Type)
 	case config.FactoryTypeAddress:
 		factoryAddress := *cfg.Address
 
@@ -156,5 +161,5 @@ func getBurnMintFactory(acs *store.ActiveContractStore, cfg config.BurnMintFacto
 		}, nil
 	}
 
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
