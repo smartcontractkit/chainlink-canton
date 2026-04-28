@@ -8,6 +8,9 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -21,9 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
 )
 
 func receiverWaitForFinalityConfig() common.FinalityConfig {

@@ -19,9 +19,9 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260410105708-4e8133b0b504
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260414185437-e41e205c8bfa
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
-	github.com/smartcontractkit/chainlink-deployments-framework v0.95.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.98.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
-	github.com/smartcontractkit/go-daml v0.6.1-0.20260424200436-2d7753bfaa32
+	github.com/smartcontractkit/go-daml v0.6.1-0.20260427221214-62fc94f51248
 	github.com/smartcontractkit/mcms v0.41.2-0.20260423204345-3cd8c2672428
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0
@@ -59,7 +59,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.9 // indirect
-	github.com/aws/smithy-go v1.25.0 // indirect
+	github.com/aws/smithy-go v1.25.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -205,7 +205,7 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
-	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect

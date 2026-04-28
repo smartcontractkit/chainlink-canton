@@ -34,6 +34,12 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	VersionTagV200           = types.TEXT("e9a05a20")
+	SignatureLength          = types.INT64(64)
+	SignatureComponentLength = types.INT64(32)
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "4dd4bc1e1c2bb7462f8e7614e720d96447306bd36bc8f2c9dd3612e8e23f4a02"
+	PackageID   = "f37811e93bdacc6f96ebf0448d9a14629aa4ae666b070ccb6c0487279893e3c5"
 	SDKVersion  = "3.4.10"
 )
 
@@ -33,6 +33,10 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+
+const (
+	OffRampKey = types.TEXT("off-ramp")
+)
 
 func argsToMap(args any) map[string]any {
 	if args == nil {
@@ -55,11 +59,12 @@ func argsToMap(args any) map[string]any {
 
 // ExecuteFromRouter is a Record type
 type ExecuteFromRouter struct {
-	RouterPartyOwner      types.PARTY       `json:"routerPartyOwner"`
-	ExecutingMessageCid   types.CONTRACT_ID `json:"executingMessageCid"`
-	GlobalConfigCid       types.CONTRACT_ID `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID `json:"rmnRemoteCid"`
+	RouterPartyOwner      types.PARTY        `json:"routerPartyOwner"`
+	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
+	GlobalConfigCid       types.CONTRACT_ID  `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        *types.CONTRACT_ID `json:"tokenConfigCid" hex:"optional"`
+	RmnRemoteCid          types.CONTRACT_ID  `json:"rmnRemoteCid"`
 }
 
 // ToMap converts ExecuteFromRouter to a map for DAML arguments
@@ -73,6 +78,18 @@ func (t ExecuteFromRouter) ToMap() map[string]any {
 	m["globalConfigCid"] = model.NestedToDAMLValue(t.GlobalConfigCid)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	if t.TokenConfigCid != nil {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TokenConfigCid),
+		}
+	} else {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 

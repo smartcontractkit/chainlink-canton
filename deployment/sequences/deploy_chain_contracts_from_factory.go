@@ -97,9 +97,9 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure TokenAdminRegistry instance ID: %w", err)
 		}
 		tokenAdminRegistryTemplate := tokenadminregistry.TokenAdminRegistry{
-			InstanceId:   types.TEXT(tokenAdminRegistryInstanceID),
-			Owner:        ownerParty,
-			TokenConfigs: nil,
+			InstanceId: types.TEXT(tokenAdminRegistryInstanceID),
+			Owner:      ownerParty,
+			EntryCount: 0,
 		}
 		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, factoryops.DeployTokenAdminRegistry, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployTokenAdminRegistry{Contract: tokenAdminRegistryTemplate}, input.ProposalDriven))
 		if err != nil {

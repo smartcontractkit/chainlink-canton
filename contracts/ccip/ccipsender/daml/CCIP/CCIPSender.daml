@@ -252,10 +252,11 @@ template CCIPSender
                         pure smCid
                     Some tt -> case tokenTransferInput of
                         None -> abort "sender: tokenTransferInput required for token transfer"
-                        Some tokenTransferInput ->
-                            exercise tokenTransferInput.tokenPoolCid
-                            CCIP.Interfaces.TokenPool.TokenPool_VerifyOutboundCCVs with
+                        Some tokenTransferInput -> do
+                            tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
+                            exercise tokenTransferInput.tokenPoolCid CCIP.Interfaces.TokenPool.TokenPool_VerifyOutboundCCVs with
                                 tokenAdminRegistryCid = tokenAdminRegistryCid
+                                tokenConfigCid = tokenConfigCid
                                 extraContext = tokenTransferInput.poolExtraContext
                                 sendingMessageCid = smCid
                                 amount = tt.amount
@@ -275,15 +276,16 @@ template CCIPSender
                         abort "sender: tokenTransferInput provided without token transfer"
                     (Some _, None) ->
                         abort "sender: tokenTransferInput required for token transfer"
-                    (Some tt, Some tokenTransferInput) ->
-                        exercise tokenTransferInput.tokenPoolCid
-                            CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
-                                tokenAdminRegistryCid = tokenAdminRegistryCid
-                                extraContext = tokenTransferInput.poolExtraContext
-                                sendingMessageCid = smCid
-                                feeQuoterCid = feeQuoterCid
-                                tokenInstrumentId = tt.token
-                                caller = owner
+                    (Some tt, Some tokenTransferInput) -> do
+                        tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
+                        exercise tokenTransferInput.tokenPoolCid CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            tokenConfigCid = tokenConfigCid
+                            extraContext = tokenTransferInput.poolExtraContext
+                            sendingMessageCid = smCid
+                            feeQuoterCid = feeQuoterCid
+                            tokenInstrumentId = tt.token
+                            caller = owner
 
                 smCid <- case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> do
@@ -328,16 +330,17 @@ template CCIPSender
                     (Some _, None) ->
                         abort "sender: tokenTransferInput required for token transfer"
                     (Some tt, Some tokenTransferInput) -> do
-                        lockResult <- exercise tokenTransferInput.tokenPoolCid
-                            CCIP.Interfaces.TokenPool.TokenPool_LockOrBurn with
-                                tokenAdminRegistryCid = tokenAdminRegistryCid
-                                rmnRemoteCid = rmnRemoteCid
-                                extraContext = tokenTransferInput.poolExtraContext
-                                sendingMessageCid = smCid
-                                tokenInput = tokenTransferInput.tokenInput
-                                senderInputCids = tokenTransferInput.senderInputCids
-                                amount = tt.amount
-                                caller = owner
+                        tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
+                        lockResult <- exercise tokenTransferInput.tokenPoolCid CCIP.Interfaces.TokenPool.TokenPool_LockOrBurn with
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            tokenConfigCid = tokenConfigCid
+                            rmnRemoteCid = rmnRemoteCid
+                            extraContext = tokenTransferInput.poolExtraContext
+                            sendingMessageCid = smCid
+                            tokenInput = tokenTransferInput.tokenInput
+                            senderInputCids = tokenTransferInput.senderInputCids
+                            amount = tt.amount
+                            caller = owner
                         pure lockResult.sendingMessageCid
 
                 smCid <- foldlA (\cid input -> do

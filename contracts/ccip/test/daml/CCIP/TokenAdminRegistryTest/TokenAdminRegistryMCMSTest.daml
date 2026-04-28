@@ -1,25 +1,64 @@
--- | MCMS entrypoint tests for TokenAdminRegistry
--- Tests the MCMSReceiver interface implementation by calling mcmsEntrypoint directly
+-- | MCMS entrypoint tests for TokenAdminRegistry.
 module CCIP.TokenAdminRegistryTest.TokenAdminRegistryMCMSTest where
 
 import Daml.Script
 import DA.Assert ((===))
 import DA.Map qualified as Map
-import DA.Optional (isSome)
+import DA.Optional (fromSomeNote)
 
 import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
-import qualified CCIP.MessageCodecV1
 import CCIP.TokenAdminRegistry
 import CCIP.TokenAdminRegistryCodecGen (encodeSetPoolParams, encodeProposeAdminParams, encodeTransferAdminParams, encodeAcceptAdminParams)
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
 
--- ===========================================================================
--- MCMS ENTRYPOINT TESTS - SET POOL
--- ===========================================================================
+toAnyContractId : ContractId a -> ContractId ()
+toAnyContractId = coerceContractId
 
--- | Test MCMSReceiver entrypoint for SetPool function
+tokenConfigAddr : Party -> Splice.Api.Token.HoldingV1.InstrumentId -> Text
+tokenConfigAddr owner instrumentId = RawInstanceAddress.makeText (tokenConfigInstanceId instrumentId) owner
+
+createRegistryAndConfig
+    : Party
+    -> Text
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> Optional Party
+    -> Optional Party
+    -> Optional PoolRegistration
+    -> Script (ContractId TokenAdminRegistry, ContractId TokenConfig)
+createRegistryAndConfig owner instanceId instrumentId admin pendingAdmin tokenPool = do
+  tarCid <- submit owner do
+    createCmd TokenAdminRegistry with
+      instanceId
+      owner
+      entryCount = 1
+
+  configCid <- submit owner do
+    createCmd TokenConfig with
+      instanceId = tokenConfigInstanceId instrumentId
+      registryInstanceId = instanceId
+      registryOwner = owner
+      index = 0
+      isCCIPManaged = False
+      instrumentId
+      admin
+      pendingAdmin
+      tokenPool
+
+  pure (tarCid, configCid)
+
+mcmsIds : Party -> Text -> Splice.Api.Token.HoldingV1.InstrumentId -> ContractId TokenAdminRegistry -> ContractId TokenConfig -> Map.Map Text (ContractId ())
+mcmsIds owner instanceId instrumentId tarCid configCid =
+  Map.fromList
+    [ (RawInstanceAddress.makeText instanceId owner, toAnyContractId tarCid)
+    , (tokenConfigAddr owner instrumentId, toAnyContractId configCid)
+    ]
+
+lookupContractId : Text -> Map.Map Text (ContractId ()) -> ContractId ()
+lookupContractId address contractIds =
+  fromSomeNote ("missing contract id: " <> address) (Map.lookup address contractIds)
+
 testTokenAdminRegistryMCMSEntrypoint_SetPool : Script ()
 testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
   owner <- allocateParty "ccip_owner"
@@ -28,49 +67,22 @@ testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
 
   let instanceId = "tar-test-instance"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+      poolReg = PoolRegistration poolOwner "pool-v1"
 
-  -- Create TokenAdminRegistry with a token config that has an admin set
-  tarCid <- submit owner do
-    createCmd TokenAdminRegistry with
-      instanceId
-      owner
-      tokenConfigs = Map.fromList [
-        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
-        ]
-
-  let instAddr = RawInstanceAddress.makeText instanceId owner
+  (tarCid, configCid0) <- createRegistryAndConfig owner instanceId instrumentId (Some owner) None None
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-
-  -- Encode SetPool params
-  let poolReg = PoolRegistration poolOwner "pool-v1"
       encoded = encodeSetPoolParams (SetPoolParams with instrumentId, tokenPool = Some poolReg)
 
-  -- Call mcmsEntrypoint directly via MCMSReceiver interface
   newContractIds <- submit owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "SetPool"
       operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
+      contractIds = mcmsIds owner instanceId instrumentId tarCid configCid0
 
-  -- Verify state changed
-  contracts <- query @TokenAdminRegistry owner
-  case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
-    [(_, tar)] -> do
-      case Map.lookup encodedInstrumentId tar.tokenConfigs of
-        None -> abort "Expected token config"
-        Some config -> do
-          isSome config.tokenPool === True
-          case config.tokenPool of
-            None -> abort "Expected pool to be set"
-            Some pool -> do
-              pool.poolOwner === poolOwner
-              pool.poolInstanceId === "pool-v1"
-    _ -> abort "Expected exactly one TokenAdminRegistry contract"
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr owner instrumentId) newContractIds) : ContractId TokenConfig
+  Some config <- queryContractId owner configCid1
+  config.tokenPool === Some poolReg
 
-  pure ()
-
--- | Test MCMSReceiver entrypoint for SetPool to remove pool (None)
 testTokenAdminRegistryMCMSEntrypoint_SetPoolNone : Script ()
 testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
   owner <- allocateParty "ccip_owner"
@@ -79,47 +91,22 @@ testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
 
   let instanceId = "tar-test-instance"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
       existingPool = PoolRegistration poolOwner "old-pool"
 
-  -- Create TokenAdminRegistry with existing pool
-  tarCid <- submit owner do
-    createCmd TokenAdminRegistry with
-      instanceId
-      owner
-      tokenConfigs = Map.fromList [
-        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None (Some existingPool))
-        ]
-
-  let instAddr = RawInstanceAddress.makeText instanceId owner
+  (tarCid, configCid0) <- createRegistryAndConfig owner instanceId instrumentId (Some owner) None (Some existingPool)
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
+      encoded = encodeSetPoolParams (SetPoolParams with instrumentId, tokenPool = None)
 
-  -- Encode SetPool params with None (remove pool)
-  let encoded = encodeSetPoolParams (SetPoolParams with instrumentId, tokenPool = None)
-
-  -- Call mcmsEntrypoint
   newContractIds <- submit owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "SetPool"
       operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
+      contractIds = mcmsIds owner instanceId instrumentId tarCid configCid0
 
-  -- Verify pool was removed
-  contracts <- query @TokenAdminRegistry owner
-  case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
-    [(_, tar)] ->
-      case Map.lookup encodedInstrumentId tar.tokenConfigs of
-        None -> abort "Expected token config"
-        Some config -> config.tokenPool === None
-    _ -> abort "Expected exactly one TokenAdminRegistry contract"
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr owner instrumentId) newContractIds) : ContractId TokenConfig
+  Some config <- queryContractId owner configCid1
+  config.tokenPool === None
 
-  pure ()
-
--- ===========================================================================
--- MCMS ENTRYPOINT TESTS - PROPOSE ADMINISTRATOR
--- ===========================================================================
-
--- | Test MCMSReceiver entrypoint for ProposeAdministrator function
 testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator : Script ()
 testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
   owner <- allocateParty "ccip_owner"
@@ -128,47 +115,32 @@ testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
 
   let instanceId = "tar-propose-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
-      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+      instAddr = RawInstanceAddress.makeText instanceId owner
 
-  -- Create TokenAdminRegistry with no config for this instrument
   tarCid <- submit owner do
     createCmd TokenAdminRegistry with
       instanceId
       owner
-      tokenConfigs = Map.empty
+      entryCount = 0
 
-  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
+      encoded = encodeProposeAdminParams (ProposeAdminParams with instrumentId, newAdmin)
 
-  -- Encode ProposeAdministrator params
-  let params = ProposeAdminParams with instrumentId, newAdmin
-      encoded = encodeProposeAdminParams params
-
-  -- Call mcmsEntrypoint
   newContractIds <- submit owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "ProposeAdministrator"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
 
-  -- Verify pendingAdmin was set
-  contracts <- query @TokenAdminRegistry owner
-  case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
-    [(_, tar)] ->
-      case Map.lookup encodedInstrumentId tar.tokenConfigs of
-        None -> abort "Expected token config to be created"
-        Some config -> do
-          config.admin === None
-          config.pendingAdmin === Some newAdmin
-    _ -> abort "Expected exactly one TokenAdminRegistry contract"
+  let newTarCid = coerceContractId (lookupContractId instAddr newContractIds) : ContractId TokenAdminRegistry
+      configCid = coerceContractId (lookupContractId (tokenConfigAddr owner instrumentId) newContractIds) : ContractId TokenConfig
+  Some tar <- queryContractId owner newTarCid
+  tar.entryCount === 1
+  Some config <- queryContractId owner configCid
+  config.admin === None
+  config.pendingAdmin === Some newAdmin
+  config.isCCIPManaged === True
 
-  pure ()
-
--- ===========================================================================
--- MCMS ENTRYPOINT TESTS - TRANSFER ADMIN ROLE
--- ===========================================================================
-
--- | Test MCMSReceiver entrypoint for TransferAdminRole function
 testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole : Script ()
 testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
   owner <- allocateParty "ccip_owner"
@@ -177,49 +149,22 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
 
   let instanceId = "tar-transfer-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "WETH"
-      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
-  -- Create TokenAdminRegistry with admin set to owner
-  tarCid <- submit owner do
-    createCmd TokenAdminRegistry with
-      instanceId
-      owner
-      tokenConfigs = Map.fromList [
-        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
-        ]
-
-  let instAddr = RawInstanceAddress.makeText instanceId owner
+  (tarCid, configCid0) <- createRegistryAndConfig owner instanceId instrumentId (Some owner) None None
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
+      encoded = encodeTransferAdminParams (TransferAdminParams with instrumentId, newAdmin)
 
-  -- Encode TransferAdminRole params
-  let params = TransferAdminParams with instrumentId, newAdmin
-      encoded = encodeTransferAdminParams params
-
-  -- Call mcmsEntrypoint
   newContractIds <- submit owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "TransferAdminRole"
       operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
+      contractIds = mcmsIds owner instanceId instrumentId tarCid configCid0
 
-  -- Verify transfer creates a pending admin and leaves current admin unchanged
-  contracts <- query @TokenAdminRegistry owner
-  case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
-    [(_, tar)] ->
-      case Map.lookup encodedInstrumentId tar.tokenConfigs of
-        None -> abort "Expected token config"
-        Some config -> do
-          config.admin === Some owner
-          config.pendingAdmin === Some newAdmin
-    _ -> abort "Expected exactly one TokenAdminRegistry contract"
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr owner instrumentId) newContractIds) : ContractId TokenConfig
+  Some config <- queryContractId owner configCid1
+  config.admin === Some owner
+  config.pendingAdmin === Some newAdmin
 
-  pure ()
-
--- ===========================================================================
--- MCMS ENTRYPOINT TESTS - ACCEPT ADMIN ROLE
--- ===========================================================================
-
--- | Test MCMSReceiver entrypoint for AcceptAdminRole function
 testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole : Script ()
 testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
   owner <- allocateParty "ccip_owner"
@@ -227,128 +172,71 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
 
   let instanceId = "tar-accept-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "DAI"
-      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
-  -- Create TokenAdminRegistry with pending admin set to owner
-  tarCid <- submit owner do
-    createCmd TokenAdminRegistry with
-      instanceId
-      owner
-      tokenConfigs = Map.fromList [
-        (encodedInstrumentId, TokenConfig instrumentId None (Some owner) None)
-        ]
-
-  let instAddr = RawInstanceAddress.makeText instanceId owner
+  (tarCid, configCid0) <- createRegistryAndConfig owner instanceId instrumentId None (Some owner) None
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
+      encoded = encodeAcceptAdminParams (AcceptAdminParams with instrumentId)
 
-  -- Encode AcceptAdminRole params
-  let params = AcceptAdminParams with instrumentId
-      encoded = encodeAcceptAdminParams params
-
-  -- Call mcmsEntrypoint
   newContractIds <- submit owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "AcceptAdminRole"
       operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
+      contractIds = mcmsIds owner instanceId instrumentId tarCid configCid0
 
-  -- Verify admin was accepted
-  contracts <- query @TokenAdminRegistry owner
-  case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
-    [(_, tar)] ->
-      case Map.lookup encodedInstrumentId tar.tokenConfigs of
-        None -> abort "Expected token config"
-        Some config -> do
-          config.admin === Some owner
-          config.pendingAdmin === None
-    _ -> abort "Expected exactly one TokenAdminRegistry contract"
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr owner instrumentId) newContractIds) : ContractId TokenConfig
+  Some config <- queryContractId owner configCid1
+  config.admin === Some owner
+  config.pendingAdmin === None
 
-  pure ()
-
--- ===========================================================================
--- ERROR CASE TESTS
--- ===========================================================================
-
--- | Test that unknown function name returns E_UNKNOWN_FUNCTION
 testTokenAdminRegistryMCMSEntrypoint_UnknownFunction : Script ()
 testTokenAdminRegistryMCMSEntrypoint_UnknownFunction = script do
   owner <- allocateParty "ccip_owner"
-
   let instanceId = "tar-error-test"
-
   tarCid <- submit owner do
     createCmd TokenAdminRegistry with
       instanceId
       owner
-      tokenConfigs = Map.empty
-
+      entryCount = 0
   let instAddr = RawInstanceAddress.makeText instanceId owner
-  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-
-  -- Call with unknown function name - should fail
+      targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
   submitMustFail owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "NonExistentFunction"
       operationData = ""
       contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
 
-  pure ()
-
--- | Test that invalid params returns E_INVALID_PARAMS
 testTokenAdminRegistryMCMSEntrypoint_InvalidParams : Script ()
 testTokenAdminRegistryMCMSEntrypoint_InvalidParams = script do
   owner <- allocateParty "ccip_owner"
-
   let instanceId = "tar-invalid-test"
-
   tarCid <- submit owner do
     createCmd TokenAdminRegistry with
       instanceId
       owner
-      tokenConfigs = Map.empty
-
+      entryCount = 0
   let instAddr = RawInstanceAddress.makeText instanceId owner
-  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-
-  -- Call with invalid/truncated operationData - should fail
+      targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
   submitMustFail owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "SetPool"
-      operationData = "00"  -- Too short to decode
+      operationData = "00"
       contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
 
-  pure ()
-
--- | Test that missing self CID returns E_SELF_CID_NOT_IN_MAP
 testTokenAdminRegistryMCMSEntrypoint_MissingSelfCid : Script ()
 testTokenAdminRegistryMCMSEntrypoint_MissingSelfCid = script do
   owner <- allocateParty "ccip_owner"
   tokenAdmin <- allocateParty "TokenAdmin"
-
   let instanceId = "tar-missing-cid-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TEST"
-
   tarCid <- submit owner do
     createCmd TokenAdminRegistry with
       instanceId
       owner
-      tokenConfigs = Map.empty
-
+      entryCount = 0
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-
-  -- Encode valid params
-  let params = AcceptAdminParams with instrumentId
-      encoded = encodeAcceptAdminParams params
-
-  -- Call with empty contractIds map - should fail
+      encoded = encodeAcceptAdminParams (AcceptAdminParams with instrumentId)
   submitMustFail owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "AcceptAdminRole"
       operationData = encoded
-      contractIds = Map.empty  -- Missing self CID
-
-  pure ()
-
--- Helper to convert ContractId to AnyContractId for the map
-toAnyContractId : ContractId a -> ContractId ()
-toAnyContractId = coerceContractId
+      contractIds = Map.empty

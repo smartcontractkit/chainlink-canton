@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "a3a854e5d34967bd308352f4e637a82738de34c517db1a4cecb50435765fed5b"
+	PackageID   = "399c69418e4967f1a07eb30ca9e76fc251cd44811add6504e901cf148e7e5f1a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -36,6 +36,12 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+
+const (
+	OnRampKey               = types.TEXT("on-ramp")
+	NoExecutionAddressBytes = types.TEXT("eba517d200000000000000000000000000000000000000000000000000000000")
+	MessageStaticSize       = types.INT64(69)
+)
 
 func argsToMap(args any) map[string]any {
 	if args == nil {
@@ -58,13 +64,14 @@ func argsToMap(args any) map[string]any {
 
 // CCIPSendFromRouter is a Record type
 type CCIPSendFromRouter struct {
-	RouterPartyOwner      types.PARTY       `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT        `json:"routerInstanceId"`
-	CurrentSequenceNumber types.NUMERIC     `json:"currentSequenceNumber"`
-	RmnRemoteCid          types.CONTRACT_ID `json:"rmnRemoteCid"`
-	GlobalConfigCid       types.CONTRACT_ID `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	SendingMessageCid     types.CONTRACT_ID `json:"sendingMessageCid"`
+	RouterPartyOwner      types.PARTY        `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT         `json:"routerInstanceId"`
+	CurrentSequenceNumber types.NUMERIC      `json:"currentSequenceNumber"`
+	RmnRemoteCid          types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	GlobalConfigCid       types.CONTRACT_ID  `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        *types.CONTRACT_ID `json:"tokenConfigCid" hex:"optional"`
+	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
 }
 
 // ToMap converts CCIPSendFromRouter to a map for DAML arguments
@@ -82,6 +89,18 @@ func (t CCIPSendFromRouter) ToMap() map[string]any {
 	m["globalConfigCid"] = model.NestedToDAMLValue(t.GlobalConfigCid)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	if t.TokenConfigCid != nil {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TokenConfigCid),
+		}
+	} else {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 

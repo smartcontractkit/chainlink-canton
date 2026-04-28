@@ -219,13 +219,6 @@ func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.Private
 	return result.Bytes(), nil
 }
 
-// EncodePartyID encodes a Canton party ID as a 32-byte keccak256 address.
-// Matches Daml encodePartyAddress: keccak256(toHex(partyToText party)),
-// which is equivalent to keccak256(partyBytes) since keccak256 hex-decodes its input.
-func EncodePartyID(partyID string) []byte {
-	return crypto.Keccak256([]byte(partyID))
-}
-
 // hexToBytes decodes a hex string to raw bytes. Panics on invalid hex.
 func hexToBytes(s string) []byte {
 	b, err := hex.DecodeString(s)
@@ -234,13 +227,6 @@ func hexToBytes(s string) []byte {
 	}
 
 	return b
-}
-
-// rawInstanceAddress wraps a text value as a Daml RawInstanceAddress newtype for the gRPC API.
-func rawInstanceAddress(text string) *apiv2.Value {
-	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: text}}},
-	}}}}
 }
 
 // TestCCIPExecuteE2E tests the full execute flow without token transfers.
@@ -252,6 +238,12 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	ccipParticipant := env.Chain.Participants[0]
 	receiverParticipant := env.Chain.Participants[1]
+
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		testhelpers.ContractCleanup(t, ctx, env.Chain.Participants)
+	})
 
 	// Upload DARs
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
@@ -395,7 +387,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		},
 	})
 	require.NoErrorf(t, err, "Failed to deploy CCIP contracts: %v", err)
-
 	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
 	cldfEnv.DataStore = out.DataStore.Seal()
@@ -407,22 +398,74 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	}
 
 	// Resolve contracts
-	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(global_config.ContractType), global_config.Version, ""))
+	globalConfigRef, globalConfigAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_config.ContractType, global_config.Version, "")
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
+	_, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
 	require.NoError(t, err, "failed to get FeeQuoter address")
-	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(onramp.ContractType), onramp.Version, ""))
+	_, onRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), onramp.ContractType, onramp.Version, "")
 	require.NoError(t, err, "failed to get OnRamp address")
-	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(offramp.ContractType), offramp.Version, ""))
+	_, offRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), offramp.ContractType, offramp.Version, "")
 	require.NoError(t, err, "failed to get OffRamp address")
-	committeeVerifier, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
+	committeeVerifierRef, committeeVerifierAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), committee_verifier.ContractType, committee_verifier.Version, ccvQualifier)
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
-	tokenAdminRegistry, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(token_admin_registry.ContractType), token_admin_registry.Version, ""))
+	_, tokenAdminRegistryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), token_admin_registry.ContractType, token_admin_registry.Version, "")
 	require.NoError(t, err, "failed to get TokenAdminRegistry address")
-	rmnRemote, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	_, rmnRemoteAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), rmn_remote.ContractType, rmn_remote.Version, "")
 	require.NoError(t, err, "failed to get RMNRemote address")
-	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
+	_, perPartyRouterFactoryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), per_party_router_factory.ContractType, per_party_router_factory.Version, "")
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+
+	// Deploy and configure lane
+	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
+	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
+	require.Truef(t, ok, "failed to get Canton Lane adapter")
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsDest(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
+		Source: &lanes.ChainDefinition{
+			Selector: remoteSelector,
+			OnRamp:   hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+			OffRamp:  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+		},
+		Dest: &lanes.ChainDefinition{
+			Selector: env.Chain.ChainSelector(),
+			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+				{
+					CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
+					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+						remoteSelector: {
+							AllowlistEnabled:          false,
+							AddedAllowlistedSenders:   nil,
+							RemovedAllowlistedSenders: nil,
+							FeeUSDCents:               50,
+							GasForVerification:        50_000,
+							PayloadSizeBytes:          6*64 + 2*32,
+							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+								Signers:   ccvSignerPubKeys,
+								Threshold: 2,
+							},
+						},
+					},
+				},
+			},
+			LaneMandatedInboundCCVs: []datastore.AddressRef{committeeVerifierRef},
+			DefaultInboundCCVs:      nil,
+			CantonLaneConfig: &lanes.CantonLaneConfig{
+				GlobalConfig: globalConfigRef,
+			},
+		},
+		IsDisabled:   false,
+		TestRouter:   false,
+		ExtraConfigs: lanes.ExtraConfigs{},
+	})
+	require.NoErrorf(t, err, "Failed to configure chain for lanes")
+	runningDs := datastore.NewMemoryDataStore()
+	for _, address := range deployLaneLegReport.Output.Addresses {
+		err = runningDs.Addresses().Add(address)
+		require.NoErrorf(t, err, "Failed to add address %s", address.Address)
+	}
+	err = runningDs.Merge(cldfEnv.DataStore)
+	require.NoErrorf(t, err, "Failed to merge datastore")
+	cldfEnv.DataStore = runningDs.Seal()
+	t.Log("Configured chain for lanes")
 
 	// Run EDS
 	edsParticipant := env.Chain.Participants[0]
@@ -449,31 +492,31 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				Enabled: true,
 				PerPartyRouterFactory: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
+					InstanceAddress: perPartyRouterFactoryAddress.InstanceAddress(),
 				},
 				OnRamp: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(onRamp.Address),
+					InstanceAddress: onRampAddress.InstanceAddress(),
 				},
 				OffRamp: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(offRamp.Address),
+					InstanceAddress: offRampAddress.InstanceAddress(),
 				},
 				GlobalConfig: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(globalConfig.Address),
+					InstanceAddress: globalConfigAddress.InstanceAddress(),
 				},
 				TokenAdminRegistry: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
+					InstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 				},
 				RMNRemote: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
+					InstanceAddress: rmnRemoteAddress.InstanceAddress(),
 				},
 				FeeQuoter: config.ContractIdentifier{
 					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
+					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
@@ -482,7 +525,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					{
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
-							InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+							InstanceAddress: committeeVerifierAddress.InstanceAddress(),
 						},
 					},
 				},
@@ -501,58 +544,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err, "Failed to create CCIP API client")
 	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create CCV API client")
-
-	// Deploy and configure lane
-	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
-	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
-	require.Truef(t, ok, "failed to get Canton Lane adapter")
-	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsDest(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
-		Source: &lanes.ChainDefinition{
-			Selector: remoteSelector,
-			OnRamp:   hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
-			OffRamp:  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
-		},
-		Dest: &lanes.ChainDefinition{
-			Selector: env.Chain.ChainSelector(),
-			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-				{
-					CommitteeVerifier: []datastore.AddressRef{committeeVerifier},
-					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						remoteSelector: {
-							AllowlistEnabled:          false,
-							AddedAllowlistedSenders:   nil,
-							RemovedAllowlistedSenders: nil,
-							FeeUSDCents:               50,
-							GasForVerification:        50_000,
-							PayloadSizeBytes:          6*64 + 2*32,
-							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
-								Signers:   ccvSignerPubKeys,
-								Threshold: 2,
-							},
-						},
-					},
-				},
-			},
-			LaneMandatedInboundCCVs: []datastore.AddressRef{committeeVerifier},
-			DefaultInboundCCVs:      nil,
-			CantonLaneConfig: &lanes.CantonLaneConfig{
-				GlobalConfig: globalConfig,
-			},
-		},
-		IsDisabled:   false,
-		TestRouter:   false,
-		ExtraConfigs: lanes.ExtraConfigs{},
-	})
-	require.NoErrorf(t, err, "Failed to configure chain for lanes")
-	runningDs := datastore.NewMemoryDataStore()
-	for _, address := range deployLaneLegReport.Output.Addresses {
-		err = runningDs.Addresses().Add(address)
-		require.NoErrorf(t, err, "Failed to add address %s", address.Address)
-	}
-	err = runningDs.Merge(cldfEnv.DataStore)
-	require.NoErrorf(t, err, "Failed to merge datastore")
-	cldfEnv.DataStore = runningDs.Seal()
-	t.Log("Configured chain for lanes")
 
 	// Create PerPartyRouter for receiver
 	perPartyRouterFactoryDisclosure, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosure(t.Context(), ccipAPIClient, partyReceiver)
@@ -589,8 +580,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NotEmpty(t, routerCid)
 	t.Logf("Created PerPartyRouter for receiver: %s", routerCid)
 
-	localOffRampAddress := contracts.HexToInstanceAddress(offRamp.Address).Bytes()
-
 	// Build message (no token transfer, just payload data)
 	testPayload := []byte("Hello CCIP - this is a test message payload!")
 	msg := &MessageV1{
@@ -602,9 +591,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		Finality:            finalityConfigFromBlockConfirmations(2000),
 		CCVAndExecutorHash:  [32]byte{},
 		OnRampAddress:       hexToBytes("000000000000000000000000f6eced5e96fff2de4f0ecd722beb57556fc443fd"), // left-padded to 32 bytes
-		OffRampAddress:      localOffRampAddress,
+		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
-		Receiver:            EncodePartyID(partyReceiver),
+		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
 		DestBlob:            []byte{},
 		TokenTransfer:       nil, // No token transfer
 		MessageData:         testPayload,
@@ -650,7 +639,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// receiver-only; ccip-owned dependencies are only provided via disclosure.
 	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(t.Context(), ccipAPIClient, encodedMessageHex)
 	require.NoError(t, err)
-	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, contracts.HexToInstanceAddress(committeeVerifier.Address))
+	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress())
 	require.NoError(t, err)
 
 	executeArgs := ccipreceiver.Execute2{
@@ -707,4 +696,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Execute completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
+
+	t.Logf("✅ Success")
 }

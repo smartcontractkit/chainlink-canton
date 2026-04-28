@@ -33,6 +33,10 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	GlobalCurseSubject = types.TEXT("01000000000000000000000000000001")
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

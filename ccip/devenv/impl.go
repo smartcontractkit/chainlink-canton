@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -539,7 +539,7 @@ func mintTwoAmuletHoldings(
 	participant canton.Participant,
 	ownerParty string,
 	amount string,
-) (types.CONTRACT_ID, types.CONTRACT_ID, []*ledgerv2.DisclosedContract, error) {
+) (types.CONTRACT_ID, types.CONTRACT_ID, []*apiv2.DisclosedContract, error) {
 	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
 	if err != nil {
 		return "", "", nil, err
@@ -564,7 +564,7 @@ func mintTwoAmuletHoldings(
 		return "", "", nil, fmt.Errorf("get disclosed token holding by id: %w", err)
 	}
 
-	return types.CONTRACT_ID(feeHoldingCID), types.CONTRACT_ID(tokenHoldingCID), []*ledgerv2.DisclosedContract{
+	return types.CONTRACT_ID(feeHoldingCID), types.CONTRACT_ID(tokenHoldingCID), []*apiv2.DisclosedContract{
 		disclosedFeeHolding,
 		disclosedTokenHolding,
 	}, nil
@@ -817,7 +817,7 @@ func (c *Chain) GetTokenBalance(ctx context.Context, address, tokenAddress proto
 		}
 	}
 
-	holdingContracts, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &ledgerv2.Identifier{
+	holdingContracts, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
 		PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
 		ModuleName: "Splice.Api.Token.HoldingV1",
 		EntityName: "Holding",
@@ -940,6 +940,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	// Collect Disclosures
+	hasTokenTransfer := fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 	outgoingMessage := oapiCommon.Message{
 		DestinationChainSelector: strconv.FormatUint(dest, 10),
 		FeeToken: oapiCommon.InstrumentId{
@@ -952,17 +953,22 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}{Type: oapiCommon.Empty}, // Using default Executor
 		Payload:  hex.EncodeToString(fields.Data),
 		Receiver: hex.EncodeToString(fields.Receiver),
-		TokenTransfer: &oapiCommon.TokenTransfer{
-			Amount: nil,
-			Token:  nil,
-		},
+	}
+	if hasTokenTransfer {
+		outgoingMessage.TokenTransfer = &oapiCommon.TokenTransfer{
+			Amount: "0.0000001000",
+			Token: oapiCommon.InstrumentId{
+				Admin: oapiCommon.PartyId(feeTokenInstrument.Admin),
+				Id:    string(feeTokenInstrument.Id),
+			},
+		}
 	}
 	// TODO come up with a better way of doing this
 	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", routerAddress, err)
 	}
-	var disclosedContracts []*ledgerv2.DisclosedContract
+	var disclosedContracts []*apiv2.DisclosedContract
 	sendArgs := ccipsender.Send{
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(dest, 10)),
@@ -1000,7 +1006,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	// Token Pool
 	var tokenPoolRequiredCCVs []string
-	hasTokenTransfer := fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 	if hasTokenTransfer {
 		// TODO - use different instrument?
 		// Mint holding to be used for token transfer
@@ -1022,8 +1027,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Token Pool Send disclosure for token pool at address %s: %w", tokenPoolAddress.String(), err)
 		}
 		sendArgs.Message.TokenTransfer = &ccipclient.TokenTransfer{
-			Token:  feeTokenInstrument,
-			Amount: "0.0000001000",
+			Token: splice_api_token_holding_v1.InstrumentId{
+				Admin: types.PARTY(outgoingMessage.TokenTransfer.Token.Admin),
+				Id:    types.TEXT(outgoingMessage.TokenTransfer.Token.Id),
+			},
+			Amount: types.NUMERIC(outgoingMessage.TokenTransfer.Amount),
 		}
 		sendArgs.TokenTransferInput = &ccipsender.TokenTransferInput{
 			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
@@ -1108,18 +1116,18 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("execute CCIP Send: %w", err)
 	}
 	c.logger.Info().Str("UpdateID", ccipSendReport.Output.ExecInfo.UpdateID).Msg("CCIP Send executed")
-	update, err := participant.LedgerServices.Update.GetUpdateById(ctx, &ledgerv2.GetUpdateByIdRequest{
+	update, err := participant.LedgerServices.Update.GetUpdateById(ctx, &apiv2.GetUpdateByIdRequest{
 		UpdateId: ccipSendReport.Output.ExecInfo.UpdateID,
-		UpdateFormat: &ledgerv2.UpdateFormat{
-			IncludeTransactions: &ledgerv2.TransactionFormat{
-				TransactionShape: ledgerv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
-				EventFormat: &ledgerv2.EventFormat{
-					FiltersByParty: map[string]*ledgerv2.Filters{
+		UpdateFormat: &apiv2.UpdateFormat{
+			IncludeTransactions: &apiv2.TransactionFormat{
+				TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
+				EventFormat: &apiv2.EventFormat{
+					FiltersByParty: map[string]*apiv2.Filters{
 						participant.PartyID: {
-							Cumulative: []*ledgerv2.CumulativeFilter{
+							Cumulative: []*apiv2.CumulativeFilter{
 								{
-									IdentifierFilter: &ledgerv2.CumulativeFilter_WildcardFilter{
-										WildcardFilter: &ledgerv2.WildcardFilter{
+									IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{
+										WildcardFilter: &apiv2.WildcardFilter{
 											IncludeCreatedEventBlob: false,
 										},
 									},

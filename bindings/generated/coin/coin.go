@@ -36,6 +36,10 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	MintPreapprovalContextKey = types.TEXT("mint-preapproval")
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

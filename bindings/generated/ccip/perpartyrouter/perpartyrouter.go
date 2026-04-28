@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "98c5467c2557e8cd1e20f4db8f0ba74ed157d5644f1dadd496ba25a8b2f021de"
+	PackageID   = "754aa3a3ee7eaad04a5fe0cb277b355ee5d60efa9bd1764dc8a3aba76d483f57"
 	SDKVersion  = "3.4.10"
 )
 
@@ -35,6 +35,10 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+
+const (
+	MaxExecutedMessagesSize = types.INT64(25000)
+)
 
 func argsToMap(args any) map[string]any {
 	if args == nil {
