@@ -9,14 +9,15 @@ import (
 
 	"github.com/BurntSushi/toml"
 	ledgerv2admin "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
+	"github.com/testcontainers/testcontainers-go"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/go-daml/pkg/auth"
-	"github.com/testcontainers/testcontainers-go"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
@@ -119,8 +120,6 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		}
 
 		cantonConfigs.BlockchainInfos[strSelector] = ccip.BlockchainInfo{
-			// TODO: we should get the port number programmatically somehow.
-			// This is the default nginx port for the canton ledger API.
 			GRPCLedgerAPIURL: output.NetworkSpecificData.CantonData.InternalEndpoints.Participants[0].GRPCLedgerAPIURL,
 			Auth: commonconfig.AuthConfig{
 				Type: commonconfig.AuthTypeInsecureStatic,
@@ -133,6 +132,8 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gRPC connection: %w", err)
 		}
+		defer conn.Close() //nolint:revive // defer is used to close the connection after the function returns, and we don't spin up that many chains
+
 		resp, err := ledgerv2admin.NewPartyManagementServiceClient(conn).ListKnownParties(context.Background(), &ledgerv2admin.ListKnownPartiesRequest{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get user: %w", err)

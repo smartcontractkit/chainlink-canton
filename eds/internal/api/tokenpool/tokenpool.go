@@ -16,10 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -31,7 +30,8 @@ import (
 type ContractConfig struct {
 	Type            config.TokenPoolType
 	Owner           types.PARTY
-	FactoryResolver factoryResolver
+	transferFactory transferFactory
+	preapproval     preapprovalFactory
 }
 
 type Server struct {
@@ -67,6 +67,10 @@ func NewServer(
 			PartyID:    tokenPool.PartyID,
 		})
 		s.instrumentHoldingStore.RegisterParty(tokenPool.PoolOwner)
+		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenConfig{}),
+			PartyID:    tokenPool.PartyID,
+		})
 		switch tokenPool.Type {
 		case config.TokenPoolTypeLockRelease:
 			s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
@@ -74,22 +78,29 @@ func NewServer(
 				PartyID:    tokenPool.PartyID,
 			})
 		case config.TokenPoolTypeBurnMint:
-			s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
-				TemplateID: contracts.TemplateIDFromBinding(burnminttokenpool.BurnMintTokenPool{}),
-				PartyID:    tokenPool.PartyID,
-			})
+			fallthrough
 		default:
 			return nil, fmt.Errorf("unsupported token pool type: %s", tokenPool.Type)
 		}
 
-		if resolver := newStaticFactoryResolver(tokenPool.TransferFactoryID, tokenPool.BurnMintFactoryID); resolver != nil {
-			contractConfig.FactoryResolver = resolver
-		} else if tokenPool.TokenStandardURL != nil {
-			resolver, err := getTokenStandardFactoryResolver(ctx, *tokenPool.TokenStandardURL, tokenPool.TokenStandardAuthConfig, contractConfig.Owner)
+		// If the TokenStandardURL is set, this will make this API automatically retrieve the necessary
+		// ContractIds, Context, and disclosures from the instrument's TransferFactory.
+		// If not enabled, users will have to get these information from the TransferFactory API themselves.
+		if tokenPool.TokenStandardURL != nil {
+			getFactoryFunc, err := getTransferFactory(ctx, *tokenPool.TokenStandardURL, tokenPool.TokenStandardAuthConfig, contractConfig.Owner)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get token standard resolver for token pool with address %s: %w", tokenPool.InstanceAddress, err)
+				return nil, fmt.Errorf("failed to get transfer factory for token pool with address %s: %w", tokenPool.InstanceAddress, err)
 			}
-			contractConfig.FactoryResolver = resolver
+			contractConfig.transferFactory = getFactoryFunc
+		}
+
+		// If the TransferPreapproval is configured, this will make the API keep track of and return the given pre-approval
+		if tokenPool.TransferPreapproval != nil {
+			preapprovalFactoryFunc, err := getPreapprovalFactory(activeContractStore, tokenPool.TransferPreapproval.ContextKey, contractConfig.Owner, *tokenPool.TransferPreapproval)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get preapproval factory for token pool with address %s: %w", tokenPool.InstanceAddress, err)
+			}
+			contractConfig.preapproval = preapprovalFactoryFunc
 		}
 
 		s.contractConfigs[tokenPool.InstanceAddress] = contractConfig
@@ -100,7 +111,7 @@ func NewServer(
 
 func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -132,14 +143,18 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 		return
 	}
 
+	// TODO check that the token transfer is for this pool
+
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
-		s.lockReleaseTokenPoolSend(c, cfg, instanceAddress, activeTokenPoolContract, destinationChainSelector)
+		s.lockReleaseTokenPoolSend(c, cfg, instanceAddress, activeTokenPoolContract, destinationChainSelector, req.Message)
+		return
 	case config.TokenPoolTypeBurnMint:
-		s.burnMintTokenPoolSend(c, cfg, instanceAddress, activeTokenPoolContract, destinationChainSelector)
+		fallthrough
 	default:
 		s.logger.Error().Stringer("address", instanceAddress).Msgf("unknown token pool type: %s", cfg.Type)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
 	}
 }
 
@@ -149,6 +164,7 @@ func (s Server) lockReleaseTokenPoolSend(
 	instanceAddress contracts.InstanceAddress,
 	activeTokenPoolContract *apiv2.ActiveContract,
 	destinationChainSelector uint64,
+	_ oapiCommon.Message,
 ) {
 	lockReleaseTokenPool, err := ParseLockReleaseTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
@@ -169,21 +185,57 @@ func (s Server) lockReleaseTokenPoolSend(
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
-	contextValues := map[string]struct {
-		Tag   string `json:"tag"`
-		Value string `json:"value"`
-	}{
-		"rate-limiter": {Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()},
-	}
 
 	requiredCCVs := make([]oapiCommon.RawOrHashedAddress, len(remoteChainConfig.OutboundCCVs))
 	for i, v := range remoteChainConfig.OutboundCCVs {
 		requiredCCVs[i] = converters.RawInstanceAddressAsRawOrHashedAddress(v)
 	}
 
-	factories, err := s.resolveFactories(c, cfg, lockReleaseTokenPool.InstrumentId)
+	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
+	var (
+		transferFactory           string
+		transferContext           common.CCIPContext
+		disclosedFactoryContracts = make([]oapiCommon.DisclosedContract, 0, 2)
+	)
+	if cfg.transferFactory != nil {
+		transferFactory, transferContext, disclosedFactoryContracts, err = cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("transfer factory returned an error")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+	}
+
+	// Get TransferPreapproval (if enabled)
+	if cfg.preapproval != nil {
+		contextKey, activeTransferPreapproval, err := cfg.preapproval(c)
+		if err != nil {
+			s.logger.Err(err).Msg("failed to get transfer preapproval")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+
+		transferContext.Values[contextKey] = common.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(activeTransferPreapproval.GetCreatedEvent().GetContractId())),
+		}
+		disclosedFactoryContracts = append(disclosedFactoryContracts, converters.ActiveContractToDisclosedContract(activeTransferPreapproval))
+	}
+
+	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
+		Values: map[string]common.AnyValue{
+			string(common.RateLimiterKey): {
+				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
+			},
+		},
+	})
 	if err != nil {
-		s.logger.Error().Err(err).Msg("token factory resolver returned an error")
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+	choiceContext, err := converters.SerializeCCIPContext(transferContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize transfer context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -193,102 +245,20 @@ func (s Server) lockReleaseTokenPoolSend(
 		InstanceAddress:    lockReleaseTokenPool.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
-		ContextData: map[string]any{
-			"values": contextValues,
-		},
+		ContextData:        ccipContext,
 		TokenInput: oapiTokenPool.TokenInput{
 			ExtraArgs: struct {
 				Context  map[string]any `json:"context"`
 				Metadata map[string]any `json:"metadata"`
 			}{
-				Context:  factories.ChoiceContext,
+				Context:  choiceContext,
 				Metadata: map[string]any{},
 			},
 			TokenPoolHoldings: nil,
-			TransferFactory:   oapiCommon.ContractId(factories.TransferFactory),
+			TransferFactory:   transferFactory,
 		},
 		DisclosedContracts: append(
-			factories.DisclosedContracts,
-			converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
-			converters.ActiveContractToDisclosedContract(rateLimiter),
-		),
-	}
-
-	c.JSON(http.StatusOK, resp)
-}
-
-func (s Server) burnMintTokenPoolSend(
-	c *gin.Context,
-	cfg ContractConfig,
-	instanceAddress contracts.InstanceAddress,
-	activeTokenPoolContract *apiv2.ActiveContract,
-	destinationChainSelector uint64,
-) {
-	burnMintTokenPool, err := ParseBurnMintTokenPool(activeTokenPoolContract.CreatedEvent)
-	if err != nil {
-		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse burn/mint token pool contract")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-
-	remoteChainConfig, ok := burnMintTokenPool.RemoteChainConfigs[destinationChainSelector]
-	if !ok {
-		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("unsupported destination chain selector: %v", destinationChainSelector)})
-		return
-	}
-
-	rateLimiter, ok := s.activeContractStore.Get(remoteChainConfig.OutboundRateLimiter)
-	if !ok {
-		s.logger.Error().Uint64("destinationChainSelector", destinationChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("outbound active rate limiter not found")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	contextValues := map[string]struct {
-		Tag   string `json:"tag"`
-		Value string `json:"value"`
-	}{
-		"rate-limiter": {Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()},
-	}
-
-	requiredCCVs := make([]oapiCommon.RawOrHashedAddress, len(remoteChainConfig.OutboundCCVs))
-	for i, v := range remoteChainConfig.OutboundCCVs {
-		requiredCCVs[i] = converters.RawInstanceAddressAsRawOrHashedAddress(v)
-	}
-
-	factories, err := s.resolveFactories(c, cfg, burnMintTokenPool.InstrumentId)
-	if err != nil {
-		s.logger.Error().Err(err).Msg("token factory resolver returned an error")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	if factories.BurnMintFactory == nil || *factories.BurnMintFactory == "" {
-		s.logger.Error().Stringer("address", instanceAddress).Msg("burn/mint token pool is missing burn/mint factory configuration")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "burn/mint factory not configured"})
-		return
-	}
-
-	resp := &oapiTokenPool.TokenPoolSendResponse{
-		ContractId:         activeTokenPoolContract.GetCreatedEvent().GetContractId(),
-		InstanceAddress:    burnMintTokenPool.Address.InstanceAddress().Hex(),
-		RawInstanceAddress: burnMintTokenPool.Address.String(),
-		RequiredCCVs:       requiredCCVs,
-		ContextData: map[string]any{
-			"values": contextValues,
-		},
-		TokenInput: oapiTokenPool.TokenInput{
-			ExtraArgs: struct {
-				Context  map[string]any `json:"context"`
-				Metadata map[string]any `json:"metadata"`
-			}{
-				Context:  factories.ChoiceContext,
-				Metadata: map[string]any{},
-			},
-			TokenPoolHoldings: nil,
-			TransferFactory:   oapiCommon.ContractId(factories.TransferFactory),
-			BurnMintFactory:   toOAPIContractID(factories.BurnMintFactory),
-		},
-		DisclosedContracts: append(
-			factories.DisclosedContracts,
+			disclosedFactoryContracts,
 			converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
 			converters.ActiveContractToDisclosedContract(rateLimiter),
 		),
@@ -299,7 +269,7 @@ func (s Server) burnMintTokenPoolSend(
 
 func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolExecuteRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -320,6 +290,7 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 		return
 	}
 
+	// Parse the encoded message
 	messageBytes, err := hex.DecodeString(strings.TrimPrefix(req.EncodedMessage, "0x"))
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("invalid encoded message: %s", err.Error())})
@@ -337,14 +308,18 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 		return
 	}
 
+	// TODO check that the Token Transfer is for this pool
+
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
 		s.lockReleaseTokenPoolExecute(c, cfg, instanceAddress, activeTokenPoolContract, sourceChainSelector, message)
+		return
 	case config.TokenPoolTypeBurnMint:
-		s.burnMintTokenPoolExecute(c, cfg, instanceAddress, activeTokenPoolContract, sourceChainSelector, message)
+		fallthrough
 	default:
 		s.logger.Error().Stringer("address", instanceAddress).Msgf("unknown token pool type: %s", cfg.Type)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
 	}
 }
 
@@ -369,9 +344,30 @@ func (s Server) lockReleaseTokenPoolExecute(
 		return
 	}
 
-	contextValues, rateLimiter, ok := s.getInboundRateLimiterContext(c, instanceAddress, sourceChainSelector, remoteChainConfig, message)
-	if !ok {
-		return
+	ccipContext := common.CCIPContext{
+		Values: map[string]common.AnyValue{},
+	}
+	var rateLimiter *apiv2.ActiveContract
+	if message.Finality == protocol.FinalityWaitForFinality {
+		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
+		if !ok {
+			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("inbound active rate limiter not found")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+		ccipContext.Values[string(common.RateLimiterKey)] = common.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
+		}
+	} else {
+		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
+		if !ok {
+			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("custom inbound active rate limiter not found")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+		ccipContext.Values[string(common.RateLimiterKey)] = common.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
+		}
 	}
 
 	requiredCCVs := make([]oapiCommon.RawOrHashedAddress, len(remoteChainConfig.InboundCCVs))
@@ -392,9 +388,30 @@ func (s Server) lockReleaseTokenPoolExecute(
 		disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
 	}
 
-	factories, err := s.resolveFactories(c, cfg, lockReleaseTokenPool.InstrumentId)
+	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
+	var (
+		transferFactory           string
+		transferContext           common.CCIPContext
+		disclosedFactoryContracts []oapiCommon.DisclosedContract
+	)
+	if cfg.transferFactory != nil {
+		transferFactory, transferContext, disclosedFactoryContracts, err = cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("transfer factory returned an error")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+	}
+
+	contextData, err := converters.SerializeCCIPContext(ccipContext)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("token factory resolver returned an error")
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+	choiceContext, err := converters.SerializeCCIPContext(transferContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize transfer context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -404,23 +421,21 @@ func (s Server) lockReleaseTokenPoolExecute(
 		InstanceAddress:    lockReleaseTokenPool.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
-		ContextData: map[string]any{
-			"values": contextValues,
-		},
+		ContextData:        contextData,
 		TokenInput: oapiTokenPool.TokenInput{
 			TokenPoolHoldings: tokenPoolHoldings,
 			ExtraArgs: struct {
 				Context  map[string]any `json:"context"`
 				Metadata map[string]any `json:"metadata"`
 			}{
-				Context:  factories.ChoiceContext,
+				Context:  choiceContext,
 				Metadata: map[string]any{},
 			},
-			TransferFactory: oapiCommon.ContractId(factories.TransferFactory),
+			TransferFactory: transferFactory,
 		},
 		DisclosedContracts: slices.Concat(
 			disclosedHoldings,
-			factories.DisclosedContracts,
+			disclosedFactoryContracts,
 			[]oapiCommon.DisclosedContract{
 				converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
 				converters.ActiveContractToDisclosedContract(rateLimiter),
@@ -429,152 +444,4 @@ func (s Server) lockReleaseTokenPoolExecute(
 	}
 
 	c.JSON(http.StatusOK, resp)
-}
-
-func (s Server) burnMintTokenPoolExecute(
-	c *gin.Context,
-	cfg ContractConfig,
-	instanceAddress contracts.InstanceAddress,
-	activeTokenPoolContract *apiv2.ActiveContract,
-	sourceChainSelector uint64,
-	message *protocol.Message,
-) {
-	burnMintTokenPool, err := ParseBurnMintTokenPool(activeTokenPoolContract.CreatedEvent)
-	if err != nil {
-		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse burn/mint token pool contract")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-
-	remoteChainConfig, ok := burnMintTokenPool.RemoteChainConfigs[sourceChainSelector]
-	if !ok {
-		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("unsupported source chain selector: %v", sourceChainSelector)})
-		return
-	}
-
-	contextValues, rateLimiter, ok := s.getInboundRateLimiterContext(c, instanceAddress, sourceChainSelector, remoteChainConfig, message)
-	if !ok {
-		return
-	}
-
-	requiredCCVs := make([]oapiCommon.RawOrHashedAddress, len(remoteChainConfig.InboundCCVs))
-	for i, v := range remoteChainConfig.InboundCCVs {
-		requiredCCVs[i] = converters.RawInstanceAddressAsRawOrHashedAddress(v)
-	}
-
-	factories, err := s.resolveFactories(c, cfg, burnMintTokenPool.InstrumentId)
-	if err != nil {
-		s.logger.Error().Err(err).Msg("token factory resolver returned an error")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	if factories.BurnMintFactory == nil || *factories.BurnMintFactory == "" {
-		s.logger.Error().Stringer("address", instanceAddress).Msg("burn/mint token pool is missing burn/mint factory configuration")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "burn/mint factory not configured"})
-		return
-	}
-
-	resp := &oapiTokenPool.TokenPoolExecuteResponse{
-		ContractId:         activeTokenPoolContract.GetCreatedEvent().GetContractId(),
-		InstanceAddress:    burnMintTokenPool.Address.InstanceAddress().Hex(),
-		RawInstanceAddress: burnMintTokenPool.Address.String(),
-		RequiredCCVs:       requiredCCVs,
-		ContextData: map[string]any{
-			"values": contextValues,
-		},
-		TokenInput: oapiTokenPool.TokenInput{
-			TokenPoolHoldings: nil,
-			ExtraArgs: struct {
-				Context  map[string]any `json:"context"`
-				Metadata map[string]any `json:"metadata"`
-			}{
-				Context:  factories.ChoiceContext,
-				Metadata: map[string]any{},
-			},
-			TransferFactory: oapiCommon.ContractId(factories.TransferFactory),
-			BurnMintFactory: toOAPIContractID(factories.BurnMintFactory),
-		},
-		DisclosedContracts: append(
-			factories.DisclosedContracts,
-			converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
-			converters.ActiveContractToDisclosedContract(rateLimiter),
-		),
-	}
-
-	c.JSON(http.StatusOK, resp)
-}
-
-func (s Server) resolveFactories(
-	ctx context.Context,
-	cfg ContractConfig,
-	instrumentId splice_api_token_holding_v1.InstrumentId,
-) (tokenFactories, error) {
-	if cfg.FactoryResolver == nil {
-		return tokenFactories{
-			ChoiceContext:      map[string]any{"values": map[string]any{}},
-			DisclosedContracts: nil,
-		}, nil
-	}
-
-	factories, err := cfg.FactoryResolver(ctx, instrumentId)
-	if err != nil {
-		return tokenFactories{}, err
-	}
-	if factories.ChoiceContext == nil {
-		factories.ChoiceContext = map[string]any{"values": map[string]any{}}
-	}
-
-	return factories, nil
-}
-
-func (s Server) getInboundRateLimiterContext(
-	c *gin.Context,
-	instanceAddress contracts.InstanceAddress,
-	sourceChainSelector uint64,
-	remoteChainConfig RemoteChainConfig,
-	message *protocol.Message,
-) (map[string]struct {
-	Tag   string `json:"tag"`
-	Value string `json:"value"`
-}, *apiv2.ActiveContract, bool) {
-	contextValues := make(map[string]struct {
-		Tag   string `json:"tag"`
-		Value string `json:"value"`
-	})
-	var rateLimiter *apiv2.ActiveContract
-	var ok bool
-	if message.Finality == protocol.FinalityWaitForFinality {
-		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
-		if !ok {
-			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("inbound active rate limiter not found")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-			return nil, nil, false
-		}
-		contextValues["inbound-rate-limiter"] = struct {
-			Tag   string `json:"tag"`
-			Value string `json:"value"`
-		}{Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()}
-	} else {
-		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
-		if !ok {
-			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("custom inbound active rate limiter not found")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-			return nil, nil, false
-		}
-		contextValues["inbound-custom-block-confirmations-rate-limiter"] = struct {
-			Tag   string `json:"tag"`
-			Value string `json:"value"`
-		}{Tag: "AV_ContractId", Value: rateLimiter.GetCreatedEvent().GetContractId()}
-	}
-
-	return contextValues, rateLimiter, true
-}
-
-func toOAPIContractID(contractID *string) *oapiCommon.ContractId {
-	if contractID == nil || *contractID == "" {
-		return nil
-	}
-
-	value := oapiCommon.ContractId(*contractID)
-	return &value
 }

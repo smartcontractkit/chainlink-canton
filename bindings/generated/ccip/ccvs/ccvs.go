@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "f27c63f3661b8c832ba875d26bae7ef12d4e14be19e801b87fb6f511eb7bf992"
+	PackageID   = "e2a40f99c58182faba06f8495c0f4449f9e05b8267d4997a806d9bc86a6f4046"
 	SDKVersion  = "3.4.10"
 )
 
@@ -33,6 +33,12 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+
+const (
+	VersionTagV200           = types.TEXT("e9a05a20")
+	SignatureLength          = types.INT64(64)
+	SignatureComponentLength = types.INT64(32)
+)
 
 func argsToMap(args any) map[string]any {
 	if args == nil {
@@ -499,18 +505,18 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 
 // CommitteeVerifier is a Template type
 type CommitteeVerifier struct {
-	InstanceId                   types.TEXT            `json:"instanceId"`
-	Owner                        types.PARTY           `json:"owner"`
-	CcipOwner                    types.PARTY           `json:"ccipOwner"`
-	VersionTag                   types.TEXT            `json:"versionTag" hex:"bytes"`
-	AllowListAdmin               *types.PARTY          `json:"allowListAdmin" hex:"optional"`
-	MessageSentObservers         []types.PARTY         `json:"messageSentObservers"`
-	StorageLocations             []types.TEXT          `json:"storageLocations"`
-	StorageLocationsAdmin        types.PARTY           `json:"storageLocationsAdmin"`
-	PendingStorageLocationsAdmin types.PARTY           `json:"pendingStorageLocationsAdmin"`
-	RemoteChainConfigs           types.GENMAP          `json:"remoteChainConfigs"`
-	SignerConfigs                types.GENMAP          `json:"signerConfigs"`
-	Deps                         CommitteeVerifierDeps `json:"deps"`
+	InstanceId                   types.TEXT                          `json:"instanceId"`
+	Owner                        types.PARTY                         `json:"owner"`
+	CcipOwner                    types.PARTY                         `json:"ccipOwner"`
+	VersionTag                   types.TEXT                          `json:"versionTag" hex:"bytes"`
+	AllowListAdmin               *types.PARTY                        `json:"allowListAdmin" hex:"optional"`
+	MessageSentObservers         []types.PARTY                       `json:"messageSentObservers"`
+	StorageLocations             []types.TEXT                        `json:"storageLocations"`
+	StorageLocationsAdmin        types.PARTY                         `json:"storageLocationsAdmin"`
+	PendingStorageLocationsAdmin types.PARTY                         `json:"pendingStorageLocationsAdmin"`
+	RemoteChainConfigs           map[types.NUMERIC]RemoteChainConfig `json:"remoteChainConfigs"`
+	SignerConfigs                map[types.NUMERIC]SignatureConfig   `json:"signerConfigs"`
+	Deps                         CommitteeVerifierDeps               `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

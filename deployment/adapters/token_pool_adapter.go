@@ -99,6 +99,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 			return 0, fmt.Errorf("parse active lock/release pool %s: %w", poolAddressRef.Address, err)
 		}
 
+		//nolint:gosec // Decimals should never exceed uint8
 		return uint8(parsedPool.Decimals), nil
 	case datastore.ContractType("BurnMintTokenPool"):
 		activePool, err := opcontract.FindActiveContractByInstanceAddress(
@@ -116,6 +117,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 			return 0, fmt.Errorf("parse active burn/mint pool %s: %w", poolAddressRef.Address, err)
 		}
 
+		//nolint:gosec // Decimals should never exceed uint8
 		return uint8(parsedPool.Decimals), nil
 	default:
 		return 0, fmt.Errorf("unsupported Canton token pool type %q", poolRef.Type)

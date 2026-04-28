@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "83b4d1e447678f17932451bd43864ae10658738e0b67a0766c576cee5ccb23d6"
+	PackageID   = "cf3277e58470441410d94331b56b494d3ba4588cbfb14e96cd115a021ae45711"
 	SDKVersion  = "3.4.10"
 )
 
@@ -35,6 +35,10 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+
+const (
+	BpsDenominator = types.NUMERIC("10000.")
+)
 
 func argsToMap(args any) map[string]any {
 	if args == nil {
@@ -262,6 +266,7 @@ func (t *ApplyTokenTransferFeeConfigUpdatesParams) UnmarshalHex(data string) err
 // CalculateFee is a Record type
 type CalculateFee struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext                       `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
 	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
@@ -274,6 +279,8 @@ func (t CalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
@@ -314,6 +321,7 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CalculateFeeMCMSParams struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext                       `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
 	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
@@ -551,6 +559,7 @@ func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
 // LockOrBurn is a Record type
 type LockOrBurn struct {
 	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID     `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
 	ExtraContext          common.CCIPContext    `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
@@ -565,6 +574,8 @@ func (t LockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
@@ -615,6 +626,7 @@ func (t *LockOrBurn) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockOrBurnMCMSParams struct {
 	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID     `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
 	ExtraContext          common.CCIPContext    `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
@@ -637,17 +649,17 @@ func (t *LockOrBurnMCMSParams) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPool is a Template type
 type LockReleaseTokenPool struct {
-	InstanceId              types.TEXT                               `json:"instanceId"`
-	PoolOwner               types.PARTY                              `json:"poolOwner"`
-	CcipOwner               types.PARTY                              `json:"ccipOwner"`
-	InstrumentId            splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals                types.INT64                              `json:"decimals"`
-	RateLimitAdmin          *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
-	RemoteChainConfigs      types.GENMAP                             `json:"remoteChainConfigs"`
-	TokenTransferFeeConfigs types.GENMAP                             `json:"tokenTransferFeeConfigs"`
-	PoolReceiveContext      common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout         TransferTimeout                          `json:"transferTimeout"`
-	Deps                    LockReleaseTokenPoolDeps                 `json:"deps"`
+	InstanceId              types.TEXT                                `json:"instanceId"`
+	PoolOwner               types.PARTY                               `json:"poolOwner"`
+	CcipOwner               types.PARTY                               `json:"ccipOwner"`
+	InstrumentId            splice_api_token_holding_v1.InstrumentId  `json:"instrumentId"`
+	Decimals                types.INT64                               `json:"decimals"`
+	RateLimitAdmin          *types.PARTY                              `json:"rateLimitAdmin" hex:"optional"`
+	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig       `json:"remoteChainConfigs"`
+	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig2 `json:"tokenTransferFeeConfigs"`
+	PoolReceiveContext      common.CCIPContext                        `json:"poolReceiveContext"`
+	TransferTimeout         TransferTimeout                           `json:"transferTimeout"`
+	Deps                    LockReleaseTokenPoolDeps                  `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1366,6 +1378,7 @@ func (t *RateLimitConfigArgs) UnmarshalHex(data string) error {
 // ReleaseFromTicket is a Record type
 type ReleaseFromTicket struct {
 	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID     `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
 	ExtraContext          common.CCIPContext    `json:"extraContext"`
 	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
@@ -1378,6 +1391,8 @@ func (t ReleaseFromTicket) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
@@ -1418,6 +1433,7 @@ func (t *ReleaseFromTicket) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type ReleaseFromTicketMCMSParams struct {
 	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID     `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
 	ExtraContext          common.CCIPContext    `json:"extraContext"`
 	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
@@ -1997,6 +2013,7 @@ var _ types.VariantWithTagByte = (*TransferTimeout)(nil)
 // VerifyInboundMessage is a Record type
 type VerifyInboundMessage struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
 	Caller                types.PARTY        `json:"caller"`
@@ -2007,6 +2024,8 @@ func (t VerifyInboundMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
@@ -2043,6 +2062,7 @@ func (t *VerifyInboundMessage) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type VerifyInboundMessageMCMSParams struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
 }
@@ -2062,6 +2082,7 @@ func (t *VerifyInboundMessageMCMSParams) UnmarshalHex(data string) error {
 // VerifyOutboundCCVs is a Record type
 type VerifyOutboundCCVs struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
 	Amount                types.NUMERIC      `json:"amount"`
@@ -2073,6 +2094,8 @@ func (t VerifyOutboundCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
@@ -2111,6 +2134,7 @@ func (t *VerifyOutboundCCVs) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type VerifyOutboundCCVsMCMSParams struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
 	Amount                types.NUMERIC      `json:"amount"`

@@ -291,7 +291,7 @@ func createMCMSMultiRole(
 	// Build empty RoleState (same for all roles initially)
 	roleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: types.GENMAP{},
+		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
 		ExpiringRoot: mcms.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
@@ -316,7 +316,7 @@ func createMCMSMultiRole(
 		Bypasser:           roleState,
 		MinDelay:           types.RELTIME(time.Duration(minDelayMicros) * time.Microsecond),
 		BlockedFunctions:   blockedFunctions,
-		TimelockTimestamps: types.GENMAP{},
+		TimelockTimestamps: map[types.TEXT]types.TIMESTAMP{},
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -447,7 +447,7 @@ func scheduleBatch(
 			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: types.GENMAP{},
+		TargetCids: map[types.TEXT]types.CONTRACT_ID{},
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -515,7 +515,7 @@ func scheduleBatchExpectError(
 			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: types.GENMAP{},
+		TargetCids: map[types.TEXT]types.CONTRACT_ID{},
 	}
 
 	_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -598,16 +598,16 @@ func executeScheduledBatch(
 	return ""
 }
 
-// toContractIDMap converts a map[string]string to types.GENMAP for binding compatibility
+// toContractIDMap converts a map[string]string to the typed TargetCids binding map.
 // The key is the instanceAddress and the value is the contract ID wrapped as CONTRACT_ID type
-// so it serializes as Value_ContractId rather than Value_Text
-func toContractIDMap(m map[string]string) types.GENMAP {
+// so it serializes as Value_ContractId rather than Value_Text.
+func toContractIDMap(m map[string]string) map[types.TEXT]types.CONTRACT_ID {
 	if m == nil {
-		return types.GENMAP{}
+		return map[types.TEXT]types.CONTRACT_ID{}
 	}
-	result := make(types.GENMAP, len(m))
+	result := make(map[types.TEXT]types.CONTRACT_ID, len(m))
 	for instanceID, cid := range m {
-		result[instanceID] = types.CONTRACT_ID(cid)
+		result[types.TEXT(instanceID)] = types.CONTRACT_ID(cid)
 	}
 
 	return result
@@ -683,7 +683,7 @@ func cancelBatch(
 			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: types.GENMAP{},
+		TargetCids: map[types.TEXT]types.CONTRACT_ID{},
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{

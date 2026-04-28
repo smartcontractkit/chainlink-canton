@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "a348c31180506a0f0c4b8060132a6bd86b85919aae22f973dfb98866633e30eb"
+	PackageID   = "8c7bd96666877c72166bd8d83e4a794a685c1da347ea635b2ca167f7f98cf051"
 	SDKVersion  = "3.4.10"
 )
 
@@ -382,12 +382,12 @@ func (t *DynamicConfig) UnmarshalHex(data string) error {
 
 // Executor is a Template type
 type Executor struct {
-	InstanceId         types.TEXT                `json:"instanceId"`
-	Owner              types.PARTY               `json:"owner"`
-	MaxCCVsPerMsg      types.INT64               `json:"maxCCVsPerMsg"`
-	DynamicConfig      DynamicConfig             `json:"dynamicConfig"`
-	AllowedCCVs        []mcms.RawInstanceAddress `json:"allowedCCVs"`
-	RemoteChainConfigs types.GENMAP              `json:"remoteChainConfigs"`
+	InstanceId         types.TEXT                          `json:"instanceId"`
+	Owner              types.PARTY                         `json:"owner"`
+	MaxCCVsPerMsg      types.INT64                         `json:"maxCCVsPerMsg"`
+	DynamicConfig      DynamicConfig                       `json:"dynamicConfig"`
+	AllowedCCVs        []mcms.RawInstanceAddress           `json:"allowedCCVs"`
+	RemoteChainConfigs map[types.NUMERIC]RemoteChainConfig `json:"remoteChainConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

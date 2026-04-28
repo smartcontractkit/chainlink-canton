@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
@@ -51,7 +52,7 @@ func NewServer(
 
 func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 	var req oapiExecutor.ExecutorSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -84,6 +85,17 @@ func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 		return
 	}
 
+	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
+		Values: map[string]common.AnyValue{
+			// Empty for now
+		},
+	})
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
 	// TODO check the provided CCVs against CCV allow list
 	// TODO Validate that the executor specified in the message matches this executor (and the user didn't specify no-execution)
 
@@ -91,12 +103,7 @@ func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 		ContractId:         activeExecutorContract.GetCreatedEvent().GetContractId(),
 		InstanceAddress:    parsedExecutor.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: parsedExecutor.Address.String(),
-		ContextData: map[string]any{
-			"values": map[string]struct {
-				Tag   string `json:"tag"`
-				Value string `json:"value"`
-			}{},
-		},
+		ContextData:        ccipContext,
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activeExecutorContract),
 		},

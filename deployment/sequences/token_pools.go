@@ -49,7 +49,7 @@ type configuredCantonTokenPool struct {
 	CcipOwner          types.PARTY
 	PoolOwner          types.PARTY
 	Decimals           types.INT64
-	RemoteChainConfigs types.GENMAP
+	RemoteChainConfigs map[types.NUMERIC]any
 }
 
 type tokenPoolChainUpdate struct {
@@ -123,7 +123,8 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 
 		updates := make([]tokenPoolChainUpdate, 0, len(input.RemoteChains))
 		for remoteSelector, remoteCfg := range input.RemoteChains {
-			remoteSelectorKey := strconv.FormatUint(remoteSelector, 10)
+			remoteSelectorKeyStr := strconv.FormatUint(remoteSelector, 10)
+			remoteSelectorKey := types.NUMERIC(remoteSelectorKeyStr)
 			if _, found := parsedPool.RemoteChainConfigs[remoteSelectorKey]; found {
 				return out, fmt.Errorf("remote chain %d is already configured on token pool", remoteSelector)
 			}
@@ -161,7 +162,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				input.ExistingDataStore,
 				meta,
 				input.TokenPoolAddress,
-				remoteSelectorKey,
+				remoteSelectorKeyStr,
 				"outbound",
 				outboundDefaultCfg,
 				common.RateLimitModeRateLimitMode_DefaultFinality,
@@ -177,7 +178,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				input.ExistingDataStore,
 				meta,
 				input.TokenPoolAddress,
-				remoteSelectorKey,
+				remoteSelectorKeyStr,
 				"inbound",
 				inboundDefaultCfg,
 				common.RateLimitModeRateLimitMode_DefaultFinality,
@@ -193,7 +194,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				input.ExistingDataStore,
 				meta,
 				input.TokenPoolAddress,
-				remoteSelectorKey,
+				remoteSelectorKeyStr,
 				"inbound-custom",
 				inboundCustomCfg,
 				common.RateLimitModeRateLimitMode_CustomFinality,
@@ -215,7 +216,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			}
 
 			updates = append(updates, tokenPoolChainUpdate{
-				RemoteChainSelector: types.NUMERIC(remoteSelectorKey),
+				RemoteChainSelector: remoteSelectorKey,
 				RemotePools:         []types.TEXT{types.TEXT(remotePoolAddress)},
 				RemoteTokenAddress:  types.TEXT(remoteTokenAddress),
 				InboundCCVs:         inboundCCVs,
@@ -413,10 +414,10 @@ var DeployTokenPoolForToken = operations.NewSequence(
 					PoolOwner:               types.PARTY(participant.PartyID),
 					InstrumentId:            instrumentID,
 					Decimals:                types.INT64(10),
-					RemoteChainConfigs:      types.GENMAP{},
-					TokenTransferFeeConfigs: types.GENMAP{},
+					RemoteChainConfigs:      map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{},
+					TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{},
 					PoolReceiveContext: common.CCIPContext{
-						Values: types.TEXTMAP{},
+						Values: map[string]common.AnyValue{},
 					},
 					TransferTimeout: lockreleasetokenpool.TransferTimeout{
 						RelativeHours: new(types.INT64(24)),
@@ -441,10 +442,10 @@ var DeployTokenPoolForToken = operations.NewSequence(
 					PoolOwner:               types.PARTY(participant.PartyID),
 					InstrumentId:            instrumentID,
 					Decimals:                types.INT64(10),
-					RemoteChainConfigs:      types.GENMAP{},
-					TokenTransferFeeConfigs: types.GENMAP{},
+					RemoteChainConfigs:      map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{},
+					TokenTransferFeeConfigs: map[types.NUMERIC]burnminttokenpool.TokenTransferFeeConfig{},
 					PoolReceiveContext: common.CCIPContext{
-						Values: types.TEXTMAP{},
+						Values: map[string]common.AnyValue{},
 					},
 					TransferTimeout: burnminttokenpool.TransferTimeout{
 						RelativeHours: new(types.INT64(24)),
@@ -669,13 +670,18 @@ func loadConfiguredCantonTokenPool(
 			return nil, fmt.Errorf("parse active lock/release pool %s: %w", poolAddress.Hex(), err)
 		}
 
+		remoteChainConfigsAny := make(map[types.NUMERIC]any, len(parsedPool.RemoteChainConfigs))
+		for numeric, config := range parsedPool.RemoteChainConfigs {
+			remoteChainConfigsAny[numeric] = any(config)
+		}
+
 		return &configuredCantonTokenPool{
 			InstrumentId:       parsedPool.InstrumentId,
 			InstanceId:         parsedPool.InstanceId,
 			CcipOwner:          parsedPool.CcipOwner,
 			PoolOwner:          parsedPool.PoolOwner,
 			Decimals:           parsedPool.Decimals,
-			RemoteChainConfigs: parsedPool.RemoteChainConfigs,
+			RemoteChainConfigs: remoteChainConfigsAny,
 		}, nil
 	case burnMintPoolType:
 		activePool, err := contract.FindActiveContractByInstanceAddress(
@@ -693,13 +699,18 @@ func loadConfiguredCantonTokenPool(
 			return nil, fmt.Errorf("parse active burn/mint pool %s: %w", poolAddress.Hex(), err)
 		}
 
+		remoteChainConfigsAny := make(map[types.NUMERIC]any, len(parsedPool.RemoteChainConfigs))
+		for numeric, config := range parsedPool.RemoteChainConfigs {
+			remoteChainConfigsAny[numeric] = any(config)
+		}
+
 		return &configuredCantonTokenPool{
 			InstrumentId:       parsedPool.InstrumentId,
 			InstanceId:         parsedPool.InstanceId,
 			CcipOwner:          parsedPool.CcipOwner,
 			PoolOwner:          parsedPool.PoolOwner,
 			Decimals:           parsedPool.Decimals,
-			RemoteChainConfigs: parsedPool.RemoteChainConfigs,
+			RemoteChainConfigs: remoteChainConfigsAny,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported Canton token pool type %q", logicalPoolType)

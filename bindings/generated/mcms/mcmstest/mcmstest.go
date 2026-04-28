@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "mcms-test"
-	PackageID   = "ab5ee1e0c5a5640c48b7c5e1ea719e29d054aca1dd6edb969c1b20b705b8a45b"
+	PackageID   = "b2c0fa23bdfb65d59e8f577a66da87c2d79bf4b48d68c5b7141a0f8c90076300"
 	SDKVersion  = "3.4.10"
 )
 
@@ -32,6 +32,22 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+
+const (
+	TimelockTestInstanceAddress = types.TEXT("mcms-daml-test@ccip_owner-9cefe94d")
+	TimelockScheduleRoot        = types.TEXT("a562ea5617f1ad48ba3712119a12ca1c2f7736e1f8f02d6c7c319653a8663cd4")
+	TimelockBypasserRoot        = types.TEXT("03d506aeaffd933a56d3572797fa69aa96db825fa7c1c0bdaefc22cc40c51df7")
+	SelfDispatchTestBaseMcmsId  = types.TEXT("mcms-daml-test")
+	OverrideRoot                = types.TEXT("d618cc847a2ef8f4b445dd8328a05e64576d637d560f4d8caf2b34d34d8ff740")
+	RealTestRoot                = types.TEXT("e5aeef059e7037a3b83c98b67797721c3e93c9ed1c91c2629d2302939177817f")
+	RealTestMcmsId              = types.TEXT("mcms-daml-test")
+	RealTestInstanceId          = types.TEXT("mcms-daml-test@ccip_owner-9cefe94d")
+	RealTestChainId             = types.INT64(1)
+	ExternalTestBaseMcmsId      = types.TEXT("mcms-daml-test")
+	ExternalScheduleSalt        = types.TEXT("65787465726e616c2d73616c742d31")
+	ExternalScheduleRoot        = types.TEXT("4f91344c80e695656fef97b4c58382b66ce1b984c3bcf7d94efcb0daafa4772c")
+	ExternalBypasserRoot        = types.TEXT("7d70e8ba5c202e505d587e0e8a84580ed6aee6e1fa2e5bc2de64ca24994cf7e5")
+)
 
 func argsToMap(args any) map[string]any {
 	if args == nil {

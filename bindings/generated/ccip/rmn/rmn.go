@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "3f383f3fd82ebc4756d076fe8c908e79359718697fb46e3868979962dcdec9b2"
+	PackageID   = "c1e3f1be1912122b3017a15ca309cbeb4ecb72ada691d2b50598255bbf1f95ab"
 	SDKVersion  = "3.4.10"
 )
 
@@ -32,6 +32,10 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+
+const (
+	GlobalCurseSubject = types.TEXT("01000000000000000000000000000001")
+)
 
 func argsToMap(args any) map[string]any {
 	if args == nil {

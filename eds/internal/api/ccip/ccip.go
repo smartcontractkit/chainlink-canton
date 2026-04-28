@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -28,6 +30,10 @@ import (
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
+
+// MaxNumCCVs is a sane limit on the maximum number of CCVs requestable by a client.
+// This is a defense in depth measure to prevent abuse of the API.
+const MaxNumCCVs = 64
 
 type Server struct {
 	logger              zerolog.Logger
@@ -80,6 +86,9 @@ func NewServer(
 				TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenAdminRegistry{}),
 				PartyID:    config.TokenAdminRegistry.PartyID,
 			}, {
+				TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenConfig{}),
+				PartyID:    config.TokenAdminRegistry.PartyID,
+			}, {
 				TemplateID: contracts.TemplateIDFromBinding(rmn.RMNRemote{}),
 				PartyID:    config.RMNRemote.PartyID,
 			}, {
@@ -94,7 +103,7 @@ func NewServer(
 
 func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
 	var req oapiCCIP.CCIPPerPartyRouterFactoryRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -136,24 +145,34 @@ func (s Server) GetTokenAdminRegistryToken(c *gin.Context, instrumentId oapiComm
 	if !ok {
 		s.logger.Error().Stringer("address", s.tokenAdminRegistry).Msg("active tokenAdminRegistry contract not found")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-
 		return
 	}
-
 	parsedTokenAdminRegistry, err := ParseTokenAdminRegistry(activeTokenAdminRegistryContract.GetCreatedEvent())
 	if err != nil {
 		s.logger.Err(err).Stringer("address", s.tokenAdminRegistry).Msg("failed to parse token admin registry contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-
 		return
 	}
 
-	tokenConfig, ok := parsedTokenAdminRegistry.TokenConfigs[encodedInstrumentId]
-	if !ok || tokenConfig.TokenPool == nil {
+	// Calculate the InstanceID of the TokenConfig
+	tokenConfigInstanceAddress := contracts.InstanceID(hex.EncodeToString(encodedInstrumentId.Bytes())).RawInstanceAddress(types.PARTY(parsedTokenAdminRegistry.Address.Owner())).InstanceAddress()
+	activeTokenConfigContract, ok := s.activeContractStore.Get(tokenConfigInstanceAddress)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token config registered for token: %s", encodedInstrumentId.Hex())})
+		return
+	}
+	parsedTokenConfig, err := ParseTokenConfig(activeTokenConfigContract.GetCreatedEvent())
+	if err != nil {
+		s.logger.Err(err).Str("instrumentId", encodedInstrumentId.Hex()).Msg("failed to parse token config contract")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	if parsedTokenConfig.Pool == nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token pool registered for token: %s", encodedInstrumentId.Hex())})
 		return
 	}
-	tokenPoolRawInstanceAddress := oapiCommon.RawInstanceAddress(contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).RawInstanceAddress(tokenConfig.TokenPool.PoolOwner))
+	tokenPoolRawInstanceAddress := oapiCommon.RawInstanceAddress(contracts.InstanceID(parsedTokenConfig.Pool.PoolInstanceId).RawInstanceAddress(parsedTokenConfig.Pool.PoolOwner))
 
 	resp := &oapiCCIP.LookupTokenPoolResponse{
 		RawInstanceAddress: tokenPoolRawInstanceAddress,
@@ -163,8 +182,16 @@ func (s Server) GetTokenAdminRegistryToken(c *gin.Context, instrumentId oapiComm
 
 func (s Server) PostCCIPSend(c *gin.Context) {
 	var req oapiCCIP.CCIPSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if req.SenderRequiredCCVs != nil && len(*req.SenderRequiredCCVs) > MaxNumCCVs {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("sender required CCVs exceeds maximum value: %d", MaxNumCCVs)})
+		return
+	}
+	if req.TokenPoolRequiredCCVs != nil && len(*req.TokenPoolRequiredCCVs) > MaxNumCCVs {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("token pool required CCVs exceeds maximum value: %d", MaxNumCCVs)})
 		return
 	}
 
@@ -289,58 +316,104 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		// Default Executor
 		// If set to none, the default executor is the no-exec executor
 		if destChainConfig.DefaultExecutor != nil {
-			defaultExecutor := converters.RawInstanceAddressAsRawOrHashedAddress(*destChainConfig.DefaultExecutor)
-			executor = &defaultExecutor
+			executor = new(converters.RawInstanceAddressAsRawOrHashedAddress(*destChainConfig.DefaultExecutor))
 		}
 	case oapiCommon.WithAddress:
 		// Use the specified executor
 		executor = req.Message.Executor.Address
 	}
 
-	resp := &oapiCCIP.CCIPSendResponse{
-		Ccvs: maps.Values(resolvedCCVs),
-		ContextData: map[string]any{
-			"values": map[string]struct {
-				Tag   string `json:"tag"`
-				Value string `json:"value"`
-			}{
-				"on-ramp": {
-					Tag:   "AV_ContractId",
-					Value: activeOnRampContract.GetCreatedEvent().GetContractId(),
-				},
-				"global-config": {
-					Tag:   "AV_ContractId",
-					Value: activeGlobalConfigContract.GetCreatedEvent().GetContractId(),
-				},
-				"token-admin-registry": {
-					Tag:   "AV_ContractId",
-					Value: activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId(),
-				},
-				"rmn-remote": {
-					Tag:   "AV_ContractId",
-					Value: activeRMNRemoteContract.GetCreatedEvent().GetContractId(),
-				},
-				"fee-quoter": {
-					Tag:   "AV_ContractId",
-					Value: activeFeeQuoterContract.GetCreatedEvent().GetContractId(),
-				},
+	ccipContext := common.CCIPContext{
+		Values: map[string]common.AnyValue{
+			string(onramp.OnRampKey): {
+				AVContractId: new(types.CONTRACT_ID(activeOnRampContract.GetCreatedEvent().GetContractId())),
+			},
+			string(common.GlobalConfigKey): {
+				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
+			},
+			string(tokenadminregistry.TokenAdminRegistryKey): {
+				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
+			},
+			string(common.RmnRemoteKey): {
+				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
+			},
+			string(feequoter.FeeQuoterKey): {
+				AVContractId: new(types.CONTRACT_ID(activeFeeQuoterContract.GetCreatedEvent().GetContractId())),
 			},
 		},
-		Executor: executor,
-		DisclosedContracts: []oapiCommon.DisclosedContract{
-			converters.ActiveContractToDisclosedContract(activeOnRampContract),
-			converters.ActiveContractToDisclosedContract(activeGlobalConfigContract),
-			converters.ActiveContractToDisclosedContract(activeTokenAdminRegistryContract),
-			converters.ActiveContractToDisclosedContract(activeRMNRemoteContract),
-			converters.ActiveContractToDisclosedContract(activeFeeQuoterContract),
-		},
+	}
+	disclosedContracts := []oapiCommon.DisclosedContract{
+		converters.ActiveContractToDisclosedContract(activeOnRampContract),
+		converters.ActiveContractToDisclosedContract(activeGlobalConfigContract),
+		converters.ActiveContractToDisclosedContract(activeTokenAdminRegistryContract),
+		converters.ActiveContractToDisclosedContract(activeRMNRemoteContract),
+		converters.ActiveContractToDisclosedContract(activeFeeQuoterContract),
+	}
+
+	// If the message contains a token transfer, look up the token pool on the TAR and return the TokenConfig
+	if req.Message.TokenTransfer != nil {
+		activeTokenAdminRegistryContract, ok := s.activeContractStore.Get(s.tokenAdminRegistry)
+		if !ok {
+			s.logger.Error().Stringer("address", s.tokenAdminRegistry).Msg("active tokenAdminRegistry contract not found")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+
+		parsedTokenAdminRegistry, err := ParseTokenAdminRegistry(activeTokenAdminRegistryContract.GetCreatedEvent())
+		if err != nil {
+			s.logger.Err(err).Msg("failed to parse token admin registry contract")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+
+			return
+		}
+
+		// Calculate the InstanceID of the TokenConfig
+		encodedInstrumentId := contracts.EncodeInstrumentID(splice_api_token_holding_v1.InstrumentId{
+			Admin: types.PARTY(req.Message.TokenTransfer.Token.Admin),
+			Id:    types.TEXT(req.Message.TokenTransfer.Token.Id),
+		})
+		tokenConfigInstanceAddress := contracts.InstanceID(hex.EncodeToString(encodedInstrumentId.Bytes())).RawInstanceAddress(types.PARTY(parsedTokenAdminRegistry.Address.Owner())).InstanceAddress()
+		activeTokenConfigContract, ok := s.activeContractStore.Get(tokenConfigInstanceAddress)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token config registered for token: %s", encodedInstrumentId.Hex())})
+			return
+		}
+		parsedTokenConfig, err := ParseTokenConfig(activeTokenConfigContract.GetCreatedEvent())
+		if err != nil {
+			s.logger.Err(err).Str("instrumentId", encodedInstrumentId.Hex()).Msg("failed to parse token config contract")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+
+		if parsedTokenConfig.Pool == nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token pool registered for token: %s", encodedInstrumentId.Hex())})
+			return
+		}
+		ccipContext.Values[string(tokenadminregistry.TokenConfigKey)] = common.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
+		}
+		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))
+	}
+
+	contextData, err := converters.SerializeCCIPContext(ccipContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	resp := &oapiCCIP.CCIPSendResponse{
+		Ccvs:               maps.Values(resolvedCCVs),
+		ContextData:        contextData,
+		Executor:           executor,
+		DisclosedContracts: disclosedContracts,
 	}
 	c.JSON(http.StatusOK, resp)
 }
 
 func (s Server) PostCCIPExecute(c *gin.Context) {
 	var req oapiCCIP.CCIPExecuteRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -362,29 +435,48 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 	if !ok {
 		s.logger.Error().Stringer("address", s.offRamp).Msg("active offRamp contract not found")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-
 		return
 	}
 	activeGlobalConfigContract, ok := s.activeContractStore.Get(s.globalConfig)
 	if !ok {
 		s.logger.Error().Stringer("address", s.globalConfig).Msg("active globalConfig contract not found")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-
 		return
 	}
 	activeTokenAdminRegistryContract, ok := s.activeContractStore.Get(s.tokenAdminRegistry)
 	if !ok {
 		s.logger.Error().Stringer("address", s.tokenAdminRegistry).Msg("active tokenAdminRegistry contract not found")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-
 		return
 	}
 	activeRMNRemoteContract, ok := s.activeContractStore.Get(s.rmnRemote)
 	if !ok {
 		s.logger.Error().Stringer("address", s.rmnRemote).Msg("active rmnRemote contract not found")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-
 		return
+	}
+
+	ccipContext := common.CCIPContext{
+		Values: map[string]common.AnyValue{
+			string(offramp.OffRampKey): {
+				AVContractId: new(types.CONTRACT_ID(activeOffRampContract.GetCreatedEvent().GetContractId())),
+			},
+			string(common.GlobalConfigKey): {
+				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
+			},
+			string(tokenadminregistry.TokenAdminRegistryKey): {
+				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
+			},
+			string(common.RmnRemoteKey): {
+				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
+			},
+		},
+	}
+	disclosedContracts := []oapiCommon.DisclosedContract{
+		converters.ActiveContractToDisclosedContract(activeOffRampContract),
+		converters.ActiveContractToDisclosedContract(activeGlobalConfigContract),
+		converters.ActiveContractToDisclosedContract(activeTokenAdminRegistryContract),
+		converters.ActiveContractToDisclosedContract(activeRMNRemoteContract),
 	}
 
 	var tokenPool *oapiCommon.RawInstanceAddress
@@ -395,50 +487,45 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 		if err != nil {
 			s.logger.Err(err).Msg("failed to parse token admin registry contract")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-
 			return
 		}
 
-		tokenConfig, ok := parsedTokenAdminRegistry.TokenConfigs[destTokenAddress]
-		if !ok || tokenConfig.TokenPool == nil {
+		// Calculate the InstanceID of the TokenConfig
+		tokenConfigInstanceAddress := contracts.InstanceID(hex.EncodeToString(destTokenAddress.Bytes())).RawInstanceAddress(types.PARTY(parsedTokenAdminRegistry.Address.Owner())).InstanceAddress()
+		activeTokenConfigContract, ok := s.activeContractStore.Get(tokenConfigInstanceAddress)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token config registered for token: %s", destTokenAddress.Hex())})
+			return
+		}
+		parsedTokenConfig, err := ParseTokenConfig(activeTokenConfigContract.GetCreatedEvent())
+		if err != nil {
+			s.logger.Err(err).Str("instrumentId", destTokenAddress.Hex()).Msg("failed to parse token config contract")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+
+		if parsedTokenConfig.Pool == nil {
 			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token pool registered for token: %s", destTokenAddress.Hex())})
 			return
 		}
-		tokenPoolRawInstanceAddress := oapiCommon.RawInstanceAddress(contracts.InstanceID(tokenConfig.TokenPool.PoolInstanceId).RawInstanceAddress(tokenConfig.TokenPool.PoolOwner))
-		tokenPool = &tokenPoolRawInstanceAddress
+		tokenPool = new(oapiCommon.RawInstanceAddress(contracts.InstanceID(parsedTokenConfig.Pool.PoolInstanceId).RawInstanceAddress(parsedTokenConfig.Pool.PoolOwner)))
+		ccipContext.Values[string(tokenadminregistry.TokenConfigKey)] = common.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
+		}
+		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))
+	}
+
+	contextData, err := converters.SerializeCCIPContext(ccipContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
 	}
 
 	resp := &oapiCCIP.CCIPExecuteResponse{
-		ContextData: map[string]any{
-			"values": map[string]struct {
-				Tag   string `json:"tag"`
-				Value string `json:"value"`
-			}{
-				"off-ramp": {
-					Tag:   "AV_ContractId",
-					Value: activeOffRampContract.GetCreatedEvent().GetContractId(),
-				},
-				"global-config": {
-					Tag:   "AV_ContractId",
-					Value: activeGlobalConfigContract.GetCreatedEvent().GetContractId(),
-				},
-				"token-admin-registry": {
-					Tag:   "AV_ContractId",
-					Value: activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId(),
-				},
-				"rmn-remote": {
-					Tag:   "AV_ContractId",
-					Value: activeRMNRemoteContract.GetCreatedEvent().GetContractId(),
-				},
-			},
-		},
-		DisclosedContracts: []oapiCommon.DisclosedContract{
-			converters.ActiveContractToDisclosedContract(activeOffRampContract),
-			converters.ActiveContractToDisclosedContract(activeGlobalConfigContract),
-			converters.ActiveContractToDisclosedContract(activeTokenAdminRegistryContract),
-			converters.ActiveContractToDisclosedContract(activeRMNRemoteContract),
-		},
-		TokenPool: tokenPool,
+		ContextData:        contextData,
+		DisclosedContracts: disclosedContracts,
+		TokenPool:          tokenPool,
 	}
 	c.JSON(http.StatusOK, resp)
 }

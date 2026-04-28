@@ -132,7 +132,7 @@ emptyExpiringRoot = ExpiringRoot
 data RoleState = RoleState
   with
     config : MultisigConfig
-    seenHashes : Map.Map BytesHex Bool
+    seenHashes : Map.Map BytesHex Time
     expiringRoot : ExpiringRoot
     rootMetadata : RootMetadata
   deriving (Show, Eq)

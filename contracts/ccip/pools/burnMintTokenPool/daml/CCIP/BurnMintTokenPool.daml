@@ -221,6 +221,7 @@ template BurnMintTokenPool
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyInboundMessage
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
                         extraContext = arg.extraContext
                         executingMessageCid = arg.executingMessageCid
                         caller = arg.caller
@@ -229,6 +230,7 @@ template BurnMintTokenPool
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyOutboundCCVs
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         amount = arg.amount
@@ -238,6 +240,7 @@ template BurnMintTokenPool
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) ReleaseFromTicket
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         tokenReceiveTicketCid = arg.tokenReceiveTicketCid
@@ -248,6 +251,7 @@ template BurnMintTokenPool
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) LockOrBurn
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
@@ -260,6 +264,7 @@ template BurnMintTokenPool
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) CalculateFee
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         feeQuoterCid = arg.feeQuoterCid
@@ -473,6 +478,7 @@ template BurnMintTokenPool
         nonconsuming choice VerifyInboundMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 extraContext : CCIP.Context.CCIPContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 caller : Party
@@ -505,6 +511,7 @@ template BurnMintTokenPool
 
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.SetInboundPoolCCVs with
+                        tokenConfigCid = tokenConfigCid
                         executingMessageCid
                         poolInstanceId = instanceId
                         poolCCVs = remoteChainCfg.inboundCCVs
@@ -515,6 +522,7 @@ template BurnMintTokenPool
         nonconsuming choice VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 extraContext : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 amount : Decimal
@@ -538,6 +546,7 @@ template BurnMintTokenPool
 
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.SetOutboundPoolCCVs with
+                        tokenConfigCid = tokenConfigCid
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
                         poolCCVs = poolCCVs
@@ -550,6 +559,7 @@ template BurnMintTokenPool
         nonconsuming choice ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 extraContext : CCIP.Context.CCIPContext
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
@@ -599,7 +609,7 @@ template BurnMintTokenPool
                 let expectedRateLimiter = if useCustomFinalityRateLimiter
                         then remoteChainCfg.inboundCustomBlockConfirmationsRateLimiter
                         else remoteChainCfg.inboundRateLimiter
-                rateLimiterCid <- CCIP.RateLimiter.lookupInboundRateLimiterCid expectedRateLimitMode extraContext
+                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "ReleaseFromTicket: rateLimiter"
@@ -620,6 +630,7 @@ template BurnMintTokenPool
                 -- Consume ticket via TAR after validating the disclosed TAR identity.
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.ConsumeReceiveTicket with
+                        tokenConfigCid = tokenConfigCid
                         ticketCid = tokenReceiveTicketCid
                         instrumentId = instrumentId
                         caller = poolOwner
@@ -676,6 +687,7 @@ template BurnMintTokenPool
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 extraContext : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
@@ -715,6 +727,7 @@ template BurnMintTokenPool
 
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.AddTokenSendFee with
+                        tokenConfigCid = tokenConfigCid
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
                         feeUSDCents = feeUSDCents
@@ -770,6 +783,7 @@ template BurnMintTokenPool
         nonconsuming choice LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 extraContext : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -865,6 +879,7 @@ template BurnMintTokenPool
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.AddTokenSend with
+                        tokenConfigCid = tokenConfigCid
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
                         instrumentId = instrumentId

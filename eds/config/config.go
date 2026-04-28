@@ -112,14 +112,16 @@ type TokenPool struct {
 
 	// The owner party of the token pool.
 	PoolOwner string `toml:"pool_owner" validate:"required"`
-	// Explicit factory contract IDs can be set for custom tokens that do not expose
-	// Splice's Token Standard HTTP APIs.
-	TransferFactoryID *string `toml:"transfer_factory_id"`
-	BurnMintFactoryID *string `toml:"burn_mint_factory_id"`
 	// The URL of the Token Standard API to use for this token pool.
 	// If not set, fetching the transfer factory will be disabled for this pool.
 	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"omitnil,url"`
 	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"omitnil,required"`
+	TransferPreapproval     *TransferPreapproval     `toml:"transfer_preapproval" validate:"omitnil,required"`
+}
+
+type TransferPreapproval struct {
+	ContextKey string `toml:"context_key" validate:"required"`
+	TemplateId string `toml:"template_id" validate:"required"`
 }
 
 type TokenPoolAPIConfig struct {

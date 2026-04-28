@@ -46,7 +46,7 @@ func NewServer(
 // PostGetExplicitDisclosureBatch (POST /ccip/v1/global/disclosure/batch)
 func (s Server) PostGetExplicitDisclosureBatch(c *gin.Context) {
 	var req oapiGlobal.GetExplicitDisclosureBatchRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}

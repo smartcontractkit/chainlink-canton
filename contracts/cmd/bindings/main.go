@@ -99,6 +99,12 @@ func main() {
 				"RelativeHours": 0x01,
 			},
 		},
+		// Dispatcher operationData payloads decoded by MCMS.Main.ExecuteOp.
+		ChoiceParamEncoderNames: map[string]bool{
+			"ScheduleBatch":        true,
+			"CancelBatch":          true,
+			"BypasserExecuteBatch": true,
+		},
 	}
 
 	// Generate bindings for each package

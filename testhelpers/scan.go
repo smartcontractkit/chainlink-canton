@@ -10,6 +10,7 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"

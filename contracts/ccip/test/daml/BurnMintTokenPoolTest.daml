@@ -35,17 +35,6 @@ mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
   values = TextMap.fromList
     [(RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)]
 
-mkInboundRateLimiterContext
-  : ContractId RateLimiter.RateLimiter
-  -> ContractId RateLimiter.RateLimiter
-  -> CCIP.Context.CCIPContext
-mkInboundRateLimiterContext inboundRateLimiterCid inboundCustomBlockConfirmationsRateLimiterCid =
-  CCIP.Context.CCIPContext with
-    values = TextMap.fromList
-      [ (RateLimiter.inboundRateLimiterKey, CCIP.Context.toAnyValue inboundRateLimiterCid)
-      , (RateLimiter.inboundCustomBlockConfirmationsRateLimiterKey, CCIP.Context.toAnyValue inboundCustomBlockConfirmationsRateLimiterCid)
-      ]
-
 mkPoolDeps : Text -> Text -> Text -> Party -> Party -> BurnMintTokenPool.BurnMintTokenPoolDeps
 mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner =
   BurnMintTokenPool.BurnMintTokenPoolDeps with
@@ -80,34 +69,47 @@ createRateLimiter poolOwner instanceId poolInstanceId remoteChainSelector direct
       lastUpdated = now
   pure (rateLimiterCid, RawInstanceAddress.make instanceId poolOwner)
 
-setupTokenAdminRegistry : Party -> Party -> HoldingV1.InstrumentId -> Text -> Text -> Script (ContractId TokenAdminRegistry.TokenAdminRegistry)
-setupTokenAdminRegistry ccipOwner poolOwner instrumentId tokenAdminRegistryInstanceId tokenPoolInstanceId = do
-  tokenAdminRegistryCid <- submit ccipOwner do
-    createCmd TokenAdminRegistry.TokenAdminRegistry with
-      owner = ccipOwner
-      instanceId = tokenAdminRegistryInstanceId
-      tokenConfigs = Map.empty
+setupTokenAdminRegistry
+    : Party
+    -> Party
+    -> Text
+    -> HoldingV1.InstrumentId
+    -> Text
+    -> Script (ContractId TokenAdminRegistry.TokenAdminRegistry, ContractId TokenAdminRegistry.TokenConfig)
+setupTokenAdminRegistry ccipOwner poolOwner tokenAdminRegistryInstanceId instrumentId tokenPoolInstanceId = do
+    tokenAdminRegistry0 <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            owner = ccipOwner
+            instanceId = tokenAdminRegistryInstanceId
+            entryCount = 0
 
-  tokenAdminRegistryCid <- submit ccipOwner do
-    exerciseCmd tokenAdminRegistryCid TokenAdminRegistry.ProposeAdministrator with
-      instrumentId
-      newAdmin = poolOwner
-      caller = ccipOwner
+    proposeResult <- submit ccipOwner do
+        exerciseCmd tokenAdminRegistry0 TokenAdminRegistry.ProposeAdministrator with
+            tokenConfigCid = None
+            instrumentId = instrumentId
+            newAdmin = poolOwner
+            caller = ccipOwner
+    let tokenAdminRegistry = proposeResult.tokenAdminRegistryCid
+        tokenConfigCid0 = proposeResult.tokenConfigCid
 
-  disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
-  tokenAdminRegistryCid <- submit (actAs poolOwner <> disclose disclosedTar) do
-    exerciseCmd tokenAdminRegistryCid TokenAdminRegistry.AcceptAdminRole with
-      instrumentId
-      caller = poolOwner
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenConfigCid1 <- submit (actAs poolOwner <> disclose disclosedTar) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
+            tokenConfigCid = tokenConfigCid0
+            instrumentId = instrumentId
+            caller = poolOwner
 
-  disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
-  submit (actAs poolOwner <> disclose disclosedTar) do
-    exerciseCmd tokenAdminRegistryCid TokenAdminRegistry.SetPool with
-      instrumentId
-      tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
-        poolOwner
-        poolInstanceId = tokenPoolInstanceId
-      caller = poolOwner
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenConfigCid2 <- submit (actAs poolOwner <> disclose disclosedTar) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
+            tokenConfigCid = tokenConfigCid1
+            instrumentId = instrumentId
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
+                poolOwner = poolOwner
+                poolInstanceId = tokenPoolInstanceId
+            caller = poolOwner
+
+    pure (tokenAdminRegistry, tokenConfigCid2)
 
 createLinkRegistry : Party -> HoldingV1.InstrumentId -> Text -> Script (ContractId Link.LinkRegistry)
 createLinkRegistry admin instrumentId registryInstanceId =
@@ -246,7 +248,7 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
         id = "LINK"
 
   registryCid <- createLinkRegistry poolOwner instrumentId registryInstanceId
-  tokenAdminRegistryCid <- setupTokenAdminRegistry ccipOwner poolOwner instrumentId tokenAdminRegistryInstanceId tokenPoolInstanceId
+  (tokenAdminRegistryCid, tokenConfigCid) <- setupTokenAdminRegistry ccipOwner poolOwner tokenAdminRegistryInstanceId instrumentId tokenPoolInstanceId
 
   rmnRemoteCid <- submit rmnOwner do
     createCmd RMNRemote.RMNRemote with
@@ -304,6 +306,7 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   result <- submit (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
       tokenAdminRegistryCid = tokenAdminRegistryCid
+      tokenConfigCid = tokenConfigCid
       rmnRemoteCid = rmnRemoteCid
       extraContext = mkRateLimiterContext outboundRateLimiterCid
       sendingMessageCid = sendingMessageCid
@@ -345,7 +348,7 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
         id = "LINK"
 
   registryCid <- createLinkRegistry poolOwner instrumentId registryInstanceId
-  tokenAdminRegistryCid <- setupTokenAdminRegistry ccipOwner poolOwner instrumentId tokenAdminRegistryInstanceId tokenPoolInstanceId
+  (tokenAdminRegistryCid, tokenConfigCid) <- setupTokenAdminRegistry ccipOwner poolOwner tokenAdminRegistryInstanceId instrumentId tokenPoolInstanceId
 
   rmnRemoteCid <- submit rmnOwner do
     createCmd RMNRemote.RMNRemote with
@@ -412,8 +415,9 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
   result <- submit (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
+      tokenConfigCid = tokenConfigCid
       rmnRemoteCid = rmnRemoteCid
-      extraContext = mkInboundRateLimiterContext inboundRateLimiterCid inboundRateLimiterCid
+      extraContext = mkRateLimiterContext inboundRateLimiterCid
       tokenReceiveTicketCid = tokenReceiveTicketCid
       tokenInput = tokenInput
       caller = receiver
@@ -443,7 +447,7 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
         id = "LINK"
 
   registryCid <- createLinkRegistry poolOwner instrumentId registryInstanceId
-  tokenAdminRegistryCid <- setupTokenAdminRegistry ccipOwner poolOwner instrumentId tokenAdminRegistryInstanceId tokenPoolInstanceId
+  (tokenAdminRegistryCid, tokenConfigCid) <- setupTokenAdminRegistry ccipOwner poolOwner tokenAdminRegistryInstanceId instrumentId tokenPoolInstanceId
 
   rmnRemoteCid <- submit rmnOwner do
     createCmd RMNRemote.RMNRemote with
@@ -494,6 +498,7 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
   submitMustFail (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
       tokenAdminRegistryCid = tokenAdminRegistryCid
+      tokenConfigCid = tokenConfigCid
       rmnRemoteCid = rmnRemoteCid
       extraContext = mkRateLimiterContext outboundRateLimiterCid
       sendingMessageCid = sendingMessageCid

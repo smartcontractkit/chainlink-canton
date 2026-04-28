@@ -50,6 +50,7 @@ interface ITokenPool where
     nonconsuming choice TokenPool_VerifyInboundMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
             extraContext : CCIP.Context.CCIPContext
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             caller : Party
@@ -60,6 +61,7 @@ interface ITokenPool where
     nonconsuming choice TokenPool_VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
             extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             amount : Decimal
@@ -72,6 +74,7 @@ interface ITokenPool where
     nonconsuming choice TokenPool_ReleaseFromTicket : ReleaseOrMintResult
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             extraContext : CCIP.Context.CCIPContext
             tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
@@ -86,6 +89,7 @@ interface ITokenPool where
     nonconsuming choice TokenPool_LockOrBurn : LockOrBurnResult
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -102,6 +106,7 @@ interface ITokenPool where
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
             extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
