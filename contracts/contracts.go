@@ -16,6 +16,7 @@ type Package string
 
 const (
 	Coin = Package("coin")
+	Link = Package("link")
 
 	MCMS         = Package("mcms")
 	MCMSTest     = Package("mcms-test")
@@ -32,6 +33,7 @@ const (
 	CCIPOffRamp              = Package("ccip-offramp")
 	CCIPPoolInterfaces       = Package("ccip-tokenpool-interfaces")
 	CCIPLockReleaseTokenPool = Package("ccip-lockreleasetokenpool")
+	CCIPBurnMintTokenPool    = Package("ccip-burnminttokenpool")
 	CCIPPerPartyRouter       = Package("ccip-perpartyrouter")
 	CCIPExecutor             = Package("ccip-executor")
 	CCIPFactory              = Package("ccip-factory")
@@ -48,6 +50,7 @@ const CurrentVersion = "current"
 
 var Versions map[Package][]string = map[Package][]string{
 	Coin: []string{"0.0.1", CurrentVersion},
+	Link: []string{"0.0.1", CurrentVersion},
 
 	MCMS:         []string{"0.0.1", CurrentVersion},
 	MCMSTest:     []string{"0.0.1", CurrentVersion},
@@ -64,6 +67,7 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPOffRamp:              []string{"0.0.1", CurrentVersion},
 	CCIPPoolInterfaces:       []string{"0.0.1", CurrentVersion},
 	CCIPLockReleaseTokenPool: []string{"0.0.1", CurrentVersion},
+	CCIPBurnMintTokenPool:    []string{"0.0.1", CurrentVersion},
 	CCIPPerPartyRouter:       []string{"0.0.1", CurrentVersion},
 	CCIPExecutor:             []string{"0.0.1", CurrentVersion},
 	CCIPFactory:              []string{"0.0.1", CurrentVersion},
@@ -101,6 +105,7 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 
 var OutputDirs = map[Package][]string{
 	Coin: []string{"coin"},
+	Link: []string{"link"},
 
 	MCMS:     []string{"mcms"},
 	MCMSTest: []string{"mcms", "mcmstest"},
@@ -113,6 +118,7 @@ var OutputDirs = map[Package][]string{
 	CCIPFeeQuoter:            []string{"ccip", "feequoter"},
 	CCIPPoolInterfaces:       []string{"ccip", "interfaces"},
 	CCIPLockReleaseTokenPool: []string{"ccip", "lockreleasetokenpool"},
+	CCIPBurnMintTokenPool:    []string{"ccip", "burnminttokenpool"},
 	CCIPOffRamp:              []string{"ccip", "offramp"},
 	CCIPOnRamp:               []string{"ccip", "onramp"},
 	CCIPPerPartyRouter:       []string{"ccip", "perpartyrouter"},
