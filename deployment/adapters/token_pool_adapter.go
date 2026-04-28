@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -13,8 +14,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonsequences "github.com/smartcontractkit/chainlink-canton/deployment/sequences"
+	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 var (
@@ -56,7 +61,65 @@ func (c CantonTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSe
 }
 
 func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {
-	return 10, nil
+	poolAddressRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		chainSelector,
+		poolRef.Type,
+		poolRef.Version,
+		poolRef.Qualifier,
+	))
+	if err != nil {
+		return 0, fmt.Errorf("resolve Canton token pool ref: %w", err)
+	}
+
+	chain, ok := e.BlockChains.CantonChains()[chainSelector]
+	if !ok || len(chain.Participants) == 0 {
+		return 0, fmt.Errorf("canton chain with selector %d not found", chainSelector)
+	}
+	participant := chain.Participants[0]
+	ctx := context.Background()
+	if e.GetContext != nil {
+		ctx = e.GetContext()
+	}
+
+	poolAddress := contracts.HexToInstanceAddress(poolAddressRef.Address)
+	switch poolRef.Type {
+	case datastore.ContractType("LockReleaseTokenPool"):
+		activePool, err := opcontract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			participant.PartyID,
+			lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
+			poolAddress,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("find active lock/release pool %s: %w", poolAddressRef.Address, err)
+		}
+		parsedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
+		if err != nil {
+			return 0, fmt.Errorf("parse active lock/release pool %s: %w", poolAddressRef.Address, err)
+		}
+
+		return uint8(parsedPool.Decimals), nil
+	case datastore.ContractType("BurnMintTokenPool"):
+		activePool, err := opcontract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			participant.PartyID,
+			burnminttokenpool.BurnMintTokenPool{}.GetTemplateID(),
+			poolAddress,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("find active burn/mint pool %s: %w", poolAddressRef.Address, err)
+		}
+		parsedPool, err := bindings.UnmarshalCreatedEvent[burnminttokenpool.BurnMintTokenPool](activePool.GetCreatedEvent())
+		if err != nil {
+			return 0, fmt.Errorf("parse active burn/mint pool %s: %w", poolAddressRef.Address, err)
+		}
+
+		return uint8(parsedPool.Decimals), nil
+	default:
+		return 0, fmt.Errorf("unsupported Canton token pool type %q", poolRef.Type)
+	}
 }
 
 func (c CantonTokenAdapter) DeriveTokenPoolCounterpart(e deployment.Environment, chainSelector uint64, tokenPool []byte, token []byte) ([]byte, error) {
