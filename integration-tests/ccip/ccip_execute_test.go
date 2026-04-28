@@ -219,13 +219,6 @@ func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.Private
 	return result.Bytes(), nil
 }
 
-// EncodePartyID encodes a Canton party ID as a 32-byte keccak256 address.
-// Matches Daml encodePartyAddress: keccak256(toHex(partyToText party)),
-// which is equivalent to keccak256(partyBytes) since keccak256 hex-decodes its input.
-func EncodePartyID(partyID string) []byte {
-	return crypto.Keccak256([]byte(partyID))
-}
-
 // hexToBytes decodes a hex string to raw bytes. Panics on invalid hex.
 func hexToBytes(s string) []byte {
 	b, err := hex.DecodeString(s)
@@ -234,13 +227,6 @@ func hexToBytes(s string) []byte {
 	}
 
 	return b
-}
-
-// rawInstanceAddress wraps a text value as a Daml RawInstanceAddress newtype for the gRPC API.
-func rawInstanceAddress(text string) *apiv2.Value {
-	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: text}}},
-	}}}}
 }
 
 // TestCCIPExecuteE2E tests the full execute flow without token transfers.
@@ -607,7 +593,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		OnRampAddress:       hexToBytes("000000000000000000000000f6eced5e96fff2de4f0ecd722beb57556fc443fd"), // left-padded to 32 bytes
 		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
-		Receiver:            EncodePartyID(partyReceiver),
+		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
 		DestBlob:            []byte{},
 		TokenTransfer:       nil, // No token transfer
 		MessageData:         testPayload,

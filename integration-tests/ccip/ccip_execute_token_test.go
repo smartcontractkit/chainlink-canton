@@ -631,7 +631,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 		OnRampAddress:       gethcommon.LeftPadBytes(hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"), 32),
 		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
-		Receiver:            EncodePartyID(partyReceiver),
+		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
 		DestBlob:            []byte{},
 		TokenTransfer:       encodedTokenTransfer,
 		MessageData:         []byte{},
@@ -818,7 +818,7 @@ func buildTokenTransferV1(
 		SourcePoolAddress:  sourcePoolAddress,
 		SourceTokenAddress: sourceTokenAddress,
 		DestTokenAddress:   destTokenAddress.Bytes(),
-		TokenReceiver:      EncodePartyID(tokenReceiverParty),
+		TokenReceiver:      contracts.HashedPartyFromString(tokenReceiverParty).Bytes(),
 		ExtraData:          extraData,
 	}
 }
