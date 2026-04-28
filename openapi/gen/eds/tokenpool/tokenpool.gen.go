@@ -20,7 +20,9 @@ import (
 
 // TokenInput The token input for the token transfer.
 type TokenInput struct {
-	ExtraArgs struct {
+	// BurnMintFactory The unique identifier of a contract.
+	BurnMintFactory *externalRef0.ContractId `json:"burnMintFactory,omitempty"`
+	ExtraArgs       struct {
 		Context  map[string]interface{} `json:"context"`
 		Metadata map[string]interface{} `json:"metadata"`
 	} `json:"extraArgs"`
