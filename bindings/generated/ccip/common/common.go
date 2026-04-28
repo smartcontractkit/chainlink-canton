@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "128a4d14800b9dad441c17aec3e0678cb9e0d00d4013572048465da564dba7cb"
+	PackageID   = "0d2bb335ae553af2242d34c53d58248ca875d54ab31150b8d8a71b63d4191966"
 	SDKVersion  = "3.4.10"
 )
 
@@ -67,20 +67,18 @@ type IIExecutor interface {
 }
 
 const (
-	UsdPerUsdCent                                 = types.NUMERIC("100000000.")
-	PremiumIdentity                               = types.NUMERIC("10000000000.")
-	JuelsPerLocalLink                             = types.NUMERIC("10000000000.")
-	E10PerPercent                                 = types.NUMERIC("100000000.")
-	BaseNumeric                                   = types.NUMERIC("100000000.")
-	BaseInt                                       = types.INT64(100000000)
-	RmnRemoteKey                                  = types.TEXT("rmn-remote")
-	WaitForFinalityFlag                           = types.TEXT("00000000")
-	FinalityConfigByteLength                      = types.INT64(4)
-	MaxNumeric0IntegerText                        = types.TEXT("99999999999999999999999999999999999999")
-	GlobalConfigKey                               = types.TEXT("global-config")
-	RateLimiterKey                                = types.TEXT("rate-limiter")
-	InboundRateLimiterKey                         = types.TEXT("inbound-rate-limiter")
-	InboundCustomBlockConfirmationsRateLimiterKey = types.TEXT("inbound-custom-block-confirmations-rate-limiter")
+	UsdPerUsdCent            = types.NUMERIC("100000000.")
+	PremiumIdentity          = types.NUMERIC("10000000000.")
+	JuelsPerLocalLink        = types.NUMERIC("10000000000.")
+	E10PerPercent            = types.NUMERIC("100000000.")
+	BaseNumeric              = types.NUMERIC("100000000.")
+	BaseInt                  = types.INT64(100000000)
+	RmnRemoteKey             = types.TEXT("rmn-remote")
+	WaitForFinalityFlag      = types.TEXT("00000000")
+	FinalityConfigByteLength = types.INT64(4)
+	MaxNumeric0IntegerText   = types.TEXT("99999999999999999999999999999999999999")
+	GlobalConfigKey          = types.TEXT("global-config")
+	RateLimiterKey           = types.TEXT("rate-limiter")
 )
 
 func argsToMap(args any) map[string]any {
