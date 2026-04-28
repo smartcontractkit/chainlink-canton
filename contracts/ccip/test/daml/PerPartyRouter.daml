@@ -244,7 +244,7 @@ testCCIPSend = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     -- Deploy FeeQuoter with fee token price
     feeQuoter <- submit ccipOwner do
@@ -511,7 +511,7 @@ testCCIPExecute = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     -- Deploy OffRamp
     offRamp <- submit ccipOwner do
@@ -685,7 +685,7 @@ testPrepareSendExtraArgs = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
@@ -895,7 +895,7 @@ testPrepareSendRejectsOversizedPayload = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
@@ -1113,7 +1113,7 @@ testExecuteRollsOverExecutedMessages = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     offRamp <- submit ccipOwner do
         createCmd CCIP.OffRamp.OffRamp with
@@ -1328,7 +1328,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
@@ -1482,7 +1482,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.FeeQuoter.FeeQuoter with

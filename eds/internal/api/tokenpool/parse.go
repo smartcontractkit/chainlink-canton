@@ -25,6 +25,7 @@ type RemoteChainConfig struct {
 
 type LockReleaseTokenPool struct {
 	Address            contracts.RawInstanceAddress
+	CCIPOwner          types.PARTY
 	InstrumentId       splice_api_token_holding_v1.InstrumentId
 	Decimals           types.INT64
 	RemoteChainConfigs map[uint64]RemoteChainConfig
@@ -80,6 +81,7 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 
 	return &LockReleaseTokenPool{
 		Address:            address,
+		CCIPOwner:          boundContract.CcipOwner,
 		RemoteChainConfigs: remoteChainConfigs,
 		InstrumentId:       boundContract.InstrumentId,
 		Decimals:           boundContract.Decimals,

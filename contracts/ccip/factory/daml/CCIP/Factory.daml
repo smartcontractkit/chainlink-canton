@@ -635,7 +635,7 @@ mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.T
 mkTokenAdminRegistryContract owner params = CCIP.TokenAdminRegistry.TokenAdminRegistry with
     instanceId = params.instanceId
     owner
-    tokenConfigs = Map.empty
+    entryCount = 0
 
 mkOnRampContract : Party -> DeployOnRampParams -> CCIP.OnRamp.OnRamp
 mkOnRampContract ccipOwner params = CCIP.OnRamp.OnRamp with

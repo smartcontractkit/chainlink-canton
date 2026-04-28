@@ -47,6 +47,48 @@ unsafeDecodeRequestedFinality finalityConfig =
 
 messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
+setupTokenAdminRegistryWithPool
+    : Party
+    -> Party
+    -> Text
+    -> HoldingV1.InstrumentId
+    -> Text
+    -> Script (ContractId TokenAdminRegistry.TokenAdminRegistry, ContractId TokenAdminRegistry.TokenConfig)
+setupTokenAdminRegistryWithPool ccipOwner poolOwner tokenAdminRegistryInstanceId instrumentId tokenPoolInstanceId = do
+    tokenAdminRegistry0 <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            entryCount = 0
+
+    proposeResult <- submit ccipOwner do
+        exerciseCmd tokenAdminRegistry0 TokenAdminRegistry.ProposeAdministrator with
+            tokenConfigCid = None
+            instrumentId = instrumentId
+            newAdmin = poolOwner
+            caller = ccipOwner
+    let tokenAdminRegistry = proposeResult.tokenAdminRegistryCid
+        tokenConfigCid0 = proposeResult.tokenConfigCid
+
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenConfigCid1 <- submit (actAs poolOwner <> disclose disclosedTar) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
+            tokenConfigCid = tokenConfigCid0
+            instrumentId = instrumentId
+            caller = poolOwner
+
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenConfigCid2 <- submit (actAs poolOwner <> disclose disclosedTar) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
+            tokenConfigCid = tokenConfigCid1
+            instrumentId = instrumentId
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
+                poolOwner = poolOwner
+                poolInstanceId = tokenPoolInstanceId
+            caller = poolOwner
+
+    pure (tokenAdminRegistry, tokenConfigCid2)
+
 -- | Test execute with CCV verification via collecting contract pattern.
 --
 -- This test exercises AddCCVVerification directly on ExecutingMessageV1 rather
@@ -106,7 +148,7 @@ testExecuteWithCCVVerification = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     -- Deploy OffRamp
     offRamp <- submit ccipOwner do
@@ -252,32 +294,12 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             customObservers = []
             cursedSubjects = []
 
-    tokenAdminRegistry <- submit ccipOwner do
-        createCmd TokenAdminRegistry.TokenAdminRegistry with
-            instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
-            tokenConfigs = Map.empty
-
-    tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
-            instrumentId = feeToken
-            newAdmin = poolOwner
-            caller = ccipOwner
-
-    disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
-            instrumentId = feeToken
-            caller = poolOwner
-
-    disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
-            instrumentId = feeToken
-            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
-                poolOwner = poolOwner
-                poolInstanceId = "test-pool-token-only"
-            caller = poolOwner
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
+        ccipOwner
+        poolOwner
+        tokenAdminRegistryInstanceId
+        feeToken
+        "test-pool-token-only"
 
     let offRampAddr = RawInstanceAddress.make offRampInstanceId ccipOwner
     let globalConfigAddr = RawInstanceAddress.make globalConfigInstanceId ccipOwner
@@ -367,14 +389,16 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
     disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    result <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+    result <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedTokenConfig <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = CCIP.Context.CCIPContext with
                 values = TextMap.fromList
                     [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
                     , (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (TokenAdminRegistry.tokenConfigKey, CCIP.Context.AV_ContractId $ coerceContractId tokenConfigCid)
                     , (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
                     , (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)
                     ]
@@ -439,7 +463,7 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     -- Deploy OffRamp
     offRamp <- submit ccipOwner do
@@ -617,7 +641,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     -- Deploy OffRamp
     offRamp <- submit ccipOwner do
@@ -800,7 +824,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     -- Deploy OffRamp
     offRamp <- submit ccipOwner do
@@ -986,7 +1010,7 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
@@ -1110,7 +1134,7 @@ testPrepareExecuteAllowsSafeFinalityConfig = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
@@ -1233,7 +1257,7 @@ testExecuteFailsMissingCCV = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     -- Deploy OffRamp
     offRamp <- submit ccipOwner do
@@ -1368,7 +1392,7 @@ testExecuteWrongReceiver = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     -- Deploy OffRamp
     offRamp <- submit ccipOwner do
@@ -1492,7 +1516,7 @@ testExecuteAllowsMultipleOnRamps = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
@@ -1625,7 +1649,7 @@ testExecuteRejectsUnconfiguredOnRamp = script do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            tokenConfigs = Map.empty
+            entryCount = 0
 
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with

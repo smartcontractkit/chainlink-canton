@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -135,8 +136,8 @@ func parseDestChainConfig(destChainConfig common.DestChainConfig) (DestChainConf
 }
 
 type TokenAdminRegistry struct {
-	Address      contracts.RawInstanceAddress
-	TokenConfigs map[contracts.EncodedInstrumentID]tokenadminregistry.TokenConfig
+	Address    contracts.RawInstanceAddress
+	EntryCount types.INT64
 }
 
 func ParseTokenAdminRegistry(createdEvent *apiv2.CreatedEvent) (*TokenAdminRegistry, error) {
@@ -147,14 +148,37 @@ func ParseTokenAdminRegistry(createdEvent *apiv2.CreatedEvent) (*TokenAdminRegis
 
 	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.Owner)
 
-	tokenConfigs := make(map[contracts.EncodedInstrumentID]tokenadminregistry.TokenConfig, len(boundContract.TokenConfigs))
-	for encodedInstrumentIdString, tokenConfig := range boundContract.TokenConfigs {
-		encodedInstrumentId := contracts.HexToEncodedInstrumentID(string(encodedInstrumentIdString))
-		tokenConfigs[encodedInstrumentId] = tokenConfig
+	return &TokenAdminRegistry{
+		Address:    address,
+		EntryCount: boundContract.EntryCount,
+	}, nil
+}
+
+type TokenConfig struct {
+	Address         contracts.RawInstanceAddress
+	RegistryAddress contracts.RawInstanceAddress
+	Index           types.INT64
+	InstrumentId    contracts.EncodedInstrumentID
+	IsCCIPManaged   types.BOOL
+	Pool            *tokenadminregistry.PoolRegistration
+}
+
+func ParseTokenConfig(createdEvent *apiv2.CreatedEvent) (*TokenConfig, error) {
+	boundContract, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenConfig](createdEvent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal TokenConfig: %w", err)
 	}
 
-	return &TokenAdminRegistry{
-		Address:      address,
-		TokenConfigs: tokenConfigs,
+	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.RegistryOwner)
+	registryAddress := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.RegistryInstanceId), boundContract.RegistryOwner)
+	instrumentId := contracts.EncodeInstrumentID(boundContract.InstrumentId)
+
+	return &TokenConfig{
+		Address:         address,
+		RegistryAddress: registryAddress,
+		Index:           boundContract.Index,
+		InstrumentId:    instrumentId,
+		IsCCIPManaged:   boundContract.IsCCIPManaged,
+		Pool:            boundContract.TokenPool,
 	}, nil
 }

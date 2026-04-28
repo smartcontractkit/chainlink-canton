@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
@@ -43,7 +44,7 @@ func TestSetPoolViaMCMS(t *testing.T) {
 	// Deploy MCMS with minDelay=0 for testing
 	mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, baseMcmsID, cfg, 0, nil)
 
-	// Deploy TokenAdminRegistry with empty tokenConfigs
+	// Deploy TokenAdminRegistry with no TokenConfig entries.
 	tarInstanceID := "tar-" + uuid.New().String()[:8]
 	tarInstanceAddr := fmt.Sprintf("%s@%s", tarInstanceID, ccipOwner)
 	testInstrumentId := splice.InstrumentId{
@@ -54,7 +55,8 @@ func TestSetPoolViaMCMS(t *testing.T) {
 	tarCid := createTokenAdminRegistryEmpty(t, participant, tarPkgID, ccipOwner, tarInstanceID)
 
 	// Set up admin for the instrument so SetPool can succeed
-	tarCid = exerciseProposeAndAcceptAdmin(t, participant, tarPkgID, ccipOwner, tarCid, testInstrumentId)
+	tarCid, tokenConfigCid := exerciseProposeAndAcceptAdmin(t, participant, tarPkgID, ccipOwner, tarCid, testInstrumentId)
+	tokenConfigInstanceAddr := makeTokenConfigInstanceAddr(ccipOwner, testInstrumentId)
 
 	// Create MCMS encoder for TokenAdminRegistry
 	tarContract := tokenadminregistry.NewContract(tarPkgID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
@@ -64,8 +66,8 @@ func TestSetPoolViaMCMS(t *testing.T) {
 		PoolOwner:      types.PARTY(ccipOwner),
 		PoolInstanceId: types.TEXT("test-pool-001"),
 	}
-	encodedSetPool, err := tarContract.Encoder().SetPoolMCMSParams(
-		tokenadminregistry.SetPoolMCMSParams{
+	encodedSetPool, err := tarContract.Encoder().SetPoolParams(
+		tokenadminregistry.SetPoolParams{
 			InstrumentId: testInstrumentId,
 			TokenPool:    poolReg,
 		},
@@ -110,13 +112,15 @@ func TestSetPoolViaMCMS(t *testing.T) {
 	mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 	// ExecuteScheduledBatch - this exercises the set_pool choice on TokenAdminRegistry via MCMS
-	newTarCid := executeScheduledBatchReturningTargetCid(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{tarInstanceAddr: tarCid}, tarPkgID, "TokenAdminRegistry")
+	newTokenConfigCid := executeScheduledBatchReturningTargetCid(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{
+		tarInstanceAddr:         tarCid,
+		tokenConfigInstanceAddr: tokenConfigCid,
+	}, tarPkgID, "TokenConfig")
 
-	// Verify the TokenAdminRegistry was updated (new contract created)
-	require.NotEqual(t, tarCid, newTarCid, "TokenAdminRegistry contract should have been updated")
+	require.NotEqual(t, tokenConfigCid, newTokenConfigCid, "TokenConfig contract should have been updated")
 
-	// Verify pool was set by querying the updated contract
-	config := queryTokenConfigFromContract(t, participant, tarPkgID, newTarCid, testInstrumentId)
+	// Verify pool was set by querying the standalone TokenConfig contract
+	config := queryTokenConfig(t, participant, tarPkgID, ccipOwner, testInstrumentId)
 	require.NotNil(t, config, "TokenConfig should exist after set_pool")
 	require.NotNil(t, config.TokenPool, "pool should be set after MCMS execution")
 	require.Equal(t, string(poolReg.PoolOwner), string(config.TokenPool.PoolOwner))
@@ -151,17 +155,18 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 
 	// Create TokenAdminRegistry and set up admin
 	tarCid := createTokenAdminRegistryEmpty(t, participant, tarPkgID, ccipOwner, tarInstanceID)
-	tarCid = exerciseProposeAndAcceptAdmin(t, participant, tarPkgID, ccipOwner, tarCid, testInstrumentId)
+	tarCid, tokenConfigCid := exerciseProposeAndAcceptAdmin(t, participant, tarPkgID, ccipOwner, tarCid, testInstrumentId)
+	tokenConfigInstanceAddr := makeTokenConfigInstanceAddr(ccipOwner, testInstrumentId)
 
 	// Set initial pool directly (not via MCMS) so we have something to clear
 	initialPool := &tokenadminregistry.PoolRegistration{
 		PoolOwner:      types.PARTY(ccipOwner),
 		PoolInstanceId: types.TEXT("initial-pool"),
 	}
-	tarCid = exerciseSetPoolDirectly(t, participant, tarPkgID, ccipOwner, tarCid, testInstrumentId, initialPool)
+	tokenConfigCid = exerciseSetPoolDirectly(t, participant, tarPkgID, ccipOwner, tarCid, tokenConfigCid, testInstrumentId, initialPool)
 
 	// Verify pool is initially set
-	config := queryTokenConfigFromContract(t, participant, tarPkgID, tarCid, testInstrumentId)
+	config := queryTokenConfig(t, participant, tarPkgID, ccipOwner, testInstrumentId)
 	require.NotNil(t, config, "TokenConfig should exist")
 	require.NotNil(t, config.TokenPool, "pool should be set initially")
 
@@ -169,8 +174,8 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 	tarContract := tokenadminregistry.NewContract(tarPkgID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Clear pool by setting to None via MCMS
-	encodedClearPool, err := tarContract.Encoder().SetPoolMCMSParams(
-		tokenadminregistry.SetPoolMCMSParams{
+	encodedClearPool, err := tarContract.Encoder().SetPoolParams(
+		tokenadminregistry.SetPoolParams{
 			InstrumentId: testInstrumentId,
 			TokenPool:    nil, // nil = clear pool
 		},
@@ -208,11 +213,15 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 	opProof, err := proposal.GetOpProof(0)
 	require.NoError(t, err)
 	mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
-	newTarCid := executeScheduledBatchReturningTargetCid(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{tarInstanceAddr: tarCid}, tarPkgID, "TokenAdminRegistry")
+	newTokenConfigCid := executeScheduledBatchReturningTargetCid(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{
+		tarInstanceAddr:         tarCid,
+		tokenConfigInstanceAddr: tokenConfigCid,
+	}, tarPkgID, "TokenConfig")
 	_ = mcmsCid
+	require.NotEqual(t, tokenConfigCid, newTokenConfigCid, "TokenConfig contract should have been updated")
 
 	// Verify pool was cleared
-	config = queryTokenConfigFromContract(t, participant, tarPkgID, newTarCid, testInstrumentId)
+	config = queryTokenConfig(t, participant, tarPkgID, ccipOwner, testInstrumentId)
 	require.NotNil(t, config, "TokenConfig should still exist")
 	require.Nil(t, config.TokenPool, "pool should be cleared after MCMS execution")
 }
@@ -251,8 +260,8 @@ func TestTokenAdminRegistry_ProposeAdminViaMCMS(t *testing.T) {
 
 	// Propose a new admin via MCMS
 	newAdmin := types.PARTY(ccipOwner) // For simplicity, propose self as admin
-	encodedPropose, err := tarContract.Encoder().ProposeAdministratorMCMSParams(
-		tokenadminregistry.ProposeAdministratorMCMSParams{
+	encodedPropose, err := tarContract.Encoder().ProposeAdministrator(
+		tokenadminregistry.ProposeAdministrator{
 			InstrumentId: testInstrumentId,
 			NewAdmin:     newAdmin,
 		},
@@ -290,11 +299,12 @@ func TestTokenAdminRegistry_ProposeAdminViaMCMS(t *testing.T) {
 	opProof, err := proposal.GetOpProof(0)
 	require.NoError(t, err)
 	mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
-	newTarCid := executeScheduledBatchReturningTargetCid(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{tarInstanceAddr: tarCid}, tarPkgID, "TokenAdminRegistry")
+	newTokenConfigCid := executeScheduledBatchReturningTargetCid(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{tarInstanceAddr: tarCid}, tarPkgID, "TokenConfig")
 	_ = mcmsCid
+	require.NotEmpty(t, newTokenConfigCid, "TokenConfig should be created")
 
 	// Verify pending admin was set
-	config := queryTokenConfigFromContract(t, participant, tarPkgID, newTarCid, testInstrumentId)
+	config := queryTokenConfig(t, participant, tarPkgID, ccipOwner, testInstrumentId)
 	require.NotNil(t, config, "TokenConfig should exist")
 	require.NotNil(t, config.PendingAdmin, "pendingAdmin should be set after propose_administrator")
 	require.Equal(t, string(newAdmin), string(*config.PendingAdmin))
@@ -312,9 +322,9 @@ func createTokenAdminRegistryEmpty(
 	t.Helper()
 
 	tarContract := tokenadminregistry.TokenAdminRegistry{
-		InstanceId:   types.TEXT(instanceID),
-		Owner:        types.PARTY(owner),
-		TokenConfigs: map[types.TEXT]tokenadminregistry.TokenConfig{}, // Empty initially
+		InstanceId: types.TEXT(instanceID),
+		Owner:      types.PARTY(owner),
+		EntryCount: 0,
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -348,15 +358,17 @@ func exerciseSetPoolDirectly(
 	tarPkgID string,
 	owner string,
 	tarCid string,
+	tokenConfigCid string,
 	instrumentId splice.InstrumentId,
 	pool *tokenadminregistry.PoolRegistration,
 ) string {
 	t.Helper()
 
 	setPoolArgs := tokenadminregistry.SetPool{
-		InstrumentId: instrumentId,
-		TokenPool:    pool,
-		Caller:       types.PARTY(owner),
+		TokenConfigCid: types.CONTRACT_ID(tokenConfigCid),
+		InstrumentId:   instrumentId,
+		TokenPool:      pool,
+		Caller:         types.PARTY(owner),
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -371,7 +383,7 @@ func exerciseSetPoolDirectly(
 							EntityName: "TokenAdminRegistry",
 						},
 						ContractId:     tarCid,
-						Choice:         "TokenAdminRegistry_SetPool",
+						Choice:         "SetPool",
 						ChoiceArgument: ledger.MapToValue(setPoolArgs),
 					},
 				},
@@ -381,13 +393,13 @@ func exerciseSetPoolDirectly(
 	})
 	require.NoError(t, err)
 
-	// Return the new contract ID
+	// Return the new TokenConfig contract ID
 	for _, event := range res.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "TokenAdminRegistry" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "TokenConfig" {
 			return created.GetContractId()
 		}
 	}
-	t.Fatal("no TokenAdminRegistry contract created after SetPool")
+	t.Fatal("no TokenConfig contract created after SetPool")
 
 	return ""
 }
@@ -401,7 +413,7 @@ func exerciseProposeAndAcceptAdmin(
 	owner string,
 	tarCid string,
 	instrumentId splice.InstrumentId,
-) string {
+) (string, string) {
 	t.Helper()
 
 	proposeArgs := tokenadminregistry.ProposeAdministrator{
@@ -422,7 +434,7 @@ func exerciseProposeAndAcceptAdmin(
 							EntityName: "TokenAdminRegistry",
 						},
 						ContractId:     tarCid,
-						Choice:         "TokenAdminRegistry_ProposeAdministrator",
+						Choice:         "ProposeAdministrator",
 						ChoiceArgument: ledger.MapToValue(proposeArgs),
 					},
 				},
@@ -433,16 +445,23 @@ func exerciseProposeAndAcceptAdmin(
 	require.NoError(t, err)
 
 	var newTarCid string
+	var tokenConfigCid string
 	for _, event := range res.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "TokenAdminRegistry" {
+		if created := event.GetCreated(); created == nil {
+			continue
+		} else if created.GetTemplateId().GetEntityName() == "TokenAdminRegistry" {
 			newTarCid = created.GetContractId()
+		} else if created.GetTemplateId().GetEntityName() == "TokenConfig" {
+			tokenConfigCid = created.GetContractId()
 		}
 	}
 	require.NotEmpty(t, newTarCid, "no TokenAdminRegistry contract created after ProposeAdministrator")
+	require.NotEmpty(t, tokenConfigCid, "no TokenConfig contract created after ProposeAdministrator")
 
 	acceptArgs := tokenadminregistry.AcceptAdminRole{
-		InstrumentId: instrumentId,
-		Caller:       types.PARTY(owner),
+		TokenConfigCid: types.CONTRACT_ID(tokenConfigCid),
+		InstrumentId:   instrumentId,
+		Caller:         types.PARTY(owner),
 	}
 
 	res, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -457,7 +476,7 @@ func exerciseProposeAndAcceptAdmin(
 							EntityName: "TokenAdminRegistry",
 						},
 						ContractId:     newTarCid,
-						Choice:         "TokenAdminRegistry_AcceptAdminRole",
+						Choice:         "AcceptAdminRole",
 						ChoiceArgument: ledger.MapToValue(acceptArgs),
 					},
 				},
@@ -468,13 +487,13 @@ func exerciseProposeAndAcceptAdmin(
 	require.NoError(t, err)
 
 	for _, event := range res.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "TokenAdminRegistry" {
-			return created.GetContractId()
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "TokenConfig" {
+			return newTarCid, created.GetContractId()
 		}
 	}
-	t.Fatal("no TokenAdminRegistry contract created after AcceptAdminRole")
+	t.Fatal("no TokenConfig contract created after AcceptAdminRole")
 
-	return ""
+	return "", ""
 }
 
 // executeScheduledBatchReturningTargetCid executes a scheduled batch and returns the new CID of a target contract.
@@ -538,38 +557,46 @@ func executeScheduledBatchReturningTargetCid(
 	return ""
 }
 
-// queryTokenConfigFromContract queries token config from a specific contract instance.
-func queryTokenConfigFromContract(
+// queryTokenConfig queries the standalone TokenConfig for an instrument and registry owner.
+func queryTokenConfig(
 	t *testing.T,
 	participant canton.Participant,
 	tarPkgID string,
-	tarCid string,
+	owner string,
 	instrumentId splice.InstrumentId,
 ) *tokenadminregistry.TokenConfig {
 	t.Helper()
 
-	// Get the contract by ID
 	contracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
 		PackageId:  tarPkgID,
 		ModuleName: "CCIP.TokenAdminRegistry",
-		EntityName: "TokenAdminRegistry",
+		EntityName: "TokenConfig",
 	})
 	require.NoError(t, err)
 
+	expectedInstanceID := encodeInstrumentId(instrumentId)
 	for _, contract := range contracts {
-		if contract.GetCreatedEvent().GetContractId() != tarCid {
+		createdEvent := contract.GetCreatedEvent()
+		config, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenConfig](createdEvent)
+		require.NoError(t, err)
+		if string(config.InstanceId) != expectedInstanceID {
+			continue
+		}
+		if string(config.RegistryOwner) != owner {
+			continue
+		}
+		if config.InstrumentId != instrumentId {
 			continue
 		}
 
-		// Found our contract, parse tokenConfigs
-		for _, field := range contract.GetCreatedEvent().GetCreateArguments().GetFields() {
-			if field.GetLabel() == "tokenConfigs" {
-				return parseTokenConfigFromGenMap(t, field.GetValue(), instrumentId)
-			}
-		}
+		return config
 	}
 
 	return nil
+}
+
+func makeTokenConfigInstanceAddr(owner string, instrumentId splice.InstrumentId) string {
+	return fmt.Sprintf("%s@%s", encodeInstrumentId(instrumentId), owner)
 }
 
 // encodeInstrumentId matches Canton's CCIP.MessageCodecV1.encodeInstrumentId
@@ -579,72 +606,4 @@ func encodeInstrumentId(instrumentId splice.InstrumentId) string {
 	hash := crypto.Keccak256([]byte(combined))
 
 	return hex.EncodeToString(hash)
-}
-
-func parseTokenConfigFromGenMap(t *testing.T, tokenConfigs *apiv2.Value, instrumentId splice.InstrumentId) *tokenadminregistry.TokenConfig {
-	t.Helper()
-
-	genMap := tokenConfigs.GetGenMap()
-	if genMap == nil {
-		// Empty map or no entries
-		return nil
-	}
-
-	// The map key is BytesHex (encoded InstrumentId), not a Record
-	expectedKey := encodeInstrumentId(instrumentId)
-
-	for _, entry := range genMap.GetEntries() {
-		key := entry.GetKey()
-		value := entry.GetValue()
-
-		// Key is a Text (hex string), not a Record
-		keyText := key.GetText()
-		if keyText == expectedKey {
-			return parseTokenConfig(t, value)
-		}
-	}
-
-	return nil
-}
-
-func parseTokenConfig(t *testing.T, value *apiv2.Value) *tokenadminregistry.TokenConfig {
-	t.Helper()
-
-	record := value.GetRecord()
-	if record == nil {
-		t.Fatal("TokenConfig value is not a Record")
-	}
-
-	config := &tokenadminregistry.TokenConfig{}
-
-	for _, field := range record.GetFields() {
-		switch field.GetLabel() {
-		case "admin":
-			if opt := field.GetValue().GetOptional(); opt != nil && opt.GetValue() != nil {
-				config.Admin = new(types.PARTY(opt.GetValue().GetParty()))
-			}
-		case "pendingAdmin":
-			if opt := field.GetValue().GetOptional(); opt != nil && opt.GetValue() != nil {
-				config.PendingAdmin = new(types.PARTY(opt.GetValue().GetParty()))
-			}
-		case "tokenPool":
-			if opt := field.GetValue().GetOptional(); opt != nil && opt.GetValue() != nil {
-				poolRecord := opt.GetValue().GetRecord()
-				if poolRecord != nil {
-					pool := &tokenadminregistry.PoolRegistration{}
-					for _, pf := range poolRecord.GetFields() {
-						switch pf.GetLabel() {
-						case "poolOwner":
-							pool.PoolOwner = types.PARTY(pf.GetValue().GetParty())
-						case "poolInstanceId":
-							pool.PoolInstanceId = types.TEXT(pf.GetValue().GetText())
-						}
-					}
-					config.TokenPool = pool
-				}
-			}
-		}
-	}
-
-	return config
 }

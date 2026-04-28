@@ -102,10 +102,10 @@ type RawOrHashedInstrumentId struct {
 // TokenTransfer A token transfer to be included in the message, set to null if the message does not include a token transfer.
 type TokenTransfer struct {
 	// Amount The decimal amount of the token to be transferred.
-	Amount *string `json:"amount,omitempty"`
+	Amount string `json:"amount"`
 
 	// Token A globally unique identifier for instruments.
-	Token *InstrumentId `json:"token,omitempty"`
+	Token InstrumentId `json:"token"`
 }
 
 // N400 defines model for 400.
