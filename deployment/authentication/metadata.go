@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // AuthorizationServerMetadata represents a subset of the metadata provided by an OAuth 2.0 Authorization Server.
@@ -34,7 +35,9 @@ func GetAuthorizationServerMetadata(ctx context.Context, authorizationServerURL 
 	if err != nil {
 		return nil, err
 	}
-	client := http.DefaultClient
+	client := http.Client{
+		Timeout: 10 * time.Second,
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, err
