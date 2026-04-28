@@ -31,6 +31,10 @@ import (
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
+// MaxNumCCVs is a sane limit on the maximum number of CCVs requestable by a client.
+// This is a defense in depth measure to prevent abuse of the API.
+const MaxNumCCVs = 64
+
 type Server struct {
 	logger              zerolog.Logger
 	activeContractStore *store.ActiveContractStore
@@ -99,7 +103,7 @@ func NewServer(
 
 func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
 	var req oapiCCIP.CCIPPerPartyRouterFactoryRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -178,8 +182,16 @@ func (s Server) GetTokenAdminRegistryToken(c *gin.Context, instrumentId oapiComm
 
 func (s Server) PostCCIPSend(c *gin.Context) {
 	var req oapiCCIP.CCIPSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
+		return
+	}
+	if req.SenderRequiredCCVs != nil && len(*req.SenderRequiredCCVs) > MaxNumCCVs {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("sender required CCVs exceeds maximum value: %d", MaxNumCCVs)})
+		return
+	}
+	if req.TokenPoolRequiredCCVs != nil && len(*req.TokenPoolRequiredCCVs) > MaxNumCCVs {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("token pool required CCVs exceeds maximum value: %d", MaxNumCCVs)})
 		return
 	}
 
@@ -401,7 +413,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 
 func (s Server) PostCCIPExecute(c *gin.Context) {
 	var req oapiCCIP.CCIPExecuteRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}

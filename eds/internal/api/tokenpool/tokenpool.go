@@ -100,7 +100,7 @@ func NewServer(
 
 func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -237,7 +237,7 @@ func (s Server) lockReleaseTokenPoolSend(
 
 func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolExecuteRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
