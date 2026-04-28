@@ -52,7 +52,7 @@ func NewServer(
 
 func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 	var req oapiExecutor.ExecutorSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}

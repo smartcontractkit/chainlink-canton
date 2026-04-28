@@ -34,6 +34,10 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	FeeQuoterKey = types.TEXT("fee-quoter")
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

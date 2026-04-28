@@ -36,6 +36,10 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	MaxExecutedMessagesSize = types.INT64(25000)
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

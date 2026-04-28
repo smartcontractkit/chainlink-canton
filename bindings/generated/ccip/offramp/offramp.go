@@ -34,6 +34,10 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	OffRampKey = types.TEXT("off-ramp")
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

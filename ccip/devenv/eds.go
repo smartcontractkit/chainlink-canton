@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/docker/docker/api/types/container"
@@ -185,7 +186,8 @@ func startEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Contai
 				},
 			}
 		},
-		WaitingFor: wait.ForLog("Backfill complete"), // TODO: properly implement readiness endpoint
+		// TODO: properly implement readiness endpoint
+		WaitingFor: wait.ForLog("Backfill complete").WithStartupTimeout(2 * time.Minute),
 		Files: []testcontainers.ContainerFile{
 			{
 				Reader:            bytes.NewReader(configToml),

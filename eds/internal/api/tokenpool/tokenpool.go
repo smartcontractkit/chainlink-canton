@@ -111,7 +111,7 @@ func NewServer(
 
 func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -223,7 +223,7 @@ func (s Server) lockReleaseTokenPoolSend(
 
 	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
 		Values: map[string]common.AnyValue{
-			"rate-limiter": {
+			string(common.RateLimiterKey): {
 				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -269,7 +269,7 @@ func (s Server) lockReleaseTokenPoolSend(
 
 func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolExecuteRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -355,7 +355,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values["inbound-rate-limiter"] = common.AnyValue{
+		ccipContext.Values[string(common.InboundRateLimiterKey)] = common.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	} else {
@@ -365,7 +365,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values["inbound-custom-block-confirmations-rate-limiter"] = common.AnyValue{
+		ccipContext.Values[string(common.InboundCustomBlockConfirmationsRateLimiterKey)] = common.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	}
