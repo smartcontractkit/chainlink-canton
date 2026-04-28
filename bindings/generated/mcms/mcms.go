@@ -42,6 +42,12 @@ type IMCMSReceiver interface {
 	MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand
 }
 
+const (
+	ZeroHash      = types.TEXT("0000000000000000000000000000000000000000000000000000000000000000")
+	NumGroups     = types.INT64(32)
+	MaxNumSigners = types.INT64(200)
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

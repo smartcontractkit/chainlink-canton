@@ -34,6 +34,11 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	TokenConfigKey        = types.TEXT("token-config")
+	TokenAdminRegistryKey = types.TEXT("token-admin-registry")
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}
