@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
 )
 
@@ -44,9 +43,9 @@ func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter opera
 		return operations.NewBundle(t.Context, logger.Test(t), reporter)
 	}
 
-	deps1 := ceremony.CantonDeps{Client: s.Actors[0].client, Logger: logger.Test(t)}
-	deps2 := ceremony.CantonDeps{Client: s.Actors[1].client, Logger: logger.Test(t)}
-	deps3 := ceremony.CantonDeps{Client: s.Actors[2].client, Logger: logger.Test(t)}
+	deps1 := s.OnboardingDeps(0)
+	deps2 := s.OnboardingDeps(1)
+	deps3 := s.OnboardingDeps(2)
 
 	// Run 1: Actor 1 generates key (1/3 keys)
 	t.Log("Actor 1: run 1 — key gen (1/3)")
@@ -124,17 +123,17 @@ func (s *OnboardingFlowTestSuite) TestOnboardingFlow() {
 	require.Len(t, parts, 2, "PartyID %q should be <name>::<namespace>", sr.Output.PartyID)
 	decNS := parts[1]
 
-	dnsOK, err := s.Actors[0].client.DNSExists(t.Context(), decNS, s.SynchronizerID)
+	dnsOK, err := s.Actors[0].deps.Client.DNSExists(t.Context(), decNS, s.SynchronizerID)
 	require.NoError(t, err, "DNSExists query failed")
 	assert.True(t, dnsOK, "DecentralizedNamespaceDefinition should be active in topology")
 
-	p2pOK, err := s.Actors[0].client.P2PExists(t.Context(), sr.Output.PartyID, s.SynchronizerID)
+	p2pOK, err := s.Actors[0].deps.Client.P2PExists(t.Context(), sr.Output.PartyID, s.SynchronizerID)
 	require.NoError(t, err, "P2PExists query failed")
 	assert.True(t, p2pOK, "PartyToParticipant mapping should be active in topology")
 
 	// ── Verify idempotency: re-run produces the same output from cache ───
 	t.Log("Actor 1: run 8 — idempotency check")
-	deps1 := ceremony.CantonDeps{Client: s.Actors[0].client, Logger: logger.Test(t)}
+	deps1 := s.OnboardingDeps(0)
 	newBundle := func() operations.Bundle {
 		return operations.NewBundle(t.Context, logger.Test(t), sharedReporter)
 	}

@@ -1,25 +1,22 @@
 package tests
 
 import (
-	"context"
 	"fmt"
-	"testing"
 
-	interactivepb "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
-	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
 
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	ceremonyruntime "github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/runtime"
 )
 
 type Actor struct {
-	client client.CantonClient
-	uid    string // Canton participant UID
+	deps ceremony.CantonDeps
+	uid  string // Canton participant UID
 }
 
 type CeremonyTestSuite struct {
@@ -29,6 +26,7 @@ type CeremonyTestSuite struct {
 	SynchronizerID string
 	ParticipantIDs []string
 	Actors         []Actor
+	Participants   []ceremonyruntime.Participant
 }
 
 func (s *CeremonyTestSuite) SetupSuite() {
@@ -45,69 +43,53 @@ func (s *CeremonyTestSuite) SetupSuite() {
 		s.chain = chain
 	}
 
-	// Build CantonClients for each participant.
+	runtimeParticipants := make([]ceremonyruntime.Participant, 3)
+	for i := range 3 {
+		p, err := ceremonyruntime.FromCantonParticipant(s.chain.Participants[i])
+		require.NoError(t, err, "runtime participant %d", i+1)
+		runtimeParticipants[i] = p
+	}
+
+	// Build ceremony deps for each participant through the public runtime bridge.
 	actors := make([]Actor, 3)
 	for i := range 3 {
-		c, conn := s.NewCantonClient(s.chain.Participants[i])
-		t.Cleanup(func() { _ = conn.Close() })
+		deps, cleanup, err := ceremonyruntime.NewOnboardingDeps(t.Context(), runtimeParticipants[i], logger.Test(t), nil)
+		require.NoError(t, err, "onboarding deps for participant %d", i+1)
+		t.Cleanup(func() { _ = cleanup() })
+
+		uid, err := ceremonyruntime.ParticipantUID(t.Context(), runtimeParticipants[i])
+		require.NoError(t, err, "participant %d UID", i+1)
 		actors[i] = Actor{
-			client: c,
-			uid:    getParticipantUID(t, c),
+			deps: deps,
+			uid:  uid,
 		}
 		t.Logf("Participant %d: %s", i+1, actors[i].uid)
 	}
 
-	synchronizerID := s.DiscoverSynchronizerID(s.chain.Participants[0])
+	synchronizerID, err := ceremonyruntime.DiscoverSynchronizerID(t.Context(), runtimeParticipants[0])
+	require.NoError(t, err, "discover synchronizer ID")
+	t.Logf("Discovered synchronizer ID: %s", synchronizerID)
+
 	participantIDs := []string{actors[0].uid, actors[1].uid, actors[2].uid}
 
 	s.SynchronizerID = synchronizerID
 	s.ParticipantIDs = participantIDs
 	s.Actors = actors
+	s.Participants = runtimeParticipants
 }
 
-// Creates a GRPCCantonClient from a canton.Participant by
-// dialling the participant's Admin API endpoint. The caller must close the
-// returned connection when done.
-func (s *CeremonyTestSuite) NewCantonClient(p canton.Participant) (client.CantonClient, *grpc.ClientConn) {
-	t := s.T()
-	require.NotNil(t, p.AdminServices, "participant %q has no admin API configured", p.Name)
+func (s *CeremonyTestSuite) OnboardingDeps(i int) ceremony.CantonDeps {
+	deps := s.Actors[i].deps
+	deps.Logger = logger.Test(s.T())
 
-	var dialOpts []grpc.DialOption
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if p.TokenSource != nil {
-		tok, err := p.TokenSource.Token()
-		require.NoError(t, err, "failed to get JWT for participant %s", p.Name)
-		if tok.AccessToken != "" {
-			dialOpts = append(dialOpts,
-				grpc.WithUnaryInterceptor(jwtUnary(tok.AccessToken)),
-				grpc.WithStreamInterceptor(jwtStream(tok.AccessToken)),
-			)
-		}
-	}
-
-	conn, err := grpc.NewClient(p.Endpoints.AdminAPIURL, dialOpts...)
-	require.NoError(t, err, "failed to dial admin API for participant %s", p.Name)
-
-	return client.NewGRPCClient(conn), conn
+	return deps
 }
 
-// discoverSynchronizerID queries the first connected synchronizer from the
-// participant's admin API and returns its synchronizer_id.
-func (s *CeremonyTestSuite) DiscoverSynchronizerID(p canton.Participant) string {
-	t := s.T()
+func (s *CeremonyTestSuite) OnboardingDepsWithConfirmer(i int, confirmer ceremony.Confirmer) ceremony.CantonDeps {
+	deps := s.OnboardingDeps(i)
+	deps.Confirmer = confirmer
 
-	require.NotNil(t, p.AdminServices, "participant %q has no admin API configured", p.Name)
-
-	resp, err := p.AdminServices.SynchronizerConnectivity.ListConnectedSynchronizers(
-		t.Context(), &participantv30.ListConnectedSynchronizersRequest{},
-	)
-	require.NoError(t, err, "ListConnectedSynchronizers failed")
-	require.NotEmpty(t, resp.GetConnectedSynchronizers(), "no connected synchronizers found")
-
-	syncID := resp.GetConnectedSynchronizers()[0].GetSynchronizerId()
-	t.Logf("Discovered synchronizer ID: %s", syncID)
-
-	return syncID
+	return deps
 }
 
 func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
@@ -145,80 +127,4 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 	return &canton.Chain{
 		Participants: participants,
 	}, nil
-}
-
-// getParticipantID returns the Canton-assigned participant identifier by
-// calling GetParticipantID on a CantonClient.
-func getParticipantUID(t *testing.T, c client.CantonClient) string {
-	t.Helper()
-	uid, err := c.GetParticipantUID(t.Context())
-	require.NoError(t, err, "GetParticipantUID failed")
-
-	return uid
-}
-
-// jwtUnary injects a bearer token into outgoing gRPC unary requests.
-func jwtUnary(token string) grpc.UnaryClientInterceptor {
-	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		return invoker(metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token), method, req, reply, cc, opts...)
-	}
-}
-
-// jwtStream injects a bearer token into outgoing gRPC streaming requests.
-func jwtStream(token string) grpc.StreamClientInterceptor {
-	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-		return streamer(metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token), desc, cc, method, opts...)
-	}
-}
-
-// userIDInterceptor injects a user_id into PrepareSubmissionRequests and
-// ExecuteSubmissionRequests when the Canton node runs without authentication
-// (no JWT subject claim).
-func userIDInterceptor(userID string) grpc.UnaryClientInterceptor {
-	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		if r, ok := req.(*interactivepb.PrepareSubmissionRequest); ok && r.UserId == "" {
-			r.UserId = userID
-		}
-		if r, ok := req.(*interactivepb.ExecuteSubmissionRequest); ok && r.UserId == "" {
-			r.UserId = userID
-		}
-		if r, ok := req.(*interactivepb.ExecuteSubmissionAndWaitForTransactionRequest); ok && r.UserId == "" {
-			r.UserId = userID
-		}
-
-		return invoker(ctx, method, req, reply, cc, opts...)
-	}
-}
-
-// NewLedgerClient creates a GRPCLedgerClient from a canton.Participant by
-// dialling the participant's gRPC Ledger API endpoint. The caller must close
-// the returned connection when done.
-func (s *CeremonyTestSuite) NewLedgerClient(p canton.Participant) (client.LedgerClient, *grpc.ClientConn) {
-	t := s.T()
-	require.NotEmpty(t, p.Endpoints.GRPCLedgerAPIURL,
-		"participant %q has no gRPC Ledger API URL", p.Name)
-
-	var dialOpts []grpc.DialOption
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if p.TokenSource != nil {
-		tok, err := p.TokenSource.Token()
-		require.NoError(t, err, "failed to get JWT for participant %s", p.Name)
-		if tok.AccessToken != "" {
-			dialOpts = append(dialOpts,
-				grpc.WithUnaryInterceptor(jwtUnary(tok.AccessToken)),
-				grpc.WithStreamInterceptor(jwtStream(tok.AccessToken)),
-			)
-		}
-	}
-	// When the participant has a UserID set and no JWT carries a subject claim
-	// (local no-auth Canton), inject the user_id field into PrepareSubmission
-	// requests so Canton can resolve the acting user.
-	if p.UserID != "" && p.TokenSource == nil {
-		dialOpts = append(dialOpts, grpc.WithUnaryInterceptor(userIDInterceptor(p.UserID)))
-	}
-
-	conn, err := grpc.NewClient(p.Endpoints.GRPCLedgerAPIURL, dialOpts...)
-	require.NoError(t, err, "failed to dial ledger API for participant %s", p.Name)
-
-	return client.NewGRPCLedgerClient(conn), conn
 }

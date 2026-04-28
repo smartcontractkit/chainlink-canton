@@ -261,9 +261,39 @@ func createMCMSMultiRole(
 	blockedFunctions []mcms.BlockedFunction,
 ) string {
 	t.Helper()
-	// Use bindings to create MCMS - provides type safety and tests bindings work correctly
+	mcmsContract := buildMCMSMultiRoleContract(owner, chainID, baseMcmsID, config, minDelayMicros, blockedFunctions)
 
-	// Convert local SignerInfo to binding SignerInfo
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Create{
+					Create: &apiv2.CreateCommand{
+						TemplateId: &apiv2.Identifier{
+							PackageId:  mcmsPkgID,
+							ModuleName: "MCMS.Main",
+							EntityName: "MCMS",
+						},
+						CreateArguments: ledger.ConvertToRecord(mcmsContract),
+					},
+				},
+			}},
+			ActAs: []string{owner},
+		},
+	})
+	require.NoError(t, err)
+
+	return res.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
+}
+
+func buildMCMSMultiRoleContract(
+	owner string,
+	chainID int64,
+	baseMcmsID string,
+	config MCMSConfig,
+	minDelayMicros int64,
+	blockedFunctions []mcms.BlockedFunction,
+) mcms.MCMS {
 	signerInfos := make([]mcms.SignerInfo, len(config.Signers))
 	for i, si := range config.Signers {
 		signerInfos[i] = mcms.SignerInfo{
@@ -306,8 +336,7 @@ func createMCMSMultiRole(
 		},
 	}
 
-	// Build MCMS contract using bindings
-	mcmsContract := mcms.MCMS{
+	return mcms.MCMS{
 		Owner:              types.PARTY(owner),
 		InstanceId:         types.TEXT(baseMcmsID),
 		ChainId:            types.INT64(chainID),
@@ -318,28 +347,6 @@ func createMCMSMultiRole(
 		BlockedFunctions:   blockedFunctions,
 		TimelockTimestamps: map[types.TEXT]types.TIMESTAMP{},
 	}
-
-	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{
-					Create: &apiv2.CreateCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
-						CreateArguments: ledger.ConvertToRecord(mcmsContract),
-					},
-				},
-			}},
-			ActAs: []string{owner},
-		},
-	})
-	require.NoError(t, err)
-
-	return res.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
 }
 
 func setRootWithRole(
@@ -347,6 +354,23 @@ func setRootWithRole(
 	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
+	mcmsCid string,
+	roleConstructor string,
+	proposal *MCMSProposal,
+	validUntil time.Time,
+	signatures []RawSignature,
+) string {
+	t.Helper()
+
+	return setRootWithRoleAndDisclosureParty(t, participant, mcmsPkgID, owner, owner, mcmsCid, roleConstructor, proposal, validUntil, signatures)
+}
+
+func setRootWithRoleAndDisclosureParty(
+	t *testing.T,
+	participant canton.Participant,
+	mcmsPkgID string,
+	submitter string,
+	disclosureParty string,
 	mcmsCid string,
 	roleConstructor string,
 	proposal *MCMSProposal,
@@ -378,7 +402,7 @@ func setRootWithRole(
 	// Build SetRoot choice argument using bindings
 	setRootArgs := mcms.SetRoot{
 		TargetRole: mcms.Role(roleConstructor),
-		Submitter:  types.PARTY(owner),
+		Submitter:  types.PARTY(submitter),
 		NewRoot:    types.TEXT(proposal.GetRoot()),
 		ValidUntil: types.TIMESTAMP(validUntil),
 		Metadata: mcms.RootMetadata{
@@ -391,6 +415,8 @@ func setRootWithRole(
 		MetadataProof: metadataProofTexts,
 		Signatures:    bindingSignatures,
 	}
+
+	disclosedContracts := mcmsDisclosureForSubmitter(t, participant, mcmsPkgID, submitter, disclosureParty, mcmsCid)
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -409,7 +435,8 @@ func setRootWithRole(
 					},
 				},
 			}},
-			ActAs: []string{owner},
+			ActAs:              []string{submitter},
+			DisclosedContracts: disclosedContracts,
 		},
 	})
 	require.NoError(t, err)
@@ -418,9 +445,8 @@ func setRootWithRole(
 			return created.GetContractId()
 		}
 	}
-	t.Fatal("no MCMS contract created after SetRoot")
 
-	return ""
+	return findRefreshedMCMSCid(t, participant, disclosureParty, mcmsPkgID, mcmsCid)
 }
 
 func scheduleBatch(
@@ -757,10 +783,26 @@ func bypasserExecuteBatch(
 ) string {
 	t.Helper()
 
+	return bypasserExecuteBatchWithDisclosureParty(t, participant, mcmsPkgID, owner, owner, mcmsCid, targetCids, op, opProof)
+}
+
+func bypasserExecuteBatchWithDisclosureParty(
+	t *testing.T,
+	participant canton.Participant,
+	mcmsPkgID string,
+	submitter string,
+	disclosureParty string,
+	mcmsCid string,
+	targetCids map[string]string,
+	op MCMSOp,
+	opProof []string,
+) string {
+	t.Helper()
+
 	// BypasserExecuteBatch is dispatched via ExecuteOp with targetRole=Bypasser
 	executeOpArgs := mcms.ExecuteOp{
 		TargetRole: mcms.RoleBypasser,
-		Submitter:  types.PARTY(owner),
+		Submitter:  types.PARTY(submitter),
 		Op: mcms.Op{
 			ChainId:               types.INT64(op.ChainId),
 			MultisigId:            types.TEXT(op.MultisigId),
@@ -772,6 +814,8 @@ func bypasserExecuteBatch(
 		OpProof:    toTextSlice(opProof),
 		TargetCids: toContractIDMap(targetCids),
 	}
+
+	disclosedContracts := mcmsDisclosureForSubmitter(t, participant, mcmsPkgID, submitter, disclosureParty, mcmsCid)
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -790,7 +834,8 @@ func bypasserExecuteBatch(
 					},
 				},
 			}},
-			ActAs: []string{owner},
+			ActAs:              []string{submitter},
+			DisclosedContracts: disclosedContracts,
 		},
 	})
 	require.NoError(t, err)
@@ -799,7 +844,59 @@ func bypasserExecuteBatch(
 			return created.GetContractId()
 		}
 	}
-	t.Fatal("no MCMS contract created after ExecuteOp (Bypasser)")
+
+	return findRefreshedMCMSCid(t, participant, disclosureParty, mcmsPkgID, mcmsCid)
+}
+
+func mcmsDisclosureForSubmitter(
+	t *testing.T,
+	participant canton.Participant,
+	mcmsPkgID string,
+	submitter string,
+	disclosureParty string,
+	mcmsCid string,
+) []*apiv2.DisclosedContract {
+	t.Helper()
+
+	if submitter == disclosureParty {
+		return nil
+	}
+
+	queryParticipant := participant
+	queryParticipant.PartyID = disclosureParty
+	disclosedMcms, err := testhelpers.GetDisclosedContractById(t.Context(), queryParticipant, mcmsCid)
+	require.NoError(t, err, "disclose MCMS contract %s from party %s", mcmsCid, disclosureParty)
+	require.Equal(t, mcmsPkgID, disclosedMcms.GetTemplateId().GetPackageId())
+
+	return []*apiv2.DisclosedContract{disclosedMcms}
+}
+
+func findRefreshedMCMSCid(
+	t *testing.T,
+	participant canton.Participant,
+	party string,
+	mcmsPkgID string,
+	oldCid string,
+) string {
+	t.Helper()
+
+	queryParticipant := participant
+	queryParticipant.PartyID = party
+	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), queryParticipant, &apiv2.Identifier{
+		PackageId:  mcmsPkgID,
+		ModuleName: "MCMS.Main",
+		EntityName: "MCMS",
+	})
+	require.NoError(t, err)
+
+	for i := len(activeContracts) - 1; i >= 0; i-- {
+		cid := activeContracts[i].GetCreatedEvent().GetContractId()
+		if cid != oldCid {
+			return cid
+		}
+	}
+
+	t.Fatalf("no refreshed MCMS contract found after consuming choice (old=%s)", oldCid)
 
 	return ""
 }

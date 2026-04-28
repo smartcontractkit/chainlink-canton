@@ -1,30 +1,25 @@
 package tests
 
 import (
-	"context"
 	"encoding/json"
 	"path/filepath"
 	"testing"
 
-	cryptoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/admin/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
+	ceremonyruntime "github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/runtime"
 )
 
 type ContractDeployFlowTestSuite struct {
 	OnboardingFlowTestSuite
 
-	LedgerClients []client.LedgerClient
-	Signers       []client.TransactionSigner
+	ContractDeployDeps []ledger.ContractDeployDeps
 }
 
 func (s *ContractDeployFlowTestSuite) SetupSuite() {
@@ -37,16 +32,6 @@ func (s *ContractDeployFlowTestSuite) SetupSuite() {
 	// Capture the reporter so we can extract DAML key fingerprints below.
 	onboardingReporter := operations.NewMemoryReporter()
 	s.performOnboarding(t, onboardingReporter)
-
-	chain := s.chain
-
-	ledgerClients := make([]client.LedgerClient, len(chain.Participants))
-	for i, p := range chain.Participants {
-		lc, conn := s.NewLedgerClient(p)
-		t.Cleanup(func() { _ = conn.Close() })
-		ledgerClients[i] = lc
-	}
-	s.LedgerClients = ledgerClients
 
 	// Extract the DAML (PROTOCOL) key fingerprint for each participant from the
 	// onboarding ceremony reports. Using the reporter avoids relying on
@@ -63,25 +48,20 @@ func (s *ContractDeployFlowTestSuite) SetupSuite() {
 		}
 	}
 
-	// Create a VaultSigner for each participant using the DAML signing key
-	// fingerprint from the ceremony (the key registered in PartyToParticipant.PartySigningKeys).
-	signers := make([]client.TransactionSigner, len(chain.Participants))
-	for i, p := range chain.Participants {
-		adminConn, err := grpc.NewClient(p.Endpoints.AdminAPIURL,
-			grpc.WithTransportCredentials(insecure.NewCredentials()))
-		require.NoError(t, err, "dial admin API for vault (participant %d)", i+1)
-		t.Cleanup(func() { _ = adminConn.Close() })
-
+	darDir := filepath.Join("..", "..", "..", "contracts", "dars")
+	darLoader := ledger.FileDARLoader(darDir)
+	deps := make([]ledger.ContractDeployDeps, len(s.Participants))
+	for i, p := range s.Participants {
 		fp, hasFP := damlFingerprints[s.ParticipantIDs[i]]
 		require.True(t, hasFP, "DAML key fingerprint not found for participant %d (%s)", i+1, s.ParticipantIDs[i])
 
-		vault := cryptoadminv30.NewVaultServiceClient(adminConn)
-		signer, err := client.NewVaultSigner(context.Background(), vault, fp)
-		require.NoError(t, err, "create vault signer (participant %d)", i+1)
-		signers[i] = signer
-		t.Logf("Participant %d VaultSigner ready, fingerprint=%s", i+1, fp)
+		dep, cleanup, err := ceremonyruntime.NewContractDeployDeps(t.Context(), p, darLoader, fp, logger.Test(t), nil)
+		require.NoError(t, err, "contract deploy deps for participant %d", i+1)
+		t.Cleanup(func() { _ = cleanup() })
+		deps[i] = dep
+		t.Logf("Participant %d contract-deploy deps ready, fingerprint=%s", i+1, fp)
 	}
-	s.Signers = signers
+	s.ContractDeployDeps = deps
 }
 
 // TestOnboardingFlow overrides the inherited method to skip re-running the
@@ -116,18 +96,15 @@ func (s *ContractDeployFlowTestSuite) TestContractDeployFlow() {
 		ContractArgs:         contractArgs,
 	}
 
-	darDir := filepath.Join("..", "..", "..", "contracts", "dars")
-	darLoader := ledger.FileDARLoader(darDir)
-
 	sharedReporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle {
 		return operations.NewBundle(t.Context, logger.Test(t), sharedReporter)
 	}
 
 	deps := [3]ledger.ContractDeployDeps{
-		{AdminClient: s.Actors[0].client, LedgerClient: s.LedgerClients[0], DARLoader: darLoader, Signer: s.Signers[0], Logger: logger.Test(t), UserID: s.chain.Participants[0].UserID},
-		{AdminClient: s.Actors[1].client, LedgerClient: s.LedgerClients[1], DARLoader: darLoader, Signer: s.Signers[1], Logger: logger.Test(t), UserID: s.chain.Participants[1].UserID},
-		{AdminClient: s.Actors[2].client, LedgerClient: s.LedgerClients[2], DARLoader: darLoader, Signer: s.Signers[2], Logger: logger.Test(t), UserID: s.chain.Participants[2].UserID},
+		s.ContractDeployDeps[0],
+		s.ContractDeployDeps[1],
+		s.ContractDeployDeps[2],
 	}
 
 	// Run 1 (p1): uploads DARs (1/3) → threshold not met

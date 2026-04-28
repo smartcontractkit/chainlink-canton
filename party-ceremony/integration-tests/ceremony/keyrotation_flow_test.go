@@ -52,12 +52,12 @@ func (s *KeyRotationFlowTestSuite) TestKeyRotationFlow() {
 
 	// Discover the target participant's current namespace fingerprint from the DNS state.
 	decNS := strings.SplitN(s.PartyID, "::", 2)[1]
-	dnsState, err := actors[0].client.GetDNS(t.Context(), decNS, synchronizerID)
+	dnsState, err := actors[0].deps.Client.GetDNS(t.Context(), decNS, synchronizerID)
 	require.NoError(t, err, "GetDNS after onboarding")
 	require.Len(t, dnsState.Owners, 3, "should have 3 owners after onboarding")
 
 	// Identify the target (actor[0]) namespace fingerprint.
-	targetNSFP, err := actors[0].client.GetNamespaceFingerprint(t.Context(), onboardingNamespaceName, synchronizerID, dnsState.Owners)
+	targetNSFP, err := actors[0].deps.Client.GetNamespaceFingerprint(t.Context(), onboardingNamespaceName, synchronizerID, dnsState.Owners)
 	require.NoError(t, err, "GetNamespaceFingerprint for target participant")
 
 	targetUID := actors[0].uid
@@ -81,9 +81,9 @@ func (s *KeyRotationFlowTestSuite) TestKeyRotationFlow() {
 	}
 
 	deps := [3]ceremony.CantonDeps{
-		{Client: actors[0].client, Logger: logger.Test(t)},
-		{Client: actors[1].client, Logger: logger.Test(t)},
-		{Client: actors[2].client, Logger: logger.Test(t)},
+		s.OnboardingDeps(0),
+		s.OnboardingDeps(1),
+		s.OnboardingDeps(2),
 	}
 
 	// Run 1 (p1, target): generates key, NSD, DNS proposal, signs DNS (1/3) -> ErrThresholdNotMet.
@@ -111,7 +111,7 @@ func (s *KeyRotationFlowTestSuite) TestKeyRotationFlow() {
 	newNSFP := rotationResult.Output.NewNamespaceFingerprint
 
 	// ── Verify via topology read API ─────────────────────────────────────────
-	updatedDNS, err := actors[0].client.GetDNS(t.Context(), decNS, synchronizerID)
+	updatedDNS, err := actors[0].deps.Client.GetDNS(t.Context(), decNS, synchronizerID)
 	require.NoError(t, err, "GetDNS after rotation")
 	assert.Len(t, updatedDNS.Owners, 3, "should still have 3 owners after rotation")
 	assert.NotContains(t, updatedDNS.Owners, targetNSFP, "old namespace fingerprint must be removed from DNS")
