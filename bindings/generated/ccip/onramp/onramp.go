@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "43bb152fafa04e16530b2e70904e86557ab8a7dd01bdbc14d49a2547d46f17de"
+	PackageID   = "dfe6758555b044391bc2ef61fce9cfb67b077d6372625eb6862054029ca158b1"
 	SDKVersion  = "3.4.10"
 )
 
@@ -58,13 +58,14 @@ func argsToMap(args any) map[string]any {
 
 // CCIPSendFromRouter is a Record type
 type CCIPSendFromRouter struct {
-	RouterPartyOwner      types.PARTY       `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT        `json:"routerInstanceId"`
-	CurrentSequenceNumber types.NUMERIC     `json:"currentSequenceNumber"`
-	RmnRemoteCid          types.CONTRACT_ID `json:"rmnRemoteCid"`
-	GlobalConfigCid       types.CONTRACT_ID `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	SendingMessageCid     types.CONTRACT_ID `json:"sendingMessageCid"`
+	RouterPartyOwner      types.PARTY        `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT         `json:"routerInstanceId"`
+	CurrentSequenceNumber types.NUMERIC      `json:"currentSequenceNumber"`
+	RmnRemoteCid          types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	GlobalConfigCid       types.CONTRACT_ID  `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        *types.CONTRACT_ID `json:"tokenConfigCid" hex:"optional"`
+	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
 }
 
 // ToMap converts CCIPSendFromRouter to a map for DAML arguments
@@ -82,6 +83,18 @@ func (t CCIPSendFromRouter) ToMap() map[string]any {
 	m["globalConfigCid"] = model.NestedToDAMLValue(t.GlobalConfigCid)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	if t.TokenConfigCid != nil {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TokenConfigCid),
+		}
+	} else {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 

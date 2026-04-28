@@ -2489,32 +2489,12 @@ testVerifyInboundMessage_RejectsMismatchedSourceToken = script do
             admin = ccipOwner
             id = "TestToken"
 
-    tokenAdminRegistry <- submit ccipOwner do
-        createCmd TokenAdminRegistry.TokenAdminRegistry with
-            owner = ccipOwner
-            instanceId = tokenAdminRegistryInstanceId
-            tokenConfigs = Map.empty
-
-    tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
-            instrumentId = testInstrumentId
-            newAdmin = poolOwner
-            caller = ccipOwner
-
-    disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
-            instrumentId = testInstrumentId
-            caller = poolOwner
-
-    disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
-            instrumentId = testInstrumentId
-            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
-                poolOwner = poolOwner
-                poolInstanceId = "test-pool-verify-mismatch"
-            caller = poolOwner
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
+        ccipOwner
+        poolOwner
+        tokenAdminRegistryInstanceId
+        testInstrumentId
+        "test-pool-verify-mismatch"
 
     let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
             remotePools = [allowedSourcePool]
@@ -2589,10 +2569,12 @@ testVerifyInboundMessage_RejectsMismatchedSourceToken = script do
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
     submitMustFail (actAs poolOwner <> actAs ccipOwner <> actAs receiver
-                    <> disclose disclosedTar) do
+                    <> disclose disclosedTar <> disclose disclosedTokenConfig) do
         exerciseCmd tokenPool LockReleaseTokenPool.VerifyInboundMessage with
             tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             caller = receiver
