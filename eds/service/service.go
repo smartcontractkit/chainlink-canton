@@ -118,6 +118,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	router := gin.Default()
 	router.Use(middleware.RequestMonitoringMiddleware(metrics))
 
+	errChan := make(chan error)
 	globalAPIServer, err := global.NewServer(ctx, logger, activeContractStore, cfg.GlobalAPIConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create Global API: %w", err)
@@ -150,24 +151,24 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			return fmt.Errorf("failed to create TokenPool API: %w", err)
 		}
 		oapiTokenPool.RegisterHandlers(router, tokenPoolAPIServer)
+
+		// Run instrument holding store in the background
+		// This should only be run if the TokenPool API is enabled, as it will fail if no filters are specified.
+		go func(errChan chan<- error) {
+			logger.Info().Msg("starting instrument holding store")
+			err := instrumentHoldingStore.Run(ctx, store.DefaultStreamConfig())
+			if err != nil {
+				errChan <- fmt.Errorf("failed to run instrument holding store: %w", err)
+			}
+		}(errChan)
 	}
 
 	// Run update store in the background
-	errChan := make(chan error)
 	go func(errChan chan<- error) {
 		logger.Info().Msg("starting active contract store")
 		err := activeContractStore.Run(ctx, store.DefaultStreamConfig())
 		if err != nil {
 			errChan <- fmt.Errorf("failed to run active contract store: %w", err)
-		}
-	}(errChan)
-
-	// Run instrument holding store in the background
-	go func(errChan chan<- error) {
-		logger.Info().Msg("starting instrument holding store")
-		err := instrumentHoldingStore.Run(ctx, store.DefaultStreamConfig())
-		if err != nil {
-			errChan <- fmt.Errorf("failed to run instrument holding store: %w", err)
 		}
 	}(errChan)
 

@@ -52,7 +52,7 @@ func NewServer(
 
 func (s Server) PostCCVSend(c *gin.Context, address string) {
 	var req oapiCCV.CCVSendRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -111,7 +111,7 @@ func (s Server) PostCCVSend(c *gin.Context, address string) {
 
 func (s Server) PostCCVExecute(c *gin.Context, address string) {
 	var req oapiCCV.CCVExecuteRequest
-	if err := c.ShouldBind(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}

@@ -620,7 +620,7 @@ template LockReleaseTokenPool
                 let expectedRateLimiter = if useCustomFinalityRateLimiter
                         then remoteChainCfg.inboundCustomBlockConfirmationsRateLimiter
                         else remoteChainCfg.inboundRateLimiter
-                rateLimiterCid <- CCIP.RateLimiter.lookupInboundRateLimiterCid expectedRateLimitMode extraContext
+                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "ReleaseFromTicket: rateLimiter"
