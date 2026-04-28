@@ -37,7 +37,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "46b35d0a8fbed027ef2349e026dfab0827e54614c486f089ba5a45e45771a11d"
+	PackageID   = "81b3d477167f7ae48aefc048c82ba6ef93ffcc625937c1e281411b6075ffe458"
 	SDKVersion  = "3.4.10"
 )
 
@@ -185,195 +185,6 @@ func (t *CCIPFactory) UnmarshalHex(data string) error {
 
 // Choice methods for CCIPFactory
 
-// DeployOnRamp exercises the DeployOnRamp choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployOnRamp(contractID string, args DeployOnRamp) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployOnRamp",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployOnRampWithPackageID exercises the DeployOnRamp choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployOnRampWithPackageID(contractID string, packageID string, args DeployOnRamp) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployOnRamp",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployOffRamp exercises the DeployOffRamp choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployOffRamp(contractID string, args DeployOffRamp) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployOffRamp",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployOffRampWithPackageID exercises the DeployOffRamp choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployOffRampWithPackageID(contractID string, packageID string, args DeployOffRamp) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployOffRamp",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployPerPartyRouterFactory exercises the DeployPerPartyRouterFactory choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployPerPartyRouterFactory(contractID string, args DeployPerPartyRouterFactory) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployPerPartyRouterFactory",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployPerPartyRouterFactoryWithPackageID exercises the DeployPerPartyRouterFactory choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployPerPartyRouterFactoryWithPackageID(contractID string, packageID string, args DeployPerPartyRouterFactory) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployPerPartyRouterFactory",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCommitteeVerifier exercises the DeployCommitteeVerifier choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployCommitteeVerifier(contractID string, args DeployCommitteeVerifier) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCommitteeVerifier",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCommitteeVerifierWithPackageID exercises the DeployCommitteeVerifier choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployCommitteeVerifierWithPackageID(contractID string, packageID string, args DeployCommitteeVerifier) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCommitteeVerifier",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployLockReleaseTokenPool exercises the DeployLockReleaseTokenPool choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployLockReleaseTokenPool(contractID string, args DeployLockReleaseTokenPool) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployLockReleaseTokenPool",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployLockReleaseTokenPoolWithPackageID exercises the DeployLockReleaseTokenPool choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployLockReleaseTokenPoolWithPackageID(contractID string, packageID string, args DeployLockReleaseTokenPool) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployLockReleaseTokenPool",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCCIPReceiver exercises the DeployCCIPReceiver choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployCCIPReceiver(contractID string, args DeployCCIPReceiver) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCCIPReceiver",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCCIPReceiverWithPackageID exercises the DeployCCIPReceiver choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployCCIPReceiverWithPackageID(contractID string, packageID string, args DeployCCIPReceiver) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCCIPReceiver",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployExecutor exercises the DeployExecutor choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployExecutor(contractID string, args DeployExecutor) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployExecutor",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployExecutorWithPackageID exercises the DeployExecutor choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployExecutorWithPackageID(contractID string, packageID string, args DeployExecutor) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployExecutor",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployRateLimiter exercises the DeployRateLimiter choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployRateLimiter(contractID string, args DeployRateLimiter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployRateLimiter",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployRateLimiterWithPackageID exercises the DeployRateLimiter choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployRateLimiterWithPackageID(contractID string, packageID string, args DeployRateLimiter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployRateLimiter",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCCIPSender exercises the DeployCCIPSender choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployCCIPSender(contractID string, args DeployCCIPSender) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCCIPSender",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCCIPSenderWithPackageID exercises the DeployCCIPSender choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployCCIPSenderWithPackageID(contractID string, packageID string, args DeployCCIPSender) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCCIPSender",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // DeployGlobalConfig exercises the DeployGlobalConfig choice on this CCIPFactory contract
 // This method uses the package name in the template ID
 func (t CCIPFactory) DeployGlobalConfig(contractID string, args DeployGlobalConfig) *model.ExerciseCommand {
@@ -437,6 +248,69 @@ func (t CCIPFactory) DeployTokenAdminRegistryWithPackageID(contractID string, pa
 	}
 }
 
+// DeployOnRamp exercises the DeployOnRamp choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployOnRamp(contractID string, args DeployOnRamp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployOnRamp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployOnRampWithPackageID exercises the DeployOnRamp choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployOnRampWithPackageID(contractID string, packageID string, args DeployOnRamp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployOnRamp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployOffRamp exercises the DeployOffRamp choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployOffRamp(contractID string, args DeployOffRamp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployOffRamp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployOffRampWithPackageID exercises the DeployOffRamp choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployOffRampWithPackageID(contractID string, packageID string, args DeployOffRamp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployOffRamp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployPerPartyRouterFactory exercises the DeployPerPartyRouterFactory choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployPerPartyRouterFactory(contractID string, args DeployPerPartyRouterFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployPerPartyRouterFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployPerPartyRouterFactoryWithPackageID exercises the DeployPerPartyRouterFactory choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployPerPartyRouterFactoryWithPackageID(contractID string, packageID string, args DeployPerPartyRouterFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployPerPartyRouterFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // DeployRMNRemote exercises the DeployRMNRemote choice on this CCIPFactory contract
 // This method uses the package name in the template ID
 func (t CCIPFactory) DeployRMNRemote(contractID string, args DeployRMNRemote) *model.ExerciseCommand {
@@ -454,6 +328,132 @@ func (t CCIPFactory) DeployRMNRemoteWithPackageID(contractID string, packageID s
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "DeployRMNRemote",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployCommitteeVerifier exercises the DeployCommitteeVerifier choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployCommitteeVerifier(contractID string, args DeployCommitteeVerifier) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployCommitteeVerifier",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployCommitteeVerifierWithPackageID exercises the DeployCommitteeVerifier choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployCommitteeVerifierWithPackageID(contractID string, packageID string, args DeployCommitteeVerifier) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployCommitteeVerifier",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployExecutor exercises the DeployExecutor choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployExecutor(contractID string, args DeployExecutor) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployExecutor",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployExecutorWithPackageID exercises the DeployExecutor choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployExecutorWithPackageID(contractID string, packageID string, args DeployExecutor) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployExecutor",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployLockReleaseTokenPool exercises the DeployLockReleaseTokenPool choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployLockReleaseTokenPool(contractID string, args DeployLockReleaseTokenPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployLockReleaseTokenPool",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployLockReleaseTokenPoolWithPackageID exercises the DeployLockReleaseTokenPool choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployLockReleaseTokenPoolWithPackageID(contractID string, packageID string, args DeployLockReleaseTokenPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployLockReleaseTokenPool",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployRateLimiter exercises the DeployRateLimiter choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployRateLimiter(contractID string, args DeployRateLimiter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployRateLimiter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployRateLimiterWithPackageID exercises the DeployRateLimiter choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployRateLimiterWithPackageID(contractID string, packageID string, args DeployRateLimiter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployRateLimiter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployCCIPSender exercises the DeployCCIPSender choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployCCIPSender(contractID string, args DeployCCIPSender) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployCCIPSender",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployCCIPSenderWithPackageID exercises the DeployCCIPSender choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployCCIPSenderWithPackageID(contractID string, packageID string, args DeployCCIPSender) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployCCIPSender",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployCCIPReceiver exercises the DeployCCIPReceiver choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployCCIPReceiver(contractID string, args DeployCCIPReceiver) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployCCIPReceiver",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployCCIPReceiverWithPackageID exercises the DeployCCIPReceiver choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployCCIPReceiverWithPackageID(contractID string, packageID string, args DeployCCIPReceiver) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployCCIPReceiver",
 		Arguments:  argsToMap(args),
 	}
 }

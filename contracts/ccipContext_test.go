@@ -1,4 +1,4 @@
-package eds
+package contracts
 
 import (
 	"encoding/json"

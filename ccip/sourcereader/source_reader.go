@@ -71,6 +71,7 @@ func NewSourceReader(
 		opts = append(opts, grpc.WithAuthority(config.Authority))
 	}
 
+	// The default idle timeout is 30 minutes, after which the connection will be closed.
 	conn, err := grpc.NewClient(grpcEndpoint, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gRPC connection to canton node: %w", err)
@@ -187,7 +188,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 		return nil, fmt.Errorf("failed to get updates: %w", err)
 	}
 
-	var transactions []*ledgerv2.Transaction
+	var events []protocol.MessageSentEvent
 	for {
 		update, err := updates.Recv()
 		if err != nil {
@@ -197,10 +198,13 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 
 			return nil, fmt.Errorf("failed to get updates: %w", err)
 		}
-		transactions = append(transactions, update.GetTransaction())
+
+		tx := update.GetTransaction()
+		txEvents := extractEvents(c.lggr, []*ledgerv2.Transaction{tx}, c.config.CCIPOwnerParty, ccipMessageSentIdentifier)
+		events = append(events, txEvents...)
 	}
 
-	return extractEvents(c.lggr, transactions, c.config.CCIPOwnerParty, ccipMessageSentIdentifier), nil
+	return events, nil
 }
 
 func extractEvents(lggr logger.Logger, transactions []*ledgerv2.Transaction, ccipOwnerParty string, ccipMessageSentTemplateID *ledgerv2.Identifier) []protocol.MessageSentEvent {
