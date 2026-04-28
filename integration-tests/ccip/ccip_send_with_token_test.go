@@ -564,7 +564,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "Failed to create Executor API client")
 
 	// wait for EDS to start up
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// Create PerPartyRouter for sender via EDS
 	perPartyRouterFactoryDisclosure, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosure(t.Context(), ccipAPIClient, partySender)

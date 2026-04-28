@@ -112,6 +112,8 @@ func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContra
 	instanceAddresses, _ := getInstanceAddresses(activeContract.GetCreatedEvent())
 
 	s.mux.Lock()
+	// Add by ContractId
+	s.contractsByContractId[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
 	// Add by InstanceAddress
 	for _, address := range instanceAddresses {
 		s.contractsByInstanceAddress[address] = activeContract
@@ -151,6 +153,8 @@ func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *a
 	}
 
 	s.mux.Lock()
+	// Add by ContractId
+	s.contractsByContractId[types.CONTRACT_ID(createdEvent.GetContractId())] = activeContract
 	// Add by InstanceAddress
 	for _, address := range instanceAddresses {
 		s.contractsByInstanceAddress[address] = activeContract
@@ -189,6 +193,8 @@ func (s *ActiveContractStore) onArchivedEvent(ctx context.Context, transaction *
 		return fmt.Errorf("archived event for contract %v with no active contract record", archivedEvent.GetContractId())
 	}
 
+	// Delete by ContractId
+	delete(s.contractsByContractId, types.CONTRACT_ID(archivedEvent.GetContractId()))
 	// Delete by InstanceAddress
 	instanceAddresses, _ := getInstanceAddresses(activeContract.GetCreatedEvent())
 	for _, address := range instanceAddresses {
