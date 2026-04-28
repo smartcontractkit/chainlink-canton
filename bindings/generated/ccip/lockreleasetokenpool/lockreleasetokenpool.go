@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "81d9209c78c7867f4fc8f49cfbe4b0bc1f06087903381eb257a1d88cff0166b6"
+	PackageID   = "ddd48aed36e984c00dfbd9d3a44ae2e73dd0e550e8fca959ef9fdf2ff915ecc5"
 	SDKVersion  = "3.4.10"
 )
 
@@ -37,7 +37,8 @@ type Template interface {
 }
 
 const (
-	BpsDenominator = types.NUMERIC("10000.")
+	BpsDenominator          = types.NUMERIC("10000.")
+	AbiEncodedAddressPrefix = types.TEXT("000000000000000000000000")
 )
 
 func argsToMap(args any) map[string]any {
@@ -841,6 +842,27 @@ func (t LockReleaseTokenPool) ReleaseFromTicketWithPackageID(contractID string, 
 	}
 }
 
+// VerifyInboundMessage exercises the VerifyInboundMessage choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) VerifyInboundMessage(contractID string, args VerifyInboundMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "VerifyInboundMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// VerifyInboundMessageWithPackageID exercises the VerifyInboundMessage choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) VerifyInboundMessageWithPackageID(contractID string, packageID string, args VerifyInboundMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "VerifyInboundMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // LockOrBurn exercises the LockOrBurn choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) LockOrBurn(contractID string, args LockOrBurn) *model.ExerciseCommand {
@@ -921,27 +943,6 @@ func (t LockReleaseTokenPool) ApplyChainUpdatesWithPackageID(contractID string, 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
 		Choice:     "ApplyChainUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// VerifyInboundMessage exercises the VerifyInboundMessage choice on this LockReleaseTokenPool contract
-// This method uses the package name in the template ID
-func (t LockReleaseTokenPool) VerifyInboundMessage(contractID string, args VerifyInboundMessage) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
-		ContractID: contractID,
-		Choice:     "VerifyInboundMessage",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// VerifyInboundMessageWithPackageID exercises the VerifyInboundMessage choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) VerifyInboundMessageWithPackageID(contractID string, packageID string, args VerifyInboundMessage) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
-		ContractID: contractID,
-		Choice:     "VerifyInboundMessage",
 		Arguments:  argsToMap(args),
 	}
 }

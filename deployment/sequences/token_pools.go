@@ -213,7 +213,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			remoteTokenAddress := strings.ToLower(hex.EncodeToString(remoteCfg.RemoteToken))
 			if remoteFamily == chain_selectors.FamilyEVM {
 				remotePoolAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToHash(remoteCfg.RemotePool).Hex()), "0x")
-				remoteTokenAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToHash(remoteCfg.RemoteToken).Hex()), "0x")
+				remoteTokenAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToAddress(remoteCfg.RemoteToken).Hex()), "0x")
 			}
 
 			updates = append(updates, lockreleasetokenpool.ChainUpdate{
