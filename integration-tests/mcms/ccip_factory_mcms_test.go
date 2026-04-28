@@ -798,18 +798,6 @@ func queryContractFields(
 	return nil
 }
 
-// queryBypasserOpCount reads the current bypasser op count from an MCMS contract.
-func queryBypasserOpCount(
-	t *testing.T,
-	participant canton.Participant,
-	mcmsPkgID string,
-	mcmsCid string,
-) int64 {
-	t.Helper()
-
-	return queryBypasserOpCountForParty(t, participant, participant.PartyID, mcmsPkgID, mcmsCid)
-}
-
 func queryBypasserOpCountForParty(
 	t *testing.T,
 	participant canton.Participant,
