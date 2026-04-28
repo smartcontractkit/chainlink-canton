@@ -53,7 +53,11 @@ func main() {
 					return nil, fmt.Errorf("failed to load config: %w", err)
 				}
 
-				lggr.Infow("loaded canton config", "config", cantonConfig)
+				// Don't log full config to avoid leaking sensitive fields.
+				lggr.Infow("loaded canton config",
+					"numChains", len(cantonConfig.BlockchainInfos),
+					"numReaderConfigs", len(cantonConfig.ReaderConfigs),
+				)
 
 				return accessors.NewFactory(lggr, cantonConfig.BlockchainInfos, cantonConfig.ReaderConfigs, cfg.RMNRemoteAddresses), nil
 			}),
