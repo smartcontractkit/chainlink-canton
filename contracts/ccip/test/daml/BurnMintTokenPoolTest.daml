@@ -1,0 +1,503 @@
+module BurnMintTokenPoolTest where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Map qualified as Map
+import DA.Optional (fromSome, fromSomeNote)
+import DA.Text qualified as Text
+import DA.TextMap qualified as TextMap
+
+import qualified CCIP.Context
+import CCIP.BurnMintTokenPool qualified as BurnMintTokenPool
+import CCIP.FinalityConfig qualified as FinalityConfig
+import CCIP.Interfaces.TokenPool qualified as ITokenPool
+import CCIP.MessageCodecV1 qualified as MessageCodecV1
+import CCIP.RMNRemote qualified as RMNRemote
+import CCIP.RateLimiter qualified as RateLimiter
+import CCIP.SendingMessageV1 qualified as SendingMessageV1
+import CCIP.Tickets qualified as Tickets
+import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
+import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
+import Link.Token qualified as Link
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Splice.Api.Token.BurnMintV1 qualified as BurnMintV1
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
+
+emptyExtraArgs : MetadataV1.ExtraArgs
+emptyExtraArgs = MetadataV1.ExtraArgs with
+  context = MetadataV1.emptyChoiceContext
+  meta = MetadataV1.emptyMetadata
+
+mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
+mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
+  values = TextMap.fromList
+    [(RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)]
+
+mkInboundRateLimiterContext
+  : ContractId RateLimiter.RateLimiter
+  -> ContractId RateLimiter.RateLimiter
+  -> CCIP.Context.CCIPContext
+mkInboundRateLimiterContext inboundRateLimiterCid inboundCustomBlockConfirmationsRateLimiterCid =
+  CCIP.Context.CCIPContext with
+    values = TextMap.fromList
+      [ (RateLimiter.inboundRateLimiterKey, CCIP.Context.toAnyValue inboundRateLimiterCid)
+      , (RateLimiter.inboundCustomBlockConfirmationsRateLimiterKey, CCIP.Context.toAnyValue inboundCustomBlockConfirmationsRateLimiterCid)
+      ]
+
+mkPoolDeps : Text -> Text -> Text -> Party -> Party -> BurnMintTokenPool.BurnMintTokenPoolDeps
+mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner =
+  BurnMintTokenPool.BurnMintTokenPoolDeps with
+    tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    rmnRemote = RawInstanceAddress.make rmnInstanceId rmnOwner
+    feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+
+createRateLimiter
+  : Party
+  -> Text
+  -> Text
+  -> Numeric 0
+  -> RateLimiter.RateLimitDirection
+  -> RateLimiter.RateLimitMode
+  -> Numeric 0
+  -> Numeric 0
+  -> Script (ContractId RateLimiter.RateLimiter, RawInstanceAddress.RawInstanceAddress)
+createRateLimiter poolOwner instanceId poolInstanceId remoteChainSelector direction mode capacity rate = do
+  now <- getTime
+  rateLimiterCid <- submit poolOwner do
+    createCmd RateLimiter.RateLimiter with
+      instanceId
+      poolInstanceId
+      poolOwner
+      remoteChainSelector
+      direction
+      mode
+      isEnabled = True
+      capacity
+      rate
+      tokens = capacity
+      lastUpdated = now
+  pure (rateLimiterCid, RawInstanceAddress.make instanceId poolOwner)
+
+setupTokenAdminRegistry : Party -> Party -> HoldingV1.InstrumentId -> Text -> Text -> Script (ContractId TokenAdminRegistry.TokenAdminRegistry)
+setupTokenAdminRegistry ccipOwner poolOwner instrumentId tokenAdminRegistryInstanceId tokenPoolInstanceId = do
+  tokenAdminRegistryCid <- submit ccipOwner do
+    createCmd TokenAdminRegistry.TokenAdminRegistry with
+      owner = ccipOwner
+      instanceId = tokenAdminRegistryInstanceId
+      tokenConfigs = Map.empty
+
+  tokenAdminRegistryCid <- submit ccipOwner do
+    exerciseCmd tokenAdminRegistryCid TokenAdminRegistry.ProposeAdministrator with
+      instrumentId
+      newAdmin = poolOwner
+      caller = ccipOwner
+
+  disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+  tokenAdminRegistryCid <- submit (actAs poolOwner <> disclose disclosedTar) do
+    exerciseCmd tokenAdminRegistryCid TokenAdminRegistry.AcceptAdminRole with
+      instrumentId
+      caller = poolOwner
+
+  disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+  submit (actAs poolOwner <> disclose disclosedTar) do
+    exerciseCmd tokenAdminRegistryCid TokenAdminRegistry.SetPool with
+      instrumentId
+      tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
+        poolOwner
+        poolInstanceId = tokenPoolInstanceId
+      caller = poolOwner
+
+createLinkRegistry : Party -> HoldingV1.InstrumentId -> Text -> Script (ContractId Link.LinkRegistry)
+createLinkRegistry admin instrumentId registryInstanceId =
+  submit admin do
+    createCmd Link.LinkRegistry with
+      registryAdmin = admin
+      registryInstrumentId = instrumentId
+      registryInstanceId
+      registryMeta = MetadataV1.emptyMetadata
+      transferPreapprovals = Map.empty
+
+mintLink
+  : Party
+  -> Party
+  -> ContractId Link.LinkRegistry
+  -> HoldingV1.InstrumentId
+  -> Decimal
+  -> Script (ContractId HoldingV1.Holding)
+mintLink admin owner registryCid instrumentId amount = do
+  result <- submitMulti [admin, owner] [] do
+    exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
+      expectedAdmin = admin
+      instrumentId
+      inputHoldingCids = []
+      outputs =
+        [BurnMintV1.BurnMintOutput with
+          owner
+          amount
+          context = MetadataV1.emptyChoiceContext]
+      extraActors = if owner == admin then [] else [owner]
+      extraArgs = emptyExtraArgs
+  case result.outputCids of
+    [holdingCid] -> pure holdingCid
+    _ -> abort "expected exactly one minted holding"
+
+mkRemoteChainConfig
+  : [RawInstanceAddress.RawInstanceAddress]
+  -> [RawInstanceAddress.RawInstanceAddress]
+  -> RawInstanceAddress.RawInstanceAddress
+  -> RawInstanceAddress.RawInstanceAddress
+  -> RawInstanceAddress.RawInstanceAddress
+  -> BurnMintTokenPool.RemoteChainConfig
+mkRemoteChainConfig inboundCCVs outboundCCVs inboundRateLimiter inboundCustomRateLimiter outboundRateLimiter =
+  BurnMintTokenPool.RemoteChainConfig with
+    remotePools = ["1111111111111111111111111111111111111111"]
+    remoteTokenAddress = "2222222222222222222222222222222222222222"
+    inboundCCVs
+    outboundCCVs
+    finalityConfig = FinalityConfig.WaitForFinality
+    inboundRateLimiter
+    inboundCustomBlockConfirmationsRateLimiter = inboundCustomRateLimiter
+    outboundRateLimiter
+
+mkSendingMessage
+  : Party
+  -> Party
+  -> Party
+  -> Text
+  -> Text
+  -> Text
+  -> Numeric 0
+  -> HoldingV1.InstrumentId
+  -> Script (ContractId SendingMessageV1.SendingMessageV1)
+mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInstanceId feeQuoterInstanceId destChainSelector instrumentId =
+  submit ccipOwner do
+    createCmd SendingMessageV1.SendingMessageV1 with
+      ccipOwner = ccipOwner
+      sender = sender
+      deps = SendingMessageV1.SendingMessageDeps with
+        router = RawInstanceAddress.make "test-router" sender
+        onRamp = RawInstanceAddress.make "test-onramp" ccipOwner
+        globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
+        rmnRemote = RawInstanceAddress.make rmnInstanceId rmnOwner
+        tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+        feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+      destChainSelector
+      sequenceNumber = 1.0
+      requiredCCVs = []
+      requiredExecutor = None
+      executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor" ccipOwner)
+      executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
+      sourceChainSelector = 123.0
+      senderAddress = MessageCodecV1.encodePartyAddress sender
+      receiver = "0000000000000000000000000000000000000001"
+      payload = ""
+      executionGasLimit = 0
+      ccipReceiveGasLimit = 100000
+      ccvAndExecutorHash = ""
+      onRampAddress = "0000000000000000000000000000000000000001"
+      offRampAddress = "0000000000000000000000000000000000000002"
+      tokenReceiver = "0000000000000000000000000000000000000003"
+      tokenArgs = ""
+      feeToken = instrumentId
+      networkFeeUSDCents = 0.0
+      expectedTokenInstrumentId = Some instrumentId
+      outboundPoolCCVs = Some []
+      executorArgs = ""
+      executorFee = None
+      executorDestGasLimit = 0
+      executorDestBytesOverhead = 0
+      executorFeeTokenAmount = 0.0
+      observingParties = [sender]
+      ccvFees = []
+      tokenSendFee = Some (SendingMessageV1.TokenSendFee with
+        poolInstanceId = "burn-mint-pool"
+        poolOwner = instrumentId.admin
+        feeUSDCents = 0.0
+        destGasOverhead = 0
+        destBytesOverhead = 64)
+      ccvFeeTokenAmounts = []
+      tokenSendFeeTokenAmount = 0.0
+      networkFeeTokenAmount = 0.0
+      tokenSendData = None
+      verifierData = []
+      ccvOwners = []
+      message = None
+      encodedMessage = ""
+      messageId = ""
+      state = SendingMessageV1.SendingMessageState_FeeFinalized
+
+testBurnMintPoolLockOrBurnBurnsAndMintsOutputs : Script ()
+testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
+  ccipOwner <- allocateParty "ccip-owner-bm-lock"
+  rmnOwner <- allocateParty "rmn-owner-bm-lock"
+  poolOwner <- allocateParty "pool-owner-bm-lock"
+  sender <- allocateParty "sender-bm-lock"
+
+  let tokenAdminRegistryInstanceId = "tar-bm-lock"
+  let rmnInstanceId = "rmn-bm-lock"
+  let feeQuoterInstanceId = "fq-bm-lock"
+  let tokenPoolInstanceId = "burn-mint-pool"
+  let registryInstanceId = "link-registry-bm-lock"
+  let destChainSelector = 456.0
+  let instrumentId = HoldingV1.InstrumentId with
+        admin = poolOwner
+        id = "LINK"
+
+  registryCid <- createLinkRegistry poolOwner instrumentId registryInstanceId
+  tokenAdminRegistryCid <- setupTokenAdminRegistry ccipOwner poolOwner instrumentId tokenAdminRegistryInstanceId tokenPoolInstanceId
+
+  rmnRemoteCid <- submit rmnOwner do
+    createCmd RMNRemote.RMNRemote with
+      instanceId = rmnInstanceId
+      rmnOwner = rmnOwner
+      ccipOwner = ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  senderHoldingCid <- mintLink poolOwner sender registryCid instrumentId 10.0
+  sendingMessageCid <- mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInstanceId feeQuoterInstanceId destChainSelector instrumentId
+  (outboundRateLimiterCid, outboundRateLimiterAddr) <- createRateLimiter
+    poolOwner
+    "rl-bm-lock-out"
+    tokenPoolInstanceId
+    destChainSelector
+    RateLimiter.RateLimitDirection_Outbound
+    RateLimiter.RateLimitMode_DefaultFinality
+    100000000000.0
+    10000000.0
+
+  let remoteChainConfig = mkRemoteChainConfig [] [] outboundRateLimiterAddr outboundRateLimiterAddr outboundRateLimiterAddr
+  tokenPoolCid <- submit poolOwner do
+    createCmd BurnMintTokenPool.BurnMintTokenPool with
+      instanceId = tokenPoolInstanceId
+      poolOwner = poolOwner
+      ccipOwner = ccipOwner
+      instrumentId
+      decimals = 10
+      rateLimitAdmin = None
+      remoteChainConfigs = Map.fromList [(destChainSelector, remoteChainConfig)]
+      tokenTransferFeeConfigs = Map.fromList
+        [(destChainSelector, BurnMintTokenPool.TokenTransferFeeConfig with
+          isEnabled = True
+          destGasOverhead = 0
+          destBytesOverhead = 64
+          feeUSDCents = 0.0
+          feeBps = 500.0)]
+      poolReceiveContext = CCIP.Context.emptyCCIPContext
+      transferTimeout = BurnMintTokenPool.Indefinite
+      deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner
+
+  let tokenInput = ITokenPool.TokenInput with
+        transferFactory = toInterfaceContractId registryCid
+        burnMintFactory = Some (toInterfaceContractId registryCid)
+        extraArgs = emptyExtraArgs
+        tokenPoolHoldings = []
+
+  disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
+  disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+  disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemoteCid
+  disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiterCid
+  disclosedRegistry <- fromSome <$> queryDisclosure poolOwner registryCid
+
+  result <- submit (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedRegistry) do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
+      tokenAdminRegistryCid = tokenAdminRegistryCid
+      rmnRemoteCid = rmnRemoteCid
+      extraContext = mkRateLimiterContext outboundRateLimiterCid
+      sendingMessageCid = sendingMessageCid
+      tokenInput = tokenInput
+      senderInputCids = [senderHoldingCid]
+      amount = 7.0
+      caller = sender
+
+  let [senderChangeCid] = result.senderChangeCids
+  let [poolFeeCid] = result.poolChangeCids
+
+  Some senderChangeHolding <- queryContractId sender (fromInterfaceContractId @Link.LinkHolding senderChangeCid)
+  Some poolFeeHolding <- queryContractId poolOwner (fromInterfaceContractId @Link.LinkHolding poolFeeCid)
+  None <- queryContractId sender (fromInterfaceContractId @Link.LinkHolding senderHoldingCid)
+  Some updatedSendingMessage <- queryContractId ccipOwner result.sendingMessageCid
+
+  senderChangeHolding.holdingAmount === 3.0
+  poolFeeHolding.holdingAmount === 0.35
+
+  tokenSendData <- pure (fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData)
+  tokenSendData.amount === 66500000000.0
+  tokenSendData.instrumentId === instrumentId
+
+testBurnMintPoolReleaseFromTicketMintsReceiver : Script ()
+testBurnMintPoolReleaseFromTicketMintsReceiver = script do
+  ccipOwner <- allocateParty "ccip-owner-bm-release"
+  rmnOwner <- allocateParty "rmn-owner-bm-release"
+  poolOwner <- allocateParty "pool-owner-bm-release"
+  receiver <- allocateParty "receiver-bm-release"
+
+  let tokenAdminRegistryInstanceId = "tar-bm-release"
+  let rmnInstanceId = "rmn-bm-release"
+  let feeQuoterInstanceId = "fq-bm-release"
+  let tokenPoolInstanceId = "burn-mint-pool-release"
+  let registryInstanceId = "link-registry-bm-release"
+  let sourceChainSelector = 123.0
+  let instrumentId = HoldingV1.InstrumentId with
+        admin = poolOwner
+        id = "LINK"
+
+  registryCid <- createLinkRegistry poolOwner instrumentId registryInstanceId
+  tokenAdminRegistryCid <- setupTokenAdminRegistry ccipOwner poolOwner instrumentId tokenAdminRegistryInstanceId tokenPoolInstanceId
+
+  rmnRemoteCid <- submit rmnOwner do
+    createCmd RMNRemote.RMNRemote with
+      instanceId = rmnInstanceId
+      rmnOwner = rmnOwner
+      ccipOwner = ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
+    poolOwner
+    "rl-bm-release-in"
+    tokenPoolInstanceId
+    sourceChainSelector
+    RateLimiter.RateLimitDirection_Inbound
+    RateLimiter.RateLimitMode_DefaultFinality
+    100000000000.0
+    10000000.0
+
+  let remoteChainConfig = mkRemoteChainConfig [] [] inboundRateLimiterAddr inboundRateLimiterAddr inboundRateLimiterAddr
+  tokenPoolCid <- submit poolOwner do
+    createCmd BurnMintTokenPool.BurnMintTokenPool with
+      instanceId = tokenPoolInstanceId
+      poolOwner = poolOwner
+      ccipOwner = ccipOwner
+      instrumentId
+      decimals = 10
+      rateLimitAdmin = None
+      remoteChainConfigs = Map.fromList [(sourceChainSelector, remoteChainConfig)]
+      tokenTransferFeeConfigs = Map.empty
+      poolReceiveContext = CCIP.Context.emptyCCIPContext
+      transferTimeout = BurnMintTokenPool.Indefinite
+      deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner
+
+  tokenReceiveTicketCid <- submit ccipOwner do
+    createCmd Tickets.TokenReceiveTicket with
+      ccipOwner = ccipOwner
+      ccvOwners = []
+      verifiedCCVs = []
+      tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolOwner = poolOwner
+      receiver = receiver
+      tokenReceiver = receiver
+      instrumentId
+      amount = 30000000000.0
+      sourcePoolData = ""
+      messageId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      sourceChainSelector = sourceChainSelector
+      finality = FinalityConfig.WaitForFinality
+
+  let tokenInput = ITokenPool.TokenInput with
+        transferFactory = toInterfaceContractId registryCid
+        burnMintFactory = Some (toInterfaceContractId registryCid)
+        extraArgs = emptyExtraArgs
+        tokenPoolHoldings = []
+
+  disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
+  disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+  disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemoteCid
+  disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiterCid
+  disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicketCid
+  disclosedRegistry <- fromSome <$> queryDisclosure poolOwner registryCid
+
+  result <- submit (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
+      tokenAdminRegistryCid = tokenAdminRegistryCid
+      rmnRemoteCid = rmnRemoteCid
+      extraContext = mkInboundRateLimiterContext inboundRateLimiterCid inboundRateLimiterCid
+      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenInput = tokenInput
+      caller = receiver
+
+  case result.output of
+    ITokenPool.ReleaseOrMintResult_Completed receiverHoldingCids -> do
+      [receiverHoldingCid] <- pure receiverHoldingCids
+      Some receiverHolding <- queryContractId receiver (fromInterfaceContractId @Link.LinkHolding receiverHoldingCid)
+      receiverHolding.holdingAmount === 3.0
+    _ -> abort "expected completed release result"
+
+testBurnMintPoolRejectsMissingBurnMintFactory : Script ()
+testBurnMintPoolRejectsMissingBurnMintFactory = script do
+  ccipOwner <- allocateParty "ccip-owner-bm-missing"
+  rmnOwner <- allocateParty "rmn-owner-bm-missing"
+  poolOwner <- allocateParty "pool-owner-bm-missing"
+  sender <- allocateParty "sender-bm-missing"
+
+  let tokenAdminRegistryInstanceId = "tar-bm-missing"
+  let rmnInstanceId = "rmn-bm-missing"
+  let feeQuoterInstanceId = "fq-bm-missing"
+  let tokenPoolInstanceId = "burn-mint-pool-missing"
+  let registryInstanceId = "link-registry-bm-missing"
+  let destChainSelector = 456.0
+  let instrumentId = HoldingV1.InstrumentId with
+        admin = poolOwner
+        id = "LINK"
+
+  registryCid <- createLinkRegistry poolOwner instrumentId registryInstanceId
+  tokenAdminRegistryCid <- setupTokenAdminRegistry ccipOwner poolOwner instrumentId tokenAdminRegistryInstanceId tokenPoolInstanceId
+
+  rmnRemoteCid <- submit rmnOwner do
+    createCmd RMNRemote.RMNRemote with
+      instanceId = rmnInstanceId
+      rmnOwner = rmnOwner
+      ccipOwner = ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  senderHoldingCid <- mintLink poolOwner sender registryCid instrumentId 5.0
+  sendingMessageCid <- mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInstanceId feeQuoterInstanceId destChainSelector instrumentId
+  (outboundRateLimiterCid, outboundRateLimiterAddr) <- createRateLimiter
+    poolOwner
+    "rl-bm-missing-out"
+    tokenPoolInstanceId
+    destChainSelector
+    RateLimiter.RateLimitDirection_Outbound
+    RateLimiter.RateLimitMode_DefaultFinality
+    100000000000.0
+    10000000.0
+
+  let remoteChainConfig = mkRemoteChainConfig [] [] outboundRateLimiterAddr outboundRateLimiterAddr outboundRateLimiterAddr
+  tokenPoolCid <- submit poolOwner do
+    createCmd BurnMintTokenPool.BurnMintTokenPool with
+      instanceId = tokenPoolInstanceId
+      poolOwner = poolOwner
+      ccipOwner = ccipOwner
+      instrumentId
+      decimals = 10
+      rateLimitAdmin = None
+      remoteChainConfigs = Map.fromList [(destChainSelector, remoteChainConfig)]
+      tokenTransferFeeConfigs = Map.empty
+      poolReceiveContext = CCIP.Context.emptyCCIPContext
+      transferTimeout = BurnMintTokenPool.Indefinite
+      deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner
+
+  let tokenInput = ITokenPool.TokenInput with
+        transferFactory = toInterfaceContractId registryCid
+        burnMintFactory = None
+        extraArgs = emptyExtraArgs
+        tokenPoolHoldings = []
+
+  disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
+  disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+  disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemoteCid
+  disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiterCid
+
+  submitMustFail (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
+      tokenAdminRegistryCid = tokenAdminRegistryCid
+      rmnRemoteCid = rmnRemoteCid
+      extraContext = mkRateLimiterContext outboundRateLimiterCid
+      sendingMessageCid = sendingMessageCid
+      tokenInput = tokenInput
+      senderInputCids = [senderHoldingCid]
+      amount = 2.0
+      caller = sender
