@@ -90,7 +90,21 @@ func (a *CantonAggregatorConfigAdapter) ScanCommitteeStates(ctx context.Context,
 
 func (a *CantonAggregatorConfigAdapter) ResolveVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
 	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
-		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
+		func(r datastore.AddressRef) (string, error) {
+			// The aggregator sends the raw destination instance address to the indexer so that users
+			// can more easily execute messages on Canton.
+			labels := r.Labels.List()
+			if len(labels) == 0 {
+				// Shouldn't happen, graceful fallback.
+				return r.Address, nil
+			}
+
+			// labels[0] is the raw instance address, but since the aggregator requires hex-encoded addresses,
+			// we need to hex-encode the string bytes before returning it.
+			hexEncoded := hex.EncodeToString([]byte(labels[0]))
+
+			return "0x" + hexEncoded, nil
+		},
 		datastore.AddressRef{
 			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
 			Qualifier: qualifier,
