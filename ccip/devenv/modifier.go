@@ -120,8 +120,6 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		}
 
 		cantonConfigs.BlockchainInfos[strSelector] = ccip.BlockchainInfo{
-			// TODO: we should get the port number programmatically somehow.
-			// This is the default nginx port for the canton ledger API.
 			GRPCLedgerAPIURL: output.NetworkSpecificData.CantonData.InternalEndpoints.Participants[0].GRPCLedgerAPIURL,
 			Auth: commonconfig.AuthConfig{
 				Type: commonconfig.AuthTypeInsecureStatic,

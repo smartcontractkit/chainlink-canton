@@ -10,6 +10,7 @@ func getPathLabel(c *gin.Context, unmatchedLabel string) string {
 	if fullPath := c.FullPath(); fullPath != "" {
 		return fullPath
 	}
+
 	return unmatchedLabel
 }
 
