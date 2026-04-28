@@ -55,7 +55,7 @@ func GetExecutorSendDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := CCIPContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := contracts.CCIPContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}

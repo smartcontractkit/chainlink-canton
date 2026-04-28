@@ -18,8 +18,10 @@ type ActiveContractStore struct {
 	stream  *BackfilledStream
 	filters FiltersByParty
 
-	mux       sync.RWMutex
-	contracts map[contracts.InstanceAddress]*apiv2.ActiveContract
+	mux                        sync.RWMutex
+	contractsByInstanceAddress map[contracts.InstanceAddress]*apiv2.ActiveContract
+	contractsByTemplateId      map[types.PARTY]map[contracts.TemplateID]*apiv2.ActiveContract
+	contractsByContractId      map[types.CONTRACT_ID]*apiv2.ActiveContract
 }
 
 func NewActiveContractStore(
@@ -73,49 +75,144 @@ func (s *ActiveContractStore) RegisterTemplates(templates ...RegisteredTemplate)
 }
 
 func (s *ActiveContractStore) Run(ctx context.Context, streamConfig StreamConfig) error {
-	s.contracts = make(map[contracts.InstanceAddress]*apiv2.ActiveContract)
+	s.contractsByInstanceAddress = make(map[contracts.InstanceAddress]*apiv2.ActiveContract)
+	s.contractsByTemplateId = make(map[types.PARTY]map[contracts.TemplateID]*apiv2.ActiveContract)
+	s.contractsByContractId = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
 
-	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, nil, nil)
+	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, s.onArchivedEvent, nil)
 }
 
 func (s *ActiveContractStore) Get(address contracts.InstanceAddress) (*apiv2.ActiveContract, bool) {
 	s.mux.RLock()
-	value, ok := s.contracts[address]
+	value, ok := s.contractsByInstanceAddress[address]
 	s.mux.RUnlock()
 
 	return value, ok
 }
 
+// GetByTemplateId returns the active contract for the given TemplateID, if it exists.
+// It accepts TemplateIds in both the #packageName and PackageId syntax.
+func (s *ActiveContractStore) GetByTemplateId(party types.PARTY, templateId contracts.TemplateID) (*apiv2.ActiveContract, bool) {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+
+	contractsForParty, ok := s.contractsByTemplateId[party]
+	if !ok {
+		return nil, false
+	}
+	value, ok := contractsForParty[templateId]
+	if !ok {
+		return nil, false
+	}
+
+	return value, true
+}
+
 func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContract *apiv2.ActiveContract) error {
-	instanceAddresses, err := getInstanceAddresses(activeContract.GetCreatedEvent())
-	if err != nil {
-		s.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get instance addresses for active contract, skipping")
-		return nil
-	}
+	instanceAddresses, _ := getInstanceAddresses(activeContract.GetCreatedEvent())
+
 	s.mux.Lock()
+	// Add by InstanceAddress
 	for _, address := range instanceAddresses {
-		s.contracts[address] = activeContract
+		s.contractsByInstanceAddress[address] = activeContract
 	}
+	for _, witnessParty := range activeContract.GetCreatedEvent().GetWitnessParties() {
+		party := types.PARTY(witnessParty)
+		contractsForParty, ok := s.contractsByTemplateId[party]
+		if !ok {
+			contractsForParty = make(map[contracts.TemplateID]*apiv2.ActiveContract)
+			s.contractsByTemplateId[party] = contractsForParty
+		}
+		// Add by PackageId
+		contractsForParty[contracts.TemplateID{
+			PackageID:  activeContract.GetCreatedEvent().GetTemplateId().GetPackageId(),
+			ModuleName: activeContract.GetCreatedEvent().GetTemplateId().GetModuleName(),
+			EntityName: activeContract.GetCreatedEvent().GetTemplateId().GetEntityName(),
+		}] = activeContract
+		// Add by PackageName
+		contractsForParty[contracts.TemplateID{
+			PackageID:  fmt.Sprintf("#%s", activeContract.GetCreatedEvent().GetPackageName()),
+			ModuleName: activeContract.GetCreatedEvent().GetTemplateId().GetModuleName(),
+			EntityName: activeContract.GetCreatedEvent().GetTemplateId().GetEntityName(),
+		}] = activeContract
+	}
+	activeContract.GetCreatedEvent().GetWitnessParties()
 	s.mux.Unlock()
 
 	return nil
 }
 
 func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) error {
-	instanceAddresses, err := getInstanceAddresses(createdEvent)
-	if err != nil {
-		s.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get instance addresses for created event, skipping")
-		return nil
+	instanceAddresses, _ := getInstanceAddresses(createdEvent)
+	activeContract := &apiv2.ActiveContract{
+		CreatedEvent:        createdEvent,
+		SynchronizerId:      transaction.GetSynchronizerId(),
+		ReassignmentCounter: 0,
 	}
+
 	s.mux.Lock()
+	// Add by InstanceAddress
 	for _, address := range instanceAddresses {
-		s.contracts[address] = &apiv2.ActiveContract{
-			CreatedEvent:        createdEvent,
-			SynchronizerId:      transaction.GetSynchronizerId(),
-			ReassignmentCounter: 0,
+		s.contractsByInstanceAddress[address] = activeContract
+	}
+	for _, witnessParty := range createdEvent.GetWitnessParties() {
+		party := types.PARTY(witnessParty)
+		contractsForParty, ok := s.contractsByTemplateId[party]
+		if !ok {
+			contractsForParty = make(map[contracts.TemplateID]*apiv2.ActiveContract)
+			s.contractsByTemplateId[party] = contractsForParty
 		}
+		// Add by PackageId
+		contractsForParty[contracts.TemplateID{
+			PackageID:  createdEvent.GetTemplateId().GetPackageId(),
+			ModuleName: createdEvent.GetTemplateId().GetModuleName(),
+			EntityName: createdEvent.GetTemplateId().GetEntityName(),
+		}] = activeContract
+		// Add by PackageName
+		contractsForParty[contracts.TemplateID{
+			PackageID:  fmt.Sprintf("#%s", createdEvent.GetPackageName()),
+			ModuleName: createdEvent.GetTemplateId().GetModuleName(),
+			EntityName: createdEvent.GetTemplateId().GetEntityName(),
+		}] = activeContract
 	}
 	s.mux.Unlock()
+
+	return nil
+}
+
+func (s *ActiveContractStore) onArchivedEvent(ctx context.Context, transaction *apiv2.Transaction, archivedEvent *apiv2.ArchivedEvent) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	activeContract, ok := s.contractsByContractId[types.CONTRACT_ID(archivedEvent.GetContractId())]
+	if !ok {
+		return fmt.Errorf("archived event for contract %v with no active contract record", archivedEvent.GetContractId())
+	}
+
+	// Delete by InstanceAddress
+	instanceAddresses, _ := getInstanceAddresses(activeContract.GetCreatedEvent())
+	for _, address := range instanceAddresses {
+		delete(s.contractsByInstanceAddress, address)
+	}
+	for _, witnessParty := range activeContract.GetCreatedEvent().GetWitnessParties() {
+		party := types.PARTY(witnessParty)
+		contractsForParty, ok := s.contractsByTemplateId[party]
+		if !ok {
+			continue
+		}
+		// Delete by PackageId
+		delete(contractsForParty, contracts.TemplateID{
+			PackageID:  archivedEvent.GetTemplateId().GetPackageId(),
+			ModuleName: archivedEvent.GetTemplateId().GetModuleName(),
+			EntityName: archivedEvent.GetTemplateId().GetEntityName(),
+		})
+		// Delete by PackageName
+		delete(contractsForParty, contracts.TemplateID{
+			PackageID:  fmt.Sprintf("#%s", archivedEvent.GetPackageName()),
+			ModuleName: archivedEvent.GetTemplateId().GetModuleName(),
+			EntityName: archivedEvent.GetTemplateId().GetEntityName(),
+		})
+	}
 
 	return nil
 }

@@ -16,6 +16,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -531,9 +532,11 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				},
 			},
 		})
-		log.Info().Msg("EDS terminated")
-		if err != nil {
+		log.Info().Err(err).Msg("EDS terminated")
+		if !errors.Is(err, context.Canceled) {
 			log.Error().Err(err).Msg("EDS server exited with error")
+			t.Fail()
+			return
 		}
 	}()
 
