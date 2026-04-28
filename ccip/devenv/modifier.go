@@ -134,6 +134,8 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gRPC connection: %w", err)
 		}
+		defer conn.Close() //nolint:revive // defer is used to close the connection after the function returns, and we don't spin up that many chains
+
 		resp, err := ledgerv2admin.NewPartyManagementServiceClient(conn).ListKnownParties(context.Background(), &ledgerv2admin.ListKnownPartiesRequest{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get user: %w", err)
