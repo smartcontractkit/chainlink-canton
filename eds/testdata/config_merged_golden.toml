@@ -1,3 +1,4 @@
+# Golden: expected result of ReadAndMerge(testdata/config.toml, testdata/config_secrets.toml). Update when inputs change.
 chain_selector = "8706591216959472610"
 
 [server]
@@ -11,7 +12,7 @@ chain_selector = "8706591216959472610"
 [node.auth]
   type = 'insecureStatic'
   user_id = 'user-participant1'
-  # jwt should be taken from a separate secrets file, see config_secrets.toml
+  jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLXBhcnRpY2lwYW50MSIsImF1ZCI6WyJodHRwczovL2NoYWluLmxpbmsiXSwiZXhwIjoyMDg4NDQyMzQzLCJuYmYiOjE3NzMwODIzNDMsImlhdCI6MTc3MzA4MjM0M30.IPFC1soD4Mc1M-NdOm-F6J5nbEd4JnBNgpdzqxptRH8'
 
 [monitoring]
   enabled = true
@@ -68,13 +69,21 @@ chain_selector = "8706591216959472610"
 
 [token_pool_api]
   enabled = true
-  [[token_pool_api.token_pools]]
+
+  [token_pool_api.token_pools."0xcdc30a75c93191f39bff4236dec958f5b000525268cc383c3cde09529d8fb8f1"]
     type = "lockRelease"
     party_id = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
     instance_address = "0xcdc30a75c93191f39bff4236dec958f5b000525268cc383c3cde09529d8fb8f1"
     pool_owner = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
-  [[token_pool_api.token_pools]]
+    [token_pool_api.token_pools."0xcdc30a75c93191f39bff4236dec958f5b000525268cc383c3cde09529d8fb8f1".token_standard_auth]
+      type = "insecureStatic"
+      jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+
+  [token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"]
     type = "lockRelease"
     party_id = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
     instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
     pool_owner = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
+    [token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011".token_standard_auth]
+      type = "insecureStatic"
+      jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLXBhcnRpY2lwYW50MSIsImF1ZCI6WyJodHRwczovL2NoYWluLmxpbmsiXSwiZXhwIjoyMDg4NDQyMzQzLCJuYmYiOjE3NzMwODIzNDMsImlhdCI6MTc3MzA4MjM0M30.IPFC1soD4Mc1M-NdOm-F6J5nbEd4JnBNgpdzqxptRH8"

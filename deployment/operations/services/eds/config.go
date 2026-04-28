@@ -150,19 +150,20 @@ var BuildConfig = operations.NewOperation(
 			filteredRefs = append(filteredRefs, ref)
 		}
 		refs = filteredRefs
-		tokenPools := make([]edsConfig.TokenPool, 0, len(refs))
+		tokenPools := make(map[string]edsConfig.TokenPool, len(refs))
 		for _, ref := range refs {
-			tokenPools = append(tokenPools, edsConfig.TokenPool{
+			instanceAddress := contracts.HexToInstanceAddress(ref.Address)
+			tokenPools[instanceAddress.Hex()] = edsConfig.TokenPool{
 				ContractIdentifier: edsConfig.ContractIdentifier{
 					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+					InstanceAddress: instanceAddress,
 				},
 				Type:      edsConfig.TokenPoolTypeLockRelease,
 				PoolOwner: participant.PartyID,
 				// TODO This only works while we're using Nativ/Amulet for Token testing
 				TokenStandardURL:        new(fmt.Sprintf("%s/v0/scan-proxy", validatorAPIEndpoint)),
 				TokenStandardAuthConfig: &nodeConfig.AuthConfig,
-			})
+			}
 		}
 
 		return GenerateEDSConfigOutput{

@@ -1,11 +1,9 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
@@ -87,21 +85,21 @@ chain_selector = "8706591216959472610"
 
 [token_pool_api]
 	enabled = true
-	[[token_pool_api.token_pools]]
+	[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"]
 		type = "lockRelease"
 		party_id = "tokenPoolOwner"
 		instance_address = "0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"
 		pool_owner = "tokenPoolOwner"
 		token_standard_url = "localhost:8545"
-		[token_pool_api.token_pools.token_standard_auth]
+		[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec".token_standard_auth]
 			type = "insecureStatic"
 			jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
-	[[token_pool_api.token_pools]]
+	[token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"]
 		type = "burnMint"
 		party_id = "tokenPoolOwner"
 		instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
 		pool_owner = "tokenPoolOwner"
-		[token_pool_api.token_pools.transfer_preapproval]
+		[token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011".transfer_preapproval]
 			context_key = "transfer-preapproval"
 			template_id = "#splice-amulet:Splice.AmuletRules:TransferPreapproval"
 	`,
@@ -161,8 +159,8 @@ chain_selector = "8706591216959472610"
 				},
 				TokenPoolAPIConfig: TokenPoolAPIConfig{
 					Enabled: true,
-					TokenPools: []TokenPool{
-						{
+					TokenPools: map[string]TokenPool{
+						contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec").Hex(): {
 							Type: TokenPoolTypeLockRelease,
 							ContractIdentifier: ContractIdentifier{
 								PartyID:         "tokenPoolOwner",
@@ -174,7 +172,8 @@ chain_selector = "8706591216959472610"
 								Type: commonconfig.AuthTypeInsecureStatic,
 								JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 							},
-						}, {
+						},
+						contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011").Hex(): {
 							Type: TokenPoolTypeBurnMint,
 							ContractIdentifier: ContractIdentifier{
 								PartyID:         "tokenPoolOwner",
@@ -232,6 +231,11 @@ chain_selector = "8706591216959472610"
 func TestConfig_Merge(t *testing.T) {
 	t.Parallel()
 
+	poolAddrA := contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec")
+	poolAddrB := contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011")
+	keyA := poolAddrA.Hex()
+	keyB := poolAddrB.Hex()
+
 	tests := []struct {
 		name    string
 		base    *Config
@@ -240,16 +244,16 @@ func TestConfig_Merge(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "valid merge",
+			name: "layered merge enriches two token pools without dropping entries",
 			base: &Config{
-				ChainSelector: "123", // Should be overridden
-				Server: ServerConfig{ // Should not be overridden
+				ChainSelector: "123",
+				Server: ServerConfig{
 					Host: "localhost",
 					Port: 8080,
 				},
 				CCVAPIConfig: CCVAPIConfig{
 					CCVs: []CCV{
-						{ // Should not be overridden
+						{
 							ContractIdentifier: ContractIdentifier{
 								PartyID:         "ccvOwner1",
 								InstanceAddress: contracts.HexToInstanceAddress("0x1"),
@@ -258,13 +262,27 @@ func TestConfig_Merge(t *testing.T) {
 					},
 				},
 				TokenPoolAPIConfig: TokenPoolAPIConfig{
-					Enabled: false,
-					TokenPools: []TokenPool{
-						{ // Should be overridden
+					Enabled: true,
+					TokenPools: map[string]TokenPool{
+						keyA: {
 							Type: TokenPoolTypeLockRelease,
 							ContractIdentifier: ContractIdentifier{
 								PartyID:         "tokenPoolOwner",
-								InstanceAddress: contracts.HexToInstanceAddress("0x2222"),
+								InstanceAddress: poolAddrA,
+							},
+							PoolOwner:        "tokenPoolOwner",
+							TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
+						},
+						keyB: {
+							Type: TokenPoolTypeBurnMint,
+							ContractIdentifier: ContractIdentifier{
+								PartyID:         "tokenPoolOwner",
+								InstanceAddress: poolAddrB,
+							},
+							PoolOwner: "tokenPoolOwner",
+							TransferPreapproval: &TransferPreapproval{
+								ContextKey: "transfer-preapproval",
+								TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
 							},
 						},
 					},
@@ -275,12 +293,25 @@ func TestConfig_Merge(t *testing.T) {
 				Server:        ServerConfig{},
 				TokenPoolAPIConfig: TokenPoolAPIConfig{
 					Enabled: true,
-					TokenPools: []TokenPool{
-						{
-							Type: TokenPoolTypeBurnMint,
+					TokenPools: map[string]TokenPool{
+						keyA: {
 							ContractIdentifier: ContractIdentifier{
 								PartyID:         "tokenPoolOwner",
-								InstanceAddress: contracts.HexToInstanceAddress("0x2222"),
+								InstanceAddress: poolAddrA,
+							},
+							TokenStandardAuthConfig: &commonconfig.AuthConfig{
+								Type: commonconfig.AuthTypeInsecureStatic,
+								JWT:  "jwt-token-pool-a",
+							},
+						},
+						keyB: {
+							ContractIdentifier: ContractIdentifier{
+								PartyID:         "tokenPoolOwner",
+								InstanceAddress: poolAddrB,
+							},
+							TokenStandardAuthConfig: &commonconfig.AuthConfig{
+								Type: commonconfig.AuthTypeInsecureStatic,
+								JWT:  "jwt-token-pool-b",
 							},
 						},
 					},
@@ -294,7 +325,7 @@ func TestConfig_Merge(t *testing.T) {
 				},
 				CCVAPIConfig: CCVAPIConfig{
 					CCVs: []CCV{
-						{ // Should not be overridden
+						{
 							ContractIdentifier: ContractIdentifier{
 								PartyID:         "ccvOwner1",
 								InstanceAddress: contracts.HexToInstanceAddress("0x1"),
@@ -304,12 +335,34 @@ func TestConfig_Merge(t *testing.T) {
 				},
 				TokenPoolAPIConfig: TokenPoolAPIConfig{
 					Enabled: true,
-					TokenPools: []TokenPool{
-						{
+					TokenPools: map[string]TokenPool{
+						keyA: {
+							Type: TokenPoolTypeLockRelease,
+							ContractIdentifier: ContractIdentifier{
+								PartyID:         "tokenPoolOwner",
+								InstanceAddress: poolAddrA,
+							},
+							PoolOwner:        "tokenPoolOwner",
+							TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
+							TokenStandardAuthConfig: &commonconfig.AuthConfig{
+								Type: commonconfig.AuthTypeInsecureStatic,
+								JWT:  "jwt-token-pool-a",
+							},
+						},
+						keyB: {
 							Type: TokenPoolTypeBurnMint,
 							ContractIdentifier: ContractIdentifier{
 								PartyID:         "tokenPoolOwner",
-								InstanceAddress: contracts.HexToInstanceAddress("0x2222"),
+								InstanceAddress: poolAddrB,
+							},
+							PoolOwner: "tokenPoolOwner",
+							TransferPreapproval: &TransferPreapproval{
+								ContextKey: "transfer-preapproval",
+								TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
+							},
+							TokenStandardAuthConfig: &commonconfig.AuthConfig{
+								Type: commonconfig.AuthTypeInsecureStatic,
+								JWT:  "jwt-token-pool-b",
 							},
 						},
 					},
@@ -358,9 +411,6 @@ func TestConfig_Merge(t *testing.T) {
 				return
 			}
 			require.Equal(t, tt.want, got)
-
-			b, _ := toml.Marshal(got)
-			fmt.Println(string(b))
 		})
 	}
 }
