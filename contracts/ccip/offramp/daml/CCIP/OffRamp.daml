@@ -335,9 +335,12 @@ template OffRamp
                 assertMsg "offramp: owner signatory aggregation mismatch"
                     (dedup execMsg.ccvOwners == ownersFromVerifications)
 
+                authorizedExecutingMessageCid <- exercise executingMessageCid
+                    CCIP.ExecutingMessageV1.AuthorizeFinalize
+
                 finalizeResult <- case execMsg.tokenReceiver of
                     None ->
-                        exercise executingMessageCid
+                        exercise authorizedExecutingMessageCid
                             CCIP.ExecutingMessageV1.FinalizeExecute with
                                 tokenAdminRegistryInstanceId = tokenAdminRegistry.instanceId
                                 maybePoolOwner = None
@@ -352,10 +355,9 @@ template OffRamp
                             Some cid -> pure cid
                         exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.FinalizeExecute with
                             tokenConfigCid = configCid
-                            executingMessageCid = executingMessageCid
+                            executingMessageCid = authorizedExecutingMessageCid
                             ticketReceiver = routerPartyOwner
                             returnData = ""
-                            caller = ccipOwner
 
                 pure ExecuteFromRouterResult with
                     messageId = messageId

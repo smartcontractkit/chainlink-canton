@@ -29,6 +29,7 @@ data CCVVerification = CCVVerification
 data ExecutingMessageState
     = ExecutingMessageState_RequirePoolCCVs
     | ExecutingMessageState_Prepared
+    | ExecutingMessageState_ValidatedForFinalize
     deriving (Eq, Show)
 
 data ExecutingMessageDeps = ExecutingMessageDeps
@@ -71,8 +72,8 @@ template ExecutingMessageV1
         inboundPoolCCVs : Optional [RawInstanceAddress]
         deps : ExecutingMessageDeps
         -- State machine:
-        --   message-only: Prepared -(FinalizeExecute)-> consumed
-        --   token-receive: RequirePoolCCVs -> Prepared -(FinalizeExecute)-> consumed
+        --   message-only: Prepared -(AuthorizeFinalize)-> ValidatedForFinalize -(FinalizeExecute)-> consumed
+        --   token-receive: RequirePoolCCVs -> Prepared -(AuthorizeFinalize)-> ValidatedForFinalize -(FinalizeExecute)-> consumed
         state : ExecutingMessageState
     where
         signatory dedup (ccipOwner :: ccvOwners)
@@ -144,6 +145,16 @@ template ExecutingMessageV1
                     inboundPoolCCVs = Some poolCCVs
                     state = ExecutingMessageState_Prepared
 
+        -- Mark the message as having passed the validated OffRamp execution path.
+        -- FinalizeExecute only accepts this state so a prepared message cannot
+        -- mint a receive ticket by bypassing ExecuteFromRouter.
+        choice AuthorizeFinalize : ContractId ExecutingMessageV1
+            controller ccipOwner
+            do
+                assertMsg "executingMessage: AuthorizeFinalize only allowed in Prepared"
+                    (state == ExecutingMessageState_Prepared)
+                create this with state = ExecutingMessageState_ValidatedForFinalize
+
         -- Consuming finalize choice for the success path. Always consumes the
         -- executing message and emits an ExecutionStateChanged event. For token
         -- transfers it also creates a TokenReceiveTicket.
@@ -159,7 +170,7 @@ template ExecutingMessageV1
             controller ccipOwner
             do
                 assertMsg "executingMessage: invalid state for FinalizeExecute"
-                    (state == ExecutingMessageState_Prepared)
+                    (state == ExecutingMessageState_ValidatedForFinalize)
                 tokenReceiveTicket <- case (maybePoolOwner, maybeTicketReceiver, maybeTokenReceiver, maybeInstrumentId, maybeAmount) of
                     (Some poolOwner, Some ticketReceiver, Some resolvedTokenReceiver, Some instrumentId, Some amount) -> do
                         assertMsg "executingMessage: ticket receiver mismatch"

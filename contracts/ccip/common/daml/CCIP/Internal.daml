@@ -69,7 +69,7 @@ computeExecuteCCVs defaultCCVs laneMandatedCCVs message receiverRequiredCCVs rec
             && isSome message.tokenTransfer
     in
         if isTokenOnlyTransfer
-        then pure ([], [], 0)
+        then pure (dedup laneMandatedCCVs, [], 0)
         else do
             assertMsg "offramp: receiver required CCVs cannot contain duplicates" (dedup receiverRequiredCCVs == receiverRequiredCCVs)
             assertMsg "offramp: receiver optional CCVs cannot contain duplicates" (dedup receiverOptionalCCVs == receiverOptionalCCVs)

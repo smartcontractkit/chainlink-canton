@@ -466,17 +466,16 @@ template TokenAdminRegistry
                 exercise executingMessageCid CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
                     poolCCVs
 
-        -- | Resolve token-side finalization data for an inbound token transfer and
+        -- | Internal OffRamp bridge: resolve token-side finalization data, then
         -- exercise ExecutingMessageV1.FinalizeExecute under TAR's signatory context.
-        -- OffRamp remains the authority that decides execution is valid and complete.
+        -- The executing message must still be authorized by OffRamp before finalization.
         nonconsuming choice FinalizeExecute : CCIP.ExecutingMessageV1.FinalizeExecuteResult
             with
                 tokenConfigCid : ContractId TokenConfig
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 ticketReceiver : Party
                 returnData : BytesHex
-                caller : Party
-            controller caller
+            controller owner
             do
                 execMsg <- fetch executingMessageCid
                 assertMsg "TAR finalize: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)

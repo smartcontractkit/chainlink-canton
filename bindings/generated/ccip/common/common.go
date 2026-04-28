@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "0d2bb335ae553af2242d34c53d58248ca875d54ab31150b8d8a71b63d4191966"
+	PackageID   = "f0a044da037a1159590857789a62471d4a1c604a3e4361f01f27e65d08890e79"
 	SDKVersion  = "3.4.10"
 )
 
@@ -774,6 +774,38 @@ func (t ApplySourceChainConfigUpdatesParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplySourceChainConfigUpdatesParams from hex string (Canton MCMS format)
 func (t *ApplySourceChainConfigUpdatesParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AuthorizeFinalize is a Record type
+type AuthorizeFinalize struct {
+}
+
+// ToMap converts AuthorizeFinalize to a map for DAML arguments
+func (t AuthorizeFinalize) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t AuthorizeFinalize) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AuthorizeFinalize) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AuthorizeFinalize to hex string (Canton MCMS format)
+func (t AuthorizeFinalize) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AuthorizeFinalize from hex string (Canton MCMS format)
+func (t *AuthorizeFinalize) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1834,6 +1866,8 @@ const (
 	ExecutingMessageStateExecutingMessageState_RequirePoolCCVs ExecutingMessageState = "ExecutingMessageState_RequirePoolCCVs"
 
 	ExecutingMessageStateExecutingMessageState_Prepared ExecutingMessageState = "ExecutingMessageState_Prepared"
+
+	ExecutingMessageStateExecutingMessageState_ValidatedForFinalize ExecutingMessageState = "ExecutingMessageState_ValidatedForFinalize"
 )
 
 func (e ExecutingMessageState) GetEnumConstructor() string { return string(e) }
@@ -2217,6 +2251,27 @@ func (t ExecutingMessageV1) SetInboundPoolCCVsWithPackageID(contractID string, p
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
 		ContractID: contractID,
 		Choice:     "SetInboundPoolCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AuthorizeFinalize exercises the AuthorizeFinalize choice on this ExecutingMessageV1 contract
+// This method uses the package name in the template ID
+func (t ExecutingMessageV1) AuthorizeFinalize(contractID string, args AuthorizeFinalize) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AuthorizeFinalize",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AuthorizeFinalizeWithPackageID exercises the AuthorizeFinalize choice using the provided package ID instead of package name
+func (t ExecutingMessageV1) AuthorizeFinalizeWithPackageID(contractID string, packageID string, args AuthorizeFinalize) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AuthorizeFinalize",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -5996,6 +6051,7 @@ type MCMSEncoder interface {
 	ApplyDestChainConfigUpdatesParams(args ApplyDestChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error)
 	ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfigUpdatesParams) (*bind.EncodedChoice, error)
+	AuthorizeFinalize(args AuthorizeFinalize) (*bind.EncodedChoice, error)
 	BuildMessage(args BuildMessage) (*bind.EncodedChoice, error)
 	BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
@@ -6110,6 +6166,11 @@ func (e *encoder) ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdat
 // ApplySourceChainConfigUpdatesParams encodes parameters for the ApplySourceChainConfigUpdates choice.
 func (e *encoder) ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfigUpdatesParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplySourceChainConfigUpdates", args)
+}
+
+// AuthorizeFinalize encodes parameters for the AuthorizeFinalize choice.
+func (e *encoder) AuthorizeFinalize(args AuthorizeFinalize) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AuthorizeFinalize", args)
 }
 
 // BuildMessage encodes parameters for the BuildMessage choice.
