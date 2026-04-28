@@ -355,7 +355,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values[string(common.InboundRateLimiterKey)] = common.AnyValue{
+		ccipContext.Values[string(common.RateLimiterKey)] = common.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	} else {
@@ -365,7 +365,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values[string(common.InboundCustomBlockConfirmationsRateLimiterKey)] = common.AnyValue{
+		ccipContext.Values[string(common.RateLimiterKey)] = common.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	}
