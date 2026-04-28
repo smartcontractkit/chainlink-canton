@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 )
@@ -63,15 +63,15 @@ type TemplateID struct {
 }
 
 // ToLedgerIdentifier returns a ledgerv2.Identifier from the TemplateID.
-func (t *TemplateID) ToLedgerIdentifier() *ledgerv2.Identifier {
-	return &ledgerv2.Identifier{
+func (t TemplateID) ToLedgerIdentifier() *apiv2.Identifier {
+	return &apiv2.Identifier{
 		PackageId:  t.PackageID,
 		ModuleName: t.ModuleName,
 		EntityName: t.EntityName,
 	}
 }
 
-func (t *TemplateID) String() string {
+func (t TemplateID) String() string {
 	return fmt.Sprintf("%s:%s:%s", t.PackageID, t.ModuleName, t.EntityName)
 }
 
