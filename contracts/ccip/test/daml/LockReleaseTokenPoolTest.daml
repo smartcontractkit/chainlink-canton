@@ -322,6 +322,7 @@ testLockOrBurn = script do
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
+            burnMintFactory = None
             extraArgs = MetadataV1.ExtraArgs with
                 context = MetadataV1.emptyChoiceContext
                 meta = MetadataV1.emptyMetadata
@@ -579,6 +580,7 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
+            burnMintFactory = None
             extraArgs = MetadataV1.ExtraArgs with
                 context = MetadataV1.emptyChoiceContext
                 meta = MetadataV1.emptyMetadata
@@ -792,6 +794,7 @@ testLockOrBurnDeductsFeeBps = script do
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
+            burnMintFactory = None
             extraArgs = MetadataV1.ExtraArgs with
                 context = MetadataV1.emptyChoiceContext
                 meta = MetadataV1.emptyMetadata
@@ -950,6 +953,7 @@ testReleaseFromTicket = script do
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
+            burnMintFactory = None
             extraArgs = MetadataV1.ExtraArgs with
                 context = MetadataV1.emptyChoiceContext
                 meta = MetadataV1.emptyMetadata
@@ -1133,6 +1137,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
+            burnMintFactory = None
             extraArgs = MetadataV1.ExtraArgs with
                 context = MetadataV1.emptyChoiceContext
                 meta = MetadataV1.emptyMetadata
@@ -1279,6 +1284,7 @@ testReleaseFromTicketDecimalConversion = script do
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
+            burnMintFactory = None
             extraArgs = MetadataV1.ExtraArgs with
                 context = MetadataV1.emptyChoiceContext
                 meta = MetadataV1.emptyMetadata
@@ -1447,6 +1453,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
+            burnMintFactory = None
             extraArgs = MetadataV1.ExtraArgs with
                 context = MetadataV1.emptyChoiceContext
                 meta = MetadataV1.emptyMetadata
@@ -1607,6 +1614,7 @@ testReleaseFromTicketWithAdditionalCCVOwner = script do
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
+            burnMintFactory = None
             extraArgs = MetadataV1.ExtraArgs with
                 context = MetadataV1.emptyChoiceContext
                 meta = MetadataV1.emptyMetadata
