@@ -63,16 +63,6 @@ unsafeDecodeRequestedFinality finalityConfig =
 
 messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
-mkInboundRateLimiterContext
-    : ContractId RateLimiter.RateLimiter
-    -> ContractId RateLimiter.RateLimiter
-    -> CCIP.Context.CCIPContext
-mkInboundRateLimiterContext inboundRateLimiterCid inboundCustomBlockConfirmationsRateLimiterCid = CCIP.Context.CCIPContext with
-    values = TextMap.fromList
-        [ (RateLimiter.inboundRateLimiterKey, CCIP.Context.toAnyValue inboundRateLimiterCid)
-        , (RateLimiter.inboundCustomBlockConfirmationsRateLimiterKey, CCIP.Context.toAnyValue inboundCustomBlockConfirmationsRateLimiterCid)
-        ]
-
 mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
 mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
     values = TextMap.fromList
@@ -949,7 +939,7 @@ testReleaseFromTicket = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            extraContext = mkRateLimiterContext inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -1111,7 +1101,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            extraContext = mkRateLimiterContext inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -1239,7 +1229,7 @@ testReleaseFromTicketDecimalConversion = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            extraContext = mkRateLimiterContext inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -1389,7 +1379,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            extraContext = mkRateLimiterContext inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -1531,7 +1521,7 @@ testReleaseFromTicketWithAdditionalCCVOwner = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            extraContext = mkRateLimiterContext inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
