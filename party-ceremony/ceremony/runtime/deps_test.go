@@ -8,6 +8,8 @@ import (
 )
 
 func TestFromCantonParticipant(t *testing.T) {
+	t.Parallel()
+
 	participant, err := FromCantonParticipant(canton.Participant{
 		Name: "participantA",
 		Endpoints: canton.ParticipantEndpoints{

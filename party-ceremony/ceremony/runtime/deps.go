@@ -160,24 +160,16 @@ func NewContractDeployDeps(
 }
 
 func dialAdmin(_ context.Context, participant Participant) (*grpc.ClientConn, error) {
-	opts, err := dialOptions(participant, false)
-	if err != nil {
-		return nil, err
-	}
-
+	opts := dialOptions(participant, false)
 	return grpc.NewClient(participant.AdminAPIURL, opts...)
 }
 
 func dialLedger(_ context.Context, participant Participant) (*grpc.ClientConn, error) {
-	opts, err := dialOptions(participant, true)
-	if err != nil {
-		return nil, err
-	}
-
+	opts := dialOptions(participant, true)
 	return grpc.NewClient(participant.GRPCLedgerAPIURL, opts...)
 }
 
-func dialOptions(participant Participant, ledgerAPI bool) ([]grpc.DialOption, error) {
+func dialOptions(participant Participant, ledgerAPI bool) []grpc.DialOption {
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
 	jwt := participant.AdminJWT
@@ -194,7 +186,7 @@ func dialOptions(participant Participant, ledgerAPI bool) ([]grpc.DialOption, er
 		opts = append(opts, grpc.WithUnaryInterceptor(userIDUnary(participant.UserID)))
 	}
 
-	return opts, nil
+	return opts
 }
 
 func jwtUnary(token string) grpc.UnaryClientInterceptor {
