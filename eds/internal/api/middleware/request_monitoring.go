@@ -6,7 +6,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func getPathLabel(c *gin.Context, unmatchedLabel string) string {
+	if fullPath := c.FullPath(); fullPath != "" {
+		return fullPath
+	}
+	return unmatchedLabel
+}
+
 func RequestMonitoringMiddleware(metrics HTTPAPIMetrics) gin.HandlerFunc {
+	const unmatchedPathLabel = "unmatched"
 	return func(c *gin.Context) {
 		metrics.IncrementActiveRequestsCounter(c.Request.Context())
 
@@ -19,7 +27,7 @@ func RequestMonitoringMiddleware(metrics HTTPAPIMetrics) gin.HandlerFunc {
 		metrics.RecordHTTPRequestDuration(
 			c.Request.Context(),
 			duration,
-			c.Request.URL.Path,
+			getPathLabel(c, unmatchedPathLabel),
 			c.Request.Method,
 			c.Writer.Status(),
 		)
