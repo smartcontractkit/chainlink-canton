@@ -37,6 +37,12 @@ type Template interface {
 	GetTemplateID() string
 }
 
+const (
+	OnRampKey               = types.TEXT("on-ramp")
+	NoExecutionAddressBytes = types.TEXT("eba517d200000000000000000000000000000000000000000000000000000000")
+	MessageStaticSize       = types.INT64(69)
+)
+
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}

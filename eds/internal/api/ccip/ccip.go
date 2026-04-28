@@ -313,19 +313,19 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 
 	ccipContext := common.CCIPContext{
 		Values: map[string]common.AnyValue{
-			"on-ramp": {
+			string(onramp.OnRampKey): {
 				AVContractId: new(types.CONTRACT_ID(activeOnRampContract.GetCreatedEvent().GetContractId())),
 			},
-			"global-config": {
+			string(common.GlobalConfigKey): {
 				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
 			},
-			"token-admin-registry": {
+			string(tokenadminregistry.TokenAdminRegistryKey): {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			"rmn-remote": {
+			string(common.RmnRemoteKey): {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
-			"fee-quoter": {
+			string(feequoter.FeeQuoterKey): {
 				AVContractId: new(types.CONTRACT_ID(activeFeeQuoterContract.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -377,7 +377,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token pool registered for token: %s", encodedInstrumentId.Hex())})
 			return
 		}
-		ccipContext.Values["token-config"] = common.AnyValue{
+		ccipContext.Values[string(tokenadminregistry.TokenConfigKey)] = common.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
 		}
 		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))
@@ -446,16 +446,16 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 
 	ccipContext := common.CCIPContext{
 		Values: map[string]common.AnyValue{
-			"off-ramp": {
+			string(offramp.OffRampKey): {
 				AVContractId: new(types.CONTRACT_ID(activeOffRampContract.GetCreatedEvent().GetContractId())),
 			},
-			"global-config": {
+			string(common.GlobalConfigKey): {
 				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
 			},
-			"token-admin-registry": {
+			string(tokenadminregistry.TokenAdminRegistryKey): {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			"rmn-remote": {
+			string(common.RmnRemoteKey): {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -497,7 +497,7 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 			return
 		}
 		tokenPool = new(oapiCommon.RawInstanceAddress(contracts.InstanceID(parsedTokenConfig.Pool.PoolInstanceId).RawInstanceAddress(parsedTokenConfig.Pool.PoolOwner)))
-		ccipContext.Values["token-config"] = common.AnyValue{
+		ccipContext.Values[string(tokenadminregistry.TokenConfigKey)] = common.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
 		}
 		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))

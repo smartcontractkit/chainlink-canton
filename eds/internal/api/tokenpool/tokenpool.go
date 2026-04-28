@@ -197,7 +197,7 @@ func (s Server) lockReleaseTokenPoolSend(
 
 	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
 		Values: map[string]common.AnyValue{
-			"rate-limiter": {
+			string(common.RateLimiterKey): {
 				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -323,7 +323,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values["inbound-rate-limiter"] = common.AnyValue{
+		ccipContext.Values[string(common.InboundRateLimiterKey)] = common.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	} else {
@@ -333,7 +333,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values["inbound-custom-block-confirmations-rate-limiter"] = common.AnyValue{
+		ccipContext.Values[string(common.InboundCustomBlockConfirmationsRateLimiterKey)] = common.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	}
