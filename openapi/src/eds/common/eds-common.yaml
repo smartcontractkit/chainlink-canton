@@ -149,6 +149,9 @@ components:
     TokenTransfer:
       type: object
       description: A token transfer to be included in the message, set to null if the message does not include a token transfer.
+      required:
+        - token
+        - amount
       properties:
         token:
           $ref: '#/components/schemas/InstrumentId'

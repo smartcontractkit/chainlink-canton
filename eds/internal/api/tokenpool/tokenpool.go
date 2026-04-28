@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -65,6 +66,10 @@ func NewServer(
 			PartyID:    tokenPool.PartyID,
 		})
 		s.instrumentHoldingStore.RegisterParty(tokenPool.PoolOwner)
+		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenConfig{}),
+			PartyID:    tokenPool.PartyID,
+		})
 		switch tokenPool.Type {
 		case config.TokenPoolTypeLockRelease:
 			s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
@@ -127,9 +132,11 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 		return
 	}
 
+	// TODO check that the token transfer is for this pool
+
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
-		s.lockReleaseTokenPoolSend(c, cfg, instanceAddress, activeTokenPoolContract, destinationChainSelector)
+		s.lockReleaseTokenPoolSend(c, cfg, instanceAddress, activeTokenPoolContract, destinationChainSelector, req.Message)
 		return
 	case config.TokenPoolTypeBurnMint:
 		fallthrough
@@ -146,6 +153,7 @@ func (s Server) lockReleaseTokenPoolSend(
 	instanceAddress contracts.InstanceAddress,
 	activeTokenPoolContract *apiv2.ActiveContract,
 	destinationChainSelector uint64,
+	_ oapiCommon.Message,
 ) {
 	lockReleaseTokenPool, err := ParseLockReleaseTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
@@ -163,19 +171,6 @@ func (s Server) lockReleaseTokenPoolSend(
 	rateLimiter, ok := s.activeContractStore.Get(remoteChainConfig.OutboundRateLimiter)
 	if !ok {
 		s.logger.Error().Uint64("destinationChainSelector", destinationChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("outbound active rate limiter not found")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-
-	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: map[string]common.AnyValue{
-			"rate-limiter": {
-				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
-			},
-		},
-	})
-	if err != nil {
-		s.logger.Err(err).Msg("failed to serialize CCIP context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -198,6 +193,19 @@ func (s Server) lockReleaseTokenPoolSend(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
+	}
+
+	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
+		Values: map[string]common.AnyValue{
+			"rate-limiter": {
+				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
+			},
+		},
+	})
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
 	}
 
 	resp := &oapiTokenPool.TokenPoolSendResponse{
@@ -268,6 +276,8 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 		return
 	}
 
+	// TODO check that the Token Transfer is for this pool
+
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
 		s.lockReleaseTokenPoolExecute(c, cfg, instanceAddress, activeTokenPoolContract, sourceChainSelector, message)
@@ -328,13 +338,6 @@ func (s Server) lockReleaseTokenPoolExecute(
 		}
 	}
 
-	serializedContext, err := converters.SerializeCCIPContext(ccipContext)
-	if err != nil {
-		s.logger.Err(err).Msg("failed to serialize CCIP context")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-
 	requiredCCVs := make([]oapiCommon.RawOrHashedAddress, len(remoteChainConfig.InboundCCVs))
 	for i, v := range remoteChainConfig.InboundCCVs {
 		requiredCCVs[i] = converters.RawInstanceAddressAsRawOrHashedAddress(v)
@@ -368,12 +371,19 @@ func (s Server) lockReleaseTokenPoolExecute(
 		}
 	}
 
+	contextData, err := converters.SerializeCCIPContext(ccipContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
 	resp := &oapiTokenPool.TokenPoolExecuteResponse{
 		ContractId:         activeTokenPoolContract.GetCreatedEvent().GetContractId(),
 		InstanceAddress:    lockReleaseTokenPool.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
-		ContextData:        serializedContext,
+		ContextData:        contextData,
 		TokenInput: oapiTokenPool.TokenInput{
 			TokenPoolHoldings: tokenPoolHoldings,
 			ExtraArgs: struct {
