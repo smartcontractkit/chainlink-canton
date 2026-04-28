@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -14,10 +15,38 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
-type transferFactory func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (string, map[string]any, []oapiCommon.DisclosedContract, error)
+type tokenFactories struct {
+	TransferFactory    string
+	BurnMintFactory    *string
+	ChoiceContext      map[string]any
+	DisclosedContracts []oapiCommon.DisclosedContract
+}
 
-func getTransferFactory(ctx context.Context, url string, auth *commonconfig.AuthConfig, poolOwner types.PARTY) (transferFactory, error) {
-	// If authentication has been configured, add an interceptor that adds the Authorization header
+type factoryResolver func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (tokenFactories, error)
+
+func newStaticFactoryResolver(transferFactoryID, burnMintFactoryID *string) factoryResolver {
+	transferFactory := trimOptionalString(transferFactoryID)
+	burnMintFactory := trimOptionalString(burnMintFactoryID)
+	if transferFactory == "" && burnMintFactory == "" {
+		return nil
+	}
+
+	return func(context.Context, splice_api_token_holding_v1.InstrumentId) (tokenFactories, error) {
+		factories := tokenFactories{
+			TransferFactory:    transferFactory,
+			ChoiceContext:      map[string]any{"values": map[string]any{}},
+			DisclosedContracts: nil,
+		}
+		if burnMintFactory != "" {
+			factories.BurnMintFactory = &burnMintFactory
+		}
+
+		return factories, nil
+	}
+}
+
+func getTokenStandardFactoryResolver(ctx context.Context, url string, auth *commonconfig.AuthConfig, poolOwner types.PARTY) (factoryResolver, error) {
+	// If authentication has been configured, add an interceptor that adds the Authorization header.
 	var options []transferInstructionV1.ClientOption
 	if auth != nil {
 		authProvider, err := auth.NewProvider(ctx)
@@ -43,7 +72,7 @@ func getTransferFactory(ctx context.Context, url string, auth *commonconfig.Auth
 		return nil, fmt.Errorf("failed to create TransferInstructionV1 client with URL %q: %w", url, err)
 	}
 
-	return func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (string, map[string]any, []oapiCommon.DisclosedContract, error) {
+	return func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (tokenFactories, error) {
 		resp, err := transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 			ChoiceArguments: map[string]any{
 				"expectedAdmin": instrumentId.Admin,
@@ -75,10 +104,10 @@ func getTransferFactory(ctx context.Context, url string, auth *commonconfig.Auth
 			ExcludeDebugFields: nil,
 		})
 		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to call GetTransferFactory: %w", err)
+			return tokenFactories{}, fmt.Errorf("failed to call GetTransferFactory: %w", err)
 		}
 		if resp.StatusCode() != http.StatusOK {
-			return "", nil, nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
+			return tokenFactories{}, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 		}
 
 		disclosedContracts := make([]oapiCommon.DisclosedContract, len(resp.JSON200.ChoiceContext.DisclosedContracts))
@@ -91,6 +120,24 @@ func getTransferFactory(ctx context.Context, url string, auth *commonconfig.Auth
 			}
 		}
 
-		return resp.JSON200.FactoryId, resp.JSON200.ChoiceContext.ChoiceContextData, disclosedContracts, nil
+		// Custom LINK registries implement both TransferFactory and BurnMintFactory on the
+		// same underlying template, so the contract ID returned by the transfer API is also
+		// the correct contract ID for exercising the burn/mint interface.
+		factoryID := resp.JSON200.FactoryId
+
+		return tokenFactories{
+			TransferFactory:    factoryID,
+			BurnMintFactory:    &factoryID,
+			ChoiceContext:      resp.JSON200.ChoiceContext.ChoiceContextData,
+			DisclosedContracts: disclosedContracts,
+		}, nil
 	}, nil
+}
+
+func trimOptionalString(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(*value)
 }

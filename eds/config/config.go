@@ -110,8 +110,12 @@ type TokenPool struct {
 	ContractIdentifier
 	Type TokenPoolType `toml:"type" validate:"required,oneof=lockRelease burnMint"`
 
-	// The owner party of the token pool that is the owner of locked holdings
+	// The owner party of the token pool.
 	PoolOwner string `toml:"pool_owner" validate:"required"`
+	// Explicit factory contract IDs can be set for custom tokens that do not expose
+	// Splice's Token Standard HTTP APIs.
+	TransferFactoryID *string `toml:"transfer_factory_id"`
+	BurnMintFactoryID *string `toml:"burn_mint_factory_id"`
 	// The URL of the Token Standard API to use for this token pool.
 	// If not set, fetching the transfer factory will be disabled for this pool.
 	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"omitnil,url"`

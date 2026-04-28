@@ -101,6 +101,8 @@ chain_selector = "8706591216959472610"
 		party_id = "tokenPoolOwner"
 		instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
 		pool_owner = "tokenPoolOwner"
+		transfer_factory_id = "00abc"
+		burn_mint_factory_id = "00def"
 	`,
 			want: &Config{
 				ChainSelector: "8706591216959472610",
@@ -166,7 +168,7 @@ chain_selector = "8706591216959472610"
 								InstanceAddress: contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"),
 							},
 							PoolOwner:        "tokenPoolOwner",
-							TokenStandardURL: new("localhost:8545"),
+							TokenStandardURL: ptr("localhost:8545"),
 							TokenStandardAuthConfig: &commonconfig.AuthConfig{
 								Type: commonconfig.AuthTypeInsecureStatic,
 								JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
@@ -177,7 +179,9 @@ chain_selector = "8706591216959472610"
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"),
 							},
-							PoolOwner: "tokenPoolOwner",
+							PoolOwner:         "tokenPoolOwner",
+							TransferFactoryID: ptr("00abc"),
+							BurnMintFactoryID: ptr("00def"),
 						},
 					},
 				},
@@ -220,6 +224,10 @@ chain_selector = "8706591216959472610"
 			}
 		})
 	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }
 
 func TestConfig_Merge(t *testing.T) {
