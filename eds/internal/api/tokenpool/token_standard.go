@@ -8,13 +8,16 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
-type transferFactory func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (string, map[string]any, []oapiCommon.DisclosedContract, error)
+type transferFactory func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (string, common.CCIPContext, []oapiCommon.DisclosedContract, error)
 
 func getTransferFactory(ctx context.Context, url string, auth *commonconfig.AuthConfig, poolOwner types.PARTY) (transferFactory, error) {
 	// If authentication has been configured, add an interceptor that adds the Authorization header
@@ -43,7 +46,7 @@ func getTransferFactory(ctx context.Context, url string, auth *commonconfig.Auth
 		return nil, fmt.Errorf("failed to create TransferInstructionV1 client with URL %q: %w", url, err)
 	}
 
-	return func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (string, map[string]any, []oapiCommon.DisclosedContract, error) {
+	return func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (string, common.CCIPContext, []oapiCommon.DisclosedContract, error) {
 		resp, err := transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 			ChoiceArguments: map[string]any{
 				"expectedAdmin": instrumentId.Admin,
@@ -75,10 +78,10 @@ func getTransferFactory(ctx context.Context, url string, auth *commonconfig.Auth
 			ExcludeDebugFields: nil,
 		})
 		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to call GetTransferFactory: %w", err)
+			return "", common.CCIPContext{}, nil, fmt.Errorf("failed to call GetTransferFactory: %w", err)
 		}
 		if resp.StatusCode() != http.StatusOK {
-			return "", nil, nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
+			return "", common.CCIPContext{}, nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 		}
 
 		disclosedContracts := make([]oapiCommon.DisclosedContract, len(resp.JSON200.ChoiceContext.DisclosedContracts))
@@ -91,6 +94,11 @@ func getTransferFactory(ctx context.Context, url string, auth *commonconfig.Auth
 			}
 		}
 
-		return resp.JSON200.FactoryId, resp.JSON200.ChoiceContext.ChoiceContextData, disclosedContracts, nil
+		ccipContext, err := contracts.CCIPContextFromData(resp.JSON200.ChoiceContext.ChoiceContextData)
+		if err != nil {
+			return "", common.CCIPContext{}, nil, fmt.Errorf("failed to convert choice context: %w", err)
+		}
+
+		return resp.JSON200.FactoryId, ccipContext, disclosedContracts, nil
 	}, nil
 }

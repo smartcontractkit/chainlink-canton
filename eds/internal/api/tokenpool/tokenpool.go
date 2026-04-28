@@ -31,6 +31,7 @@ type ContractConfig struct {
 	Type            config.TokenPoolType
 	Owner           types.PARTY
 	transferFactory transferFactory
+	preapproval     preapprovalFactory
 }
 
 type Server struct {
@@ -92,6 +93,16 @@ func NewServer(
 			}
 			contractConfig.transferFactory = getFactoryFunc
 		}
+
+		// If the TransferPreapproval is configured, this will make the API keep track of and return the given pre-approval
+		if tokenPool.TransferPreapproval != nil {
+			preapprovalFactoryFunc, err := getPreapprovalFactory(activeContractStore, tokenPool.TransferPreapproval.ContextKey, contractConfig.Owner, *tokenPool.TransferPreapproval)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get preapproval factory for token pool with address %s: %w", tokenPool.InstanceAddress, err)
+			}
+			contractConfig.preapproval = preapprovalFactoryFunc
+		}
+
 		s.contractConfigs[tokenPool.InstanceAddress] = contractConfig
 	}
 
@@ -183,16 +194,31 @@ func (s Server) lockReleaseTokenPoolSend(
 	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
 	var (
 		transferFactory           string
-		choiceContext             map[string]any
+		transferContext           common.CCIPContext
 		disclosedFactoryContracts = make([]oapiCommon.DisclosedContract, 0, 2)
 	)
 	if cfg.transferFactory != nil {
-		transferFactory, choiceContext, disclosedFactoryContracts, err = cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
+		transferFactory, transferContext, disclosedFactoryContracts, err = cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
+	}
+
+	// Get TransferPreapproval (if enabled)
+	if cfg.preapproval != nil {
+		contextKey, activeTransferPreapproval, err := cfg.preapproval(c)
+		if err != nil {
+			s.logger.Err(err).Msg("failed to get transfer preapproval")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+
+		transferContext.Values[contextKey] = common.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(activeTransferPreapproval.GetCreatedEvent().GetContractId())),
+		}
+		disclosedFactoryContracts = append(disclosedFactoryContracts, converters.ActiveContractToDisclosedContract(activeTransferPreapproval))
 	}
 
 	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
@@ -204,6 +230,12 @@ func (s Server) lockReleaseTokenPoolSend(
 	})
 	if err != nil {
 		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+	choiceContext, err := converters.SerializeCCIPContext(transferContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize transfer context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -359,11 +391,11 @@ func (s Server) lockReleaseTokenPoolExecute(
 	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
 	var (
 		transferFactory           string
-		choiceContext             map[string]any
+		transferContext           common.CCIPContext
 		disclosedFactoryContracts []oapiCommon.DisclosedContract
 	)
 	if cfg.transferFactory != nil {
-		transferFactory, choiceContext, disclosedFactoryContracts, err = cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
+		transferFactory, transferContext, disclosedFactoryContracts, err = cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
@@ -374,6 +406,12 @@ func (s Server) lockReleaseTokenPoolExecute(
 	contextData, err := converters.SerializeCCIPContext(ccipContext)
 	if err != nil {
 		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+	choiceContext, err := converters.SerializeCCIPContext(transferContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize transfer context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}

@@ -101,6 +101,9 @@ chain_selector = "8706591216959472610"
 		party_id = "tokenPoolOwner"
 		instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
 		pool_owner = "tokenPoolOwner"
+		[token_pool_api.token_pools.transfer_preapproval]
+			context_key = "transfer-preapproval"
+			template_id = "#splice-amulet:Splice.AmuletRules:TransferPreapproval"
 	`,
 			want: &Config{
 				ChainSelector: "8706591216959472610",
@@ -178,6 +181,10 @@ chain_selector = "8706591216959472610"
 								InstanceAddress: contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"),
 							},
 							PoolOwner: "tokenPoolOwner",
+							TransferPreapproval: &TransferPreapproval{
+								ContextKey: "transfer-preapproval",
+								TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
+							},
 						},
 					},
 				},
