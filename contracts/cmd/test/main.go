@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -35,8 +36,12 @@ func main() {
 	noColor := flag.Bool("no-color", false, "Disables color output")
 	plain := flag.Bool("plain", false, "Whether or not to use plain output")
 	summaryOutput := flag.String("output", "", "Path to output summary file")
+	jobs := flag.Int("jobs", min(4, runtime.NumCPU()), "Maximum number of package tests to run in parallel")
 
 	flag.Parse()
+	if *jobs < 1 {
+		log.Fatalf("jobs must be at least 1, got %d", *jobs)
+	}
 
 	if *noColor {
 		color.NoColor = true
@@ -137,8 +142,12 @@ func main() {
 		log.Println("Running tests...")
 	}
 	results := make([]packageResult, len(packages))
+	sem := make(chan struct{}, *jobs)
 	for i, s := range packages {
 		wg.Go(func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
 			directory, _ := filepath.Split(s)
 			cmd := exec.CommandContext(ctx, "dpm", "test")
 			if !*noColor {
