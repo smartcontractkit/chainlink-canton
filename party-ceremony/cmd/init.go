@@ -90,11 +90,13 @@ func runInitOnboarding(cmd *cobra.Command, _ []string) error {
 	}
 
 	input := onboarding.OnboardingInput{
-		NamespaceName:  namespaceName,
-		PartyPrefix:    partyName,
-		Participants:   participants,
-		SynchronizerID: synchronizerID,
-		Threshold:      threshold,
+		NamespaceName:     namespaceName,
+		PartyPrefix:       partyName,
+		Participants:      participants,
+		SynchronizerID:    synchronizerID,
+		Threshold:         threshold,
+		KmsNamespaceKeyID: cfg.KmsNamespaceKeyID,
+		KmsProtocolKeyID:  cfg.KmsProtocolKeyID,
 	}
 
 	return executeOnboardingSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))

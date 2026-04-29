@@ -172,6 +172,8 @@ func executeOnboardingSequence(
 		"ceremony", input.NamespaceName,
 		"participant", cfg.ParticipantID,
 		"participants", input.Participants,
+		"kms_namespace_key", input.KmsNamespaceKeyID != "",
+		"kms_protocol_key", input.KmsProtocolKeyID != "",
 	)
 
 	sr, seqErr := operations.ExecuteSequence(bundle, onboarding.OnboardingSequence, deps, input)

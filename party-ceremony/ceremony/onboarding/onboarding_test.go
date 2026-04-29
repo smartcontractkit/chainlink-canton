@@ -44,6 +44,14 @@ func (m *mockCantonClient) GenerateSigningKey(_ context.Context, name string, _ 
 	}, nil
 }
 
+func (m *mockCantonClient) RegisterKmsSigningKey(_ context.Context, kmsKeyID string, name string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	raw := sha256.Sum256([]byte(m.participantID + ":" + kmsKeyID + ":" + name))
+	return &cryptov30.SigningPublicKey{
+		PublicKey: raw[:],
+		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
+	}, nil
+}
+
 func (m *mockCantonClient) GetNamespaceFingerprint(_ context.Context, keyName string, _ string, _ []string) (string, error) {
 	raw := sha256.Sum256([]byte(m.participantID + ":" + keyName))
 	return fmt.Sprintf("1220%x", raw[:8]), nil
@@ -276,6 +284,69 @@ func TestRoundTripProtoMarshal(t *testing.T) {
 
 	assert.Equal(t, original.GetTransaction(), restored.GetTransaction())
 	assert.Equal(t, original.GetProposal(), restored.GetProposal())
+}
+
+// ── KMS tests ────────────────────────────────────────────────────────────────
+
+// kmsInput returns a single-participant input with KMS key IDs populated.
+func kmsInput() onboarding.OnboardingInput {
+	return onboarding.OnboardingInput{
+		NamespaceName:     "test-namespace",
+		PartyPrefix:       "test-party",
+		Participants:      []string{"p1"},
+		SynchronizerID:    "global",
+		Threshold:         1,
+		KmsNamespaceKeyID: "arn:aws:kms:us-east-1:123456789:key/ns-key-123",
+		KmsProtocolKeyID:  "arn:aws:kms:us-east-1:123456789:key/proto-key-456",
+	}
+}
+
+func TestOnboardingSequence_KMS_HappyPath(t *testing.T) {
+	t.Parallel()
+
+	b := optest.NewBundle(t)
+	sr, err := operations.ExecuteSequence(b, onboarding.OnboardingSequence, newDeps("p1"), kmsInput())
+	require.NoError(t, err)
+
+	assert.True(t, sr.Output.DNSConfirmed)
+	assert.True(t, sr.Output.P2PConfirmed)
+	assert.Contains(t, sr.Output.PartyID, "test-party::")
+}
+
+func TestOnboardingSequence_KMS_DifferentOutputFromGenerate(t *testing.T) {
+	t.Parallel()
+
+	// Run with generated keys.
+	b1 := optest.NewBundle(t)
+	srGen, err := operations.ExecuteSequence(b1, onboarding.OnboardingSequence, newDeps("p1"), baseInput())
+	require.NoError(t, err)
+
+	// Run with KMS keys.
+	b2 := optest.NewBundle(t)
+	srKms, err := operations.ExecuteSequence(b2, onboarding.OnboardingSequence, newDeps("p1"), kmsInput())
+	require.NoError(t, err)
+
+	// The KMS path uses different key material (kmsKeyID is hashed into mock
+	// output), so the party ID should differ.
+	assert.NotEqual(t, srGen.Output.PartyID, srKms.Output.PartyID,
+		"KMS and generated paths should produce different keys/party IDs")
+}
+
+func TestOnboardingSequence_KMS_Idempotent(t *testing.T) {
+	t.Parallel()
+
+	b := optest.NewBundle(t)
+	deps := newDeps("p1")
+	in := kmsInput()
+
+	sr1, err := operations.ExecuteSequence(b, onboarding.OnboardingSequence, deps, in)
+	require.NoError(t, err)
+
+	sr2, err := operations.ExecuteSequence(b, onboarding.OnboardingSequence, deps, in)
+	require.NoError(t, err)
+
+	assert.Equal(t, sr1.ID, sr2.ID, "second call must return the cached report")
+	assert.Equal(t, sr1.Output, sr2.Output)
 }
 
 // ── Mock Canton client ───────────────────────────────────────────────────────

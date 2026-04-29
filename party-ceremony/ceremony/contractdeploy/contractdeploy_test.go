@@ -44,6 +44,10 @@ func (m *mockAdminClient) GenerateSigningKey(_ context.Context, _ string, _ []cr
 	return &cryptov30.SigningPublicKey{}, nil
 }
 
+func (m *mockAdminClient) RegisterKmsSigningKey(_ context.Context, _ string, _ string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	return &cryptov30.SigningPublicKey{}, nil
+}
+
 func (m *mockAdminClient) GetNamespaceFingerprint(_ context.Context, _ string, _ string, _ []string) (string, error) {
 	return "mock-ns-fp", nil
 }

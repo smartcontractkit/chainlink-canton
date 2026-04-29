@@ -4,6 +4,16 @@ package keys
 type CreateMemberKeyInput struct {
 	NamespaceName string `json:"namespace_name"`
 	ParticipantID string `json:"participant_id"`
+
+	// KmsNamespaceKeyID, when non-empty, tells the operation to register a
+	// pre-existing KMS signing key for the NAMESPACE purpose instead of
+	// generating a new one.
+	KmsNamespaceKeyID string `json:"kms_namespace_key_id,omitempty"`
+
+	// KmsProtocolKeyID, when non-empty, tells the operation to register a
+	// pre-existing KMS signing key for the PROTOCOL (DAML) purpose instead of
+	// generating a new one.
+	KmsProtocolKeyID string `json:"kms_protocol_key_id,omitempty"`
 }
 
 // CreateMemberKeyOutput is the output of [CreateMemberKeyOp].

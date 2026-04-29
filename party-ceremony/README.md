@@ -51,12 +51,12 @@ deploying and owning the MCMS contract through the decentralized party. After
 that initial deployment, every subsequent workflow exists for maintenance
 reasons:
 
-| Lifecycle stage | Workflow |
-|---|---|
-| **Create** the decentralized party | `onboarding` |
+| Lifecycle stage                                        | Workflow          |
+| ------------------------------------------------------ | ----------------- |
+| **Create** the decentralized party                     | `onboarding`      |
 | **Deploy** the MCMS contract (or other DAML contracts) | `contract-deploy` |
-| **Add** a new participant to the party | `add-participant` |
-| **Remove** a compromised or decommissioned participant | `kick` |
+| **Add** a new participant to the party                 | `add-participant` |
+| **Remove** a compromised or decommissioned participant | `kick`            |
 
 ---
 
@@ -104,10 +104,10 @@ the CLI to exit with code `2` ("come back later").
 Each ceremony is stored in a directory (`<state-dir>/<workflow-id>/`) containing
 two files:
 
-| File | Mutability | Purpose |
-|---|---|---|
-| `workflow.json` | Immutable | Ceremony type + full input parameters. Written once by `init`. Allows `resume` to reconstruct the workflow without re-supplying flags. |
-| `reports.json` | Append-only | Cached operation results (the idempotency store). Updated after every CLI invocation — even on error — so partial progress is never lost. |
+| File            | Mutability  | Purpose                                                                                                                                   |
+| --------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `workflow.json` | Immutable   | Ceremony type + full input parameters. Written once by `init`. Allows `resume` to reconstruct the workflow without re-supplying flags.    |
+| `reports.json`  | Append-only | Cached operation results (the idempotency store). Updated after every CLI invocation — even on error — so partial progress is never lost. |
 
 Both files use **atomic writes** (write to temp file, then rename) to prevent
 corruption if the process is interrupted.
@@ -126,11 +126,11 @@ Any participant can be the coordinator; the choice is made at `init` time.
 
 ### Exit Codes
 
-| Code | Meaning |
-|---|---|
-| `0` | Ceremony completed successfully |
-| `1` | Unrecoverable error |
-| `2` | Threshold not yet met — more participants must `resume` before the ceremony can complete |
+| Code | Meaning                                                                                  |
+| ---- | ---------------------------------------------------------------------------------------- |
+| `0`  | Ceremony completed successfully                                                          |
+| `1`  | Unrecoverable error                                                                      |
+| `2`  | Threshold not yet met — more participants must `resume` before the ceremony can complete |
 
 ---
 
@@ -177,29 +177,30 @@ to load the correct state.
 
 ## Workflows
 
-| Type | Steps | Purpose |
-|---|---|---|
-| [`onboarding`](#onboarding) | 6 | Create a new decentralized party from scratch |
-| [`kick`](#kick-remove-participant) | 5 | Remove a participant from an existing party |
-| [`add-participant`](#add-participant) | 7 | Add a new participant to an existing party |
-| [`contract-deploy`](#contract-deploy) | 7 | Deploy a DAML contract (e.g. MCMS) owned by the party |
-| [`example`](#example-mock) | 4 | Mock reference implementation for testing |
+| Type                                  | Steps | Purpose                                               |
+| ------------------------------------- | ----- | ----------------------------------------------------- |
+| [`onboarding`](#onboarding)           | 6     | Create a new decentralized party from scratch         |
+| [`kick`](#kick-remove-participant)    | 5     | Remove a participant from an existing party           |
+| [`add-participant`](#add-participant) | 7     | Add a new participant to an existing party            |
+| [`contract-deploy`](#contract-deploy) | 7     | Deploy a DAML contract (e.g. MCMS) owned by the party |
+| [`example`](#example-mock)            | 4     | Mock reference implementation for testing             |
 
 ### Onboarding
 
 Creates a new decentralized party by generating keys, establishing namespace
 delegations, and building the topology mappings from scratch.
 
-| # | Operation | Actor | Description |
-|---|-----------|-------|-------------|
-| 1 | `CreateMemberKeyOp` | Each participant | Generate a namespace signing key and a DAML (protocol) signing key |
-| 2 | `ProposeNamespaceDelegationOp` | Each participant | Publish own namespace delegation to the synchronizer |
-| 3 | `CreateDNSProposalOp` | Coordinator | Create the `DecentralizedNamespaceDefinition` proposal with all owner keys |
-| 4 | `SignDNSProposalOp` | Each signer | Add participant's signature to the DNS proposal |
-| 5 | `SubmitDNSOp` | Coordinator | Merge all collected signatures and submit the fully-signed DNS |
-| 6 | `CreateAndSubmitP2POp` | Each participant | Authorize the `PartyToParticipant` mapping independently |
+| #   | Operation                      | Actor            | Description                                                                |
+| --- | ------------------------------ | ---------------- | -------------------------------------------------------------------------- |
+| 1   | `CreateMemberKeyOp`            | Each participant | Generate a namespace signing key and a DAML (protocol) signing key         |
+| 2   | `ProposeNamespaceDelegationOp` | Each participant | Publish own namespace delegation to the synchronizer                       |
+| 3   | `CreateDNSProposalOp`          | Coordinator      | Create the `DecentralizedNamespaceDefinition` proposal with all owner keys |
+| 4   | `SignDNSProposalOp`            | Each signer      | Add participant's signature to the DNS proposal                            |
+| 5   | `SubmitDNSOp`                  | Coordinator      | Merge all collected signatures and submit the fully-signed DNS             |
+| 6   | `CreateAndSubmitP2POp`         | Each participant | Authorize the `PartyToParticipant` mapping independently                   |
 
 **Threshold gates:**
+
 - Step 3 requires all participants to have completed step 1 (all keys must exist).
 - Step 5 requires `threshold` signatures to have been collected in step 4.
 - Step 6 requires the DNS to be confirmed on the synchronizer.
@@ -210,15 +211,16 @@ Removes a participant from an existing decentralized party by updating the
 `DecentralizedNamespaceDefinition` (remove the kicked owner) and the
 `PartyToParticipant` mapping (remove the kicked hosting participant).
 
-| # | Operation | Actor | Description |
-|---|-----------|-------|-------------|
-| 1 | `ReadCurrentStateOp` | Any | Read current DNS and P2P topology state |
-| 2 | `CreateKickDNSProposalOp` | Coordinator | Create updated DNS proposal with the kicked owner removed |
-| 3 | `SignKickDNSProposalOp` | Remaining participants | Sign the updated DNS proposal |
-| 4 | `SubmitKickDNSOp` | Coordinator | Merge signatures and submit the updated DNS |
-| 5 | `ProposeKickP2POp` | Remaining participants | Propose updated P2P mapping without the kicked participant |
+| #   | Operation                 | Actor                  | Description                                                |
+| --- | ------------------------- | ---------------------- | ---------------------------------------------------------- |
+| 1   | `ReadCurrentStateOp`      | Any                    | Read current DNS and P2P topology state                    |
+| 2   | `CreateKickDNSProposalOp` | Coordinator            | Create updated DNS proposal with the kicked owner removed  |
+| 3   | `SignKickDNSProposalOp`   | Remaining participants | Sign the updated DNS proposal                              |
+| 4   | `SubmitKickDNSOp`         | Coordinator            | Merge signatures and submit the updated DNS                |
+| 5   | `ProposeKickP2POp`        | Remaining participants | Propose updated P2P mapping without the kicked participant |
 
 **Authorization rules:**
+
 - Canton requires `threshold-of-current-owners` signatures for serial > 1 DNS
   updates. The kicked participant is still a current owner until the update is
   confirmed and **can sign the DNS proposal** in step 3.
@@ -231,17 +233,18 @@ Removes a participant from an existing decentralized party by updating the
 Adds a new participant to an existing decentralized party. The reverse of the
 kick workflow.
 
-| # | Operation | Actor | Description |
-|---|-----------|-------|-------------|
-| 1 | `GenerateNewMemberKeyOp` | New participant | Generate namespace + DAML signing keys |
-| 2 | `ProposeNewNSDOp` | New participant | Publish namespace delegation to the synchronizer |
-| 3 | `ReadCurrentStateOp` | Any | Read current DNS and P2P topology state |
-| 4 | `CreateAddDNSProposalOp` | Coordinator | Create updated DNS proposal with the new owner added |
-| 5 | `SignAddDNSProposalOp` | Existing members | Sign the updated DNS proposal |
-| 6 | `SubmitAddDNSOp` | Coordinator | Merge signatures and submit the updated DNS |
-| 7 | `ProposeAddP2POp` | All (existing + new) | Propose updated P2P mapping including the new participant |
+| #   | Operation                | Actor                | Description                                               |
+| --- | ------------------------ | -------------------- | --------------------------------------------------------- |
+| 1   | `GenerateNewMemberKeyOp` | New participant      | Generate namespace + DAML signing keys                    |
+| 2   | `ProposeNewNSDOp`        | New participant      | Publish namespace delegation to the synchronizer          |
+| 3   | `ReadCurrentStateOp`     | Any                  | Read current DNS and P2P topology state                   |
+| 4   | `CreateAddDNSProposalOp` | Coordinator          | Create updated DNS proposal with the new owner added      |
+| 5   | `SignAddDNSProposalOp`   | Existing members     | Sign the updated DNS proposal                             |
+| 6   | `SubmitAddDNSOp`         | Coordinator          | Merge signatures and submit the updated DNS               |
+| 7   | `ProposeAddP2POp`        | All (existing + new) | Propose updated P2P mapping including the new participant |
 
 **Authorization rules:**
+
 - Only existing members sign the DNS update (the new participant is not yet an
   owner and cannot sign).
 - The new participant receives `CONFIRMATION` permission in the P2P mapping.
@@ -252,17 +255,18 @@ Deploys a DAML contract owned by the decentralized party using the Canton
 Ledger API's `InteractiveSubmissionService`. This is the workflow used to
 deploy the MCMS contract.
 
-| # | Operation | Actor | Description |
-|---|-----------|-------|-------------|
-| 1 | `VerifyPartyOp` | Any | Verify the party is visible on the Ledger API |
-| 2 | `FetchParticipantsOp` | Any | Fetch hosting participant UIDs from topology |
-| 3 | `UploadDarsOp` | Each participant | Upload DAML package archives (DARs) via Admin `PackageService` |
-| 4 | `PrepareSubmissionOp` | Coordinator | Prepare the contract creation via `InteractiveSubmissionService.PrepareSubmission` |
-| 5 | `SignSubmissionOp` | Each participant | Sign the prepared transaction hash with their DAML signing key |
-| 6 | `ExecuteSubmissionOp` | Coordinator | Aggregate all signatures and call `ExecuteSubmission` |
-| 7 | `VerifyContractOp` | Any | Query the Active Contract Set and verify the contract was created |
+| #   | Operation             | Actor            | Description                                                                        |
+| --- | --------------------- | ---------------- | ---------------------------------------------------------------------------------- |
+| 1   | `VerifyPartyOp`       | Any              | Verify the party is visible on the Ledger API                                      |
+| 2   | `FetchParticipantsOp` | Any              | Fetch hosting participant UIDs from topology                                       |
+| 3   | `UploadDarsOp`        | Each participant | Upload DAML package archives (DARs) via Admin `PackageService`                     |
+| 4   | `PrepareSubmissionOp` | Coordinator      | Prepare the contract creation via `InteractiveSubmissionService.PrepareSubmission` |
+| 5   | `SignSubmissionOp`    | Each participant | Sign the prepared transaction hash with their DAML signing key                     |
+| 6   | `ExecuteSubmissionOp` | Coordinator      | Aggregate all signatures and call `ExecuteSubmission`                              |
+| 7   | `VerifyContractOp`    | Any              | Query the Active Contract Set and verify the contract was created                  |
 
 **Threshold gates:**
+
 - Step 4 requires all participants to have uploaded DARs in step 3.
 - Step 6 requires all participants to have signed in step 5.
 
@@ -270,9 +274,9 @@ deploy the MCMS contract.
 When a known package name is used with `--packages`, the template module,
 entity, and args file are auto-populated:
 
-| Package name | Module | Entity | Args file |
-|---|---|---|---|
-| `mcms` | `MCMS.Main` | `MCMS` | `mcms-args.json` |
+| Package name | Module      | Entity | Args file        |
+| ------------ | ----------- | ------ | ---------------- |
+| `mcms`       | `MCMS.Main` | `MCMS` | `mcms-args.json` |
 
 DARs are loaded from the `dars/` directory by default (relative to the working
 directory). Each participant must have the required DAR files available locally.
@@ -299,19 +303,54 @@ participant and points to their Canton APIs:
   "admin_jwt": "",
   "ledger_host": "localhost",
   "ledger_port": 5002,
-  "ledger_jwt": ""
+  "ledger_jwt": "",
+  "kms_namespace_key_id": "",
+  "kms_protocol_key_id": ""
 }
 ```
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `participant_id` | Yes | — | Identifies this operator in the ceremony (`p1`, `p2`, …) |
-| `admin_host` | No | `localhost` | Canton Admin gRPC API host |
-| `admin_port` | No | `5001` | Canton Admin gRPC API port |
-| `admin_jwt` | No | (empty) | Bearer token for Admin API authentication |
-| `ledger_host` | No | `localhost` | Canton Ledger gRPC API host (used by `contract-deploy`) |
-| `ledger_port` | No | `5002` | Canton Ledger gRPC API port |
-| `ledger_jwt` | No | (empty) | Bearer token for Ledger API authentication |
+| Field                  | Required | Default     | Description                                                                                                  |
+| ---------------------- | -------- | ----------- | ------------------------------------------------------------------------------------------------------------ |
+| `participant_id`       | Yes      | —           | Identifies this operator in the ceremony (`p1`, `p2`, …)                                                     |
+| `admin_host`           | No       | `localhost` | Canton Admin gRPC API host                                                                                   |
+| `admin_port`           | No       | `5001`      | Canton Admin gRPC API port                                                                                   |
+| `admin_jwt`            | No       | (empty)     | Bearer token for Admin API authentication                                                                    |
+| `ledger_host`          | No       | `localhost` | Canton Ledger gRPC API host (used by `contract-deploy`)                                                      |
+| `ledger_port`          | No       | `5002`      | Canton Ledger gRPC API port                                                                                  |
+| `ledger_jwt`           | No       | (empty)     | Bearer token for Ledger API authentication                                                                   |
+| `kms_namespace_key_id` | No       | (empty)     | External KMS key ID (e.g. AWS KMS ARN) for NAMESPACE signing key. When set, registers pre-existing KMS key   |
+| `kms_protocol_key_id`  | No       | (empty)     | External KMS key ID (e.g. AWS KMS ARN) for PROTOCOL (DAML) signing key. When set, registers pre-existing key |
+
+### KMS Key Registration
+
+By default, the ceremony generates new signing keys via Canton's internal vault.
+For production deployments where Canton participants run in environments with
+restricted IAM permissions (e.g. AWS), you can **pre-create** signing keys in
+an external KMS and register them instead:
+
+1. Use Terraform (or other infrastructure tooling) to create two KMS keys per
+   participant: one for NAMESPACE signing, one for PROTOCOL (DAML) signing.
+2. Grant the Canton participant's IAM role permissions to **use** those keys
+   (e.g. `kms:Sign`, `kms:GetPublicKey`) but **not** to create new keys.
+3. Populate `kms_namespace_key_id` and `kms_protocol_key_id` in
+   `participant-config.json` with the external key identifiers (e.g. AWS KMS ARNs).
+
+When these fields are set, the ceremony calls Canton's
+`VaultService.RegisterKmsSigningKey` instead of `GenerateSigningKey`. Both
+fields must be set together or both must be empty.
+
+**Example with AWS KMS keys:**
+
+```json
+{
+  "participant_id": "cv1",
+  "admin_host": "cv1.devnet.canton",
+  "admin_port": 5001,
+  "admin_jwt": "eyJhbGciOi...",
+  "kms_namespace_key_id": "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-...",
+  "kms_protocol_key_id": "arn:aws:kms:us-east-1:123456789012:key/e5f6g7h8-..."
+}
+```
 
 The config file path defaults to `./participant-config.json` and can be
 overridden with `--config <path>`.
@@ -336,16 +375,16 @@ canton-party-ceremony init onboarding \
   [--state-dir <dir>]
 ```
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--new-namespace-name` | Yes | — | Unique ceremony identifier |
-| `--new-party-name` | Yes | — | Party ID prefix used to derive the final party identifier |
-| `--participants` | Yes | — | Comma-separated list of participant IDs |
-| `--synchronizer-id` | Yes | — | Canton synchronizer ID |
-| `--coordinator` | No | — | Coordinator participant ID |
-| `--threshold` | No | `0` | Minimum signatures required. `0` = strict majority `floor(n/2)+1` |
-| `--config` | No | `participant-config.json` | Path to participant config JSON |
-| `--state-dir` | No | `ceremonies` | Root directory for ceremony state |
+| Flag                   | Required | Default                   | Description                                                       |
+| ---------------------- | -------- | ------------------------- | ----------------------------------------------------------------- |
+| `--new-namespace-name` | Yes      | —                         | Unique ceremony identifier                                        |
+| `--new-party-name`     | Yes      | —                         | Party ID prefix used to derive the final party identifier         |
+| `--participants`       | Yes      | —                         | Comma-separated list of participant IDs                           |
+| `--synchronizer-id`    | Yes      | —                         | Canton synchronizer ID                                            |
+| `--coordinator`        | No       | —                         | Coordinator participant ID                                        |
+| `--threshold`          | No       | `0`                       | Minimum signatures required. `0` = strict majority `floor(n/2)+1` |
+| `--config`             | No       | `participant-config.json` | Path to participant config JSON                                   |
+| `--state-dir`          | No       | `ceremonies`              | Root directory for ceremony state                                 |
 
 ### init kick
 
@@ -363,16 +402,16 @@ canton-party-ceremony init kick \
   [--state-dir <dir>]
 ```
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--decentralized-party-id` | Yes | — | Full party ID (`<prefix>::<namespace>`) |
-| `--kicked-participant-id` | Yes | — | Canton UID of the participant to remove |
-| `--kicked-namespace-fingerprint` | Yes | — | Namespace fingerprint of the kicked participant |
-| `--remaining-participants` | Yes | — | Comma-separated Canton UIDs of remaining participants (≥ 2) |
-| `--synchronizer-id` | Yes | — | Canton synchronizer ID |
-| `--new-threshold` | No | `0` | Post-kick threshold. `0` = strict majority of remaining |
-| `--config` | No | `participant-config.json` | Path to participant config JSON |
-| `--state-dir` | No | `ceremonies` | Root directory for ceremony state |
+| Flag                             | Required | Default                   | Description                                                 |
+| -------------------------------- | -------- | ------------------------- | ----------------------------------------------------------- |
+| `--decentralized-party-id`       | Yes      | —                         | Full party ID (`<prefix>::<namespace>`)                     |
+| `--kicked-participant-id`        | Yes      | —                         | Canton UID of the participant to remove                     |
+| `--kicked-namespace-fingerprint` | Yes      | —                         | Namespace fingerprint of the kicked participant             |
+| `--remaining-participants`       | Yes      | —                         | Comma-separated Canton UIDs of remaining participants (≥ 2) |
+| `--synchronizer-id`              | Yes      | —                         | Canton synchronizer ID                                      |
+| `--new-threshold`                | No       | `0`                       | Post-kick threshold. `0` = strict majority of remaining     |
+| `--config`                       | No       | `participant-config.json` | Path to participant config JSON                             |
+| `--state-dir`                    | No       | `ceremonies`              | Root directory for ceremony state                           |
 
 Use [`query-parties`](#query-parties) to obtain the identifiers needed for
 these flags.
@@ -392,15 +431,15 @@ canton-party-ceremony init add-participant \
   [--state-dir <dir>]
 ```
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--decentralized-party-id` | Yes | — | Full party ID (`<prefix>::<namespace>`) |
-| `--new-participant-id` | Yes | — | Canton UID of the participant to add |
-| `--namespace-name` | Yes | — | Label for the new participant's key generation |
-| `--synchronizer-id` | Yes | — | Canton synchronizer ID |
-| `--new-threshold` | No | `0` | Post-addition threshold. `0` = keep current |
-| `--config` | No | `participant-config.json` | Path to participant config JSON |
-| `--state-dir` | No | `ceremonies` | Root directory for ceremony state |
+| Flag                       | Required | Default                   | Description                                    |
+| -------------------------- | -------- | ------------------------- | ---------------------------------------------- |
+| `--decentralized-party-id` | Yes      | —                         | Full party ID (`<prefix>::<namespace>`)        |
+| `--new-participant-id`     | Yes      | —                         | Canton UID of the participant to add           |
+| `--namespace-name`         | Yes      | —                         | Label for the new participant's key generation |
+| `--synchronizer-id`        | Yes      | —                         | Canton synchronizer ID                         |
+| `--new-threshold`          | No       | `0`                       | Post-addition threshold. `0` = keep current    |
+| `--config`                 | No       | `participant-config.json` | Path to participant config JSON                |
+| `--state-dir`              | No       | `ceremonies`              | Root directory for ceremony state              |
 
 ### init contract-deploy
 
@@ -418,16 +457,16 @@ canton-party-ceremony init contract-deploy \
   [--state-dir <dir>]
 ```
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--decentralized-party-id` | Yes | — | Full party ID (`<prefix>::<namespace>`) |
-| `--synchronizer-id` | Yes | — | Canton synchronizer ID |
-| `--packages` | Yes | — | Comma-separated `name:version` pairs (e.g. `mcms:current`) |
-| `--template-module` | No | Auto-filled for known packages | Fully-qualified DAML module name (e.g. `MCMS.Main`) |
-| `--template-entity` | No | Auto-filled for known packages | DAML template entity name (e.g. `MCMS`) |
-| `--contract-args-file` | No | Auto-filled for known packages | Path to JSON file with contract creation arguments |
-| `--config` | No | `participant-config.json` | Path to participant config JSON |
-| `--state-dir` | No | `ceremonies` | Root directory for ceremony state |
+| Flag                       | Required | Default                        | Description                                                |
+| -------------------------- | -------- | ------------------------------ | ---------------------------------------------------------- |
+| `--decentralized-party-id` | Yes      | —                              | Full party ID (`<prefix>::<namespace>`)                    |
+| `--synchronizer-id`        | Yes      | —                              | Canton synchronizer ID                                     |
+| `--packages`               | Yes      | —                              | Comma-separated `name:version` pairs (e.g. `mcms:current`) |
+| `--template-module`        | No       | Auto-filled for known packages | Fully-qualified DAML module name (e.g. `MCMS.Main`)        |
+| `--template-entity`        | No       | Auto-filled for known packages | DAML template entity name (e.g. `MCMS`)                    |
+| `--contract-args-file`     | No       | Auto-filled for known packages | Path to JSON file with contract creation arguments         |
+| `--config`                 | No       | `participant-config.json`      | Path to participant config JSON                            |
+| `--state-dir`              | No       | `ceremonies`                   | Root directory for ceremony state                          |
 
 For [known contracts](#contract-deploy), `--template-module`, `--template-entity`,
 and `--contract-args-file` are auto-populated. For custom contracts, all three
@@ -443,10 +482,10 @@ canton-party-ceremony resume <ceremony-id> \
   [--state-dir <dir>]
 ```
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--config` | No | `participant-config.json` | Path to participant config JSON |
-| `--state-dir` | No | `ceremonies` | Root directory for ceremony state |
+| Flag          | Required | Default                   | Description                       |
+| ------------- | -------- | ------------------------- | --------------------------------- |
+| `--config`    | No       | `participant-config.json` | Path to participant config JSON   |
+| `--state-dir` | No       | `ceremonies`              | Root directory for ceremony state |
 
 `resume` loads `workflow.json` to determine the ceremony type and input, then
 loads `reports.json` to seed the reporter cache. All previously completed
@@ -454,6 +493,7 @@ operations are served from cache; only the current participant's pending
 operations execute.
 
 **Exit behavior:**
+
 - Exit `0` — ceremony complete.
 - Exit `2` — threshold not met. Print a message and wait for more operators.
 - Exit `1` — unrecoverable error.
@@ -470,10 +510,10 @@ canton-party-ceremony query-parties \
   [--config <path>]
 ```
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--synchronizer-id` | Yes | — | Canton synchronizer ID to query |
-| `--config` | No | `participant-config.json` | Path to participant config JSON |
+| Flag                | Required | Default                   | Description                     |
+| ------------------- | -------- | ------------------------- | ------------------------------- |
+| `--synchronizer-id` | Yes      | —                         | Canton synchronizer ID to query |
+| `--config`          | No       | `participant-config.json` | Path to participant config JSON |
 
 **Example output:**
 
@@ -519,6 +559,7 @@ Canton nodes are required.
 **1. Initialize the ceremony as the coordinator (`p1`):**
 
 Create `participant-config.json`:
+
 ```json
 {
   "participant_id": "p1",

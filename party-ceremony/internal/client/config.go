@@ -43,6 +43,18 @@ type ClientConfig struct {
 	// grant actAs/readAs rights for the decentralized party.
 	// Only required in JWT-auth environments. Leave empty for no-auth setups.
 	UserID string `json:"user_id,omitempty"`
+
+	// KmsNamespaceKeyID is the external KMS identifier (e.g. AWS KMS ARN) for a
+	// pre-existing NAMESPACE signing key. When set the ceremony registers this
+	// key via VaultService.RegisterKmsSigningKey instead of generating a new one.
+	// Both KmsNamespaceKeyID and KmsProtocolKeyID must be specified together.
+	KmsNamespaceKeyID string `json:"kms_namespace_key_id,omitempty"`
+
+	// KmsProtocolKeyID is the external KMS identifier (e.g. AWS KMS ARN) for a
+	// pre-existing PROTOCOL (DAML) signing key. When set the ceremony registers
+	// this key via VaultService.RegisterKmsSigningKey instead of generating a new one.
+	// Both KmsNamespaceKeyID and KmsProtocolKeyID must be specified together.
+	KmsProtocolKeyID string `json:"kms_protocol_key_id,omitempty"`
 }
 
 // LoadConfig reads a ClientConfig from the given JSON file path.
@@ -61,6 +73,12 @@ func LoadConfig(path string) (ClientConfig, error) {
 
 	if cfg.ParticipantID == "" {
 		return ClientConfig{}, fmt.Errorf("config %q: participant_id is required", path)
+	}
+
+	// If one KMS key is provided, both must be provided.
+	if (cfg.KmsNamespaceKeyID == "") != (cfg.KmsProtocolKeyID == "") {
+		return ClientConfig{}, fmt.Errorf(
+			"config %q: kms_namespace_key_id and kms_protocol_key_id must both be set or both be empty", path)
 	}
 
 	return cfg, nil

@@ -149,6 +149,14 @@ func (m *mockCantonClient) GenerateSigningKey(_ context.Context, name string, _ 
 	}, nil
 }
 
+func (m *mockCantonClient) RegisterKmsSigningKey(_ context.Context, kmsKeyID string, name string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	raw := sha256.Sum256([]byte(m.participantID + ":" + kmsKeyID + ":" + name))
+	return &cryptov30.SigningPublicKey{
+		PublicKey: raw[:],
+		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
+	}, nil
+}
+
 func (m *mockCantonClient) GetNamespaceFingerprint(_ context.Context, keyName string, _ string, _ []string) (string, error) {
 	raw := sha256.Sum256([]byte(m.participantID + ":" + keyName))
 

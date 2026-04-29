@@ -12,6 +12,16 @@ type OnboardingInput struct {
 	// namespace and the party-to-participant mapping. When 0 the sequence
 	// defaults to strict-majority: floor(n/2)+1.
 	Threshold int `json:"threshold"`
+
+	// KmsNamespaceKeyID is the external KMS key identifier for the NAMESPACE
+	// signing key. When non-empty the ceremony registers the pre-existing key
+	// via RegisterKmsSigningKey instead of generating a new one.
+	KmsNamespaceKeyID string `json:"kms_namespace_key_id,omitempty"`
+
+	// KmsProtocolKeyID is the external KMS key identifier for the PROTOCOL
+	// (DAML) signing key. When non-empty the ceremony registers the
+	// pre-existing key via RegisterKmsSigningKey instead of generating a new one.
+	KmsProtocolKeyID string `json:"kms_protocol_key_id,omitempty"`
 }
 
 // Phase represents the current execution phase of the onboarding ceremony.
@@ -57,6 +67,16 @@ type OnboardingOutput struct {
 type CreateMemberKeyInput struct {
 	NamespaceName string `json:"namespace_name"`
 	ParticipantID string `json:"participant_id"`
+
+	// KmsNamespaceKeyID, when non-empty, tells the operation to register a
+	// pre-existing KMS signing key for the NAMESPACE purpose instead of
+	// generating a new one.
+	KmsNamespaceKeyID string `json:"kms_namespace_key_id,omitempty"`
+
+	// KmsProtocolKeyID, when non-empty, tells the operation to register a
+	// pre-existing KMS signing key for the PROTOCOL (DAML) purpose instead of
+	// generating a new one.
+	KmsProtocolKeyID string `json:"kms_protocol_key_id,omitempty"`
 }
 
 // CreateMemberKeyOutput is the output of [CreateMemberKeyOp].

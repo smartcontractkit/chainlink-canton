@@ -28,6 +28,12 @@ type CantonClient interface {
 	// Returns the generated public key proto.
 	GenerateSigningKey(ctx context.Context, name string, usage []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error)
 
+	// RegisterKmsSigningKey registers a pre-existing KMS signing key in the
+	// participant's vault. kmsKeyID is the external KMS identifier (e.g. an
+	// AWS KMS ARN); name and usage mirror [GenerateSigningKey].
+	// Returns the public key proto for the registered key.
+	RegisterKmsSigningKey(ctx context.Context, kmsKeyID string, name string, usage []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error)
+
 	// GetNamespaceFingerprint returns the namespace fingerprint for a named
 	// key by cross-referencing the vault (ListMyKeys) with namespace
 	// delegations (ListNamespaceDelegation).

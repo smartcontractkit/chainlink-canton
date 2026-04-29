@@ -58,6 +58,9 @@ var errNotImplemented = errors.New("not implemented")
 func (m *signTestClient) GenerateSigningKey(context.Context, string, []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
 	return nil, errNotImplemented
 }
+func (m *signTestClient) RegisterKmsSigningKey(context.Context, string, string, []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	return nil, errNotImplemented
+}
 func (m *signTestClient) GetNamespaceFingerprint(context.Context, string, string, []string) (string, error) {
 	return "", nil
 }
