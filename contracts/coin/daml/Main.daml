@@ -1,3 +1,6 @@
+-- | Daml Script setup for the test/demo coin package.
+-- This package exercises Token Standard flows in tests and local development;
+-- it is not the production token implementation used by CCIP deployments.
 module Main where
 
 import Daml.Script
