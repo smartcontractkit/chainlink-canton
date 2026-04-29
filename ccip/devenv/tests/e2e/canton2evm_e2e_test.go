@@ -110,7 +110,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 				Data:     []byte("canton2evm tcapi test"),
 			},
 			cciptestinterfaces.MessageOptions{
-				Version:           3,
 				ExecutionGasLimit: 200_000,
 				FinalityConfig:    1,
 				Executor:          executorAddr,
@@ -122,6 +121,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 					},
 				},
 			},
+			3,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
@@ -134,7 +134,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		)
 
 		t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", cantonChain.ChainSelector(), evmChain.ChainSelector(), seqNo)
-		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, 30*time.Second)
+		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 30*time.Second)
 		require.NoError(t, err)
 
 		t.Logf("CCIPMessageSent event: %+v", sentEvent)
@@ -147,7 +147,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		)
 
 		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
-		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, tests.WaitTimeout(t))
+		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 		require.NoError(t, err)
 		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 		t.Logf("Execution event: %+v", ev)
@@ -201,7 +201,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 				},
 			},
 			cciptestinterfaces.MessageOptions{
-				Version:           3,
 				ExecutionGasLimit: 500_000,
 				FinalityConfig:    1,
 				Executor:          executorAddr,
@@ -213,18 +212,19 @@ func TestCanton2EVM_Basic(t *testing.T) {
 					},
 				},
 			},
+			3,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 		require.NotNil(t, sendMessageResult.Message.TokenTransfer)
 		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
 
-		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, tests.WaitTimeout(t))
+		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.NotNil(t, sentEvent.Message.TokenTransfer)
 
-		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, tests.WaitTimeout(t))
+		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 		require.NoError(t, err)
 		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 

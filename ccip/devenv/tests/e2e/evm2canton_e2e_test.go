@@ -115,7 +115,6 @@ func TestEVM2Canton_Basic(t *testing.T) {
 			Receiver: receiver,
 			Data:     []byte("Hello message transfer from EVM!"),
 		}, cciptestinterfaces.MessageOptions{
-			Version:           3,
 			ExecutionGasLimit: 200_000,
 			FinalityConfig:    0,
 			Executor:          executorAddress,
@@ -126,11 +125,11 @@ func TestEVM2Canton_Basic(t *testing.T) {
 					ArgsLen:    0,
 				},
 			},
-		})
+		}, 3)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 
-		sentEvent, err := srcChain.WaitOneSentEventBySeqNo(subtestCtx, dstSelector, seqNo, 15*time.Second)
+		sentEvent, err := srcChain.ConfirmSendOnSource(subtestCtx, dstSelector, cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 15*time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.Nil(t, sentEvent.Message.TokenTransfer)
@@ -169,7 +168,6 @@ func TestEVM2Canton_Basic(t *testing.T) {
 				TokenAddress: srcToken,
 			},
 		}, cciptestinterfaces.MessageOptions{
-			Version:           3,
 			ExecutionGasLimit: 200_000,
 			FinalityConfig:    0,
 			Executor:          executorAddress,
@@ -180,12 +178,12 @@ func TestEVM2Canton_Basic(t *testing.T) {
 					ArgsLen:    0,
 				},
 			},
-		})
+		}, 3)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 		require.NotNil(t, sendMessageResult.Message.TokenTransfer)
 
-		sentEvent, err := srcChain.WaitOneSentEventBySeqNo(subtestCtx, dstSelector, seqNo, 15*time.Second)
+		sentEvent, err := srcChain.ConfirmSendOnSource(subtestCtx, dstSelector, cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 15*time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.NotNil(t, sentEvent.Message.TokenTransfer)

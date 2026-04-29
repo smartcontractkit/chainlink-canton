@@ -17,7 +17,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -788,11 +787,6 @@ func (c *Chain) GetMaxDataBytes(ctx context.Context, remoteChainSelector uint64)
 	return 0, nil // TODO: implement
 }
 
-// GetRoundRobinUser implements cciptestinterfaces.CCIP17.
-func (c *Chain) GetRoundRobinUser() func() *bind.TransactOpts {
-	return nil // TODO: implement
-}
-
 // GetSenderAddress implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetSenderAddress() (protocol.UnknownAddress, error) {
 	return protocol.UnknownAddress{}, nil // TODO: implement
@@ -872,13 +866,49 @@ func (c *Chain) TransferNative(ctx context.Context, from, to protocol.UnknownAdd
 	return nil
 }
 
-// GetUserNonce implements cciptestinterfaces.CCIP17.
-func (c *Chain) GetUserNonce(ctx context.Context, userAddress protocol.UnknownAddress) (uint64, error) {
-	return 0, nil // TODO: implement
+// ConfirmSendOnSource implements cciptestinterfaces.CCIP17.
+func (c *Chain) ConfirmSendOnSource(ctx context.Context, to uint64, key cciptestinterfaces.MessageEventKey, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
+	if key.MessageID == (protocol.Bytes32{}) && key.SeqNum == 0 {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("MessageEventKey must have MessageID or SeqNum set")
+	}
+	if key.SeqNum != 0 {
+		return c.waitOneSentEventBySeqNo(ctx, to, key.SeqNum, timeout)
+	}
+	deadline := time.Now().Add(timeout)
+	for {
+		if c.lastSentEvent.MessageID == key.MessageID {
+			return c.lastSentEvent, nil
+		}
+		if timeout > 0 && time.Now().After(deadline) {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("timed out waiting for sent event by message ID")
+		}
+		select {
+		case <-ctx.Done():
+			return cciptestinterfaces.MessageSentEvent{}, ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+}
+
+// ConfirmExecOnDest implements cciptestinterfaces.CCIP17.
+func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptestinterfaces.MessageEventKey, timeout time.Duration) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
+	if key.MessageID == (protocol.Bytes32{}) && key.SeqNum == 0 {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("MessageEventKey must have MessageID or SeqNum set")
+	}
+	// Canton destination execution is driven by ManuallyExecuteMessage in current tests; on-chain
+	// ExecutionStateChanged polling is not wired yet.
+	return cciptestinterfaces.ExecutionStateChangedEvent{}, nil // TODO: implement on-chain confirmation
 }
 
 // SendMessage implements cciptestinterfaces.CCIP17.
-func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions) (cciptestinterfaces.MessageSentEvent, error) {
+func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, dataProvider cciptestinterfaces.ExtraArgsDataProvider, messageVersion uint8) (cciptestinterfaces.MessageSentEvent, error) {
+	opts, ok := dataProvider.(cciptestinterfaces.MessageOptions)
+	if !ok {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports cciptestinterfaces.MessageOptions, got %T", dataProvider)
+	}
+	if messageVersion != 3 {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports message version 3, got %d", messageVersion)
+	}
 	participant := c.chain.Participants[0]
 	party := participant.PartyID
 
@@ -1224,18 +1254,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	return event, nil
 }
 
-// SendMessageWithNonce implements cciptestinterfaces.CCIP17.
-func (c *Chain) SendMessageWithNonce(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions, sender *bind.TransactOpts, nonce *uint64, disableTokenAmountCheck bool) (cciptestinterfaces.MessageSentEvent, error) {
-	return c.SendMessage(ctx, dest, fields, opts)
-}
-
-// WaitOneExecEventBySeqNo implements cciptestinterfaces.CCIP17.
-func (c *Chain) WaitOneExecEventBySeqNo(ctx context.Context, from, seq uint64, timeout time.Duration) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	return cciptestinterfaces.ExecutionStateChangedEvent{}, nil // TODO: implement
-}
-
-// WaitOneSentEventBySeqNo implements cciptestinterfaces.CCIP17.
-func (c *Chain) WaitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
+func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
 	deadline := time.Now().Add(timeout)
 
 	for {
@@ -1243,7 +1262,7 @@ func (c *Chain) WaitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, tim
 			return c.lastSentEvent, nil
 		}
 
-		if time.Now().After(deadline) {
+		if timeout > 0 && time.Now().After(deadline) {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("timed out waiting for sent event: dest=%d seq=%d", to, seq)
 		}
 
