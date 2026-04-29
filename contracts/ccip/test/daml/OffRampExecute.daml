@@ -356,7 +356,7 @@ testExecuteTokenOnlyRequiresLaneMandatedCCVs = script do
                 rmnRemote = rmnRemoteAddr
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.empty
-            archivedExecutionContractIds = []
+            archivedExecutionContractIds = Map.empty
             customObservers = []
 
     let message = MessageCodecV1.MessageV1 with

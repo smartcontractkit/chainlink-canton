@@ -221,7 +221,7 @@ template SendingMessageV1
         verifierData : [VerifierData]
 
         -- CCV owner parties accumulated via AddVerifierData and AddCCVFee.
-        -- Mirrors the widened signatory set for auditability.
+        -- Mirrors the widened signatory set for traceability.
         ccvOwners : [Party]
 
         -- External CCIP message, populated by BuildMessage.

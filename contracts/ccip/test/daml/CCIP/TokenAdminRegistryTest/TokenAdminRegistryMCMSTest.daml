@@ -10,8 +10,8 @@ import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.TokenAdminRegistry
-import CCIP.TokenAdminRegistryCodecGen (encodeSetPoolParams, encodeProposeAdminParams, encodeTransferAdminParams, encodeAcceptAdminParams)
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
+import CCIP.TokenAdminRegistryCodecGen (encodeSetPoolParams, encodeProposeAdminParams, encodeTransferAdminParams, encodeAcceptAdminParams, encodeCancelAdminParams)
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..), CancelAdminParams(..))
 
 toAnyContractId : ContractId a -> ContractId ()
 toAnyContractId = coerceContractId
@@ -180,6 +180,31 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
   newContractIds <- submit owner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "AcceptAdminRole"
+      operationData = encoded
+      contractIds = mcmsIds owner instanceId instrumentId tarCid configCid0
+
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr owner instrumentId) newContractIds) : ContractId TokenConfig
+  Some config <- queryContractId owner configCid1
+  config.admin === Some owner
+  config.pendingAdmin === None
+
+-- MCMS can explicitly cancel pending administrator proposals.
+testTokenAdminRegistryMCMSEntrypoint_CancelAdministratorProposal : Script ()
+testTokenAdminRegistryMCMSEntrypoint_CancelAdministratorProposal = script do
+  owner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "TokenAdmin"
+  newAdmin <- allocateParty "NewAdmin"
+
+  let instanceId = "tar-cancel-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "UNI"
+
+  (tarCid, configCid0) <- createRegistryAndConfig owner instanceId instrumentId (Some owner) (Some newAdmin) None
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
+      encoded = encodeCancelAdminParams (CancelAdminParams with instrumentId)
+
+  newContractIds <- submit owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "CancelAdministratorProposal"
       operationData = encoded
       contractIds = mcmsIds owner instanceId instrumentId tarCid configCid0
 

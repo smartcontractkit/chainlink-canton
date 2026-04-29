@@ -4,6 +4,7 @@ module CCIP.TokenAdminRegistryTypes
   ( PoolRegistration(..)
   , SetPoolParams(..)
   , ProposeAdminParams(..)
+  , CancelAdminParams(..)
   , TransferAdminParams(..)
   , AcceptAdminParams(..)
   ) where
@@ -33,6 +34,13 @@ data ProposeAdminParams = ProposeAdminParams
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         newAdmin : Party
+    deriving (Eq, Show)
+
+-- | Params for CancelAdministratorProposal choice.
+-- MCMS payload for explicit pending-admin cancellation.
+data CancelAdminParams = CancelAdminParams
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
     deriving (Eq, Show)
 
 -- | Params for TransferAdmin choice (same structure as ProposeAdminParams)

@@ -2093,7 +2093,7 @@ testVerifyInboundMessage = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
@@ -2211,7 +2211,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig-safe" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn-safe" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify-safe" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
@@ -2330,7 +2330,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify-invalid" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
@@ -2442,7 +2442,7 @@ testVerifyInboundMessageMissingChainConfig = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify-nochain" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
@@ -2554,7 +2554,7 @@ testVerifyInboundMessage_RejectsMismatchedSourceToken = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify-mismatch" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
@@ -2567,6 +2567,49 @@ testVerifyInboundMessage_RejectsMismatchedSourceToken = script do
             tokenConfigCid = tokenConfigCid
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
+            caller = receiver
+
+    let messageWithCorrectSourceToken = message with
+            tokenTransfer = Some MessageCodecV1.TokenTransferV1 with
+                amount = 5000000.0
+                sourcePoolAddress = allowedSourcePool
+                sourceTokenAddress = configuredRemoteToken
+                destTokenAddress = destTokenAddr
+                tokenReceiver = MessageCodecV1.encodePartyAddress receiver
+                extraData = ""
+
+    executingMessageWithWrongRmnCid <- submit ccipOwner do
+        createCmd ExecutingMessageV1.ExecutingMessageV1 with
+            ccipOwner = ccipOwner
+            message = messageWithCorrectSourceToken
+            messageId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            receiver = receiver
+            tokenReceiver = Some receiver
+            executor = ccipOwner
+            observingParties = [receiver, ccipOwner, poolOwner]
+            ccvVerifications = []
+            ccvOwners = []
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverFinalityConfig = finalityConfig 2000
+            sourceDefaultCCVs = []
+            inboundPoolCCVs = None
+            deps = ExecutingMessageV1.ExecutingMessageDeps with
+                offRamp = offRampInstanceAddress
+                globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
+                rmnRemote = RawInstanceAddress.make "wrong-rmn" ccipOwner
+                tokenAdminRegistry = tarInstanceAddress
+            state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
+
+    -- inbound verification rejects messages bound to a different RMN dependency.
+    submitMustFail (actAs poolOwner <> actAs ccipOwner <> actAs receiver
+                    <> disclose disclosedTar <> disclose disclosedTokenConfig) do
+        exerciseCmd tokenPool LockReleaseTokenPool.VerifyInboundMessage with
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            extraContext = CCIP.Context.emptyCCIPContext
+            executingMessageCid = executingMessageWithWrongRmnCid
             caller = receiver
 
     debug "testVerifyInboundMessage_RejectsMismatchedSourceToken: PASSED"
@@ -3305,6 +3348,14 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
+    -- duplicate remote chain selectors in one batch are rejected.
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd =
+                [ (head chainsToAdd1) with remoteChainSelector = 999.0
+                , ((head chainsToAdd1) with remoteTokenAddress = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") with remoteChainSelector = 999.0
+                ]
     -- Attempt to add a chain with an invalid chain selector (negative)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
@@ -3449,6 +3500,23 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner" -- invalid
+                ]
+
+    -- Attempt to add an invalid chain config with custom limiter sharing the inbound limiter
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    finalityConfig = finalityConfig 7
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
 
     pure ()
@@ -3596,17 +3664,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
     -- | ========= Test 5 ========
     -- | Invalid updates
     -- | ========================
-    -- Attempt to update rate limiters for a non-existent chain config
-    submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
-            rateLimitConfigArgs = [
-                LockReleaseTokenPool.RateLimitConfigArgs with
-                    remoteChainSelector = 999.0 -- does not exist
-                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
-                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
-                ]
-            caller = owner
     -- Attempt to update with an invalid chain selector (negative)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
@@ -3640,7 +3697,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
                 ]
             caller = owner
-    -- Attempt to update with an identical rate limiter for both inbound and outbound (invalid)
+    -- shared inbound/outbound limiter roles are rejected.
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
             rateLimitConfigArgs = [
@@ -3651,7 +3708,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner" -- invalid
                 ]
             caller = owner
-    -- Attempt to update a chain that requires custom finality with an empty custom rate limiter
+    -- custom finality must use a distinct custom limiter.
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
             rateLimitConfigArgs = [
@@ -3659,6 +3716,28 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     remoteChainSelector = 456.0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+            caller = owner
+
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+            rateLimitConfigArgs = [
+                LockReleaseTokenPool.RateLimitConfigArgs with
+                    remoteChainSelector = 456.0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+            caller = owner
+
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+            rateLimitConfigArgs = [
+                LockReleaseTokenPool.RateLimitConfigArgs with
+                    remoteChainSelector = 456.0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
             caller = owner

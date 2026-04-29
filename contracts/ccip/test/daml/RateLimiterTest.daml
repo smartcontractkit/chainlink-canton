@@ -93,3 +93,55 @@ testRateLimiterSetConfigResetsBucket = script do
     limiterState.rate === 10.0
 
     debug "testRateLimiterSetConfigResetsBucket: PASSED"
+
+-- Negative limiter state, config, and consume inputs fail.
+testRateLimiterRejectsNegativeValues = script do
+    poolOwner <- allocateParty "pool-owner-negative"
+
+    now <- getTime
+
+    submitMustFail poolOwner do
+        createCmd RateLimiter.RateLimiter with
+            instanceId = "rl-negative-capacity"
+            poolInstanceId = "pool-1"
+            poolOwner = poolOwner
+            remoteChainSelector = 123.0
+            direction = RateLimiter.RateLimitDirection_Outbound
+            mode = RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = -1.0
+            rate = 0.0
+            tokens = 0.0
+            lastUpdated = now
+
+    limiter <- submit poolOwner do
+        createCmd RateLimiter.RateLimiter with
+            instanceId = "rl-negative-request"
+            poolInstanceId = "pool-1"
+            poolOwner = poolOwner
+            remoteChainSelector = 123.0
+            direction = RateLimiter.RateLimitDirection_Outbound
+            mode = RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = 5.0
+            tokens = 100.0
+            lastUpdated = now
+
+    submitMustFail poolOwner do
+        exerciseCmd limiter RateLimiter.ConsumeCapacity with
+            requested = -1.0
+
+    submitMustFail poolOwner do
+        exerciseCmd limiter RateLimiter.SetConfig with
+            newIsEnabled = True
+            newCapacity = 100.0
+            newRate = -1.0
+
+    submitMustFail poolOwner do
+        exerciseCmd limiter RateLimiter.SetConfig with
+            newIsEnabled = True
+            newCapacity = -1.0
+            newRate = 0.0
+
+    debug "testRateLimiterRejectsNegativeValues: PASSED"

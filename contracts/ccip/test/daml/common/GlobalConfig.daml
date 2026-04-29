@@ -196,6 +196,24 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
         exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
             sourceChainConfigUpdates = invalidSourceChainConfigUpdates
 
+    -- duplicate source selector batches are rejected.
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = [head sourceChainConfigUpdates1, (head sourceChainConfigUpdates1) with isEnabled = False]
+
+    -- empty onramp addresses are rejected.
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 222.0
+                isEnabled = True
+                onRampAddresses = [""]
+                defaultCCVs = []
+                laneMandatedCCVs = [RawInstanceAddress "0x123"]
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
     -- | ======== Test 4 ========
     -- | Test creating a GlobalConfig with invalid chain selector and verify that the transaction is reverted
     -- | =======================
@@ -390,6 +408,11 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     -- | ======== Test 3 =======
     -- | Add invalid dest chain config updates and verify that the entire transaction is reverted
     -- | =======================
+    -- duplicate destination selector batches are rejected.
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
+            destChainConfigUpdates = [head destChainConfigUpdates1, (head destChainConfigUpdates1) with isEnabled = False]
+
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 0.0 -- Invalid zero chain selector
@@ -554,7 +577,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     submitMustFail owner do
         exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
             destChainConfigUpdates = invalidDestChainConfigUpdates
-    
+
     pure()
 
 -- Assertion helpers

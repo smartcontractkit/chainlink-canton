@@ -63,6 +63,13 @@ testNormalizedFeeWithinCap_CloseBoundary = script do
         capJuels = 66666670000000000.0
     assert (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice capJuels)
 
+-- Exact cross-product cap comparison rejects double-floor false positives.
+testNormalizedFeeWithinCap_RejectsDoubleFloorFalsePositive = script do
+    -- Old logic floored both sides separately:
+    -- floor(1 * 2 / 3) <= floor(1 / 1e10), or 0 <= 0.
+    -- The exact cross-product comparison correctly sees that the fee exceeds the cap.
+    assert (not (Math.normalizedFeeWithinCap 1.0 2.0 3.0 1.0))
+
 testDecimalBoundaryShifts = script do
     Math.decimalToNumeric0 1.0 === 10000000000.0
     Math.decimalToNumeric0 0.0000000001 === 1.0

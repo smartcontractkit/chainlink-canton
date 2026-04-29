@@ -4,7 +4,7 @@ module CCIP.TokenAdminRegistryCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), ProposeAdminParams(..), CancelAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
 
 import MCMS.Codec (
     decodeOptional,
@@ -64,6 +64,20 @@ decodeProposeAdminParamsAt encoded offset = do
     (instrumentId, offset) <- decodeInstrumentId encoded offset
     (newAdmin, offset) <- decodePartyAt encoded offset
     Some (ProposeAdminParams{..}, offset)
+
+
+-- ===============================================
+-- |              CancelAdminParams
+-- ===============================================
+
+encodeCancelAdminParams : CancelAdminParams -> BytesHex
+encodeCancelAdminParams params =
+    encodeInstrumentId params.instrumentId
+
+decodeCancelAdminParamsAt : BytesHex -> Int -> Optional (CancelAdminParams, Int)
+decodeCancelAdminParamsAt encoded offset = do
+    (instrumentId, offset) <- decodeInstrumentId encoded offset
+    Some (CancelAdminParams{..}, offset)
 
 
 -- ===============================================

@@ -10,6 +10,7 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.Factory
+import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified Splice.Api.Token.HoldingV1
 
@@ -541,7 +542,8 @@ testDeployCommitteeVerifier_MCMS = script do
         instanceId = "ccv-1"
         owner = mcmsParty
         ccipOwner = mcmsParty
-        versionTag = "01020304"
+        -- deploy fixtures must use the canonical verifier version tag.
+        versionTag = CommitteeVerifier.versionTagV2_0_0
         allowListAdmin = None
         messageSentObservers = [mcmsParty]
         rmnRemote = RawInstanceAddress "rmn@owner"
@@ -733,7 +735,7 @@ testDeployCCIPReceiver_MCMS = script do
         owner = mcmsParty
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
         optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
-        optionalThreshold = 20
+        optionalThreshold = 2
         receiverFinalityConfig = finalityConfig 7
       encoded = encodeDeployCCIPReceiverParams params
 
@@ -798,8 +800,9 @@ testMultipleNonSingletonDeployments = script do
             direction = RateLimitDirection_Inbound
             mode = RateLimitMode_CustomFinality
             isEnabled = False
-            capacity = 500000.0
-            rate = 50.0
+            -- disabled rate limiter fixtures must store zero capacity/rate.
+            capacity = 0.0
+            rate = 0.0
           encoded2 = encodeDeployRateLimiterParams params2
 
       submit mcmsParty do

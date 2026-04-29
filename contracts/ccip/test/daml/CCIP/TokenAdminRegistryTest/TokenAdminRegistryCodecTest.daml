@@ -17,6 +17,8 @@ import CCIP.TokenAdminRegistryCodecGen (
     decodeTransferAdminParamsAt,
     encodeAcceptAdminParams,
     decodeAcceptAdminParamsAt,
+    encodeCancelAdminParams,
+    decodeCancelAdminParamsAt,
     )
 import CCIP.TokenAdminRegistryTypes (
     PoolRegistration(..),
@@ -24,6 +26,7 @@ import CCIP.TokenAdminRegistryTypes (
     ProposeAdminParams(..),
     TransferAdminParams(..),
     AcceptAdminParams(..),
+    CancelAdminParams(..),
     )
 import MCMS.Codec (encodeText, decodeTextAt)
 
@@ -196,6 +199,26 @@ testAcceptAdminParamsRoundtrip = do
 
   case decodeAcceptAdminParamsAt encoded 0 of
     None -> abort "Failed to decode accept_admin params"
+    Some (decoded, _) ->
+      decoded.instrumentId === instrumentId
+
+  pure ()
+
+-- ===========================================================================
+-- CANCEL_ADMINISTRATOR_PROPOSAL PARAMS TESTS
+-- ===========================================================================
+
+-- Cancel-admin MCMS payload codec round-trips.
+testCancelAdminParamsRoundtrip : Script ()
+testCancelAdminParamsRoundtrip = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
+      params = CancelAdminParams with instrumentId
+      encoded = encodeCancelAdminParams params
+
+  case decodeCancelAdminParamsAt encoded 0 of
+    None -> abort "Failed to decode cancel_admin params"
     Some (decoded, _) ->
       decoded.instrumentId === instrumentId
 

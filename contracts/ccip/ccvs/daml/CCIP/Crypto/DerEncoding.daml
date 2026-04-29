@@ -1,9 +1,22 @@
 module CCIP.Crypto.DerEncoding where
 
-import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Crypto.Text (BytesHex, byteCount, isUInt256Hex, minUInt256Hex)
 import DA.Text qualified as Text
 
 import qualified CCIP.Crypto.Hex
+
+-- secp256k1 group order / 2. ECDSA signatures with s above this value are
+-- malleable high-S signatures and are rejected by Ethereum-style canonicalization.
+secp256k1HalfOrder : BytesHex
+secp256k1HalfOrder = "7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0"
+
+-- Canonicalize ECDSA by accepting only non-zero low-S values.
+isCanonicalLowS : BytesHex -> Bool
+isCanonicalLowS s =
+  let normalizedS = Text.asciiToLower s
+  in isUInt256Hex normalizedS
+    && normalizedS /= minUInt256Hex
+    && normalizedS <= secp256k1HalfOrder
 
 -- | Convert raw ECDSA signature (r, s) to DER format
 --
@@ -66,4 +79,3 @@ secp256k1PublicKeyToDer uncompressedKey =
     _ = if keyLen /= 65 then error "Public key must be exactly 65 bytes (uncompressed format)" else ()
     _ = if Text.take 2 uncompressedKey /= "04" then error "Public key must start with 0x04 (uncompressed format)" else ()
   in "3056301006072a8648ce3d020106052b8104000a034200" <> uncompressedKey
-

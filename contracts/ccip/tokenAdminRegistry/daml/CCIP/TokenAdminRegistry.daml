@@ -9,12 +9,14 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified CCIP.Context
 import CCIP.TokenAdminRegistryCodecGen (
     decodeAcceptAdminParamsAt,
+    decodeCancelAdminParamsAt,
     decodeProposeAdminParamsAt,
     decodeSetPoolParamsAt,
     decodeTransferAdminParamsAt,
     )
 import CCIP.TokenAdminRegistryTypes (
     AcceptAdminParams(..),
+    CancelAdminParams(..),
     PoolRegistration(..),
     ProposeAdminParams(..),
     SetPoolParams(..),
@@ -235,6 +237,8 @@ template TokenAdminRegistry
                     Some admin -> pure admin
                 assertMsg "TransferAdminRole: caller is not current admin" (currentAdmin == caller)
                 assertMsg "TransferAdminRole: new admin must differ from current admin" (currentAdmin /= newAdmin)
+                -- do not silently replace an outstanding admin proposal.
+                assertMsg "TransferAdminRole: pending admin already set" (not (isSome config.pendingAdmin))
                 archive tokenConfigCid
                 create config with pendingAdmin = Some newAdmin
 
@@ -279,6 +283,8 @@ template TokenAdminRegistry
                         assertMsg "ProposeAdministrator: managed token config can only be proposed by owner"
                             (not config.isCCIPManaged || isOwner)
                         assertMsg "ProposeAdministrator: admin already set" (not (isSome config.admin))
+                        -- Do not silently replace an outstanding admin proposal.
+                        assertMsg "ProposeAdministrator: pending admin already set" (not (isSome config.pendingAdmin))
 
                         archive configCid
                         newConfigCid <- create config with pendingAdmin = Some newAdmin
@@ -307,6 +313,27 @@ template TokenAdminRegistry
                             tokenConfigCid = configCid
                             created = True
                             index = newConfigIndex
+
+        -- | Cancel an outstanding administrator proposal.
+        -- Explicit cancellation prevents proposal overwrite as a reset mechanism.
+        nonconsuming choice CancelAdministratorProposal : ContractId TokenConfig
+            with
+                tokenConfigCid : ContractId TokenConfig
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                config <- fetch tokenConfigCid
+                assertTokenConfigForInstrument instanceId owner entryCount instrumentId config
+                assertMsg "CancelAdministratorProposal: no pending admin to cancel"
+                    (isSome config.pendingAdmin)
+                let isOwner = caller == owner
+                    isInstrumentAdmin = caller == instrumentId.admin
+                    isCurrentAdmin = config.admin == Some caller
+                assertMsg "CancelAdministratorProposal: caller must be registry owner, token admin, or current admin"
+                    (isOwner || isInstrumentAdmin || isCurrentAdmin)
+                archive tokenConfigCid
+                create config with pendingAdmin = None
 
         -- | Consume a token receive ticket to authorize token release.
         -- Validates caller is the registered pool owner, ticket was issued by this TAR,
@@ -568,6 +595,23 @@ template TokenAdminRegistry
                       tokenConfigCid
                       instrumentId
                       newAdmin
+                      caller = owner
+                    pure (Map.insert configAddr (coerceContractId newConfigCid) contractIds)
+
+              "CancelAdministratorProposal" -> do
+                -- expose explicit proposal cancellation through MCMS.
+                case decodeCancelAdminParamsAt operationData 0 of
+                  None -> abort "E_INVALID_PARAMS: CancelAdministratorProposal"
+                  Some (CancelAdminParams{..}, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: CancelAdministratorProposal" $
+                      finalOffset == byteCount operationData
+                    let configAddr = tokenConfigInstAddr instrumentId
+                    tokenConfigCid <- case Map.lookup configAddr contractIds of
+                      None -> abort $ "E_TOKEN_CONFIG_CID_NOT_IN_MAP: " <> configAddr
+                      Some cid -> pure (coerceContractId cid : ContractId TokenConfig)
+                    newConfigCid <- exercise selfTarCid CancelAdministratorProposal with
+                      tokenConfigCid
+                      instrumentId
                       caller = owner
                     pure (Map.insert configAddr (coerceContractId newConfigCid) contractIds)
 
