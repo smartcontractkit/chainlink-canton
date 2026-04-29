@@ -8,7 +8,6 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "0fc7ab8615d872c1db48f7cfe144e8fdc86736eaeef62b36e32930739c21dae4"
+	PackageID   = "c761b20d939a55809341459c91d43170ec64fc91a3ca40c6d962074dbfa0b2b3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -445,9 +444,9 @@ func (t *ApplySignatureConfigsParams) UnmarshalHex(data string) error {
 
 // CalculateFee is a Record type
 type CalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	Caller            types.PARTY                                `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	Caller            types.PARTY        `json:"caller"`
 }
 
 // ToMap converts CalculateFee to a map for DAML arguments
@@ -488,8 +487,8 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -1185,11 +1184,11 @@ func (t *DynamicConfig) UnmarshalHex(data string) error {
 
 // ForwardToVerifier is a Record type
 type ForwardToVerifier struct {
-	RmnRemoteCid      types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
-	Caller            types.PARTY                                `json:"caller"`
+	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT         `json:"verifierArgs"`
+	Caller            types.PARTY        `json:"caller"`
 }
 
 // ToMap converts ForwardToVerifier to a map for DAML arguments
@@ -1234,10 +1233,10 @@ func (t *ForwardToVerifier) UnmarshalHex(data string) error {
 // ForwardToVerifierMCMSParams is ForwardToVerifier without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type ForwardToVerifierMCMSParams struct {
-	RmnRemoteCid      types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT         `json:"verifierArgs"`
 }
 
 // MarshalHex encodes ForwardToVerifierMCMSParams to hex string for MCMS operationData.
@@ -1771,11 +1770,11 @@ func (t *UpdateStorageLocationsParams) UnmarshalHex(data string) error {
 
 // VerifyMessage is a Record type
 type VerifyMessage struct {
-	RmnRemoteCid        types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext        splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
-	VerifierResults     types.TEXT                                 `json:"verifierResults"`
-	Caller              types.PARTY                                `json:"caller"`
+	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext        common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	VerifierResults     types.TEXT         `json:"verifierResults"`
+	Caller              types.PARTY        `json:"caller"`
 }
 
 // ToMap converts VerifyMessage to a map for DAML arguments
@@ -1820,10 +1819,10 @@ func (t *VerifyMessage) UnmarshalHex(data string) error {
 // VerifyMessageMCMSParams is VerifyMessage without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type VerifyMessageMCMSParams struct {
-	RmnRemoteCid        types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext        splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
-	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext        common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	VerifierResults     types.TEXT         `json:"verifierResults"`
 }
 
 // MarshalHex encodes VerifyMessageMCMSParams to hex string for MCMS operationData.

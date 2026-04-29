@@ -7,8 +7,9 @@ import (
 	"strings"
 
 	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
+	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "264323b40983c43dabac2acb3e9145a8fbedb8fe6137f2f11b84706bcd33e19e"
+	PackageID   = "97119f256c793b0e6306662a4338f5599a466ed7c8b1c1a3c5101bcec8371e09"
 	SDKVersion  = "3.4.10"
 )
 
@@ -212,9 +213,9 @@ func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, arg
 
 // CCVSendInput is a Record type
 type CCVSendInput struct {
-	CcvAddress      mcms.RawInstanceAddress                    `json:"ccvAddress"`
-	CcvCid          types.CONTRACT_ID                          `json:"ccvCid"`
-	CcvExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"ccvExtraContext"`
+	CcvAddress      mcms.RawInstanceAddress `json:"ccvAddress"`
+	CcvCid          types.CONTRACT_ID       `json:"ccvCid"`
+	CcvExtraContext common.CCIPContext      `json:"ccvExtraContext"`
 }
 
 // ToMap converts CCVSendInput to a map for DAML arguments
@@ -254,8 +255,8 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 
 // ExecutorInput is a Record type
 type ExecutorInput struct {
-	ExecutorCid          types.CONTRACT_ID                          `json:"executorCid"`
-	ExecutorExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"executorExtraContext"`
+	ExecutorCid          types.CONTRACT_ID  `json:"executorCid"`
+	ExecutorExtraContext common.CCIPContext `json:"executorExtraContext"`
 }
 
 // ToMap converts ExecutorInput to a map for DAML arguments
@@ -293,9 +294,8 @@ func (t *ExecutorInput) UnmarshalHex(data string) error {
 
 // FeeTokenInput is a Record type
 type FeeTokenInput struct {
-	SenderInputCids         []types.CONTRACT_ID                    `json:"senderInputCids"`
-	FeeTokenTransferFactory types.CONTRACT_ID                      `json:"feeTokenTransferFactory"`
-	FeeTokenExtraArgs       splice_api_token_metadata_v1.ExtraArgs `json:"feeTokenExtraArgs"`
+	SenderInputCids []types.CONTRACT_ID   `json:"senderInputCids"`
+	TokenInput      interfaces.TokenInput `json:"tokenInput"`
 }
 
 // ToMap converts FeeTokenInput to a map for DAML arguments
@@ -310,9 +310,7 @@ func (t FeeTokenInput) ToMap() map[string]any {
 		return res
 	}()
 
-	m["feeTokenTransferFactory"] = model.NestedToDAMLValue(t.FeeTokenTransferFactory)
-
-	m["feeTokenExtraArgs"] = model.NestedToDAMLValue(t.FeeTokenExtraArgs)
+	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	return m
 }
@@ -341,13 +339,13 @@ func (t *FeeTokenInput) UnmarshalHex(data string) error {
 
 // GetFee2 is a Record type
 type GetFee2 struct {
-	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  client.Canton2AnyMessage                   `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
-	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
-	TokenTransferInput       *TokenTransferInput                        `json:"tokenTransferInput" hex:"optional"`
-	ExecutorInput            *ExecutorInput                             `json:"executorInput" hex:"optional"`
+	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
+	Message                  client.Canton2AnyMessage `json:"message"`
+	Context                  common.CCIPContext       `json:"context"`
+	RouterCid                types.CONTRACT_ID        `json:"routerCid"`
+	CcvSendInputs            []CCVSendInput           `json:"ccvSendInputs"`
+	TokenTransferInput       *TokenTransferInput      `json:"tokenTransferInput" hex:"optional"`
+	ExecutorInput            *ExecutorInput           `json:"executorInput" hex:"optional"`
 }
 
 // ToMap converts GetFee2 to a map for DAML arguments
@@ -460,11 +458,11 @@ func (t *GetFeeResult) UnmarshalHex(data string) error {
 
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
-	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  client.Canton2AnyMessage                   `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
-	TokenPoolCid             *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
+	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
+	Message                  client.Canton2AnyMessage `json:"message"`
+	Context                  common.CCIPContext       `json:"context"`
+	RouterCid                types.CONTRACT_ID        `json:"routerCid"`
+	TokenPoolCid             *types.CONTRACT_ID       `json:"tokenPoolCid" hex:"optional"`
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
@@ -518,14 +516,14 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 
 // Send is a Record type
 type Send struct {
-	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  client.Canton2AnyMessage                   `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
-	FeeTokenInput            FeeTokenInput                              `json:"feeTokenInput"`
-	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
-	TokenTransferInput       *TokenTransferInput                        `json:"tokenTransferInput" hex:"optional"`
-	ExecutorInput            *ExecutorInput                             `json:"executorInput" hex:"optional"`
+	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
+	Message                  client.Canton2AnyMessage `json:"message"`
+	Context                  common.CCIPContext       `json:"context"`
+	RouterCid                types.CONTRACT_ID        `json:"routerCid"`
+	FeeTokenInput            FeeTokenInput            `json:"feeTokenInput"`
+	CcvSendInputs            []CCVSendInput           `json:"ccvSendInputs"`
+	TokenTransferInput       *TokenTransferInput      `json:"tokenTransferInput" hex:"optional"`
+	ExecutorInput            *ExecutorInput           `json:"executorInput" hex:"optional"`
 }
 
 // ToMap converts Send to a map for DAML arguments
@@ -601,9 +599,10 @@ func (t *Send) UnmarshalHex(data string) error {
 
 // TokenTransferInput is a Record type
 type TokenTransferInput struct {
-	SenderInputCids  []types.CONTRACT_ID                        `json:"senderInputCids"`
-	TokenPoolCid     types.CONTRACT_ID                          `json:"tokenPoolCid"`
-	PoolExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"poolExtraContext"`
+	SenderInputCids  []types.CONTRACT_ID   `json:"senderInputCids"`
+	TokenPoolCid     types.CONTRACT_ID     `json:"tokenPoolCid"`
+	PoolExtraContext common.CCIPContext    `json:"poolExtraContext"`
+	TokenInput       interfaces.TokenInput `json:"tokenInput"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -621,6 +620,8 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	m["tokenPoolCid"] = model.NestedToDAMLValue(t.TokenPoolCid)
 
 	m["poolExtraContext"] = model.NestedToDAMLValue(t.PoolExtraContext)
+
+	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	return m
 }
