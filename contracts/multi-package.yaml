@@ -1,5 +1,6 @@
 packages:
   - coin
+  - link
   - ccip/ccipreceiver
   - ccip/ccipsender
   - ccip/ccvs
@@ -13,6 +14,7 @@ packages:
   - ccip/client
   - ccip/pools/interfaces
   - ccip/pools/lockReleaseTokenPool
+  - ccip/pools/burnMintTokenPool
   - ccip/perpartyrouter
   - ccip/factory
   - ccip/test

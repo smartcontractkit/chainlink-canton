@@ -1,0 +1,388 @@
+module Link.Token where
+
+import DA.Action (forA, foldlA)
+import DA.Assert
+import DA.List (dedup)
+import DA.Map qualified as Map
+import DA.Text qualified as T
+import DA.TextMap qualified as TextMap
+
+import Splice.Api.Token.BurnMintV1 qualified as BurnMintV1
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
+
+transferPreapprovalContextKey : Text
+transferPreapprovalContextKey = "transfer-preapproval"
+
+template LinkHolding
+  with
+    holdingOwner : Party
+    holdingAdmin : Party
+    holdingInstrumentId : HoldingV1.InstrumentId
+    holdingAmount : Decimal
+  where
+    signatory holdingOwner, holdingAdmin
+
+    interface instance HoldingV1.Holding for LinkHolding where
+      view = HoldingV1.HoldingView with
+        owner = holdingOwner
+        instrumentId = holdingInstrumentId
+        amount = holdingAmount
+        lock = None
+        meta = MetadataV1.emptyMetadata
+
+template LinkTransferPreapproval
+  with
+    preapprovalAdmin : Party
+    preapprovalReceiver : Party
+  where
+    signatory preapprovalAdmin, preapprovalReceiver
+
+    nonconsuming choice Send : TransferV1.TransferInstructionResult
+      with
+        sender : Party
+        amount : Decimal
+        instrumentId : HoldingV1.InstrumentId
+        inputHoldingCids : [ContractId HoldingV1.Holding]
+      controller sender
+      do
+        inputTotal <- sumAndArchiveInputs sender instrumentId inputHoldingCids
+        assertMsg "LinkTransferPreapproval.Send: amount must be positive" (amount > 0.0)
+        assertMsg "LinkTransferPreapproval.Send: insufficient input" (inputTotal >= amount)
+
+        receiverCid <- create LinkHolding with
+          holdingOwner = preapprovalReceiver
+          holdingAdmin = preapprovalAdmin
+          holdingInstrumentId = instrumentId
+          holdingAmount = amount
+
+        senderChangeCids <- createChangeIfNeeded preapprovalAdmin sender instrumentId (inputTotal - amount)
+
+        pure TransferV1.TransferInstructionResult with
+          senderChangeCids
+          output = TransferV1.TransferInstructionResult_Completed with
+            receiverHoldingCids = [toInterfaceContractId receiverCid]
+          meta = MetadataV1.emptyMetadata
+
+    choice Cancel : ()
+      with
+        actor : Party
+      controller actor
+      do
+        assertMsg "LinkTransferPreapproval.Cancel: unauthorized actor"
+          (actor == preapprovalAdmin || actor == preapprovalReceiver)
+
+template LinkTransferInstruction
+  with
+    instructionAdmin : Party
+    instructionTransfer : TransferV1.Transfer
+    instructionLockedHoldingCid : ContractId LockedLinkHolding
+  where
+    signatory instructionAdmin, instructionTransfer.sender
+    observer instructionTransfer.receiver
+
+    interface instance TransferV1.TransferInstruction for LinkTransferInstruction where
+      view = TransferV1.TransferInstructionView with
+        originalInstructionCid = None
+        transfer = instructionTransfer
+        status = TransferV1.TransferPendingReceiverAcceptance
+        meta = MetadataV1.emptyMetadata
+
+      transferInstruction_acceptImpl _self _arg = do
+        lockedHolding <- fetch instructionLockedHoldingCid
+        archive instructionLockedHoldingCid
+
+        receiverCid <- create LinkHolding with
+          holdingOwner = instructionTransfer.receiver
+          holdingAdmin = instructionAdmin
+          holdingInstrumentId = instructionTransfer.instrumentId
+          holdingAmount = lockedHolding.lockedAmount
+
+        pure TransferV1.TransferInstructionResult with
+          senderChangeCids = []
+          output = TransferV1.TransferInstructionResult_Completed with
+            receiverHoldingCids = [toInterfaceContractId receiverCid]
+          meta = MetadataV1.emptyMetadata
+
+      transferInstruction_rejectImpl _self _arg =
+        returnLockedFunds instructionAdmin instructionTransfer instructionLockedHoldingCid
+
+      transferInstruction_withdrawImpl _self _arg =
+        returnLockedFunds instructionAdmin instructionTransfer instructionLockedHoldingCid
+
+      transferInstruction_updateImpl _self _arg =
+        abort "LinkTransferInstruction: update not supported"
+
+template LockedLinkHolding
+  with
+    lockedAdmin : Party
+    lockedSender : Party
+    lockedReceiver : Party
+    lockedInstrumentId : HoldingV1.InstrumentId
+    lockedAmount : Decimal
+  where
+    signatory lockedAdmin, lockedSender
+    observer lockedReceiver
+
+template LinkRegistry
+  with
+    registryAdmin : Party
+    registryInstrumentId : HoldingV1.InstrumentId
+    instanceId : Text
+    registryMeta : MetadataV1.Metadata
+    transferPreapprovals : Map.Map Party (ContractId LinkTransferPreapproval)
+  where
+    signatory registryAdmin
+    ensure registryInstrumentId.admin == registryAdmin
+      && instanceId /= ""
+      && not (T.isInfixOf "@" instanceId)
+
+    interface instance TransferV1.TransferFactory for LinkRegistry where
+      view = TransferV1.TransferFactoryView with
+        admin = registryAdmin
+        meta = registryMeta
+
+      transferFactory_transferImpl _self arg = do
+        let transfer = arg.transfer
+        validateTransferFactoryCall registryAdmin registryInstrumentId arg
+
+        optPreapprovalCid <- lookupTransferPreapproval
+          registryAdmin
+          transfer.receiver
+          arg.extraArgs.context
+          transferPreapprovals
+        case (transfer.sender == transfer.receiver, optPreapprovalCid) of
+          (True, _) -> executeDirectTransfer registryAdmin transfer
+          (False, Some preapprovalCid) -> do
+            exercise preapprovalCid Send with
+              sender = transfer.sender
+              amount = transfer.amount
+              instrumentId = transfer.instrumentId
+              inputHoldingCids = transfer.inputHoldingCids
+          (False, None) -> createPendingTransfer registryAdmin transfer
+
+      transferFactory_publicFetchImpl _self arg = do
+        assertMsg "LinkRegistry.TransferFactory_PublicFetch: expectedAdmin mismatch"
+          (arg.expectedAdmin == registryAdmin)
+        pure TransferV1.TransferFactoryView with
+          admin = registryAdmin
+          meta = registryMeta
+
+    interface instance BurnMintV1.BurnMintFactory for LinkRegistry where
+      view = BurnMintV1.BurnMintFactoryView with
+        admin = registryAdmin
+        meta = registryMeta
+
+      burnMintFactory_burnMintImpl _self arg = do
+        assertMsg "LinkRegistry.BurnMintFactory_BurnMint: expectedAdmin mismatch"
+          (arg.expectedAdmin == registryAdmin)
+        assertMsg "LinkRegistry.BurnMintFactory_BurnMint: instrumentId mismatch"
+          (arg.instrumentId == registryInstrumentId)
+
+        forA arg.inputHoldingCids \holdingCid -> do
+          let linkHoldingCid = coerceContractId holdingCid : ContractId LinkHolding
+          holding <- fetch linkHoldingCid
+          assertMsg "LinkRegistry.BurnMintFactory_BurnMint: input instrumentId mismatch"
+            (holding.holdingInstrumentId == registryInstrumentId)
+          assertAuthorizedOwner registryAdmin arg.extraActors holding.holdingOwner
+          archive linkHoldingCid
+
+        outputCids <- forA arg.outputs \output -> do
+          assertMsg "LinkRegistry.BurnMintFactory_BurnMint: output amount must be positive"
+            (output.amount > 0.0)
+          assertAuthorizedOwner registryAdmin arg.extraActors output.owner
+          toInterfaceContractId <$> create LinkHolding with
+            holdingOwner = output.owner
+            holdingAdmin = registryAdmin
+            holdingInstrumentId = registryInstrumentId
+            holdingAmount = output.amount
+
+        pure BurnMintV1.BurnMintFactory_BurnMintResult with
+          outputCids
+
+      burnMintFactory_publicFetchImpl _self arg = do
+        assertMsg "LinkRegistry.BurnMintFactory_PublicFetch: expectedAdmin mismatch"
+          (arg.expectedAdmin == registryAdmin)
+        pure BurnMintV1.BurnMintFactoryView with
+          admin = registryAdmin
+          meta = registryMeta
+
+    choice SetTransferPreapproval : ContractId LinkRegistry
+      with
+        receiver : Party
+        newPreapprovalCid : Optional (ContractId LinkTransferPreapproval)
+      controller registryAdmin
+      do
+        case newPreapprovalCid of
+          Some preapprovalCid -> do
+            preapproval <- fetch preapprovalCid
+            assertMsg "LinkRegistry.SetTransferPreapproval: admin mismatch"
+              (preapproval.preapprovalAdmin == registryAdmin)
+            assertMsg "LinkRegistry.SetTransferPreapproval: receiver mismatch"
+              (preapproval.preapprovalReceiver == receiver)
+          None -> pure ()
+
+        let updatedTransferPreapprovals = case newPreapprovalCid of
+              Some preapprovalCid -> Map.insert receiver preapprovalCid transferPreapprovals
+              None -> Map.delete receiver transferPreapprovals
+
+        create this with transferPreapprovals = updatedTransferPreapprovals
+
+sumAndArchiveInputs
+  : Party
+  -> HoldingV1.InstrumentId
+  -> [ContractId HoldingV1.Holding]
+  -> Update Decimal
+sumAndArchiveInputs sender instrumentId cids =
+  foldlA
+    (\acc cid -> do
+      let linkHoldingCid = coerceContractId cid : ContractId LinkHolding
+      holding <- fetch linkHoldingCid
+      assertMsg "Link: input instrumentId mismatch" (holding.holdingInstrumentId == instrumentId)
+      assertMsg "Link: input owner mismatch" (holding.holdingOwner == sender)
+      archive linkHoldingCid
+      pure (acc + holding.holdingAmount))
+    0.0
+    cids
+
+createChangeIfNeeded
+  : Party
+  -> Party
+  -> HoldingV1.InstrumentId
+  -> Decimal
+  -> Update [ContractId HoldingV1.Holding]
+createChangeIfNeeded admin owner instrumentId change =
+  if change > 0.0
+    then do
+      changeCid <- create LinkHolding with
+        holdingOwner = owner
+        holdingAdmin = admin
+        holdingInstrumentId = instrumentId
+        holdingAmount = change
+      pure [toInterfaceContractId changeCid]
+    else pure []
+
+returnLockedFunds
+  : Party
+  -> TransferV1.Transfer
+  -> ContractId LockedLinkHolding
+  -> Update TransferV1.TransferInstructionResult
+returnLockedFunds admin transfer lockedHoldingCid = do
+  lockedHolding <- fetch lockedHoldingCid
+  archive lockedHoldingCid
+
+  senderCid <- create LinkHolding with
+    holdingOwner = transfer.sender
+    holdingAdmin = admin
+    holdingInstrumentId = transfer.instrumentId
+    holdingAmount = lockedHolding.lockedAmount
+
+  pure TransferV1.TransferInstructionResult with
+    senderChangeCids = [toInterfaceContractId senderCid]
+    output = TransferV1.TransferInstructionResult_Failed
+    meta = MetadataV1.emptyMetadata
+
+executeDirectTransfer : Party -> TransferV1.Transfer -> Update TransferV1.TransferInstructionResult
+executeDirectTransfer admin transfer = do
+  inputTotal <- sumAndArchiveInputs transfer.sender transfer.instrumentId transfer.inputHoldingCids
+  assertMsg "LinkRegistry.TransferFactory_Transfer: insufficient input"
+    (inputTotal >= transfer.amount)
+
+  receiverCid <- create LinkHolding with
+    holdingOwner = transfer.receiver
+    holdingAdmin = admin
+    holdingInstrumentId = transfer.instrumentId
+    holdingAmount = transfer.amount
+
+  senderChangeCids <- createChangeIfNeeded admin transfer.sender transfer.instrumentId (inputTotal - transfer.amount)
+
+  pure TransferV1.TransferInstructionResult with
+    senderChangeCids
+    output = TransferV1.TransferInstructionResult_Completed with
+      receiverHoldingCids = [toInterfaceContractId receiverCid]
+    meta = MetadataV1.emptyMetadata
+
+createPendingTransfer : Party -> TransferV1.Transfer -> Update TransferV1.TransferInstructionResult
+createPendingTransfer admin transfer = do
+  inputTotal <- sumAndArchiveInputs transfer.sender transfer.instrumentId transfer.inputHoldingCids
+  assertMsg "LinkRegistry.TransferFactory_Transfer: insufficient input"
+    (inputTotal >= transfer.amount)
+
+  lockedCid <- create LockedLinkHolding with
+    lockedAdmin = admin
+    lockedSender = transfer.sender
+    lockedReceiver = transfer.receiver
+    lockedInstrumentId = transfer.instrumentId
+    lockedAmount = transfer.amount
+
+  senderChangeCids <- createChangeIfNeeded admin transfer.sender transfer.instrumentId (inputTotal - transfer.amount)
+  instructionCid <- create LinkTransferInstruction with
+    instructionAdmin = admin
+    instructionTransfer = transfer
+    instructionLockedHoldingCid = lockedCid
+
+  pure TransferV1.TransferInstructionResult with
+    senderChangeCids
+    output = TransferV1.TransferInstructionResult_Pending with
+      transferInstructionCid = toInterfaceContractId instructionCid
+    meta = MetadataV1.emptyMetadata
+
+validateTransferFactoryCall
+  : Party
+  -> HoldingV1.InstrumentId
+  -> TransferV1.TransferFactory_Transfer
+  -> Update ()
+validateTransferFactoryCall admin instrumentId arg = do
+  now <- getTime
+  let transfer = arg.transfer
+  assertMsg "LinkRegistry.TransferFactory_Transfer: expectedAdmin mismatch"
+    (arg.expectedAdmin == admin)
+  assertMsg "LinkRegistry.TransferFactory_Transfer: instrumentId mismatch"
+    (transfer.instrumentId == instrumentId)
+  assertMsg "LinkRegistry.TransferFactory_Transfer: amount must be positive"
+    (transfer.amount > 0.0)
+  assertMsg "LinkRegistry.TransferFactory_Transfer: requestedAt must not be in the future"
+    (transfer.requestedAt <= now)
+  assertMsg "LinkRegistry.TransferFactory_Transfer: executeBefore must be in the future"
+    (transfer.executeBefore > now)
+  assertMsg "LinkRegistry.TransferFactory_Transfer: at least one input holding is required"
+    (not (null transfer.inputHoldingCids))
+
+lookupTransferPreapproval
+  : Party
+  -> Party
+  -> MetadataV1.ChoiceContext
+  -> Map.Map Party (ContractId LinkTransferPreapproval)
+  -> Update (Optional (ContractId LinkTransferPreapproval))
+lookupTransferPreapproval admin receiver context configuredPreapprovals = do
+  optContextCid <- case TextMap.lookup transferPreapprovalContextKey context.values of
+    None -> pure None
+    Some (MetadataV1.AV_ContractId cid) -> pure (Some (coerceContractId cid))
+    Some value ->
+      abort ("LinkRegistry.TransferFactory_Transfer: invalid transfer-preapproval context value: " <> show value)
+
+  case optContextCid of
+    Some preapprovalCid -> do
+      preapproval <- fetch preapprovalCid
+      assertMsg "LinkRegistry.TransferFactory_Transfer: preapproval admin mismatch"
+        (preapproval.preapprovalAdmin == admin)
+      assertMsg "LinkRegistry.TransferFactory_Transfer: preapproval receiver mismatch"
+        (preapproval.preapprovalReceiver == receiver)
+      pure (Some preapprovalCid)
+    None -> do
+      let optPreapprovalCid = Map.lookup receiver configuredPreapprovals
+      case optPreapprovalCid of
+        Some preapprovalCid -> do
+          preapproval <- fetch preapprovalCid
+          assertMsg "LinkRegistry.TransferFactory_Transfer: keyed preapproval admin mismatch"
+            (preapproval.preapprovalAdmin == admin)
+          assertMsg "LinkRegistry.TransferFactory_Transfer: keyed preapproval receiver mismatch"
+            (preapproval.preapprovalReceiver == receiver)
+          pure (Some preapprovalCid)
+        None -> pure None
+
+assertAuthorizedOwner : Party -> [Party] -> Party -> Update ()
+assertAuthorizedOwner admin extraActors owner =
+  assertMsg "LinkRegistry.BurnMintFactory_BurnMint: missing required actor"
+    (owner == admin || owner `elem` dedup extraActors)

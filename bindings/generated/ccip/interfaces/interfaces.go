@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "aec1e4ebb12e8da55b51c5c591231ba70d2d49e51ada0fd89155ab632efa5e7d"
+	PackageID   = "1b663d5db9fdb64ed25cb5cf2d28236523525ba604521658815ecf6772ca4a66"
 	SDKVersion  = "3.4.10"
 )
 
@@ -325,6 +325,7 @@ func (t *ReleaseOrMintResultPending) UnmarshalHex(data string) error {
 // TokenInput is a Record type
 type TokenInput struct {
 	TransferFactory   types.CONTRACT_ID                      `json:"transferFactory"`
+	BurnMintFactory   *types.CONTRACT_ID                     `json:"burnMintFactory" hex:"optional"`
 	ExtraArgs         splice_api_token_metadata_v1.ExtraArgs `json:"extraArgs"`
 	TokenPoolHoldings []types.CONTRACT_ID                    `json:"tokenPoolHoldings"`
 }
@@ -334,6 +335,18 @@ func (t TokenInput) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["transferFactory"] = model.NestedToDAMLValue(t.TransferFactory)
+
+	if t.BurnMintFactory != nil {
+		m["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.BurnMintFactory),
+		}
+	} else {
+		m["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
 

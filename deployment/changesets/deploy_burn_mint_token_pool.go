@@ -8,19 +8,18 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
-// DeployTokenPoolConfig is the config for deploying a LockReleaseTokenPool.
+// DeployBurnMintTokenPoolConfig is the config for deploying a BurnMintTokenPool.
 // If TokenAdminRegistryInstanceAddress is set, the pool is also registered with that TAR in the same changeset.
-type DeployTokenPoolConfig struct {
+type DeployBurnMintTokenPoolConfig struct {
 	CcipOwner    string
 	PoolOwner    string
 	InstrumentId splice_api_token_holding_v1.InstrumentId
@@ -33,22 +32,22 @@ type DeployTokenPoolConfig struct {
 	// Optional; defaults to empty. PoolReceiveContext can be set for receive context.
 	PoolReceiveContext common.CCIPContext
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
-	TransferTimeout lockreleasetokenpool.TransferTimeout
+	TransferTimeout burnminttokenpool.TransferTimeout
 	// Optional; defaults to empty map.
-	RemoteChainConfigs map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig
+	RemoteChainConfigs map[types.NUMERIC]burnminttokenpool.RemoteChainConfig
 	// Optional; defaults to empty map.
-	TokenTransferFeeConfigs map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2
+	TokenTransferFeeConfigs map[types.NUMERIC]burnminttokenpool.TokenTransferFeeConfig
 	// Optional; zero-value deps if not provided.
-	Deps lockreleasetokenpool.LockReleaseTokenPoolDeps
+	Deps burnminttokenpool.BurnMintTokenPoolDeps
 	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
 	TokenAdminRegistryInstanceAddress contracts.InstanceAddress
 }
 
-var _ cldf.ChangeSetV2[CantonCSDeps[DeployTokenPoolConfig]] = DeployTokenPool{}
+var _ cldf.ChangeSetV2[CantonCSDeps[DeployBurnMintTokenPoolConfig]] = DeployBurnMintTokenPool{}
 
-type DeployTokenPool struct{}
+type DeployBurnMintTokenPool struct{}
 
-func (d DeployTokenPool) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployTokenPoolConfig]) error {
+func (d DeployBurnMintTokenPool) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployBurnMintTokenPoolConfig]) error {
 	chain, ok := e.BlockChains.CantonChains()[config.ChainSelector]
 	if !ok {
 		return fmt.Errorf("canton chain %v not found", config.ChainSelector)
@@ -60,7 +59,7 @@ func (d DeployTokenPool) VerifyPreconditions(e cldf.Environment, config CantonCS
 	return nil
 }
 
-func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTokenPoolConfig]) (cldf.ChangesetOutput, error) {
+func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployBurnMintTokenPoolConfig]) (cldf.ChangesetOutput, error) {
 	ds := datastore.NewMemoryDataStore()
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
@@ -71,23 +70,23 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 	transferTimeout := cfg.TransferTimeout
 	if transferTimeout.RelativeHours == nil && transferTimeout.Indefinite == nil {
-		transferTimeout = lockreleasetokenpool.TransferTimeout{RelativeHours: new(types.INT64(24))}
+		transferTimeout = burnminttokenpool.TransferTimeout{RelativeHours: new(types.INT64(24))}
 	}
 	remoteChainConfigs := cfg.RemoteChainConfigs
 	if remoteChainConfigs == nil {
-		remoteChainConfigs = map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{}
+		remoteChainConfigs = map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{}
 	}
 	tokenTransferFeeConfigs := cfg.TokenTransferFeeConfigs
 	if tokenTransferFeeConfigs == nil {
-		tokenTransferFeeConfigs = map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{}
+		tokenTransferFeeConfigs = map[types.NUMERIC]burnminttokenpool.TokenTransferFeeConfig{}
 	}
 	qualifier := new(cfg.Qualifier)
 	if cfg.Qualifier == "" {
 		qualifier = nil
 	}
-	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, lock_release_token_pool.Deploy, chain, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
+	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, burn_mint_token_pool.Deploy, chain, contract.DeployInput[burnminttokenpool.BurnMintTokenPool]{
 		Qualifier: qualifier,
-		Template: lockreleasetokenpool.LockReleaseTokenPool{
+		Template: burnminttokenpool.BurnMintTokenPool{
 			CcipOwner:               types.PARTY(cfg.CcipOwner),
 			PoolOwner:               types.PARTY(cfg.PoolOwner),
 			InstanceId:              types.TEXT(cfg.InstanceID),
@@ -113,7 +112,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 
 	if err = ds.AddressRefStore.Add(out.Output); err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save deployed LockReleaseTokenPool contract address: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save deployed BurnMintTokenPool contract address: %w", err)
 	}
 
 	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {

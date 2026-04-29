@@ -31,7 +31,7 @@ func GetPerPartyRouterFactoryDisclosure(
 		return nil, fmt.Errorf("failed to get per party router factory: %w", err)
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 	}
 
 	var disclosedContracts []*apiv2.DisclosedContract
@@ -61,7 +61,7 @@ func GetTokenPoolForToken(ctx context.Context, ccipAPIClient oapiCCIP.ClientWith
 		return contracts.RawInstanceAddress(""), fmt.Errorf("failed to get token pool for token: %w", err)
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return contracts.RawInstanceAddress(""), fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+		return contracts.RawInstanceAddress(""), fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 	}
 
 	tokenPoolAddress, err := contracts.RawInstanceAddressFromString(resp.JSON200.RawInstanceAddress)

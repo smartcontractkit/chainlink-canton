@@ -93,6 +93,7 @@ mkTokenInput admin = do
             preapprovalCid = None
     pure (transferFactory, CCIP.Interfaces.TokenPool.TokenInput with
         transferFactory = toInterfaceContractId transferFactory
+        burnMintFactory = None
         extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             meta = Splice.Api.Token.MetadataV1.emptyMetadata

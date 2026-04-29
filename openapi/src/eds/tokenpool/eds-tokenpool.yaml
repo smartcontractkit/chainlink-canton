@@ -95,6 +95,8 @@ components:
       properties:
         transferFactory:
           $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        burnMintFactory:
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
         extraArgs:
           type: object
           required:

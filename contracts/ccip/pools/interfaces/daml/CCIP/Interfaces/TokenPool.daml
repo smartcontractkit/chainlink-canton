@@ -2,6 +2,7 @@ module CCIP.Interfaces.TokenPool where
 
 import DA.Crypto.Text (BytesHex)
 
+import qualified Splice.Api.Token.BurnMintV1
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
@@ -137,6 +138,8 @@ data TokenInput = TokenInput
     with
         -- The transfer factory CID for the pool's asset
         transferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        -- Optional burn/mint factory for pools that burn on send and mint on receive.
+        burnMintFactory : Optional (ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory)
         -- The extraArgs passed to the transfer factory when creating transfer instructions
         extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
         -- The holdings in the pool
