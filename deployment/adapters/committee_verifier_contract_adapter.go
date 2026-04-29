@@ -26,3 +26,8 @@ func (c CantonCommitteeVerifierContractAdapter) ResolveCommitteeVerifierContract
 
 	return []datastore.AddressRef{verifier}, nil
 }
+
+// GetCommitteeVerifierResolver implements [adapters.CommitteeVerifierContractAdapter].
+func (c CantonCommitteeVerifierContractAdapter) GetCommitteeVerifierResolver(ds datastore.DataStore, chainSelector uint64, qualifier string) ([]datastore.AddressRef, error) {
+	panic("unimplemented")
+}

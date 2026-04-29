@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	ccipseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -156,10 +157,10 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 					LaneMandatedOutboundCCVs: laneMandatedOutboundCCVs,
 					DefaultExecutor:          localExecutor,
 					CantonLaneConfig:         &lanes.CantonLaneConfig{GlobalConfig: localGlobalConfig},
-					OnRamp:                   contracts.HexToInstanceAddress(input.OnRamp).Bytes(),
-					OffRamp:                  contracts.HexToInstanceAddress(input.OffRamp).Bytes(),
-					Router:                   contracts.HexToInstanceAddress(input.Router).Bytes(),
-					FeeQuoter:                contracts.HexToInstanceAddress(input.FeeQuoter).Bytes(),
+					OnRamp:                   contracts.BytesToInstanceAddress(input.OnRamp).Bytes(),
+					OffRamp:                  contracts.BytesToInstanceAddress(input.OffRamp).Bytes(),
+					Router:                   contracts.BytesToInstanceAddress(input.Router).Bytes(),
+					FeeQuoter:                contracts.BytesToInstanceAddress(input.FeeQuoter).Bytes(),
 				}
 
 				remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)
@@ -232,6 +233,36 @@ func (a *CantonChainFamilyAdapter) ResolveExecutor(ds datastore.DataStore, chain
 	}
 
 	return ref.Address, nil
+}
+
+// GetAddressBytesLength implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetAddressBytesLength() uint8 {
+	panic("unimplemented")
+}
+
+// GetChainFamilySelector implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetChainFamilySelector() [4]byte {
+	panic("unimplemented")
+}
+
+// GetDefaultCommitteeVerifierRemoteChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig() ccipadapters.CommitteeVerifierRemoteChainDefaults {
+	panic("unimplemented")
+}
+
+// GetDefaultFeeQuoterDestChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccipadapters.FeeQuoterDestChainConfig {
+	panic("unimplemented")
+}
+
+// GetDefaultFinalityConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
+	panic("unimplemented")
+}
+
+// GetDefaultRemoteChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig() ccipadapters.RemoteChainDefaults {
+	panic("unimplemented")
 }
 
 func findContractRef(ds datastore.DataStore, chainSelector uint64, contractType datastore.ContractType, version *semver.Version, qualifier string) (datastore.AddressRef, error) {
