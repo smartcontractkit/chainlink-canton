@@ -91,9 +91,9 @@ testTransferAdminRoleRejectsSameAdmin = script do
 
   pure ()
 
--- Pending proposals cannot be overwritten without explicit cancellation.
-testProposeAdministratorRejectsPendingOverwrite : Script ()
-testProposeAdministratorRejectsPendingOverwrite = script do
+-- Pending proposals cannot be overwritten and arbitrary configs cannot be created by token admins.
+testProposeAdministratorRejectsArbitraryCreationAndPendingOverwrite : Script ()
+testProposeAdministratorRejectsArbitraryCreationAndPendingOverwrite = script do
   owner <- allocateParty "ccip_owner"
   tokenAdmin <- allocateParty "TokenAdmin"
   newAdmin1 <- allocateParty "NewAdmin1"
@@ -107,6 +107,14 @@ testProposeAdministratorRejectsPendingOverwrite = script do
       instanceId
       owner
       entryCount = 0
+
+  disclosedTar0 <- fromSome <$> queryDisclosure owner tarCid0
+  submitMustFail (actAs tokenAdmin <> disclose disclosedTar0) do
+    exerciseCmd tarCid0 ProposeAdministrator with
+      tokenConfigCid = None
+      instrumentId
+      newAdmin = newAdmin1
+      caller = tokenAdmin
 
   result1 <- submit owner do
     exerciseCmd tarCid0 ProposeAdministrator with

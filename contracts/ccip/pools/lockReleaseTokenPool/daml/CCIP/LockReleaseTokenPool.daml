@@ -452,7 +452,7 @@ template LockReleaseTokenPool
                 let remoteChainConfigsUpdated = foldl
                         (\configs RateLimitConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} ->
                             case Map.lookup remoteChainSelector configs of
-                                None -> configs
+                                None -> error ("SetRateLimitConfig: unsupported chain selector: " <> show remoteChainSelector)
                                 Some cfg ->
                                     let updatedCfg = cfg with inboundRateLimiter = inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter = inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter = outboundRateLimiter
                                     in Map.insert remoteChainSelector updatedCfg configs

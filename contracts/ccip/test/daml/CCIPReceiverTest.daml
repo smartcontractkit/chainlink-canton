@@ -1,0 +1,53 @@
+module CCIPReceiverTest where
+
+import Daml.Script
+
+import CCIP.CCIPReceiver
+import CCIP.FinalityConfig qualified as FinalityConfig
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+
+-- Invalid optional verifier configs are rejected at receiver creation.
+testCCIPReceiverRejectsInvalidOptionalCCVConfig : Script ()
+testCCIPReceiverRejectsInvalidOptionalCCVConfig = script do
+    owner <- allocateParty "ccipreceiver-owner"
+
+    let optionalCCV1 = RawInstanceAddress "optional-ccv-1@owner"
+        optionalCCV2 = RawInstanceAddress "optional-ccv-2@owner"
+
+    submitMustFail owner do
+        createCmd CCIPReceiver with
+            instanceId = "receiver-duplicate-optional"
+            owner
+            requiredCCVs = []
+            optionalCCVs = [optionalCCV1, optionalCCV1]
+            optionalThreshold = 1
+            receiverFinalityConfig = FinalityConfig.WaitForFinality
+
+    submitMustFail owner do
+        createCmd CCIPReceiver with
+            instanceId = "receiver-negative-threshold"
+            owner
+            requiredCCVs = []
+            optionalCCVs = [optionalCCV1]
+            optionalThreshold = -1
+            receiverFinalityConfig = FinalityConfig.WaitForFinality
+
+    submitMustFail owner do
+        createCmd CCIPReceiver with
+            instanceId = "receiver-threshold-too-high"
+            owner
+            requiredCCVs = []
+            optionalCCVs = [optionalCCV1, optionalCCV2]
+            optionalThreshold = 3
+            receiverFinalityConfig = FinalityConfig.WaitForFinality
+
+    _ <- submit owner do
+        createCmd CCIPReceiver with
+            instanceId = "receiver-valid-optional"
+            owner
+            requiredCCVs = []
+            optionalCCVs = [optionalCCV1, optionalCCV2]
+            optionalThreshold = 2
+            receiverFinalityConfig = FinalityConfig.WaitForFinality
+
+    pure ()

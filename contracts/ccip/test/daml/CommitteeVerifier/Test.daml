@@ -37,6 +37,44 @@ testCommitteeVerifier_SignatureCanonicalization = script do
     assert (not (DerEncoding.isCanonicalLowS zeroS))
     assert (not (DerEncoding.isCanonicalLowS "00"))
 
+-- Verifier message-sent observer lists stay unique on create/update.
+testCommitteeVerifier_RejectsDuplicateMessageSentObservers : Script ()
+testCommitteeVerifier_RejectsDuplicateMessageSentObservers = script do
+    owner <- allocateParty "ccv-observer-owner"
+    observer <- allocateParty "ccv-message-observer"
+
+    let signerConfig = CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 123.0
+            threshold = 1
+            signerKeys = [PayloadBuilder.pubkeys !! 0]
+        deps = CommitteeVerifier.CommitteeVerifierDeps with
+            rmnRemote = RawInstanceAddress.make "ccv-observer-rmn" owner
+        createVerifier instanceId messageSentObservers = createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId
+            owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, signerConfig)]
+            deps
+
+    submitMustFail owner do
+        createVerifier "ccv-duplicate-message-observer" [observer, observer]
+
+    ccv <- submit owner do
+        createVerifier "ccv-valid-message-observer" [observer]
+
+    submitMustFail owner do
+        exerciseCmd ccv CommitteeVerifier.SetDynamicConfig with
+            dynamicConfig = CommitteeVerifier.DynamicConfig with
+                allowListAdmin = None
+                messageSentObservers = [observer, observer]
+
 -- | Helper to create a fresh ExecutingMessageV1 for each test.
 -- AddCCVVerification is a consuming choice, so each successful verify
 -- consumes the contract.
@@ -352,6 +390,18 @@ testCommitteeVerifier = script do
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data
             caller = owner
+    -- Trailing partial signature bytes are rejected.
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
+        exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
+            executingMessageCid = executingMessageCid
+            verifierResults =
+                CommitteeVerifier.versionTagV2_0_0 <> -- version tag
+                "0001" <>     -- signature length is one byte, matching payload length
+                "de"          -- partial signature payload must not be silently ignored
+            caller = owner
+
     debug ("===== Passed Test9 =====")
 
     debug ("===== Test10 =====")
@@ -445,6 +495,22 @@ testCommitteeVerifier = script do
             remoteChainConfigs = Map.empty
             signerConfigs = Map.fromList [(456.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+    -- Non-canonical verifier version tags are rejected.
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv10b-version"
+            owner = owner
+            ccipOwner = owner
+            versionTag = "01020304"
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.empty
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
     -- duplicate signer keys should be rejected on config updates as well
     ccv10b <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
@@ -621,6 +687,16 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
                 feeUSDCents = 100.0
                 gasForVerification = 5000
                 payloadSizeBytes = -1
+                allowListEnabled = False]
+
+    -- Negative verifier fee fields are rejected.
+    submitMustFail owner do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CommitteeVerifier.RemoteChainConfigArgs with
+                remoteChainSelector = 123.0
+                feeUSDCents = -1.0
+                gasForVerification = 5000
+                payloadSizeBytes = 200
                 allowListEnabled = False]
 
     -- duplicate remote selector batches are rejected.
