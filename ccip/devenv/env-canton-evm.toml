@@ -267,10 +267,12 @@ execution_interval = 15_000_000_000
 
 [[executor]]
   image = "executor:dev"
-  port = 8101
   container_name = "default-executor-1"
   nop_alias = "default-executor-1"
   executor_qualifier = "default"
+  [executor.db]
+    image = "postgres:16-alpine"
+    name = "default-executor-1-db"
 
 [[indexer]]
   image = "indexer:dev"
