@@ -159,6 +159,7 @@ func (cfg *Config) validateTokenPoolMapKeys() error {
 			return fmt.Errorf("token_pool_api.token_pools: map key %q must equal instance_address %q", key, want)
 		}
 	}
+
 	return nil
 }
 
@@ -209,19 +210,17 @@ func (cfg *Config) Merge(in *Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(mergedPools) == 0 {
+		mergedPools = nil
+	}
 	cfg.TokenPoolAPIConfig.TokenPools = mergedPools
 
 	return cfg, nil
 }
 
 func mergeTokenPoolMaps(base, overlay map[string]TokenPool) (map[string]TokenPool, error) {
-	if len(base) == 0 && len(overlay) == 0 {
-		return nil, nil
-	}
 	out := make(map[string]TokenPool)
-	for k, v := range base {
-		out[k] = v
-	}
+	maps.Copy(out, base)
 	for k, sv := range overlay {
 		if dv, ok := out[k]; ok {
 			merged := dv
@@ -233,6 +232,7 @@ func mergeTokenPoolMaps(base, overlay map[string]TokenPool) (map[string]TokenPoo
 			out[k] = sv
 		}
 	}
+
 	return out, nil
 }
 
