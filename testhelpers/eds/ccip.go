@@ -7,7 +7,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
@@ -73,7 +73,7 @@ func GetTokenPoolForToken(ctx context.Context, ccipAPIClient oapiCCIP.ClientWith
 }
 
 type CCIPExecuteDisclosure struct {
-	ChoiceContext      common.CCIPContext
+	ChoiceContext      splice_api_token_metadata_v1.ChoiceContext
 	DisclosedContracts []*apiv2.DisclosedContract
 	TokenPool          *contracts.RawInstanceAddress
 }
@@ -102,7 +102,7 @@ func GetCCIPExecuteDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := contracts.CCIPContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := contracts.ChoiceContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
@@ -124,7 +124,7 @@ func GetCCIPExecuteDisclosure(
 }
 
 type CCIPSendDisclosure struct {
-	ChoiceContext      common.CCIPContext
+	ChoiceContext      splice_api_token_metadata_v1.ChoiceContext
 	DisclosedContracts []*apiv2.DisclosedContract
 	CCVs               []string
 	Executor           *string
@@ -167,7 +167,7 @@ func GetCCIPSendDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := contracts.CCIPContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := contracts.ChoiceContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}

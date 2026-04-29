@@ -7,6 +7,10 @@ import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
 import DA.List (filter)
 
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
 import qualified CCIP.Client
 import qualified CCIP.Context
 import qualified CCIP.FeeQuoter
@@ -28,27 +32,27 @@ data CCVSendInput = CCVSendInput
         -- Used to match this CCV to its verifier args in the client-provided CCVExtraArgs.
         ccvAddress : RawInstanceAddress.RawInstanceAddress
         ccvCid : ContractId ICCV.ICrossChainVerifier
-        ccvExtraContext : CCIP.Context.CCIPContext
+        ccvExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data FeeTokenInput = FeeTokenInput
     with
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+        feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
     deriving (Eq, Show)
 
 data TokenTransferInput = TokenTransferInput
     with
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
-        poolExtraContext : CCIP.Context.CCIPContext
-        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+        poolExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data ExecutorInput = ExecutorInput
     with
         executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
-        executorExtraContext : CCIP.Context.CCIPContext
+        executorExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data GetFeeResult = GetFeeResult
@@ -82,7 +86,7 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
                 tokenPoolCid : Optional (ContractId CCIP.Interfaces.TokenPool.ITokenPool)
             controller owner
@@ -116,7 +120,7 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
                 ccvSendInputs : [CCVSendInput]
                 tokenTransferInput : Optional TokenTransferInput
@@ -216,7 +220,7 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
                 feeTokenInput : FeeTokenInput
                 ccvSendInputs : [CCVSendInput]
@@ -337,7 +341,6 @@ template CCIPSender
                             rmnRemoteCid = rmnRemoteCid
                             extraContext = tokenTransferInput.poolExtraContext
                             sendingMessageCid = smCid
-                            tokenInput = tokenTransferInput.tokenInput
                             senderInputCids = tokenTransferInput.senderInputCids
                             amount = tt.amount
                             caller = owner
@@ -357,5 +360,6 @@ template CCIPSender
                 exercise routerCid CCIP.PerPartyRouter.CCIPSend with
                     context
                     sendingMessageCid = smCid
-                    feeTokenInput = feeTokenInput.tokenInput
                     feeTokenHoldingCids = feeTokenInput.senderInputCids
+                    feeTokenTransferFactory = feeTokenInput.feeTokenTransferFactory
+                    feeTokenExtraArgs = feeTokenInput.feeTokenExtraArgs

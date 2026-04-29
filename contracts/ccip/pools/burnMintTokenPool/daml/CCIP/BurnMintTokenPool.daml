@@ -29,7 +29,7 @@ import CCIP.BurnMintTokenPoolCodecGen (
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
     )
-import CCIP.ContextCodec (decodeCCIPContextAt)
+import CCIP.ContextCodec (decodeChoiceContextAt)
 import CCIP.BurnMintTokenPoolTypes (
     TokenTransferFeeConfig(..),
     RemoteChainConfig(..),
@@ -70,6 +70,24 @@ import qualified CCIP.TokenAdminRegistry
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
 
+burnMintFactoryContextKey : Text
+burnMintFactoryContextKey = "burn-mint-factory"
+
+lookupBurnMintFactory : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory)
+lookupBurnMintFactory ctx = CCIP.Context.getFromContextU ctx burnMintFactoryContextKey
+
+burnMintFactoryExtraArgsContextValuesContextKey : Text
+burnMintFactoryExtraArgsContextValuesContextKey = "burn-mint-factory-extra-args-values"
+
+lookupBurnMintFactoryExtraArgsContextValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Splice.Api.Token.MetadataV1.AnyValue)
+lookupBurnMintFactoryExtraArgsContextValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx burnMintFactoryExtraArgsContextValuesContextKey
+
+burnMintFactoryExtraArgsMetaValuesContextKey : Text
+burnMintFactoryExtraArgsMetaValuesContextKey = "burn-mint-factory-extra-args-meta-values"
+
+lookupBurnMintFactoryExtraArgsMetaValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Text)
+lookupBurnMintFactoryExtraArgsMetaValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx burnMintFactoryExtraArgsMetaValuesContextKey
+
 data BurnMintTokenPoolDeps = BurnMintTokenPoolDeps
     with
         tokenAdminRegistry : RawInstanceAddress
@@ -97,25 +115,6 @@ calculateLocalAmount remoteAmount remoteDecimals localDecimals =
         remoteAmount
         remoteDecimals
         localDecimals
-
--- | Convert CCIP AnyValue to Splice AnyValue at TransferFactory boundary.
-toSpliceAnyValue : CCIP.Context.AnyValue -> Splice.Api.Token.MetadataV1.AnyValue
-toSpliceAnyValue (CCIP.Context.AV_Text t) = Splice.Api.Token.MetadataV1.AV_Text t
-toSpliceAnyValue (CCIP.Context.AV_Int i) = Splice.Api.Token.MetadataV1.AV_Int i
-toSpliceAnyValue (CCIP.Context.AV_Decimal d) = Splice.Api.Token.MetadataV1.AV_Decimal d
-toSpliceAnyValue (CCIP.Context.AV_Bool b) = Splice.Api.Token.MetadataV1.AV_Bool b
-toSpliceAnyValue (CCIP.Context.AV_Date d) = Splice.Api.Token.MetadataV1.AV_Date d
-toSpliceAnyValue (CCIP.Context.AV_Time t) = Splice.Api.Token.MetadataV1.AV_Time t
-toSpliceAnyValue (CCIP.Context.AV_RelTime r) = Splice.Api.Token.MetadataV1.AV_RelTime r
-toSpliceAnyValue (CCIP.Context.AV_Party p) = Splice.Api.Token.MetadataV1.AV_Party p
-toSpliceAnyValue (CCIP.Context.AV_ContractId c) = Splice.Api.Token.MetadataV1.AV_ContractId (coerceContractId c)
-toSpliceAnyValue (CCIP.Context.AV_List xs) = Splice.Api.Token.MetadataV1.AV_List (map toSpliceAnyValue xs)
-toSpliceAnyValue (CCIP.Context.AV_Map m) = Splice.Api.Token.MetadataV1.AV_Map (TextMap.fromList (map (\(k, v) -> (k, toSpliceAnyValue v)) (TextMap.toList m)))
-
--- | Convert CCIPContext to Splice ChoiceContext for TransferFactory calls.
-toSpliceChoiceContext : CCIP.Context.CCIPContext -> Splice.Api.Token.MetadataV1.ChoiceContext
-toSpliceChoiceContext ctx = Splice.Api.Token.MetadataV1.ChoiceContext with
-    values = TextMap.fromList (map (\(k, v) -> (k, toSpliceAnyValue v)) (TextMap.toList ctx.values))
 
 sumHoldingAmounts : [ContractId Splice.Api.Token.HoldingV1.Holding] -> Update Decimal
 sumHoldingAmounts =
@@ -183,7 +182,7 @@ template BurnMintTokenPool
         -- the pool's preapproval CID under the key the TransferFactory expects
         -- (e.g., "transfer-preapproval"). Converted to Splice ChoiceContext at the
         -- TransferFactory boundary.
-        poolReceiveContext : CCIP.Context.CCIPContext
+        poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
         -- Timeout for pending TransferInstructions created by this pool.
         transferTimeout : TransferTimeout
         deps : BurnMintTokenPoolDeps
@@ -244,7 +243,6 @@ template BurnMintTokenPool
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         tokenReceiveTicketCid = arg.tokenReceiveTicketCid
-                        tokenInput = arg.tokenInput
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
@@ -255,7 +253,6 @@ template BurnMintTokenPool
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
-                        tokenInput = arg.tokenInput
                         senderInputCids = arg.senderInputCids
                         amount = arg.amount
                         caller = arg.caller
@@ -439,7 +436,7 @@ template BurnMintTokenPool
         -- Callable by poolOwner
         choice SetPoolReceiveContext : ContractId BurnMintTokenPool
             with
-                newPoolReceiveContext : CCIP.Context.CCIPContext
+                newPoolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
             controller poolOwner
             do create this with poolReceiveContext = newPoolReceiveContext
 
@@ -479,7 +476,7 @@ template BurnMintTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 caller : Party
             controller caller
@@ -523,7 +520,7 @@ template BurnMintTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 amount : Decimal
                 caller : Party
@@ -561,9 +558,8 @@ template BurnMintTokenPool
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
-                tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 caller : Party
             controller caller
             do
@@ -635,11 +631,13 @@ template BurnMintTokenPool
                         instrumentId = instrumentId
                         caller = poolOwner
 
+                -- Get inputs from extraContext
+                burnMintFactory <- lookupBurnMintFactory extraContext
+                extraArgsContextValues <- lookupBurnMintFactoryExtraArgsContextValues extraContext
+                extraArgsMetaValues <- lookupBurnMintFactoryExtraArgsMetaValues extraContext
+
                 let amountDecimal = CCIP.Math.numeric0ToDecimal localAmount
-                let burnMintFactoryCid = fromSomeNote
-                        "ReleaseFromTicket: burnMintFactory is required"
-                        tokenInput.burnMintFactory
-                burnMintResult <- exercise burnMintFactoryCid
+                burnMintResult <- exercise burnMintFactory
                     Splice.Api.Token.BurnMintV1.BurnMintFactory_BurnMint with
                         expectedAdmin = instrumentId.admin
                         instrumentId = instrumentId
@@ -650,7 +648,11 @@ template BurnMintTokenPool
                                 amount = amountDecimal
                                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext]
                         extraActors = if ticket.tokenReceiver == instrumentId.admin then [] else [ticket.tokenReceiver]
-                        extraArgs = tokenInput.extraArgs
+                        extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+                            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                                values = extraArgsContextValues
+                            meta = Splice.Api.Token.MetadataV1.Metadata with
+                                values = extraArgsMetaValues
 
                 let receiverCids = burnMintResult.outputCids
                 assertMsg "ReleaseFromTicket: mint completed with no receiver holdings" (not (null receiverCids))
@@ -688,7 +690,7 @@ template BurnMintTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -785,9 +787,8 @@ template BurnMintTokenPool
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
                 amount : Decimal
                 caller : Party
@@ -837,6 +838,11 @@ template BurnMintTokenPool
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
                     requested = amountNumeric0
 
+                -- Get inputs from extraContext
+                burnMintFactory <- lookupBurnMintFactory extraContext
+                extraArgsContextValues <- lookupBurnMintFactoryExtraArgsContextValues extraContext
+                extraArgsMetaValues <- lookupBurnMintFactoryExtraArgsMetaValues extraContext
+
                 let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
                         Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
                         _ -> 0.0
@@ -847,9 +853,6 @@ template BurnMintTokenPool
                 let amountAfterFeeBps = amountNumeric0 - feeAmount
                 let senderChangeAmount = inputTotal - amount
                 let feeHoldingAmount = CCIP.Math.numeric0ToDecimal feeAmount
-                let burnMintFactoryCid = fromSomeNote
-                        "LockOrBurn: burnMintFactory is required"
-                        tokenInput.burnMintFactory
                 let outputs =
                         (if senderChangeAmount > 0.0 then
                             [Splice.Api.Token.BurnMintV1.BurnMintOutput with
@@ -864,14 +867,18 @@ template BurnMintTokenPool
                                 amount = feeHoldingAmount
                                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext]
                          else [])
-                burnMintResult <- exercise burnMintFactoryCid
+                burnMintResult <- exercise burnMintFactory
                     Splice.Api.Token.BurnMintV1.BurnMintFactory_BurnMint with
                         expectedAdmin = instrumentId.admin
                         instrumentId = instrumentId
                         inputHoldingCids = senderInputCids
                         outputs = outputs
                         extraActors = if caller == instrumentId.admin then [] else [caller]
-                        extraArgs = tokenInput.extraArgs
+                        extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+                            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                                values = extraArgsContextValues
+                            meta = Splice.Api.Token.MetadataV1.Metadata with
+                                values = extraArgsMetaValues
 
                 let senderChangeCount = if senderChangeAmount > 0.0 then 1 else 0
                 let senderChangeCids = take senderChangeCount burnMintResult.outputCids
@@ -941,7 +948,7 @@ template BurnMintTokenPool
                             caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "SetPoolReceiveContext" -> do
-                    case decodeCCIPContextAt operationData 0 of
+                    case decodeChoiceContextAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: SetPoolReceiveContext"
                         Some (newPoolReceiveContext, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetPoolReceiveContext" (finalOffset == byteCount operationData)

@@ -7,6 +7,8 @@ import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isNone, isSome)
 
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import qualified CCIP.Client
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
@@ -66,7 +68,7 @@ noExecutionAddressBytes =
 onRampKey : Text
 onRampKey = "on-ramp"
 
-lookupOnRampCid : CCIP.Context.CCIPContext -> Update (ContractId OnRamp)
+lookupOnRampCid : ChoiceContext -> Update (ContractId OnRamp)
 lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
 
 rawInstanceAddress : OnRamp -> RawInstanceAddress.RawInstanceAddress

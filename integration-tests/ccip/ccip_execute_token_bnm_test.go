@@ -428,7 +428,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			InstrumentId:       linkInstrumentId,
 			Decimals:           10,
 			InstanceID:         poolInstanceId,
-			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 			TransferTimeout: burnminttokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
@@ -538,10 +538,10 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 						PoolOwner: partyCCIP,
 						// By setting the TokenStandard info, the Toke Pool API will return the necessary factory disclosures
 						BurnMintFactory: &config.BurnMintFactory{
-							Type:       config.FactoryTypeAddress,
-							TemplateId: new(link.LinkRegistry{}.GetTemplateID()),
-							Party:      new(partyTokenPoolOwner),
-							Address:    new(linkRegistryAddress.InstanceAddress()),
+							Type:            config.FactoryTypeAddress,
+							TemplateId:      new(link.LinkRegistry{}.GetTemplateID()),
+							Party:           new(partyTokenPoolOwner),
+							InstanceAddress: new(linkRegistryAddress.InstanceAddress()),
 						},
 					},
 				},
@@ -684,7 +684,6 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 		TokenTransfer: &ccipreceiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(partyReceiver),
-			TokenInput:         tokenPoolDisclosure.TokenInput,
 			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
 		},
 		CcvInputs: []ccipreceiver.CCVInput{

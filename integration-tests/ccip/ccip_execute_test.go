@@ -246,6 +246,12 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		testhelpers.ContractCleanup(t, ctx, env.Chain.Participants)
 	})
 
+	resp, err := ccipParticipant.LedgerServices.Admin.PackageManagement.ListKnownPackages(t.Context(), nil)
+	require.NoError(t, err)
+	for i, details := range resp.GetPackageDetails() {
+		fmt.Printf("Known package %d: ID=%s, Name=%s, Version=%s\n", i, details.GetPackageId(), details.GetName(), details.GetVersion())
+	}
+
 	// Upload DARs
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
 	require.NoError(t, err)

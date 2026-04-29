@@ -195,7 +195,6 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		executeArgs.TokenTransfer = &ccipreceiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(executingParty),
-			TokenInput:         tokenPoolDisclosure.TokenInput,
 			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
 		}
 		disclosedContracts = append(disclosedContracts, tokenPoolDisclosure.DisclosedContracts...)
