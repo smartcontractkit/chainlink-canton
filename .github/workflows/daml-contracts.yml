@@ -32,6 +32,8 @@ jobs:
               done
               exit 1
           fi
+      - name: Lint Daml contracts
+        run: make lint-daml-contracts
 
   generate-bindings:
     name: Generate Bindings

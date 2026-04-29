@@ -36,6 +36,43 @@ gomodtidy: ## Run go mod tidy on all modules.
 test-daml-contracts:
 	go run ./contracts/cmd/test --root ./contracts
 
+# Baseline-clean packages enforced in CI. Expand this list as lint debt is
+# removed from the remaining Daml packages.
+DAML_LINT_PACKAGES ?= \
+	contracts/ccip/ccipreceiver \
+	contracts/ccip/ccvs \
+	contracts/ccip/client \
+	contracts/ccip/feequoter \
+	contracts/ccip/offramp \
+	contracts/ccip/pools/burnMintTokenPool \
+	contracts/ccip/pools/interfaces \
+	contracts/ccip/pools/lockReleaseTokenPool \
+	contracts/coin \
+	contracts/mcms/test/globalconfig-v1 \
+	contracts/test/interfaces \
+	contracts/test/proxy \
+	contracts/test/receiver \
+	contracts/test/test
+
+.PHONY: lint-daml-contracts
+lint-daml-contracts: compile-contracts
+	@echo "Linting Daml contracts..."
+	@set -e; \
+	for pkg_dir in $(DAML_LINT_PACKAGES); do \
+		echo "dpm damlc lint $$pkg_dir"; \
+		( cd "$$pkg_dir" && dpm damlc lint ); \
+	done
+
+.PHONY: lint-daml-contracts-all
+lint-daml-contracts-all:
+	@echo "Linting all Daml contracts..."
+	@set -e; \
+	find contracts -name daml.yaml -not -path '*/.daml/*' -print | sort | while read -r daml_yaml; do \
+		pkg_dir=$$(dirname "$$daml_yaml"); \
+		echo "dpm damlc lint $$pkg_dir"; \
+		( cd "$$pkg_dir" && dpm damlc lint ); \
+	done
+
 # GolangCI-Lint targets
 
 .PHONY: golangci-lint-main golangci-lint-integration-tests golangci-lint-party-ceremony golangci-lint-party-ceremony-integration-tests
