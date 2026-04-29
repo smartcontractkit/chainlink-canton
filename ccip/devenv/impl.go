@@ -28,11 +28,11 @@ import (
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
-	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	ccvservices "github.com/smartcontractkit/chainlink-ccv/build/devenv/services"
+	ccipOffchain "github.com/smartcontractkit/chainlink-ccv/deployment"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -392,25 +392,29 @@ func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64
 
 	defaultFeeQuoterCfg := cantonadapters.DefaultCantonFeeQuoterDestChainConfig()
 
+	baseExecutionGasCost := uint32(1)
+	tokenReceiverAllowed := false
+	gasForVerification := uint32(50_000)
 	return cciptestinterfaces.ChainLaneProfile{
-		AddressBytesLength:   32,
-		BaseExecutionGasCost: 1,
-		FeeQuoterDestChainConfig: ccipadapters.FeeQuoterDestChainConfig{
+		BaseExecutionGasCost: &baseExecutionGasCost,
+		TokenReceiverAllowed: &tokenReceiverAllowed,
+		AllowedFinalityConfig: &finality.Config{
+			WaitForFinality: true,
+		},
+		FeeQuoterDestChainConfig: ccipChangesets.FeeQuoterDestChainConfigOverrides{
 			OverrideExistingConfig:      defaultFeeQuoterCfg.OverrideExistingConfig,
-			IsEnabled:                   defaultFeeQuoterCfg.IsEnabled,
-			MaxDataBytes:                defaultFeeQuoterCfg.MaxDataBytes,
-			MaxPerMsgGasLimit:           defaultFeeQuoterCfg.MaxPerMsgGasLimit,
-			DestGasOverhead:             defaultFeeQuoterCfg.DestGasOverhead,
-			DestGasPerPayloadByteBase:   defaultFeeQuoterCfg.DestGasPerPayloadByteBase,
-			ChainFamilySelector:         cantonadapters.CantonFamilySelector,
-			DefaultTokenFeeUSDCents:     defaultFeeQuoterCfg.DefaultTokenFeeUSDCents,
-			DefaultTokenDestGasOverhead: defaultFeeQuoterCfg.DefaultTokenDestGasOverhead,
-			DefaultTxGasLimit:           defaultFeeQuoterCfg.DefaultTxGasLimit,
-			NetworkFeeUSDCents:          defaultFeeQuoterCfg.NetworkFeeUSDCents,
-			LinkFeeMultiplierPercent:    defaultFeeQuoterCfg.V2Params.LinkFeeMultiplierPercent,
+			IsEnabled:                   &defaultFeeQuoterCfg.IsEnabled,
+			MaxDataBytes:                &defaultFeeQuoterCfg.MaxDataBytes,
+			MaxPerMsgGasLimit:           &defaultFeeQuoterCfg.MaxPerMsgGasLimit,
+			DestGasPerPayloadByteBase:   &defaultFeeQuoterCfg.DestGasPerPayloadByteBase,
+			DefaultTokenFeeUSDCents:     &defaultFeeQuoterCfg.DefaultTokenFeeUSDCents,
+			DefaultTokenDestGasOverhead: &defaultFeeQuoterCfg.DefaultTokenDestGasOverhead,
+			DefaultTxGasLimit:           &defaultFeeQuoterCfg.DefaultTxGasLimit,
+			NetworkFeeUSDCents:          &defaultFeeQuoterCfg.NetworkFeeUSDCents,
+			LinkFeeMultiplierPercent:    &defaultFeeQuoterCfg.V2Params.LinkFeeMultiplierPercent,
 			USDPerUnitGas:               defaultFeeQuoterCfg.V2Params.USDPerUnitGas,
 		},
-		ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
+		ExecutorDestChainConfig: &ccipadapters.ExecutorDestChainConfig{
 			Enabled: true,
 		},
 		DefaultExecutorQualifier: devenvcommon.DefaultExecutorQualifier,
@@ -430,7 +434,7 @@ func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64
 				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
 			},
 		},
-		GasForVerification: 50_000,
+		GasForVerification: &gasForVerification,
 	}, nil
 }
 
@@ -625,13 +629,17 @@ func (c *Chain) GetTokenTransferConfigs(
 				}
 
 				remoteChains[rs] = tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					RemotePool:                               &pair.remote,
-					DefaultFinalityInboundRateLimiterConfig:  tokenscore.RateLimiterConfigFloatInput{},
-					DefaultFinalityOutboundRateLimiterConfig: tokenscore.RateLimiterConfigFloatInput{},
-					CustomFinalityInboundRateLimiterConfig:   tokenscore.RateLimiterConfigFloatInput{},
-					CustomFinalityOutboundRateLimiterConfig:  tokenscore.RateLimiterConfigFloatInput{},
-					OutboundCCVs:                             ccvRefs,
-					InboundCCVs:                              ccvRefs,
+					RemotePool:                &pair.remote,
+					InboundRateLimiterConfig:  tokenscore.RateLimiterConfigFloatInput{},
+					OutboundRateLimiterConfig: tokenscore.RateLimiterConfigFloatInput{},
+					OutboundCCVs:              ccvRefs,
+					InboundCCVs:               ccvRefs,
+					// TODO: what to set for these?
+					// RemoteToken: nil,
+					// RemoteDecimals: 0,
+					// OutboundCCVsToAddAboveThreshold: nil,
+					// InboundCCVsToAddAboveThreshold: nil,
+					// TokenTransferFeeConfig: tokenscore.TokenTransferFeeConfig{},
 				}
 			}
 			if len(remoteChains) == 0 {

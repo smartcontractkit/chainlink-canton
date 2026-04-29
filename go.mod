@@ -37,6 +37,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260416055149-75c017f534ca
 	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260428214342-613086f0e387
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260428214342-613086f0e387
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.1
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.98.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.18
@@ -60,7 +61,6 @@ require (
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.1 // indirect
 	github.com/smartcontractkit/chainlink-ccv/evm v0.0.1 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20260423135514-5b1a7565a99c // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260423135514-5b1a7565a99c // indirect
