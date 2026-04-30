@@ -1,6 +1,5 @@
 packages:
   - coin
-  - link
   - ccip/ccipreceiver
   - ccip/ccipsender
   - ccip/ccvs
@@ -18,6 +17,9 @@ packages:
   - ccip/perpartyrouter
   - ccip/factory
   - ccip/test
+
+  - link
+  - link/test
 
   - mcms
   - mcms/test
