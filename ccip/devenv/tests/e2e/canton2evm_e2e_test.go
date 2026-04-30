@@ -215,7 +215,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		const numTokenTransfers = 2
 		for i := range numTokenTransfers {
 			tokenMsgFields.Data = []byte(fmt.Sprintf("canton2evm token transfer #%d", i+1))
-			require.NoError(t, cantonImpl.PrepareSendPrerequisites(subtestCtx, tokenMsgFields))
+			require.NoError(t, cantonImpl.PrepareSendPrerequisites(subtestCtx))
 			sendMessageResult, err := cantonChain.SendMessage(subtestCtx, evmChain.ChainSelector(), tokenMsgFields, tokenMsgOpts)
 			require.NoError(t, err)
 			require.NotNil(t, sendMessageResult.Message)

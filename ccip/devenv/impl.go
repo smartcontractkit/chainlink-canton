@@ -63,6 +63,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -174,6 +177,21 @@ type Chain struct {
 	lastSentEvent cciptestinterfaces.MessageSentEvent
 
 	cfg *ccv.Cfg
+
+	validatorAPIClients ValidatorAPIClients
+
+	routerAddress                        contracts.InstanceAddress
+	senderAddress                        contracts.InstanceAddress
+	feeTokenInstrument                   splice_api_token_holding_v1.InstrumentId
+	senderFeeInputCid                    types.CONTRACT_ID
+	feeTransferFactorycid                types.CONTRACT_ID
+	feeTransferFactoryDisclosures        []*apiv2.DisclosedContract
+	feeTransferFactoryChoiceContextValue *apiv2.Value
+}
+type ValidatorAPIClients struct {
+	scanClient     scanProxy.ClientWithResponsesInterface
+	metadataClient tokenMetadataV1.ClientWithResponsesInterface
+	transferClient transferInstructionV1.ClientWithResponsesInterface
 }
 
 func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
@@ -877,21 +895,14 @@ func (c *Chain) GetUserNonce(ctx context.Context, userAddress protocol.UnknownAd
 	return 0, nil // TODO: implement
 }
 
-func (c *Chain) PrepareSendPrerequisites(ctx context.Context, fields cciptestinterfaces.MessageFields) error {
-	return nil
-}
-
-// SendMessage implements cciptestinterfaces.CCIP17.
-func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions) (cciptestinterfaces.MessageSentEvent, error) {
+func (c *Chain) PrepareSendPrerequisites(ctx context.Context) error {
 	participant := c.chain.Participants[0]
 	party := participant.PartyID
-
-	seqNo := c.nextSeq + 1
 
 	// Router for sender party.
 	routerAddress, err := c.deployPerPartyRouter(ctx, participant, party)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
+		return fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
 
 	// Deploy a sender-owned CCIPSender contract.
@@ -905,14 +916,14 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		OwnerParty: types.PARTY(party),
 	})
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to deploy ccip sender contract: %w", err)
+		return fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
 	senderAddress := contracts.HexToInstanceAddress(out.Output.Address)
 
 	// Fee Token
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve registry admin: %w", err)
+		return fmt.Errorf("resolve registry admin: %w", err)
 	}
 	feeTokenInstrument := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(registryAdmin),
@@ -922,11 +933,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	// Mint holding for sender
 	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("creating validator API clients: %w", err)
+		return fmt.Errorf("creating validator API clients: %w", err)
 	}
 	senderFeeInputCid, err := testhelpers.MintAMT(ctx, participant, metadataClient, transferClient, scanClient, party, "1000000.00")
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to mint sender fee input holding: %w", err)
+		return fmt.Errorf("failed to mint sender fee input holding: %w", err)
 	}
 
 	feeTransferFactorycid, feeTransferFactoryDisclosures, feeTransferFactoryChoiceContextRaw, err := testhelpers.GetTransferFactory(
@@ -937,20 +948,38 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		party,
 	)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve fee transfer factory from scan-proxy: %w", err)
+		return fmt.Errorf("resolve fee transfer factory from scan-proxy: %w", err)
 	}
 	feeTransferFactoryChoiceContextValue, err := testhelpers.ChoiceContextFromData(feeTransferFactoryChoiceContextRaw)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse fee transfer factory choice context: %w", err)
+		return fmt.Errorf("parse fee transfer factory choice context: %w", err)
 	}
+
+	c.routerAddress = routerAddress
+	c.senderAddress = senderAddress
+	c.feeTokenInstrument = feeTokenInstrument
+	c.senderFeeInputCid = types.CONTRACT_ID(senderFeeInputCid)
+	c.feeTransferFactorycid = types.CONTRACT_ID(feeTransferFactorycid)
+	c.feeTransferFactoryDisclosures = feeTransferFactoryDisclosures
+	c.feeTransferFactoryChoiceContextValue = feeTransferFactoryChoiceContextValue
+
+	return nil
+}
+
+// SendMessage implements cciptestinterfaces.CCIP17.
+func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions) (cciptestinterfaces.MessageSentEvent, error) {
+	participant := c.chain.Participants[0]
+	party := participant.PartyID
+
+	seqNo := c.nextSeq + 1
 
 	// Collect Disclosures
 	hasTokenTransfer := fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 	outgoingMessage := oapiCommon.Message{
 		DestinationChainSelector: strconv.FormatUint(dest, 10),
 		FeeToken: oapiCommon.InstrumentId{
-			Admin: oapiCommon.PartyId(feeTokenInstrument.Admin),
-			Id:    string(feeTokenInstrument.Id),
+			Admin: oapiCommon.PartyId(c.feeTokenInstrument.Admin),
+			Id:    string(c.feeTokenInstrument.Id),
 		},
 		Executor: struct {
 			Address *oapiCommon.RawOrHashedAddress `json:"address,omitempty"`
@@ -963,15 +992,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		outgoingMessage.TokenTransfer = &oapiCommon.TokenTransfer{
 			Amount: "0.0000001000",
 			Token: oapiCommon.InstrumentId{
-				Admin: oapiCommon.PartyId(feeTokenInstrument.Admin),
-				Id:    string(feeTokenInstrument.Id),
+				Admin: oapiCommon.PartyId(c.feeTokenInstrument.Admin),
+				Id:    string(c.feeTokenInstrument.Id),
 			},
 		}
 	}
 	// TODO come up with a better way of doing this
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", routerAddress, err)
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}
 	var disclosedContracts []*apiv2.DisclosedContract
 	sendArgs := ccipsender.Send{
@@ -980,7 +1009,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
-			FeeToken: feeTokenInstrument,
+			FeeToken: c.feeTokenInstrument,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit: types.INT64(opts.ExecutionGasLimit),
@@ -991,11 +1020,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			},
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
-			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(senderFeeInputCid)},
+			SenderInputCids: []types.CONTRACT_ID{c.senderFeeInputCid},
 			TokenInput: interfaces.TokenInput{
-				TransferFactory: types.CONTRACT_ID(feeTransferFactorycid),
+				TransferFactory: c.feeTransferFactorycid,
 				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(feeTransferFactoryChoiceContextValue)},
+					Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(c.feeTransferFactoryChoiceContextValue)},
 					Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 				},
 				TokenPoolHoldings: []types.CONTRACT_ID{},
@@ -1014,13 +1043,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	if hasTokenTransfer {
 		// TODO - use different instrument?
 		// Mint holding to be used for token transfer
-		tokenTransferHoldingCid, err := testhelpers.MintAMT(ctx, participant, metadataClient, transferClient, scanClient, party, "1000000.00")
+		tokenTransferHoldingCid, err := testhelpers.MintAMT(ctx, participant, c.validatorAPIClients.metadataClient, c.validatorAPIClients.transferClient, c.validatorAPIClients.scanClient, party, "1000000.00")
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to mint sender fee input holding: %w", err)
 		}
 
 		// Get Token Pool
-		token := contracts.EncodeInstrumentID(feeTokenInstrument)
+		token := contracts.EncodeInstrumentID(c.feeTokenInstrument)
 		tokenPoolAddress, err := c.getTokenPoolForToken(ctx, token)
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get token pool for token %s: %w", token.String(), err)
@@ -1105,14 +1134,14 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	// Fee Token
-	disclosedContracts = append(disclosedContracts, feeTransferFactoryDisclosures...)
+	disclosedContracts = append(disclosedContracts, c.feeTransferFactoryDisclosures...)
 
 	// TODO deduplicating disclosed contracts shouldn't be required once we move away from native from token transfers
 	disclosedContracts = testhelpers.DeduplicateDisclosedContracts(disclosedContracts...)
 
 	// Call CCIPSend
 	ccipSendReport, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Send, c.chain, contract.ChoiceInput[ccipsender.Send]{
-		InstanceAddress:    senderAddress,
+		InstanceAddress:    c.senderAddress,
 		Args:               sendArgs,
 		MCMSEnabled:        false,
 		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),
