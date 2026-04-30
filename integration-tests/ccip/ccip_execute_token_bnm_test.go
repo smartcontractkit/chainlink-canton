@@ -528,8 +528,8 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			},
 			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
 				Enabled: true,
-				TokenPools: []config.TokenPool{
-					{
+				TokenPools: map[string]config.TokenPool{
+					tokenPoolAddress.InstanceAddress().Hex(): {
 						Type: config.TokenPoolTypeBurnMint,
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
