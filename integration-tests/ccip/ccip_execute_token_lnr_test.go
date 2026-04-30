@@ -22,6 +22,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -432,16 +434,16 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
-	out, err = changesets.DeployTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployTokenPoolConfig]{
+	out, err = changesets.DeployLockReleaseTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployLockReleaseTokenPoolConfig]{
 		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   0,
-		Config: changesets.DeployTokenPoolConfig{
+		Config: changesets.DeployLockReleaseTokenPoolConfig{
 			CcipOwner:          partyCCIP,
 			PoolOwner:          partyTokenPoolOwner,
 			InstrumentId:       nativeInstrumentId,
 			Decimals:           10,
 			InstanceID:         poolInstanceId,
-			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 			TransferTimeout: lockreleasetokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
@@ -549,11 +551,14 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partyCCIP,
-						// By setting the TokenStandard info, the Toke Pool API will return the necessary factory disclosures
-						TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
-						TokenStandardAuthConfig: &commonconfig.AuthConfig{
-							Type: commonconfig.AuthTypeInsecureStatic,
-							JWT:  edsToken.AccessToken,
+						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
+						TransferFactory: &config.TransferFactory{
+							Type:             config.FactoryTypeURL,
+							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
+							TokenStandardAuthConfig: &commonconfig.AuthConfig{
+								Type: commonconfig.AuthTypeInsecureStatic,
+								JWT:  edsToken.AccessToken,
+							},
 						},
 					},
 				},
@@ -586,7 +591,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
@@ -652,7 +657,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// Deploy CCIPReceiver for receiver
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
@@ -696,7 +701,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 		TokenTransfer: &ccipreceiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(partyReceiver),
-			TokenInput:         tokenPoolDisclosure.TokenInput,
 			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
 		},
 		CcvInputs: []ccipreceiver.CCVInput{
@@ -712,7 +716,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// in one receiver-authored transaction with disclosed shared dependencies.
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},

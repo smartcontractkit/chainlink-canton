@@ -57,7 +57,7 @@ func TestCoin(t *testing.T) {
 	}}}}
 	res, err := env.Chain.Participants[0].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Create{
@@ -107,7 +107,7 @@ func TestCoin(t *testing.T) {
 	// Bob creates MintPreapproval
 	res, err = env.Chain.Participants[1].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Create{
@@ -147,7 +147,7 @@ func TestCoin(t *testing.T) {
 	// Alice mints to Bob
 	res, err = env.Chain.Participants[0].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Exercise{
@@ -237,7 +237,7 @@ func TestCoin(t *testing.T) {
 	// Bob transfers part of their holdings to charlie
 	res, err = env.Chain.Participants[1].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Exercise{
@@ -328,7 +328,7 @@ func TestCoin(t *testing.T) {
 	// Charlie accepts transfer from Bob
 	res, err = env.Chain.Participants[2].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Exercise{
@@ -378,7 +378,7 @@ func TestCoin(t *testing.T) {
 	// Alice grants mint rights to Dave
 	res, err = env.Chain.Participants[0].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Create{
@@ -420,7 +420,7 @@ func TestCoin(t *testing.T) {
 	// Erin grants MintPreapproval
 	res, err = env.Chain.Participants[4].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Create{
@@ -511,7 +511,7 @@ func TestCoin(t *testing.T) {
 
 	res, err = env.Chain.Participants[3].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{
 				{
 					Command: &apiv2.Command_Exercise{

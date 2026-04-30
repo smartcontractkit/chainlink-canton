@@ -7,6 +7,9 @@ module CCIP.GlobalConfig
 import DA.Crypto.Text (byteCount)
 import DA.Foldable (forA_)
 import DA.Map qualified as Map
+
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import qualified CCIP.Context
 import CCIP.GlobalConfigTypes (
     DestChainConfig(..),
@@ -149,5 +152,5 @@ template GlobalConfig
 globalConfigKey : Text
 globalConfigKey = "global-config"
 
-lookupGlobalConfigCid : CCIP.Context.CCIPContext -> Update (ContractId GlobalConfig)
+lookupGlobalConfigCid : ChoiceContext -> Update (ContractId GlobalConfig)
 lookupGlobalConfigCid ctx = CCIP.Context.getFromContextU ctx globalConfigKey

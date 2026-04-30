@@ -9,6 +9,9 @@ import DA.Foldable (forA_)
 import DA.List (dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote)
+
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import CCIP.CommitteeVerifierCodecGen (
     decodeApplySignatureConfigsParamsAt,
     decodeSetDynamicConfigParamsAt,
@@ -33,7 +36,6 @@ import CCIP.CommitteeVerifierTypes (
     TransferStorageLocationsAdminParams(..),
     UpdateStorageLocationsParams(..),
     )
-import qualified CCIP.Context
 import qualified CCIP.Crypto.DerEncoding
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
@@ -286,7 +288,7 @@ template CommitteeVerifier
         nonconsuming choice VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : ChoiceContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 verifierResults : BytesHex
                 caller : Party
@@ -363,7 +365,7 @@ template CommitteeVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : ChoiceContext
                 caller : Party
             controller caller
             do
@@ -404,7 +406,7 @@ template CommitteeVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 verifierArgs : BytesHex
                 caller : Party

@@ -41,7 +41,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
@@ -79,11 +78,11 @@ import (
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
-// TestCCIPSendWithTokenTransferFeeBps tests full send flow with token transfer.
+// TestLnRTokenPool_FullSendFlow tests full send flow with token transfer.
 // Validates LockOrBurn deducts proportional feeBps from encoded token amount.
 //
 //nolint:paralleltest // We can't run this test in parallel as that would mix up the holding calculations
-func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
+func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
 
 	ccipParticipant := env.Chain.Participants[0]
@@ -395,10 +394,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
-	out, err = changesets.DeployTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployTokenPoolConfig]{
+	out, err = changesets.DeployLockReleaseTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployLockReleaseTokenPoolConfig]{
 		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   1,
-		Config: changesets.DeployTokenPoolConfig{
+		Config: changesets.DeployLockReleaseTokenPoolConfig{
 			CcipOwner:    partyCCIP,
 			PoolOwner:    partyCCIP,
 			InstrumentId: nativeInstrumentId,
@@ -426,7 +425,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					FeeBps:            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
 				},
 			},
-			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 			TransferTimeout: lockreleasetokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
@@ -531,10 +530,13 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 						},
 						PoolOwner: partyCCIP,
 						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
-						TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
-						TokenStandardAuthConfig: &commonconfig.AuthConfig{
-							Type: commonconfig.AuthTypeInsecureStatic,
-							JWT:  edsToken.AccessToken,
+						TransferFactory: &config.TransferFactory{
+							Type:             config.FactoryTypeURL,
+							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
+							TokenStandardAuthConfig: &commonconfig.AuthConfig{
+								Type: commonconfig.AuthTypeInsecureStatic,
+								JWT:  edsToken.AccessToken,
+							},
 						},
 						// By setting the TransferPreapproval, the Token Pool API will return it as part of its transfer context.
 						TransferPreapproval: &config.TransferPreapproval{
@@ -574,7 +576,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	res, err := senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
@@ -611,7 +613,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Deploy CCIPSender for sender
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
@@ -761,18 +763,15 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			},
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
-			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			TokenInput: interfaces.TokenInput{
-				TransferFactory: types.CONTRACT_ID(transferFactoryCid),
-				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: splice_api_token_metadata_v1.ChoiceContext{
-						Values: transferFactoryContextValues,
-					},
-					Meta: splice_api_token_metadata_v1.Metadata{
-						Values: map[string]types.TEXT{},
-					},
+			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+				Context: splice_api_token_metadata_v1.ChoiceContext{
+					Values: transferFactoryContextValues,
 				},
-				TokenPoolHoldings: []types.CONTRACT_ID{},
+				Meta: splice_api_token_metadata_v1.Metadata{
+					Values: map[string]types.TEXT{},
+				},
 			},
 		},
 		CcvSendInputs: []ccipsender.CCVSendInput{
@@ -786,7 +785,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
 			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
 			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
-			TokenInput:       tokenPoolSendDisclosure.TokenInput,
 		},
 		ExecutorInput: &ccipsender.ExecutorInput{
 			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
@@ -811,7 +809,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction.
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},

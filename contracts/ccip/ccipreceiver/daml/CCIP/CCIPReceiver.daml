@@ -12,6 +12,8 @@ import DA.Action (foldlA)
 import DA.List (unique)
 import DA.Optional (fromSomeNote)
 
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import qualified CCIP.Context
 import qualified CCIP.FinalityConfig
 import qualified CCIP.Interfaces.CrossChainVerifier
@@ -28,7 +30,7 @@ data CCVInput = CCVInput
     with
         ccvCid : ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier
         verifierResults : BytesHex
-        ccvExtraContext : CCIP.Context.CCIPContext
+        ccvExtraContext : ChoiceContext
     deriving (Eq, Show)
 
 -- | Token transfer input, provided only when the message includes a
@@ -37,8 +39,7 @@ data TokenTransferInput = TokenTransferInput
     with
         tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
         tokenReceiverParty : Party
-        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
-        poolExtraContext : CCIP.Context.CCIPContext
+        poolExtraContext : ChoiceContext
     deriving (Eq, Show)
 
 template CCIPReceiver
@@ -64,7 +65,7 @@ template CCIPReceiver
         -- protocol-level resolution to PerPartyRouter/OffRamp.
         nonconsuming choice GetRequiredCCVs : [RawInstanceAddress]
             with
-                context : CCIP.Context.CCIPContext
+                context : ChoiceContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
                 encodedMessage : BytesHex
                 tokenPoolCid : Optional (ContractId CCIP.Interfaces.TokenPool.ITokenPool)
@@ -114,7 +115,7 @@ template CCIPReceiver
         nonconsuming choice Execute : ContractId CCIPMessageReceived
             with
                 -- CCIP context for internal orchestration (PerPartyRouter calls).
-                context : CCIP.Context.CCIPContext
+                context : ChoiceContext
 
                 -- CCIP contract IDs
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
@@ -185,7 +186,6 @@ template CCIPReceiver
                             rmnRemoteCid = rmnRemoteCid
                             extraContext = tt.poolExtraContext
                             tokenReceiveTicketCid = ticketCid
-                            tokenInput = tt.tokenInput
                             caller = owner
                         pure (Some releaseResult)
                     _ -> pure None

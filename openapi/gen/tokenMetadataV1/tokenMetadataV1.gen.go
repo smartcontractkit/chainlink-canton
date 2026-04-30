@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/oapi-codegen/runtime"
 )
 
@@ -605,4 +606,129 @@ func ParseGetInstrumentResp(rsp *http.Response) (*GetInstrumentResp, error) {
 	}
 
 	return response, nil
+}
+
+// ServerInterface represents all server handlers.
+type ServerInterface interface {
+
+	// (GET /registry/metadata/v1/info)
+	GetRegistryInfo(c *gin.Context)
+
+	// (GET /registry/metadata/v1/instruments)
+	ListInstruments(c *gin.Context, params ListInstrumentsParams)
+
+	// (GET /registry/metadata/v1/instruments/{instrumentId})
+	GetInstrument(c *gin.Context, instrumentId string)
+}
+
+// ServerInterfaceWrapper converts contexts to parameters.
+type ServerInterfaceWrapper struct {
+	Handler            ServerInterface
+	HandlerMiddlewares []MiddlewareFunc
+	ErrorHandler       func(*gin.Context, error, int)
+}
+
+type MiddlewareFunc func(c *gin.Context)
+
+// GetRegistryInfo operation middleware
+func (siw *ServerInterfaceWrapper) GetRegistryInfo(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetRegistryInfo(c)
+}
+
+// ListInstruments operation middleware
+func (siw *ServerInterfaceWrapper) ListInstruments(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListInstrumentsParams
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageToken" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageToken", c.Request.URL.Query(), &params.PageToken)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageToken: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListInstruments(c, params)
+}
+
+// GetInstrument operation middleware
+func (siw *ServerInterfaceWrapper) GetInstrument(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "instrumentId" -------------
+	var instrumentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "instrumentId", c.Param("instrumentId"), &instrumentId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter instrumentId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetInstrument(c, instrumentId)
+}
+
+// GinServerOptions provides options for the Gin server.
+type GinServerOptions struct {
+	BaseURL      string
+	Middlewares  []MiddlewareFunc
+	ErrorHandler func(*gin.Context, error, int)
+}
+
+// RegisterHandlers creates http.Handler with routing matching OpenAPI spec.
+func RegisterHandlers(router gin.IRouter, si ServerInterface) {
+	RegisterHandlersWithOptions(router, si, GinServerOptions{})
+}
+
+// RegisterHandlersWithOptions creates http.Handler with additional options
+func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options GinServerOptions) {
+	errorHandler := options.ErrorHandler
+	if errorHandler == nil {
+		errorHandler = func(c *gin.Context, err error, statusCode int) {
+			c.JSON(statusCode, gin.H{"msg": err.Error()})
+		}
+	}
+
+	wrapper := ServerInterfaceWrapper{
+		Handler:            si,
+		HandlerMiddlewares: options.Middlewares,
+		ErrorHandler:       errorHandler,
+	}
+
+	router.GET(options.BaseURL+"/registry/metadata/v1/info", wrapper.GetRegistryInfo)
+	router.GET(options.BaseURL+"/registry/metadata/v1/instruments", wrapper.ListInstruments)
+	router.GET(options.BaseURL+"/registry/metadata/v1/instruments/:instrumentId", wrapper.GetInstrument)
 }

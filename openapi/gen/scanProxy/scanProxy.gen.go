@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/oapi-codegen/runtime"
 )
 
@@ -1898,4 +1899,368 @@ func ParseLookupTransferPreapprovalByPartyResp(rsp *http.Response) (*LookupTrans
 	}
 
 	return response, nil
+}
+
+// ServerInterface represents all server handlers.
+type ServerInterface interface {
+
+	// (GET /v0/scan-proxy/amulet-rules)
+	GetAmuletRules(c *gin.Context)
+
+	// (GET /v0/scan-proxy/ans-entries)
+	ListAnsEntries(c *gin.Context, params ListAnsEntriesParams)
+
+	// (GET /v0/scan-proxy/ans-entries/by-name/{name})
+	LookupAnsEntryByName(c *gin.Context, name string)
+
+	// (GET /v0/scan-proxy/ans-entries/by-party/{party})
+	LookupAnsEntryByParty(c *gin.Context, party string)
+
+	// (POST /v0/scan-proxy/ans-rules)
+	GetAnsRules(c *gin.Context)
+
+	// (GET /v0/scan-proxy/dso)
+	GetDsoInfo(c *gin.Context)
+
+	// (GET /v0/scan-proxy/dso-party-id)
+	GetDsoPartyId(c *gin.Context)
+
+	// (GET /v0/scan-proxy/featured-apps/{provider_party_id})
+	LookupFeaturedAppRight(c *gin.Context, providerPartyId string)
+
+	// (GET /v0/scan-proxy/open-and-issuing-mining-rounds)
+	GetOpenAndIssuingMiningRounds(c *gin.Context)
+
+	// (GET /v0/scan-proxy/transfer-command-counter/{party})
+	LookupTransferCommandCounterByParty(c *gin.Context, party string)
+
+	// (GET /v0/scan-proxy/transfer-command/status)
+	LookupTransferCommandStatus(c *gin.Context, params LookupTransferCommandStatusParams)
+
+	// (GET /v0/scan-proxy/transfer-preapprovals/by-party/{party})
+	LookupTransferPreapprovalByParty(c *gin.Context, party string)
+}
+
+// ServerInterfaceWrapper converts contexts to parameters.
+type ServerInterfaceWrapper struct {
+	Handler            ServerInterface
+	HandlerMiddlewares []MiddlewareFunc
+	ErrorHandler       func(*gin.Context, error, int)
+}
+
+type MiddlewareFunc func(c *gin.Context)
+
+// GetAmuletRules operation middleware
+func (siw *ServerInterfaceWrapper) GetAmuletRules(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetAmuletRules(c)
+}
+
+// ListAnsEntries operation middleware
+func (siw *ServerInterfaceWrapper) ListAnsEntries(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAnsEntriesParams
+
+	// ------------- Optional query parameter "name_prefix" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "name_prefix", c.Request.URL.Query(), &params.NamePrefix)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter name_prefix: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Required query parameter "page_size" -------------
+
+	if paramValue := c.Query("page_size"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument page_size is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "page_size", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page_size: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListAnsEntries(c, params)
+}
+
+// LookupAnsEntryByName operation middleware
+func (siw *ServerInterfaceWrapper) LookupAnsEntryByName(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", c.Param("name"), &name, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter name: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LookupAnsEntryByName(c, name)
+}
+
+// LookupAnsEntryByParty operation middleware
+func (siw *ServerInterfaceWrapper) LookupAnsEntryByParty(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "party" -------------
+	var party string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "party", c.Param("party"), &party, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter party: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LookupAnsEntryByParty(c, party)
+}
+
+// GetAnsRules operation middleware
+func (siw *ServerInterfaceWrapper) GetAnsRules(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetAnsRules(c)
+}
+
+// GetDsoInfo operation middleware
+func (siw *ServerInterfaceWrapper) GetDsoInfo(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetDsoInfo(c)
+}
+
+// GetDsoPartyId operation middleware
+func (siw *ServerInterfaceWrapper) GetDsoPartyId(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetDsoPartyId(c)
+}
+
+// LookupFeaturedAppRight operation middleware
+func (siw *ServerInterfaceWrapper) LookupFeaturedAppRight(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "provider_party_id" -------------
+	var providerPartyId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider_party_id", c.Param("provider_party_id"), &providerPartyId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter provider_party_id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LookupFeaturedAppRight(c, providerPartyId)
+}
+
+// GetOpenAndIssuingMiningRounds operation middleware
+func (siw *ServerInterfaceWrapper) GetOpenAndIssuingMiningRounds(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetOpenAndIssuingMiningRounds(c)
+}
+
+// LookupTransferCommandCounterByParty operation middleware
+func (siw *ServerInterfaceWrapper) LookupTransferCommandCounterByParty(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "party" -------------
+	var party string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "party", c.Param("party"), &party, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter party: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LookupTransferCommandCounterByParty(c, party)
+}
+
+// LookupTransferCommandStatus operation middleware
+func (siw *ServerInterfaceWrapper) LookupTransferCommandStatus(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params LookupTransferCommandStatusParams
+
+	// ------------- Required query parameter "sender" -------------
+
+	if paramValue := c.Query("sender"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument sender is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "sender", c.Request.URL.Query(), &params.Sender)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sender: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Required query parameter "nonce" -------------
+
+	if paramValue := c.Query("nonce"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument nonce is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "nonce", c.Request.URL.Query(), &params.Nonce)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter nonce: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LookupTransferCommandStatus(c, params)
+}
+
+// LookupTransferPreapprovalByParty operation middleware
+func (siw *ServerInterfaceWrapper) LookupTransferPreapprovalByParty(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "party" -------------
+	var party string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "party", c.Param("party"), &party, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter party: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.LookupTransferPreapprovalByParty(c, party)
+}
+
+// GinServerOptions provides options for the Gin server.
+type GinServerOptions struct {
+	BaseURL      string
+	Middlewares  []MiddlewareFunc
+	ErrorHandler func(*gin.Context, error, int)
+}
+
+// RegisterHandlers creates http.Handler with routing matching OpenAPI spec.
+func RegisterHandlers(router gin.IRouter, si ServerInterface) {
+	RegisterHandlersWithOptions(router, si, GinServerOptions{})
+}
+
+// RegisterHandlersWithOptions creates http.Handler with additional options
+func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options GinServerOptions) {
+	errorHandler := options.ErrorHandler
+	if errorHandler == nil {
+		errorHandler = func(c *gin.Context, err error, statusCode int) {
+			c.JSON(statusCode, gin.H{"msg": err.Error()})
+		}
+	}
+
+	wrapper := ServerInterfaceWrapper{
+		Handler:            si,
+		HandlerMiddlewares: options.Middlewares,
+		ErrorHandler:       errorHandler,
+	}
+
+	router.GET(options.BaseURL+"/v0/scan-proxy/amulet-rules", wrapper.GetAmuletRules)
+	router.GET(options.BaseURL+"/v0/scan-proxy/ans-entries", wrapper.ListAnsEntries)
+	router.GET(options.BaseURL+"/v0/scan-proxy/ans-entries/by-name/:name", wrapper.LookupAnsEntryByName)
+	router.GET(options.BaseURL+"/v0/scan-proxy/ans-entries/by-party/:party", wrapper.LookupAnsEntryByParty)
+	router.POST(options.BaseURL+"/v0/scan-proxy/ans-rules", wrapper.GetAnsRules)
+	router.GET(options.BaseURL+"/v0/scan-proxy/dso", wrapper.GetDsoInfo)
+	router.GET(options.BaseURL+"/v0/scan-proxy/dso-party-id", wrapper.GetDsoPartyId)
+	router.GET(options.BaseURL+"/v0/scan-proxy/featured-apps/:provider_party_id", wrapper.LookupFeaturedAppRight)
+	router.GET(options.BaseURL+"/v0/scan-proxy/open-and-issuing-mining-rounds", wrapper.GetOpenAndIssuingMiningRounds)
+	router.GET(options.BaseURL+"/v0/scan-proxy/transfer-command-counter/:party", wrapper.LookupTransferCommandCounterByParty)
+	router.GET(options.BaseURL+"/v0/scan-proxy/transfer-command/status", wrapper.LookupTransferCommandStatus)
+	router.GET(options.BaseURL+"/v0/scan-proxy/transfer-preapprovals/by-party/:party", wrapper.LookupTransferPreapprovalByParty)
 }

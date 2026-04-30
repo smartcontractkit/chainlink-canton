@@ -108,6 +108,14 @@ func (s *ActiveContractStore) GetByTemplateId(party types.PARTY, templateId cont
 	return value, true
 }
 
+func (s *ActiveContractStore) GetByContractId(contractId types.CONTRACT_ID) (*apiv2.ActiveContract, bool) {
+	s.mux.RLock()
+	value, ok := s.contractsByContractId[contractId]
+	s.mux.RUnlock()
+
+	return value, ok
+}
+
 func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContract *apiv2.ActiveContract) error {
 	instanceAddresses, _ := getInstanceAddresses(activeContract.GetCreatedEvent())
 
