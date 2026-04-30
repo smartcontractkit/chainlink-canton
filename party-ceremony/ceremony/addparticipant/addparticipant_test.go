@@ -42,6 +42,7 @@ const (
 type mockState struct {
 	mu               sync.Mutex
 	keyGenerated     bool // true after new participant generates keys
+	kmsRegistrations int
 	nsdProposed      bool // true after NSD is proposed
 	addCallCount     int  // incremented by each AddTransactions call
 	authorizePostDNS int  // incremented by Authorize calls after DNS is submitted
@@ -51,6 +52,19 @@ func (s *mockState) onKeyGenerated() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.keyGenerated = true
+}
+
+func (s *mockState) onKMSRegistration() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.kmsRegistrations++
+}
+
+func (s *mockState) kmsRegistrationCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.kmsRegistrations
 }
 
 func (s *mockState) onNSDProposed() {
@@ -120,7 +134,11 @@ func (m *mockCantonClient) GenerateSigningKey(_ context.Context, name string, _ 
 }
 
 func (m *mockCantonClient) RegisterKmsSigningKey(_ context.Context, kmsKeyID string, name string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	if m.state != nil {
+		m.state.onKMSRegistration()
+	}
 	raw := sha256.Sum256([]byte(m.participantID + ":" + kmsKeyID + ":" + name))
+
 	return &cryptov30.SigningPublicKey{
 		PublicKey: raw[:],
 		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
@@ -279,6 +297,17 @@ func newDepsWithState(participantID string, state *mockState) ceremony.CantonDep
 	}
 }
 
+func newKMSDepsWithState(participantID string, state *mockState) ceremony.CantonDeps {
+	return ceremony.CantonDeps{
+		Client: &mockCantonClient{participantID: participantID, state: state},
+		KMS: client.KMSConfig{
+			NamespaceKeyID: "arn:aws:kms:us-east-1:123456789:key/" + participantID + "-namespace",
+			ProtocolKeyID:  "arn:aws:kms:us-east-1:123456789:key/" + participantID + "-protocol",
+		},
+		Logger: logger.Nop(),
+	}
+}
+
 func baseInput() addparticipant.AddParticipantInput {
 	return addparticipant.AddParticipantInput{
 		DecentralizedPartyID: testPartyID,
@@ -330,6 +359,35 @@ func TestAddParticipantSequence_HappyPath(t *testing.T) {
 	assert.True(t, sr.Output.P2PUpdated, "P2PUpdated should be true")
 	assert.Equal(t, 2, sr.Output.NewThreshold, "NewThreshold should default to current (2)")
 	assert.Len(t, sr.Output.AllOwners, 3, "should have 3 owners after add")
+}
+
+func TestAddParticipantSequence_KMS_NewParticipantUsesLocalConfig(t *testing.T) {
+	t.Parallel()
+	sharedReporter := operations.NewMemoryReporter()
+	state := &mockState{}
+	newBundle := func() operations.Bundle {
+		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter)
+	}
+	input := baseInput()
+
+	_, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newKMSDepsWithState(testNewUID, state), input)
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 1: DNS threshold not met (0/2)")
+
+	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 2: DNS threshold not met (1/2)")
+
+	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p2", state), input)
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 3: P2P existing threshold not met (1/2)")
+
+	_, err = operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newDepsWithState("p1", state), input)
+	require.ErrorContains(t, err, addparticipant.ErrThresholdNotMet.Error(), "run 4: new participant consent pending")
+
+	sr, err := operations.ExecuteSequence(newBundle(), addparticipant.AddParticipantSequence, newKMSDepsWithState(testNewUID, state), input)
+	require.NoError(t, err, "run 5: ceremony should complete successfully")
+
+	assert.True(t, sr.Output.DNSUpdated)
+	assert.True(t, sr.Output.P2PUpdated)
+	assert.Equal(t, 2, state.kmsRegistrationCount(), "namespace and protocol keys should both be registered through KMS")
 }
 
 // TestAddParticipantSequence_Idempotent verifies that re-running after

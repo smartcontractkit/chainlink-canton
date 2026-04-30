@@ -47,14 +47,31 @@ type ClientConfig struct {
 	// KmsNamespaceKeyID is the external KMS identifier (e.g. AWS KMS ARN) for a
 	// pre-existing NAMESPACE signing key. When set the ceremony registers this
 	// key via VaultService.RegisterKmsSigningKey instead of generating a new one.
-	// Both KmsNamespaceKeyID and KmsProtocolKeyID must be specified together.
+	// Onboarding and add-participant require this together with KmsProtocolKeyID;
+	// key rotation may use it independently when only the namespace key rotates.
 	KmsNamespaceKeyID string `json:"kms_namespace_key_id,omitempty"`
 
 	// KmsProtocolKeyID is the external KMS identifier (e.g. AWS KMS ARN) for a
 	// pre-existing PROTOCOL (DAML) signing key. When set the ceremony registers
 	// this key via VaultService.RegisterKmsSigningKey instead of generating a new one.
-	// Both KmsNamespaceKeyID and KmsProtocolKeyID must be specified together.
+	// It is also used by contract-deploy to sign prepared transaction hashes.
 	KmsProtocolKeyID string `json:"kms_protocol_key_id,omitempty"`
+}
+
+// KMSConfig contains the local operator's external KMS key IDs. These values
+// are intentionally loaded from participant-config.json on each init/resume
+// invocation and are not persisted in shared workflow state.
+type KMSConfig struct {
+	NamespaceKeyID string
+	ProtocolKeyID  string
+}
+
+// KMS returns the local KMS configuration for dependency injection.
+func (cfg ClientConfig) KMS() KMSConfig {
+	return KMSConfig{
+		NamespaceKeyID: cfg.KmsNamespaceKeyID,
+		ProtocolKeyID:  cfg.KmsProtocolKeyID,
+	}
 }
 
 // LoadConfig reads a ClientConfig from the given JSON file path.
@@ -73,12 +90,6 @@ func LoadConfig(path string) (ClientConfig, error) {
 
 	if cfg.ParticipantID == "" {
 		return ClientConfig{}, fmt.Errorf("config %q: participant_id is required", path)
-	}
-
-	// If one KMS key is provided, both must be provided.
-	if (cfg.KmsNamespaceKeyID == "") != (cfg.KmsProtocolKeyID == "") {
-		return ClientConfig{}, fmt.Errorf(
-			"config %q: kms_namespace_key_id and kms_protocol_key_id must both be set or both be empty", path)
 	}
 
 	return cfg, nil

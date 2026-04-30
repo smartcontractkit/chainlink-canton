@@ -177,6 +177,7 @@ var ContractDeploySequence = operations.NewSequence(
 				ParticipantID:           pid,
 				PreparedTransactionHash: prep.PreparedTransactionHash,
 				PreparedTxB64:           prep.PreparedTxB64,
+				KnownSigningKeysB64:     fetchReport.Output.PartySigningKeysB64,
 			})
 			if signErr != nil {
 				deps.Logger.Infow("Signing pending", "participant", pid, "err", signErr)

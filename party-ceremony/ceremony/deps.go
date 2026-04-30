@@ -9,6 +9,7 @@ import (
 // CantonDeps is the dependency container passed to every operation handler.
 type CantonDeps struct {
 	Client    client.CantonClient
+	KMS       client.KMSConfig
 	Logger    logger.Logger
 	Confirmer Confirmer // nil means no confirmation prompt
 }

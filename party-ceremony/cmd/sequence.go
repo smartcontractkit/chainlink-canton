@@ -6,6 +6,9 @@ import (
 	"os"
 	"strings"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	awskms "github.com/aws/aws-sdk-go-v2/service/kms"
+	cryptoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/admin/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 
@@ -166,14 +169,14 @@ func executeOnboardingSequence(
 	defer conn.Close()
 
 	grpcClient := client.NewGRPCClient(conn)
-	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr, Confirmer: confirmer}
+	deps := ceremony.CantonDeps{Client: grpcClient, KMS: cfg.KMS(), Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running onboarding sequence (real)",
 		"ceremony", input.NamespaceName,
 		"participant", cfg.ParticipantID,
 		"participants", input.Participants,
-		"kms_namespace_key", input.KmsNamespaceKeyID != "",
-		"kms_protocol_key", input.KmsProtocolKeyID != "",
+		"kms_namespace_key", cfg.KmsNamespaceKeyID != "",
+		"kms_protocol_key", cfg.KmsProtocolKeyID != "",
 	)
 
 	sr, seqErr := operations.ExecuteSequence(bundle, onboarding.OnboardingSequence, deps, input)
@@ -262,7 +265,7 @@ func executeKickSequence(
 	defer conn.Close()
 
 	grpcClient := client.NewGRPCClient(conn)
-	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr, Confirmer: confirmer}
+	deps := ceremony.CantonDeps{Client: grpcClient, KMS: cfg.KMS(), Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running kick sequence",
 		"party", input.DecentralizedPartyID,
@@ -360,12 +363,28 @@ func executeContractDeploySequence(
 	}
 	defer ledgerConn.Close()
 
+	adminClient := client.NewGRPCClient(adminConn)
+	var kmsAPI client.AWSKMSAPI
+	if cfg.KmsProtocolKeyID != "" {
+		awsCfg, cfgErr := awsconfig.LoadDefaultConfig(ctx)
+		if cfgErr != nil {
+			return fmt.Errorf("loading AWS config for KMS signing: %w", cfgErr)
+		}
+		kmsAPI = awskms.NewFromConfig(awsCfg)
+	}
+
 	deps := ledger.ContractDeployDeps{
-		AdminClient:  client.NewGRPCClient(adminConn),
+		AdminClient:  adminClient,
 		LedgerClient: client.NewGRPCLedgerClient(ledgerConn),
 		// DARLoader reads DAR bytes by package name and version.
 		// Callers that embed the contracts FS can swap this for contracts.GetDar.
 		DARLoader: ledger.FileDARLoader("dars"),
+		SignerFactory: client.NewTransactionSignerFactory(
+			adminClient,
+			cryptoadminv30.NewVaultServiceClient(adminConn),
+			cfg.KMS(),
+			kmsAPI,
+		),
 		Logger:    lggr,
 		Confirmer: confirmer,
 		UserID:    cfg.UserID,
@@ -376,6 +395,7 @@ func executeContractDeploySequence(
 		"participant", cfg.ParticipantID,
 		"package_count", len(input.Packages),
 		"template", input.TemplateModule+":"+input.TemplateEntity,
+		"kms_protocol_key", cfg.KmsProtocolKeyID != "",
 	)
 
 	sr, seqErr := operations.ExecuteSequence(bundle, contractdeploy.ContractDeploySequence, deps, input)
@@ -460,7 +480,7 @@ func executeAddParticipantSequence(
 	defer conn.Close()
 
 	grpcClient := client.NewGRPCClient(conn)
-	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr, Confirmer: confirmer}
+	deps := ceremony.CantonDeps{Client: grpcClient, KMS: cfg.KMS(), Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running add-participant sequence",
 		"party", input.DecentralizedPartyID,
@@ -549,7 +569,7 @@ func executeKeyRotationSequence(
 	defer conn.Close()
 
 	grpcClient := client.NewGRPCClient(conn)
-	deps := ceremony.CantonDeps{Client: grpcClient, Logger: lggr, Confirmer: confirmer}
+	deps := ceremony.CantonDeps{Client: grpcClient, KMS: cfg.KMS(), Logger: lggr, Confirmer: confirmer}
 
 	lggr.Infow("Running key-rotation sequence",
 		"party", input.DecentralizedPartyID,

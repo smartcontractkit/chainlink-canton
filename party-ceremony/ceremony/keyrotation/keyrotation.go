@@ -332,16 +332,16 @@ var KeyRotationSequence = operations.NewSequence(
 			var p2pProposedCount int
 			for _, uid := range allParticipantUIDs {
 				_, p2pErr := operations.ExecuteOperation(b, topology.ProposeRotationP2POp, deps, topology.ProposeRotationP2PInput{
-					ParticipantID:         uid,
-					PartyID:               in.DecentralizedPartyID,
-					AllParticipantUIDs:    allParticipantUIDs,
-					NewP2PThreshold:       newThreshold,
-					CurrentP2PSerial:      int(currentState.P2PSerial),
-					SynchronizerID:        in.SynchronizerID,
-					CurrentSigningKeysB64: currentState.PartySigningKeysB64,
-					OldDamlKeyB64:         rotatedKeys.OldDamlKeyB64,
-					NewDamlKeyB64:         rotatedKeys.NewDamlKeyB64,
-					SigningKeysThreshold:  currentState.PartySigningThreshold,
+					ParticipantID:             uid,
+					PartyID:                   in.DecentralizedPartyID,
+					AllParticipantUIDs:        allParticipantUIDs,
+					NewP2PThreshold:           newThreshold,
+					CurrentP2PSerial:          int(currentState.P2PSerial),
+					SynchronizerID:            in.SynchronizerID,
+					CurrentSigningKeysB64:     currentState.PartySigningKeysB64,
+					OldDamlKeyB64:             rotatedKeys.OldDamlKeyB64,
+					NewDamlKeyB64:             rotatedKeys.NewDamlKeyB64,
+					PartySigningKeysThreshold: currentState.PartySigningThreshold,
 				})
 				if p2pErr != nil {
 					deps.Logger.Infow("P2P rotation proposal pending", "participant", uid, "err", p2pErr)
@@ -372,9 +372,11 @@ var KeyRotationSequence = operations.NewSequence(
 					if p2pState.PartySigningKeys == nil {
 						return fmt.Errorf("P2P signing keys not yet available")
 					}
-					// Verify the new key is present by checking if the old key is gone.
 					if slices.Contains(p2pState.PartySigningKeys.Keys, rotatedKeys.OldDamlKeyB64) {
 						return fmt.Errorf("old DAML key still present in P2P signing keys")
+					}
+					if !slices.Contains(p2pState.PartySigningKeys.Keys, rotatedKeys.NewDamlKeyB64) {
+						return fmt.Errorf("new DAML key not yet present in P2P signing keys")
 					}
 					deps.Logger.Infow("Rotation P2P confirmed", "party", in.DecentralizedPartyID)
 

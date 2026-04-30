@@ -4,16 +4,6 @@ package keys
 type CreateMemberKeyInput struct {
 	NamespaceName string `json:"namespace_name"`
 	ParticipantID string `json:"participant_id"`
-
-	// KmsNamespaceKeyID, when non-empty, tells the operation to register a
-	// pre-existing KMS signing key for the NAMESPACE purpose instead of
-	// generating a new one.
-	KmsNamespaceKeyID string `json:"kms_namespace_key_id,omitempty"`
-
-	// KmsProtocolKeyID, when non-empty, tells the operation to register a
-	// pre-existing KMS signing key for the PROTOCOL (DAML) purpose instead of
-	// generating a new one.
-	KmsProtocolKeyID string `json:"kms_protocol_key_id,omitempty"`
 }
 
 // CreateMemberKeyOutput is the output of [CreateMemberKeyOp].
@@ -30,6 +20,25 @@ type CreateMemberKeyOutput struct {
 	// transactions submitted via InteractiveSubmissionService.
 	DamlKeyB64         string `json:"daml_key_b64"`
 	DamlKeyFingerprint string `json:"daml_key_fingerprint"`
+}
+
+// ResolveProtocolSigningKeyInput is the input to [ResolveProtocolSigningKeyOp].
+type ResolveProtocolSigningKeyInput struct {
+	// ParticipantID identifies the participant whose local protocol key should
+	// be resolved. Only this participant's node can execute this operation.
+	ParticipantID string `json:"participant_id"`
+
+	// KnownSigningKeysB64 is the current PartyToParticipant signing-key set
+	// from topology. The local vault is cross-referenced with this list.
+	KnownSigningKeysB64 []string `json:"known_signing_keys_b64"`
+}
+
+// ResolveProtocolSigningKeyOutput is the output of [ResolveProtocolSigningKeyOp].
+type ResolveProtocolSigningKeyOutput struct {
+	ParticipantID      string `json:"participant_id"`
+	KeyB64             string `json:"key_b64"`
+	KeyFingerprint     string `json:"key_fingerprint"`
+	KnownSigningKeyIdx int    `json:"known_signing_key_idx"`
 }
 
 // GenerateRotatedKeyInput is the input to [GenerateRotatedKeyOp].

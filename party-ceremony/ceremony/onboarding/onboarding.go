@@ -73,10 +73,8 @@ var OnboardingSequence = operations.NewSequence(
 		for _, pid := range in.Participants {
 			deps.Logger.Info("creating key for participant", pid)
 			r, err := operations.ExecuteOperation(b, keys.CreateMemberKeyOp, deps, keys.CreateMemberKeyInput{
-				NamespaceName:     in.NamespaceName,
-				ParticipantID:     pid,
-				KmsNamespaceKeyID: in.KmsNamespaceKeyID,
-				KmsProtocolKeyID:  in.KmsProtocolKeyID,
+				NamespaceName: in.NamespaceName,
+				ParticipantID: pid,
 			})
 			if err != nil {
 				if !retry.IsRecoverable(err) {

@@ -318,8 +318,8 @@ participant and points to their Canton APIs:
 | `ledger_host`          | No       | `localhost` | Canton Ledger gRPC API host (used by `contract-deploy`)                                                      |
 | `ledger_port`          | No       | `5002`      | Canton Ledger gRPC API port                                                                                  |
 | `ledger_jwt`           | No       | (empty)     | Bearer token for Ledger API authentication                                                                   |
-| `kms_namespace_key_id` | No       | (empty)     | External KMS key ID (e.g. AWS KMS ARN) for NAMESPACE signing key. When set, registers pre-existing KMS key   |
-| `kms_protocol_key_id`  | No       | (empty)     | External KMS key ID (e.g. AWS KMS ARN) for PROTOCOL (DAML) signing key. When set, registers pre-existing key |
+| `kms_namespace_key_id` | No       | (empty)     | Local external KMS key ID (e.g. AWS KMS ARN) for NAMESPACE signing key registration                         |
+| `kms_protocol_key_id`  | No       | (empty)     | Local external KMS key ID (e.g. AWS KMS ARN) for PROTOCOL/DAML signing key registration and tx signing      |
 
 ### KMS Key Registration
 
@@ -332,12 +332,16 @@ an external KMS and register them instead:
    participant: one for NAMESPACE signing, one for PROTOCOL (DAML) signing.
 2. Grant the Canton participant's IAM role permissions to **use** those keys
    (e.g. `kms:Sign`, `kms:GetPublicKey`) but **not** to create new keys.
-3. Populate `kms_namespace_key_id` and `kms_protocol_key_id` in
-   `participant-config.json` with the external key identifiers (e.g. AWS KMS ARNs).
+3. Each operator populates their own `participant-config.json` with the external
+   key identifiers (e.g. AWS KMS ARNs). These values stay local and are injected
+   on every `init` or `resume`.
 
 When these fields are set, the ceremony calls Canton's
-`VaultService.RegisterKmsSigningKey` instead of `GenerateSigningKey`. Both
-fields must be set together or both must be empty.
+`VaultService.RegisterKmsSigningKey` instead of `GenerateSigningKey`.
+Onboarding and add-participant require both namespace and protocol key IDs.
+Key rotation only requires the key ID for the key type being rotated.
+Contract deploy uses `kms_protocol_key_id` to sign prepared transaction hashes
+through AWS KMS; when it is empty, it signs with the participant vault.
 
 **Example with AWS KMS keys:**
 

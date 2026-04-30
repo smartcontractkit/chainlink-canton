@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 
@@ -20,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
@@ -38,9 +40,13 @@ const (
 // test scenario. It tracks topology state changes (DNS submission, P2P
 // proposals) that Canton would normally record.
 type mockState struct {
-	mu               sync.Mutex
-	addCallCount     int // incremented by each AddTransactions call
-	authorizePostDNS int // incremented by Authorize calls after DNS is submitted
+	mu                        sync.Mutex
+	addCallCount              int // incremented by each AddTransactions call
+	authorizePostDNS          int // incremented by Authorize calls after DNS is submitted
+	partySigningKeys          []string
+	protocolKeysByParticipant map[string]string
+	lastP2PSigningKeys        []string
+	lastP2PSigningThreshold   uint32
 }
 
 func (s *mockState) onAddTransactions() {
@@ -56,10 +62,26 @@ func (s *mockState) dnsSubmitted() bool {
 	return s.addCallCount > 0
 }
 
-func (s *mockState) onP2PAuthorize() {
+func (s *mockState) onP2PAuthorizeMapping(mapping *protov30.TopologyMapping) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.authorizePostDNS++
+
+	p2p := mapping.GetPartyToParticipant()
+	if p2p == nil || p2p.GetPartySigningKeys() == nil {
+		s.lastP2PSigningKeys = nil
+		s.lastP2PSigningThreshold = 0
+
+		return
+	}
+
+	signingKeys := p2p.GetPartySigningKeys()
+	s.lastP2PSigningKeys = make([]string, 0, len(signingKeys.GetKeys()))
+	for _, key := range signingKeys.GetKeys() {
+		keyBytes, _ := proto.Marshal(key)
+		s.lastP2PSigningKeys = append(s.lastP2PSigningKeys, base64.StdEncoding.EncodeToString(keyBytes))
+	}
+	s.lastP2PSigningThreshold = signingKeys.GetThreshold()
 }
 
 func (s *mockState) p2pSubmitted() bool {
@@ -67,6 +89,38 @@ func (s *mockState) p2pSubmitted() bool {
 	defer s.mu.Unlock()
 
 	return s.authorizePostDNS > 0
+}
+
+func (s *mockState) activePartySigningInfo() ([]string, uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	threshold := uint32(2)
+	if len(s.lastP2PSigningKeys) > 0 {
+		if s.lastP2PSigningThreshold > 0 {
+			threshold = s.lastP2PSigningThreshold
+		}
+
+		return append([]string(nil), s.lastP2PSigningKeys...), threshold
+	}
+
+	return append([]string(nil), s.partySigningKeys...), threshold
+}
+
+func (s *mockState) protocolKey(participantID string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key, ok := s.protocolKeysByParticipant[participantID]
+
+	return key, ok
+}
+
+func (s *mockState) lastP2PSigningState() ([]string, uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return append([]string(nil), s.lastP2PSigningKeys...), s.lastP2PSigningThreshold
 }
 
 // ── Mock Canton client ───────────────────────────────────────────────────────
@@ -114,7 +168,7 @@ func (m *mockCantonClient) GetNamespaceKeyName(_ context.Context, _ string, _ []
 func (m *mockCantonClient) Authorize(_ context.Context, serial uint32, mapping *protov30.TopologyMapping, _ string, _ bool, _ ...string) (*protov30.SignedTopologyTransaction, error) {
 	// Track P2P Authorize calls (post-DNS) so GetP2P can return updated state.
 	if m.state != nil && m.state.dnsSubmitted() {
-		m.state.onP2PAuthorize()
+		m.state.onP2PAuthorizeMapping(mapping)
 	}
 	payload, _ := proto.Marshal(mapping)
 	raw := sha256.Sum256(append(payload, byte(serial)))
@@ -188,6 +242,17 @@ func (m *mockCantonClient) GetDNS(_ context.Context, namespace string, _ string)
 // has been submitted it returns the post-kick 2-participant state so the P2P
 // confirmation poll can complete.
 func (m *mockCantonClient) GetP2P(_ context.Context, partyUID string, _ string) (*client.P2PState, error) {
+	var partySigningKeys *client.P2PSigningKeysInfo
+	if m.state != nil {
+		keys, threshold := m.state.activePartySigningInfo()
+		if len(keys) > 0 {
+			partySigningKeys = &client.P2PSigningKeysInfo{
+				Keys:      keys,
+				Threshold: threshold,
+			}
+		}
+	}
+
 	if m.state != nil && m.state.p2pSubmitted() {
 		return &client.P2PState{
 			Party: partyUID,
@@ -195,8 +260,9 @@ func (m *mockCantonClient) GetP2P(_ context.Context, partyUID string, _ string) 
 				{ParticipantUID: "p1", Permission: "CONFIRMATION"},
 				{ParticipantUID: "p2", Permission: "CONFIRMATION"},
 			},
-			Threshold: 2,
-			Serial:    2,
+			Threshold:        2,
+			Serial:           2,
+			PartySigningKeys: partySigningKeys,
 		}, nil
 	}
 
@@ -207,8 +273,9 @@ func (m *mockCantonClient) GetP2P(_ context.Context, partyUID string, _ string) 
 			{ParticipantUID: "p2", Permission: "CONFIRMATION"},
 			{ParticipantUID: testKickedUID, Permission: "CONFIRMATION"},
 		},
-		Threshold: 2,
-		Serial:    1,
+		Threshold:        2,
+		Serial:           1,
+		PartySigningKeys: partySigningKeys,
 	}, nil
 }
 
@@ -223,7 +290,19 @@ func (m *mockCantonClient) ListDecentralizedNamespaces(_ context.Context, _ stri
 	}, nil
 }
 
-func (m *mockCantonClient) GetProtocolKeyFingerprint(_ context.Context, _ []string) (string, string, error) {
+func (m *mockCantonClient) GetProtocolKeyFingerprint(_ context.Context, knownKeysB64 []string) (string, string, error) {
+	if m.state != nil {
+		keyB64, ok := m.state.protocolKey(m.participantID)
+		if ok {
+			if slices.Contains(knownKeysB64, keyB64) {
+				raw := sha256.Sum256([]byte(m.participantID + ":" + keyB64))
+				return fmt.Sprintf("1220%x", raw[:8]), keyB64, nil
+			}
+
+			return "", "", fmt.Errorf("protocol key for %s not found in known key set", m.participantID)
+		}
+	}
+
 	return "mock-protocol-fp", "mock-protocol-key-b64", nil
 }
 
@@ -251,6 +330,19 @@ func newDepsWithState(participantID string, state *mockState) ceremony.CantonDep
 		Client: &mockCantonClient{participantID: participantID, state: state},
 		Logger: logger.Nop(),
 	}
+}
+
+func encodedP2PSigningKey(t *testing.T, seed string) string {
+	t.Helper()
+
+	raw := sha256.Sum256([]byte(seed))
+	keyBytes, err := proto.Marshal(&cryptov30.SigningPublicKey{
+		PublicKey: raw[:],
+		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
+	})
+	require.NoError(t, err)
+
+	return base64.StdEncoding.EncodeToString(keyBytes)
 }
 
 // baseInput returns a valid 2-remaining kick input (kick "p3" from a 3-member party).
@@ -292,6 +384,43 @@ func TestKickSequence_HappyPath(t *testing.T) {
 	assert.Equal(t, 2, sr.Output.NewThreshold, "NewThreshold should be 2 (floor(2/2)+1)")
 	assert.NotContains(t, sr.Output.RemainingOwners, testKickedFP, "kicked fingerprint should be removed")
 	assert.Len(t, sr.Output.RemainingOwners, 2, "should have 2 remaining owners")
+}
+
+func TestKickSequence_RemovesKickedProtocolSigningKeyWithoutRelyingOnP2POrder(t *testing.T) {
+	t.Parallel()
+
+	p1Key := encodedP2PSigningKey(t, "p1-protocol-key")
+	p2Key := encodedP2PSigningKey(t, "p2-protocol-key")
+	kickedKey := encodedP2PSigningKey(t, "p3-protocol-key")
+
+	sharedReporter := operations.NewMemoryReporter()
+	state := &mockState{
+		// Canton does not guarantee that PartySigningKeys and Participants are
+		// positionally aligned. This deliberately places the kicked key at a
+		// non-kicked participant index.
+		partySigningKeys: []string{p1Key, kickedKey, p2Key},
+		protocolKeysByParticipant: map[string]string{
+			"p1":          p1Key,
+			"p2":          p2Key,
+			testKickedUID: kickedKey,
+		},
+	}
+	newBundle := func() operations.Bundle {
+		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter)
+	}
+	input := baseInput()
+
+	_, err := operations.ExecuteSequence(newBundle(), kick.KickSequence, newDepsWithState("p1", state), input)
+	require.ErrorContains(t, err, kick.ErrThresholdNotMet.Error(), "run 1: DNS threshold not met")
+	_, err = operations.ExecuteSequence(newBundle(), kick.KickSequence, newDepsWithState("p2", state), input)
+	require.ErrorContains(t, err, kick.ErrThresholdNotMet.Error(), "run 2: P2P threshold not met")
+	_, err = operations.ExecuteSequence(newBundle(), kick.KickSequence, newDepsWithState("p1", state), input)
+	require.NoError(t, err)
+
+	keys, threshold := state.lastP2PSigningState()
+	require.ElementsMatch(t, []string{p1Key, p2Key}, keys)
+	require.NotContains(t, keys, kickedKey)
+	require.Equal(t, uint32(2), threshold)
 }
 
 // TestKickSequence_Idempotent verifies that re-running the ceremony after
@@ -446,16 +575,16 @@ func TestKickSequence_SerializationValid(t *testing.T) {
 	lggr := logger.Nop()
 	require.True(t, operations.IsSerializable(lggr, kick.KickInput{}), "KickInput must be serializable")
 	require.True(t, operations.IsSerializable(lggr, kick.KickOutput{}), "KickOutput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.ReadCurrentStateInput{}), "ReadCurrentStateInput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.ReadCurrentStateOutput{}), "ReadCurrentStateOutput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.CreateKickDNSProposalInput{}), "CreateKickDNSProposalInput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.CreateKickDNSProposalOutput{}), "CreateKickDNSProposalOutput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.SignKickDNSProposalInput{}), "SignKickDNSProposalInput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.SignKickDNSProposalOutput{}), "SignKickDNSProposalOutput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.SubmitKickDNSInput{}), "SubmitKickDNSInput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.SubmitKickDNSOutput{}), "SubmitKickDNSOutput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.ProposeKickP2PInput{}), "ProposeKickP2PInput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, kick.ProposeKickP2POutput{}), "ProposeKickP2POutput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.ReadCurrentStateInput{}), "ReadCurrentStateInput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.ReadCurrentStateOutput{}), "ReadCurrentStateOutput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.CreateKickDNSProposalInput{}), "CreateKickDNSProposalInput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.CreateKickDNSProposalOutput{}), "CreateKickDNSProposalOutput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.SignDNSProposalInput{}), "SignDNSProposalInput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.SignDNSProposalOutput{}), "SignDNSProposalOutput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.SubmitDNSInput{}), "SubmitDNSInput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.SubmitDNSOutput{}), "SubmitDNSOutput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.ProposeKickP2PInput{}), "ProposeKickP2PInput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.ProposeKickP2POutput{}), "ProposeKickP2POutput must be serializable")
 }
 
 // TestGRPCCantonClientImplementsInterface confirms that *client.GRPCCantonClient

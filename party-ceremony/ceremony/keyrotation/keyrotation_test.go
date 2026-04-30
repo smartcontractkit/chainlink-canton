@@ -60,6 +60,17 @@ func computeExpectedNewNamespaceFP() string {
 	return fp
 }
 
+func computeExpectedNewDamlKeyB64() string {
+	raw := sha256.Sum256([]byte(testTargetUID + ":" + testNSName + "-protocol-rotated"))
+	key := &cryptov30.SigningPublicKey{
+		PublicKey: raw[:],
+		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
+	}
+	keyBytes, _ := proto.Marshal(key)
+
+	return base64.StdEncoding.EncodeToString(keyBytes)
+}
+
 var (
 	// testSigningKeyTargetB64 is the target's (p1) current DAML signing key.
 	// GetProtocolKeyFingerprint returns this as the "old" key.
@@ -71,6 +82,10 @@ var (
 	// testNewNamespaceFP is the expected fingerprint of the rotated namespace
 	// key, computed from the mock's deterministic GenerateSigningKey output.
 	testNewNamespaceFP = computeExpectedNewNamespaceFP()
+
+	// testNewDamlKeyB64 is the expected generated DAML key for the non-KMS
+	// rotation path.
+	testNewDamlKeyB64 = computeExpectedNewDamlKeyB64()
 )
 
 // ── Mock shared state ────────────────────────────────────────────────────────
@@ -128,8 +143,9 @@ func (s *mockState) p2pReady() bool {
 // mockCantonClient is a deterministic, in-memory implementation of
 // [client.CantonClient] for key rotation ceremony unit tests.
 type mockCantonClient struct {
-	participantID string
-	state         *mockState // nil for single-run tests that never reach polling
+	participantID    string
+	state            *mockState // nil for single-run tests that never reach polling
+	kmsRegistrations *int
 }
 
 func (m *mockCantonClient) GetParticipantUID(_ context.Context) (string, error) {
@@ -150,7 +166,11 @@ func (m *mockCantonClient) GenerateSigningKey(_ context.Context, name string, _ 
 }
 
 func (m *mockCantonClient) RegisterKmsSigningKey(_ context.Context, kmsKeyID string, name string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	if m.kmsRegistrations != nil {
+		(*m.kmsRegistrations)++
+	}
 	raw := sha256.Sum256([]byte(m.participantID + ":" + kmsKeyID + ":" + name))
+
 	return &cryptov30.SigningPublicKey{
 		PublicKey: raw[:],
 		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
@@ -265,7 +285,7 @@ func (m *mockCantonClient) GetP2P(_ context.Context, partyUID string, _ string) 
 	}
 	if m.state != nil && m.state.p2pReady() {
 		signingKeys = &client.P2PSigningKeysInfo{
-			Keys:      []string{makeTestSigningKeyB64("rotated-daml"), testSigningKeyOtherB64},
+			Keys:      []string{testNewDamlKeyB64, testSigningKeyOtherB64},
 			Threshold: 1,
 		}
 	}
@@ -314,6 +334,14 @@ func newDeps(participantID string) ceremony.CantonDeps {
 func newDepsWithState(participantID string, state *mockState) ceremony.CantonDeps {
 	return ceremony.CantonDeps{
 		Client: &mockCantonClient{participantID: participantID, state: state},
+		Logger: logger.Nop(),
+	}
+}
+
+func newKMSDeps(participantID string, kms client.KMSConfig, registrations *int) ceremony.CantonDeps {
+	return ceremony.CantonDeps{
+		Client: &mockCantonClient{participantID: participantID, kmsRegistrations: registrations},
+		KMS:    kms,
 		Logger: logger.Nop(),
 	}
 }
@@ -609,12 +637,12 @@ func TestKeyRotationSequence_SerializationValid(t *testing.T) {
 	lggr := logger.Nop()
 	require.True(t, operations.IsSerializable(lggr, keyrotation.KeyRotationInput{}), "KeyRotationInput must be serializable")
 	require.True(t, operations.IsSerializable(lggr, keyrotation.KeyRotationOutput{}), "KeyRotationOutput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, keyrotation.GenerateRotatedKeyInput{}), "GenerateRotatedKeyInput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, keyrotation.GenerateRotatedKeyOutput{}), "GenerateRotatedKeyOutput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, keyrotation.CreateRotationDNSProposalInput{}), "CreateRotationDNSProposalInput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, keyrotation.CreateRotationDNSProposalOutput{}), "CreateRotationDNSProposalOutput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, keyrotation.ProposeRotationP2PInput{}), "ProposeRotationP2PInput must be serializable")
-	require.True(t, operations.IsSerializable(lggr, keyrotation.ProposeRotationP2POutput{}), "ProposeRotationP2POutput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, keys.GenerateRotatedKeyInput{}), "GenerateRotatedKeyInput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, keys.GenerateRotatedKeyOutput{}), "GenerateRotatedKeyOutput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.CreateRotationDNSProposalInput{}), "CreateRotationDNSProposalInput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.CreateRotationDNSProposalOutput{}), "CreateRotationDNSProposalOutput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.ProposeRotationP2PInput{}), "ProposeRotationP2PInput must be serializable")
+	require.True(t, operations.IsSerializable(lggr, topology.ProposeRotationP2POutput{}), "ProposeRotationP2POutput must be serializable")
 }
 
 // TestGRPCCantonClientImplementsInterface confirms that *client.GRPCCantonClient
@@ -676,6 +704,49 @@ func TestGenerateRotatedKeyOp_Success(t *testing.T) {
 	var pk cryptov30.SigningPublicKey
 	require.NoError(t, proto.Unmarshal(keyBytes, &pk))
 	assert.NotEmpty(t, pk.GetPublicKey())
+}
+
+func TestGenerateRotatedKeyOp_KMSNamespaceOnly(t *testing.T) {
+	t.Parallel()
+	b := optest.NewBundle(t)
+	var registrations int
+
+	r, err := operations.ExecuteOperation(b, keys.GenerateRotatedKeyOp, newKMSDeps(testTargetUID, client.KMSConfig{
+		NamespaceKeyID: "arn:aws:kms:us-east-1:123456789:key/rotated-namespace",
+	}, &registrations), keys.GenerateRotatedKeyInput{
+		ParticipantID:      testTargetUID,
+		SynchronizerID:     testSyncID,
+		DNSOwners:          []string{testTargetNSFP, "fp-owner-p2"},
+		RotateNamespaceKey: true,
+	})
+	require.NoError(t, err)
+
+	assert.NotEmpty(t, r.Output.NewNamespaceKeyB64)
+	assert.NotEmpty(t, r.Output.NewNamespaceFingerprint)
+	assert.Empty(t, r.Output.NewDamlKeyB64)
+	assert.Equal(t, 1, registrations)
+}
+
+func TestGenerateRotatedKeyOp_KMSProtocolOnly(t *testing.T) {
+	t.Parallel()
+	b := optest.NewBundle(t)
+	var registrations int
+
+	r, err := operations.ExecuteOperation(b, keys.GenerateRotatedKeyOp, newKMSDeps(testTargetUID, client.KMSConfig{
+		ProtocolKeyID: "arn:aws:kms:us-east-1:123456789:key/rotated-protocol",
+	}, &registrations), keys.GenerateRotatedKeyInput{
+		ParticipantID:       testTargetUID,
+		SynchronizerID:      testSyncID,
+		DNSOwners:           []string{testTargetNSFP, "fp-owner-p2"},
+		RotateDamlKey:       true,
+		KnownSigningKeysB64: []string{testSigningKeyTargetB64, testSigningKeyOtherB64},
+	})
+	require.NoError(t, err)
+
+	assert.Empty(t, r.Output.NewNamespaceKeyB64)
+	assert.NotEmpty(t, r.Output.NewDamlKeyB64)
+	assert.Equal(t, testSigningKeyTargetB64, r.Output.OldDamlKeyB64)
+	assert.Equal(t, 1, registrations)
 }
 
 // TestProposeRotationP2POp_ParticipantMismatch verifies that proposing a
