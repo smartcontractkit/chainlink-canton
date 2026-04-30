@@ -2444,7 +2444,7 @@ testVerifyInboundMessage_RejectsMismatchedSourceToken = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-mismatch" "test-feequoter-verify-mismatch" ccipOwner ccipOwner
 
@@ -2504,7 +2504,7 @@ testVerifyInboundMessage_RejectsMismatchedSourceToken = script do
         exerciseCmd tokenPool LockReleaseTokenPool.VerifyInboundMessage with
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
-            extraContext = CCIP.Context.emptyCCIPContext
+            extraContext = MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             caller = receiver
 

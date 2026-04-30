@@ -835,7 +835,7 @@ testVerifyMessage_RejectsCrossDomainExecutingMessage = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccvCid CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
-            extraContext = CCIP.Context.emptyCCIPContext
+            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults
             caller = owner
@@ -898,7 +898,7 @@ testVerifyMessage_RejectsUnauthorizedCaller = script do
     submitMustFail (actAs mallory <> disclose disclosedRmnRemote <> disclose disclosedCcv <> disclose disclosedExecMsg) do
         exerciseCmd ccvCid CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
-            extraContext = CCIP.Context.emptyCCIPContext
+            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults
             caller = mallory
@@ -907,7 +907,7 @@ testVerifyMessage_RejectsUnauthorizedCaller = script do
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccvCid CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = rmnRemote
-            extraContext = CCIP.Context.emptyCCIPContext
+            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults
             caller = owner
