@@ -237,32 +237,63 @@ func (a *CantonChainFamilyAdapter) ResolveExecutor(ds datastore.DataStore, chain
 
 // GetAddressBytesLength implements [adapters.ChainFamily].
 func (a *CantonChainFamilyAdapter) GetAddressBytesLength() uint8 {
-	panic("unimplemented")
+	return 32
 }
 
 // GetChainFamilySelector implements [adapters.ChainFamily].
 func (a *CantonChainFamilyAdapter) GetChainFamilySelector() [4]byte {
-	panic("unimplemented")
+	return CantonFamilySelector
 }
 
 // GetDefaultCommitteeVerifierRemoteChainConfig implements [adapters.ChainFamily].
 func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig() ccipadapters.CommitteeVerifierRemoteChainDefaults {
-	panic("unimplemented")
+	return ccipadapters.CommitteeVerifierRemoteChainDefaults{
+		AllowlistEnabled:   false,
+		FeeUSDCents:        0,
+		GasForVerification: 100_000,
+		PayloadSizeBytes:   1_000,
+	}
 }
 
 // GetDefaultFeeQuoterDestChainConfig implements [adapters.ChainFamily].
 func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccipadapters.FeeQuoterDestChainConfig {
-	panic("unimplemented")
+	return ccipadapters.FeeQuoterDestChainConfig{
+		OverrideExistingConfig:      false,
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         CantonFamilySelector,
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		LinkFeeMultiplierPercent:    0,
+		USDPerUnitGas:               big.NewInt(0),
+	}
 }
 
 // GetDefaultFinalityConfig implements [adapters.ChainFamily].
 func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
-	panic("unimplemented")
+	return finality.Config{
+		WaitForFinality: true,
+	}
 }
 
 // GetDefaultRemoteChainConfig implements [adapters.ChainFamily].
 func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig() ccipadapters.RemoteChainDefaults {
-	panic("unimplemented")
+	return ccipadapters.RemoteChainDefaults{
+		AllowTrafficFrom: true, // TODO: check what this does?
+		ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
+			USDCentsFee: 0,
+			Enabled:     true,
+		},
+		BaseExecutionGasCost:      50_000,
+		TokenReceiverAllowed:      false, // TODO: check what this does?
+		MessageNetworkFeeUSDCents: 0,
+		TokenNetworkFeeUSDCents:   0,
+	}
 }
 
 func findContractRef(ds datastore.DataStore, chainSelector uint64, contractType datastore.ContractType, version *semver.Version, qualifier string) (datastore.AddressRef, error) {

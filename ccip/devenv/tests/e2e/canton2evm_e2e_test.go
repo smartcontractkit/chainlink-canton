@@ -139,7 +139,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		t.Logf("CCIPMessageSent event: %+v", sentEvent)
 
-		t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID)
+		t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID[:])
 		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
 		t.Logf(
 			"Message assertion succeeded: aggregated=true indexerResults=%+v",
@@ -226,7 +226,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 		require.NoError(t, err)
-		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 
 		receiverBalanceAfter, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)

@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 2.0.0 [default] to LockReleaseTokenPool 2.0.0 [default])"
+	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default]):local"
 	// 1e11 (10-decimal units) gives a stable non-dust transfer in this lane after fee handling.
 	evmToCantonTransferAmount = int64(100_000_000_000)
 )
