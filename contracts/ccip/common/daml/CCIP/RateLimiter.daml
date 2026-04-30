@@ -4,7 +4,10 @@ import DA.Map qualified as Map
 import DA.Time (convertRelTimeToMicroseconds, subTime)
 import DA.Crypto.Text (BytesHex, byteCount)
 
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import qualified CCIP.Context
+
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.RawInstanceAddress (assertValidInstanceId)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -13,7 +16,7 @@ import MCMS.Codec (decodeBoolAt, decodeNumeric0At)
 rateLimiterKey : Text
 rateLimiterKey = "rate-limiter"
 
-lookupRateLimiterCid : CCIP.Context.CCIPContext -> Update (ContractId RateLimiter)
+lookupRateLimiterCid : ChoiceContext -> Update (ContractId RateLimiter)
 lookupRateLimiterCid ctx = CCIP.Context.getFromContextU ctx rateLimiterKey
 
 rawInstanceAddress : RateLimiter -> RawInstanceAddress.RawInstanceAddress

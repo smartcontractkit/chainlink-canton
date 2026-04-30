@@ -29,7 +29,7 @@ import CCIP.LockReleaseTokenPoolCodecGen (
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
     )
-import CCIP.ContextCodec (decodeCCIPContextAt)
+import CCIP.ContextCodec (decodeChoiceContextAt)
 import CCIP.LockReleaseTokenPoolTypes (
     TokenTransferFeeConfig(..),
     RemoteChainConfig(..),
@@ -69,6 +69,30 @@ import qualified CCIP.TokenAdminRegistry
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
 
+transferFactoryContextKey : Text
+transferFactoryContextKey = "transfer-factory"
+
+lookupTransferFactory : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory)
+lookupTransferFactory ctx = CCIP.Context.getFromContextU ctx transferFactoryContextKey
+
+transferFactoryExtraArgsContextValuesContextKey : Text
+transferFactoryExtraArgsContextValuesContextKey = "transfer-factory-extra-args-context-values"
+
+lookupTransferFactoryExtraArgsContextValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Splice.Api.Token.MetadataV1.AnyValue)
+lookupTransferFactoryExtraArgsContextValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx transferFactoryExtraArgsContextValuesContextKey
+
+transferFactoryExtraArgsMetaValuesContextKey : Text
+transferFactoryExtraArgsMetaValuesContextKey = "transfer-factory-extra-args-meta-values"
+
+lookupTransferFactoryExtraArgsMetaValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Text)
+lookupTransferFactoryExtraArgsMetaValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx transferFactoryExtraArgsMetaValuesContextKey
+
+tokenPoolHoldingsContextKey : Text
+tokenPoolHoldingsContextKey = "token-pool-holdings"
+
+lookupTokenPoolHoldings : Splice.Api.Token.MetadataV1.ChoiceContext -> Update [ContractId Splice.Api.Token.HoldingV1.Holding]
+lookupTokenPoolHoldings ctx = CCIP.Context.getFromContextU ctx tokenPoolHoldingsContextKey
+
 data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
     with
         tokenAdminRegistry : RawInstanceAddress
@@ -96,25 +120,6 @@ calculateLocalAmount remoteAmount remoteDecimals localDecimals =
         remoteAmount
         remoteDecimals
         localDecimals
-
--- | Convert CCIP AnyValue to Splice AnyValue at TransferFactory boundary.
-toSpliceAnyValue : CCIP.Context.AnyValue -> Splice.Api.Token.MetadataV1.AnyValue
-toSpliceAnyValue (CCIP.Context.AV_Text t) = Splice.Api.Token.MetadataV1.AV_Text t
-toSpliceAnyValue (CCIP.Context.AV_Int i) = Splice.Api.Token.MetadataV1.AV_Int i
-toSpliceAnyValue (CCIP.Context.AV_Decimal d) = Splice.Api.Token.MetadataV1.AV_Decimal d
-toSpliceAnyValue (CCIP.Context.AV_Bool b) = Splice.Api.Token.MetadataV1.AV_Bool b
-toSpliceAnyValue (CCIP.Context.AV_Date d) = Splice.Api.Token.MetadataV1.AV_Date d
-toSpliceAnyValue (CCIP.Context.AV_Time t) = Splice.Api.Token.MetadataV1.AV_Time t
-toSpliceAnyValue (CCIP.Context.AV_RelTime r) = Splice.Api.Token.MetadataV1.AV_RelTime r
-toSpliceAnyValue (CCIP.Context.AV_Party p) = Splice.Api.Token.MetadataV1.AV_Party p
-toSpliceAnyValue (CCIP.Context.AV_ContractId c) = Splice.Api.Token.MetadataV1.AV_ContractId (coerceContractId c)
-toSpliceAnyValue (CCIP.Context.AV_List xs) = Splice.Api.Token.MetadataV1.AV_List (map toSpliceAnyValue xs)
-toSpliceAnyValue (CCIP.Context.AV_Map m) = Splice.Api.Token.MetadataV1.AV_Map (TextMap.fromList (map (\(k, v) -> (k, toSpliceAnyValue v)) (TextMap.toList m)))
-
--- | Convert CCIPContext to Splice ChoiceContext for TransferFactory calls.
-toSpliceChoiceContext : CCIP.Context.CCIPContext -> Splice.Api.Token.MetadataV1.ChoiceContext
-toSpliceChoiceContext ctx = Splice.Api.Token.MetadataV1.ChoiceContext with
-    values = TextMap.fromList (map (\(k, v) -> (k, toSpliceAnyValue v)) (TextMap.toList ctx.values))
 
 sumHoldingAmounts : [ContractId Splice.Api.Token.HoldingV1.Holding] -> Update Decimal
 sumHoldingAmounts =
@@ -182,7 +187,7 @@ template LockReleaseTokenPool
         -- the pool's preapproval CID under the key the TransferFactory expects
         -- (e.g., "transfer-preapproval"). Converted to Splice ChoiceContext at the
         -- TransferFactory boundary.
-        poolReceiveContext : CCIP.Context.CCIPContext
+        poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
         -- Timeout for pending TransferInstructions created by this pool.
         transferTimeout : TransferTimeout
         deps : LockReleaseTokenPoolDeps
@@ -242,7 +247,6 @@ template LockReleaseTokenPool
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         tokenReceiveTicketCid = arg.tokenReceiveTicketCid
-                        tokenInput = arg.tokenInput
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
@@ -253,7 +257,6 @@ template LockReleaseTokenPool
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
-                        tokenInput = arg.tokenInput
                         senderInputCids = arg.senderInputCids
                         amount = arg.amount
                         caller = arg.caller
@@ -437,7 +440,7 @@ template LockReleaseTokenPool
         -- Callable by poolOwner
         choice SetPoolReceiveContext : ContractId LockReleaseTokenPool
             with
-                newPoolReceiveContext : CCIP.Context.CCIPContext
+                newPoolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
             controller poolOwner
             do create this with poolReceiveContext = newPoolReceiveContext
 
@@ -477,7 +480,7 @@ template LockReleaseTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 caller : Party
             controller caller
@@ -521,7 +524,7 @@ template LockReleaseTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 amount : Decimal
                 caller : Party
@@ -559,9 +562,8 @@ template LockReleaseTokenPool
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
-                tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 caller : Party
             controller caller
             do
@@ -633,6 +635,12 @@ template LockReleaseTokenPool
                         instrumentId = instrumentId
                         caller = poolOwner
 
+                -- Get inputs from extraContext
+                tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                transferFactory <- lookupTransferFactory extraContext
+                extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
+                extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
+
                 -- Transfer tokens from pool to receiver via TransferFactory.
                 -- If receiver has preapproval, completes immediately. Otherwise creates pending
                 -- TransferInstruction that receiver must accept.
@@ -648,14 +656,18 @@ template LockReleaseTokenPool
                         instrumentId = instrumentId
                         requestedAt = now
                         executeBefore
-                        inputHoldingCids = tokenInput.tokenPoolHoldings
+                        inputHoldingCids = tokenPoolHoldings
                         meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
-                transferResult <- exercise tokenInput.transferFactory
+                transferResult <- exercise transferFactory
                     Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
                         expectedAdmin = instrumentId.admin
                         transfer
-                        extraArgs = tokenInput.extraArgs
+                        extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+                            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                                values = extraArgsContextValues
+                            meta = Splice.Api.Token.MetadataV1.Metadata with
+                                values = extraArgsMetaValues
 
                 case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids -> do
@@ -721,7 +733,7 @@ template LockReleaseTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -818,9 +830,8 @@ template LockReleaseTokenPool
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
                 amount : Decimal
                 caller : Party
@@ -870,11 +881,19 @@ template LockReleaseTokenPool
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
                     requested = amountNumeric0
 
-                -- Convert pool's CCIPContext to Splice ChoiceContext at TransferFactory boundary.
-                let splicePoolCtx = toSpliceChoiceContext poolReceiveContext
+                -- Get inputs from extraContext
+                tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                transferFactory <- lookupTransferFactory extraContext
+                extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
+                extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
+
+                -- Merge the pool's receive context with the extra args context values
                 let mergedContext = Splice.Api.Token.MetadataV1.ChoiceContext with
-                        values = TextMap.union splicePoolCtx.values tokenInput.extraArgs.context.values
-                let mergedExtraArgs = tokenInput.extraArgs with context = mergedContext
+                        values = TextMap.union poolReceiveContext.values extraArgsContextValues
+                let mergedExtraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+                        context = mergedContext
+                        meta = Splice.Api.Token.MetadataV1.Metadata with
+                            values = extraArgsMetaValues
                 now <- getTime
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
@@ -889,7 +908,7 @@ template LockReleaseTokenPool
                         inputHoldingCids = senderInputCids
                         meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
-                transferResult <- exercise tokenInput.transferFactory
+                transferResult <- exercise transferFactory
                     Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
                         expectedAdmin = instrumentId.admin
                         transfer
@@ -921,7 +940,7 @@ template LockReleaseTokenPool
                         caller = poolOwner
 
                 pure CCIP.Interfaces.TokenPool.LockOrBurnResult with
-                    poolChangeCids = receiverCids ++ tokenInput.tokenPoolHoldings
+                    poolChangeCids = receiverCids ++ tokenPoolHoldings
                     senderChangeCids = transferResult.senderChangeCids
                     sendingMessageCid = newSendingMessageCid
 
@@ -973,7 +992,7 @@ template LockReleaseTokenPool
                             caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "SetPoolReceiveContext" -> do
-                    case decodeCCIPContextAt operationData 0 of
+                    case decodeChoiceContextAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: SetPoolReceiveContext"
                         Some (newPoolReceiveContext, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetPoolReceiveContext" (finalOffset == byteCount operationData)

@@ -118,9 +118,9 @@ const (
 type TransferFactory struct {
 	Type FactoryType `toml:"type" validate:"oneof=address url"`
 
-	TemplateId *string                    `toml:"template_id" validate:"required_if=Type address"`
-	Party      *string                    `toml:"party" validate:"required_if=Type address"`
-	Address    *contracts.InstanceAddress `toml:"address" validate:"required_if=Type address"`
+	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
+	Party           *string                    `toml:"party" validate:"required_if=Type address"`
+	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
 
 	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"required_if=Type url,url"`
 	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url"`
@@ -129,9 +129,9 @@ type TransferFactory struct {
 type BurnMintFactory struct {
 	Type FactoryType `toml:"type" validate:"oneof=address"`
 
-	TemplateId *string                    `toml:"template_id" validate:"required_if=Type address"`
-	Party      *string                    `toml:"party" validate:"required_if=Type address"`
-	Address    *contracts.InstanceAddress `toml:"address" validate:"required_if=Type address"`
+	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
+	Party           *string                    `toml:"party" validate:"required_if=Type address"`
+	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
 }
 
 type TokenPool struct {

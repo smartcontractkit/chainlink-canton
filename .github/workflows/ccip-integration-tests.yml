@@ -22,8 +22,7 @@ jobs:
         run: |
           cd integration-tests/ccip
           go test -v -count 1 -timeout 20m -run TestCCIPExecuteE2E ./...
-
-  test-ccip-execute-token:
+  test-ccip-execute-lnr:
     name: TestLnRTokenPool_FullReceiveFlow
     runs-on: ubuntu-latest
     steps:
@@ -37,23 +36,7 @@ jobs:
         run: |
           cd integration-tests/ccip
           go test -v -count 1 -timeout 20m -run '^TestLnRTokenPool_FullReceiveFlow$' ./...
-
-  test-ccip-execute-token-bnm:
-    name: TestBnMTokenPool_FullReceiveFlow
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-      - name: Install Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: integration-tests/go.mod
-      - name: Run Go tests
-        run: |
-          cd integration-tests/ccip
-          go test -v -count 1 -timeout 20m -run '^TestBnMTokenPool_FullReceiveFlow' ./...
-
-  test-ccip-execute-token-decimal:
+  test-ccip-execute-bnm-decimal:
     name: TestLnRTokenPool_FullReceiveFlow_DecimalConversion
     runs-on: ubuntu-latest
     steps:
@@ -67,6 +50,20 @@ jobs:
         run: |
           cd integration-tests/ccip
           go test -v -count 1 -timeout 20m -run '^TestLnRTokenPool_FullReceiveFlow_DecimalConversion$' ./...
+  test-ccip-execute-bnm:
+    name: TestBnMTokenPool_FullReceiveFlow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: integration-tests/go.mod
+      - name: Run Go tests
+        run: |
+          cd integration-tests/ccip
+          go test -v -count 1 -timeout 20m -run '^TestBnMTokenPool_FullReceiveFlow' ./...
 
   test-ccip-send:
     name: TestCCIPSend
@@ -82,9 +79,8 @@ jobs:
         run: |
           cd integration-tests/ccip
           go test -v -count 1 -timeout 20m -run '^TestCCIPSend$' ./...
-
-  test-ccip-send-with-token:
-    name: TestCCIPSendWithToken
+  test-ccip-send-lnr:
+    name: TestLnRTokenPool_FullSendFlow
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -94,6 +90,20 @@ jobs:
         with:
           go-version-file: integration-tests/go.mod
       - name: Run Go tests
-        run: |  
+        run: |
           cd integration-tests/ccip
-          go test -v -count 1 -timeout 20m -run '^TestCCIPSendWithTokenTransferFeeBps$' ./...
+          go test -v -count 1 -timeout 20m -run '^TestLnRTokenPool_FullSendFlow' ./...
+  test-ccip-send-bnm:
+    name: TestBnMTokenPool_FullSendFlow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: integration-tests/go.mod
+      - name: Run Go tests
+        run: |
+          cd integration-tests/ccip
+          go test -v -count 1 -timeout 20m -run '^TestBnMTokenPool_FullSendFlow' ./...
