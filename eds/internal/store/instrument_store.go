@@ -88,9 +88,6 @@ func (s *InstrumentHoldingStore) GetHolding(party types.PARTY, instrumentId spli
 		return nil, false
 	}
 	holdings := maps.Values(instrumentHoldings)
-	if len(holdings) == 0 {
-		return nil, false
-	}
 
 	return holdings, true
 }

@@ -90,18 +90,35 @@ chain_selector = "8706591216959472610"
 		party_id = "tokenPoolOwner"
 		instance_address = "0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"
 		pool_owner = "tokenPoolOwner"
-		token_standard_url = "localhost:8545"
-		[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec".token_standard_auth]
-			type = "insecureStatic"
-			jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+		[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec".transfer_factory]
+			type = "url"
+			token_standard_url = "localhost:8545"
+			[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec".transfer_factory.token_standard_auth]
+				type = "insecureStatic"
+				jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
 	[token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"]
 		type = "burnMint"
 		party_id = "tokenPoolOwner"
 		instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
 		pool_owner = "tokenPoolOwner"
+		[token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011".burn_mint_factory]
+			type = "address"
+			instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
+			template_id = "#link:Link.Token:LinkToken"
+			party = "linkOwner"
 		[token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011".transfer_preapproval]
 			context_key = "transfer-preapproval"
 			template_id = "#splice-amulet:Splice.AmuletRules:TransferPreapproval"
+
+[token_standard_api]
+	enabled = true
+	admin = "tokenAdmin"
+	[token_standard_api.registries.0x1234]
+		party_id = "tokenAdmin"
+		instance_address = "0x0000000000000000000000000000000000000000000000000000000000001234"
+		token_type = "LINK"
+		token_id = "ChainLink"
+		
 	`,
 			want: &Config{
 				ChainSelector: "8706591216959472610",
@@ -166,11 +183,14 @@ chain_selector = "8706591216959472610"
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"),
 							},
-							PoolOwner:        "tokenPoolOwner",
-							TokenStandardURL: new("localhost:8545"),
-							TokenStandardAuthConfig: &commonconfig.AuthConfig{
-								Type: commonconfig.AuthTypeInsecureStatic,
-								JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+							PoolOwner: "tokenPoolOwner",
+							TransferFactory: &TransferFactory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("localhost:8545"),
+								TokenStandardAuthConfig: &commonconfig.AuthConfig{
+									Type: commonconfig.AuthTypeInsecureStatic,
+									JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+								},
 							},
 						},
 						contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011").Hex(): {
@@ -180,10 +200,30 @@ chain_selector = "8706591216959472610"
 								InstanceAddress: contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"),
 							},
 							PoolOwner: "tokenPoolOwner",
+							BurnMintFactory: &BurnMintFactory{
+								Type:            FactoryTypeAddress,
+								TemplateId:      new("#link:Link.Token:LinkToken"),
+								Party:           new("linkOwner"),
+								InstanceAddress: new(contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011")),
+							},
 							TransferPreapproval: &TransferPreapproval{
 								ContextKey: "transfer-preapproval",
 								TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
 							},
+						},
+					},
+				},
+				TokenStandardAPIConfig: TokenStandardAPIConfig{
+					Enabled: true,
+					Admin:   "tokenAdmin",
+					Registries: map[string]Registry{
+						"0x1234": {
+							ContractIdentifier: ContractIdentifier{
+								PartyID:         "tokenAdmin",
+								InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+							},
+							TokenType: TokenTypeLINK,
+							TokenId:   "ChainLink",
 						},
 					},
 				},
@@ -233,6 +273,7 @@ func TestConfig_Merge(t *testing.T) {
 
 	poolAddrA := contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec")
 	poolAddrB := contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011")
+	poolAddrBPtr := &poolAddrB
 	keyA := poolAddrA.Hex()
 	keyB := poolAddrB.Hex()
 
@@ -270,8 +311,11 @@ func TestConfig_Merge(t *testing.T) {
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: poolAddrA,
 							},
-							PoolOwner:        "tokenPoolOwner",
-							TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
+							PoolOwner: "tokenPoolOwner",
+							TransferFactory: &TransferFactory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
+							},
 						},
 						keyB: {
 							Type: TokenPoolTypeBurnMint,
@@ -299,9 +343,11 @@ func TestConfig_Merge(t *testing.T) {
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: poolAddrA,
 							},
-							TokenStandardAuthConfig: &commonconfig.AuthConfig{
-								Type: commonconfig.AuthTypeInsecureStatic,
-								JWT:  "jwt-token-pool-a",
+							TransferFactory: &TransferFactory{
+								TokenStandardAuthConfig: &commonconfig.AuthConfig{
+									Type: commonconfig.AuthTypeInsecureStatic,
+									JWT:  "jwt-token-pool-a",
+								},
 							},
 						},
 						keyB: {
@@ -309,9 +355,11 @@ func TestConfig_Merge(t *testing.T) {
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: poolAddrB,
 							},
-							TokenStandardAuthConfig: &commonconfig.AuthConfig{
-								Type: commonconfig.AuthTypeInsecureStatic,
-								JWT:  "jwt-token-pool-b",
+							BurnMintFactory: &BurnMintFactory{
+								Type:            FactoryTypeAddress,
+								TemplateId:      new("#link:Link.Token:LinkToken"),
+								Party:           new("linkOwner"),
+								InstanceAddress: poolAddrBPtr,
 							},
 						},
 					},
@@ -342,11 +390,14 @@ func TestConfig_Merge(t *testing.T) {
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: poolAddrA,
 							},
-							PoolOwner:        "tokenPoolOwner",
-							TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
-							TokenStandardAuthConfig: &commonconfig.AuthConfig{
-								Type: commonconfig.AuthTypeInsecureStatic,
-								JWT:  "jwt-token-pool-a",
+							PoolOwner: "tokenPoolOwner",
+							TransferFactory: &TransferFactory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
+								TokenStandardAuthConfig: &commonconfig.AuthConfig{
+									Type: commonconfig.AuthTypeInsecureStatic,
+									JWT:  "jwt-token-pool-a",
+								},
 							},
 						},
 						keyB: {
@@ -356,13 +407,15 @@ func TestConfig_Merge(t *testing.T) {
 								InstanceAddress: poolAddrB,
 							},
 							PoolOwner: "tokenPoolOwner",
+							BurnMintFactory: &BurnMintFactory{
+								Type:            FactoryTypeAddress,
+								TemplateId:      new("#link:Link.Token:LinkToken"),
+								Party:           new("linkOwner"),
+								InstanceAddress: poolAddrBPtr,
+							},
 							TransferPreapproval: &TransferPreapproval{
 								ContextKey: "transfer-preapproval",
 								TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
-							},
-							TokenStandardAuthConfig: &commonconfig.AuthConfig{
-								Type: commonconfig.AuthTypeInsecureStatic,
-								JWT:  "jwt-token-pool-b",
 							},
 						},
 					},

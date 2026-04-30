@@ -2,6 +2,7 @@ module CCIP.Interfaces.TokenPool where
 
 import DA.Crypto.Text (BytesHex)
 
+import qualified Splice.Api.Token.BurnMintV1
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
@@ -50,7 +51,7 @@ interface ITokenPool where
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-            extraContext : CCIP.Context.CCIPContext
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             caller : Party
         controller caller
@@ -61,7 +62,7 @@ interface ITokenPool where
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-            extraContext : CCIP.Context.CCIPContext
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             amount : Decimal
             caller : Party
@@ -75,9 +76,8 @@ interface ITokenPool where
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-            extraContext : CCIP.Context.CCIPContext
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
-            tokenInput : TokenInput
             caller : Party
         controller caller
         do tokenPool_releaseFromTicketImpl this self arg
@@ -90,9 +90,8 @@ interface ITokenPool where
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-            extraContext : CCIP.Context.CCIPContext
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            tokenInput : TokenInput
             senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
             amount : Decimal
             caller : Party
@@ -106,7 +105,7 @@ interface ITokenPool where
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-            extraContext : CCIP.Context.CCIPContext
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
             tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -130,19 +129,6 @@ data TokenPoolView = TokenPoolView
         owner : Party
         ccipOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-    deriving (Eq, Show)
-
--- Pool specific input data, provided by the Pool API
-data TokenInput = TokenInput
-    with
-        -- The transfer factory CID for the pool's asset
-        transferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
-        -- The extraArgs passed to the transfer factory when creating transfer instructions
-        extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
-        -- The holdings in the pool
-        --  On Release, these holdings will be used to release tokens
-        --  On Lock, these holdings are optional and will be used to combine UTXOs with the incoming locked tokens
-        tokenPoolHoldings : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)
 
 data ReleaseOrMintResult = ReleaseOrMintResult

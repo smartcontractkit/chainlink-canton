@@ -1,9 +1,9 @@
--- | Codec module for CCIPContext and AnyValue encoding/decoding
+-- | Codec module for ChoiceContext and AnyValue encoding/decoding
 -- Used by pool contracts for MCMS operations that need to set poolReceiveContext
 module CCIP.ContextCodec
-  ( -- CCIPContext encoding
-    encodeCCIPContext
-  , decodeCCIPContextAt
+  ( -- ChoiceContext encoding
+    encodeChoiceContext
+  , decodeChoiceContextAt
   -- AnyValue encoding (for extensibility)
   , encodeAnyValue
   , decodeAnyValueAt
@@ -19,7 +19,7 @@ import DA.TextMap qualified as TextMap
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.Context (CCIPContext(..), AnyValue(..))
+import Splice.Api.Token.MetadataV1 (ChoiceContext(..), AnyValue(..), AnyContractId(..))
 
 import MCMS.Codec
   ( extractBytes
@@ -38,19 +38,19 @@ import MCMS.Codec
   )
 
 -- ===========================================================================
--- CCIPCONTEXT ENCODING/DECODING
--- CCIPContext is a wrapper around TextMap AnyValue
+-- CHOICECONTEXT ENCODING/DECODING
+-- ChoiceContext is a wrapper around TextMap AnyValue
 -- ===========================================================================
 
--- | Encode CCIPContext as TextMap AnyValue
-encodeCCIPContext : CCIPContext -> BytesHex
-encodeCCIPContext (CCIPContext values) = encodeTextMapAnyValue values
+-- | Encode ChoiceContext as TextMap AnyValue
+encodeChoiceContext : ChoiceContext -> BytesHex
+encodeChoiceContext (ChoiceContext values) = encodeTextMapAnyValue values
 
--- | Decode CCIPContext from bytes
-decodeCCIPContextAt : BytesHex -> Int -> Optional (CCIPContext, Int)
-decodeCCIPContextAt encoded offset = do
+-- | Decode ChoiceContext from bytes
+decodeChoiceContextAt : BytesHex -> Int -> Optional (ChoiceContext, Int)
+decodeChoiceContextAt encoded offset = do
   (values, newOffset) <- decodeTextMapAnyValueAt encoded offset
-  Some (CCIPContext values, newOffset)
+  Some (ChoiceContext values, newOffset)
 
 -- ===========================================================================
 -- TEXTMAP ANYVALUE ENCODING/DECODING
@@ -238,12 +238,12 @@ decodePartyValueAt encoded offset = do
 -- ===========================================================================
 
 -- | Encode ContractId as text (encode-only)
-encodeContractIdValue : ContractId () -> BytesHex
+encodeContractIdValue : AnyContractId -> BytesHex
 encodeContractIdValue cid = encodeText (show cid)
 
 -- | Decode ContractId - ALWAYS RETURNS NONE
 -- Daml has no contractIdFromText. Use AV_Text for contract IDs instead.
-decodeContractIdValueAt : BytesHex -> Int -> Optional (ContractId (), Int)
+decodeContractIdValueAt : BytesHex -> Int -> Optional (AnyContractId, Int)
 decodeContractIdValueAt encoded offset = do
   -- Skip the text bytes to advance offset correctly
   (_cidText, newOffset) <- decodeTextAt encoded offset

@@ -7,7 +7,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
@@ -78,15 +78,15 @@ func ActiveContractToDisclosedContract(activeContract *apiv2.ActiveContract) oap
 	}
 }
 
-func SerializeCCIPContext(context common.CCIPContext) (map[string]any, error) {
+func SerializeChoiceContext(context splice_api_token_metadata_v1.ChoiceContext) (map[string]any, error) {
 	jsonBytes, err := context.MarshalJSON()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal CCIPContext: %w", err)
+		return nil, fmt.Errorf("failed to marshal ChoiceContext: %w", err)
 	}
 	var data map[string]any
 	err = json.Unmarshal(jsonBytes, &data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal CCIPContext JSON: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal ChoiceContext JSON: %w", err)
 	}
 
 	return data, nil
