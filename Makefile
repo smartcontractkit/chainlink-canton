@@ -54,6 +54,24 @@ DAML_LINT_PACKAGES ?= \
 	contracts/test/receiver \
 	contracts/test/test
 
+# Warning baseline for idiomatic Daml cleanup. Keep this target separate from
+# dpm damlc lint so CI can surface broader compiler warnings before the full
+# -Wall baseline is clean enough to enforce with -Werror.
+DAML_WARNING_GHC_OPTIONS ?= \
+	-Wall \
+	-Wunused-do-bind \
+	-Wname-shadowing \
+	-Wincomplete-patterns
+
+.PHONY: build-daml-warning-baseline
+build-daml-warning-baseline: generate-daml-codecs
+	@echo "Building Daml warning baseline..."
+	@set -e; \
+	for pkg_dir in $(DAML_LINT_PACKAGES); do \
+		echo "dpm build $$pkg_dir $(foreach option,$(DAML_WARNING_GHC_OPTIONS),--ghc-option $(option))"; \
+		( cd "$$pkg_dir" && dpm build $(foreach option,$(DAML_WARNING_GHC_OPTIONS),--ghc-option $(option)) ); \
+	done
+
 .PHONY: lint-daml-contracts
 lint-daml-contracts: compile-contracts
 	@echo "Linting Daml contracts..."

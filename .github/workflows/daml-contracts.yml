@@ -32,6 +32,8 @@ jobs:
               done
               exit 1
           fi
+      - name: Build Daml warning baseline
+        run: make build-daml-warning-baseline
       - name: Lint Daml contracts
         run: make lint-daml-contracts
 
