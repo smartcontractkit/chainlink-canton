@@ -207,9 +207,9 @@ func (s Server) lockReleaseTokenPoolSend(
 	// Add Token Pool holdings to choiceContext - not currently used by the Token Pool, but may be required in the future
 	holdings, ok := s.instrumentHoldingStore.GetHolding(cfg.Owner, lockReleaseTokenPool.InstrumentId)
 	if !ok {
-		s.logger.Error().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Msg("no holdings found for lock release token pool")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
+		// If the LnR Token Pool hasn't been seeded with liquidity it might not have any holdings during the first send.
+		// Logging as a warning but otherwise continuing - this should not happen during normal operation.
+		s.logger.Warn().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Msg("no holdings found for lock release token pool during send")
 	}
 	tokenPoolHoldings := make([]splice_api_token_metadata_v1.AnyValue, len(holdings))
 	disclosedHoldings := make([]oapiCommon.DisclosedContract, len(holdings))
@@ -585,9 +585,6 @@ func (s Server) burnMintTokenPoolExecute(
 		return
 	}
 
-	ccipContext := splice_api_token_metadata_v1.ChoiceContext{
-		Values: map[string]splice_api_token_metadata_v1.AnyValue{},
-	}
 	var rateLimiter *apiv2.ActiveContract
 	if message.Finality == protocol.FinalityWaitForFinality {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
@@ -596,18 +593,12 @@ func (s Server) burnMintTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values[string(common.RateLimiterKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
-		}
 	} else {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
 		if !ok {
 			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("custom inbound active rate limiter not found")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
-		}
-		ccipContext.Values[string(common.RateLimiterKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	}
 
