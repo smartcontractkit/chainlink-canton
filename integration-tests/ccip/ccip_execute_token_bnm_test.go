@@ -536,7 +536,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partyCCIP,
-						// By setting the TokenStandard info, the Toke Pool API will return the necessary factory disclosures
+						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
 						BurnMintFactory: &config.BurnMintFactory{
 							Type:       config.FactoryTypeAddress,
 							TemplateId: new(link.LinkRegistry{}.GetTemplateID()),
@@ -574,7 +574,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
@@ -640,7 +640,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	// Deploy CCIPReceiver for receiver
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
@@ -700,7 +700,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	// in one receiver-authored transaction with disclosed shared dependencies.
 	_, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},

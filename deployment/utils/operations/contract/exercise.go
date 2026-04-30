@@ -172,7 +172,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 
 			submitResp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{
-					CommandId: uuid.Must(uuid.NewUUID()).String(),
+					CommandId: uuid.NewString(),
 					ActAs:     []string{participant.PartyID},
 					Commands: []*apiv2.Command{{
 						Command: &apiv2.Command_Exercise{
