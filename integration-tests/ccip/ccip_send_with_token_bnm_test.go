@@ -683,7 +683,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	linkHoldings, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), ccipParticipant, contracts.TemplateIDFromBinding(link.LinkHolding{}).ToLedgerIdentifier())
 	require.NoError(t, err)
-	require.NotZero(t, len(linkHoldings), "expected at least one active LinkHolding after minting")
+	require.NotEmpty(t, linkHoldings, "expected at least one active LinkHolding after minting")
 	t.Logf("Minted 100 LINK to ccipOwner. Current LINK holdings %v", len(linkHoldings))
 	for _, holding := range linkHoldings {
 		t.Logf("- Holding CID: %s", holding.GetCreatedEvent().GetContractId())
