@@ -35,31 +35,36 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/link"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_burn_mint_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/linkregistry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
@@ -78,11 +83,11 @@ import (
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
-// TestCCIPSendWithTokenTransferFeeBps tests full send flow with token transfer.
+// TestBnMTokenPool_FullSendFlow tests full send flow with token transfer.
 // Validates LockOrBurn deducts proportional feeBps from encoded token amount.
 //
 //nolint:paralleltest // We can't run this test in parallel as that would mix up the holding calculations
-func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
+func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
 
 	ccipParticipant := env.Chain.Participants[0]
@@ -115,12 +120,14 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err)
 	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
 	require.NoError(t, err)
-	lockReleaseTokenPoolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPool, contracts.CurrentVersion)
+	tokenPoolDar, err := contracts.GetDar(contracts.CCIPBurnMintTokenPool, contracts.CurrentVersion)
+	require.NoError(t, err)
+	linkTokenDar, err := contracts.GetDar(contracts.Link, contracts.CurrentVersion)
 	require.NoError(t, err)
 	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	dars := [][]byte{commonDar, offRampDar, onRampDar, feeQuoterDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar, rmnDar, ccipSenderDar, ccipExecutorDar, lockReleaseTokenPoolDar, ccipTestDar}
+	dars := [][]byte{commonDar, offRampDar, onRampDar, feeQuoterDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar, rmnDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, linkTokenDar, ccipTestDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -161,7 +168,11 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		Admin: types.PARTY(registryAdmin),
 		Id:    types.TEXT("Amulet"),
 	}
-	hashedInstrumentId := contracts.EncodeInstrumentID(nativeInstrumentId)
+	linkInstrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(partyCCIP),
+		Id:    "ChainLink",
+	}
+	hashedLinkInstrumentId := contracts.EncodeInstrumentID(linkInstrumentId)
 
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
@@ -356,6 +367,20 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	cldfEnv.DataStore = runningDs.Seal()
 	t.Log("Configured chain for lanes")
 
+	// Deploy Link Token
+	linkTokenOut, err := cld_ops.ExecuteOperation(bundle, linkregistry.Deploy, env.Chain, contractops.DeployInput[link.LinkRegistry]{
+		OwnerParty: types.PARTY(partyCCIP),
+		Template: link.LinkRegistry{
+			RegistryAdmin:        types.PARTY(partyCCIP),
+			RegistryInstrumentId: linkInstrumentId,
+			RegistryMeta:         splice_api_token_metadata_v1.Metadata{},
+			TransferPreapprovals: nil,
+		},
+	})
+	require.NoError(t, err)
+	linkRegistryAddress, err := contracts.RawInstanceAddressFromString(linkTokenOut.Output.Labels.List()[0])
+	require.NoError(t, err)
+
 	// Setup token pool for outbound token transfer in Send.
 	poolInstanceID := "test-pool-send"
 	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
@@ -378,14 +403,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	outboundRateLimiterAddr, err := contracts.RawInstanceAddressFromString(outboundRateLimiterRawAddr)
 	require.NoError(t, err, "failed to parse outbound rate limiter raw address")
 
-	// Create TransferPreapproval to be set in the pool's PoolReceiveContext
-	ccipOwnerHoldingCid, err := testhelpers.MintAMT(t.Context(), ccipParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partyCCIP, "100")
-	require.NoError(t, err, "failed to mint AMT for CCIP owner")
-	t.Logf("Minted 100 Amulet to ccipOwner, Holding CID: %s", ccipOwnerHoldingCid)
-	preapprovalCid, err := testhelpers.CreateTransferPreapproval(t.Context(), ccipParticipant, scanProxyClient, partyCCIP, ccipOwnerHoldingCid)
-	require.NoError(t, err, "failed to create preapproval")
-	t.Log("Created Amulet Preapproval, Cid: ", preapprovalCid)
-
 	// Pool transfer amounts use the token's smallest units; with Amulet's 10 token
 	// decimals, a transfer amount of 100 means 100 local units and a 5% bps fee
 	// floors to 5.
@@ -394,17 +411,17 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
-	out, err = changesets.DeployLockReleaseTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployLockReleaseTokenPoolConfig]{
+	out, err = changesets.DeployBurnMintTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployBurnMintTokenPoolConfig]{
 		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   1,
-		Config: changesets.DeployLockReleaseTokenPoolConfig{
+		Config: changesets.DeployBurnMintTokenPoolConfig{
 			CcipOwner:    partyCCIP,
 			PoolOwner:    partyCCIP,
-			InstrumentId: nativeInstrumentId,
+			InstrumentId: linkInstrumentId,
 			Decimals:     10,
 			InstanceID:   poolInstanceID,
-			RemoteChainConfigs: map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{
-				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): lockreleasetokenpool.RemoteChainConfig{
+			RemoteChainConfigs: map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{
+				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): burnminttokenpool.RemoteChainConfig{
 					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
 					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
 					InboundCCVs:        []mcms.RawInstanceAddress{},
@@ -416,7 +433,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				},
 			},
 			// Set a custom token transfer fee config
-			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{
+			TokenTransferFeeConfigs: map[types.NUMERIC]burnminttokenpool.TokenTransferFeeConfig{
 				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
 					IsEnabled:         types.BOOL(true),
 					DestGasOverhead:   types.INT64(25_000),
@@ -425,11 +442,11 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					FeeBps:            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
 				},
 			},
-			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
-			TransferTimeout: lockreleasetokenpool.TransferTimeout{
+			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+			TransferTimeout: burnminttokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
-			Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
+			Deps: burnminttokenpool.BurnMintTokenPoolDeps{
 				TokenAdminRegistry: tokenAdminRegistryAddress.Binding(),
 				RmnRemote:          rmnRemoteAddress.Binding(),
 				FeeQuoter:          feeQuoterAddress.Binding(),
@@ -438,11 +455,11 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TokenAdminRegistryInstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 		},
 	})
-	require.NoError(t, err, "failed to deploy lock release token pool via changeset")
+	require.NoError(t, err, "failed to deploy burn mint token pool via changeset")
 	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
 	cldfEnv.DataStore = out.DataStore.Seal()
-	_, tokenPoolAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), lock_release_token_pool.ContractType, lock_release_token_pool.Version, "")
+	_, tokenPoolAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), burn_mint_token_pool.ContractType, burn_mint_token_pool.Version, "")
 	require.NoError(t, err, "failed to get Token Pool address")
 
 	// Run EDS
@@ -523,25 +540,18 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				Enabled: true,
 				TokenPools: []config.TokenPool{
 					{
-						Type: config.TokenPoolTypeLockRelease,
+						Type: config.TokenPoolTypeBurnMint,
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partyCCIP,
 						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
-						TransferFactory: &config.TransferFactory{
-							Type:             config.FactoryTypeURL,
-							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
-							TokenStandardAuthConfig: &commonconfig.AuthConfig{
-								Type: commonconfig.AuthTypeInsecureStatic,
-								JWT:  edsToken.AccessToken,
-							},
-						},
-						// By setting the TransferPreapproval, the Token Pool API will return it as part of its transfer context.
-						TransferPreapproval: &config.TransferPreapproval{
-							ContextKey: "transfer-preapproval",
-							TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
+						BurnMintFactory: &config.BurnMintFactory{
+							Type:       config.FactoryTypeAddress,
+							TemplateId: new(link.LinkRegistry{}.GetTemplateID()),
+							Party:      new(partyCCIP),
+							Address:    new(linkRegistryAddress.InstanceAddress()),
 						},
 					},
 				},
@@ -576,7 +586,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	res, err := senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
@@ -613,7 +623,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Deploy CCIPSender for sender
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
@@ -639,9 +649,108 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
-	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
-	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
-	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
+
+	// Mint LINK
+	linkRegistryCid, err := contractops.FindActiveContractIDByInstanceAddress(t.Context(), ccipParticipant.LedgerServices.State, partyCCIP, contracts.TemplateIDFromBinding(link.LinkRegistry{}).String(), linkRegistryAddress.InstanceAddress())
+	require.NoError(t, err)
+	t.Logf("LinkRegistry ContractId: %v", linkRegistryCid)
+	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.NewString(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-burn-mint-v1", ModuleName: "Splice.Api.Token.BurnMintV1", EntityName: "BurnMintFactory"},
+					ContractId: linkRegistryCid,
+					Choice:     "BurnMintFactory_BurnMint",
+					ChoiceArgument: ledger.MapToValue(splice_api_token_burn_mint_v1.BurnMintFactoryBurnMint{
+						ExpectedAdmin:    types.PARTY(partyCCIP),
+						InstrumentId:     linkInstrumentId,
+						InputHoldingCids: nil,
+						Outputs: []splice_api_token_burn_mint_v1.BurnMintOutput{
+							{
+								Owner:   types.PARTY(partyCCIP),
+								Amount:  "100.0",
+								Context: splice_api_token_metadata_v1.ChoiceContext{},
+							},
+						},
+						ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{},
+					}),
+				}},
+			}},
+			ActAs: []string{partyCCIP},
+		},
+	})
+	require.NoError(t, err)
+	linkHoldings, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), ccipParticipant, contracts.TemplateIDFromBinding(link.LinkHolding{}).ToLedgerIdentifier())
+	require.NoError(t, err)
+	require.NotEmpty(t, linkHoldings, "expected at least one active LinkHolding after minting")
+	t.Logf("Minted 100 LINK to ccipOwner. Current LINK holdings %v", len(linkHoldings))
+	for _, holding := range linkHoldings {
+		t.Logf("- Holding CID: %s", holding.GetCreatedEvent().GetContractId())
+	}
+	// Transfer LINK to sender
+	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.NewString(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferFactory"},
+					ContractId: linkRegistryCid,
+					Choice:     "TransferFactory_Transfer",
+					ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferFactoryTransfer{
+						ExpectedAdmin: types.PARTY(partyCCIP),
+						Transfer: splice_api_token_transfer_instruction_v1.Transfer{
+							Sender:        types.PARTY(partyCCIP),
+							Receiver:      types.PARTY(partySender),
+							Amount:        "50.0",
+							InstrumentId:  linkInstrumentId,
+							RequestedAt:   types.TIMESTAMP(time.Now()),
+							ExecuteBefore: types.TIMESTAMP(time.Now().Add(1 * time.Hour)),
+							// Only using the last holding here - since that's the one that should have been minted just now
+							InputHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(linkHoldings[len(linkHoldings)-1].GetCreatedEvent().GetContractId())},
+							Meta:             splice_api_token_metadata_v1.Metadata{},
+						},
+						ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{},
+					}),
+				}},
+			}},
+			ActAs: []string{partyCCIP},
+		},
+	})
+	require.NoError(t, err)
+	// Wait for transaction to propagate
+	time.Sleep(time.Second * 5)
+	linkTransferInstructions, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), senderParticipant, contracts.TemplateIDFromBinding(link.LinkTransferInstruction{}).ToLedgerIdentifier())
+	require.NoError(t, err)
+	require.NotEmpty(t, linkTransferInstructions, "expected at least one active LinkTransferInstruction after initiating transfer")
+	t.Logf("Initiated transfer of 50 LINK to sender party. Current TransferInstructions %v", len(linkTransferInstructions))
+	// Accept incoming transfer
+	_, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.NewString(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferInstruction"},
+					ContractId: linkTransferInstructions[0].GetCreatedEvent().GetContractId(),
+					Choice:     "TransferInstruction_Accept",
+					ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferInstructionAccept{
+						ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{},
+					}),
+				}},
+			}},
+			ActAs: []string{partySender},
+		},
+	})
+	require.NoError(t, err)
+	senderLinkHoldings, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), senderParticipant, contracts.TemplateIDFromBinding(link.LinkHolding{}).ToLedgerIdentifier())
+	require.NoError(t, err)
+	t.Logf("Accepted transfer of 50 LINK to sender party. Current holdings:")
+	senderHoldingCids := make([]types.CONTRACT_ID, len(linkHoldings))
+	for i, holding := range senderLinkHoldings {
+		t.Logf("- Holding CID: %s", holding.GetCreatedEvent().GetContractId())
+		senderHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
+	}
+
 	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
@@ -706,13 +815,13 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		TokenTransfer: &oapiCommon.TokenTransfer{
 			Amount: tokenTransferAmountDecimal,
 			Token: oapiCommon.InstrumentId{
-				Admin: oapiCommon.PartyId(nativeInstrumentId.Admin),
-				Id:    string(nativeInstrumentId.Id),
+				Admin: oapiCommon.PartyId(linkInstrumentId.Admin),
+				Id:    string(linkInstrumentId.Id),
 			},
 		},
 	}
 
-	tokenPoolAddressEDS, err := edsTesthelpers.GetTokenPoolForToken(t.Context(), ccipAPIClient, hashedInstrumentId)
+	tokenPoolAddressEDS, err := edsTesthelpers.GetTokenPoolForToken(t.Context(), ccipAPIClient, hashedLinkInstrumentId)
 	require.NoError(t, err)
 	tokenPoolSendDisclosure, err := edsTesthelpers.GetTokenPoolSendDisclosure(t.Context(), tokenPoolAPIClient, msg, tokenPoolAddressEDS.InstanceAddress())
 	require.NoError(t, err)
@@ -738,7 +847,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
 			TokenTransfer: &ccipclient.TokenTransfer{
-				Token:  nativeInstrumentId,
+				Token:  linkInstrumentId,
 				Amount: types.NUMERIC(tokenTransferAmountDecimal),
 			},
 			FeeToken: nativeInstrumentId,
@@ -763,15 +872,18 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			},
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
-			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
-			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-				Context: splice_api_token_metadata_v1.ChoiceContext{
-					Values: transferFactoryContextValues,
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			TokenInput: interfaces.TokenInput{
+				TransferFactory: types.CONTRACT_ID(transferFactoryCid),
+				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+					Context: splice_api_token_metadata_v1.ChoiceContext{
+						Values: transferFactoryContextValues,
+					},
+					Meta: splice_api_token_metadata_v1.Metadata{
+						Values: map[string]types.TEXT{},
+					},
 				},
-				Meta: splice_api_token_metadata_v1.Metadata{
-					Values: map[string]types.TEXT{},
-				},
+				TokenPoolHoldings: []types.CONTRACT_ID{},
 			},
 		},
 		CcvSendInputs: []ccipsender.CCVSendInput{
@@ -782,9 +894,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			},
 		},
 		TokenTransferInput: &ccipsender.TokenTransferInput{
-			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
+			SenderInputCids:  senderHoldingCids,
 			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
 			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+			TokenInput:       tokenPoolSendDisclosure.TokenInput,
 		},
 		ExecutorInput: &ccipsender.ExecutorInput{
 			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
@@ -809,7 +922,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction.
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
@@ -878,30 +991,4 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("  Original payload: %s", string(testPayload))
 
 	t.Logf("✅ Success")
-}
-
-// extractTokenTransferAmountFromEncodedMessageHex decodes encodedMessage and returns
-// tokenTransfer.amount (uint256 big-endian) from the token-transfer payload.
-// It skips the fixed CCIP message prefix, short variable fields, and destination blob,
-// then reads the amount from bytes [1:33] of tokenTransfer (byte 0 is version/tag).
-func extractTokenTransferAmountFromEncodedMessageHex(t *testing.T, encodedMessageHex string) int64 {
-	t.Helper()
-
-	b, err := hex.DecodeString(encodedMessageHex)
-	require.NoError(t, err, "decode encodedMessage")
-
-	i := 1 + 8 + 8 + 8 + 4 + 4 + 4 + 32
-	for range 4 {
-		i += 1 + int(b[i])
-	}
-	destBlobLen := int(b[i])<<8 | int(b[i+1])
-	i += 2 + destBlobLen
-	i += 2
-
-	amt := int64(0)
-	for _, x := range b[i+25 : i+33] {
-		amt = (amt << 8) | int64(x)
-	}
-
-	return amt
 }

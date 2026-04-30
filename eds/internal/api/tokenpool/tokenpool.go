@@ -334,7 +334,7 @@ func (s Server) burnMintTokenPoolSend(
 
 	// Get BurnMintFactory (if enabled)
 	var factoryDisclosures []oapiCommon.DisclosedContract
-	if cfg.transferFactory != nil {
+	if cfg.burnMintFactory != nil {
 		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
