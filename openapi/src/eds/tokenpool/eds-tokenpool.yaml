@@ -85,33 +85,6 @@ tags:
 
 components:
   schemas:
-    TokenInput:
-      type: object
-      description: The token input for the token transfer.
-      required:
-        - transferFactory
-        - extraArgs
-        - tokenPoolHoldings
-      properties:
-        transferFactory:
-          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
-        burnMintFactory:
-          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
-        extraArgs:
-          type: object
-          required:
-            - metadata
-            - context
-          properties:
-            metadata:
-              type: object
-            context:
-              type: object
-        tokenPoolHoldings:
-          type: array
-          items:
-            $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
-
     TokenPoolSendRequest:
       type: object
       required:
@@ -127,7 +100,6 @@ components:
         - rawInstanceAddress
         - requiredCCVs
         - contextData
-        - tokenInput
         - disclosedContracts
       properties:
         contractId:
@@ -143,8 +115,6 @@ components:
         contextData:
           type: object
           description: The context to be passed along to the token pool.
-        tokenInput:
-          $ref: "#/components/schemas/TokenInput"
         disclosedContracts:
           type: array
           items:
@@ -166,7 +136,6 @@ components:
         - rawInstanceAddress
         - requiredCCVs
         - contextData
-        - tokenInput
         - disclosedContracts
       properties:
         contractId:
@@ -182,8 +151,6 @@ components:
         contextData:
           type: object
           description: The context to be passed along to the token pool.
-        tokenInput:
-          $ref: "#/components/schemas/TokenInput"
         disclosedContracts:
           type: array
           items:

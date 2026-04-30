@@ -25,9 +25,11 @@ import CCIP.BurnMintTokenPoolTypes (
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
     )
-import CCIP.ContextCodec (encodeCCIPContext)
+import CCIP.ContextCodec (encodeChoiceContext)
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import qualified CCIP.Context
+
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 mkFinalityConfig n =
   if n == 0
@@ -64,7 +66,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetDynamicConfig = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -113,7 +115,7 @@ testBurnMintTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -187,7 +189,7 @@ testBurnMintTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.fromList [(123.0, existingConfig)]
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = RelativeHours 24
             deps = dummyPoolDeps ccipOwner
 
@@ -276,7 +278,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.fromList [(123.0, existingConfig)]
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -338,7 +340,7 @@ testBurnMintTokenPoolMCMSEntrypoint_UnknownFunction = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -373,7 +375,7 @@ testBurnMintTokenPoolMCMSEntrypoint_InvalidParams = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+            poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -408,7 +410,7 @@ testBurnMintTokenPoolMCMSEntrypoint_MissingSelfCid = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -492,7 +494,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetPoolReceiveContext = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -500,8 +502,8 @@ testBurnMintTokenPoolMCMSEntrypoint_SetPoolReceiveContext = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Create new context with text values
-    let newContext = CCIP.Context.CCIPContext (TextMap.fromList [("key1", CCIP.Context.AV_Text "value1"), ("key2", CCIP.Context.AV_Int 42)])
-    let encodedParams = encodeCCIPContext newContext
+    let newContext = MetadataV1.ChoiceContext (TextMap.fromList [("key1", MetadataV1.AV_Text "value1"), ("key2", MetadataV1.AV_Int 42)])
+    let encodedParams = encodeChoiceContext newContext
 
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -524,7 +526,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetPoolReceiveContext_Empty = script do
 
     let instanceId = "pool-context-empty-test"
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "LINK"
-        initialContext = CCIP.Context.CCIPContext (TextMap.fromList [("existing", CCIP.Context.AV_Text "data")])
+        initialContext = MetadataV1.ChoiceContext (TextMap.fromList [("existing", MetadataV1.AV_Text "data")])
 
     -- Create BurnMintTokenPool with non-empty context
     poolCid <- submit poolOwner do
@@ -545,8 +547,8 @@ testBurnMintTokenPoolMCMSEntrypoint_SetPoolReceiveContext_Empty = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Reset to empty context
-    let emptyContext = CCIP.Context.emptyCCIPContext
-    let encodedParams = encodeCCIPContext emptyContext
+    let emptyContext = MetadataV1.emptyChoiceContext
+    let encodedParams = encodeChoiceContext emptyContext
 
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -584,7 +586,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetTransferTimeout_Indefinite = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = RelativeHours 24
             deps = dummyPoolDeps ccipOwner
 
@@ -627,7 +629,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetTransferTimeout_RelativeHours = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -670,7 +672,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetTransferTimeout_InvalidData = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 

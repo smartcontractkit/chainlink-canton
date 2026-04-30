@@ -41,7 +41,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
@@ -622,30 +621,27 @@ func TestCCIPSend(t *testing.T) {
 			},
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
-			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			TokenInput: interfaces.TokenInput{
-				TransferFactory: types.CONTRACT_ID(transferFactoryCid),
-				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: splice_api_token_metadata_v1.ChoiceContext{
-						Values: transferFactoryContextValues,
-					},
-					Meta: splice_api_token_metadata_v1.Metadata{
-						Values: map[string]types.TEXT{},
-					},
+			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+				Context: splice_api_token_metadata_v1.ChoiceContext{
+					Values: transferFactoryContextValues,
 				},
-				TokenPoolHoldings: []types.CONTRACT_ID{},
+				Meta: splice_api_token_metadata_v1.Metadata{
+					Values: map[string]types.TEXT{},
+				},
 			},
 		},
 		CcvSendInputs: []ccipsender.CCVSendInput{
 			{
 				CcvAddress:      ccvSendDisclosure.Address.Binding(),
 				CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-				CcvExtraContext: common.CCIPContext{},
+				CcvExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
 			},
 		},
 		ExecutorInput: &ccipsender.ExecutorInput{
 			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-			ExecutorExtraContext: common.CCIPContext{},
+			ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
 		},
 	}
 

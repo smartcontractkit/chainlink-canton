@@ -105,7 +105,7 @@ chain_selector = "8706591216959472610"
 		pool_owner = "tokenPoolOwner"
 		[token_pool_api.token_pools.burn_mint_factory]
 			type = "address"
-			address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
+			instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
 			template_id = "#link:Link.Token:LinkToken"
 			party = "linkOwner"
 		[token_pool_api.token_pools.transfer_preapproval]
@@ -202,10 +202,10 @@ chain_selector = "8706591216959472610"
 							},
 							PoolOwner: "tokenPoolOwner",
 							BurnMintFactory: &BurnMintFactory{
-								Type:       FactoryTypeAddress,
-								TemplateId: new("#link:Link.Token:LinkToken"),
-								Party:      new("linkOwner"),
-								Address:    new(contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011")),
+								Type:            FactoryTypeAddress,
+								TemplateId:      new("#link:Link.Token:LinkToken"),
+								Party:           new("linkOwner"),
+								InstanceAddress: new(contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011")),
 							},
 							TransferPreapproval: &TransferPreapproval{
 								ContextKey: "transfer-preapproval",

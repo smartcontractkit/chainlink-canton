@@ -22,6 +22,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -33,7 +35,6 @@ import (
 	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
@@ -42,7 +43,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/link"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
@@ -442,7 +442,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 					FeeBps:            types.NUMERIC(strconv.Itoa(tokenTransferFeeBps)),
 				},
 			},
-			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 			TransferTimeout: burnminttokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
@@ -548,10 +548,10 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 						PoolOwner: partyCCIP,
 						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
 						BurnMintFactory: &config.BurnMintFactory{
-							Type:       config.FactoryTypeAddress,
-							TemplateId: new(link.LinkRegistry{}.GetTemplateID()),
-							Party:      new(partyCCIP),
-							Address:    new(linkRegistryAddress.InstanceAddress()),
+							Type:            config.FactoryTypeAddress,
+							TemplateId:      new(link.LinkRegistry{}.GetTemplateID()),
+							Party:           new(partyCCIP),
+							InstanceAddress: new(linkRegistryAddress.InstanceAddress()),
 						},
 					},
 				},
@@ -872,18 +872,15 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			},
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
-			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			TokenInput: interfaces.TokenInput{
-				TransferFactory: types.CONTRACT_ID(transferFactoryCid),
-				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: splice_api_token_metadata_v1.ChoiceContext{
-						Values: transferFactoryContextValues,
-					},
-					Meta: splice_api_token_metadata_v1.Metadata{
-						Values: map[string]types.TEXT{},
-					},
+			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+				Context: splice_api_token_metadata_v1.ChoiceContext{
+					Values: transferFactoryContextValues,
 				},
-				TokenPoolHoldings: []types.CONTRACT_ID{},
+				Meta: splice_api_token_metadata_v1.Metadata{
+					Values: map[string]types.TEXT{},
+				},
 			},
 		},
 		CcvSendInputs: []ccipsender.CCVSendInput{
@@ -897,7 +894,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			SenderInputCids:  senderHoldingCids,
 			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
 			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
-			TokenInput:       tokenPoolSendDisclosure.TokenInput,
 		},
 		ExecutorInput: &ccipsender.ExecutorInput{
 			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),

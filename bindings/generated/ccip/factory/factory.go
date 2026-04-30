@@ -20,6 +20,7 @@ import (
 	tokenadminregistry "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -37,7 +38,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "e84dfc9b179937f6f09407eb3f37a65648e102de325f03984d18063258cf2eb9"
+	PackageID   = "5ab035c46ab1ca49215ecae66d5a29a8d4b68c73701acfcbe2d4adefa4a7a332"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1113,17 +1114,17 @@ func (t *DeployLockReleaseTokenPool) UnmarshalHex(data string) error {
 
 // DeployLockReleaseTokenPoolParams is a Record type
 type DeployLockReleaseTokenPoolParams struct {
-	InstanceId         types.TEXT                               `json:"instanceId"`
-	PoolOwner          types.PARTY                              `json:"poolOwner"`
-	CcipOwner          types.PARTY                              `json:"ccipOwner"`
-	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals           types.INT64                              `json:"decimals"`
-	RateLimitAdmin     *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
-	TokenAdminRegistry mcms.RawInstanceAddress                  `json:"tokenAdminRegistry"`
-	FeeQuoter          mcms.RawInstanceAddress                  `json:"feeQuoter"`
-	RmnRemote          mcms.RawInstanceAddress                  `json:"rmnRemote"`
-	PoolReceiveContext common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout    lockreleasetokenpool.TransferTimeout     `json:"transferTimeout"`
+	InstanceId         types.TEXT                                 `json:"instanceId"`
+	PoolOwner          types.PARTY                                `json:"poolOwner"`
+	CcipOwner          types.PARTY                                `json:"ccipOwner"`
+	InstrumentId       splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Decimals           types.INT64                                `json:"decimals"`
+	RateLimitAdmin     *types.PARTY                               `json:"rateLimitAdmin" hex:"optional"`
+	TokenAdminRegistry mcms.RawInstanceAddress                    `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress                    `json:"feeQuoter"`
+	RmnRemote          mcms.RawInstanceAddress                    `json:"rmnRemote"`
+	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
+	TransferTimeout    lockreleasetokenpool.TransferTimeout       `json:"transferTimeout"`
 }
 
 // ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments

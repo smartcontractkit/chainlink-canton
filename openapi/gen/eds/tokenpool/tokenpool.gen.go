@@ -18,20 +18,6 @@ import (
 	externalRef0 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
-// TokenInput The token input for the token transfer.
-type TokenInput struct {
-	// BurnMintFactory The unique identifier of a contract.
-	BurnMintFactory *externalRef0.ContractId `json:"burnMintFactory,omitempty"`
-	ExtraArgs       struct {
-		Context  map[string]interface{} `json:"context"`
-		Metadata map[string]interface{} `json:"metadata"`
-	} `json:"extraArgs"`
-	TokenPoolHoldings []externalRef0.ContractId `json:"tokenPoolHoldings"`
-
-	// TransferFactory The unique identifier of a contract.
-	TransferFactory externalRef0.ContractId `json:"transferFactory"`
-}
-
 // TokenPoolExecuteRequest defines model for TokenPoolExecuteRequest.
 type TokenPoolExecuteRequest struct {
 	// EncodedMessage The CCIP message to be executed, encoded as a hex string.
@@ -53,9 +39,6 @@ type TokenPoolExecuteResponse struct {
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
 	RawInstanceAddress externalRef0.RawInstanceAddress   `json:"rawInstanceAddress"`
 	RequiredCCVs       []externalRef0.RawOrHashedAddress `json:"requiredCCVs"`
-
-	// TokenInput The token input for the token transfer.
-	TokenInput TokenInput `json:"tokenInput"`
 }
 
 // TokenPoolSendRequest defines model for TokenPoolSendRequest.
@@ -79,9 +62,6 @@ type TokenPoolSendResponse struct {
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
 	RawInstanceAddress externalRef0.RawInstanceAddress   `json:"rawInstanceAddress"`
 	RequiredCCVs       []externalRef0.RawOrHashedAddress `json:"requiredCCVs"`
-
-	// TokenInput The token input for the token transfer.
-	TokenInput TokenInput `json:"tokenInput"`
 }
 
 // PostTokenPoolExecuteJSONRequestBody defines body for PostTokenPoolExecute for application/json ContentType.

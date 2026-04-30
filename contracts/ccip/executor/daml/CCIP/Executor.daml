@@ -6,9 +6,11 @@ import DA.List (dedup)
 import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.Map as Map
 
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
-import qualified CCIP.Context
+
 import qualified CCIP.FinalityConfig
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.SendingMessageV1
@@ -121,7 +123,7 @@ template Executor
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 executorArgs : BytesHex
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : ChoiceContext
                 caller : Party
             controller caller
             do
