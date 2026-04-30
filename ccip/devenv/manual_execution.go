@@ -49,11 +49,11 @@ func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error)
 	}
 }
 
-// DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
+// deployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
-func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Participant, partyId string) (routerAddress contracts.InstanceAddress, err error) {
+func (c *Chain) deployPerPartyRouter(ctx context.Context, participant canton.Participant, partyId string) (routerAddress contracts.InstanceAddress, err error) {
 	// Create PerPartyRouter (ignore error if it exists already)
-	perPartyRouterFactoryDisclosure, err := c.GetPerPartyRouterFactoryDisclosure(ctx, partyId)
+	perPartyRouterFactoryDisclosure, err := c.getPerPartyRouterFactoryDisclosure(ctx, partyId)
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to get canton per party router factory disclosure: %w", err)
 	}
@@ -82,7 +82,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 	return routerAddress, nil
 }
 
-func (c *Chain) DeployCCIPReceiver(partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
+func (c *Chain) deployCCIPReceiver(partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
 	finalityConfig, err := encodeReceiverFinalityConfig(receiverFinality)
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to encode receiver finality config: %w", err)
@@ -120,14 +120,14 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Deploy PerPartyRouter for the receiver party
-	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, executingParty)
+	routerAddress, err := c.deployPerPartyRouter(ctx, participant, executingParty)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
 	c.logger.Debug().Str("RouterAddress", routerAddress.String()).Msg("Deployed PerPartyRouter")
 
 	// Deploy CCIPReceiver contract
-	receiverAddress, err := c.DeployCCIPReceiver(executingParty, int64(message.Finality))
+	receiverAddress, err := c.deployCCIPReceiver(executingParty, int64(message.Finality))
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy CCIPReceiver contract: %w", err)
 	}
@@ -151,7 +151,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 	// Collect disclosures
 	// CCIP
-	ccipExecuteDisclosure, err := c.GetCCIPExecuteDisclosure(ctx, encodedMessageHex)
+	ccipExecuteDisclosure, err := c.getCCIPExecuteDisclosure(ctx, encodedMessageHex)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCIP execute disclosure: %w", err)
 	}
@@ -166,7 +166,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 	// CCVs
 	for i, verifier := range ccvs {
-		ccvExecuteDisclosure, err := c.GetCCVExecuteDisclosure(ctx, encodedMessageHex, verifier)
+		ccvExecuteDisclosure, err := c.getCCVExecuteDisclosure(ctx, encodedMessageHex, verifier)
 		if err != nil {
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCV execute disclosure for verifier %s: %w", verifier.String(), err)
 		}
@@ -182,12 +182,12 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	// Token Pool
 	if message.TokenTransfer != nil {
 		hashedInstrumentId := contracts.BytesToEncodedInstrumentID(message.TokenTransfer.DestTokenAddress)
-		tokenPoolAddress, err := c.GetTokenPoolForToken(ctx, hashedInstrumentId)
+		tokenPoolAddress, err := c.getTokenPoolForToken(ctx, hashedInstrumentId)
 		if err != nil {
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get token pool for token %s: %w", hashedInstrumentId.String(), err)
 		}
 
-		tokenPoolDisclosure, err := c.GetTokenPoolExecuteDisclosure(ctx, encodedMessageHex, tokenPoolAddress.InstanceAddress())
+		tokenPoolDisclosure, err := c.getTokenPoolExecuteDisclosure(ctx, encodedMessageHex, tokenPoolAddress.InstanceAddress())
 		if err != nil {
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get token pool execute disclosure: %w", err)
 		}

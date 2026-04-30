@@ -41,7 +41,7 @@ func (c *Chain) getEDSOutput() (*output, error) {
 	return edsOut, nil
 }
 
-func (c *Chain) GetPerPartyRouterFactoryDisclosure(ctx context.Context, partyId string) (*edsTesthelpers.PerPartyRouterFactoryDisclosure, error) {
+func (c *Chain) getPerPartyRouterFactoryDisclosure(ctx context.Context, partyId string) (*edsTesthelpers.PerPartyRouterFactoryDisclosure, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (c *Chain) GetPerPartyRouterFactoryDisclosure(ctx context.Context, partyId 
 	return edsTesthelpers.GetPerPartyRouterFactoryDisclosure(ctx, ccipAPIClient, partyId)
 }
 
-func (c *Chain) GetTokenPoolForToken(ctx context.Context, token contracts.EncodedInstrumentID) (contracts.RawInstanceAddress, error) {
+func (c *Chain) getTokenPoolForToken(ctx context.Context, token contracts.EncodedInstrumentID) (contracts.RawInstanceAddress, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return contracts.RawInstanceAddress(""), err
@@ -67,7 +67,7 @@ func (c *Chain) GetTokenPoolForToken(ctx context.Context, token contracts.Encode
 	return edsTesthelpers.GetTokenPoolForToken(ctx, ccipAPIClient, token)
 }
 
-func (c *Chain) GetTokenPoolSendDisclosure(ctx context.Context, message oapiCommon.Message, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolSendDisclosure, error) {
+func (c *Chain) getTokenPoolSendDisclosure(ctx context.Context, message oapiCommon.Message, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolSendDisclosure, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func (c *Chain) GetTokenPoolSendDisclosure(ctx context.Context, message oapiComm
 	return edsTesthelpers.GetTokenPoolSendDisclosure(ctx, tokenPoolAPIClient, message, tokenPoolAddress)
 }
 
-func (c *Chain) GetCCIPSendDisclosure(ctx context.Context, message oapiCommon.Message, senderRequiredCCVs, tokenPoolRequiredCCVs []string) (*edsTesthelpers.CCIPSendDisclosure, error) {
+func (c *Chain) getCCIPSendDisclosure(ctx context.Context, message oapiCommon.Message, senderRequiredCCVs, tokenPoolRequiredCCVs []string) (*edsTesthelpers.CCIPSendDisclosure, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (c *Chain) GetCCIPSendDisclosure(ctx context.Context, message oapiCommon.Me
 	return edsTesthelpers.GetCCIPSendDisclosure(ctx, ccipAPIClient, message, senderRequiredCCVs, tokenPoolRequiredCCVs)
 }
 
-func (c *Chain) GetCCVSendDisclosure(ctx context.Context, message oapiCommon.Message, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVSendDisclosure, error) {
+func (c *Chain) getCCVSendDisclosure(ctx context.Context, message oapiCommon.Message, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVSendDisclosure, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (c *Chain) GetCCVSendDisclosure(ctx context.Context, message oapiCommon.Mes
 	return edsTesthelpers.GetCCVSendDisclosure(ctx, ccvAPIClient, message, ccvAddress)
 }
 
-func (c *Chain) GetExecutorSendDisclosure(ctx context.Context, message oapiCommon.Message, executorAddress contracts.InstanceAddress, ccvAddresses []string) (*edsTesthelpers.ExecutorDisclosure, error) {
+func (c *Chain) getExecutorSendDisclosure(ctx context.Context, message oapiCommon.Message, executorAddress contracts.InstanceAddress, ccvAddresses []string) (*edsTesthelpers.ExecutorDisclosure, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (c *Chain) GetExecutorSendDisclosure(ctx context.Context, message oapiCommo
 	return edsTesthelpers.GetExecutorSendDisclosure(ctx, executorAPIClient, message, executorAddress, ccvAddresses)
 }
 
-func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessageHex string, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolExecuteDisclosure, error) {
+func (c *Chain) getTokenPoolExecuteDisclosure(ctx context.Context, encodedMessageHex string, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolExecuteDisclosure, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessag
 	return edsTesthelpers.GetTokenPoolExecuteDisclosure(ctx, tokenPoolAPIClient, encodedMessageHex, tokenPoolAddress)
 }
 
-func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex string) (*edsTesthelpers.CCIPExecuteDisclosure, error) {
+func (c *Chain) getCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex string) (*edsTesthelpers.CCIPExecuteDisclosure, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex 
 	return edsTesthelpers.GetCCIPExecuteDisclosure(ctx, ccipAPIClient, encodedMessageHex)
 }
 
-func (c *Chain) GetCCVExecuteDisclosure(ctx context.Context, encodedMessageHex string, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVExecuteDisclosure, error) {
+func (c *Chain) getCCVExecuteDisclosure(ctx context.Context, encodedMessageHex string, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVExecuteDisclosure, error) {
 	edsOut, err := c.getEDSOutput()
 	if err != nil {
 		return nil, err

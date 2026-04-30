@@ -877,6 +877,10 @@ func (c *Chain) GetUserNonce(ctx context.Context, userAddress protocol.UnknownAd
 	return 0, nil // TODO: implement
 }
 
+func (c *Chain) PrepareSendPrerequisites(ctx context.Context, fields cciptestinterfaces.MessageFields) error {
+	return nil
+}
+
 // SendMessage implements cciptestinterfaces.CCIP17.
 func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions) (cciptestinterfaces.MessageSentEvent, error) {
 	participant := c.chain.Participants[0]
@@ -885,7 +889,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	seqNo := c.nextSeq + 1
 
 	// Router for sender party.
-	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, party)
+	routerAddress, err := c.deployPerPartyRouter(ctx, participant, party)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
@@ -914,6 +918,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Admin: types.PARTY(registryAdmin),
 		Id:    types.TEXT("Amulet"),
 	}
+
 	// Mint holding for sender
 	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
 	if err != nil {
@@ -1016,13 +1021,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 		// Get Token Pool
 		token := contracts.EncodeInstrumentID(feeTokenInstrument)
-		tokenPoolAddress, err := c.GetTokenPoolForToken(ctx, token)
+		tokenPoolAddress, err := c.getTokenPoolForToken(ctx, token)
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get token pool for token %s: %w", token.String(), err)
 		}
 
 		// Query Token Pool API
-		tokenPoolSendDisclosure, err := c.GetTokenPoolSendDisclosure(ctx, outgoingMessage, tokenPoolAddress.InstanceAddress())
+		tokenPoolSendDisclosure, err := c.getTokenPoolSendDisclosure(ctx, outgoingMessage, tokenPoolAddress.InstanceAddress())
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Token Pool Send disclosure for token pool at address %s: %w", tokenPoolAddress.String(), err)
 		}
@@ -1044,7 +1049,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	// CCIP
-	ccipSendDisclosure, err := c.GetCCIPSendDisclosure(ctx, outgoingMessage, senderRequiredCCVs, tokenPoolRequiredCCVs)
+	ccipSendDisclosure, err := c.getCCIPSendDisclosure(ctx, outgoingMessage, senderRequiredCCVs, tokenPoolRequiredCCVs)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get CCIP Send disclosure: %w", err)
 	}
@@ -1062,7 +1067,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			ccvAddress = contracts.HexToInstanceAddress(v)
 		}
 
-		ccvSendDisclosure, err := c.GetCCVSendDisclosure(ctx, outgoingMessage, ccvAddress)
+		ccvSendDisclosure, err := c.getCCVSendDisclosure(ctx, outgoingMessage, ccvAddress)
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get CCV Send disclosure for CCV %q: %w", v, err)
 		}
@@ -1088,7 +1093,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			executorAddress = contracts.HexToInstanceAddress(*ccipSendDisclosure.Executor)
 		}
 
-		executorSendDisclosure, err := c.GetExecutorSendDisclosure(ctx, outgoingMessage, executorAddress, allCCVs)
+		executorSendDisclosure, err := c.getExecutorSendDisclosure(ctx, outgoingMessage, executorAddress, allCCVs)
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Executor Send disclosure for Executor %q: %w", *ccipSendDisclosure.Executor, err)
 		}
