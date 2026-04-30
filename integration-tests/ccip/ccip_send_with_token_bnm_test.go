@@ -718,7 +718,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	linkTransferInstructions, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), ccipParticipant, contracts.TemplateIDFromBinding(link.LinkTransferInstruction{}).ToLedgerIdentifier())
+	// Wait for transaction to propagate
+	time.Sleep(time.Second * 5)
+	linkTransferInstructions, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), senderParticipant, contracts.TemplateIDFromBinding(link.LinkTransferInstruction{}).ToLedgerIdentifier())
 	require.NoError(t, err)
 	require.NotEmpty(t, linkTransferInstructions, "expected at least one active LinkTransferInstruction after initiating transfer")
 	t.Logf("Initiated transfer of 50 LINK to sender party. Current TransferInstructions %v", len(linkTransferInstructions))
