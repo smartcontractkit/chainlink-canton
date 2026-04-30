@@ -79,11 +79,11 @@ import (
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
-// TestCCIPSendWithTokenTransferFeeBps tests full send flow with token transfer.
+// TestLnRTokenPool_FullSendFlow tests full send flow with token transfer.
 // Validates LockOrBurn deducts proportional feeBps from encoded token amount.
 //
 //nolint:paralleltest // We can't run this test in parallel as that would mix up the holding calculations
-func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
+func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
 
 	ccipParticipant := env.Chain.Participants[0]
@@ -577,7 +577,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	res, err := senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
@@ -614,7 +614,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Deploy CCIPSender for sender
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
@@ -814,7 +814,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction.
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},

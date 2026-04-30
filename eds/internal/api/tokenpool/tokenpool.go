@@ -318,7 +318,7 @@ func (s Server) burnMintTokenPoolSend(
 		transferContext           common.CCIPContext
 		disclosedFactoryContracts = make([]oapiCommon.DisclosedContract, 0, 2)
 	)
-	if cfg.transferFactory != nil {
+	if cfg.burnMintFactory != nil {
 		burnMintFactory, disclosedFactoryContracts, err = cfg.burnMintFactory(c)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
@@ -376,7 +376,7 @@ func (s Server) burnMintTokenPoolSend(
 				Metadata: map[string]any{},
 			},
 			TokenPoolHoldings: nil,
-			TransferFactory:   "",
+			TransferFactory:   burnMintFactory, // TODO make this optional
 			BurnMintFactory:   new(burnMintFactory),
 		},
 		DisclosedContracts: append(
