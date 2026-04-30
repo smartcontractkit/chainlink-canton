@@ -161,5 +161,5 @@ func (s *KeyRotationFlowTestSuite) TestKeyRotationFlow() {
 		s.kmsConfigFor(2, "onboarding"),
 	}
 	_, recorders := s.runContractDeployFlow(t, s.PartyID, "post-rotation-contract-deploy", contractKMS)
-	assertRecordersUsed(t, recorders)
+	assertRecordersMatchKMSConfig(t, contractKMS, recorders)
 }

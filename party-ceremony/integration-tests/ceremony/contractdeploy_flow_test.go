@@ -33,7 +33,8 @@ func (s *ContractDeployFlowTestSuite) TestOnboardingFlow() {
 }
 
 // TestContractDeployFlow validates the contract deployment ceremony against a
-// real CTF Canton environment with 3 KMS-backed participants.
+// real CTF Canton environment. The KMS runner uses AWS KMS signing, while the
+// non-KMS runner uses the Canton vault signer.
 //
 // Flow:
 //   - Run 1 (p1): uploads DARs (1/3) → ErrThresholdNotMet
@@ -51,7 +52,7 @@ func (s *ContractDeployFlowTestSuite) TestContractDeployFlow() {
 		s.kmsConfigFor(2, "onboarding"),
 	}
 	sr, recorders := s.runContractDeployFlow(t, s.PartyID, "contract-deploy", kmsCfgs)
-	assertRecordersUsed(t, recorders)
+	assertRecordersMatchKMSConfig(t, kmsCfgs, recorders)
 	t.Logf("Package IDs: %v", sr.Output.PackageIDs)
 	t.Logf("Prepared TX hash: %s", sr.Output.PreparedTransactionHash)
 	t.Logf("Contract ID: %s", sr.Output.ContractID)

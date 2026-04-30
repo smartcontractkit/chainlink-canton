@@ -34,6 +34,8 @@ func (s *OnboardingFlowTestSuite) onboardingPartyPrefix() string {
 // provided reporter (so the caller may reuse it for idempotency checks) and
 // sets s.PartyID to the resulting party identifier.
 func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter operations.Reporter) operations.SequenceReport[onboarding.OnboardingInput, onboarding.OnboardingOutput] {
+	t.Helper()
+
 	input := onboarding.OnboardingInput{
 		NamespaceName:  s.onboardingNamespaceName(),
 		PartyPrefix:    s.onboardingPartyPrefix(),
@@ -99,7 +101,8 @@ func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter opera
 // ── Test ─────────────────────────────────────────────────────────────────────
 
 // TestOnboardingFlow validates the full 7-step decentralized party onboarding
-// ceremony against a real CTF Canton environment with 3 KMS-backed participants.
+// ceremony against a real CTF Canton environment. The suite is run once with
+// KMS-backed ceremony deps and once with generated local keys.
 //
 // The ceremony is async: each actor runs the OnboardingSequence independently,
 // sharing a MemoryReporter so cached operation results are visible across runs.

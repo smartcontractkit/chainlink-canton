@@ -4,6 +4,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -18,51 +19,67 @@ func TestCeremonies(t *testing.T) {
 	chain := env.Chain
 	require.Len(t, chain.Participants, 3, "expected 3 participants")
 
-	t.Run("CantonKMSHarnessSmokeSuite", func(t *testing.T) {
-		s := new(KMSHarnessSmokeSuite)
-		s.chain = chain
-		s.KMS = env.KMS
-		s.KMSRunName = "smoke"
-		suite.Run(t, s)
-	})
+	runCeremonySuites(t, chain, env.KMS, "", true)
+}
+
+func TestCeremoniesWithoutKMS(t *testing.T) {
+	chain, err := integrationtests.LoadChainWithCTF(t, 3)
+	require.NoError(t, err, "failed to load shared non-KMS Canton chain")
+	require.Len(t, chain.Participants, 3, "expected 3 participants")
+
+	runCeremonySuites(t, chain, nil, "non-kms-", false)
+}
+
+func runCeremonySuites(t *testing.T, chain *canton.Chain, kms *integrationtests.KMSRegistry, runNamePrefix string, includeKMSSmoke bool) {
+	t.Helper()
+
+	if includeKMSSmoke {
+		t.Run("CantonKMSHarnessSmokeSuite", func(t *testing.T) {
+			s := new(KMSHarnessSmokeSuite)
+			s.chain = chain
+			s.KMS = kms
+			s.KMSRunName = runNamePrefix + "smoke"
+			suite.Run(t, s)
+		})
+	}
 
 	t.Run("CantonOnboardingFlowTestSuite", func(t *testing.T) {
 		s := new(OnboardingFlowTestSuite)
 		s.chain = chain
-		s.KMS = env.KMS
-		s.KMSRunName = "onboarding"
+		s.KMS = kms
+		s.KMSRunName = runNamePrefix + "onboarding"
 		suite.Run(t, s)
 	})
 
 	t.Run("CantonKickFlowTestSuite", func(t *testing.T) {
 		s := new(KickFlowTestSuite)
 		s.chain = chain
-		s.KMS = env.KMS
-		s.KMSRunName = "kick"
+		s.KMS = kms
+		s.KMSRunName = runNamePrefix + "kick"
 		suite.Run(t, s)
 	})
 
 	t.Run("CantonContractDeployFlowTestSuite", func(t *testing.T) {
 		s := new(ContractDeployFlowTestSuite)
 		s.chain = chain
-		s.KMS = env.KMS
-		s.KMSRunName = "contract-deploy"
+		s.KMS = kms
+		s.KMSRunName = runNamePrefix + "contract-deploy"
 		suite.Run(t, s)
 	})
 
 	t.Run("CantonAddParticipantFlowTestSuite", func(t *testing.T) {
 		s := new(AddParticipantFlowTestSuite)
 		s.chain = chain
-		s.KMS = env.KMS
-		s.KMSRunName = "add-participant"
+		s.KMS = kms
+		s.KMSRunName = runNamePrefix + "add-participant"
 		suite.Run(t, s)
 	})
 
 	t.Run("CantonKeyRotationFlowTestSuite", func(t *testing.T) {
 		s := new(KeyRotationFlowTestSuite)
 		s.chain = chain
-		s.KMS = env.KMS
-		s.KMSRunName = "key-rotation"
+		s.KMS = kms
+		s.KMSRunName = runNamePrefix + "key-rotation"
 		suite.Run(t, s)
 	})
 }

@@ -111,10 +111,15 @@ func (s *CeremonyTestSuite) runContractDeployFlow(
 	return sr, recorders
 }
 
-func assertRecordersUsed(t *testing.T, recorders []*recordingKMSAPI) {
+func assertRecordersMatchKMSConfig(t *testing.T, kmsCfgs []client.KMSConfig, recorders []*recordingKMSAPI) {
 	t.Helper()
-	for i, recorder := range recorders {
-		require.NotNil(t, recorder, "participant %d should use KMS signer", i+1)
-		recorder.assertUsed(t)
+	require.Len(t, recorders, len(kmsCfgs), "one recorder slot per participant")
+	for i, kmsCfg := range kmsCfgs {
+		if kmsCfg.ProtocolKeyID == "" {
+			require.Nil(t, recorders[i], "participant %d should use vault signer", i+1)
+			continue
+		}
+		require.NotNil(t, recorders[i], "participant %d should use KMS signer", i+1)
+		recorders[i].assertUsed(t)
 	}
 }

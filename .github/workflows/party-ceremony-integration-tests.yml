@@ -1,7 +1,7 @@
 name: Party Ceremony Integration Tests
 on:
   push:
-    branches: [develop, main]
+    branches: [ develop, main ]
   pull_request:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,4 +21,4 @@ jobs:
       - name: Run Go tests
         run: |
           cd party-ceremony/integration-tests
-          go test -v -count=1 -timeout 20m ./ceremony -run TestCeremonies
+          make test-integration
