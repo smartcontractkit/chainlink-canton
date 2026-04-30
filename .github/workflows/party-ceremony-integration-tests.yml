@@ -20,5 +20,5 @@ jobs:
           go-version-file: party-ceremony/integration-tests/go.mod
       - name: Run Go tests
         run: |
-          cd party-ceremony/integration-tests
+          cd party-ceremony
           make test-integration
