@@ -1632,7 +1632,7 @@ testDecimalConversion_EqualDecimals = script do
     result2 === 42.0
     debug "testDecimalConversion_EqualDecimals: PASSED"
 
--- D-002/D-018: Scale-down (remote=18, local=6) truncates via mulDivDown.
+-- Scale-down (remote=18, local=6) truncates via mulDivDown.
 testDecimalConversion_ScaleDown : Script ()
 testDecimalConversion_ScaleDown = script do
     -- 1e18 in 18 decimals = 1 token -> 1e6 in 6 decimals

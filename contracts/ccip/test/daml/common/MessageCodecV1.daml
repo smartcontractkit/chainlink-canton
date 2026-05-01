@@ -3,7 +3,7 @@ module MessageCodecV1 where
 import Daml.Script
 
 import DA.Assert
-import DA.Crypto.Text (byteCount)
+import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Text qualified as Text
 import DA.Optional
 
@@ -22,6 +22,21 @@ finalityConfig n =
         flagsHex <- MessageCodecV1.encodeUint16 0
         blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex)))
+
+replaceBytes : Int -> Int -> BytesHex -> BytesHex -> BytesHex
+replaceBytes start len replacement bytes =
+    Text.take (start * 2) bytes
+        <> replacement
+        <> Text.drop ((start + len) * 2) bytes
+
+minimalEncodedTokenTransfer : BytesHex -> BytesHex
+minimalEncodedTokenTransfer amountHex =
+    "01" <> amountHex
+        <> "00" -- sourcePool length
+        <> "00" -- sourceToken length
+        <> "00" -- destToken length
+        <> "00" -- tokenReceiver length
+        <> "0000" -- extraData length
 
 setup = script do
 
@@ -314,12 +329,22 @@ setup = script do
 
     pure()
 
--- D-002: decodeUint256 rejects values exceeding Numeric 0 range and accepts boundary values.
+-- decodeUint256 rejects values exceeding Numeric 0 range and accepts boundary values.
 testDecodeUint256_Numeric0Boundary : Script ()
 testDecodeUint256_Numeric0Boundary = script do
+    let maxNumeric0Hex =
+            "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
+        oneAboveNumeric0Hex =
+            "000000000000000000000000000000004b3b4ca85a86c47a098a224000000000"
+        maxUint256Hex =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
     -- 38 nines — largest integer that fits in Numeric 0
-    MessageCodecV1.decodeUint256 "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
+    MessageCodecV1.decodeUint256 maxNumeric0Hex
         === Some 99999999999999999999999999999999999999.0
+    case MessageCodecV1.decodeUint256WithError maxNumeric0Hex of
+        Right amount -> amount === 99999999999999999999999999999999999999.0
+        Left _ -> assert False
 
     -- 37 nines — comfortably within range
     MessageCodecV1.decodeUint256 "000000000000000000000000000000000785ee10d5da46d900f4369fffffffff"
@@ -330,14 +355,74 @@ testDecodeUint256_Numeric0Boundary = script do
         === Some 1000000000000000000000000000000000000.0
 
     -- 10^38 — one above Numeric 0 range
-    MessageCodecV1.decodeUint256 "000000000000000000000000000000004b3b4ca85a86c47a098a224000000000"
-        === None
+    MessageCodecV1.decodeUint256 oneAboveNumeric0Hex === None
+    case MessageCodecV1.decodeUint256WithError oneAboveNumeric0Hex of
+        Left err -> err === MessageCodecV1.unsupportedTokenAmountError
+        Right _ -> assert False
 
     -- uint256 max — well above Numeric 0 range
-    MessageCodecV1.decodeUint256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-        === None
+    MessageCodecV1.decodeUint256 maxUint256Hex === None
+    case MessageCodecV1.decodeUint256WithError maxUint256Hex of
+        Left err -> err === MessageCodecV1.unsupportedTokenAmountError
+        Right _ -> assert False
 
     debug "testDecodeUint256_Numeric0Boundary: PASSED"
+
+testDecodeWithErrorRejectsUnsupportedTokenAmount : Script ()
+testDecodeWithErrorRejectsUnsupportedTokenAmount = script do
+    let maxNumeric0Hex =
+            "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
+        oneAboveNumeric0Hex =
+            "000000000000000000000000000000004b3b4ca85a86c47a098a224000000000"
+        maxUint256Hex =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
+    case MessageCodecV1.decodeTokenTransferWithError (minimalEncodedTokenTransfer maxNumeric0Hex) of
+        Right tokenTransfer ->
+            tokenTransfer.amount === 99999999999999999999999999999999999999.0
+        Left _ -> assert False
+
+    case MessageCodecV1.decodeTokenTransferWithError (minimalEncodedTokenTransfer oneAboveNumeric0Hex) of
+        Left err -> err === MessageCodecV1.unsupportedTokenAmountError
+        Right _ -> assert False
+
+    case MessageCodecV1.decodeTokenTransferWithError (minimalEncodedTokenTransfer maxUint256Hex) of
+        Left err -> err === MessageCodecV1.unsupportedTokenAmountError
+        Right _ -> assert False
+
+    let msg = MessageCodecV1.MessageV1 with
+            sourceChainSelector = 1.0
+            destChainSelector = 2.0
+            sequenceNumber = 3.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            finality = FinalityCodec.waitForFinalityDecoded
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = ""
+            offRampAddress = ""
+            sender = ""
+            receiver = ""
+            destBlob = ""
+            tokenTransfer = Some (MessageCodecV1.TokenTransferV1 with
+                amount = 1.0
+                sourcePoolAddress = ""
+                sourceTokenAddress = ""
+                destTokenAddress = ""
+                tokenReceiver = ""
+                extraData = "")
+            messageData = ""
+        encodedMessage = MessageCodecV1.encodeMessageV1 msg
+        -- Empty variable fields place tokenTransfer.amount at byte offset 78:
+        -- 69 static + 1 onRamp len + 1 offRamp len + 1 sender len + 1 receiver len
+        -- + 2 destBlob len + 2 token len + 1 tokenTransfer version.
+        unsupportedAmountMessage = replaceBytes 78 32 oneAboveNumeric0Hex encodedMessage
+
+    MessageCodecV1.decodeMessageV1 unsupportedAmountMessage === None
+    case MessageCodecV1.decodeMessageV1WithError unsupportedAmountMessage of
+        Left err -> err === MessageCodecV1.unsupportedTokenAmountError
+        Right _ -> assert False
+
+    debug "testDecodeWithErrorRejectsUnsupportedTokenAmount: PASSED"
 
 -- Verify hex-to-decimal string arithmetic produces correct results for values
 -- with hex digits a-f, which exercise multi-digit carries in multiplyDecimalBy16.

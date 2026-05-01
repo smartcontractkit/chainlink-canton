@@ -5,7 +5,7 @@ import DA.Foldable qualified as Foldable
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
-import DA.Optional (fromOptional, fromSomeNote, isSome)
+import DA.Optional (fromOptional, isSome)
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
@@ -138,9 +138,9 @@ template OffRamp
                 caller : Party
             controller ccipOwner
             do
-                -- Decode message
-                let message = fromSomeNote "prepareExecute: failed to decode message"
-                        (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
+                message <- case CCIP.MessageCodecV1.decodeMessageV1WithError encodedMessage of
+                    Left err -> abort ("prepareExecute: " <> err)
+                    Right decodedMessage -> pure decodedMessage
                 let messageId = keccak256 encodedMessage
 
                 -- Validate receiver address matches provided party

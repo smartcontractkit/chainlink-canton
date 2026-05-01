@@ -283,6 +283,11 @@ data MessageV1 = MessageV1
         messageData : BytesHex
 ```
 
+Inbound token transfer amounts are encoded on the wire as ABI `uint256`, but Canton stores the decoded token amount as
+`Numeric 0`. The supported inbound amount range is therefore integer values from `0` through
+`99999999999999999999999999999999999999`, inclusive. ABI-valid `uint256` amounts above this range are unsupported on
+Canton and are rejected during inbound preparation with a dedicated unsupported-token-amount error.
+
 ## Explicit Disclosure
 
 Canton participants maintain private contract stores. Users need **explicit disclosure** to access shared contracts

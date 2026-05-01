@@ -14,12 +14,16 @@ module CCIP.MessageCodecV1
   , computeCCVAndExecutorHash
   , extractBytes
   , decodeMessageV1
+  , decodeMessageV1WithError
   , decodeTokenTransfer
+  , decodeTokenTransferWithError
   , decodeUint8
   , decodeUint16
   , decodeUint32
   , decodeUint64
   , decodeUint256
+  , decodeUint256WithError
+  , unsupportedTokenAmountError
   , messageId
   ) where
 
@@ -428,9 +432,39 @@ decodeUint64 hex =
 
 decodeUint256 : BytesHex -> Optional (Numeric 0)
 decodeUint256 hex =
-    if byteCount hex /= 32 then None
-    else
-        parseDecimal =<< hexToDecimalString hex
+    eitherToOptional (decodeUint256WithError hex)
+
+unsupportedTokenAmountError : Text
+unsupportedTokenAmountError =
+    "unsupported token amount: exceeds Canton Numeric 0 maximum"
+
+messageDecodeError : Text
+messageDecodeError = "failed to decode message"
+
+tokenTransferDecodeError : Text
+tokenTransferDecodeError = "failed to decode token transfer"
+
+eitherToOptional : Either Text a -> Optional a
+eitherToOptional result =
+    case result of
+        Right value -> Some value
+        Left _ -> None
+
+requireOptional : Text -> Optional a -> Either Text a
+requireOptional err value =
+    case value of
+        Some v -> Right v
+        None -> Left err
+
+decodeUint256WithError : BytesHex -> Either Text (Numeric 0)
+decodeUint256WithError hex =
+    if byteCount hex /= 32 then Left "invalid uint256 length"
+    else case hexToDecimalString hex of
+        None -> Left "invalid uint256 hex"
+        Some decStr ->
+            if decimalTextWithinNumeric0 decStr
+            then Right (parseDecimalUnchecked decStr)
+            else Left unsupportedTokenAmountError
 
 -- Helpers
 
@@ -676,106 +710,110 @@ parseDecimalUnchecked str =
 -- Variable section starts at offset 69.
 decodeMessageV1 : BytesHex -> Optional MessageV1
 decodeMessageV1 encoded =
+    eitherToOptional (decodeMessageV1WithError encoded)
+
+decodeMessageV1WithError : BytesHex -> Either Text MessageV1
+decodeMessageV1WithError encoded =
         do
             -- === STATIC LENGTH SECTION (69 bytes) ===
 
             -- Extract version (1 byte, offset 0)
-            versionHex <- extractBytes encoded 0 1
-            version <- decodeUint8 versionHex
+            versionHex <- requireOptional messageDecodeError (extractBytes encoded 0 1)
+            version <- requireOptional messageDecodeError (decodeUint8 versionHex)
 
-            if version /= 1 then None else do
+            if version /= 1 then Left messageDecodeError else do
 
                 -- Extract source chain selector (8 bytes, offset 1)
-                sourceChainHex <- extractBytes encoded 1 8
-                sourceChain <- decodeUint64 sourceChainHex
+                sourceChainHex <- requireOptional messageDecodeError (extractBytes encoded 1 8)
+                sourceChain <- requireOptional messageDecodeError (decodeUint64 sourceChainHex)
 
                 -- Extract dest chain selector (8 bytes, offset 9)
-                destChainHex <- extractBytes encoded 9 8
-                destChain <- decodeUint64 destChainHex
+                destChainHex <- requireOptional messageDecodeError (extractBytes encoded 9 8)
+                destChain <- requireOptional messageDecodeError (decodeUint64 destChainHex)
 
                 -- Extract sequence number (8 bytes, offset 17)
-                seqNumHex <- extractBytes encoded 17 8
-                seqNum <- decodeUint64 seqNumHex
+                seqNumHex <- requireOptional messageDecodeError (extractBytes encoded 17 8)
+                seqNum <- requireOptional messageDecodeError (decodeUint64 seqNumHex)
 
                 -- Extract executionGasLimit (4 bytes, offset 25)
-                execGasLimitHex <- extractBytes encoded 25 4
-                execGasLimit <- decodeUint32 execGasLimitHex
+                execGasLimitHex <- requireOptional messageDecodeError (extractBytes encoded 25 4)
+                execGasLimit <- requireOptional messageDecodeError (decodeUint32 execGasLimitHex)
 
                 -- Extract ccipReceiveGasLimit (4 bytes, offset 29)
-                ccipReceiveGasLimitHex <- extractBytes encoded 29 4
-                ccipRecvGasLimit <- decodeUint32 ccipReceiveGasLimitHex
+                ccipReceiveGasLimitHex <- requireOptional messageDecodeError (extractBytes encoded 29 4)
+                ccipRecvGasLimit <- requireOptional messageDecodeError (decodeUint32 ccipReceiveGasLimitHex)
 
                 -- Extract finality config (4 bytes, offset 33)
-                finalityHex <- extractBytes encoded 33 4
-                finality <- CCIP.FinalityConfig.decodeRequestedFinality finalityHex
+                finalityHex <- requireOptional messageDecodeError (extractBytes encoded 33 4)
+                finality <- requireOptional messageDecodeError (CCIP.FinalityConfig.decodeRequestedFinality finalityHex)
 
                 -- Extract ccvAndExecutorHash (32 bytes, offset 37)
-                ccvHashHex <- extractBytes encoded 37 32
+                ccvHashHex <- requireOptional messageDecodeError (extractBytes encoded 37 32)
 
                 -- === VARIABLE LENGTH SECTION (starts at offset 69) ===
 
                 -- Extract onRamp address length (1 byte, offset 69)
-                onRampLenHex <- extractBytes encoded 69 1
-                onRampLen <- decodeUint8 onRampLenHex
+                onRampLenHex <- requireOptional messageDecodeError (extractBytes encoded 69 1)
+                onRampLen <- requireOptional messageDecodeError (decodeUint8 onRampLenHex)
 
                 -- Extract onRamp address
-                onRampHex <- extractBytes encoded 70 onRampLen
+                onRampHex <- requireOptional messageDecodeError (extractBytes encoded 70 onRampLen)
 
                 -- Extract offRamp address length (1 byte)
                 let offRampLenOffset = 70 + onRampLen
-                offRampLenHex <- extractBytes encoded offRampLenOffset 1
-                offRampLen <- decodeUint8 offRampLenHex
+                offRampLenHex <- requireOptional messageDecodeError (extractBytes encoded offRampLenOffset 1)
+                offRampLen <- requireOptional messageDecodeError (decodeUint8 offRampLenHex)
 
                 -- Extract offRamp address
-                offRampHex <- extractBytes encoded (offRampLenOffset + 1) offRampLen
+                offRampHex <- requireOptional messageDecodeError (extractBytes encoded (offRampLenOffset + 1) offRampLen)
 
                 -- Extract sender length (1 byte)
                 let senderLenOffset = offRampLenOffset + 1 + offRampLen
-                senderLenHex <- extractBytes encoded senderLenOffset 1
-                senderLen <- decodeUint8 senderLenHex
+                senderLenHex <- requireOptional messageDecodeError (extractBytes encoded senderLenOffset 1)
+                senderLen <- requireOptional messageDecodeError (decodeUint8 senderLenHex)
 
                 -- Extract sender
-                senderHex <- extractBytes encoded (senderLenOffset + 1) senderLen
+                senderHex <- requireOptional messageDecodeError (extractBytes encoded (senderLenOffset + 1) senderLen)
 
                 -- Extract receiver length (1 byte)
                 let receiverLenOffset = senderLenOffset + 1 + senderLen
-                receiverLenHex <- extractBytes encoded receiverLenOffset 1
-                receiverLen <- decodeUint8 receiverLenHex
+                receiverLenHex <- requireOptional messageDecodeError (extractBytes encoded receiverLenOffset 1)
+                receiverLen <- requireOptional messageDecodeError (decodeUint8 receiverLenHex)
 
                 -- Extract receiver
-                receiverHex <- extractBytes encoded (receiverLenOffset + 1) receiverLen
+                receiverHex <- requireOptional messageDecodeError (extractBytes encoded (receiverLenOffset + 1) receiverLen)
 
                 -- Extract destBlob length (2 bytes)
                 let destBlobLenOffset = receiverLenOffset + 1 + receiverLen
-                destBlobLenHex <- extractBytes encoded destBlobLenOffset 2
-                destBlobLen <- decodeUint16 destBlobLenHex
+                destBlobLenHex <- requireOptional messageDecodeError (extractBytes encoded destBlobLenOffset 2)
+                destBlobLen <- requireOptional messageDecodeError (decodeUint16 destBlobLenHex)
 
                 -- Extract destBlob
-                destBlobHex <- extractBytes encoded (destBlobLenOffset + 2) destBlobLen
+                destBlobHex <- requireOptional messageDecodeError (extractBytes encoded (destBlobLenOffset + 2) destBlobLen)
 
                 -- Extract token transfer length (2 bytes)
                 let tokenLenOffset = destBlobLenOffset + 2 + destBlobLen
-                tokenLenHex <- extractBytes encoded tokenLenOffset 2
-                tokenLen <- decodeUint16 tokenLenHex
+                tokenLenHex <- requireOptional messageDecodeError (extractBytes encoded tokenLenOffset 2)
+                tokenLen <- requireOptional messageDecodeError (decodeUint16 tokenLenHex)
 
                 -- Extract and decode token transfer (0 or 1)
                 tokenTransfer <-
-                    if tokenLen == 0 then Some None
+                    if tokenLen == 0 then Right None
                     else do
-                        tokenHex <- extractBytes encoded (tokenLenOffset + 2) tokenLen
-                        tt <- decodeTokenTransfer tokenHex
-                        Some (Some tt)
+                        tokenHex <- requireOptional messageDecodeError (extractBytes encoded (tokenLenOffset + 2) tokenLen)
+                        tt <- decodeTokenTransferForMessage tokenHex
+                        Right (Some tt)
 
                 -- Extract message data length (2 bytes)
                 let msgDataLenOffset = tokenLenOffset + 2 + tokenLen
-                msgDataLenHex <- extractBytes encoded msgDataLenOffset 2
-                msgDataLen <- decodeUint16 msgDataLenHex
+                msgDataLenHex <- requireOptional messageDecodeError (extractBytes encoded msgDataLenOffset 2)
+                msgDataLen <- requireOptional messageDecodeError (decodeUint16 msgDataLenHex)
 
                 -- Extract message data
-                msgDataHex <- extractBytes encoded (msgDataLenOffset + 2) msgDataLen
+                msgDataHex <- requireOptional messageDecodeError (extractBytes encoded (msgDataLenOffset + 2) msgDataLen)
 
                 let finalOffset = msgDataLenOffset + 2 + msgDataLen
-                if finalOffset /= byteCount encoded then None
+                if finalOffset /= byteCount encoded then Left messageDecodeError
                 else return MessageV1
                     { sourceChainSelector = sourceChain
                     , destChainSelector = destChain
@@ -793,58 +831,71 @@ decodeMessageV1 encoded =
                     , messageData = msgDataHex
                     }
 
+decodeTokenTransferForMessage : BytesHex -> Either Text TokenTransferV1
+decodeTokenTransferForMessage encoded =
+    case decodeTokenTransferWithError encoded of
+        Right tokenTransfer -> Right tokenTransfer
+        Left err ->
+            if err == unsupportedTokenAmountError
+            then Left err
+            else Left messageDecodeError
+
 -- | Decode TokenTransferV1 from bytes
 decodeTokenTransfer : BytesHex -> Optional TokenTransferV1
 decodeTokenTransfer encoded =
+    eitherToOptional (decodeTokenTransferWithError encoded)
+
+decodeTokenTransferWithError : BytesHex -> Either Text TokenTransferV1
+decodeTokenTransferWithError encoded =
         do
             -- Extract version (1 byte)
-            versionHex <- extractBytes encoded 0 1
-            version <- decodeUint8 versionHex
+            versionHex <- requireOptional tokenTransferDecodeError (extractBytes encoded 0 1)
+            version <- requireOptional tokenTransferDecodeError (decodeUint8 versionHex)
 
-            if version /= 1 then None else do
+            if version /= 1 then Left tokenTransferDecodeError else do
 
                 -- Extract amount (32 bytes)
-                amountHex <- extractBytes encoded 1 32
-                amount <- decodeUint256 amountHex
+                amountHex <- requireOptional tokenTransferDecodeError (extractBytes encoded 1 32)
+                amount <- decodeTokenTransferAmount amountHex
 
                 -- Extract sourcePool length (1 byte)
-                sourcePoolLenHex <- extractBytes encoded 33 1
-                sourcePoolLen <- decodeUint8 sourcePoolLenHex
+                sourcePoolLenHex <- requireOptional tokenTransferDecodeError (extractBytes encoded 33 1)
+                sourcePoolLen <- requireOptional tokenTransferDecodeError (decodeUint8 sourcePoolLenHex)
 
                 -- Extract sourcePool
-                sourcePoolHex <- extractBytes encoded 34 sourcePoolLen
+                sourcePoolHex <- requireOptional tokenTransferDecodeError (extractBytes encoded 34 sourcePoolLen)
 
                 -- Extract sourceToken length (1 byte)
-                sourceTokenLenHex <- extractBytes encoded (34 + sourcePoolLen) 1
-                sourceTokenLen <- decodeUint8 sourceTokenLenHex
+                sourceTokenLenHex <- requireOptional tokenTransferDecodeError (extractBytes encoded (34 + sourcePoolLen) 1)
+                sourceTokenLen <- requireOptional tokenTransferDecodeError (decodeUint8 sourceTokenLenHex)
 
                 -- Extract sourceToken
-                sourceTokenHex <- extractBytes encoded (35 + sourcePoolLen) sourceTokenLen
+                sourceTokenHex <- requireOptional tokenTransferDecodeError (extractBytes encoded (35 + sourcePoolLen) sourceTokenLen)
 
                 -- Extract destToken length (1 byte)
-                destTokenLenHex <- extractBytes encoded (35 + sourcePoolLen + sourceTokenLen) 1
-                destTokenLen <- decodeUint8 destTokenLenHex
+                destTokenLenHex <- requireOptional tokenTransferDecodeError (extractBytes encoded (35 + sourcePoolLen + sourceTokenLen) 1)
+                destTokenLen <- requireOptional tokenTransferDecodeError (decodeUint8 destTokenLenHex)
 
                 -- Extract destToken
-                destTokenHex <- extractBytes encoded (36 + sourcePoolLen + sourceTokenLen) destTokenLen
+                destTokenHex <- requireOptional tokenTransferDecodeError (extractBytes encoded (36 + sourcePoolLen + sourceTokenLen) destTokenLen)
 
                 -- Extract tokenReceiver length (1 byte)
-                tokenReceiverLenHex <- extractBytes encoded (36 + sourcePoolLen + sourceTokenLen + destTokenLen) 1
-                tokenReceiverLen <- decodeUint8 tokenReceiverLenHex
+                tokenReceiverLenHex <- requireOptional tokenTransferDecodeError (extractBytes encoded (36 + sourcePoolLen + sourceTokenLen + destTokenLen) 1)
+                tokenReceiverLen <- requireOptional tokenTransferDecodeError (decodeUint8 tokenReceiverLenHex)
 
                 -- Extract tokenReceiver
-                tokenReceiverHex <- extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen) tokenReceiverLen
+                tokenReceiverHex <- requireOptional tokenTransferDecodeError (extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen) tokenReceiverLen)
 
                 -- Extract extraData length (2 bytes)
-                extraDataLenHex <- extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) 2
-                extraDataLen <- decodeUint16 extraDataLenHex
+                extraDataLenHex <- requireOptional tokenTransferDecodeError (extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) 2)
+                extraDataLen <- requireOptional tokenTransferDecodeError (decodeUint16 extraDataLenHex)
 
                 -- Extract extraData
                 let extraDataOffset = 39 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen
-                extraDataHex <- extractBytes encoded extraDataOffset extraDataLen
+                extraDataHex <- requireOptional tokenTransferDecodeError (extractBytes encoded extraDataOffset extraDataLen)
 
                 let finalOffset = extraDataOffset + extraDataLen
-                if finalOffset /= byteCount encoded then None
+                if finalOffset /= byteCount encoded then Left tokenTransferDecodeError
                 else return TokenTransferV1
                     { amount = amount
                     , sourcePoolAddress = sourcePoolHex
@@ -853,6 +904,15 @@ decodeTokenTransfer encoded =
                     , tokenReceiver = tokenReceiverHex
                     , extraData = extraDataHex
                     }
+
+decodeTokenTransferAmount : BytesHex -> Either Text (Numeric 0)
+decodeTokenTransferAmount amountHex =
+    case decodeUint256WithError amountHex of
+        Right amount -> Right amount
+        Left err ->
+            if err == unsupportedTokenAmountError
+            then Left err
+            else Left tokenTransferDecodeError
 
 messageId : MessageV1 -> BytesHex
 messageId message =
