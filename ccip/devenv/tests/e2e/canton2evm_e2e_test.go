@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -68,89 +69,89 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	// t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
-	// 	subtestCtx := ccv.Plog.WithContext(t.Context())
+	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
+		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-	// 	receiver, err := evmChain.GetEOAReceiverAddress()
-	// 	require.NoError(t, err)
-	// 	ccvAddr, err := tcapi.GetContractAddress(
-	// 		in,
-	// 		cantonChain.ChainSelector(),
-	// 		datastore.ContractType(canton_committee_verifier.ContractType),
-	// 		canton_committee_verifier.Version.String(),
-	// 		devenvcommon.DefaultCommitteeVerifierQualifier,
-	// 		"canton committee verifier",
-	// 	)
-	// 	require.NoError(t, err)
-	// 	executorAddr, err := tcapi.GetContractAddress(
-	// 		in,
-	// 		cantonChain.ChainSelector(),
-	// 		datastore.ContractType(executor.ContractType),
-	// 		executor.Version.String(),
-	// 		devenvcommon.DefaultExecutorQualifier,
-	// 		"source executor",
-	// 	)
-	// 	require.NoError(t, err)
-	// 	t.Logf(
-	// 		"Resolved contracts: receiver=%x cantonCCV=%x cantonExecutor=%x srcSelector=%d dstSelector=%d",
-	// 		receiver,
-	// 		ccvAddr,
-	// 		executorAddr,
-	// 		cantonChain.ChainSelector(),
-	// 		evmChain.ChainSelector(),
-	// 	)
+		receiver, err := evmChain.GetEOAReceiverAddress()
+		require.NoError(t, err)
+		ccvAddr, err := tcapi.GetContractAddress(
+			in,
+			cantonChain.ChainSelector(),
+			datastore.ContractType(canton_committee_verifier.ContractType),
+			canton_committee_verifier.Version.String(),
+			devenvcommon.DefaultCommitteeVerifierQualifier,
+			"canton committee verifier",
+		)
+		require.NoError(t, err)
+		executorAddr, err := tcapi.GetContractAddress(
+			in,
+			cantonChain.ChainSelector(),
+			datastore.ContractType(executor.ContractType),
+			executor.Version.String(),
+			devenvcommon.DefaultExecutorQualifier,
+			"source executor",
+		)
+		require.NoError(t, err)
+		t.Logf(
+			"Resolved contracts: receiver=%x cantonCCV=%x cantonExecutor=%x srcSelector=%d dstSelector=%d",
+			receiver,
+			ccvAddr,
+			executorAddr,
+			cantonChain.ChainSelector(),
+			evmChain.ChainSelector(),
+		)
 
-	// 	t.Logf("Sending Canton -> EVM message")
-	// 	msgFields := cciptestinterfaces.MessageFields{
-	// 		Receiver: receiver,
-	// 		Data:     []byte("canton2evm tcapi test"),
-	// 	}
-	// 	msgOpts := cciptestinterfaces.MessageOptions{
-	// 		Version:           3,
-	// 		ExecutionGasLimit: 200_000,
-	// 		FinalityConfig:    1,
-	// 		Executor:          executorAddr,
-	// 		CCVs: []protocol.CCV{
-	// 			{
-	// 				CCVAddress: ccvAddr,
-	// 				Args:       []byte{},
-	// 				ArgsLen:    0,
-	// 			},
-	// 		},
-	// 	}
-	// 	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
-	// 	require.True(t, ok, "Canton chain implementation must be *devenv.Chain")
-	// 	require.NoError(t, cantonImpl.PrepareSendPrerequisites(subtestCtx, msgFields))
-	// 	sendMessageResult, err := cantonChain.SendMessage(subtestCtx, evmChain.ChainSelector(), msgFields, msgOpts)
-	// 	require.NoError(t, err)
-	// 	require.NotNil(t, sendMessageResult.Message)
-	// 	// require.NotEmpty(t, sendMessageResult.ReceiptIssuers)
-	// 	seqNo := uint64(sendMessageResult.Message.SequenceNumber)
-	// 	t.Logf(
-	// 		"SendMessage accepted: seqNo=%d",
-	// 		seqNo,
-	// 		// len(sendMessageResult.ReceiptIssuers),
-	// 	)
+		t.Logf("Sending Canton -> EVM message")
+		msgFields := cciptestinterfaces.MessageFields{
+			Receiver: receiver,
+			Data:     []byte("canton2evm tcapi test"),
+		}
+		msgOpts := cciptestinterfaces.MessageOptions{
+			Version:           3,
+			ExecutionGasLimit: 200_000,
+			FinalityConfig:    1,
+			Executor:          executorAddr,
+			CCVs: []protocol.CCV{
+				{
+					CCVAddress: ccvAddr,
+					Args:       []byte{},
+					ArgsLen:    0,
+				},
+			},
+		}
+		cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
+		require.True(t, ok, "Canton chain implementation must be *devenv.Chain")
+		require.NoError(t, cantonImpl.PrepareSendPrerequisites(subtestCtx))
+		sendMessageResult, err := cantonChain.SendMessage(subtestCtx, evmChain.ChainSelector(), msgFields, msgOpts)
+		require.NoError(t, err)
+		require.NotNil(t, sendMessageResult.Message)
+		// require.NotEmpty(t, sendMessageResult.ReceiptIssuers)
+		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
+		t.Logf(
+			"SendMessage accepted: seqNo=%d",
+			seqNo,
+			// len(sendMessageResult.ReceiptIssuers),
+		)
 
-	// 	t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", cantonChain.ChainSelector(), evmChain.ChainSelector(), seqNo)
-	// 	sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, 30*time.Second)
-	// 	require.NoError(t, err)
+		t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", cantonChain.ChainSelector(), evmChain.ChainSelector(), seqNo)
+		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, 30*time.Second)
+		require.NoError(t, err)
 
-	// 	t.Logf("CCIPMessageSent event: %+v", sentEvent)
+		t.Logf("CCIPMessageSent event: %+v", sentEvent)
 
-	// 	t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID)
-	// 	result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
-	// 	t.Logf(
-	// 		"Message assertion succeeded: aggregated=true indexerResults=%+v",
-	// 		result.IndexedVerifications.Results,
-	// 	)
+		t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID)
+		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
+		t.Logf(
+			"Message assertion succeeded: aggregated=true indexerResults=%+v",
+			result.IndexedVerifications.Results,
+		)
 
-	// 	t.Logf("Waiting for execution event on EVM: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
-	// 	ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, tests.WaitTimeout(t))
-	// 	require.NoError(t, err)
-	// 	assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
-	// 	t.Logf("Execution event: %+v", ev)
-	// })
+		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
+		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, tests.WaitTimeout(t))
+		require.NoError(t, err)
+		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		t.Logf("Execution event: %+v", ev)
+	})
 
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
@@ -212,10 +213,10 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
 		require.True(t, ok, "Canton chain implementation must be *devenv.Chain")
 
+		require.NoError(t, cantonImpl.PrepareSendPrerequisites(subtestCtx))
 		const numTokenTransfers = 2
 		for i := range numTokenTransfers {
 			tokenMsgFields.Data = []byte(fmt.Sprintf("canton2evm token transfer #%d", i+1))
-			require.NoError(t, cantonImpl.PrepareSendPrerequisites(subtestCtx))
 			sendMessageResult, err := cantonChain.SendMessage(subtestCtx, evmChain.ChainSelector(), tokenMsgFields, tokenMsgOpts)
 			require.NoError(t, err)
 			require.NotNil(t, sendMessageResult.Message)
