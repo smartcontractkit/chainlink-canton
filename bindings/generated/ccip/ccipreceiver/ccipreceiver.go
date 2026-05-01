@@ -9,6 +9,7 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "0748a57432a5f8e3c74dc0ecdb6e2914830608dcb9aa487812c28ee109ccfb2e"
+	PackageID   = "7e447eea15f5b93d7b2a76d7c6f8359880d43f361f5dd93f822ffa04f7351667"
 	SDKVersion  = "3.4.10"
 )
 
@@ -396,9 +397,9 @@ func (t CCIPReceiver) UpdateRequiredCCVsWithPackageID(contractID string, package
 
 // CCVInput is a Record type
 type CCVInput struct {
-	CcvCid          types.CONTRACT_ID  `json:"ccvCid"`
-	VerifierResults types.TEXT         `json:"verifierResults"`
-	CcvExtraContext common.CCIPContext `json:"ccvExtraContext"`
+	CcvCid          types.CONTRACT_ID                          `json:"ccvCid"`
+	VerifierResults types.TEXT                                 `json:"verifierResults"`
+	CcvExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"ccvExtraContext"`
 }
 
 // ToMap converts CCVInput to a map for DAML arguments
@@ -438,11 +439,11 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute2 is a Record type
 type Execute2 struct {
-	Context        common.CCIPContext  `json:"context"`
-	RouterCid      types.CONTRACT_ID   `json:"routerCid"`
-	EncodedMessage types.TEXT          `json:"encodedMessage"`
-	TokenTransfer  *TokenTransferInput `json:"tokenTransfer" hex:"optional"`
-	CcvInputs      []CCVInput          `json:"ccvInputs"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	RouterCid      types.CONTRACT_ID                          `json:"routerCid"`
+	EncodedMessage types.TEXT                                 `json:"encodedMessage"`
+	TokenTransfer  *TokenTransferInput                        `json:"tokenTransfer" hex:"optional"`
+	CcvInputs      []CCVInput                                 `json:"ccvInputs"`
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
@@ -502,10 +503,10 @@ func (t *Execute2) UnmarshalHex(data string) error {
 
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
-	Context        common.CCIPContext `json:"context"`
-	RouterCid      types.CONTRACT_ID  `json:"routerCid"`
-	EncodedMessage types.TEXT         `json:"encodedMessage"`
-	TokenPoolCid   *types.CONTRACT_ID `json:"tokenPoolCid" hex:"optional"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	RouterCid      types.CONTRACT_ID                          `json:"routerCid"`
+	EncodedMessage types.TEXT                                 `json:"encodedMessage"`
+	TokenPoolCid   *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
@@ -557,10 +558,9 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 
 // TokenTransferInput is a Record type
 type TokenTransferInput struct {
-	TokenPoolCid       types.CONTRACT_ID     `json:"tokenPoolCid"`
-	TokenReceiverParty types.PARTY           `json:"tokenReceiverParty"`
-	TokenInput         interfaces.TokenInput `json:"tokenInput"`
-	PoolExtraContext   common.CCIPContext    `json:"poolExtraContext"`
+	TokenPoolCid       types.CONTRACT_ID                          `json:"tokenPoolCid"`
+	TokenReceiverParty types.PARTY                                `json:"tokenReceiverParty"`
+	PoolExtraContext   splice_api_token_metadata_v1.ChoiceContext `json:"poolExtraContext"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -570,8 +570,6 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	m["tokenPoolCid"] = model.NestedToDAMLValue(t.TokenPoolCid)
 
 	m["tokenReceiverParty"] = t.TokenReceiverParty.ToMap()
-
-	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	m["poolExtraContext"] = model.NestedToDAMLValue(t.PoolExtraContext)
 

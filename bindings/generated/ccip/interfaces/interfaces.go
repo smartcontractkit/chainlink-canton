@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "b1ee6a9082daca70caf2a1663970ee40670cc7b72cf99f0f77e5c043a3c0aa17"
+	PackageID   = "c7a3ad81aa0fb685bc1a2b1a5ae3bd7f041ba97e195b0936f1da831089e617a6"
 	SDKVersion  = "3.4.10"
 )
 
@@ -322,67 +322,6 @@ func (t *ReleaseOrMintResultPending) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TokenInput is a Record type
-type TokenInput struct {
-	TransferFactory   types.CONTRACT_ID                      `json:"transferFactory"`
-	BurnMintFactory   *types.CONTRACT_ID                     `json:"burnMintFactory" hex:"optional"`
-	ExtraArgs         splice_api_token_metadata_v1.ExtraArgs `json:"extraArgs"`
-	TokenPoolHoldings []types.CONTRACT_ID                    `json:"tokenPoolHoldings"`
-}
-
-// ToMap converts TokenInput to a map for DAML arguments
-func (t TokenInput) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["transferFactory"] = model.NestedToDAMLValue(t.TransferFactory)
-
-	if t.BurnMintFactory != nil {
-		m["burnMintFactory"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.BurnMintFactory),
-		}
-	} else {
-		m["burnMintFactory"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
-	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
-
-	m["tokenPoolHoldings"] = func() []any {
-		res := make([]any, 0, len(t.TokenPoolHoldings))
-		for _, e := range t.TokenPoolHoldings {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t TokenInput) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *TokenInput) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes TokenInput to hex string (Canton MCMS format)
-func (t TokenInput) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes TokenInput from hex string (Canton MCMS format)
-func (t *TokenInput) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // TokenPoolFeeQuote is a Record type
 type TokenPoolFeeQuote struct {
 	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
@@ -481,13 +420,13 @@ func (t *TokenPoolView) UnmarshalHex(data string) error {
 
 // TokenPoolCalculateFee is a Record type
 type TokenPoolCalculateFee struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext                       `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller                types.PARTY                              `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                          `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenPoolCalculateFee to a map for DAML arguments
@@ -631,15 +570,14 @@ func (t *TokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 
 // TokenPoolLockOrBurn is a Record type
 type TokenPoolLockOrBurn struct {
-	TokenAdminRegistryCid types.CONTRACT_ID   `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID   `json:"tokenConfigCid"`
-	RmnRemoteCid          types.CONTRACT_ID   `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext  `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID   `json:"sendingMessageCid"`
-	TokenInput            TokenInput          `json:"tokenInput"`
-	SenderInputCids       []types.CONTRACT_ID `json:"senderInputCids"`
-	Amount                types.NUMERIC       `json:"amount"`
-	Caller                types.PARTY         `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
+	Amount                types.NUMERIC                              `json:"amount"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenPoolLockOrBurn to a map for DAML arguments
@@ -655,8 +593,6 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]any {
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
-
-	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	m["senderInputCids"] = func() []any {
 		res := make([]any, 0, len(t.SenderInputCids))
@@ -697,13 +633,12 @@ func (t *TokenPoolLockOrBurn) UnmarshalHex(data string) error {
 
 // TokenPoolReleaseFromTicket is a Record type
 type TokenPoolReleaseFromTicket struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
-	RmnRemoteCid          types.CONTRACT_ID  `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	TokenReceiveTicketCid types.CONTRACT_ID  `json:"tokenReceiveTicketCid"`
-	TokenInput            TokenInput         `json:"tokenInput"`
-	Caller                types.PARTY        `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenPoolReleaseFromTicket to a map for DAML arguments
@@ -719,8 +654,6 @@ func (t TokenPoolReleaseFromTicket) ToMap() map[string]any {
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
 	m["tokenReceiveTicketCid"] = model.NestedToDAMLValue(t.TokenReceiveTicketCid)
-
-	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -751,11 +684,11 @@ func (t *TokenPoolReleaseFromTicket) UnmarshalHex(data string) error {
 
 // TokenPoolVerifyInboundMessage is a Record type
 type TokenPoolVerifyInboundMessage struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
-	Caller                types.PARTY        `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	ExecutingMessageCid   types.CONTRACT_ID                          `json:"executingMessageCid"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenPoolVerifyInboundMessage to a map for DAML arguments
@@ -799,12 +732,12 @@ func (t *TokenPoolVerifyInboundMessage) UnmarshalHex(data string) error {
 
 // TokenPoolVerifyOutboundCCVs is a Record type
 type TokenPoolVerifyOutboundCCVs struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
-	Amount                types.NUMERIC      `json:"amount"`
-	Caller                types.PARTY        `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Amount                types.NUMERIC                              `json:"amount"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenPoolVerifyOutboundCCVs to a map for DAML arguments

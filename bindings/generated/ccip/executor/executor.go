@@ -8,6 +8,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -25,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "a8e2042aa2597d34c3a7b4f4317e4f4832d031205560fd669dc72cd893739298"
+	PackageID   = "a6bc6586339e643eba06c707439dc5182073d7d9f4e4cc03684779409103c0cd"
 	SDKVersion  = "3.4.10"
 )
 
@@ -265,10 +266,10 @@ func (t *ApplyDestChainUpdatesParams) UnmarshalHex(data string) error {
 
 // CalculateFee is a Record type
 type CalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
-	ExecutorArgs      types.TEXT         `json:"executorArgs"`
-	ExtraContext      common.CCIPContext `json:"extraContext"`
-	Caller            types.PARTY        `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
+	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CalculateFee to a map for DAML arguments
@@ -311,9 +312,9 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
-	ExecutorArgs      types.TEXT         `json:"executorArgs"`
-	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
+	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
