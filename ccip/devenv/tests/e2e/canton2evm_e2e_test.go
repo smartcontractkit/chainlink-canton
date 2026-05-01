@@ -28,7 +28,6 @@ import (
 )
 
 const (
-	cantonToEVMDestTokenQualifier  = "TEST (BurnMintTokenPool 2.0.0 [default] to LockReleaseTokenPool 2.0.0 [default])"
 	cantonToEVMTokenTransferAmount = int64(1000)
 	cantonToEVMDecimalsScale       = int64(100_000_000) // Canton 10 decimals -> EVM 18 decimals
 )
@@ -181,7 +180,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 				evmChain.ChainSelector(),
 				datastore.ContractType("BurnMintERC20WithDripToken"),
 				semver.MustParse("1.0.0"),
-				cantonToEVMDestTokenQualifier,
+				burnMint20ToLockRelease20TokenQualifier(t),
 			),
 		)
 		require.NoError(t, err)

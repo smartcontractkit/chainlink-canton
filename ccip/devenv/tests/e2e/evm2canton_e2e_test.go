@@ -30,7 +30,6 @@ import (
 )
 
 const (
-	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default]):local"
 	// 1e11 (10-decimal units) gives a stable non-dust transfer in this lane after fee handling.
 	evmToCantonTransferAmount = int64(100_000_000_000)
 )
@@ -151,7 +150,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 				srcSelector,
 				datastore.ContractType("BurnMintERC20WithDripToken"),
 				semver.MustParse("1.0.0"),
-				evmToCantonTokenQualifier,
+				burnMint20ToLockRelease20TokenQualifier(t),
 			),
 		)
 		require.NoError(t, err)
