@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-burnminttokenpool"
-	PackageID   = "f723f2f9ec135e2a9203b328f80f831aed0afef775e62af5f2eb89dbe38daf30"
+	PackageID   = "b7dda1d9966f888b7054d5910e03fad373b37083aadec0f0ee5969a17982ca7c"
 	SDKVersion  = "3.4.10"
 )
 

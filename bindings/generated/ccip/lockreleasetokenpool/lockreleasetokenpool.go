@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "c909ba090d82a8413b352f6c6b9a14737a2c3faeaf308dc2de7a424d1d8c5c5a"
+	PackageID   = "aa960cae708d6e5537f232c86d3344d9d513224e2e89851547ddd8c89d843b7e"
 	SDKVersion  = "3.4.10"
 )
 
