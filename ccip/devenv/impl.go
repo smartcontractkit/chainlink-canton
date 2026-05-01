@@ -395,6 +395,7 @@ func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64
 	baseExecutionGasCost := uint32(1)
 	tokenReceiverAllowed := false
 	gasForVerification := uint32(50_000)
+
 	return cciptestinterfaces.ChainLaneProfile{
 		BaseExecutionGasCost: &baseExecutionGasCost,
 		TokenReceiverAllowed: &tokenReceiverAllowed,

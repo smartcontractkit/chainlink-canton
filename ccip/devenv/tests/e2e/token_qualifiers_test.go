@@ -21,5 +21,6 @@ func burnMint20ToLockRelease20TokenQualifier(t *testing.T) string {
 	}
 
 	t.Fatal("could not find BurnMint 2.0.0 to LockRelease 2.0.0 token qualifier")
+
 	return ""
 }
