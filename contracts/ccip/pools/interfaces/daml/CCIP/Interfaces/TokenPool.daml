@@ -2,7 +2,6 @@ module CCIP.Interfaces.TokenPool where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified Splice.Api.Token.BurnMintV1
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
