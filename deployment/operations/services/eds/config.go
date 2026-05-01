@@ -144,7 +144,7 @@ var BuildConfig = operations.NewOperation(
 		)
 		filteredRefs := make([]datastore.AddressRef, 0, len(refs))
 		for _, ref := range refs {
-			if strings.Count(ref.Qualifier, "[default]") != 2 {
+			if strings.Count(ref.Qualifier, "[default]") != 3 { // TODO: this logic is really fragile and needs to be improved.
 				continue
 			}
 			filteredRefs = append(filteredRefs, ref)
