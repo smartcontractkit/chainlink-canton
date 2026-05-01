@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "7b59e9533236e133a2a63eefa33ed2ce7b51b5d1e9edafb619fb752ceb13a382"
+	PackageID   = "5606bb97b3be8001c3cc13dab5d472ac2fe8d478a6b4487c27e08585a67a6f57"
 	SDKVersion  = "3.4.10"
 )
 
