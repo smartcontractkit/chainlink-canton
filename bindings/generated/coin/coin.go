@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "coin"
-	PackageID   = "12b1426f0af8cb7cfa1c23efa2970531d3b33e0daefa1ff166bc641109200a23"
+	PackageID   = "be5b08c56cc4b3813bce037b17b01439e16175ce63893dc2f1625d5ca2a8917b"
 	SDKVersion  = "3.4.10"
 )
 

@@ -284,27 +284,18 @@ numeric0IntegerText label n =
        else error (label <> ": expected integer-valued Numeric 0")
 
 chunkTexts : Text -> [Text]
-chunkTexts digits =
+chunkTexts digits = chunkTextsGo digits []
+
+chunkTextsGo : Text -> [Text] -> [Text]
+chunkTextsGo digits acc =
     let len = Text.length digits
-    in if len <= 8 then [digits]
-       else chunkTexts (Text.take (len - 8) digits) ++ [Text.drop (len - 8) digits]
+    in if len <= 8 then digits :: acc
+       else chunkTextsGo (Text.take (len - 8) digits) (Text.drop (len - 8) digits :: acc)
 
 parseChunk : Text -> Int
-parseChunk = parseDigitsUnsafe 0
-
-parseDigitsUnsafe : Int -> Text -> Int
-parseDigitsUnsafe acc text =
-    if Text.length text == 0 then acc
-    else
-        let c = Text.take 1 text
-            rest = Text.drop 1 text
-        in parseDigitsUnsafe (acc * 10 + charToDigit c) rest
-
-charToDigit : Text -> Int
-charToDigit c = case c of
-  "0" -> 0; "1" -> 1; "2" -> 2; "3" -> 3; "4" -> 4
-  "5" -> 5; "6" -> 6; "7" -> 7; "8" -> 8; "9" -> 9
-  _ -> error ("Invalid digit: " <> c)
+parseChunk chunk = case Text.parseInt chunk of
+    Some n -> n
+    None -> error ("Invalid digit chunk: " <> chunk)
 
 dropLeadingZeroInts : [Int] -> [Int]
 dropLeadingZeroInts [] = []
