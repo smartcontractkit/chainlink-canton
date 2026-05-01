@@ -100,6 +100,44 @@ testExecutionArchiveBucketUsesTwoHexChars = script do
             CCIP.PerPartyRouter.executionArchiveBucket differentBucket
 
     debug "testExecutionArchiveBucketUsesTwoHexChars: PASSED"
+
+-- Direct router creation rejects redundant custom observers.
+testPerPartyRouterRejectsRedundantCustomObservers : Script ()
+testPerPartyRouterRejectsRedundantCustomObservers = script do
+    ccipOwner <- allocateParty "router-observer-ccip-owner"
+    partyOwner <- allocateParty "router-observer-party-owner"
+    observer <- allocateParty "router-observer-custom"
+
+    let deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+            onRamp = RawInstanceAddress.make "observer-onramp" ccipOwner
+            offRamp = RawInstanceAddress.make "observer-offramp" ccipOwner
+            globalConfig = RawInstanceAddress.make "observer-globalconfig" ccipOwner
+            tokenAdminRegistry = RawInstanceAddress.make "observer-tar" ccipOwner
+            feeQuoter = RawInstanceAddress.make "observer-feequoter" ccipOwner
+            rmnRemote = RawInstanceAddress.make "observer-rmn" ccipOwner
+        createRouter instanceId customObservers = createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId
+            ccipOwner
+            partyOwner
+            deps
+            outboundSequenceNumbers = Map.empty
+            executedMessages = Set.empty
+            archivedExecutionContractIds = Map.empty
+            customObservers
+
+    submitMustFail ccipOwner do
+        createRouter "router-duplicate-observer" [observer, observer]
+
+    submitMustFail ccipOwner do
+        createRouter "router-ccip-owner-observer" [ccipOwner]
+
+    submitMustFail ccipOwner do
+        createRouter "router-party-owner-observer" [partyOwner]
+
+    _ <- submit ccipOwner do
+        createRouter "router-valid-observer" [observer]
+
+    pure ()
 basicExtraArgs : Int -> CCIP.Client.ExtraArgs
 basicExtraArgs gasLimit = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
     gasLimit = gasLimit

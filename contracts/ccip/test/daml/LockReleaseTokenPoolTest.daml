@@ -3603,6 +3603,17 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
     -- | ========= Test 5 ========
     -- | Invalid updates
     -- | ========================
+    -- missing chain configs fail explicitly during rate-limit updates.
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+            rateLimitConfigArgs = [
+                LockReleaseTokenPool.RateLimitConfigArgs with
+                    remoteChainSelector = 999.0 -- does not exist
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+            caller = owner
     -- Attempt to update with an invalid chain selector (negative)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with

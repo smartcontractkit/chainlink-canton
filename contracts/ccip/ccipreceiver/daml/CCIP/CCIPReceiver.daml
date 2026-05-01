@@ -59,6 +59,9 @@ template CCIPReceiver
         -- Ensure that requiredCCVs are unique
         ensure assertValidInstanceId instanceId
             && unique requiredCCVs
+            && unique optionalCCVs
+            && optionalThreshold >= 0
+            && optionalThreshold <= length optionalCCVs
 
         -- | Query the final required CCVs for executing an inbound message.
         -- Aggregates receiver policy with token-pool requirements and delegates

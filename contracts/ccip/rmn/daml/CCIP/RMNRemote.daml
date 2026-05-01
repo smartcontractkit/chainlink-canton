@@ -43,13 +43,20 @@ chainSelectorToSubject chainSelector =
         hexStr = decimalStringToHex decStr
     in padLeft 32 "0" hexStr
 
--- Helper to convert Numeric 0 to decimal string (removes .0 suffix)
-numericToDecimalString : Numeric 0 -> Text
-numericToDecimalString n =
+-- Daml SDK limitation; there is no direct integer text renderer for Numeric 0.
+-- This is the shared strict gate for protocol numeric rendering. It accepts
+-- only the current SDK's canonical integer-valued `show` output with a `.0`
+-- suffix and fails closed if that rendering ever changes.
+numeric0IntegerText : Text -> Numeric 0 -> Text
+numeric0IntegerText label n =
     let str = show n
     in if Text.isSuffixOf ".0" str
        then Text.take (Text.length str - 2) str
-       else str
+       else error (label <> ": expected integer-valued Numeric 0")
+
+-- Helper to convert Numeric 0 chain selectors to decimal string.
+numericToDecimalString : Numeric 0 -> Text
+numericToDecimalString = numeric0IntegerText "rmn: chain selector"
 
 -- Helper to pad string on left
 padLeft : Int -> Text -> Text -> Text
@@ -141,7 +148,11 @@ template RMNRemote
     where
         signatory rmnOwner
         observer ccipOwner, customObservers
+        -- configurable observers must not duplicate stakeholder parties.
         ensure assertValidInstanceId instanceId
+            && length customObservers == length (dedup customObservers)
+            && rmnOwner `notElem` customObservers
+            && ccipOwner `notElem` customObservers
 
         nonconsuming choice Get : RMNRemote
             with

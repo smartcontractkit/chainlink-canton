@@ -6,7 +6,7 @@ module CCIP.CommitteeVerifier (
 import qualified DA.Action
 import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1WithEcdsaOnly)
 import DA.Foldable (forA_)
-import DA.List (dedup, (\\))
+import DA.List (dedup, unique, (\\))
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote)
 
@@ -91,7 +91,10 @@ template CommitteeVerifier
         -- Ensure signer configs have a positive threshold, enough signers,
         -- and no duplicate signer keys.
         ensure assertValidInstanceId instanceId
-          && versionTag /= ""
+          -- this implementation must use the canonical verifier version tag.
+          && versionTag == versionTagV2_0_0
+          -- stored observer lists should not contain redundant parties.
+          && unique messageSentObservers
           -- signer config map keys must match embedded source selectors.
           && all isValidSignatureConfigEntry (Map.toList signerConfigs)
 
@@ -148,6 +151,8 @@ template CommitteeVerifier
                 dynamicConfig : DynamicConfig
             controller owner
             do
+                assertMsg "SetDynamicConfig: duplicate message sent observers"
+                    (unique dynamicConfig.messageSentObservers)
                 create this with 
                     allowListAdmin = dynamicConfig.allowListAdmin
                     messageSentObservers = dynamicConfig.messageSentObservers
@@ -207,6 +212,7 @@ template CommitteeVerifier
                 -- Validate
                 forA_ remoteChainConfigArgs $ \args -> do
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
+                    assertMsg ("ApplyRemoteChainConfigUpdates: invalid fee: " <> show args.feeUSDCents) (args.feeUSDCents >= 0.0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid gas for verification: " <> show args.gasForVerification) (args.gasForVerification > 0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid payload size bytes: " <> show args.payloadSizeBytes) (args.payloadSizeBytes >= 0)
                 -- Update
@@ -344,6 +350,7 @@ template CommitteeVerifier
 
                 let signatureLength = fromSomeNote "Failed to extract signature length" (CCIP.MessageCodecV1.decodeUint16 (fromSomeNote "Failed to extract signature length bytes" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag) 2)))
                 assertMsg "Invalid verifierResults" ((byteCount verifierResults) == ((byteCount versionTag) + 2 + signatureLength))
+                assertMsg "Invalid verifierResults: signature length must be a multiple of signature size" (signatureLength % signature_length == 0)
                 let numberOfSignatures = signatureLength / signature_length
                 assertMsg "Insufficient signatures provided" (numberOfSignatures >= signerConfig.threshold)
                 let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag + 2) signatureLength)

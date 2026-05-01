@@ -285,6 +285,8 @@ template PerPartyRouter
         observer partyOwner :: customObservers
         ensure assertValidInstanceId instanceId
             && unique customObservers
+            && ccipOwner `notElem` customObservers
+            && partyOwner `notElem` customObservers
 
         nonconsuming choice GetFee : CCIP.OnRamp.GetFeeFromRouterResult
             with

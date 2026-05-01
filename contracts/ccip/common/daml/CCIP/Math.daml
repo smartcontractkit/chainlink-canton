@@ -42,6 +42,7 @@ module CCIP.Math
 
 import DA.Numeric qualified as Numeric
 import DA.Text qualified as Text
+import CCIP.RMNRemote qualified as RMNRemote
 
 baseInt : Int
 baseInt = 100000000
@@ -288,11 +289,7 @@ quotientDigit remainder denominator low high =
             _ -> quotientDigit remainder denominator (mid + 1) high
 
 numeric0IntegerText : Text -> Numeric 0 -> Text
-numeric0IntegerText label n =
-    let str = show n
-    in if Text.isSuffixOf ".0" str
-       then Text.take (Text.length str - 2) str
-       else error (label <> ": expected integer-valued Numeric 0")
+numeric0IntegerText = RMNRemote.numeric0IntegerText
 
 chunkTexts : Text -> [Text]
 chunkTexts digits = chunkTextsGo digits []
