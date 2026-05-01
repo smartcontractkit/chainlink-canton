@@ -604,11 +604,9 @@ func (c *Chain) GetTokenTransferConfigs(
 			{combo.RemotePoolAddressRef(), combo.LocalPoolAddressRef(), combo.RemotePoolCCVQualifiers()},
 		} {
 			if pair.local.Type != datastore.ContractType(devenvcommon.LockReleaseTokenPoolType) {
-				fmt.Printf("makdebug canton: no local address ref found for selector %d, local: %v\n", selector, pair.local)
 				continue
 			}
 			if !hasAddressRef(selector, pair.local) {
-				fmt.Printf("makdebug canton: no local address ref found for selector %d, local: %v\n", selector, pair.local)
 				continue
 			}
 
@@ -619,7 +617,6 @@ func (c *Chain) GetTokenTransferConfigs(
 					continue
 				}
 				if !hasAddressRef(rs, pair.remote) {
-					fmt.Printf("makdebug canton: no remote address ref found for selector %d, remote: %v\n", rs, pair.remote)
 					continue
 				}
 
@@ -647,7 +644,6 @@ func (c *Chain) GetTokenTransferConfigs(
 				}
 			}
 			if len(remoteChains) == 0 {
-				fmt.Printf("makdebug canton: no remote chains found for selector %d, remote: %v\n", selector, pair.remote)
 				continue
 			}
 
@@ -672,14 +668,11 @@ func (c *Chain) GetTokenTransferConfigs(
 				qualifier:   cfg.TokenPoolRef.Qualifier,
 			}
 
-			fmt.Printf("makdebug canton: building config: %+v, key: %+v\n", cfg, key)
 			if existing, ok := merged[key]; ok {
 				maps.Copy(existing.RemoteChains, cfg.RemoteChains)
 				merged[key] = existing
-				fmt.Printf("makdebug canton: merged config: %+v, key: %+v\n", existing, key)
 			} else {
 				merged[key] = cfg
-				fmt.Printf("makdebug canton: new config: %+v, key: %+v\n", cfg, key)
 			}
 		}
 	}
@@ -688,8 +681,6 @@ func (c *Chain) GetTokenTransferConfigs(
 	for _, cfg := range merged {
 		configs = append(configs, cfg)
 	}
-
-	fmt.Printf("makdebug canton: num configs produced: %d\n", len(configs))
 
 	return configs, nil
 }
