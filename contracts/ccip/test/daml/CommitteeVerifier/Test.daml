@@ -10,6 +10,7 @@ import DA.Map qualified as Map
 import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
+import CCIP.Crypto.DerEncoding qualified as DerEncoding
 import qualified CCIP.ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -23,6 +24,19 @@ finalityConfig n =
     if n == 0
     then FinalityCodec.WaitForFinality
     else FinalityCodec.BlockDepth n
+
+-- High-S signatures are rejected before DER verification.
+testCommitteeVerifier_SignatureCanonicalization : Script ()
+testCommitteeVerifier_SignatureCanonicalization = script do
+    let lowS = "7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0"
+        upperLowS = "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0"
+        highS = "7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a1"
+        zeroS = "0000000000000000000000000000000000000000000000000000000000000000"
+    assert (DerEncoding.isCanonicalLowS lowS)
+    assert (DerEncoding.isCanonicalLowS upperLowS)
+    assert (not (DerEncoding.isCanonicalLowS highS))
+    assert (not (DerEncoding.isCanonicalLowS zeroS))
+    assert (not (DerEncoding.isCanonicalLowS "00"))
 
 -- | Helper to create a fresh ExecutingMessageV1 for each test.
 -- AddCCVVerification is a consuming choice, so each successful verify
@@ -339,7 +353,6 @@ testCommitteeVerifier = script do
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data
             caller = owner
-
     debug ("===== Passed Test9 =====")
 
     debug ("===== Test10 =====")
@@ -385,19 +398,21 @@ testCommitteeVerifier = script do
             executingMessageCid = executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
             caller = owner
-    -- Remove source chain config, afterward verification should fail
-    ccv10 <- submit owner do
+    -- Removing the final source chain config would leave the verifier unable to verify
+    -- any chain and must be rejected.
+    submitMustFail owner do
         exerciseCmd ccv10 CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = [123.0]
             signatureConfigs = []
-    executingMessageCid <- createExecMsg owner rmnOwner
-    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
-            verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
-            caller = owner
+
+    -- Duplicate source selector updates are rejected.
+    submitMustFail owner do
+        exerciseCmd ccv10 CommitteeVerifier.ApplySignatureConfigs with
+            sourceChainSelectorsToRemove = []
+            signatureConfigs =
+                [ CommitteeVerifier.SignatureConfig with sourceChainSelector = 456.0, threshold = 1, signerKeys = PayloadBuilder.getPubkeysForIndices [0]
+                , CommitteeVerifier.SignatureConfig with sourceChainSelector = 456.0, threshold = 1, signerKeys = PayloadBuilder.getPubkeysForIndices [1]
+                ]
     debug ("===== Passed Test10 =====")
 
     debug ("===== Test10b =====")
@@ -416,7 +431,21 @@ testCommitteeVerifier = script do
             remoteChainConfigs = Map.empty
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [PayloadBuilder.pubkeys !! 0, PayloadBuilder.pubkeys !! 0])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
-
+    -- Signer config map keys must agree with the embedded sourceChainSelector.
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv10b-mismatch"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(456.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     -- duplicate signer keys should be rejected on config updates as well
     ccv10b <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
@@ -595,6 +624,11 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
                 payloadSizeBytes = -1
                 allowListEnabled = False]
 
+    -- duplicate remote selector batches are rejected.
+    submitMustFail owner do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [configArgs123, configArgs123 with feeUSDCents = 101.0]
+
     pure ()
  
 testCommitteeVerifier_ApplyAllowListUpdates : Script ()
@@ -703,7 +737,17 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
             config.allowListEnabled === True
             config.allowedSendersList === [allowedParty2]
 
-    -- Test updating allow list as allow list admin
+    -- Disabling the allow list must not mutate stored senders in the same update.
+    submitMustFail admin do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyAllowListUpdates with
+            allowListConfigArgsItems = [
+                CommitteeVerifier.AllowListConfigArgs with
+                    destChainSelector = 123.0
+                    allowListEnabled = False
+                    addedAllowListedSenders = []
+                    removedAllowListedSenders = [allowedParty1]
+                ]
+            caller = admin
     ccvCid <- submit admin do
         exerciseCmd ccvCid CommitteeVerifier.ApplyAllowListUpdates with
             allowListConfigArgsItems = [
@@ -711,7 +755,7 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
                     destChainSelector = 123.0
                     allowListEnabled = False
                     addedAllowListedSenders = []
-                    removedAllowListedSenders = [allowedParty1] -- party1 should be removed, even though allow list is being disabled in this update
+                    removedAllowListedSenders = []
                 ]
             caller = admin
     gotCCV <- fromSome <$> queryContractId admin ccvCid
@@ -719,7 +763,7 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
         None -> assertMsg "Missing config for chain 123" False
         Some config -> do
             config.allowListEnabled === False
-            config.allowedSendersList === [allowedParty3] -- party1 should be removed, party3 should remain
+            config.allowedSendersList === [allowedParty1, allowedParty3]
 
     -- Test updating allow list with invalid dest chain selector
     submitMustFail admin do

@@ -90,3 +90,57 @@ testTransferAdminRoleRejectsSameAdmin = script do
   config.pendingAdmin === None
 
   pure ()
+
+-- Pending proposals cannot be overwritten without explicit cancellation.
+testProposeAdministratorRejectsPendingOverwrite : Script ()
+testProposeAdministratorRejectsPendingOverwrite = script do
+  owner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "TokenAdmin"
+  newAdmin1 <- allocateParty "NewAdmin1"
+  newAdmin2 <- allocateParty "NewAdmin2"
+
+  let instanceId = "tar-propose-hardening-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+
+  tarCid0 <- submit owner do
+    createCmd TokenAdminRegistry with
+      instanceId
+      owner
+      entryCount = 0
+
+  result1 <- submit owner do
+    exerciseCmd tarCid0 ProposeAdministrator with
+      tokenConfigCid = None
+      instrumentId
+      newAdmin = newAdmin1
+      caller = owner
+  let tarCid1 = result1.tokenAdminRegistryCid
+      configCid1 = result1.tokenConfigCid
+
+  submitMustFail owner do
+    exerciseCmd tarCid1 ProposeAdministrator with
+      tokenConfigCid = Some configCid1
+      instrumentId
+      newAdmin = newAdmin2
+      caller = owner
+
+  configCid2 <- submit owner do
+    exerciseCmd tarCid1 CancelAdministratorProposal with
+      tokenConfigCid = configCid1
+      instrumentId
+      caller = owner
+
+  Some cancelledConfig <- queryContractId owner configCid2
+  cancelledConfig.pendingAdmin === None
+
+  configCid3 <- submit owner do
+    exerciseCmd tarCid1 ProposeAdministrator with
+      tokenConfigCid = Some configCid2
+      instrumentId
+      newAdmin = newAdmin2
+      caller = owner
+
+  Some reproposedConfig <- queryContractId owner configCid3.tokenConfigCid
+  reproposedConfig.pendingAdmin === Some newAdmin2
+
+  pure ()

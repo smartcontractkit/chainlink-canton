@@ -91,7 +91,9 @@ template CommitteeVerifier
         -- Ensure signer configs have a positive threshold, enough signers,
         -- and no duplicate signer keys.
         ensure assertValidInstanceId instanceId
-          && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
+          && versionTag /= ""
+          -- signer config map keys must match embedded source selectors.
+          && all isValidSignatureConfigEntry (Map.toList signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
@@ -170,6 +172,7 @@ template CommitteeVerifier
                     assertMsg ("ApplyAllowListUpdates: invalid chain selector: " <> show args.destChainSelector ) (args.destChainSelector >= 0.0)
                     DA.Action.unless args.allowListEnabled $ do
                         assertMsg "ApplyAllowListUpdates: cannot add allowed senders if allowlist is not enabled" (null args.addedAllowListedSenders)
+                        assertMsg "ApplyAllowListUpdates: cannot remove allowed senders if allowlist is not enabled" (null args.removedAllowListedSenders)
                 -- Update. allowListAdmin can only mutate allow-list fields on an already-onboarded
                 -- chain; new chains must be onboarded through ApplyRemoteChainConfigUpdates (owner-only)
                 -- so allowListAdmin cannot create configs with zeroed fees, gas, and payload size
@@ -198,6 +201,9 @@ template CommitteeVerifier
                 remoteChainConfigArgs : [RemoteChainConfigArgs]
             controller owner
             do
+                let remoteChainSelectors = map (\args -> args.remoteChainSelector) remoteChainConfigArgs
+                assertMsg "ApplyRemoteChainConfigUpdates: duplicate remote chain selectors"
+                    (length remoteChainSelectors == length (dedup remoteChainSelectors))
                 -- Validate
                 forA_ remoteChainConfigArgs $ \args -> do
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
@@ -227,6 +233,9 @@ template CommitteeVerifier
                 signatureConfigs : [SignatureConfig]
             controller owner
             do
+                let sourceChainSelectors = map (\config -> config.sourceChainSelector) signatureConfigs
+                assertMsg "ApplySignatureConfigs: duplicate source chain selectors"
+                    (length sourceChainSelectors == length (dedup sourceChainSelectors))
                 -- Remove existing signer configs for specified source chains
                 let signerConfigsAfterRemoval = foldr Map.delete signerConfigs sourceChainSelectorsToRemove
                 -- Add new signer configs - for each config, check that threshold > 0,
@@ -234,6 +243,8 @@ template CommitteeVerifier
                 assertMsg "invalid signature config: threshold must be > 0, signerKeys must be >= threshold, and signerKeys must be unique"
                     (all isValidSignatureConfig signatureConfigs)
                 let newSignerConfigs = foldr (\config acc -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
+                assertMsg "ApplySignatureConfigs: signer configs cannot be empty"
+                    (length (Map.keys newSignerConfigs) > 0)
                 create this with signerConfigs = newSignerConfigs
 
         -- | Update dependencies selectively (None = keep existing)
@@ -542,7 +553,9 @@ validateSignature messageHash publicKey r s =
     derSignature = CCIP.Crypto.DerEncoding.rawToDerSignature r s
     derPublicKey = CCIP.Crypto.DerEncoding.secp256k1PublicKeyToDer publicKey
   in
-    secp256k1WithEcdsaOnly derSignature messageHash derPublicKey
+    -- enforce canonical low-S ECDSA before DER verification.
+    CCIP.Crypto.DerEncoding.isCanonicalLowS s
+        && secp256k1WithEcdsaOnly derSignature messageHash derPublicKey
 
 findValidSigners : BytesHex -> [(BytesHex, BytesHex)] -> [BytesHex] -> [(BytesHex, Bool)]
 findValidSigners messageHash signatures signerKeys =
@@ -561,3 +574,8 @@ isValidSignatureConfig config =
     config.threshold > 0
         && length config.signerKeys >= config.threshold
         && length config.signerKeys == length (dedup config.signerKeys)
+
+isValidSignatureConfigEntry : (Numeric 0, SignatureConfig) -> Bool
+isValidSignatureConfigEntry (sourceChainSelector, config) =
+    -- prevent map keys from disagreeing with embedded selectors.
+    sourceChainSelector == config.sourceChainSelector && isValidSignatureConfig config

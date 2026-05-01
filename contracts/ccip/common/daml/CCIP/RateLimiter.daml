@@ -68,6 +68,12 @@ template RateLimiter
     where
         signatory poolOwner
         ensure assertValidInstanceId instanceId
+            && capacity >= 0.0
+            && rate >= 0.0
+            && tokens >= 0.0
+            && tokens <= capacity
+            && (not isEnabled || rate <= capacity)
+            && (isEnabled || (capacity == 0.0 && rate == 0.0))
 
         choice SetConfig : ContractId RateLimiter
             with
@@ -76,6 +82,10 @@ template RateLimiter
                 newRate : Numeric 0
             controller poolOwner
             do
+                assertMsg "RateLimiter: capacity must be non-negative"
+                    (newCapacity >= 0.0)
+                assertMsg "RateLimiter: rate must be non-negative"
+                    (newRate >= 0.0)
                 assertMsg "RateLimiter: enabled config requires rate <= capacity"
                     (not newIsEnabled || newRate <= newCapacity)
                 assertMsg "RateLimiter: disabled config must have zero capacity and zero rate"
@@ -93,6 +103,8 @@ template RateLimiter
                 requested : Numeric 0
             controller poolOwner
             do
+                assertMsg "RateLimiter: requested capacity must be non-negative"
+                    (requested >= 0.0)
                 if not isEnabled || requested == 0.0 then
                     pure ConsumeCapacityResult with
                         rateLimiterCid = self

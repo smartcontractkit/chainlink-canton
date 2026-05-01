@@ -70,6 +70,10 @@ mkHexMessageId i =
         padding = replicateText (64 - Text.length suffix) "0"
     in padding <> suffix
 
+mkPrefixedMessageId : Text -> BytesHex
+mkPrefixedMessageId prefix =
+    prefix <> replicateText (64 - Text.length prefix) "0"
+
 replicateText : Int -> Text -> Text
 replicateText n t =
     if n <= 0 then ""
@@ -81,6 +85,21 @@ mult m = intToNumeric (truncate (m * 100000000.0))
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
 
+-- Archive buckets use a bounded two-hex-character prefix.
+testExecutionArchiveBucketUsesTwoHexChars : Script ()
+testExecutionArchiveBucketUsesTwoHexChars = script do
+    let sharedBucketA = mkPrefixedMessageId "ab12"
+    let sharedBucketB = mkPrefixedMessageId "abff"
+    let differentBucket = mkPrefixedMessageId "cd12"
+
+    CCIP.PerPartyRouter.executionArchiveBucket sharedBucketA === "ab"
+    CCIP.PerPartyRouter.executionArchiveBucket sharedBucketA ===
+        CCIP.PerPartyRouter.executionArchiveBucket sharedBucketB
+    assertMsg "messages with different two-character prefixes must use different archive buckets" $
+        CCIP.PerPartyRouter.executionArchiveBucket sharedBucketA /=
+            CCIP.PerPartyRouter.executionArchiveBucket differentBucket
+
+    debug "testExecutionArchiveBucketUsesTwoHexChars: PASSED"
 basicExtraArgs : Int -> CCIP.Client.ExtraArgs
 basicExtraArgs gasLimit = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
     gasLimit = gasLimit
@@ -985,16 +1004,17 @@ testPrepareSendRejectsOversizedPayload = script do
 
     pure ()
 
+-- Replay lookup checks active state and only the relevant archive bucket.
 testGetExecutionStateUsesActiveAndArchivedMessages : Script ()
 testGetExecutionStateUsesActiveAndArchivedMessages = script do
     ccipOwner <- allocateParty "ccip-owner-exec-state"
     partyOwner <- allocateParty "party-owner-exec-state"
     arbitraryCaller <- allocateParty "arbitrary-caller-exec-state"
 
-    let activeMessage = mkHexMessageId 100001
-    let olderMessage = mkHexMessageId 100002
-    let newerMessage = mkHexMessageId 100003
-    let missingMessage = mkHexMessageId 100004
+    let activeMessage = mkPrefixedMessageId "cd12"
+    let olderMessage = mkPrefixedMessageId "ab12"
+    let newerMessage = mkPrefixedMessageId "abff"
+    let missingMessage = mkPrefixedMessageId "ab34"
 
     let deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
             onRamp = RawInstanceAddress.make "onramp-exec-state" ccipOwner
@@ -1009,6 +1029,7 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
             ccipOwner
             partyOwner
             perPartyRouterInstanceId = "router-exec-state"
+            archiveBucket = CCIP.PerPartyRouter.executionArchiveBucket olderMessage
             archiveIndex = 0
             executedMessages = Set.fromList [olderMessage]
 
@@ -1017,6 +1038,7 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
             ccipOwner
             partyOwner
             perPartyRouterInstanceId = "router-exec-state"
+            archiveBucket = CCIP.PerPartyRouter.executionArchiveBucket newerMessage
             archiveIndex = 1
             executedMessages = Set.fromList [newerMessage]
 
@@ -1028,7 +1050,10 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
             deps
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.fromList [activeMessage]
-            archivedExecutionContractIds = [olderArchive, newerArchive]
+            archivedExecutionContractIds =
+                Map.fromList
+                    [ (CCIP.PerPartyRouter.executionArchiveBucket olderMessage, [olderArchive, newerArchive])
+                    ]
             customObservers = []
 
     disclosedOlderArchive <- fromSome <$> queryDisclosure ccipOwner olderArchive
@@ -1067,6 +1092,7 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
 
     debug "testGetExecutionStateUsesActiveAndArchivedMessages: PASSED"
 
+-- rollover archives executed messages into hash-prefix buckets.
 testExecuteRollsOverExecutedMessages : Script ()
 testExecuteRollsOverExecutedMessages = script do
     ccipOwner <- allocateParty "ccip-owner-rollover"
@@ -1132,6 +1158,7 @@ testExecuteRollsOverExecutedMessages = script do
             ccipOwner
             partyOwner = receiver
             perPartyRouterInstanceId = routerInstanceId
+            archiveBucket = CCIP.PerPartyRouter.executionArchiveBucket olderArchivedMessage
             archiveIndex = 0
             executedMessages = Set.fromList [olderArchivedMessage]
 
@@ -1149,7 +1176,10 @@ testExecuteRollsOverExecutedMessages = script do
                 rmnRemote = rmnRemoteInstanceAddress
             outboundSequenceNumbers = Map.empty
             executedMessages = seededMessagesSet
-            archivedExecutionContractIds = [olderArchive]
+            archivedExecutionContractIds =
+                Map.fromList
+                    [ (CCIP.PerPartyRouter.executionArchiveBucket olderArchivedMessage, [olderArchive])
+                    ]
             customObservers = []
 
     let message = CCIP.MessageCodecV1.MessageV1 with
@@ -1217,9 +1247,9 @@ testExecuteRollsOverExecutedMessages = script do
     assertMsg "newly executed message should be the only active message" $
         Set.member executeResult.messageId updatedRouter.executedMessages
 
-    length updatedRouter.archivedExecutionContractIds === 2
-    case updatedRouter.archivedExecutionContractIds of
-        [firstArchiveCid, secondArchiveCid] -> do
+    length (Map.keys updatedRouter.archivedExecutionContractIds) === 1
+    case Map.lookup (CCIP.PerPartyRouter.executionArchiveBucket sampleSeededMessage) updatedRouter.archivedExecutionContractIds of
+        Some [firstArchiveCid, secondArchiveCid] -> do
             firstArchiveCid === olderArchive
 
             Some firstArchive <- queryContractId receiver firstArchiveCid
@@ -1235,7 +1265,7 @@ testExecuteRollsOverExecutedMessages = script do
             Set.size secondArchive.executedMessages === CCIP.PerPartyRouter.maxExecutedMessagesSize
             assertMsg "new archive should contain the pre-rollover active set" $
                 Set.member sampleSeededMessage secondArchive.executedMessages
-        _ -> assertMsg "expected exactly two archived execution contract ids after rollover" False
+        _ -> assertMsg "expected exactly two archived execution contract ids in rollover bucket" False
 
     activeState <- submit receiver do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
@@ -1548,7 +1578,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 rmnRemote = rmnRemoteInstanceAddress
             outboundSequenceNumbers = Map.fromList [(destChainSelector, maxUint64)]
             executedMessages = Set.empty
-            archivedExecutionContractIds = []
+            archivedExecutionContractIds = Map.empty
             customObservers = []
 
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp

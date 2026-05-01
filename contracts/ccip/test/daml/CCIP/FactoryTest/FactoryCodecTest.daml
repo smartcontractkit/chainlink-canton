@@ -27,6 +27,7 @@ import CCIP.Codec
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FinalityConfig qualified as FinalityCodec
+import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import CCIP.Factory
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -363,7 +364,8 @@ testDecodeDeployCommitteeVerifierParams = script do
         instanceId = "ccv-1"
         owner
         ccipOwner
-        versionTag = "01020304"
+        -- deploy fixtures must use the canonical verifier version tag.
+        versionTag = CommitteeVerifier.versionTagV2_0_0
         allowListAdmin = Some allowListAdmin
         --allowListAdmin = None
         messageSentObservers = [messageSentObserver]

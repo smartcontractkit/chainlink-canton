@@ -44,9 +44,3 @@ trimLeadingZeros hex
       trimLeadingZeros (Text.drop 2 hex)
   | Text.length hex == 0 = "00"
   | otherwise = hex
-
--- Strip "0x" prefix from a hex string if present
-stripHexPrefix : BytesHex -> BytesHex
-stripHexPrefix hex
-  | Text.length hex >= 2 && Text.take 2 hex == "0x" = Text.drop 2 hex
-  | otherwise = hex

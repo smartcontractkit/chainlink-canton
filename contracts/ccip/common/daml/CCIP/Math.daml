@@ -115,8 +115,19 @@ integerAmountWithinCap feeAmount maxFeeJuelsPerMsg =
 -- LINK units.
 normalizedFeeWithinCap : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0 -> Bool
 normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice maxFeeJuelsPerMsg =
-    convertTokenAmountLocal feeTokenAmount feeTokenPrice linkTokenPrice
-        <= juelsCapToLocalLinkCap maxFeeJuelsPerMsg
+    if linkTokenPrice <= 0.0 then error "normalizedFeeWithinCap: link token price must be positive"
+    else if feeTokenAmount < 0.0 || feeTokenPrice < 0.0 || maxFeeJuelsPerMsg < 0.0
+        then error "normalizedFeeWithinCap: negative input"
+    else
+        let lhs = mulLimbs
+                (mulLimbs
+                    (toLimbs "normalizedFeeWithinCap feeTokenAmount" feeTokenAmount)
+                    (toLimbs "normalizedFeeWithinCap feeTokenPrice" feeTokenPrice))
+                (toLimbs "normalizedFeeWithinCap juelsPerLocalLink" juelsPerLocalLink)
+            rhs = mulLimbs
+                (toLimbs "normalizedFeeWithinCap maxFeeJuelsPerMsg" maxFeeJuelsPerMsg)
+                (toLimbs "normalizedFeeWithinCap linkTokenPrice" linkTokenPrice)
+        in compareLimbs lhs rhs /= GT
 
 -- | Exact floor(a * b / c) over integer-valued Numeric 0 inputs.
 mulDivDown : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
