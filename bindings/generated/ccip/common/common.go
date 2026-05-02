@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "64935fb441c21f8e22ac3a674f1f53cddec1769349bd4e274c99395f0f0e7902"
+	PackageID   = "1bc213543e003d8141a8fe75dbcd495d6e680991b723388373fb163e5fbcbf37"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1031,6 +1031,38 @@ func (t CancelExecuteMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CancelExecuteMCMSParams from hex string.
 func (t *CancelExecuteMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ConsumeByCCIPOwner is a Record type
+type ConsumeByCCIPOwner struct {
+}
+
+// ToMap converts ConsumeByCCIPOwner to a map for DAML arguments
+func (t ConsumeByCCIPOwner) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t ConsumeByCCIPOwner) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ConsumeByCCIPOwner) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ConsumeByCCIPOwner to hex string (Canton MCMS format)
+func (t ConsumeByCCIPOwner) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ConsumeByCCIPOwner from hex string (Canton MCMS format)
+func (t *ConsumeByCCIPOwner) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -3969,6 +4001,7 @@ type SendingMessageV1 struct {
 	Sender                    types.PARTY                               `json:"sender"`
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
+	DestDefaultCCVs           []mcms.RawInstanceAddress                 `json:"destDefaultCCVs"`
 	RequiredCCVs              []mcms.RawInstanceAddress                 `json:"requiredCCVs"`
 	RequiredExecutor          *mcms.RawInstanceAddress                  `json:"requiredExecutor" hex:"optional"`
 	ExecutorAddress           types.TEXT                                `json:"executorAddress"`
@@ -4038,6 +4071,15 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	if t.SequenceNumber != "" {
 		args["sequenceNumber"] = t.SequenceNumber
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["destDefaultCCVs"] = func() []any {
+		res := make([]any, 0, len(t.DestDefaultCCVs))
+		for _, e := range t.DestDefaultCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["requiredCCVs"] = func() []any {
@@ -4290,6 +4332,15 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	if t.SequenceNumber != "" {
 		args["sequenceNumber"] = t.SequenceNumber
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["destDefaultCCVs"] = func() []any {
+		res := make([]any, 0, len(t.DestDefaultCCVs))
+		for _, e := range t.DestDefaultCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["requiredCCVs"] = func() []any {
@@ -5037,6 +5088,7 @@ type TokenReceiveTicket struct {
 	CcipOwner                    types.PARTY                              `json:"ccipOwner"`
 	CcvOwners                    []types.PARTY                            `json:"ccvOwners"`
 	VerifiedCCVs                 []mcms.RawInstanceAddress                `json:"verifiedCCVs"`
+	RequiredInboundPoolCCVs      []mcms.RawInstanceAddress                `json:"requiredInboundPoolCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
 	PoolOwner                    types.PARTY                              `json:"poolOwner"`
 	Receiver                     types.PARTY                              `json:"receiver"`
@@ -5079,6 +5131,15 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 	args["verifiedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.VerifiedCCVs))
 		for _, e := range t.VerifiedCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["requiredInboundPoolCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredInboundPoolCCVs))
+		for _, e := range t.RequiredInboundPoolCCVs {
 			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
@@ -5148,6 +5209,15 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["requiredInboundPoolCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredInboundPoolCCVs))
+		for _, e := range t.RequiredInboundPoolCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -5208,6 +5278,27 @@ func (t *TokenReceiveTicket) UnmarshalHex(data string) error {
 }
 
 // Choice methods for TokenReceiveTicket
+
+// ConsumeByCCIPOwner exercises the ConsumeByCCIPOwner choice on this TokenReceiveTicket contract
+// This method uses the package name in the template ID
+func (t TokenReceiveTicket) ConsumeByCCIPOwner(contractID string, args ConsumeByCCIPOwner) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Tickets", "TokenReceiveTicket"),
+		ContractID: contractID,
+		Choice:     "ConsumeByCCIPOwner",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ConsumeByCCIPOwnerWithPackageID exercises the ConsumeByCCIPOwner choice using the provided package ID instead of package name
+func (t TokenReceiveTicket) ConsumeByCCIPOwnerWithPackageID(contractID string, packageID string, args ConsumeByCCIPOwner) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "TokenReceiveTicket"),
+		ContractID: contractID,
+		Choice:     "ConsumeByCCIPOwner",
+		Arguments:  argsToMap(args),
+	}
+}
 
 // Archive exercises the Archive choice on this TokenReceiveTicket contract
 // This method uses the package name in the template ID
@@ -5819,6 +5910,7 @@ type MCMSEncoder interface {
 	BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
 	CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.EncodedChoice, error)
+	ConsumeByCCIPOwner(args ConsumeByCCIPOwner) (*bind.EncodedChoice, error)
 	ConsumeCapacity(args ConsumeCapacity) (*bind.EncodedChoice, error)
 	FeeTokenAmount(args FeeTokenAmount) (*bind.EncodedChoice, error)
 	FeeTokenAmountMCMSParams(args FeeTokenAmountMCMSParams) (*bind.EncodedChoice, error)
@@ -5949,6 +6041,11 @@ func (e *encoder) CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
 // CancelExecuteMCMSParams encodes MCMS parameters (without Caller) for the CancelExecute choice.
 func (e *encoder) CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CancelExecute", args)
+}
+
+// ConsumeByCCIPOwner encodes parameters for the ConsumeByCCIPOwner choice.
+func (e *encoder) ConsumeByCCIPOwner(args ConsumeByCCIPOwner) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ConsumeByCCIPOwner", args)
 }
 
 // ConsumeCapacity encodes parameters for the ConsumeCapacity choice.
