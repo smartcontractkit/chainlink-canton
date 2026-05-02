@@ -477,8 +477,7 @@ template TokenAdminRegistry
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 ticketReceiver : Party
                 returnData : BytesHex
-                caller : Party
-            controller caller
+            controller owner
             do
                 execMsg <- fetch executingMessageCid
                 assertMsg "TAR finalize: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
