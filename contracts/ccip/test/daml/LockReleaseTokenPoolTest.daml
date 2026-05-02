@@ -17,6 +17,7 @@ import CCIP.Events qualified as Events
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.FeeQuoter qualified as FeeQuoter
+import CCIP.Internal qualified as Internal
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
@@ -298,6 +299,7 @@ testLockOrBurn = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
+            destDefaultCCVs = []
             requiredExecutor = None
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
@@ -529,6 +531,7 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
+            destDefaultCCVs = []
             requiredExecutor = None
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
@@ -716,6 +719,7 @@ testLockOrBurnDeductsFeeBps = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
+            destDefaultCCVs = []
             requiredExecutor = None
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-bps" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
@@ -1496,6 +1500,7 @@ testExecutionGasLimitAggregation = script do
                 [ RawInstanceAddress.make "ccv-1" ccvOwner1
                 , RawInstanceAddress.make "ccv-2" ccvOwner2
                 ]
+            destDefaultCCVs = []
             requiredExecutor = Some (RawInstanceAddress.make "default-executor-gas" executorOwner)
             -- executorAddress is specified, only the specified executor can add executor fee
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-gas" executorOwner)
@@ -1749,6 +1754,7 @@ testExecutionGasLimitWithTokenSendFee = script do
             destChainSelector = 456.0
             sequenceNumber = 1.0
             requiredCCVs = [RawInstanceAddress.make "ccv-pool" ccvOwner]
+            destDefaultCCVs = []
             requiredExecutor = Some (RawInstanceAddress.make "default-executor-gas-pool" executorOwner)
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-gas-pool" executorOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_Executor
@@ -1846,6 +1852,107 @@ testExecutionGasLimitWithTokenSendFee = script do
 
     debug "testExecutionGasLimitWithTokenSendFee: PASSED"
 
+-- C-4: Outbound pool CCVs should resolve destination defaults on [] and
+-- support useDefaultCCVs sentinel expansion.
+testSetOutboundPoolCCVsResolvesDefaults : Script ()
+testSetOutboundPoolCCVsResolvesDefaults = script do
+    ccipOwner <- allocateParty "ccip-owner-pool-default-resolve"
+    sender <- allocateParty "sender-pool-default-resolve"
+    defaultCCVOwner <- allocateParty "default-ccv-owner-pool-default-resolve"
+    poolCCVOwner <- allocateParty "pool-ccv-owner-pool-default-resolve"
+
+    let feeInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "FeeToken"
+    let tokenInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "SendToken"
+    let senderAddr = MessageCodecV1.encodePartyAddress sender
+    let defaultCCV1 = RawInstanceAddress.make "default-ccv-1" defaultCCVOwner
+    let defaultCCV2 = RawInstanceAddress.make "default-ccv-2" defaultCCVOwner
+    let poolCCV = RawInstanceAddress.make "pool-ccv-1" poolCCVOwner
+
+    let mkSendingMessage sequenceNumber = submit ccipOwner do
+            createCmd SendingMessageV1.SendingMessageV1 with
+                ccipOwner = ccipOwner
+                sender = sender
+                deps = SendingMessageV1.SendingMessageDeps with
+                    router = RawInstanceAddress.make "router-pool-default-resolve" sender
+                    onRamp = RawInstanceAddress.make "onramp-pool-default-resolve" ccipOwner
+                    globalConfig = RawInstanceAddress.make "globalconfig-pool-default-resolve" ccipOwner
+                    rmnRemote = RawInstanceAddress.make "rmn-pool-default-resolve" ccipOwner
+                    tokenAdminRegistry = RawInstanceAddress.make "tar-pool-default-resolve" ccipOwner
+                    feeQuoter = RawInstanceAddress.make "feequoter-pool-default-resolve" ccipOwner
+                destChainSelector = 456.0
+                sequenceNumber = sequenceNumber
+                requiredCCVs = []
+                destDefaultCCVs = [defaultCCV1, defaultCCV2]
+                requiredExecutor = None
+                executorAddress = ""
+                executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
+                sourceChainSelector = 123.0
+                senderAddress = senderAddr
+                receiver = "0000000000000000000000000000000000000001"
+                payload = ""
+                executionGasLimit = 0
+                ccipReceiveGasLimit = 0
+                ccvAndExecutorHash = ""
+                onRampAddress = "0000000000000000000000000000000000000001"
+                offRampAddress = "0000000000000000000000000000000000000002"
+                tokenReceiver = "0000000000000000000000000000000000000003"
+                tokenArgs = ""
+                message = None
+                encodedMessage = ""
+                messageId = ""
+                feeToken = feeInstrumentId
+                networkFeeUSDCents = cents 0.0
+                expectedTokenInstrumentId = Some tokenInstrumentId
+                outboundPoolCCVs = None
+                executorArgs = ""
+                executorFee = None
+                executorDestGasLimit = 0
+                executorDestBytesOverhead = 0
+                executorFeeTokenAmount = 0.0
+                ccvFees = []
+                tokenSendFee = None
+                ccvFeeTokenAmounts = []
+                tokenSendFeeTokenAmount = 0.0
+                networkFeeTokenAmount = 0.0
+                verifierData = []
+                ccvOwners = []
+                tokenSendData = None
+                observingParties = [sender]
+                state = SendingMessageV1.SendingMessageState_RequirePoolCCVs
+
+    -- Empty pool CCV list resolves to destination defaults.
+    smEmptyPool <- mkSendingMessage 1.0
+    smEmptyPool <- submit ccipOwner do
+        exerciseCmd smEmptyPool SendingMessageV1.SetOutboundPoolCCVs with
+            poolCCVs = []
+    Some smEmptyPoolData <- queryContractId ccipOwner smEmptyPool
+    smEmptyPoolData.outboundPoolCCVs === Some [defaultCCV1, defaultCCV2]
+    smEmptyPoolData.state === SendingMessageV1.SendingMessageState_Prepared
+
+    -- Sentinel expands defaults and preserves explicit pool CCVs.
+    smSentinelPool <- mkSendingMessage 2.0
+    smSentinelPool <- submit ccipOwner do
+        exerciseCmd smSentinelPool SendingMessageV1.SetOutboundPoolCCVs with
+            poolCCVs = [Internal.useDefaultCCVs, poolCCV]
+    Some smSentinelPoolData <- queryContractId ccipOwner smSentinelPool
+    smSentinelPoolData.outboundPoolCCVs === Some [defaultCCV1, defaultCCV2, poolCCV]
+    smSentinelPoolData.state === SendingMessageV1.SendingMessageState_Prepared
+
+    -- Explicit pool-only CCVs do not auto-append defaults.
+    smExplicitPool <- mkSendingMessage 3.0
+    smExplicitPool <- submit ccipOwner do
+        exerciseCmd smExplicitPool SendingMessageV1.SetOutboundPoolCCVs with
+            poolCCVs = [poolCCV]
+    Some smExplicitPoolData <- queryContractId ccipOwner smExplicitPool
+    smExplicitPoolData.outboundPoolCCVs === Some [poolCCV]
+    smExplicitPoolData.state === SendingMessageV1.SendingMessageState_Prepared
+
+    debug "testSetOutboundPoolCCVsResolvesDefaults: PASSED"
+
 -- | Token pools may only supply pool metadata up to the bytes they quoted during CalculateFee.
 testAddTokenSendRejectsExtraDataBeyondQuotedOverhead : Script ()
 testAddTokenSendRejectsExtraDataBeyondQuotedOverhead = script do
@@ -1871,6 +1978,7 @@ testAddTokenSendRejectsExtraDataBeyondQuotedOverhead = script do
             destChainSelector = 456.0
             sequenceNumber = 1.0
             requiredCCVs = []
+            destDefaultCCVs = []
             requiredExecutor = None
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-extra-bound" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
@@ -2491,6 +2599,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
+            destDefaultCCVs = []
             requiredExecutor = None
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-fallback" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
@@ -2643,6 +2752,7 @@ testCalculateFeePrefersPoolOverride = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
+            destDefaultCCVs = []
             requiredExecutor = None
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-override" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
@@ -2794,6 +2904,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
+            destDefaultCCVs = []
             requiredExecutor = None
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-disabled" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor

@@ -80,20 +80,21 @@ computeRequiredCCVsForSend
     -> CCIP.Client.GenericExtraArgsV3
     -> [RawInstanceAddress.RawInstanceAddress]
     -> [RawInstanceAddress.RawInstanceAddress]
-computeRequiredCCVsForSend destConfig message extraArgs tokenPoolRequiredCCVs =
+computeRequiredCCVsForSend destConfig message extraArgs senderRequestedCCVs =
     let hasTokenTransfer = isSome message.tokenTransfer
         isTokenOnlyTransfer = hasTokenTransfer
             && message.payload == ""
             && extraArgs.gasLimit == 0
-        resolvedSenderRequiredCCVs = case tokenPoolRequiredCCVs of
+        resolvedSenderRequiredCCVs = case senderRequestedCCVs of
             [] ->
                 if isTokenOnlyTransfer
                 then []
-                else destConfig.defaultCCVs
-            _ -> CCIP.Internal.resolveDefaultCCVs
+                else CCIP.Internal.resolveRequiredCCVsWithDefaults
+                    destConfig.defaultCCVs
+                    senderRequestedCCVs
+            _ -> CCIP.Internal.resolveRequiredCCVsWithDefaults
                 destConfig.defaultCCVs
-                CCIP.Internal.useDefaultCCVs
-                tokenPoolRequiredCCVs
+                senderRequestedCCVs
     in dedup (resolvedSenderRequiredCCVs ++ destConfig.laneMandatedCCVs)
 
 data GetFeeFromRouterResult = GetFeeFromRouterResult
@@ -250,7 +251,7 @@ template OnRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 destChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                tokenPoolRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+                poolReportedCCVs : [RawInstanceAddress.RawInstanceAddress]
             controller ccipOwner
             do
                 globalConfig <- fetch globalConfigCid
@@ -266,7 +267,20 @@ template OnRamp
                     Some config -> do
                         extraArgs <- case message.extraArgs of
                                 CCIP.Client.V3 v3 -> pure v3
-                        pure (computeRequiredCCVsForSend config message extraArgs tokenPoolRequiredCCVs)
+                                _ -> abort "onramp: unsupported extraArgs version"
+                        let senderRequiredCCVs =
+                                computeRequiredCCVsForSend
+                                    config
+                                    message
+                                    extraArgs
+                                    (map (.ccvAddress) extraArgs.ccvs)
+                        let finalRequiredCCVs = case message.tokenTransfer of
+                                None -> senderRequiredCCVs
+                                Some _ ->
+                                    dedup (senderRequiredCCVs ++ CCIP.Internal.resolveRequiredCCVsWithDefaults
+                                        config.defaultCCVs
+                                        poolReportedCCVs)
+                        pure finalRequiredCCVs
 
         -- | Build SendingMessageV1 for outbound message.
         -- Validates fee token is accepted, reads network fee from DestChainConfig.
@@ -353,7 +367,7 @@ template OnRamp
                 let (hasTokenTransfer, tokenInstrumentId) = case message.tokenTransfer of
                         None -> (False, None)
                         Some tt -> (True, Some tt.token)
-                let resolvedCCVs =
+                let resolvedSenderRequiredCCVs =
                         computeRequiredCCVsForSend
                             destConfig
                             message
@@ -405,7 +419,8 @@ template OnRamp
                         feeQuoter = deps.feeQuoter
                     destChainSelector
                     sequenceNumber = newSequenceNumber
-                    requiredCCVs = resolvedCCVs
+                    destDefaultCCVs = destConfig.defaultCCVs
+                    requiredCCVs = resolvedSenderRequiredCCVs
                     requiredExecutor = resolvedRequiredExecutor
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
