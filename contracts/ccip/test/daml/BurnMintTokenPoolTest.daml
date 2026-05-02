@@ -189,6 +189,7 @@ mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInsta
         feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
       destChainSelector
       sequenceNumber = 1.0
+      destDefaultCCVs = []
       requiredCCVs = []
       requiredExecutor = None
       executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor" ccipOwner)
@@ -383,6 +384,7 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
       ccipOwner = ccipOwner
       ccvOwners = []
       verifiedCCVs = []
+      requiredInboundPoolCCVs = []
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
       poolOwner = poolOwner
       receiver = receiver

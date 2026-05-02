@@ -456,32 +456,12 @@ testTokenAdminRegistryFinalizeExecuteRequiresOwner = script do
             customObservers = []
             cursedSubjects = []
 
-    tokenAdminRegistry <- submit ccipOwner do
-        createCmd TokenAdminRegistry.TokenAdminRegistry with
-            instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
-            tokenConfigs = Map.empty
-
-    tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
-            instrumentId = feeToken
-            newAdmin = poolOwner
-            caller = ccipOwner
-
-    disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
-            instrumentId = feeToken
-            caller = poolOwner
-
-    disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
-            instrumentId = feeToken
-            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
-                poolOwner = poolOwner
-                poolInstanceId = "test-pool-finalize-auth"
-            caller = poolOwner
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
+        ccipOwner
+        poolOwner
+        tokenAdminRegistryInstanceId
+        feeToken
+        "test-pool-finalize-auth"
 
     let offRampAddr = RawInstanceAddress.make offRampInstanceId ccipOwner
     let globalConfigAddr = RawInstanceAddress.make globalConfigInstanceId ccipOwner
@@ -536,10 +516,12 @@ testTokenAdminRegistryFinalizeExecuteRequiresOwner = script do
             state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
     disclosedExecutingMessage <- fromSome <$> queryDisclosure ccipOwner executingMessageCid
 
-    submitMustFail (actAs receiver <> disclose disclosedTar <> disclose disclosedExecutingMessage) do
+    submitMustFail (actAs receiver <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedExecutingMessage) do
         exerciseCmd tokenAdminRegistry TokenAdminRegistry.FinalizeExecute with
+            tokenConfigCid = tokenConfigCid
             executingMessageCid = executingMessageCid
             ticketReceiver = receiver
             returnData = ""

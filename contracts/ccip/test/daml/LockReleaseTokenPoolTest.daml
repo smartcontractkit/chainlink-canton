@@ -965,7 +965,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
     let tokenPoolInstanceId = "test-lock-release-pool-drift"
     let sourceChainSelector : Numeric 0 = 123.0
 
-    let requiredCcv = RawInstanceAddress.make "required-ccv-drift" ccvOwner
+    let requiredCcv = RawInstanceAddress.make "required-ccv-drift" ccipOwner
     let driftCcv = RawInstanceAddress.make "drift-ccv" ccvOwner
 
     let testInstrumentId = HoldingV1.InstrumentId with
@@ -989,32 +989,12 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
             admin = ccipOwner
             preapprovalCid = Some receiverPreapproval
 
-    tokenAdminRegistry <- submit ccipOwner do
-        createCmd TokenAdminRegistry.TokenAdminRegistry with
-            owner = ccipOwner
-            instanceId = tokenAdminRegistryInstanceId
-            tokenConfigs = Map.empty
-
-    tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.ProposeAdministrator with
-            instrumentId = testInstrumentId
-            newAdmin = poolOwner
-            caller = ccipOwner
-
-    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.AcceptAdminRole with
-            instrumentId = testInstrumentId
-            caller = poolOwner
-
-    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetPool with
-            instrumentId = testInstrumentId
-            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
-                poolOwner = poolOwner
-                poolInstanceId = tokenPoolInstanceId
-            caller = poolOwner
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
+        ccipOwner
+        poolOwner
+        tokenAdminRegistryInstanceId
+        testInstrumentId
+        tokenPoolInstanceId
 
     rmnRemote <- submit rmnOwner do
         createCmd RMNRemote.RMNRemote with
@@ -1054,7 +1034,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.fromList [(sourceChainSelector, initialConfig)]
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-release-drift" ccipOwner rmnOwner
 
@@ -1062,7 +1042,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
-            ccvOwners = [ccvOwner]
+            ccvOwners = []
             verifiedCCVs = [requiredCcv]
             requiredInboundPoolCCVs = [requiredCcv]
             poolOwner = poolOwner
@@ -1090,16 +1070,10 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
             remoteChainSelectorsToRemove = [sourceChainSelector]
             chainsToAdd = [driftUpdate]
 
-    let tokenInput = ITokenPool.TokenInput with
-            transferFactory = toInterfaceContractId transferFactory
-            extraArgs = MetadataV1.ExtraArgs with
-                context = MetadataV1.emptyChoiceContext
-                meta = MetadataV1.emptyMetadata
-            tokenPoolHoldings = [toInterfaceContractId poolHolding]
-
     disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
     disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
@@ -1107,15 +1081,15 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
     disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicket
 
     result <- submit (actAs receiver
-                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedFactory
                       <> disclose disclosedPreapproval <> disclose disclosedRmn
                       <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
         exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
-            tokenInput = tokenInput
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
             caller = receiver
 
     case result.output of

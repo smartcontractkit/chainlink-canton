@@ -817,7 +817,7 @@ testPrepareSendExtraArgs = script do
             tokenTransfer = Some (CCIP.Client.TokenTransfer with
                 token = feeTokenId
                 amount = 1.0)
-            feeToken = basicFeeToken feeTokenId dummyTokenInput
+            feeToken = feeTokenId
             extraArgs = basicExtraArgs 0
     let poolCCV = RawInstanceAddress.make "pool-ccv" user
 
