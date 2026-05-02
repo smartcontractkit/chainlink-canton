@@ -407,6 +407,11 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             executingMessageCid = executingMessageCid
 
     assertMsg "token-only execute should produce a ticket" (isSome result.tokenReceiveTicket)
+    ticketCid <- case result.tokenReceiveTicket of
+        Some cid -> pure cid
+        None -> abort "expected token ticket"
+    ticket <- fromSome <$> queryContractId receiver ticketCid
+    ticket.requiredInboundPoolCCVs === [defaultCCV]
     debug "testExecuteTokenOnlyIgnoresReceiverCCVs: PASSED"
 
 -- Test that the receiver specifying empty CCVs causes the default lane CCVs to be used.
