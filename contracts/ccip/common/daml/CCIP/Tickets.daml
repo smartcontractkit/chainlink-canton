@@ -60,3 +60,11 @@ template TokenReceiveTicket
     where
         signatory dedup (ccipOwner :: ccvOwners)
         observer poolOwner, receiver, tokenReceiver
+
+        -- Consume the ticket under ccipOwner authority.
+        -- Used by TokenAdminRegistry after it validates pool/instrument/instance checks,
+        -- so pool claims do not require every CCV owner to co-authorize archive.
+        choice ConsumeByCCIPOwner : ()
+            controller ccipOwner
+            do
+                pure ()
