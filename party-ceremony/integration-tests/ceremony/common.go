@@ -243,10 +243,6 @@ func (s *CeremonyTestSuite) depsFor(actorIndex int, kmsCfg client.KMSConfig) cer
 	return deps
 }
 
-func (s *CeremonyTestSuite) kmsDepsFor(actorIndex int) ceremony.CantonDeps {
-	return s.OnboardingDeps(actorIndex)
-}
-
 func (s *CeremonyTestSuite) assertKMSKeysRegistered(actorIndex int, kmsCfg client.KMSConfig) {
 	t := s.T()
 	t.Helper()
