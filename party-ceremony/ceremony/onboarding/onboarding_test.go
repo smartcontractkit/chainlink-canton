@@ -19,13 +19,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 // ── Mock Canton client ───────────────────────────────────────────────────────
 
 type mockCantonClient struct {
-	participantID string
+	participantID    string
+	kmsRegistrations *int
 }
 
 func (m *mockCantonClient) GetParticipantUID(_ context.Context) (string, error) {
@@ -38,6 +40,18 @@ func (m *mockCantonClient) GetParticipantID(_ context.Context) (string, error) {
 
 func (m *mockCantonClient) GenerateSigningKey(_ context.Context, name string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
 	raw := sha256.Sum256([]byte(m.participantID + ":" + name))
+	return &cryptov30.SigningPublicKey{
+		PublicKey: raw[:],
+		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
+	}, nil
+}
+
+func (m *mockCantonClient) RegisterKmsSigningKey(_ context.Context, kmsKeyID string, name string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	if m.kmsRegistrations != nil {
+		(*m.kmsRegistrations)++
+	}
+	raw := sha256.Sum256([]byte(m.participantID + ":" + kmsKeyID + ":" + name))
+
 	return &cryptov30.SigningPublicKey{
 		PublicKey: raw[:],
 		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
@@ -117,6 +131,28 @@ func (m *mockCantonClient) UploadDar(_ context.Context, _ []byte) (string, error
 func newDeps(participantID string) ceremony.CantonDeps {
 	return ceremony.CantonDeps{
 		Client: &mockCantonClient{participantID: participantID},
+		Logger: logger.Nop(),
+	}
+}
+
+func newKMSDeps(participantID string) ceremony.CantonDeps {
+	return ceremony.CantonDeps{
+		Client: &mockCantonClient{participantID: participantID},
+		KMS: client.KMSConfig{
+			NamespaceKeyID: "arn:aws:kms:us-east-1:123456789:key/ns-key-123",
+			ProtocolKeyID:  "arn:aws:kms:us-east-1:123456789:key/proto-key-456",
+		},
+		Logger: logger.Nop(),
+	}
+}
+
+func newTrackedKMSDeps(participantID string, registrations *int) ceremony.CantonDeps {
+	return ceremony.CantonDeps{
+		Client: &mockCantonClient{participantID: participantID, kmsRegistrations: registrations},
+		KMS: client.KMSConfig{
+			NamespaceKeyID: "arn:aws:kms:us-east-1:123456789:key/" + participantID + "-namespace",
+			ProtocolKeyID:  "arn:aws:kms:us-east-1:123456789:key/" + participantID + "-protocol",
+		},
 		Logger: logger.Nop(),
 	}
 }
@@ -276,6 +312,110 @@ func TestRoundTripProtoMarshal(t *testing.T) {
 
 	assert.Equal(t, original.GetTransaction(), restored.GetTransaction())
 	assert.Equal(t, original.GetProposal(), restored.GetProposal())
+}
+
+// ── KMS tests ────────────────────────────────────────────────────────────────
+
+// kmsInput returns a single-participant input. KMS key IDs are intentionally
+// carried by deps, not shared workflow input.
+func kmsInput() onboarding.OnboardingInput {
+	return baseInput()
+}
+
+func TestOnboardingSequence_KMS_HappyPath(t *testing.T) {
+	t.Parallel()
+
+	b := optest.NewBundle(t)
+	sr, err := operations.ExecuteSequence(b, onboarding.OnboardingSequence, newKMSDeps("p1"), kmsInput())
+	require.NoError(t, err)
+
+	assert.True(t, sr.Output.DNSConfirmed)
+	assert.True(t, sr.Output.P2PConfirmed)
+	assert.Contains(t, sr.Output.PartyID, "test-party::")
+}
+
+func TestOnboardingSequence_KMS_DifferentOutputFromGenerate(t *testing.T) {
+	t.Parallel()
+
+	// Run with generated keys.
+	b1 := optest.NewBundle(t)
+	srGen, err := operations.ExecuteSequence(b1, onboarding.OnboardingSequence, newDeps("p1"), baseInput())
+	require.NoError(t, err)
+
+	// Run with KMS keys.
+	b2 := optest.NewBundle(t)
+	srKms, err := operations.ExecuteSequence(b2, onboarding.OnboardingSequence, newKMSDeps("p1"), kmsInput())
+	require.NoError(t, err)
+
+	// The KMS path uses different key material (kmsKeyID is hashed into mock
+	// output), so the party ID should differ.
+	assert.NotEqual(t, srGen.Output.PartyID, srKms.Output.PartyID,
+		"KMS and generated paths should produce different keys/party IDs")
+}
+
+func TestOnboardingSequence_KMS_Idempotent(t *testing.T) {
+	t.Parallel()
+
+	b := optest.NewBundle(t)
+	deps := newKMSDeps("p1")
+	in := kmsInput()
+
+	sr1, err := operations.ExecuteSequence(b, onboarding.OnboardingSequence, deps, in)
+	require.NoError(t, err)
+
+	sr2, err := operations.ExecuteSequence(b, onboarding.OnboardingSequence, deps, in)
+	require.NoError(t, err)
+
+	assert.Equal(t, sr1.ID, sr2.ID, "second call must return the cached report")
+	assert.Equal(t, sr1.Output, sr2.Output)
+}
+
+func TestOnboardingSequence_KMS_ResumeUsesLocalConfigPerActor(t *testing.T) {
+	t.Parallel()
+
+	sharedReporter := operations.NewMemoryReporter()
+	newBundle := func() operations.Bundle {
+		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter)
+	}
+	input := multiActorInput()
+
+	var p1Registrations int
+	var p2Registrations int
+	deps1 := newTrackedKMSDeps("p1", &p1Registrations)
+	deps2 := newTrackedKMSDeps("p2", &p2Registrations)
+
+	_, err := operations.ExecuteSequence(newBundle(), onboarding.OnboardingSequence, deps1, input)
+	require.ErrorContains(t, err, onboarding.ErrThresholdNotMet.Error(), "run 1: key-gen gate (1/2)")
+
+	_, err = operations.ExecuteSequence(newBundle(), onboarding.OnboardingSequence, deps2, input)
+	require.ErrorContains(t, err, onboarding.ErrThresholdNotMet.Error(), "run 2: DNS signing threshold (1/2)")
+
+	_, err = operations.ExecuteSequence(newBundle(), onboarding.OnboardingSequence, deps1, input)
+	require.ErrorContains(t, err, onboarding.ErrThresholdNotMet.Error(), "run 3: P2P threshold (1/2)")
+
+	sr, err := operations.ExecuteSequence(newBundle(), onboarding.OnboardingSequence, deps2, input)
+	require.NoError(t, err, "run 4: all P2P proposals collected")
+
+	assert.True(t, sr.Output.DNSConfirmed)
+	assert.True(t, sr.Output.P2PConfirmed)
+	assert.Equal(t, 2, p1Registrations, "p1 should register namespace and protocol keys from local config")
+	assert.Equal(t, 2, p2Registrations, "p2 should register namespace and protocol keys from local config")
+}
+
+func TestCreateMemberKeyOp_KMSRequiresBothKeys(t *testing.T) {
+	t.Parallel()
+
+	_, err := operations.ExecuteOperation(optest.NewBundle(t), keys.CreateMemberKeyOp, ceremony.CantonDeps{
+		Client: &mockCantonClient{participantID: "p1"},
+		KMS: client.KMSConfig{
+			NamespaceKeyID: "arn:aws:kms:us-east-1:123456789:key/namespace-only",
+		},
+		Logger: logger.Nop(),
+	}, keys.CreateMemberKeyInput{
+		NamespaceName: "test-namespace",
+		ParticipantID: "p1",
+	})
+	require.ErrorContains(t, err, "kms_namespace_key_id and kms_protocol_key_id must both be set")
 }
 
 // ── Mock Canton client ───────────────────────────────────────────────────────

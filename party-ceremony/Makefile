@@ -7,8 +7,15 @@ test: ## Run all unit tests.
 	go test -v -count=1 -timeout=5m ./...
 
 .PHONY: test-integration
-test-integration: ## Run all integration tests.
-	cd integration-tests && go test -v -count=1 -timeout 20m ./ceremony -run TestCeremonies
+test-integration: test-integration-kms test-integration-non-kms ## Run all integration tests.
+
+.PHONY: test-integration-kms
+test-integration-kms: ## Run KMS-backed integration tests.
+	cd integration-tests && go test -v -count=1 -timeout 20m ./ceremony -run '^TestCeremonies$$'
+
+.PHONY: test-integration-non-kms
+test-integration-non-kms: ## Run non-KMS integration tests.
+	cd integration-tests && go test -v -count=1 -timeout 20m ./ceremony -run '^TestCeremoniesWithoutKMS$$'
 
 .PHONY: lint
 lint: ## Run golangci-lint.
@@ -32,4 +39,3 @@ clean: ## Remove build artifacts.
 help: ## Display this help.
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
-
