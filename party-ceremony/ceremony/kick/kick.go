@@ -38,6 +38,7 @@ import (
 	retry "github.com/avast/retry-go/v4"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -92,6 +93,19 @@ var KickSequence = operations.NewSequence(
 			return out, fmt.Errorf("read-current-state: %w", err)
 		}
 		currentState := stateReport.Output
+		runnerUID, err := deps.Client.GetParticipantUID(ctx)
+		if err != nil {
+			return out, fmt.Errorf("fetching runner participant UID: %w", err)
+		}
+		if len(currentState.PartySigningKeysB64) > 0 && slices.Contains(currentState.P2PParticipantUIDs, runnerUID) {
+			_, err = operations.ExecuteOperation(b, keys.ResolveProtocolSigningKeyOp, deps, keys.ResolveProtocolSigningKeyInput{
+				ParticipantID:       runnerUID,
+				KnownSigningKeysB64: currentState.PartySigningKeysB64,
+			})
+			if err != nil {
+				return out, fmt.Errorf("resolve-local-protocol-signing-key: %w", err)
+			}
+		}
 
 		// ── Sequence-level validation ─────────────────────────────────────────
 		newOwners := removeOwner(currentState.DNSOwners, in.KickedNamespaceFingerprint)
@@ -233,13 +247,18 @@ var KickSequence = operations.NewSequence(
 		out.State.Phase = PhaseP2P
 		out.State.P2PRequired = newThreshold
 
-		runnerUID, err := deps.Client.GetParticipantUID(ctx)
-		if err != nil {
-			return out, fmt.Errorf("fetching runner participant UID: %w", err)
-		}
 		if runnerUID == in.KickedParticipantID {
 			return out, fmt.Errorf("%w: kicked participant may not propose P2P update",
 				ErrThresholdNotMet)
+		}
+		remainingSigningKeysB64, keyErr := protocolSigningKeysForParticipants(
+			b,
+			deps,
+			in.RemainingParticipants,
+			currentState.PartySigningKeysB64,
+		)
+		if keyErr != nil {
+			return out, keyErr
 		}
 		allP2PProposers := in.RemainingParticipants
 		for _, uid := range allP2PProposers {
@@ -250,6 +269,7 @@ var KickSequence = operations.NewSequence(
 				NewP2PThreshold:       newThreshold,
 				CurrentP2PSerial:      int(currentState.P2PSerial),
 				SynchronizerID:        in.SynchronizerID,
+				PartySigningKeysB64:   remainingSigningKeysB64,
 			})
 			if p2pErr != nil {
 				deps.Logger.Infow("P2P kick proposal pending", "participant", uid, "err", p2pErr)
@@ -279,6 +299,20 @@ var KickSequence = operations.NewSequence(
 				for _, p := range p2pState.Participants {
 					if p.ParticipantUID == in.KickedParticipantID {
 						return fmt.Errorf("kicked participant %q still present in P2P mapping", in.KickedParticipantID)
+					}
+				}
+				if len(remainingSigningKeysB64) > 0 {
+					if p2pState.PartySigningKeys == nil {
+						return fmt.Errorf("P2P signing keys not yet available")
+					}
+					if len(p2pState.PartySigningKeys.Keys) != len(remainingSigningKeysB64) {
+						return fmt.Errorf("P2P signing keys not yet updated: have %d, want %d",
+							len(p2pState.PartySigningKeys.Keys), len(remainingSigningKeysB64))
+					}
+					for _, keyB64 := range remainingSigningKeysB64 {
+						if !slices.Contains(p2pState.PartySigningKeys.Keys, keyB64) {
+							return fmt.Errorf("remaining party signing key not yet present in P2P mapping")
+						}
 					}
 				}
 				deps.Logger.Infow("Kick P2P confirmed", "party", in.DecentralizedPartyID)
@@ -315,4 +349,29 @@ func removeOwner(owners []string, fingerprint string) []string {
 	}
 
 	return result
+}
+
+func protocolSigningKeysForParticipants(
+	b operations.Bundle,
+	deps ceremony.CantonDeps,
+	participantIDs []string,
+	knownSigningKeysB64 []string,
+) ([]string, error) {
+	if len(knownSigningKeysB64) == 0 {
+		return nil, nil
+	}
+
+	out := make([]string, 0, len(participantIDs))
+	for _, uid := range participantIDs {
+		report, err := operations.ExecuteOperation(b, keys.ResolveProtocolSigningKeyOp, deps, keys.ResolveProtocolSigningKeyInput{
+			ParticipantID:       uid,
+			KnownSigningKeysB64: knownSigningKeysB64,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("%w: protocol signing key for remaining participant %q pending: %w", ErrThresholdNotMet, uid, err)
+		}
+		out = append(out, report.Output.KeyB64)
+	}
+
+	return out, nil
 }

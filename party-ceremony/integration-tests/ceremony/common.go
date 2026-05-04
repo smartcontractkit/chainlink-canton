@@ -2,18 +2,27 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
 
+	awskms "github.com/aws/aws-sdk-go-v2/service/kms"
 	interactivepb "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+	cryptoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/admin/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	integrationtests "github.com/smartcontractkit/chainlink-canton/party-ceremony/integration-tests"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
@@ -26,6 +35,8 @@ type CeremonyTestSuite struct {
 	suite.Suite
 
 	chain          *canton.Chain
+	KMS            *integrationtests.KMSRegistry
+	KMSRunName     string
 	SynchronizerID string
 	ParticipantIDs []string
 	Actors         []Actor
@@ -35,14 +46,11 @@ func (s *CeremonyTestSuite) SetupSuite() {
 	t := s.T()
 
 	if s.chain == nil {
-		// Uncomment to use local Canton environment for faster test runs (requires local setup).
-		chain, err := s.NewLocalEnv()
-		require.NoError(t, err, "failed to create local environment")
-
-		// chain, err := integrationtests.LoadChainWithCTF(t, 3)
-		// require.NoError(t, err, "failed to load chain with CTF")
-		// require.Len(t, chain.Participants, 3, "expected 3 participants")
-		s.chain = chain
+		env, err := integrationtests.LoadChainWithCTFKMS(t, 3)
+		require.NoError(t, err, "failed to load KMS-backed chain with CTF")
+		require.Len(t, env.Chain.Participants, 3, "expected 3 participants")
+		s.chain = env.Chain
+		s.KMS = env.KMS
 	}
 
 	// Build CantonClients for each participant.
@@ -69,6 +77,12 @@ func (s *CeremonyTestSuite) SetupSuite() {
 // dialling the participant's Admin API endpoint. The caller must close the
 // returned connection when done.
 func (s *CeremonyTestSuite) NewCantonClient(p canton.Participant) (client.CantonClient, *grpc.ClientConn) {
+	conn := s.NewAdminConn(p)
+
+	return client.NewGRPCClient(conn), conn
+}
+
+func (s *CeremonyTestSuite) NewAdminConn(p canton.Participant) *grpc.ClientConn {
 	t := s.T()
 	require.NotNil(t, p.AdminServices, "participant %q has no admin API configured", p.Name)
 
@@ -88,7 +102,7 @@ func (s *CeremonyTestSuite) NewCantonClient(p canton.Participant) (client.Canton
 	conn, err := grpc.NewClient(p.Endpoints.AdminAPIURL, dialOpts...)
 	require.NoError(t, err, "failed to dial admin API for participant %s", p.Name)
 
-	return client.NewGRPCClient(conn), conn
+	return conn
 }
 
 // discoverSynchronizerID queries the first connected synchronizer from the
@@ -128,6 +142,7 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 		require.NoError(t, err, "failed to dial ledger API for participant %d", i+1)
 		t.Cleanup(func() { _ = ledgerConn.Close() })
 		ledgerServices := canton.CreateLedgerServiceClients(ledgerConn)
+		adminServices := canton.CreateAdminServiceClients(conn)
 		// UserID matches the additional-admin-user-id in simple-topology.conf.
 		userID := fmt.Sprintf("user-participant%d", i+1)
 		participants[i] = canton.Participant{
@@ -136,7 +151,7 @@ func (s *CeremonyTestSuite) NewLocalEnv() (*canton.Chain, error) {
 				AdminAPIURL:      adminURL,
 				GRPCLedgerAPIURL: ledgerURL,
 			},
-			AdminServices:  new(canton.CreateAdminServiceClients(conn)),
+			AdminServices:  &adminServices,
 			LedgerServices: ledgerServices,
 			UserID:         userID,
 		}
@@ -221,4 +236,146 @@ func (s *CeremonyTestSuite) NewLedgerClient(p canton.Participant) (client.Ledger
 	require.NoError(t, err, "failed to dial ledger API for participant %s", p.Name)
 
 	return client.NewGRPCLedgerClient(conn), conn
+}
+
+func (s *CeremonyTestSuite) testScope(phase string) string {
+	base := s.KMSRunName
+	if base == "" {
+		base = s.T().Name()
+	}
+
+	return sanitizeTestName(base + "-" + phase)
+}
+
+func (s *CeremonyTestSuite) uniqueName(phase string) string {
+	return "kms-" + s.testScope(phase)
+}
+
+func (s *CeremonyTestSuite) kmsConfigFor(actorIndex int, phase string) client.KMSConfig {
+	if s.KMS == nil {
+		return client.KMSConfig{}
+	}
+
+	return s.KMS.Config(s.T(), s.testScope(phase), actorIndex)
+}
+
+func (s *CeremonyTestSuite) depsFor(actorIndex int, kmsCfg client.KMSConfig) ceremony.CantonDeps {
+	return ceremony.CantonDeps{
+		Client: s.Actors[actorIndex].client,
+		KMS:    kmsCfg,
+		Logger: logger.Test(s.T()),
+	}
+}
+
+func (s *CeremonyTestSuite) kmsDepsFor(actorIndex int) ceremony.CantonDeps {
+	return s.depsFor(actorIndex, s.kmsConfigFor(actorIndex, "onboarding"))
+}
+
+func (s *CeremonyTestSuite) assertKMSKeysRegistered(actorIndex int, kmsCfg client.KMSConfig) {
+	t := s.T()
+	t.Helper()
+	if kmsCfg.NamespaceKeyID == "" && kmsCfg.ProtocolKeyID == "" {
+		return
+	}
+
+	conn := s.NewAdminConn(s.chain.Participants[actorIndex])
+	defer conn.Close()
+
+	vault := cryptoadminv30.NewVaultServiceClient(conn)
+	resp, err := vault.ListMyKeys(t.Context(), &cryptoadminv30.ListMyKeysRequest{})
+	require.NoError(t, err, "ListMyKeys for participant %d", actorIndex+1)
+
+	registered := make(map[string]struct{})
+	for _, metadata := range resp.GetPrivateKeysMetadata() {
+		if kmsKeyID := metadata.GetKmsKeyId(); kmsKeyID != "" {
+			registered[kmsKeyID] = struct{}{}
+		}
+	}
+
+	if kmsCfg.NamespaceKeyID != "" {
+		require.Contains(t, registered, kmsCfg.NamespaceKeyID, "namespace KMS key should be registered for participant %d", actorIndex+1)
+	}
+	if kmsCfg.ProtocolKeyID != "" {
+		require.Contains(t, registered, kmsCfg.ProtocolKeyID, "protocol KMS key should be registered for participant %d", actorIndex+1)
+	}
+}
+
+func (s *CeremonyTestSuite) assertReportsDoNotContainKMS(reporter operations.Reporter) {
+	t := s.T()
+	t.Helper()
+	if s.KMS == nil {
+		return
+	}
+
+	reports, err := reporter.GetReports()
+	require.NoError(t, err, "read reports for KMS leakage check")
+	raw, err := json.Marshal(reports)
+	require.NoError(t, err, "marshal reports for KMS leakage check")
+	payload := string(raw)
+
+	require.NotContains(t, payload, "arn:aws:kms", "workflow reports must not contain KMS ARNs")
+	for _, keyID := range s.KMS.KeyIDs() {
+		require.NotContains(t, payload, keyID, "workflow reports must not contain local KMS key IDs")
+	}
+}
+
+func sanitizeTestName(name string) string {
+	name = strings.ToLower(name)
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "ceremony"
+	}
+	if len(out) > 48 {
+		return out[:48]
+	}
+
+	return out
+}
+
+type recordingKMSAPI struct {
+	base client.AWSKMSAPI
+
+	mu                sync.Mutex
+	getPublicKeyCalls int
+	signCalls         int
+}
+
+func newRecordingKMSAPI(base client.AWSKMSAPI) *recordingKMSAPI {
+	return &recordingKMSAPI{base: base}
+}
+
+func (r *recordingKMSAPI) GetPublicKey(ctx context.Context, in *awskms.GetPublicKeyInput, optFns ...func(*awskms.Options)) (*awskms.GetPublicKeyOutput, error) {
+	r.mu.Lock()
+	r.getPublicKeyCalls++
+	r.mu.Unlock()
+
+	return r.base.GetPublicKey(ctx, in, optFns...)
+}
+
+func (r *recordingKMSAPI) Sign(ctx context.Context, in *awskms.SignInput, optFns ...func(*awskms.Options)) (*awskms.SignOutput, error) {
+	r.mu.Lock()
+	r.signCalls++
+	r.mu.Unlock()
+
+	return r.base.Sign(ctx, in, optFns...)
+}
+
+func (r *recordingKMSAPI) assertUsed(t *testing.T) {
+	t.Helper()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	require.Positive(t, r.getPublicKeyCalls, "KMS GetPublicKey should be called")
+	require.Positive(t, r.signCalls, "KMS Sign should be called")
 }

@@ -43,6 +43,35 @@ type ClientConfig struct {
 	// grant actAs/readAs rights for the decentralized party.
 	// Only required in JWT-auth environments. Leave empty for no-auth setups.
 	UserID string `json:"user_id,omitempty"`
+
+	// KmsNamespaceKeyID is the external KMS identifier (e.g. AWS KMS ARN) for a
+	// pre-existing NAMESPACE signing key. When set the ceremony registers this
+	// key via VaultService.RegisterKmsSigningKey instead of generating a new one.
+	// Onboarding and add-participant require this together with KmsProtocolKeyID;
+	// key rotation may use it independently when only the namespace key rotates.
+	KmsNamespaceKeyID string `json:"kms_namespace_key_id,omitempty"`
+
+	// KmsProtocolKeyID is the external KMS identifier (e.g. AWS KMS ARN) for a
+	// pre-existing PROTOCOL (DAML) signing key. When set the ceremony registers
+	// this key via VaultService.RegisterKmsSigningKey instead of generating a new one.
+	// It is also used by contract-deploy to sign prepared transaction hashes.
+	KmsProtocolKeyID string `json:"kms_protocol_key_id,omitempty"`
+}
+
+// KMSConfig contains the local operator's external KMS key IDs. These values
+// are intentionally loaded from participant-config.json on each init/resume
+// invocation and are not persisted in shared workflow state.
+type KMSConfig struct {
+	NamespaceKeyID string
+	ProtocolKeyID  string
+}
+
+// KMS returns the local KMS configuration for dependency injection.
+func (cfg ClientConfig) KMS() KMSConfig {
+	return KMSConfig{
+		NamespaceKeyID: cfg.KmsNamespaceKeyID,
+		ProtocolKeyID:  cfg.KmsProtocolKeyID,
+	}
 }
 
 // LoadConfig reads a ClientConfig from the given JSON file path.

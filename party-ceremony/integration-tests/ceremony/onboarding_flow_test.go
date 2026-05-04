@@ -9,14 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
 )
-
-// onboardingNamespaceName is the Canton key/namespace name used by the
-// integration-test onboarding ceremony. Both the onboarding and kick tests
-// reference this constant so the key is always looked up by the correct name.
-const onboardingNamespaceName = "inttest-onboarding"
 
 type OnboardingFlowTestSuite struct {
 	CeremonyTestSuite
@@ -28,13 +22,23 @@ func (s *OnboardingFlowTestSuite) SetupSuite() {
 	s.CeremonyTestSuite.SetupSuite()
 }
 
+func (s *OnboardingFlowTestSuite) onboardingNamespaceName() string {
+	return s.uniqueName("onboarding-ns")
+}
+
+func (s *OnboardingFlowTestSuite) onboardingPartyPrefix() string {
+	return s.uniqueName("party")
+}
+
 // performOnboarding executes the full 7-step onboarding ceremony using the
 // provided reporter (so the caller may reuse it for idempotency checks) and
 // sets s.PartyID to the resulting party identifier.
 func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter operations.Reporter) operations.SequenceReport[onboarding.OnboardingInput, onboarding.OnboardingOutput] {
+	t.Helper()
+
 	input := onboarding.OnboardingInput{
-		NamespaceName:  onboardingNamespaceName,
-		PartyPrefix:    "test-party",
+		NamespaceName:  s.onboardingNamespaceName(),
+		PartyPrefix:    s.onboardingPartyPrefix(),
 		Participants:   s.ParticipantIDs,
 		SynchronizerID: s.SynchronizerID,
 		Threshold:      3, // all must sign
@@ -44,9 +48,12 @@ func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter opera
 		return operations.NewBundle(t.Context, logger.Test(t), reporter)
 	}
 
-	deps1 := ceremony.CantonDeps{Client: s.Actors[0].client, Logger: logger.Test(t)}
-	deps2 := ceremony.CantonDeps{Client: s.Actors[1].client, Logger: logger.Test(t)}
-	deps3 := ceremony.CantonDeps{Client: s.Actors[2].client, Logger: logger.Test(t)}
+	kmsCfg1 := s.kmsConfigFor(0, "onboarding")
+	kmsCfg2 := s.kmsConfigFor(1, "onboarding")
+	kmsCfg3 := s.kmsConfigFor(2, "onboarding")
+	deps1 := s.depsFor(0, kmsCfg1)
+	deps2 := s.depsFor(1, kmsCfg2)
+	deps3 := s.depsFor(2, kmsCfg3)
 
 	// Run 1: Actor 1 generates key (1/3 keys)
 	t.Log("Actor 1: run 1 — key gen (1/3)")
@@ -84,14 +91,18 @@ func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter opera
 	require.NoError(t, err, "actor 1 run 7: ceremony should complete successfully")
 
 	s.PartyID = sr.Output.PartyID
+	s.assertKMSKeysRegistered(0, kmsCfg1)
+	s.assertKMSKeysRegistered(1, kmsCfg2)
+	s.assertKMSKeysRegistered(2, kmsCfg3)
 
 	return sr
 }
 
 // ── Test ─────────────────────────────────────────────────────────────────────
 
-// TestOnboardingFlow validates the full 6-step decentralized party onboarding
-// ceremony against a real local Canton environment with 3 participants.
+// TestOnboardingFlow validates the full 7-step decentralized party onboarding
+// ceremony against a real CTF Canton environment. The suite is run once with
+// KMS-backed ceremony deps and once with generated local keys.
 //
 // The ceremony is async: each actor runs the OnboardingSequence independently,
 // sharing a MemoryReporter so cached operation results are visible across runs.
@@ -114,8 +125,8 @@ func (s *OnboardingFlowTestSuite) TestOnboardingFlow() {
 	sr := s.performOnboarding(t, sharedReporter)
 
 	// ── Verify output fields ─────────────────────────────────────────────
-	assert.True(t, strings.HasPrefix(sr.Output.PartyID, "test-party::"),
-		"PartyID should start with 'test-party::', got: %s", sr.Output.PartyID)
+	assert.True(t, strings.HasPrefix(sr.Output.PartyID, s.onboardingPartyPrefix()+"::"),
+		"PartyID should start with the suite party prefix, got: %s", sr.Output.PartyID)
 	assert.True(t, sr.Output.DNSConfirmed, "DNSConfirmed should be true")
 	assert.True(t, sr.Output.P2PConfirmed, "P2PConfirmed should be true")
 
@@ -131,16 +142,21 @@ func (s *OnboardingFlowTestSuite) TestOnboardingFlow() {
 	p2pOK, err := s.Actors[0].client.P2PExists(t.Context(), sr.Output.PartyID, s.SynchronizerID)
 	require.NoError(t, err, "P2PExists query failed")
 	assert.True(t, p2pOK, "PartyToParticipant mapping should be active in topology")
+	p2pState, err := s.Actors[0].client.GetP2P(t.Context(), sr.Output.PartyID, s.SynchronizerID)
+	require.NoError(t, err, "GetP2P after onboarding")
+	require.NotNil(t, p2pState.PartySigningKeys, "P2P signing keys should be active")
+	assert.Len(t, p2pState.PartySigningKeys.Keys, 3, "should have one protocol signing key per participant")
+	assert.Equal(t, uint32(3), p2pState.PartySigningKeys.Threshold, "P2P signing-key threshold should match onboarding threshold")
 
 	// ── Verify idempotency: re-run produces the same output from cache ───
 	t.Log("Actor 1: run 8 — idempotency check")
-	deps1 := ceremony.CantonDeps{Client: s.Actors[0].client, Logger: logger.Test(t)}
+	deps1 := s.depsFor(0, s.kmsConfigFor(0, "onboarding"))
 	newBundle := func() operations.Bundle {
 		return operations.NewBundle(t.Context, logger.Test(t), sharedReporter)
 	}
 	input := onboarding.OnboardingInput{
-		NamespaceName:  onboardingNamespaceName,
-		PartyPrefix:    "test-party",
+		NamespaceName:  s.onboardingNamespaceName(),
+		PartyPrefix:    s.onboardingPartyPrefix(),
 		Participants:   s.ParticipantIDs,
 		SynchronizerID: s.SynchronizerID,
 		Threshold:      3,
@@ -150,4 +166,5 @@ func (s *OnboardingFlowTestSuite) TestOnboardingFlow() {
 	assert.Equal(t, sr.Output.PartyID, srCached.Output.PartyID, "cached PartyID should match")
 	assert.True(t, srCached.Output.DNSConfirmed, "cached DNSConfirmed should be true")
 	assert.True(t, srCached.Output.P2PConfirmed, "cached P2PConfirmed should be true")
+	s.assertReportsDoNotContainKMS(sharedReporter)
 }

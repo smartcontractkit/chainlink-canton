@@ -41,9 +41,12 @@ type ContractDeployDeps struct {
 	// Wire contracts.GetDar for production usage.
 	DARLoader DARLoader
 	// Signer signs prepared transaction hashes for the interactive submission.
-	Signer    client.TransactionSigner
-	Logger    logger.Logger
-	Confirmer ceremony.Confirmer // nil means no confirmation prompt
+	Signer client.TransactionSigner
+	// SignerFactory creates a signer from current topology signing keys. It is
+	// used in production; Signer remains available for focused tests.
+	SignerFactory client.TransactionSignerFactory
+	Logger        logger.Logger
+	Confirmer     ceremony.Confirmer // nil means no confirmation prompt
 	// UserID is the Ledger API user to grant actAs/readAs rights for the
 	// decentralized party. When empty the grant step is a no-op (no-auth environments).
 	UserID string
