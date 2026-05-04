@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "ee575889c7b7d8b623ba6bdfc19daf4902f6291c61c877299e4bc67b10158866"
+	PackageID   = "6f7880a6e024139f5ad43e2d791acb75c89af3a38c84e82726b678d962481d7c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -384,7 +384,6 @@ type FinalizeExecute2 struct {
 	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
 	TicketReceiver      types.PARTY       `json:"ticketReceiver"`
 	ReturnData          types.TEXT        `json:"returnData"`
-	Caller              types.PARTY       `json:"caller"`
 }
 
 // ToMap converts FinalizeExecute2 to a map for DAML arguments
@@ -398,8 +397,6 @@ func (t FinalizeExecute2) ToMap() map[string]any {
 	m["ticketReceiver"] = t.TicketReceiver.ToMap()
 
 	m["returnData"] = string(t.ReturnData)
-
-	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -422,27 +419,6 @@ func (t FinalizeExecute2) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes FinalizeExecute2 from hex string (Canton MCMS format)
 func (t *FinalizeExecute2) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// FinalizeExecute2MCMSParams is FinalizeExecute2 without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type FinalizeExecute2MCMSParams struct {
-	TokenConfigCid      types.CONTRACT_ID `json:"tokenConfigCid"`
-	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
-	TicketReceiver      types.PARTY       `json:"ticketReceiver"`
-	ReturnData          types.TEXT        `json:"returnData"`
-}
-
-// MarshalHex encodes FinalizeExecute2MCMSParams to hex string for MCMS operationData.
-func (t FinalizeExecute2MCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes FinalizeExecute2MCMSParams from hex string.
-func (t *FinalizeExecute2MCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1818,7 +1794,6 @@ type MCMSEncoder interface {
 	ConsumeReceiveTicket(args ConsumeReceiveTicket) (*bind.EncodedChoice, error)
 	ConsumeReceiveTicketMCMSParams(args ConsumeReceiveTicketMCMSParams) (*bind.EncodedChoice, error)
 	FinalizeExecute(args FinalizeExecute2) (*bind.EncodedChoice, error)
-	FinalizeExecuteMCMSParams(args FinalizeExecute2MCMSParams) (*bind.EncodedChoice, error)
 	Get(args Get2) (*bind.EncodedChoice, error)
 	GetMCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error)
 	GetTokenConfigByCid(args GetTokenConfigByCid) (*bind.EncodedChoice, error)
@@ -1907,11 +1882,6 @@ func (e *encoder) ConsumeReceiveTicketMCMSParams(args ConsumeReceiveTicketMCMSPa
 
 // FinalizeExecute encodes parameters for the FinalizeExecute choice.
 func (e *encoder) FinalizeExecute(args FinalizeExecute2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FinalizeExecute", args)
-}
-
-// FinalizeExecuteMCMSParams encodes MCMS parameters (without Caller) for the FinalizeExecute choice.
-func (e *encoder) FinalizeExecuteMCMSParams(args FinalizeExecute2MCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("FinalizeExecute", args)
 }
 

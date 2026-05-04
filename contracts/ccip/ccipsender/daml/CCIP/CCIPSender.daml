@@ -5,7 +5,7 @@ module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
-import DA.List (filter)
+import DA.Optional (isNone)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -94,7 +94,7 @@ template CCIPSender
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
                     _ -> abort "sender: unsupported extraArgs version"
-                tokenPoolRequiredCCVs <- case (message.tokenTransfer, tokenPoolCid) of
+                poolReportedCCVs <- case (message.tokenTransfer, tokenPoolCid) of
                     (None, None) -> pure []
                     (None, Some _) ->
                         abort "sender: tokenPoolCid provided without token transfer"
@@ -114,7 +114,7 @@ template CCIPSender
                     context = context
                     destChainSelector = destinationChainSelector
                     message = message
-                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
+                    poolReportedCCVs = poolReportedCCVs
 
         nonconsuming choice GetFee : GetFeeResult
             with
@@ -131,7 +131,6 @@ template CCIPSender
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
-                    _ -> abort "sender: unsupported extraArgs version"
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetDestChainConfig with
                         destChainSelector = destinationChainSelector
@@ -171,13 +170,13 @@ template CCIPSender
                 executorFeeQuote <- case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> do
                         assertMsg "sender: executorInput not allowed for no-executor mode"
-                            (executorInput == None)
+                            (isNone executorInput)
                         pure None
                     CCIP.Client.Executor_UseDefault _executorArgs ->
                       case destConfig.defaultExecutor of
                         None -> do
                             assertMsg "sender: executorInput not allowed when no default executor is configured"
-                                (executorInput == None)
+                                (isNone executorInput)
                             pure None
                         Some _ -> case executorInput of
                             None -> abort "sender: executorInput required for default executor mode"
@@ -235,7 +234,6 @@ template CCIPSender
 
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
-                    _ -> abort "sender: unsupported extraArgs version"
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetDestChainConfig with
                         destChainSelector = destinationChainSelector
@@ -252,7 +250,7 @@ template CCIPSender
                 smCid <- case message.tokenTransfer of
                     None -> do
                         assertMsg "sender: tokenTransferInput provided without token transfer"
-                            (tokenTransferInput == None)
+                            (isNone tokenTransferInput)
                         pure smCid
                     Some tt -> case tokenTransferInput of
                         None -> abort "sender: tokenTransferInput required for token transfer"
@@ -294,13 +292,13 @@ template CCIPSender
                 smCid <- case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> do
                         assertMsg "sender: executorInput not allowed for no-executor mode"
-                            (executorInput == None)
+                            (isNone executorInput)
                         pure smCid
                     CCIP.Client.Executor_UseDefault executorArgs ->
                       case destConfig.defaultExecutor of
                         None -> do
                             assertMsg "sender: executorInput not allowed when no default executor is configured"
-                                (executorInput == None)
+                                (isNone executorInput)
                             pure smCid
                         Some _ ->
                             case executorInput of

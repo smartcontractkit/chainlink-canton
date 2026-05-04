@@ -166,6 +166,11 @@ template ExecutingMessageV1
                             (ticketReceiver == receiver)
                         assertMsg "executingMessage: token receiver mismatch"
                             (Some resolvedTokenReceiver == tokenReceiver)
+                        resolvedInboundPoolCCVs <- case inboundPoolCCVs of
+                            Some poolCCVs -> pure (dedup (CCIP.Internal.resolveRequiredCCVsWithDefaults
+                                sourceDefaultCCVs
+                                poolCCVs))
+                            None -> abort "executingMessage: missing inbound pool CCVs for token ticket"
                         sourcePoolData <- case message.tokenTransfer of
                             Some tokenTransfer -> pure tokenTransfer.extraData
                             None -> abort "executingMessage: missing token transfer for ticket"
@@ -175,6 +180,7 @@ template ExecutingMessageV1
                             verifiedCCVs = dedup (map
                                 (\verification -> RawInstanceAddress.make verification.ccvInstanceId verification.ccvOwner)
                                 ccvVerifications)
+                            requiredInboundPoolCCVs = resolvedInboundPoolCCVs
                             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
                             poolOwner = poolOwner
                             receiver = ticketReceiver

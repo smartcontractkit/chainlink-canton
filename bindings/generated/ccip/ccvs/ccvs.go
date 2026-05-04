@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "0fc7ab8615d872c1db48f7cfe144e8fdc86736eaeef62b36e32930739c21dae4"
+	PackageID   = "ae9d90ed85882da4a2afdc46e0f55ae616f71b3ddb4bf13905c266fefde9b066"
 	SDKVersion  = "3.4.10"
 )
 
