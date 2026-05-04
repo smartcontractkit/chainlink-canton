@@ -13,9 +13,13 @@ packages:
   - ccip/client
   - ccip/pools/interfaces
   - ccip/pools/lockReleaseTokenPool
+  - ccip/pools/burnMintTokenPool
   - ccip/perpartyrouter
   - ccip/factory
   - ccip/test
+
+  - link
+  - link/test
 
   - mcms
   - mcms/test

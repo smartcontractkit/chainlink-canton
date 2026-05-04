@@ -94,6 +94,10 @@ func main() {
 				"Indefinite":    0x00,
 				"RelativeHours": 0x01,
 			},
+			"CCIP.BurnMintTokenPoolTypes.TransferTimeout": {
+				"Indefinite":    0x00,
+				"RelativeHours": 0x01,
+			},
 		},
 		// Dispatcher operationData payloads decoded by MCMS.Main.ExecuteOp.
 		ChoiceParamEncoderNames: map[string]bool{

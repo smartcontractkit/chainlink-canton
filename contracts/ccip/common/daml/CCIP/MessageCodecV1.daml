@@ -90,9 +90,7 @@ encodeMessageV1 : MessageV1 -> BytesHex
 encodeMessageV1 message =
     let
         -- Encode token transfer if present
-        encodedTokenTransfer = case message.tokenTransfer of
-            None -> ""
-            Some tt -> encodeTokenTransferV1 tt
+        encodedTokenTransfer = optional "" encodeTokenTransferV1 message.tokenTransfer
 
         -- Static length section (69 bytes total) - MUST match EVM order exactly
         staticSection =
@@ -208,10 +206,10 @@ encodeUint64 n =
 
 -- Convert a Numeric 0 to a hex-encoded uint256 (32 bytes)
 encodeUint256 : Numeric 0 -> Optional BytesHex
-encodeUint256 n =
-    if n < 0.0 then None
-    else if exceedsMaxUint256 n then None
-    else
+encodeUint256 n
+    | n < 0.0 = None
+    | exceedsMaxUint256 n = None
+    | otherwise =
         let
             -- Convert numeric to string to preserve full precision
             numStr = show n
@@ -426,17 +424,13 @@ decodeUint64 : BytesHex -> Optional (Numeric 0)
 decodeUint64 hex =
     if byteCount hex /= 8 then None
     else
-        case hexToDecimalString hex of
-            Some decStr -> parseDecimal decStr
-            None -> None
+        parseDecimal =<< hexToDecimalString hex
 
 decodeUint256 : BytesHex -> Optional (Numeric 0)
 decodeUint256 hex =
     if byteCount hex /= 32 then None
     else
-        case hexToDecimalString hex of
-            Some decStr -> parseDecimal decStr
-            None -> None
+        parseDecimal =<< hexToDecimalString hex
 
 -- Helpers
 
@@ -640,18 +634,17 @@ decimalTextWithinNumeric0 str =
             || (normalizedLength == maxLength && normalized <= maxNumeric0IntegerText)
 
 stripLeadingZeros : Text -> Text
-stripLeadingZeros str =
-    if Text.length str == 0 then ""
-    else if Text.take 1 str == "0" then stripLeadingZeros (Text.drop 1 str)
-    else str
+stripLeadingZeros str
+    | Text.length str == 0 = ""
+    | Text.take 1 str == "0" = stripLeadingZeros (Text.drop 1 str)
+    | otherwise = str
 
 -- Parse decimal string to Numeric 0
 parseDecimal : Text -> Optional (Numeric 0)
-parseDecimal str =
-    if Text.length str == 0 then Some 0.0
-    else if not (decimalTextWithinNumeric0 str) then None
-    else
-        Some (parseDecimalUnchecked str)
+parseDecimal str
+    | Text.length str == 0 = Some 0.0
+    | not (decimalTextWithinNumeric0 str) = None
+    | otherwise = Some (parseDecimalUnchecked str)
 
 parseDecimalUnchecked : Text -> Numeric 0
 parseDecimalUnchecked str =

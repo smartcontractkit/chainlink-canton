@@ -28,7 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
-// TestDeployTokenPool deploys TAR, then runs DeployTokenPool (deploy pool + register with TAR in one changeset),
+// TestDeployTokenPool deploys TAR, then runs DeployLockReleaseTokenPool (deploy pool + register with TAR in one changeset),
 // then verifies TAR config by querying GetTokenConfig and asserting tokenPoolOwner is set.
 func TestDeployTokenPool(t *testing.T) {
 	t.Parallel()
@@ -93,10 +93,10 @@ func TestDeployTokenPool(t *testing.T) {
 	}
 
 	// Deploy pool and register with TAR in one changeset
-	_, err = (DeployTokenPool{}).Apply(*env, CantonCSDeps[DeployTokenPoolConfig]{
+	_, err = (DeployLockReleaseTokenPool{}).Apply(*env, CantonCSDeps[DeployLockReleaseTokenPoolConfig]{
 		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
 		Participant:   0,
-		Config: DeployTokenPoolConfig{
+		Config: DeployLockReleaseTokenPoolConfig{
 			CcipOwner:                         party,
 			PoolOwner:                         party,
 			InstrumentId:                      instrumentId,

@@ -9,7 +9,9 @@ import DA.List (unique, dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional
 import DA.Set qualified as Set
+
 import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
 import qualified CCIP.Context
 import CCIP.Math qualified
@@ -39,7 +41,7 @@ import CCIP.FeeQuoterTypes (
 feeQuoterKey : Text
 feeQuoterKey = "fee-quoter"
 
-lookupFeeQuoterCid : CCIP.Context.CCIPContext -> Update (ContractId FeeQuoter)
+lookupFeeQuoterCid : ChoiceContext -> Update (ContractId FeeQuoter)
 lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
 
 rawInstanceAddress : FeeQuoter -> RawInstanceAddress.RawInstanceAddress

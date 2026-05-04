@@ -8,19 +8,18 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
-// DeployTokenPoolConfig is the config for deploying a LockReleaseTokenPool.
+// DeployLockReleaseTokenPoolConfig is the config for deploying a LockReleaseTokenPool.
 // If TokenAdminRegistryInstanceAddress is set, the pool is also registered with that TAR in the same changeset.
-type DeployTokenPoolConfig struct {
+type DeployLockReleaseTokenPoolConfig struct {
 	CcipOwner    string
 	PoolOwner    string
 	InstrumentId splice_api_token_holding_v1.InstrumentId
@@ -31,7 +30,7 @@ type DeployTokenPoolConfig struct {
 	// Qualifier is optional (e.g. token symbol) for AddressRef and idempotency.
 	Qualifier string
 	// Optional; defaults to empty. PoolReceiveContext can be set for receive context.
-	PoolReceiveContext common.CCIPContext
+	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
 	TransferTimeout lockreleasetokenpool.TransferTimeout
 	// Optional; defaults to empty map.
@@ -44,11 +43,11 @@ type DeployTokenPoolConfig struct {
 	TokenAdminRegistryInstanceAddress contracts.InstanceAddress
 }
 
-var _ cldf.ChangeSetV2[CantonCSDeps[DeployTokenPoolConfig]] = DeployTokenPool{}
+var _ cldf.ChangeSetV2[CantonCSDeps[DeployLockReleaseTokenPoolConfig]] = DeployLockReleaseTokenPool{}
 
-type DeployTokenPool struct{}
+type DeployLockReleaseTokenPool struct{}
 
-func (d DeployTokenPool) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployTokenPoolConfig]) error {
+func (d DeployLockReleaseTokenPool) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployLockReleaseTokenPoolConfig]) error {
 	chain, ok := e.BlockChains.CantonChains()[config.ChainSelector]
 	if !ok {
 		return fmt.Errorf("canton chain %v not found", config.ChainSelector)
@@ -60,14 +59,14 @@ func (d DeployTokenPool) VerifyPreconditions(e cldf.Environment, config CantonCS
 	return nil
 }
 
-func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTokenPoolConfig]) (cldf.ChangesetOutput, error) {
+func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployLockReleaseTokenPoolConfig]) (cldf.ChangesetOutput, error) {
 	ds := datastore.NewMemoryDataStore()
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 	cfg := config.Config
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
-		poolReceiveContext = common.CCIPContext{Values: map[string]common.AnyValue{}}
+		poolReceiveContext = splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}}
 	}
 	transferTimeout := cfg.TransferTimeout
 	if transferTimeout.RelativeHours == nil && transferTimeout.Indefinite == nil {

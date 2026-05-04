@@ -7,6 +7,8 @@ import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isNone, isSome)
 
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import qualified CCIP.Client
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
@@ -66,7 +68,7 @@ noExecutionAddressBytes =
 onRampKey : Text
 onRampKey = "on-ramp"
 
-lookupOnRampCid : CCIP.Context.CCIPContext -> Update (ContractId OnRamp)
+lookupOnRampCid : ChoiceContext -> Update (ContractId OnRamp)
 lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
 
 rawInstanceAddress : OnRamp -> RawInstanceAddress.RawInstanceAddress
@@ -78,20 +80,21 @@ computeRequiredCCVsForSend
     -> CCIP.Client.GenericExtraArgsV3
     -> [RawInstanceAddress.RawInstanceAddress]
     -> [RawInstanceAddress.RawInstanceAddress]
-computeRequiredCCVsForSend destConfig message extraArgs tokenPoolRequiredCCVs =
+computeRequiredCCVsForSend destConfig message extraArgs senderRequestedCCVs =
     let hasTokenTransfer = isSome message.tokenTransfer
         isTokenOnlyTransfer = hasTokenTransfer
             && message.payload == ""
             && extraArgs.gasLimit == 0
-        resolvedSenderRequiredCCVs = case tokenPoolRequiredCCVs of
+        resolvedSenderRequiredCCVs = case senderRequestedCCVs of
             [] ->
                 if isTokenOnlyTransfer
                 then []
-                else destConfig.defaultCCVs
-            _ -> CCIP.Internal.resolveDefaultCCVs
+                else CCIP.Internal.resolveRequiredCCVsWithDefaults
+                    destConfig.defaultCCVs
+                    senderRequestedCCVs
+            _ -> CCIP.Internal.resolveRequiredCCVsWithDefaults
                 destConfig.defaultCCVs
-                CCIP.Internal.useDefaultCCVs
-                tokenPoolRequiredCCVs
+                senderRequestedCCVs
     in dedup (resolvedSenderRequiredCCVs ++ destConfig.laneMandatedCCVs)
 
 data GetFeeFromRouterResult = GetFeeFromRouterResult
@@ -248,7 +251,7 @@ template OnRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 destChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                tokenPoolRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+                poolReportedCCVs : [RawInstanceAddress.RawInstanceAddress]
             controller ccipOwner
             do
                 globalConfig <- fetch globalConfigCid
@@ -265,7 +268,19 @@ template OnRamp
                         extraArgs <- case message.extraArgs of
                                 CCIP.Client.V3 v3 -> pure v3
                                 _ -> abort "onramp: unsupported extraArgs version"
-                        pure (computeRequiredCCVsForSend config message extraArgs tokenPoolRequiredCCVs)
+                        let senderRequiredCCVs =
+                                computeRequiredCCVsForSend
+                                    config
+                                    message
+                                    extraArgs
+                                    (map (.ccvAddress) extraArgs.ccvs)
+                        let finalRequiredCCVs = case message.tokenTransfer of
+                                None -> senderRequiredCCVs
+                                Some _ ->
+                                    dedup (senderRequiredCCVs ++ CCIP.Internal.resolveRequiredCCVsWithDefaults
+                                        config.defaultCCVs
+                                        poolReportedCCVs)
+                        pure finalRequiredCCVs
 
         -- | Build SendingMessageV1 for outbound message.
         -- Validates fee token is accepted, reads network fee from DestChainConfig.
@@ -324,7 +339,6 @@ template OnRamp
                 -- Parse extraArgs and validate fields
                 extraArgs <- case message.extraArgs of
                         CCIP.Client.V3 v3 -> pure v3
-                        _ -> abort "onramp: unsupported extraArgs version" -- exhaustive default match to ensure this fails if new versions of extraArgs are added without updating the onramp
                 assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
@@ -353,7 +367,7 @@ template OnRamp
                 let (hasTokenTransfer, tokenInstrumentId) = case message.tokenTransfer of
                         None -> (False, None)
                         Some tt -> (True, Some tt.token)
-                let resolvedCCVs =
+                let resolvedSenderRequiredCCVs =
                         computeRequiredCCVsForSend
                             destConfig
                             message
@@ -405,7 +419,8 @@ template OnRamp
                         feeQuoter = deps.feeQuoter
                     destChainSelector
                     sequenceNumber = newSequenceNumber
-                    requiredCCVs = resolvedCCVs
+                    destDefaultCCVs = destConfig.defaultCCVs
+                    requiredCCVs = resolvedSenderRequiredCCVs
                     requiredExecutor = resolvedRequiredExecutor
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
@@ -459,7 +474,6 @@ template OnRamp
             do
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
-                    _ -> abort "onramp: unsupported extraArgs version"
                 let executorArgs = case extraArgs.executor of
                         CCIP.Client.Executor_NoExecutor -> ""
                         CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
@@ -475,13 +489,13 @@ template OnRamp
                 assertMsg "onramp: executor quote inconsistent with extraArgs"
                     (case extraArgs.executor of
                         CCIP.Client.Executor_NoExecutor ->
-                            executorFeeQuote == None && executorArgs == ""
+                            isNone executorFeeQuote && executorArgs == ""
                         CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
                             case executorFeeQuote of
                                 None -> executorArgs == ""
                                 Some _ -> executorArgs == expectedExecutorArgs
                         CCIP.Client.Executor_WithAddress _ expectedExecutorArgs ->
-                            executorFeeQuote /= None && executorArgs == expectedExecutorArgs)
+                            isSome executorFeeQuote && executorArgs == expectedExecutorArgs)
 
                 globalConfig <- fetch globalConfigCid
                 RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
@@ -512,9 +526,9 @@ template OnRamp
                         executorArgs = executorArgs
                         hasTokenTransfer = isSome tokenPoolFeeQuote
                         ccipReceiveGasLimit = extraArgs.gasLimit
-                        ccvFeeUSDCents = foldl (+) 0.0 (map (.feeUSDCents) ccvFeeQuotes)
-                        ccvGasSum = foldl (+) 0 (map (.gasForVerification) ccvFeeQuotes)
-                        ccvBytesSum = foldl (+) 0 (map (.payloadSizeBytes) ccvFeeQuotes)
+                        ccvFeeUSDCents = sum (map (.feeUSDCents) ccvFeeQuotes)
+                        ccvGasSum = sum (map (.gasForVerification) ccvFeeQuotes)
+                        ccvBytesSum = sum (map (.payloadSizeBytes) ccvFeeQuotes)
                         poolFeeUSDCents = case tokenPoolFeeQuote of
                             None -> 0.0
                             Some q -> q.feeUSDCents
@@ -591,7 +605,7 @@ template OnRamp
                 let tokenPrice = fromSomeNote
                         ("No price found for " <> sendingMsg.feeToken.id)
                         (Map.lookup sendingMsg.feeToken feeQuoter.usdPerToken)
-                let hasTokenTransfer = sendingMsg.expectedTokenInstrumentId /= None
+                let hasTokenTransfer = isSome sendingMsg.expectedTokenInstrumentId
                 let ccvGasSum = foldl (\acc fee -> acc + fee.destGasLimit) 0 sendingMsg.ccvFees
                 let ccvBytesSum = foldl (\acc fee -> acc + fee.destBytesOverhead) 0 sendingMsg.ccvFees
                 let poolGas = case sendingMsg.tokenSendFee of

@@ -250,7 +250,8 @@ func ArchiveAllContracts(t *testing.T, ctx context.Context, participant canton.P
 		createdEvent := activeContract.GetActiveContract().GetCreatedEvent()
 
 		if strings.HasPrefix(createdEvent.GetTemplateId().GetModuleName(), "CCIP") ||
-			strings.HasPrefix(createdEvent.GetTemplateId().GetModuleName(), "MCMS") {
+			strings.HasPrefix(createdEvent.GetTemplateId().GetModuleName(), "MCMS") ||
+			strings.HasPrefix(createdEvent.GetTemplateId().GetModuleName(), "Link") {
 			wg.Go(func() {
 				t.Logf("Archiving contract %q: %s:%s:%s", createdEvent.GetContractId(), createdEvent.GetTemplateId().GetPackageId(), createdEvent.GetTemplateId().GetModuleName(), createdEvent.GetTemplateId().GetEntityName())
 

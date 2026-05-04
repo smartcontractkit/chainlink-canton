@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -85,8 +85,8 @@ func (s Server) PostCCVSend(c *gin.Context, address string) {
 		return
 	}
 
-	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: map[string]common.AnyValue{
+	contextData, err := converters.SerializeChoiceContext(splice_api_token_metadata_v1.ChoiceContext{
+		Values: map[string]splice_api_token_metadata_v1.AnyValue{
 			// Empty for now
 		},
 	})
@@ -100,7 +100,7 @@ func (s Server) PostCCVSend(c *gin.Context, address string) {
 		ContractId:         activeCCVContract.GetCreatedEvent().GetContractId(),
 		InstanceAddress:    parsedCommitteeVerifierContract.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: parsedCommitteeVerifierContract.Address.String(),
-		ContextData:        ccipContext,
+		ContextData:        contextData,
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activeCCVContract),
 		},
@@ -144,8 +144,8 @@ func (s Server) PostCCVExecute(c *gin.Context, address string) {
 		return
 	}
 
-	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: map[string]common.AnyValue{
+	contextData, err := converters.SerializeChoiceContext(splice_api_token_metadata_v1.ChoiceContext{
+		Values: map[string]splice_api_token_metadata_v1.AnyValue{
 			// Empty for now
 		},
 	})
@@ -159,7 +159,7 @@ func (s Server) PostCCVExecute(c *gin.Context, address string) {
 		ContractId:         activeCCVContract.GetCreatedEvent().GetContractId(),
 		InstanceAddress:    parsedCommitteeVerifierContract.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: parsedCommitteeVerifierContract.Address.String(),
-		ContextData:        ccipContext,
+		ContextData:        contextData,
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activeCCVContract),
 		},

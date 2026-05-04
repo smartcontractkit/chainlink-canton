@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -137,31 +138,42 @@ var BuildConfig = operations.NewOperation(
 			}
 		}
 
-		// Token pools on Canton are LockReleaseTokenPool (not EVM BurnMintTokenPool).
-		refs = env.DataStore.Addresses().Filter(
-			datastore.AddressRefByChainSelector(input.ChainSelector),
-			datastore.AddressRefByType(datastore.ContractType(lock_release_token_pool.ContractType)),
-		)
-		filteredRefs := make([]datastore.AddressRef, 0, len(refs))
+		refs = env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
+		tokenPools := make([]edsConfig.TokenPool, 0, len(refs))
 		for _, ref := range refs {
 			if strings.Count(ref.Qualifier, "[default]") != 3 { // TODO: this logic is really fragile and needs to be improved.
 				continue
 			}
-			filteredRefs = append(filteredRefs, ref)
-		}
-		refs = filteredRefs
-		tokenPools := make([]edsConfig.TokenPool, 0, len(refs))
-		for _, ref := range refs {
+
+			var (
+				tokenPoolType           edsConfig.TokenPoolType
+				tokenStandardURL        *string
+				tokenStandardAuthConfig *commonconfig.AuthConfig
+			)
+			switch ref.Type {
+			case datastore.ContractType(lock_release_token_pool.ContractType):
+				tokenPoolType = edsConfig.TokenPoolTypeLockRelease
+				// This discovery path is only valid for the Amulet/Nativ test setup.
+				tokenStandardURL = new(fmt.Sprintf("%s/v0/scan-proxy", validatorAPIEndpoint))
+				tokenStandardAuthConfig = &nodeConfig.AuthConfig
+			case datastore.ContractType(burn_mint_token_pool.ContractType):
+				tokenPoolType = edsConfig.TokenPoolTypeBurnMint
+			default:
+				continue
+			}
+
 			tokenPools = append(tokenPools, edsConfig.TokenPool{
 				ContractIdentifier: edsConfig.ContractIdentifier{
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
 				},
-				Type:      edsConfig.TokenPoolTypeLockRelease,
+				Type:      tokenPoolType,
 				PoolOwner: participant.PartyID,
-				// TODO This only works while we're using Nativ/Amulet for Token testing
-				TokenStandardURL:        new(fmt.Sprintf("%s/v0/scan-proxy", validatorAPIEndpoint)),
-				TokenStandardAuthConfig: &nodeConfig.AuthConfig,
+				TransferFactory: &edsConfig.TransferFactory{
+					Type:                    edsConfig.FactoryTypeURL,
+					TokenStandardURL:        tokenStandardURL,
+					TokenStandardAuthConfig: tokenStandardAuthConfig,
+				},
 			})
 		}
 

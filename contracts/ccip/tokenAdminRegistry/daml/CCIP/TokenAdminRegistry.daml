@@ -4,7 +4,9 @@ import DA.Crypto.Text (BytesHex, byteCount)
 import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Optional (fromSomeNote, isSome)
+
 import qualified Splice.Api.Token.HoldingV1
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
 import qualified CCIP.Context
 import CCIP.TokenAdminRegistryCodecGen (
@@ -35,15 +37,15 @@ tokenAdminRegistryKey = "token-admin-registry"
 tokenConfigKey : Text
 tokenConfigKey = "token-config"
 
-lookupTokenAdminRegistryCid : CCIP.Context.CCIPContext -> Update (ContractId TokenAdminRegistry)
+lookupTokenAdminRegistryCid : ChoiceContext -> Update (ContractId TokenAdminRegistry)
 lookupTokenAdminRegistryCid ctx =
     CCIP.Context.getFromContextU ctx tokenAdminRegistryKey
 
-lookupTokenConfigCid : CCIP.Context.CCIPContext -> Update (ContractId TokenConfig)
+lookupTokenConfigCid : ChoiceContext -> Update (ContractId TokenConfig)
 lookupTokenConfigCid ctx =
     CCIP.Context.getFromContextU ctx tokenConfigKey
 
-lookupOptionalTokenConfigCid : CCIP.Context.CCIPContext -> Update (Optional (ContractId TokenConfig))
+lookupOptionalTokenConfigCid : ChoiceContext -> Update (Optional (ContractId TokenConfig))
 lookupOptionalTokenConfigCid ctx =
     CCIP.Context.lookupFromContextU ctx tokenConfigKey
 
@@ -334,7 +336,7 @@ template TokenAdminRegistry
                     (ticket.poolOwner == pool.poolOwner)
                 assertMsg "ConsumeReceiveTicket: ticket instrument must match requested instrument"
                     (ticket.instrumentId == instrumentId)
-                archive ticketCid
+                exercise ticketCid CCIP.Tickets.ConsumeByCCIPOwner
 
         -- | Record pool's outbound CCV requirements on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,
@@ -475,8 +477,7 @@ template TokenAdminRegistry
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 ticketReceiver : Party
                 returnData : BytesHex
-                caller : Party
-            controller caller
+            controller owner
             do
                 execMsg <- fetch executingMessageCid
                 assertMsg "TAR finalize: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)

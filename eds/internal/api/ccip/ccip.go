@@ -13,6 +13,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -323,8 +325,8 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		executor = req.Message.Executor.Address
 	}
 
-	ccipContext := common.CCIPContext{
-		Values: map[string]common.AnyValue{
+	choiceContext := splice_api_token_metadata_v1.ChoiceContext{
+		Values: map[string]splice_api_token_metadata_v1.AnyValue{
 			string(onramp.OnRampKey): {
 				AVContractId: new(types.CONTRACT_ID(activeOnRampContract.GetCreatedEvent().GetContractId())),
 			},
@@ -389,13 +391,13 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token pool registered for token: %s", encodedInstrumentId.Hex())})
 			return
 		}
-		ccipContext.Values[string(tokenadminregistry.TokenConfigKey)] = common.AnyValue{
+		choiceContext.Values[string(tokenadminregistry.TokenConfigKey)] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
 		}
 		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))
 	}
 
-	contextData, err := converters.SerializeCCIPContext(ccipContext)
+	contextData, err := converters.SerializeChoiceContext(choiceContext)
 	if err != nil {
 		s.logger.Err(err).Msg("failed to serialize CCIP context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
@@ -456,8 +458,8 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 		return
 	}
 
-	ccipContext := common.CCIPContext{
-		Values: map[string]common.AnyValue{
+	choiceContext := splice_api_token_metadata_v1.ChoiceContext{
+		Values: map[string]splice_api_token_metadata_v1.AnyValue{
 			string(offramp.OffRampKey): {
 				AVContractId: new(types.CONTRACT_ID(activeOffRampContract.GetCreatedEvent().GetContractId())),
 			},
@@ -509,13 +511,13 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 			return
 		}
 		tokenPool = new(oapiCommon.RawInstanceAddress(contracts.InstanceID(parsedTokenConfig.Pool.PoolInstanceId).RawInstanceAddress(parsedTokenConfig.Pool.PoolOwner)))
-		ccipContext.Values[string(tokenadminregistry.TokenConfigKey)] = common.AnyValue{
+		choiceContext.Values[string(tokenadminregistry.TokenConfigKey)] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
 		}
 		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))
 	}
 
-	contextData, err := converters.SerializeCCIPContext(ccipContext)
+	contextData, err := converters.SerializeChoiceContext(choiceContext)
 	if err != nil {
 		s.logger.Err(err).Msg("failed to serialize CCIP context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})

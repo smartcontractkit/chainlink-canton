@@ -5,24 +5,21 @@ import (
 	"testing"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-
-	"github.com/smartcontractkit/go-daml/pkg/bind"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -198,7 +195,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
 		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
 		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+		PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 		TransferTimeout:    lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT{})},
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLockReleaseTokenPoolParams", lrtpParams)
@@ -217,7 +214,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
 		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
 		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+		PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 		TransferTimeout:    lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT{})},
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLockReleaseTokenPoolParams", lrtp2Params)
