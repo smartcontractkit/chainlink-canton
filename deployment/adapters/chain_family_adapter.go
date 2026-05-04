@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -157,10 +156,10 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 					LaneMandatedOutboundCCVs: laneMandatedOutboundCCVs,
 					DefaultExecutor:          localExecutor,
 					CantonLaneConfig:         &lanes.CantonLaneConfig{GlobalConfig: localGlobalConfig},
-					OnRamp:                   contracts.BytesToInstanceAddress(input.OnRamp).Bytes(),
-					OffRamp:                  contracts.BytesToInstanceAddress(input.OffRamp).Bytes(),
-					Router:                   contracts.BytesToInstanceAddress(input.Router).Bytes(),
-					FeeQuoter:                contracts.BytesToInstanceAddress(input.FeeQuoter).Bytes(),
+					OnRamp:                   input.OnRamp,
+					OffRamp:                  input.OffRamp,
+					Router:                   input.Router,
+					FeeQuoter:                input.FeeQuoter,
 				}
 
 				remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)
