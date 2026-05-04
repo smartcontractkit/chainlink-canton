@@ -16,7 +16,9 @@ type FetchParticipantsInput struct {
 
 // FetchParticipantsOutput is the output of [FetchParticipantsOp].
 type FetchParticipantsOutput struct {
-	Participants []string `json:"participants"`
+	Participants          []string `json:"participants"`
+	PartySigningKeysB64   []string `json:"party_signing_keys_b64,omitempty"`
+	PartySigningThreshold uint32   `json:"party_signing_threshold,omitempty"`
 }
 
 // ── GrantPartyRights ─────────────────────────────────────────────────────────
@@ -88,9 +90,10 @@ type PrepareSubmissionOutput struct {
 
 // SignSubmissionInput is the input to [SignSubmissionOp].
 type SignSubmissionInput struct {
-	ParticipantID           string `json:"participant_id"`
-	PreparedTransactionHash string `json:"prepared_transaction_hash"`
-	PreparedTxB64           string `json:"prepared_tx_b64"`
+	ParticipantID           string   `json:"participant_id"`
+	PreparedTransactionHash string   `json:"prepared_transaction_hash"`
+	PreparedTxB64           string   `json:"prepared_tx_b64"`
+	KnownSigningKeysB64     []string `json:"known_signing_keys_b64,omitempty"`
 }
 
 // SignSubmissionOutput is the output of [SignSubmissionOp].

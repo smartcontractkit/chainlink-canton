@@ -42,11 +42,7 @@ func (s *ConfirmFlowTestSuite) TestOnboardingWithNoOpConfirmer() {
 	// Build deps with NoOpConfirmer for all actors.
 	deps := make([]ceremony.CantonDeps, 3)
 	for i := range 3 {
-		deps[i] = ceremony.CantonDeps{
-			Client:    s.Actors[i].client,
-			Logger:    logger.Test(t),
-			Confirmer: ceremony.NoOpConfirmer{},
-		}
+		deps[i] = s.OnboardingDepsWithConfirmer(i, ceremony.NoOpConfirmer{})
 	}
 
 	// Run the standard 7-run flow with confirmer in the path.
@@ -91,22 +87,14 @@ func (s *ConfirmFlowTestSuite) TestOnboardingRejectsDNSSigning() {
 
 	// Phase 1: Key gen with no confirmer (nil) — 3 runs, each generating keys.
 	for i := range 3 {
-		deps := ceremony.CantonDeps{
-			Client: s.Actors[i].client,
-			Logger: logger.Test(t),
-			// No confirmer for key gen phase
-		}
+		deps := s.OnboardingDeps(i)
 		_, err := operations.ExecuteSequence(newBundle(), onboarding.OnboardingSequence, deps, input)
 		require.ErrorContains(t, err, onboarding.ErrThresholdNotMet.Error())
 	}
 
 	// Phase 2: Actor 3 (run 3) created the DNS proposal and would try to sign.
 	// Now switch to AlwaysRejectConfirmer for the signing step.
-	rejectDeps := ceremony.CantonDeps{
-		Client:    s.Actors[0].client,
-		Logger:    logger.Test(t),
-		Confirmer: ceremony.AlwaysRejectConfirmer{},
-	}
+	rejectDeps := s.OnboardingDepsWithConfirmer(0, ceremony.AlwaysRejectConfirmer{})
 
 	// This run should fail because the confirmer rejects signing.
 	_, err := operations.ExecuteSequence(newBundle(), onboarding.OnboardingSequence, rejectDeps, input)

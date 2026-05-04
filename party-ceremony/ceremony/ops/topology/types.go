@@ -204,6 +204,7 @@ type ProposeKickP2PInput struct {
 	NewP2PThreshold       int      `json:"new_p2p_threshold"`
 	CurrentP2PSerial      int      `json:"current_p2p_serial"`
 	SynchronizerID        string   `json:"synchronizer_id"`
+	PartySigningKeysB64   []string `json:"party_signing_keys_b64,omitempty"`
 }
 
 // ProposeKickP2POutput is the output of [ProposeKickP2POp].
@@ -216,12 +217,13 @@ type ProposeKickP2POutput struct {
 
 // ProposeAddP2PInput is the input to [ProposeAddP2POp].
 type ProposeAddP2PInput struct {
-	ParticipantID      string   `json:"participant_id"`
-	PartyID            string   `json:"party_id"`
-	AllParticipantUIDs []string `json:"all_participant_uids"`
-	NewP2PThreshold    int      `json:"new_p2p_threshold"`
-	CurrentP2PSerial   int      `json:"current_p2p_serial"`
-	SynchronizerID     string   `json:"synchronizer_id"`
+	ParticipantID       string   `json:"participant_id"`
+	PartyID             string   `json:"party_id"`
+	AllParticipantUIDs  []string `json:"all_participant_uids"`
+	NewP2PThreshold     int      `json:"new_p2p_threshold"`
+	CurrentP2PSerial    int      `json:"current_p2p_serial"`
+	SynchronizerID      string   `json:"synchronizer_id"`
+	PartySigningKeysB64 []string `json:"party_signing_keys_b64,omitempty"`
 }
 
 // ProposeAddP2POutput is the output of [ProposeAddP2POp].
@@ -243,7 +245,9 @@ type ProposeRotationP2PInput struct {
 	CurrentSigningKeysB64 []string `json:"current_signing_keys_b64"`
 	OldDamlKeyB64         string   `json:"old_daml_key_b64"`
 	NewDamlKeyB64         string   `json:"new_daml_key_b64"`
-	SigningKeysThreshold  uint32   `json:"signing_keys_threshold"`
+	// PartySigningKeysThreshold preserves the current topology's signing-key
+	// threshold while replacing only the rotated protocol key.
+	PartySigningKeysThreshold uint32 `json:"party_signing_keys_threshold"`
 }
 
 // ProposeRotationP2POutput is the output of [ProposeRotationP2POp].

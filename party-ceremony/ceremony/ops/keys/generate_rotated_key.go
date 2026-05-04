@@ -15,7 +15,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// GenerateRotatedKeyOp generates new namespace and/or DAML signing keys for the
+// GenerateRotatedKeyOp generates or registers locally configured KMS namespace
+// and/or DAML signing keys for the
 // target participant. When RotateDamlKey is true, it also auto-discovers the
 // target's old DAML key by cross-referencing vault keys against the party's
 // current signing keys.
@@ -62,11 +63,11 @@ var GenerateRotatedKeyOp = operations.NewOperation(
 
 		// Generate new namespace key if requested.
 		if in.RotateNamespaceKey {
-			key, genErr := deps.Client.GenerateSigningKey(ctx, nsKeyName+"-rotated", []cryptov30.SigningKeyUsage{
+			key, genErr := obtainSigningKey(ctx, deps.Client, deps.KMS.NamespaceKeyID, nsKeyName+"-rotated", []cryptov30.SigningKeyUsage{
 				cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_NAMESPACE,
 			})
 			if genErr != nil {
-				return GenerateRotatedKeyOutput{}, fmt.Errorf("generating rotated namespace key: %w", genErr)
+				return GenerateRotatedKeyOutput{}, fmt.Errorf("obtaining rotated namespace key: %w", genErr)
 			}
 
 			fp, fpErr := helpers.GetPublicKeyFingerprint(key.GetPublicKey())
@@ -90,11 +91,11 @@ var GenerateRotatedKeyOp = operations.NewOperation(
 
 		// Generate new DAML key if requested.
 		if in.RotateDamlKey {
-			damlKey, genErr := deps.Client.GenerateSigningKey(ctx, nsKeyName+"-protocol-rotated", []cryptov30.SigningKeyUsage{
+			damlKey, genErr := obtainSigningKey(ctx, deps.Client, deps.KMS.ProtocolKeyID, nsKeyName+"-protocol-rotated", []cryptov30.SigningKeyUsage{
 				cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_PROTOCOL,
 			})
 			if genErr != nil {
-				return GenerateRotatedKeyOutput{}, fmt.Errorf("generating rotated DAML key: %w", genErr)
+				return GenerateRotatedKeyOutput{}, fmt.Errorf("obtaining rotated DAML key: %w", genErr)
 			}
 
 			fp, fpErr := helpers.GetPublicKeyFingerprint(damlKey.GetPublicKey())

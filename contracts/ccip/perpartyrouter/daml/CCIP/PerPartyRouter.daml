@@ -8,7 +8,7 @@ import DA.Set (Set)
 import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Date (date, Month(Dec))
-import DA.Optional (fromOptional)
+import DA.Optional (fromOptional, isNone)
 import DA.Time (time)
 
 import qualified CCIP.Client
@@ -57,7 +57,7 @@ addFeeForParty allocs recipient amount =
     in Map.insert recipient (existing + amount) allocs
 
 sumAllocatedFees : Map.Map Party Decimal -> Decimal
-sumAllocatedFees allocations = foldl (+) 0.0 (map snd (Map.toList allocations))
+sumAllocatedFees allocations = sum (map snd (Map.toList allocations))
 
 buildCCVFeeAllocations
     : [CCIP.SendingMessageV1.CCVFee]
@@ -393,7 +393,7 @@ template PerPartyRouter
                     sendingMessageCid = sendingMessageCid
 
                 sm <- fetch smCid
-                if sm.expectedTokenInstrumentId == None
+                if isNone sm.expectedTokenInstrumentId
                     then exercise smCid CCIP.SendingMessageV1.BuildMessage with
                         caller = partyOwner
                     else pure smCid
@@ -689,7 +689,7 @@ template PerPartyRouter
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
                 destChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                tokenPoolRequiredCCVs : [RawInstanceAddress]
+                poolReportedCCVs : [RawInstanceAddress]
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -707,7 +707,7 @@ template PerPartyRouter
                     globalConfigCid = globalConfigCid
                     destChainSelector = destChainSelector
                     message = message
-                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
+                    poolReportedCCVs = poolReportedCCVs
 
         -- | Get all required CCV raw instance addresses for executing a message.
         nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]

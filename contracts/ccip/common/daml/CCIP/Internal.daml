@@ -36,6 +36,14 @@ resolveDefaultCCVs defaultCCVs useDefaultCCVs ccvs =
         else acc ++ [ccv]
     ) [] ccvs
 
+-- EVM-style required CCV resolution: empty means use defaults; otherwise the
+-- useDefaultCCVs sentinel expands in place.
+resolveRequiredCCVsWithDefaults : [RawInstanceAddress] -> [RawInstanceAddress] -> [RawInstanceAddress]
+resolveRequiredCCVsWithDefaults defaultCCVs ccvs =
+    case ccvs of
+        [] -> defaultCCVs
+        _ -> resolveDefaultCCVs defaultCCVs useDefaultCCVs ccvs
+
 resolveOptionalCCVs
     : [RawInstanceAddress]
     -> [RawInstanceAddress]
@@ -76,12 +84,7 @@ computeExecuteCCVs defaultCCVs laneMandatedCCVs message receiverRequiredCCVs rec
             assertMsg "offramp: receiver optional threshold must be non-negative" (receiverOptionalThreshold >= 0)
             assertMsg "offramp: receiver optional threshold cannot be higher than number of optional CCVs" (receiverOptionalThreshold <= length receiverOptionalCCVs)
             assertMsg "offramp: receiver optional CCVs cannot contain useDefaultCCVs sentinel" (useDefaultCCVs `notElem` receiverOptionalCCVs)
-            let resolvedRequired = case receiverRequiredCCVs of
-                    [] -> defaultCCVs
-                    _ -> resolveDefaultCCVs
-                        defaultCCVs
-                        useDefaultCCVs
-                        receiverRequiredCCVs
+            let resolvedRequired = resolveRequiredCCVsWithDefaults defaultCCVs receiverRequiredCCVs
             let baseRequiredCCVs = dedup (resolvedRequired ++ laneMandatedCCVs)
             let (baseOptionalCCVs, baseOptionalCCVThreshold) =
                     resolveOptionalCCVs
@@ -98,12 +101,7 @@ mergeInboundPoolCCVs
     -> [RawInstanceAddress]
     -> ([RawInstanceAddress], [RawInstanceAddress], Int)
 mergeInboundPoolCCVs sourceDefaultCCVs requiredCCVs optionalCCVs optionalCCVThreshold poolCCVs =
-    let resolvedPoolCCVs = case poolCCVs of
-            [] -> sourceDefaultCCVs
-            _ -> resolveDefaultCCVs
-                sourceDefaultCCVs
-                useDefaultCCVs
-                poolCCVs
+    let resolvedPoolCCVs = resolveRequiredCCVsWithDefaults sourceDefaultCCVs poolCCVs
         mergedRequiredCCVs = dedup (requiredCCVs ++ resolvedPoolCCVs)
         (mergedOptionalCCVs, mergedOptionalCCVThreshold) =
             resolveOptionalCCVs resolvedPoolCCVs optionalCCVs optionalCCVThreshold
