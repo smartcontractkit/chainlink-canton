@@ -11,14 +11,12 @@ import (
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 const defaultLedgerPort = 5002
 
 // DialLedger opens a gRPC connection to a Canton Ledger API endpoint using
 // the ledger host, port, and optional JWT bearer token from cfg.
-// TLS is not yet supported — connections are plaintext.
 func DialLedger(cfg ClientConfig) (*grpc.ClientConn, error) {
 	host := cfg.LedgerHost
 	if host == "" {
@@ -30,7 +28,8 @@ func DialLedger(cfg ClientConfig) (*grpc.ClientConn, error) {
 	}
 	target := fmt.Sprintf("%s:%d", host, port)
 
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	creds := transportCredentials(host, port)
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(creds)}
 	jwt := cfg.LedgerJWT
 	if jwt == "" {
 		jwt = cfg.AdminJWT // fall back to admin JWT if no separate ledger JWT
