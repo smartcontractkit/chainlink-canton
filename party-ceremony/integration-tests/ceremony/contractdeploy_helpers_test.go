@@ -48,11 +48,11 @@ func (s *CeremonyTestSuite) runContractDeployFlow(
 		}
 
 		deps[i] = ledger.ContractDeployDeps{
-			AdminClient:  s.Actors[i].client,
+			AdminClient:  s.Actors[i].deps.Client,
 			LedgerClient: ledgerClients[i],
 			DARLoader:    darLoader,
 			SignerFactory: client.NewTransactionSignerFactory(
-				s.Actors[i].client,
+				s.Actors[i].deps.Client,
 				cryptoadminv30.NewVaultServiceClient(adminConn),
 				kmsCfgs[i],
 				kmsAPI,

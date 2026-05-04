@@ -55,17 +55,17 @@ func (s *KeyRotationFlowTestSuite) TestKeyRotationFlow() {
 
 	// Discover the target participant's current namespace fingerprint from the DNS state.
 	decNS := strings.SplitN(s.PartyID, "::", 2)[1]
-	dnsState, err := actors[0].client.GetDNS(t.Context(), decNS, synchronizerID)
+	dnsState, err := actors[0].deps.Client.GetDNS(t.Context(), decNS, synchronizerID)
 	require.NoError(t, err, "GetDNS after onboarding")
 	require.Len(t, dnsState.Owners, 3, "should have 3 owners after onboarding")
 
 	// Identify the target (actor[0]) namespace fingerprint.
-	targetNSFP, err := actors[0].client.GetNamespaceFingerprint(t.Context(), s.onboardingNamespaceName(), synchronizerID, dnsState.Owners)
+	targetNSFP, err := actors[0].deps.Client.GetNamespaceFingerprint(t.Context(), s.onboardingNamespaceName(), synchronizerID, dnsState.Owners)
 	require.NoError(t, err, "GetNamespaceFingerprint for target participant")
-	p2pState, err := actors[0].client.GetP2P(t.Context(), s.PartyID, synchronizerID)
+	p2pState, err := actors[0].deps.Client.GetP2P(t.Context(), s.PartyID, synchronizerID)
 	require.NoError(t, err, "GetP2P before rotation")
 	require.NotNil(t, p2pState.PartySigningKeys, "P2P signing keys should be present before rotation")
-	oldTargetProtocolFP, oldTargetProtocolKeyB64, err := actors[0].client.GetProtocolKeyFingerprint(t.Context(), p2pState.PartySigningKeys.Keys)
+	oldTargetProtocolFP, oldTargetProtocolKeyB64, err := actors[0].deps.Client.GetProtocolKeyFingerprint(t.Context(), p2pState.PartySigningKeys.Keys)
 	require.NoError(t, err, "GetProtocolKeyFingerprint for target participant before rotation")
 
 	targetUID := actors[0].uid
@@ -91,8 +91,8 @@ func (s *KeyRotationFlowTestSuite) TestKeyRotationFlow() {
 	rotationKMS := s.kmsConfigFor(0, "rotation")
 	deps := [3]ceremony.CantonDeps{
 		s.depsFor(0, rotationKMS),
-		s.kmsDepsFor(1),
-		s.kmsDepsFor(2),
+		s.OnboardingDeps(1),
+		s.OnboardingDeps(2),
 	}
 
 	// Run 1 (p1, target): generates key, NSD, DNS proposal, signs DNS (1/3) -> ErrThresholdNotMet.
@@ -131,17 +131,17 @@ func (s *KeyRotationFlowTestSuite) TestKeyRotationFlow() {
 	newNSFP := rotationResult.Output.NewNamespaceFingerprint
 
 	// ── Verify via topology read API ─────────────────────────────────────────
-	updatedDNS, err := actors[0].client.GetDNS(t.Context(), decNS, synchronizerID)
+	updatedDNS, err := actors[0].deps.Client.GetDNS(t.Context(), decNS, synchronizerID)
 	require.NoError(t, err, "GetDNS after rotation")
 	assert.Len(t, updatedDNS.Owners, 3, "should still have 3 owners after rotation")
 	assert.NotContains(t, updatedDNS.Owners, targetNSFP, "old namespace fingerprint must be removed from DNS")
 	assert.Contains(t, updatedDNS.Owners, newNSFP, "new namespace fingerprint must be present in DNS")
-	updatedP2P, err := actors[0].client.GetP2P(t.Context(), s.PartyID, synchronizerID)
+	updatedP2P, err := actors[0].deps.Client.GetP2P(t.Context(), s.PartyID, synchronizerID)
 	require.NoError(t, err, "GetP2P after rotation")
 	require.NotNil(t, updatedP2P.PartySigningKeys, "P2P signing keys should be present after rotation")
 	assert.Len(t, updatedP2P.PartySigningKeys.Keys, len(p2pState.PartySigningKeys.Keys), "rotation should not change signing-key count")
 	assert.NotContains(t, updatedP2P.PartySigningKeys.Keys, oldTargetProtocolKeyB64, "old protocol signing key must be removed from P2P")
-	newTargetProtocolFP, newTargetProtocolKeyB64, err := actors[0].client.GetProtocolKeyFingerprint(t.Context(), updatedP2P.PartySigningKeys.Keys)
+	newTargetProtocolFP, newTargetProtocolKeyB64, err := actors[0].deps.Client.GetProtocolKeyFingerprint(t.Context(), updatedP2P.PartySigningKeys.Keys)
 	require.NoError(t, err, "GetProtocolKeyFingerprint after rotation")
 	assert.NotEqual(t, oldTargetProtocolFP, newTargetProtocolFP, "target protocol fingerprint should change")
 	assert.Equal(t, rotationResult.Output.NewDamlKeyFingerprint, newTargetProtocolFP, "new protocol fingerprint should match rotation output")

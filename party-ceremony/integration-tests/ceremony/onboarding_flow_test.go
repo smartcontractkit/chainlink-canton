@@ -48,12 +48,9 @@ func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter opera
 		return operations.NewBundle(t.Context, logger.Test(t), reporter)
 	}
 
-	kmsCfg1 := s.kmsConfigFor(0, "onboarding")
-	kmsCfg2 := s.kmsConfigFor(1, "onboarding")
-	kmsCfg3 := s.kmsConfigFor(2, "onboarding")
-	deps1 := s.depsFor(0, kmsCfg1)
-	deps2 := s.depsFor(1, kmsCfg2)
-	deps3 := s.depsFor(2, kmsCfg3)
+	deps1 := s.OnboardingDeps(0)
+	deps2 := s.OnboardingDeps(1)
+	deps3 := s.OnboardingDeps(2)
 
 	// Run 1: Actor 1 generates key (1/3 keys)
 	t.Log("Actor 1: run 1 — key gen (1/3)")
@@ -91,9 +88,9 @@ func (s *OnboardingFlowTestSuite) performOnboarding(t *testing.T, reporter opera
 	require.NoError(t, err, "actor 1 run 7: ceremony should complete successfully")
 
 	s.PartyID = sr.Output.PartyID
-	s.assertKMSKeysRegistered(0, kmsCfg1)
-	s.assertKMSKeysRegistered(1, kmsCfg2)
-	s.assertKMSKeysRegistered(2, kmsCfg3)
+	s.assertKMSKeysRegistered(0, deps1.KMS)
+	s.assertKMSKeysRegistered(1, deps2.KMS)
+	s.assertKMSKeysRegistered(2, deps3.KMS)
 
 	return sr
 }
@@ -135,14 +132,14 @@ func (s *OnboardingFlowTestSuite) TestOnboardingFlow() {
 	require.Len(t, parts, 2, "PartyID %q should be <name>::<namespace>", sr.Output.PartyID)
 	decNS := parts[1]
 
-	dnsOK, err := s.Actors[0].client.DNSExists(t.Context(), decNS, s.SynchronizerID)
+	dnsOK, err := s.Actors[0].deps.Client.DNSExists(t.Context(), decNS, s.SynchronizerID)
 	require.NoError(t, err, "DNSExists query failed")
 	assert.True(t, dnsOK, "DecentralizedNamespaceDefinition should be active in topology")
 
-	p2pOK, err := s.Actors[0].client.P2PExists(t.Context(), sr.Output.PartyID, s.SynchronizerID)
+	p2pOK, err := s.Actors[0].deps.Client.P2PExists(t.Context(), sr.Output.PartyID, s.SynchronizerID)
 	require.NoError(t, err, "P2PExists query failed")
 	assert.True(t, p2pOK, "PartyToParticipant mapping should be active in topology")
-	p2pState, err := s.Actors[0].client.GetP2P(t.Context(), sr.Output.PartyID, s.SynchronizerID)
+	p2pState, err := s.Actors[0].deps.Client.GetP2P(t.Context(), sr.Output.PartyID, s.SynchronizerID)
 	require.NoError(t, err, "GetP2P after onboarding")
 	require.NotNil(t, p2pState.PartySigningKeys, "P2P signing keys should be active")
 	assert.Len(t, p2pState.PartySigningKeys.Keys, 3, "should have one protocol signing key per participant")
@@ -150,7 +147,7 @@ func (s *OnboardingFlowTestSuite) TestOnboardingFlow() {
 
 	// ── Verify idempotency: re-run produces the same output from cache ───
 	t.Log("Actor 1: run 8 — idempotency check")
-	deps1 := s.depsFor(0, s.kmsConfigFor(0, "onboarding"))
+	deps1 := s.OnboardingDeps(0)
 	newBundle := func() operations.Bundle {
 		return operations.NewBundle(t.Context, logger.Test(t), sharedReporter)
 	}

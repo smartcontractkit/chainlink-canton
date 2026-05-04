@@ -21,7 +21,7 @@ func (s *KMSHarnessSmokeSuite) TestKMSHarnessSmoke() {
 	t := s.T()
 
 	kmsCfg := s.kmsConfigFor(0, "smoke")
-	namespaceKey, err := s.Actors[0].client.RegisterKmsSigningKey(
+	namespaceKey, err := s.Actors[0].deps.Client.RegisterKmsSigningKey(
 		t.Context(),
 		kmsCfg.NamespaceKeyID,
 		s.uniqueName("smoke-ns"),
@@ -29,7 +29,7 @@ func (s *KMSHarnessSmokeSuite) TestKMSHarnessSmoke() {
 	)
 	require.NoError(t, err, "register smoke namespace KMS signing key")
 
-	_, err = s.Actors[0].client.RegisterKmsSigningKey(
+	_, err = s.Actors[0].deps.Client.RegisterKmsSigningKey(
 		t.Context(),
 		kmsCfg.ProtocolKeyID,
 		s.uniqueName("smoke-protocol"),

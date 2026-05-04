@@ -404,6 +404,29 @@ func mcmsFactoryDeploy[T encodableParams](
 ) (string, string) {
 	t.Helper()
 
+	return mcmsFactoryDeployWithMCMSQueryParty(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEnc, encoderMethodName, params)
+}
+
+func mcmsFactoryDeployWithMCMSQueryParty[T encodableParams](
+	t *testing.T,
+	participant canton.Participant,
+	mcmsPkgID string,
+	factoryPkgID string,
+	mcmsEncoder mcms.MCMSEncoder,
+	ccipOwner string,
+	mcmsQueryParty string,
+	mcmsCid string,
+	mcmsInstanceAddr string,
+	factoryCid string,
+	factoryInstanceAddr string,
+	chainID int64,
+	sortedSigners []*MCMSSigner,
+	factoryEnc factory.MCMSEncoder,
+	encoderMethodName string,
+	params T,
+) (string, string) {
+	t.Helper()
+
 	encoded := encodeFactoryParams(t, factoryEnc, encoderMethodName, params)
 	t.Logf("  MCMS deploy: choice=%s, opData=%d hex chars", encoded.Choice, len(encoded.OperationData))
 
@@ -420,7 +443,7 @@ func mcmsFactoryDeploy[T encodableParams](
 	bypasserMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleBypasser)
 
 	// Get current bypasser op count from the MCMS contract
-	opCount := queryBypasserOpCount(t, participant, mcmsPkgID, mcmsCid)
+	opCount := queryBypasserOpCountForParty(t, participant, mcmsQueryParty, mcmsPkgID, mcmsCid)
 
 	proposal := NewMCMSProposal(int(chainID), bypasserMultisigID, int(opCount), false).
 		AddOperation(mcmsInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData).
@@ -432,11 +455,11 @@ func mcmsFactoryDeploy[T encodableParams](
 	require.NoError(t, err)
 
 	// SetRoot (Bypasser role)
-	mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Bypasser", proposal, validUntil, signatures)
+	mcmsCid = setRootWithRoleAndDisclosureParty(t, participant, mcmsPkgID, ccipOwner, mcmsQueryParty, mcmsCid, "Bypasser", proposal, validUntil, signatures)
 
 	// ExecuteOp with TargetCids pointing to the current factory CID
 	targetCids := map[string]string{factoryInstanceAddr: factoryCid}
-	mcmsCid = bypasserExecuteBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, targetCids, proposal.Operations[0], mustGetOpProof(t, proposal, 0))
+	mcmsCid = bypasserExecuteBatchWithDisclosureParty(t, participant, mcmsPkgID, ccipOwner, mcmsQueryParty, mcmsCid, targetCids, proposal.Operations[0], mustGetOpProof(t, proposal, 0))
 
 	// Find new factory CID (consuming choice)
 	newFactoryCid := findNewContractCid(t, participant, factoryPkgID, "CCIP.Factory", "CCIPFactory", ccipOwner, factoryInstanceAddr)
@@ -497,6 +520,26 @@ func mcmsContractConfig(
 ) (string, string) {
 	t.Helper()
 
+	return mcmsContractConfigWithMCMSQueryParty(t, participant, mcmsPkgID, mcmsEncoder, ccipOwner, ccipOwner, mcmsCid, mcmsInstanceAddr, contractCid, contractInstanceAddr, chainID, sortedSigners, encoded)
+}
+
+func mcmsContractConfigWithMCMSQueryParty(
+	t *testing.T,
+	participant canton.Participant,
+	mcmsPkgID string,
+	mcmsEncoder mcms.MCMSEncoder,
+	ccipOwner string,
+	mcmsQueryParty string,
+	mcmsCid string,
+	mcmsInstanceAddr string,
+	contractCid string,
+	contractInstanceAddr string,
+	chainID int64,
+	sortedSigners []*MCMSSigner,
+	encoded *bind.EncodedChoice,
+) (string, string) {
+	t.Helper()
+
 	calls := []mcms.TimelockCall{{
 		TargetInstanceAddress: types.TEXT(contractInstanceAddr),
 		FunctionName:          types.TEXT(encoded.Choice),
@@ -506,7 +549,7 @@ func mcmsContractConfig(
 	bypasserChoice := MustEncodeBypasserExecuteBatch(t, mcmsEncoder, bypasserParams)
 
 	bypasserMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleBypasser)
-	opCount := queryBypasserOpCount(t, participant, mcmsPkgID, mcmsCid)
+	opCount := queryBypasserOpCountForParty(t, participant, mcmsQueryParty, mcmsPkgID, mcmsCid)
 
 	proposal := NewMCMSProposal(int(chainID), bypasserMultisigID, int(opCount), false).
 		AddOperation(mcmsInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData).
@@ -516,10 +559,10 @@ func mcmsContractConfig(
 	signatures, err := proposal.Sign(validUntil, sortedSigners[:2])
 	require.NoError(t, err)
 
-	mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Bypasser", proposal, validUntil, signatures)
+	mcmsCid = setRootWithRoleAndDisclosureParty(t, participant, mcmsPkgID, ccipOwner, mcmsQueryParty, mcmsCid, "Bypasser", proposal, validUntil, signatures)
 
 	targetCids := map[string]string{contractInstanceAddr: contractCid}
-	mcmsCid = bypasserExecuteBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, targetCids, proposal.Operations[0], mustGetOpProof(t, proposal, 0))
+	mcmsCid = bypasserExecuteBatchWithDisclosureParty(t, participant, mcmsPkgID, ccipOwner, mcmsQueryParty, mcmsCid, targetCids, proposal.Operations[0], mustGetOpProof(t, proposal, 0))
 
 	// Find the new contract CID after consuming choice
 	newCid := findNewContractCidByOldCid(t, participant, encoded.TemplateID.PackageID, encoded.TemplateID.ModuleName, encoded.TemplateID.TemplateName, contractCid)
@@ -755,16 +798,19 @@ func queryContractFields(
 	return nil
 }
 
-// queryBypasserOpCount reads the current bypasser op count from an MCMS contract.
-func queryBypasserOpCount(
+func queryBypasserOpCountForParty(
 	t *testing.T,
 	participant canton.Participant,
+	party string,
 	mcmsPkgID string,
 	mcmsCid string,
 ) int64 {
 	t.Helper()
 
-	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
+	queryParticipant := participant
+	queryParticipant.PartyID = party
+
+	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), queryParticipant, &apiv2.Identifier{
 		PackageId:  mcmsPkgID,
 		ModuleName: "MCMS.Main",
 		EntityName: "MCMS",
