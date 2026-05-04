@@ -45,7 +45,7 @@ func (s *AddParticipantFlowTestSuite) performKick() {
 	dnsState, err := actors[0].deps.Client.GetDNS(t.Context(), decNS, synchronizerID)
 	require.NoError(t, err, "GetDNS after onboarding")
 
-	kickedNSFP, err := actors[2].deps.Client.GetNamespaceFingerprint(t.Context(), onboardingNamespaceName, synchronizerID, dnsState.Owners)
+	kickedNSFP, err := actors[2].deps.Client.GetNamespaceFingerprint(t.Context(), s.onboardingNamespaceName(), synchronizerID, dnsState.Owners)
 	require.NoError(t, err, "GetNamespaceFingerprint for kicked participant")
 
 	kickInput := kick.KickInput{
@@ -134,6 +134,8 @@ func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 	p2pState, err := actors[0].deps.Client.GetP2P(t.Context(), s.PartyID, synchronizerID)
 	require.NoError(t, err, "GetP2P after kick")
 	require.Len(t, p2pState.Participants, 2, "should have 2 P2P participants after kick")
+	require.NotNil(t, p2pState.PartySigningKeys, "P2P signing keys should remain after kick")
+	postKickSigningKeys := append([]string{}, p2pState.PartySigningKeys.Keys...)
 
 	newParticipantUID := actors[2].uid
 
@@ -145,7 +147,7 @@ func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 	addInput := addparticipant.AddParticipantInput{
 		DecentralizedPartyID: s.PartyID,
 		NewParticipantID:     newParticipantUID,
-		NamespaceName:        "inttest-add-participant",
+		NamespaceName:        s.uniqueName("add-participant-ns"),
 		SynchronizerID:       synchronizerID,
 		NewThreshold:         2,
 	}
@@ -155,10 +157,11 @@ func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 		return operations.NewBundle(t.Context, logger.Test(t), sharedAddReporter)
 	}
 
+	addKMS := s.kmsConfigFor(2, "add-participant")
 	addDeps := [3]ceremony.CantonDeps{
 		s.OnboardingDeps(0),
 		s.OnboardingDeps(1),
-		s.OnboardingDeps(2),
+		s.depsFor(2, addKMS),
 	}
 
 	// Run 1 (p3 — new): generates keys, NSD, reads state → 0/2 DNS sigs → ErrThresholdNotMet.
@@ -199,6 +202,17 @@ func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 	updatedP2P, err := actors[0].deps.Client.GetP2P(t.Context(), s.PartyID, synchronizerID)
 	require.NoError(t, err, "GetP2P after add")
 	assert.Len(t, updatedP2P.Participants, 3, "should have 3 P2P participants after add")
+	require.NotNil(t, updatedP2P.PartySigningKeys, "P2P signing keys should be present after add")
+	assert.Len(t, updatedP2P.PartySigningKeys.Keys, 3, "should have 3 protocol signing keys after add")
+	for _, keyB64 := range postKickSigningKeys {
+		assert.Contains(t, updatedP2P.PartySigningKeys.Keys, keyB64, "existing protocol signing key should be preserved")
+	}
+	newProtocolFP, newProtocolKeyB64, err := actors[2].deps.Client.GetProtocolKeyFingerprint(t.Context(), updatedP2P.PartySigningKeys.Keys)
+	require.NoError(t, err, "GetProtocolKeyFingerprint for re-added participant")
+	assert.NotEmpty(t, newProtocolFP, "new participant protocol fingerprint should be discoverable")
+	assert.Contains(t, updatedP2P.PartySigningKeys.Keys, newProtocolKeyB64, "new participant protocol signing key should be appended")
+	assert.Equal(t, uint32(2), updatedP2P.PartySigningKeys.Threshold, "P2P signing-key threshold should match add threshold")
+	s.assertKMSKeysRegistered(2, addKMS)
 
 	// Verify new participant is in P2P.
 	var foundNew bool
@@ -215,4 +229,5 @@ func (s *AddParticipantFlowTestSuite) TestAddParticipantFlow() {
 	addResultCached, err := operations.ExecuteSequence(newAddBundle(), addparticipant.AddParticipantSequence, addDeps[0], addInput)
 	require.NoError(t, err, "idempotent re-run should succeed")
 	assert.Equal(t, addResult.Output, addResultCached.Output, "cached result should match")
+	s.assertReportsDoNotContainKMS(sharedAddReporter)
 }

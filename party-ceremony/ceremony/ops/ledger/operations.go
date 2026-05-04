@@ -90,7 +90,13 @@ var FetchParticipantsOp = operations.NewOperation(
 			"count", len(participants),
 		)
 
-		return FetchParticipantsOutput{Participants: participants}, nil
+		out := FetchParticipantsOutput{Participants: participants}
+		if p2pState.PartySigningKeys != nil {
+			out.PartySigningKeysB64 = p2pState.PartySigningKeys.Keys
+			out.PartySigningThreshold = p2pState.PartySigningKeys.Threshold
+		}
+
+		return out, nil
 	},
 )
 
@@ -259,7 +265,18 @@ var SignSubmissionOp = operations.NewOperation(
 			}
 		}
 
-		sig, err := deps.Signer.Sign(ctx, hashBytes)
+		signer := deps.Signer
+		if signer == nil {
+			if deps.SignerFactory == nil {
+				return SignSubmissionOutput{}, fmt.Errorf("no transaction signer configured")
+			}
+			signer, err = deps.SignerFactory(ctx, in.ParticipantID, in.KnownSigningKeysB64)
+			if err != nil {
+				return SignSubmissionOutput{}, fmt.Errorf("creating transaction signer for %q: %w", in.ParticipantID, err)
+			}
+		}
+
+		sig, err := signer.Sign(ctx, hashBytes)
 		if err != nil {
 			return SignSubmissionOutput{}, fmt.Errorf("signing transaction hash for %q: %w", in.ParticipantID, err)
 		}

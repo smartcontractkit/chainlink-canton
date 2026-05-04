@@ -2,24 +2,16 @@ package tests
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"testing"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
-	ceremonyruntime "github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/runtime"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
 type ContractDeployFlowTestSuite struct {
 	OnboardingFlowTestSuite
-
-	ContractDeployDeps []ledger.ContractDeployDeps
 }
 
 func (s *ContractDeployFlowTestSuite) SetupSuite() {
@@ -29,39 +21,7 @@ func (s *ContractDeployFlowTestSuite) SetupSuite() {
 	// CeremonyTestSuite.SetupSuite (called inside) loads the chain and stores it
 	// in s.chain, so we can reuse the same endpoints below.
 	s.OnboardingFlowTestSuite.SetupSuite()
-	// Capture the reporter so we can extract DAML key fingerprints below.
-	onboardingReporter := operations.NewMemoryReporter()
-	s.performOnboarding(t, onboardingReporter)
-
-	// Extract the DAML (PROTOCOL) key fingerprint for each participant from the
-	// onboarding ceremony reports. Using the reporter avoids relying on
-	// ListMyKeys ordering, which is non-deterministic in persistent vaults.
-	damlFingerprints := map[string]string{}
-	allReports, err := onboardingReporter.GetReports()
-	require.NoError(t, err, "getting onboarding reports")
-	for _, r := range allReports {
-		if r.Def.ID != "canton-ceremony/keys/create-member-key" {
-			continue
-		}
-		if out, ok := r.Output.(keys.CreateMemberKeyOutput); ok && out.DamlKeyFingerprint != "" {
-			damlFingerprints[out.ParticipantID] = out.DamlKeyFingerprint
-		}
-	}
-
-	darDir := filepath.Join("..", "..", "..", "contracts", "dars")
-	darLoader := ledger.FileDARLoader(darDir)
-	deps := make([]ledger.ContractDeployDeps, len(s.Participants))
-	for i, p := range s.Participants {
-		fp, hasFP := damlFingerprints[s.ParticipantIDs[i]]
-		require.True(t, hasFP, "DAML key fingerprint not found for participant %d (%s)", i+1, s.ParticipantIDs[i])
-
-		dep, cleanup, err := ceremonyruntime.NewContractDeployDeps(t.Context(), p, darLoader, fp, logger.Test(t), nil)
-		require.NoError(t, err, "contract deploy deps for participant %d", i+1)
-		t.Cleanup(func() { _ = cleanup() })
-		deps[i] = dep
-		t.Logf("Participant %d contract-deploy deps ready, fingerprint=%s", i+1, fp)
-	}
-	s.ContractDeployDeps = deps
+	s.performOnboarding(t, operations.NewMemoryReporter())
 }
 
 // TestOnboardingFlow overrides the inherited method to skip re-running the
@@ -73,85 +33,29 @@ func (s *ContractDeployFlowTestSuite) TestOnboardingFlow() {
 }
 
 // TestContractDeployFlow validates the contract deployment ceremony against a
-// real Canton environment with 3 participants.
+// real CTF Canton environment. The KMS runner uses AWS KMS signing, while the
+// non-KMS runner uses the Canton vault signer.
 //
 // Flow:
 //   - Run 1 (p1): uploads DARs (1/3) → ErrThresholdNotMet
 //   - Run 2 (p2): uploads DARs (2/3) → ErrThresholdNotMet
 //   - Run 3 (p3): uploads DARs (3/3) → verifies party → prepares submission →
-//     signs (all participants) → executes → verifies contract in ACS
+//     signs (1/3) → ErrThresholdNotMet
+//   - Run 4 (p1): signs (2/3) → ErrThresholdNotMet
+//   - Run 5 (p2): signs (3/3) → executes → verifies contract in ACS
 func (s *ContractDeployFlowTestSuite) TestContractDeployFlow() {
 	t := s.T()
 
-	// Build contract args: DisclosedTarget { owner: Party, value: Int }
-	// The decentralized party is the signatory.
-	contractArgs := buildContractArgs(t, s.PartyID)
-
-	input := contractdeploy.ContractDeployInput{
-		DecentralizedPartyID: s.PartyID,
-		SynchronizerID:       s.SynchronizerID,
-		Packages:             []contractdeploy.PackageRef{{Name: "test-test", Version: "0.0.1"}},
-		TemplateModule:       "Main",
-		TemplateEntity:       "DisclosedTarget",
-		ContractArgs:         contractArgs,
+	kmsCfgs := []client.KMSConfig{
+		s.kmsConfigFor(0, "onboarding"),
+		s.kmsConfigFor(1, "onboarding"),
+		s.kmsConfigFor(2, "onboarding"),
 	}
-
-	sharedReporter := operations.NewMemoryReporter()
-	newBundle := func() operations.Bundle {
-		return operations.NewBundle(t.Context, logger.Test(t), sharedReporter)
-	}
-
-	deps := [3]ledger.ContractDeployDeps{
-		s.ContractDeployDeps[0],
-		s.ContractDeployDeps[1],
-		s.ContractDeployDeps[2],
-	}
-
-	// Run 1 (p1): uploads DARs (1/3) → threshold not met
-	t.Log("Run 1: p1 uploads DARs (1/3)")
-	_, err := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, deps[0], input)
-	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error(),
-		"run 1: expected threshold-not-met (1/3)")
-
-	// Run 2 (p2): uploads DARs (2/3) → threshold not met
-	t.Log("Run 2: p2 uploads DARs (2/3)")
-	_, err = operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, deps[1], input)
-	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error(),
-		"run 2: expected threshold-not-met (2/3)")
-
-	// Run 3 (p3): uploads DARs (3/3) → verifies → prepares → p3 signs (1/3) → threshold not met for signing
-	t.Log("Run 3: p3 uploads DARs (3/3) + prepares + signs (1/3)")
-	_, err = operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, deps[2], input)
-	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error(),
-		"run 3: expected threshold-not-met for signing (1/3)")
-
-	// Run 4 (p1): p1 signs (2/3) → threshold not met for signing
-	t.Log("Run 4: p1 signs (2/3)")
-	_, err = operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, deps[0], input)
-	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error(),
-		"run 4: expected threshold-not-met for signing (2/3)")
-
-	// Run 5 (p2): p2 signs (3/3) → executes → verifies contract
-	t.Log("Run 5: p2 signs (3/3) + executes + verifies")
-	sr, err := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, deps[1], input)
-	require.NoError(t, err, "run 5: expected full success")
-
-	// Verify output.
-	assert.NotEmpty(t, sr.Output.PackageIDs, "should have at least one package ID")
-	assert.NotEmpty(t, sr.Output.PreparedTransactionHash, "should have a prepared transaction hash")
-	assert.NotEmpty(t, sr.Output.ContractID, "should have a deployed contract ID")
+	sr, recorders := s.runContractDeployFlow(t, s.PartyID, "contract-deploy", kmsCfgs)
+	assertRecordersMatchKMSConfig(t, kmsCfgs, recorders)
 	t.Logf("Package IDs: %v", sr.Output.PackageIDs)
 	t.Logf("Prepared TX hash: %s", sr.Output.PreparedTransactionHash)
 	t.Logf("Contract ID: %s", sr.Output.ContractID)
-
-	// Verify idempotency: re-run should produce the same cached result.
-	t.Log("Run 6: p1 idempotency check")
-	srCached, err := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, deps[0], input)
-	require.NoError(t, err, "run 6: idempotent re-run should succeed")
-	assert.Equal(t, sr.Output.PackageIDs, srCached.Output.PackageIDs,
-		"cached package IDs should match")
-	assert.Equal(t, sr.Output.ContractID, srCached.Output.ContractID,
-		"cached contract ID should match")
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

@@ -273,15 +273,21 @@ var AddParticipantSequence = operations.NewSequence(
 		out.State.P2PExistingRequired = int(currentState.DNSThreshold)
 
 		allParticipantUIDs := append(append([]string{}, currentState.P2PParticipantUIDs...), newMember.ParticipantUID)
+		var partySigningKeysB64 []string
+		if len(currentState.PartySigningKeysB64) > 0 {
+			partySigningKeysB64 = append([]string{}, currentState.PartySigningKeysB64...)
+			partySigningKeysB64 = append(partySigningKeysB64, newMember.DamlKeyB64)
+		}
 
 		for _, uid := range currentState.P2PParticipantUIDs {
 			_, p2pErr := operations.ExecuteOperation(b, topology.ProposeAddP2POp, deps, topology.ProposeAddP2PInput{
-				ParticipantID:      uid,
-				PartyID:            in.DecentralizedPartyID,
-				AllParticipantUIDs: allParticipantUIDs,
-				NewP2PThreshold:    newThreshold,
-				CurrentP2PSerial:   int(currentState.P2PSerial),
-				SynchronizerID:     in.SynchronizerID,
+				ParticipantID:       uid,
+				PartyID:             in.DecentralizedPartyID,
+				AllParticipantUIDs:  allParticipantUIDs,
+				NewP2PThreshold:     newThreshold,
+				CurrentP2PSerial:    int(currentState.P2PSerial),
+				SynchronizerID:      in.SynchronizerID,
+				PartySigningKeysB64: partySigningKeysB64,
 			})
 			if p2pErr != nil {
 				deps.Logger.Infow("P2P add proposal pending", "participant", uid, "err", p2pErr)
@@ -291,12 +297,13 @@ var AddParticipantSequence = operations.NewSequence(
 		}
 
 		_, newConsentErr := operations.ExecuteOperation(b, topology.ProposeAddP2POp, deps, topology.ProposeAddP2PInput{
-			ParticipantID:      in.NewParticipantID,
-			PartyID:            in.DecentralizedPartyID,
-			AllParticipantUIDs: allParticipantUIDs,
-			NewP2PThreshold:    newThreshold,
-			CurrentP2PSerial:   int(currentState.P2PSerial),
-			SynchronizerID:     in.SynchronizerID,
+			ParticipantID:       in.NewParticipantID,
+			PartyID:             in.DecentralizedPartyID,
+			AllParticipantUIDs:  allParticipantUIDs,
+			NewP2PThreshold:     newThreshold,
+			CurrentP2PSerial:    int(currentState.P2PSerial),
+			SynchronizerID:      in.SynchronizerID,
+			PartySigningKeysB64: partySigningKeysB64,
 		})
 		out.State.NewParticipantConsented = newConsentErr == nil
 		if newConsentErr != nil {
@@ -337,6 +344,16 @@ var AddParticipantSequence = operations.NewSequence(
 				}
 				if !found {
 					return fmt.Errorf("new participant %q not yet present in P2P mapping", newMember.ParticipantUID)
+				}
+				if len(partySigningKeysB64) > 0 {
+					if p2pState.PartySigningKeys == nil {
+						return fmt.Errorf("P2P signing keys not yet available")
+					}
+					for _, keyB64 := range partySigningKeysB64 {
+						if !slices.Contains(p2pState.PartySigningKeys.Keys, keyB64) {
+							return fmt.Errorf("party signing key not yet present in P2P mapping")
+						}
+					}
 				}
 				deps.Logger.Infow("Add P2P confirmed", "party", in.DecentralizedPartyID)
 
