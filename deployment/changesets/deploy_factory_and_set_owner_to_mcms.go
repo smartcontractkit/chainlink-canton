@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/mcms"
@@ -114,10 +115,11 @@ var deployCCIPFactorySequence = operations.NewSequence(
 // DeployFactoryAndSetOwnerToMCMSConfig holds parameters for the combined changeset
 // that deploys a CCIPFactory and generates an MCMS proposal to transfer ownership.
 type DeployFactoryAndSetOwnerToMCMSConfig struct {
-	OwnerParty string `json:"ownerParty" yaml:"ownerParty"`
-	MCMSParty  string `json:"mcmsParty" yaml:"mcmsParty"`
-	InstanceID string `json:"instanceID,omitempty" yaml:"instanceID,omitempty"`
-	Qualifier  string `json:"qualifier,omitempty" yaml:"qualifier,omitempty"`
+	OwnerParty string        `json:"ownerParty" yaml:"ownerParty"`
+	MCMSParty  string        `json:"mcmsParty" yaml:"mcmsParty"`
+	InstanceID string        `json:"instanceID,omitempty" yaml:"instanceID,omitempty"`
+	Qualifier  string        `json:"qualifier,omitempty" yaml:"qualifier,omitempty"`
+	MinDelay   time.Duration `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
 }
 
 type DeployFactoryAndSetOwnerToMCMS struct{}
@@ -227,8 +229,9 @@ func (d DeployFactoryAndSetOwnerToMCMS) Apply(e cldf.Environment, config CantonC
 			},
 			ChainSelector: mcms_types.ChainSelector(config.ChainSelector),
 			Description:   "Transfer CCIPFactory ownership to MCMS party",
-			Action:        mcms_types.TimelockActionBypass,
-			Role:          cantonsdk.TimelockRoleBypasser,
+			MinDelay:      config.Config.MinDelay,
+			Action:        mcms_types.TimelockActionSchedule,
+			Role:          cantonsdk.TimelockRoleProposer,
 		},
 		[]mcms_types.BatchOperation{batchOp},
 	)
