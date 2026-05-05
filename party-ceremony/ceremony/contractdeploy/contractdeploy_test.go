@@ -44,6 +44,10 @@ func (m *mockAdminClient) GenerateSigningKey(_ context.Context, _ string, _ []cr
 	return &cryptov30.SigningPublicKey{}, nil
 }
 
+func (m *mockAdminClient) RegisterKmsSigningKey(_ context.Context, _ string, _ string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	return &cryptov30.SigningPublicKey{}, nil
+}
+
 func (m *mockAdminClient) GetNamespaceFingerprint(_ context.Context, _ string, _ string, _ []string) (string, error) {
 	return "mock-ns-fp", nil
 }
@@ -85,6 +89,10 @@ func (m *mockAdminClient) GetP2P(_ context.Context, _ string, _ string) (*client
 		Participants: []client.P2PParticipantInfo{
 			{ParticipantUID: "p1"},
 			{ParticipantUID: "p2"},
+		},
+		PartySigningKeys: &client.P2PSigningKeysInfo{
+			Keys:      []string{"p1-protocol-key-b64", "p2-protocol-key-b64"},
+			Threshold: 2,
 		},
 	}, nil
 }
@@ -170,6 +178,20 @@ func newDeps(participantID string, partyExists bool) ledger.ContractDeployDeps {
 		DARLoader:    fakeDARLoader(),
 		Signer:       &mockSigner{},
 		Logger:       logger.Nop(),
+	}
+}
+
+func newFactoryDeps(
+	participantID string,
+	partyExists bool,
+	factory client.TransactionSignerFactory,
+) ledger.ContractDeployDeps {
+	return ledger.ContractDeployDeps{
+		AdminClient:   newMockAdminClient(participantID),
+		LedgerClient:  &mockLedgerClient{partyExists: partyExists},
+		DARLoader:     fakeDARLoader(),
+		SignerFactory: factory,
+		Logger:        logger.Nop(),
 	}
 }
 
@@ -327,6 +349,46 @@ func TestContractDeploySequence_MultipleDARs(t *testing.T) {
 
 	assert.Len(t, sr.Output.PackageIDs, 2, "should have uploaded 2 DARs")
 	assert.NotEmpty(t, sr.Output.ContractID)
+}
+
+func TestContractDeploySequence_UsesSignerFactoryWithTopologyKeys(t *testing.T) {
+	t.Parallel()
+
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+
+	sharedReporter := operations.NewMemoryReporter()
+	newBundle := func() operations.Bundle {
+		return operations.NewBundle(t.Context, logger.Nop(), sharedReporter)
+	}
+
+	type factoryCall struct {
+		participantID string
+		keys          []string
+	}
+	var calls []factoryCall
+	factory := func(_ context.Context, participantID string, knownSigningKeysB64 []string) (client.TransactionSigner, error) {
+		calls = append(calls, factoryCall{
+			participantID: participantID,
+			keys:          append([]string{}, knownSigningKeysB64...),
+		})
+
+		return &mockSigner{}, nil
+	}
+
+	_, err := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newFactoryDeps("p1", true, factory), input)
+	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error())
+
+	_, err = operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newFactoryDeps("p2", true, factory), input)
+	require.ErrorContains(t, err, contractdeploy.ErrThresholdNotMet.Error())
+
+	_, err = operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newFactoryDeps("p1", true, factory), input)
+	require.NoError(t, err)
+
+	require.Len(t, calls, 2)
+	assert.Equal(t, "p2", calls[0].participantID)
+	assert.Equal(t, []string{"p1-protocol-key-b64", "p2-protocol-key-b64"}, calls[0].keys)
+	assert.Equal(t, "p1", calls[1].participantID)
+	assert.Equal(t, []string{"p1-protocol-key-b64", "p2-protocol-key-b64"}, calls[1].keys)
 }
 
 // ── Interface compliance ────────────────────────────────────────────────────

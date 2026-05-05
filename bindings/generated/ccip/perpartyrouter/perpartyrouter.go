@@ -10,6 +10,7 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -27,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "164bed96298990e576f7b2aa84a637dea98c02b26204d75908abca016f0d29e3"
+	PackageID   = "240236a8f9879e89a6212620e178c531278da68933377ecaab1705b48e7509d9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -280,10 +281,11 @@ func (t ArchivedExecutedMessages) ArchiveWithPackageID(contractID string, packag
 
 // CCIPSend is a Record type
 type CCIPSend struct {
-	Context             common.CCIPContext    `json:"context"`
-	SendingMessageCid   types.CONTRACT_ID     `json:"sendingMessageCid"`
-	FeeTokenInput       interfaces.TokenInput `json:"feeTokenInput"`
-	FeeTokenHoldingCids []types.CONTRACT_ID   `json:"feeTokenHoldingCids"`
+	Context                 splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid       types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	FeeTokenHoldingCids     []types.CONTRACT_ID                        `json:"feeTokenHoldingCids"`
+	FeeTokenTransferFactory types.CONTRACT_ID                          `json:"feeTokenTransferFactory"`
+	FeeTokenExtraArgs       splice_api_token_metadata_v1.ExtraArgs     `json:"feeTokenExtraArgs"`
 }
 
 // ToMap converts CCIPSend to a map for DAML arguments
@@ -294,8 +296,6 @@ func (t CCIPSend) ToMap() map[string]any {
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
-	m["feeTokenInput"] = model.NestedToDAMLValue(t.FeeTokenInput)
-
 	m["feeTokenHoldingCids"] = func() []any {
 		res := make([]any, 0, len(t.FeeTokenHoldingCids))
 		for _, e := range t.FeeTokenHoldingCids {
@@ -303,6 +303,10 @@ func (t CCIPSend) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["feeTokenTransferFactory"] = model.NestedToDAMLValue(t.FeeTokenTransferFactory)
+
+	m["feeTokenExtraArgs"] = model.NestedToDAMLValue(t.FeeTokenExtraArgs)
 
 	return m
 }
@@ -460,8 +464,8 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context             common.CCIPContext `json:"context"`
-	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
@@ -596,8 +600,8 @@ func (t *FactorySetDeps) UnmarshalHex(data string) error {
 
 // FinalizeFee2 is a Record type
 type FinalizeFee2 struct {
-	Context           common.CCIPContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 }
 
 // ToMap converts FinalizeFee2 to a map for DAML arguments
@@ -692,12 +696,12 @@ func (t *GetExecutionStateMCMSParams) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
-	Context           common.CCIPContext                  `json:"context"`
-	DestChainSelector types.NUMERIC                       `json:"destChainSelector"`
-	Message           client.Canton2AnyMessage            `json:"message"`
-	CcvFeeQuotes      []common.CrossChainVerifierFeeQuote `json:"ccvFeeQuotes"`
-	TokenPoolFeeQuote *interfaces.TokenPoolFeeQuote       `json:"tokenPoolFeeQuote" hex:"optional"`
-	ExecutorFeeQuote  *common.ExecutorFeeQuote            `json:"executorFeeQuote" hex:"optional"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Message           client.Canton2AnyMessage                   `json:"message"`
+	CcvFeeQuotes      []common.CrossChainVerifierFeeQuote        `json:"ccvFeeQuotes"`
+	TokenPoolFeeQuote *interfaces.TokenPoolFeeQuote              `json:"tokenPoolFeeQuote" hex:"optional"`
+	ExecutorFeeQuote  *common.ExecutorFeeQuote                   `json:"executorFeeQuote" hex:"optional"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -769,12 +773,12 @@ func (t *GetFee) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForExecute is a Record type
 type GetRequiredCCVsForExecute struct {
-	Context                   common.CCIPContext        `json:"context"`
-	Message                   common.MessageV1          `json:"message"`
-	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	TokenPoolRequiredCCVs     []mcms.RawInstanceAddress `json:"tokenPoolRequiredCCVs"`
+	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Message                   common.MessageV1                           `json:"message"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress                  `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress                  `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
+	TokenPoolRequiredCCVs     []mcms.RawInstanceAddress                  `json:"tokenPoolRequiredCCVs"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
@@ -838,10 +842,10 @@ func (t *GetRequiredCCVsForExecute) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
-	Context               common.CCIPContext        `json:"context"`
-	DestChainSelector     types.NUMERIC             `json:"destChainSelector"`
-	Message               client.Canton2AnyMessage  `json:"message"`
-	TokenPoolRequiredCCVs []mcms.RawInstanceAddress `json:"tokenPoolRequiredCCVs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Message           client.Canton2AnyMessage                   `json:"message"`
+	PoolReportedCCVs  []mcms.RawInstanceAddress                  `json:"poolReportedCCVs"`
 }
 
 // ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
@@ -854,9 +858,9 @@ func (t GetRequiredCCVsForSend) ToMap() map[string]any {
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
 
-	m["tokenPoolRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.TokenPoolRequiredCCVs))
-		for _, e := range t.TokenPoolRequiredCCVs {
+	m["poolReportedCCVs"] = func() []any {
+		res := make([]any, 0, len(t.PoolReportedCCVs))
+		for _, e := range t.PoolReportedCCVs {
 			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res
@@ -1741,15 +1745,15 @@ var _ mcms.IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
-	Context                   common.CCIPContext        `json:"context"`
-	EncodedMessage            types.TEXT                `json:"encodedMessage"`
-	ReceiverParty             types.PARTY               `json:"receiverParty"`
-	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
-	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
-	Caller                    types.PARTY               `json:"caller"`
+	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	EncodedMessage            types.TEXT                                 `json:"encodedMessage"`
+	ReceiverParty             types.PARTY                                `json:"receiverParty"`
+	TokenReceiverParty        *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress                  `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress                  `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
+	ReceiverFinalityConfig    common.FinalityConfig                      `json:"receiverFinalityConfig"`
+	Caller                    types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts PrepareExecute2 to a map for DAML arguments
@@ -1824,14 +1828,14 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 // PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecute2MCMSParams struct {
-	Context                   common.CCIPContext        `json:"context"`
-	EncodedMessage            types.TEXT                `json:"encodedMessage"`
-	ReceiverParty             types.PARTY               `json:"receiverParty"`
-	TokenReceiverParty        *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
-	ReceiverRequiredCCVs      []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs      []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold types.INT64               `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    common.FinalityConfig     `json:"receiverFinalityConfig"`
+	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	EncodedMessage            types.TEXT                                 `json:"encodedMessage"`
+	ReceiverParty             types.PARTY                                `json:"receiverParty"`
+	TokenReceiverParty        *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs      []mcms.RawInstanceAddress                  `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs      []mcms.RawInstanceAddress                  `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
+	ReceiverFinalityConfig    common.FinalityConfig                      `json:"receiverFinalityConfig"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.
@@ -1848,9 +1852,9 @@ func (t *PrepareExecute2MCMSParams) UnmarshalHex(data string) error {
 
 // PrepareSend is a Record type
 type PrepareSend struct {
-	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
-	Message                  client.Canton2AnyMessage `json:"message"`
-	Context                  common.CCIPContext       `json:"context"`
+	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
+	Message                  client.Canton2AnyMessage                   `json:"message"`
+	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts PrepareSend to a map for DAML arguments

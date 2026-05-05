@@ -31,10 +31,10 @@ import CCIP.Factory
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
-import CCIP.ContextCodec (encodeCCIPContext)
+import CCIP.ContextCodec (encodeChoiceContext)
 import CCIP.LockReleaseTokenPoolCodecGen (encodeTransferTimeout)
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
-import CCIP.Context (emptyCCIPContext)
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 finalityConfig n =
   if n == 0
@@ -134,7 +134,7 @@ encodeDeployLockReleaseTokenPoolParams params =
   <> encodeRawInstanceAddress params.tokenAdminRegistry
   <> encodeRawInstanceAddress params.feeQuoter
   <> encodeRawInstanceAddress params.rmnRemote
-  <> encodeCCIPContext params.poolReceiveContext
+  <> encodeChoiceContext params.poolReceiveContext
   <> encodeTransferTimeout params.transferTimeout
 
 encodeRateLimitDirection : RateLimitDirection -> BytesHex
@@ -459,7 +459,7 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
         tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
         feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
         rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
-        poolReceiveContext = emptyCCIPContext
+        poolReceiveContext = MetadataV1.emptyChoiceContext
         transferTimeout = RelativeHours 24
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
@@ -498,7 +498,7 @@ testDecodeDeployLockReleaseTokenPoolParams_Indefinite = script do
         tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
         feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
         rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
-        poolReceiveContext = emptyCCIPContext
+        poolReceiveContext = MetadataV1.emptyChoiceContext
         transferTimeout = Indefinite
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
@@ -506,7 +506,7 @@ testDecodeDeployLockReleaseTokenPoolParams_Indefinite = script do
     None -> abort "Failed to decode DeployLockReleaseTokenPoolParams with Indefinite"
     Some decoded -> do
       decoded.transferTimeout === Indefinite
-      decoded.poolReceiveContext === emptyCCIPContext
+      decoded.poolReceiveContext === MetadataV1.emptyChoiceContext
       decoded.rateLimitAdmin === None
 
   pure ()

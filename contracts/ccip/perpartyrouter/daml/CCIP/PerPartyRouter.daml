@@ -8,7 +8,7 @@ import DA.Set (Set)
 import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Date (date, Month(Dec))
-import DA.Optional (fromOptional)
+import DA.Optional (fromOptional, isNone)
 import DA.Time (time)
 
 import qualified CCIP.Client
@@ -57,7 +57,7 @@ addFeeForParty allocs recipient amount =
     in Map.insert recipient (existing + amount) allocs
 
 sumAllocatedFees : Map.Map Party Decimal -> Decimal
-sumAllocatedFees allocations = foldl (+) 0.0 (map snd (Map.toList allocations))
+sumAllocatedFees allocations = sum (map snd (Map.toList allocations))
 
 buildCCVFeeAllocations
     : [CCIP.SendingMessageV1.CCVFee]
@@ -237,7 +237,7 @@ template PerPartyRouter
 
         nonconsuming choice GetFee : CCIP.OnRamp.GetFeeFromRouterResult
             with
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 destChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
                 ccvFeeQuotes : [ICCV.CrossChainVerifierFeeQuote]
@@ -309,7 +309,7 @@ template PerPartyRouter
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -355,7 +355,7 @@ template PerPartyRouter
 
         nonconsuming choice FinalizeFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             controller partyOwner
             do
@@ -393,7 +393,7 @@ template PerPartyRouter
                     sendingMessageCid = sendingMessageCid
 
                 sm <- fetch smCid
-                if sm.expectedTokenInstrumentId == None
+                if isNone sm.expectedTokenInstrumentId
                     then exercise smCid CCIP.SendingMessageV1.BuildMessage with
                         caller = partyOwner
                     else pure smCid
@@ -404,10 +404,11 @@ template PerPartyRouter
         -- authorization is needed for the sender-side Splice transfer.
         choice CCIPSend : CCIPSendResult
             with
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                feeTokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+                feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+                feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -478,18 +479,18 @@ template PerPartyRouter
                                             inputHoldingCids = inputHoldingCids
                                             meta = Splice.Api.Token.MetadataV1.emptyMetadata
                                 feeResult <- exercise
-                                    feeTokenInput.transferFactory
+                                    feeTokenTransferFactory
                                     Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
                                         expectedAdmin = sendingMsg.feeToken.admin
                                         transfer = feeTransfer
-                                        extraArgs = feeTokenInput.extraArgs
+                                        extraArgs = feeTokenExtraArgs
                                 case feeResult.output of
                                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
                                         pure feeResult.senderChangeCids
                                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
                                         acceptResult <- exercise transferInstructionCid
                                             Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
-                                                extraArgs = feeTokenInput.extraArgs
+                                                extraArgs = feeTokenExtraArgs
                                         case acceptResult.output of
                                             Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
                                                 pure feeResult.senderChangeCids
@@ -533,7 +534,7 @@ template PerPartyRouter
         -- TODO: consider relaxing to allow `controller caller`
         nonconsuming choice PrepareExecute : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 encodedMessage : BytesHex
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
@@ -593,7 +594,7 @@ template PerPartyRouter
         -- executingMessageCid: The contract ID of the ExecutingMessageV1 that was created in PrepareExecute and is being executed. This is used to read the message data, CCV verifications, and pool verification state for the execute request.
         choice Execute : ExecuteResult
             with
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             controller partyOwner
             do
@@ -685,10 +686,10 @@ template PerPartyRouter
         -- | Get all required CCV raw instance addresses for sending a message.
         nonconsuming choice GetRequiredCCVsForSend : [RawInstanceAddress]
             with
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 destChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                tokenPoolRequiredCCVs : [RawInstanceAddress]
+                poolReportedCCVs : [RawInstanceAddress]
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -706,12 +707,12 @@ template PerPartyRouter
                     globalConfigCid = globalConfigCid
                     destChainSelector = destChainSelector
                     message = message
-                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
+                    poolReportedCCVs = poolReportedCCVs
 
         -- | Get all required CCV raw instance addresses for executing a message.
         nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]
             with
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 message : CCIP.MessageCodecV1.MessageV1
                 receiverRequiredCCVs : [RawInstanceAddress]
                 receiverOptionalCCVs : [RawInstanceAddress]

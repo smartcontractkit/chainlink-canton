@@ -120,11 +120,11 @@ normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice maxFeeJuelsPe
 
 -- | Exact floor(a * b / c) over integer-valued Numeric 0 inputs.
 mulDivDown : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
-mulDivDown a b c =
-    if c <= 0.0 then error "mulDivDown: denominator must be positive"
-    else if a < 0.0 || b < 0.0 then error "mulDivDown: negative input"
-    else if a == 0.0 || b == 0.0 then 0.0
-    else
+mulDivDown a b c
+    | c <= 0.0 = error "mulDivDown: denominator must be positive"
+    | a < 0.0 || b < 0.0 = error "mulDivDown: negative input"
+    | a == 0.0 || b == 0.0 = 0.0
+    | otherwise =
         let numerator = mulLimbs (toLimbs "mulDivDown a" a) (toLimbs "mulDivDown b" b)
             denominator = toLimbs "mulDivDown c" c
             (quotient, _) = divModLimbs numerator denominator
@@ -132,15 +132,15 @@ mulDivDown a b c =
 
 -- | Exact ceil(a * b / c) over integer-valued Numeric 0 inputs.
 mulDivUp : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
-mulDivUp a b c =
-    if c <= 0.0 then error "mulDivUp: denominator must be positive"
-    else if a < 0.0 || b < 0.0 then error "mulDivUp: negative input"
-    else if a == 0.0 || b == 0.0 then 0.0
-    else
+mulDivUp a b c
+    | c <= 0.0 = error "mulDivUp: denominator must be positive"
+    | a < 0.0 || b < 0.0 = error "mulDivUp: negative input"
+    | a == 0.0 || b == 0.0 = 0.0
+    | otherwise =
         let numerator = mulLimbs (toLimbs "mulDivUp a" a) (toLimbs "mulDivUp b" b)
             denominator = toLimbs "mulDivUp c" c
             (quotient, remainder) = divModLimbs numerator denominator
-            needsRoundUp = not (isZeroLimbs remainder)
+            needsRoundUp = not (null remainder)
             rounded = if needsRoundUp then addLimbs quotient [1] else quotient
         in fromLimbs "mulDivUp result" rounded
 
@@ -174,11 +174,6 @@ normalizeLimbs : [Int] -> [Int]
 normalizeLimbs [] = []
 normalizeLimbs xs = reverse (dropLeadingZeroInts (reverse xs))
 
-isZeroLimbs : [Int] -> Bool
-isZeroLimbs xs = case normalizeLimbs xs of
-    [] -> True
-    _ -> False
-
 compareLimbs : [Int] -> [Int] -> Ordering
 compareLimbs a b =
     let na = normalizeLimbs a
@@ -191,10 +186,10 @@ compareLimbs a b =
 
 compareBigEndian : [Int] -> [Int] -> Ordering
 compareBigEndian [] [] = EQ
-compareBigEndian (x :: xs) (y :: ys) =
-    if x < y then LT
-    else if x > y then GT
-    else compareBigEndian xs ys
+compareBigEndian (x :: xs) (y :: ys)
+    | x < y = LT
+    | x > y = GT
+    | otherwise = compareBigEndian xs ys
 compareBigEndian _ _ = error "compareBigEndian: length mismatch"
 
 addLimbs : [Int] -> [Int] -> [Int]
@@ -205,13 +200,13 @@ addLimbsGo [] [] 0 = []
 addLimbsGo [] [] carry = [carry]
 addLimbsGo (x :: xs) [] carry =
     let total = x + carry
-    in intMod total baseInt :: addLimbsGo xs [] (intDiv total baseInt)
+    in total % baseInt :: addLimbsGo xs [] (total / baseInt)
 addLimbsGo [] (y :: ys) carry =
     let total = y + carry
-    in intMod total baseInt :: addLimbsGo [] ys (intDiv total baseInt)
+    in total % baseInt :: addLimbsGo [] ys (total / baseInt)
 addLimbsGo (x :: xs) (y :: ys) carry =
     let total = x + y + carry
-    in intMod total baseInt :: addLimbsGo xs ys (intDiv total baseInt)
+    in total % baseInt :: addLimbsGo xs ys (total / baseInt)
 
 subLimbs : [Int] -> [Int] -> [Int]
 subLimbs a b = normalizeLimbs (subLimbsGo (normalizeLimbs a) (normalizeLimbs b) 0)
@@ -240,7 +235,7 @@ mulByDigitGo [] _ 0 = []
 mulByDigitGo [] _ carry = [carry]
 mulByDigitGo (x :: rest) d carry =
     let total = x * d + carry
-    in intMod total baseInt :: mulByDigitGo rest d (intDiv total baseInt)
+    in total % baseInt :: mulByDigitGo rest d (total / baseInt)
 
 shiftLimbs : Int -> [Int] -> [Int]
 shiftLimbs 0 xs = xs
@@ -250,20 +245,16 @@ mulLimbs : [Int] -> [Int] -> [Int]
 mulLimbs a b =
     let na = normalizeLimbs a
         nb = normalizeLimbs b
-    in if isZeroLimbs na || isZeroLimbs nb then []
+    in if null na || null nb then []
        else foldl
             (\acc (offset, digit) -> addLimbs acc (shiftLimbs offset (mulByDigit na digit)))
             []
-            (indexed nb 0)
-
-indexed : [a] -> Int -> [(Int, a)]
-indexed [] _ = []
-indexed (x :: xs) i = (i, x) :: indexed xs (i + 1)
+            (zip [0..(length nb - 1)] nb)
 
 divModLimbs : [Int] -> [Int] -> ([Int], [Int])
 divModLimbs numerator denominator =
     let den = normalizeLimbs denominator
-    in if isZeroLimbs den then error "divModLimbs: denominator must be positive"
+    in if null den then error "divModLimbs: denominator must be positive"
        else if compareLimbs numerator den == LT then ([], normalizeLimbs numerator)
        else divModLimbsGo [] [] (reverse (normalizeLimbs numerator)) den
 
@@ -279,7 +270,7 @@ quotientDigit : [Int] -> [Int] -> Int -> Int -> Int
 quotientDigit remainder denominator low high =
     if low > high then high
     else
-        let mid = intDiv (low + high) 2
+        let mid = (low + high) / 2
             probe = mulByDigit denominator mid
         in case compareLimbs probe remainder of
             GT -> quotientDigit remainder denominator low (mid - 1)
@@ -293,35 +284,20 @@ numeric0IntegerText label n =
        else error (label <> ": expected integer-valued Numeric 0")
 
 chunkTexts : Text -> [Text]
-chunkTexts digits =
+chunkTexts digits = chunkTextsGo digits []
+
+chunkTextsGo : Text -> [Text] -> [Text]
+chunkTextsGo digits acc =
     let len = Text.length digits
-    in if len <= 8 then [digits]
-       else chunkTexts (Text.take (len - 8) digits) ++ [Text.drop (len - 8) digits]
+    in if len <= 8 then digits :: acc
+       else chunkTextsGo (Text.take (len - 8) digits) (Text.drop (len - 8) digits :: acc)
 
 parseChunk : Text -> Int
-parseChunk = parseDigitsUnsafe 0
-
-parseDigitsUnsafe : Int -> Text -> Int
-parseDigitsUnsafe acc text =
-    if Text.length text == 0 then acc
-    else
-        let c = Text.take 1 text
-            rest = Text.drop 1 text
-        in parseDigitsUnsafe (acc * 10 + charToDigit c) rest
-
-charToDigit : Text -> Int
-charToDigit c = case c of
-  "0" -> 0; "1" -> 1; "2" -> 2; "3" -> 3; "4" -> 4
-  "5" -> 5; "6" -> 6; "7" -> 7; "8" -> 8; "9" -> 9
-  _ -> error ("Invalid digit: " <> c)
+parseChunk chunk = case Text.parseInt chunk of
+    Some n -> n
+    None -> error ("Invalid digit chunk: " <> chunk)
 
 dropLeadingZeroInts : [Int] -> [Int]
 dropLeadingZeroInts [] = []
 dropLeadingZeroInts (0 :: xs) = dropLeadingZeroInts xs
 dropLeadingZeroInts xs = xs
-
-intDiv : Int -> Int -> Int
-intDiv a b = a / b
-
-intMod : Int -> Int -> Int
-intMod a b = a - intDiv a b * b

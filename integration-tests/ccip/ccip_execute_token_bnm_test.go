@@ -428,7 +428,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			InstrumentId:       linkInstrumentId,
 			Decimals:           10,
 			InstanceID:         poolInstanceId,
-			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 			TransferTimeout: burnminttokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
@@ -528,20 +528,20 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			},
 			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
 				Enabled: true,
-				TokenPools: []config.TokenPool{
-					{
+				TokenPools: map[string]config.TokenPool{
+					tokenPoolAddress.InstanceAddress().Hex(): {
 						Type: config.TokenPoolTypeBurnMint,
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partyCCIP,
-						// By setting the TokenStandard info, the Toke Pool API will return the necessary factory disclosures
+						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
 						BurnMintFactory: &config.BurnMintFactory{
-							Type:       config.FactoryTypeAddress,
-							TemplateId: new(link.LinkRegistry{}.GetTemplateID()),
-							Party:      new(partyTokenPoolOwner),
-							Address:    new(linkRegistryAddress.InstanceAddress()),
+							Type:            config.FactoryTypeAddress,
+							TemplateId:      new(link.LinkRegistry{}.GetTemplateID()),
+							Party:           new(partyTokenPoolOwner),
+							InstanceAddress: new(linkRegistryAddress.InstanceAddress()),
 						},
 					},
 				},
@@ -574,7 +574,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
@@ -640,7 +640,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	// Deploy CCIPReceiver for receiver
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
@@ -684,7 +684,6 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 		TokenTransfer: &ccipreceiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(partyReceiver),
-			TokenInput:         tokenPoolDisclosure.TokenInput,
 			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
 		},
 		CcvInputs: []ccipreceiver.CCVInput{
@@ -700,7 +699,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	// in one receiver-authored transaction with disclosed shared dependencies.
 	_, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},

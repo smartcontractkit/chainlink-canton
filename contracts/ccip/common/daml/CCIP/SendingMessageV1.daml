@@ -12,6 +12,7 @@ import DA.Optional (isNone, isSome, fromSome, fromOptional)
 
 import qualified CCIP.Events
 import qualified CCIP.FinalityConfig
+import qualified CCIP.Internal
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -166,6 +167,9 @@ template SendingMessageV1
         sender : Party
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
+        -- Destination-chain defaults captured at PrepareSend, used to resolve
+        -- pool-required CCV sentinel/default semantics later.
+        destDefaultCCVs : [RawInstanceAddress.RawInstanceAddress]
         requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
         requiredExecutor : Optional RawInstanceAddress.RawInstanceAddress
         executorAddress : BytesHex
@@ -292,9 +296,12 @@ template SendingMessageV1
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
                 assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
+                let resolvedPoolCCVs = CCIP.Internal.resolveRequiredCCVsWithDefaults
+                        destDefaultCCVs
+                        poolCCVs
 
                 create this with
-                    outboundPoolCCVs = Some poolCCVs
+                    outboundPoolCCVs = Some resolvedPoolCCVs
                     state = SendingMessageState_Prepared
 
         -- Record the executor-selected flat fee. OnRamp computes execution

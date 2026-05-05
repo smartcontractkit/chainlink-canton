@@ -5,7 +5,11 @@ module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
-import DA.List (filter)
+import DA.Optional (isNone)
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Client
 import qualified CCIP.Context
@@ -28,27 +32,27 @@ data CCVSendInput = CCVSendInput
         -- Used to match this CCV to its verifier args in the client-provided CCVExtraArgs.
         ccvAddress : RawInstanceAddress.RawInstanceAddress
         ccvCid : ContractId ICCV.ICrossChainVerifier
-        ccvExtraContext : CCIP.Context.CCIPContext
+        ccvExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data FeeTokenInput = FeeTokenInput
     with
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+        feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
     deriving (Eq, Show)
 
 data TokenTransferInput = TokenTransferInput
     with
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
-        poolExtraContext : CCIP.Context.CCIPContext
-        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+        poolExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data ExecutorInput = ExecutorInput
     with
         executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
-        executorExtraContext : CCIP.Context.CCIPContext
+        executorExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data GetFeeResult = GetFeeResult
@@ -82,7 +86,7 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
                 tokenPoolCid : Optional (ContractId CCIP.Interfaces.TokenPool.ITokenPool)
             controller owner
@@ -90,7 +94,7 @@ template CCIPSender
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
                     _ -> abort "sender: unsupported extraArgs version"
-                tokenPoolRequiredCCVs <- case (message.tokenTransfer, tokenPoolCid) of
+                poolReportedCCVs <- case (message.tokenTransfer, tokenPoolCid) of
                     (None, None) -> pure []
                     (None, Some _) ->
                         abort "sender: tokenPoolCid provided without token transfer"
@@ -110,13 +114,13 @@ template CCIPSender
                     context = context
                     destChainSelector = destinationChainSelector
                     message = message
-                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
+                    poolReportedCCVs = poolReportedCCVs
 
         nonconsuming choice GetFee : GetFeeResult
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
                 ccvSendInputs : [CCVSendInput]
                 tokenTransferInput : Optional TokenTransferInput
@@ -127,7 +131,6 @@ template CCIPSender
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
-                    _ -> abort "sender: unsupported extraArgs version"
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetDestChainConfig with
                         destChainSelector = destinationChainSelector
@@ -167,13 +170,13 @@ template CCIPSender
                 executorFeeQuote <- case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> do
                         assertMsg "sender: executorInput not allowed for no-executor mode"
-                            (executorInput == None)
+                            (isNone executorInput)
                         pure None
                     CCIP.Client.Executor_UseDefault _executorArgs ->
                       case destConfig.defaultExecutor of
                         None -> do
                             assertMsg "sender: executorInput not allowed when no default executor is configured"
-                                (executorInput == None)
+                                (isNone executorInput)
                             pure None
                         Some _ -> case executorInput of
                             None -> abort "sender: executorInput required for default executor mode"
@@ -216,7 +219,7 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                context : CCIP.Context.CCIPContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
                 feeTokenInput : FeeTokenInput
                 ccvSendInputs : [CCVSendInput]
@@ -231,7 +234,6 @@ template CCIPSender
 
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
-                    _ -> abort "sender: unsupported extraArgs version"
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetDestChainConfig with
                         destChainSelector = destinationChainSelector
@@ -248,7 +250,7 @@ template CCIPSender
                 smCid <- case message.tokenTransfer of
                     None -> do
                         assertMsg "sender: tokenTransferInput provided without token transfer"
-                            (tokenTransferInput == None)
+                            (isNone tokenTransferInput)
                         pure smCid
                     Some tt -> case tokenTransferInput of
                         None -> abort "sender: tokenTransferInput required for token transfer"
@@ -290,13 +292,13 @@ template CCIPSender
                 smCid <- case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> do
                         assertMsg "sender: executorInput not allowed for no-executor mode"
-                            (executorInput == None)
+                            (isNone executorInput)
                         pure smCid
                     CCIP.Client.Executor_UseDefault executorArgs ->
                       case destConfig.defaultExecutor of
                         None -> do
                             assertMsg "sender: executorInput not allowed when no default executor is configured"
-                                (executorInput == None)
+                                (isNone executorInput)
                             pure smCid
                         Some _ ->
                             case executorInput of
@@ -337,7 +339,6 @@ template CCIPSender
                             rmnRemoteCid = rmnRemoteCid
                             extraContext = tokenTransferInput.poolExtraContext
                             sendingMessageCid = smCid
-                            tokenInput = tokenTransferInput.tokenInput
                             senderInputCids = tokenTransferInput.senderInputCids
                             amount = tt.amount
                             caller = owner
@@ -357,5 +358,6 @@ template CCIPSender
                 exercise routerCid CCIP.PerPartyRouter.CCIPSend with
                     context
                     sendingMessageCid = smCid
-                    feeTokenInput = feeTokenInput.tokenInput
                     feeTokenHoldingCids = feeTokenInput.senderInputCids
+                    feeTokenTransferFactory = feeTokenInput.feeTokenTransferFactory
+                    feeTokenExtraArgs = feeTokenInput.feeTokenExtraArgs

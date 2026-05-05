@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -416,8 +417,8 @@ var DeployTokenPoolForToken = operations.NewSequence(
 					Decimals:                types.INT64(10),
 					RemoteChainConfigs:      map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{},
 					TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{},
-					PoolReceiveContext: common.CCIPContext{
-						Values: map[string]common.AnyValue{},
+					PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{
+						Values: map[string]splice_api_token_metadata_v1.AnyValue{},
 					},
 					TransferTimeout: lockreleasetokenpool.TransferTimeout{
 						RelativeHours: new(types.INT64(24)),
@@ -444,8 +445,8 @@ var DeployTokenPoolForToken = operations.NewSequence(
 					Decimals:                types.INT64(10),
 					RemoteChainConfigs:      map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{},
 					TokenTransferFeeConfigs: map[types.NUMERIC]burnminttokenpool.TokenTransferFeeConfig{},
-					PoolReceiveContext: common.CCIPContext{
-						Values: map[string]common.AnyValue{},
+					PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{
+						Values: map[string]splice_api_token_metadata_v1.AnyValue{},
 					},
 					TransferTimeout: burnminttokenpool.TransferTimeout{
 						RelativeHours: new(types.INT64(24)),

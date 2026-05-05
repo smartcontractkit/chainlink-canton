@@ -2,12 +2,13 @@ module CCIP.Interfaces.CrossChainVerifier where
 
 import DA.Crypto.Text (BytesHex)
 
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Internal
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
-import MCMS.RawInstanceAddress (RawInstanceAddress)
 
 useDefaultCCVs = CCIP.Internal.useDefaultCCVs
 
@@ -23,7 +24,7 @@ interface ICrossChainVerifier where
     nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-            extraContext : CCIP.Context.CCIPContext
+            extraContext : ChoiceContext
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             verifierResults : BytesHex
             caller : Party
@@ -35,7 +36,7 @@ interface ICrossChainVerifier where
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            extraContext : CCIP.Context.CCIPContext
+            extraContext : ChoiceContext
             caller : Party
         controller caller
         do crossChainVerifier_calculateFeeImpl this self arg
@@ -54,7 +55,7 @@ interface ICrossChainVerifier where
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-            extraContext : CCIP.Context.CCIPContext
+            extraContext : ChoiceContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             verifierArgs : BytesHex
             caller : Party

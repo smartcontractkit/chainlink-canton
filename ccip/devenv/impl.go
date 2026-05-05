@@ -46,7 +46,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
@@ -986,14 +985,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			},
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
-			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(senderFeeInputCid)},
-			TokenInput: interfaces.TokenInput{
-				TransferFactory: types.CONTRACT_ID(feeTransferFactorycid),
-				ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(feeTransferFactoryChoiceContextValue)},
-					Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
-				},
-				TokenPoolHoldings: []types.CONTRACT_ID{},
+			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(senderFeeInputCid)},
+			FeeTokenTransferFactory: types.CONTRACT_ID(feeTransferFactorycid),
+			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+				Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(feeTransferFactoryChoiceContextValue)},
+				Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 			},
 		},
 	}
@@ -1037,7 +1033,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
 			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
 			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
-			TokenInput:       tokenPoolSendDisclosure.TokenInput,
 		}
 		tokenPoolRequiredCCVs = tokenPoolSendDisclosure.RequiredCCVs
 		disclosedContracts = append(disclosedContracts, tokenPoolSendDisclosure.DisclosedContracts...)

@@ -6,6 +6,9 @@ import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
+
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FinalityConfig
@@ -25,7 +28,7 @@ import CCIP.OffRampCodecGen (decodeSetDepsParamsAt)
 offRampKey : Text
 offRampKey = "off-ramp"
 
-lookupOffRampCid : CCIP.Context.CCIPContext -> Update (ContractId OffRamp)
+lookupOffRampCid : ChoiceContext -> Update (ContractId OffRamp)
 lookupOffRampCid ctx = CCIP.Context.getFromContextU ctx offRampKey
 
 rawInstanceAddress : OffRamp -> RawInstanceAddress.RawInstanceAddress
@@ -346,16 +349,16 @@ template OffRamp
                                 maybeInstrumentId = None
                                 maybeAmount = None
                                 returnData = ""
-                    Some _ -> do
-                        configCid <- case tokenConfigCid of
-                            None -> abort "offramp: missing token config CID"
-                            Some cid -> pure cid
-                        exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.FinalizeExecute with
-                            tokenConfigCid = configCid
-                            executingMessageCid = executingMessageCid
-                            ticketReceiver = routerPartyOwner
-                            returnData = ""
-                            caller = ccipOwner
+                    Some _ ->
+                        do
+                            configCid <- case tokenConfigCid of
+                                None -> abort "offramp: missing token config CID"
+                                Some cid -> pure cid
+                            exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.FinalizeExecute with
+                                tokenConfigCid = configCid
+                                executingMessageCid = executingMessageCid
+                                ticketReceiver = routerPartyOwner
+                                returnData = ""
 
                 pure ExecuteFromRouterResult with
                     messageId = messageId
