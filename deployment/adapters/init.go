@@ -3,6 +3,7 @@ package adapters
 import (
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -38,4 +39,12 @@ func init() {
 	for _, version := range tokenPoolVersions {
 		tokenscore.GetTokenAdapterRegistry().RegisterTokenAdapter(chainsel.FamilyCanton, semver.MustParse(version), CantonTokenAdapter{})
 	}
+
+	// Register the curse adapter for the canton family.
+	fastcurse.GetCurseRegistry().RegisterNewCurse(fastcurse.CurseRegistryInput{
+		CursingFamily:       chainsel.FamilyCanton,
+		CursingVersion:      semver.MustParse("1.0.0"),
+		CurseAdapter:        &CantonCurseAdapter{},
+		CurseSubjectAdapter: &CantonCurseSubjectAdapter{},
+	})
 }
