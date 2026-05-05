@@ -65,13 +65,18 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			CustomObservers: input.RMNRemote.Template.CustomObservers,
 			CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
 		}
-		deployRMNRemoteReport, err := operations.ExecuteOperation(b, factoryops.DeployRMNRemote, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployRMNRemote{Contract: rmnTemplate}, input.ProposalDriven))
+		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[rmn.RMNRemote]{
+			Template:   rmnTemplate,
+			OwnerParty: ownerParty,
+		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote from factory: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote: %w", err)
 		}
-		proposalOutputs = appendExerciseOutput(proposalOutputs, deployRMNRemoteReport.Output, input.ProposalDriven)
-		rmnRemoteRawInstanceAddress := rmnInstanceID.RawInstanceAddress(ownerParty)
-		addresses = append(addresses, newAddressRef(deps.ChainSelector(), rmnRemoteRawInstanceAddress, rmn_remote.ContractType, rmn_remote.Version, ""))
+		addresses = append(addresses, deployRMNRemoteReport.Output)
+		rmnRemoteRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployRMNRemoteReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse RMNRemote raw instance address: %w", err)
+		}
 
 		globalConfigInstanceID, err := ensureInstanceID(input.GlobalConfig.Template.InstanceId, "globalconfig")
 		if err != nil {

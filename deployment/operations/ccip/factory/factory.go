@@ -42,16 +42,6 @@ var Deploy = contract.NewDeploy(contract.DeployParams[factorybindings.CCIPFactor
 	Prefix:      "factory",
 })
 
-var DeployRMNRemote = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployRMNRemote]{
-	Name:         "canton/ccip/factory/deploy_rmn_remote",
-	Version:      Version,
-	Description:  "Deploys an RMNRemote through the CCIPFactory",
-	ContractType: ContractType,
-	Template:     factorybindings.CCIPFactory{},
-	Method:       factorybindings.CCIPFactory{}.DeployRMNRemote,
-	EncodeMethod: encodeDeployRMNRemote,
-})
-
 var DeployGlobalConfig = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployGlobalConfig]{
 	Name:         "canton/ccip/factory/deploy_global_config",
 	Version:      Version,
@@ -141,16 +131,6 @@ var DeployExecutor = contract.NewExercise(contract.ExerciseParams[factorybinding
 	Method:       factorybindings.CCIPFactory{}.DeployExecutor,
 	EncodeMethod: encodeDeployExecutor,
 })
-
-func encodeDeployRMNRemote(args factorybindings.DeployRMNRemote) (*bind.EncodedChoice, error) {
-	return factoryEncoder.DeployRMNRemoteParams(factorybindings.DeployRMNRemoteParams{
-		InstanceId:      args.Contract.InstanceId,
-		RmnOwner:        args.Contract.RmnOwner,
-		CcipOwner:       args.Contract.CcipOwner,
-		CustomObservers: args.Contract.CustomObservers,
-		CursedSubjects:  args.Contract.CursedSubjects,
-	})
-}
 
 func encodeDeployGlobalConfig(args factorybindings.DeployGlobalConfig) (*bind.EncodedChoice, error) {
 	return factoryEncoder.DeployGlobalConfigParams(factorybindings.DeployGlobalConfigParams{
