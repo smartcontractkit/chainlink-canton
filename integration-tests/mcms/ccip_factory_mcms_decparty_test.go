@@ -16,10 +16,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
@@ -59,7 +57,7 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	t.Logf("Decentralized party onboarded: %s", decentralizedParty)
 
 	// --- Step 2: Upload DARs and prepare encoders ---
-	mcmsPkgID, ccipCommonPkgID, factoryPkgID := uploadCCIPMCMSFactoryDARs(t, participants)
+	mcmsPkgID, ccipCommonPkgID, rmnPkgID, factoryPkgID := uploadCCIPMCMSFactoryDARs(t, participants)
 	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
 	factoryEncoder := factory.NewContract(factoryPkgID, "CCIP.Factory", "CCIPFactory").Encoder()
 
@@ -104,18 +102,9 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	pprInstanceID := "ppr-dec-" + uid
 
 	// --- Step 5: MCMS-driven deploys via BypasserExecuteBatch ---
-	// Deploy order follows dependency graph (same as TestCCIP_MCMSFactoryDeploy).
-
-	// 1. Deploy RMNRemote (no deps)
-	rmnParams := factory.DeployRMNRemoteParams{
-		InstanceId:      types.TEXT(rmnInstanceID),
-		RmnOwner:        types.PARTY(ccipOwner),
-		CcipOwner:       types.PARTY(ccipOwner),
-		CustomObservers: []types.PARTY{},
-		CursedSubjects:  []types.TEXT{},
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeployWithMCMSQueryParty(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, decentralizedParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployRMNRemoteParams", rmnParams)
-	t.Logf("RMNRemote deployed: %s", rmnInstanceID)
+	// RMNRemote is created directly because it is not a factory-managed component.
+	createRMNRemote(t, participant, rmnPkgID, ccipOwner, rmnInstanceID)
+	t.Logf("RMNRemote created directly: %s", rmnInstanceID)
 
 	// 2. Deploy GlobalConfig (no deps)
 	gcParams := factory.DeployGlobalConfigParams{
@@ -199,47 +188,6 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	require.Equal(t, "true", factoryFields["perPartyRouterFactoryDeployed"])
 
 	t.Logf("All CCIP components deployed via MCMS. Factory CID=%s, MCMS CID=%s", factoryCid, mcmsCid)
-
-	// --- Step 7 (Optional): Deploy LockReleaseTokenPool ---
-	lrtpInstanceID := "lrtp-dec-" + uid
-	lrtpParams := factory.DeployLockReleaseTokenPoolParams{
-		InstanceId:         types.TEXT(lrtpInstanceID),
-		PoolOwner:          types.PARTY(ccipOwner),
-		CcipOwner:          types.PARTY(ccipOwner),
-		InstrumentId:       splice.InstrumentId{Admin: types.PARTY(ccipOwner), Id: "test-token"},
-		Decimals:           types.INT64(18),
-		RateLimitAdmin:     nil,
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
-		TransferTimeout:    lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT{})},
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeployWithMCMSQueryParty(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, decentralizedParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLockReleaseTokenPoolParams", lrtpParams)
-	t.Logf("LockReleaseTokenPool deployed via MCMS: %s", lrtpInstanceID)
-
-	// Deploy a second pool
-	lrtp2InstanceID := "lrtp2-dec-" + uid
-	lrtp2Params := factory.DeployLockReleaseTokenPoolParams{
-		InstanceId:         types.TEXT(lrtp2InstanceID),
-		PoolOwner:          types.PARTY(ccipOwner),
-		CcipOwner:          types.PARTY(ccipOwner),
-		InstrumentId:       splice.InstrumentId{Admin: types.PARTY(ccipOwner), Id: "amulet-token"},
-		Decimals:           types.INT64(10),
-		RateLimitAdmin:     nil,
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
-		TransferTimeout:    lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT{})},
-	}
-	factoryCid, mcmsCid = mcmsFactoryDeployWithMCMSQueryParty(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, decentralizedParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLockReleaseTokenPoolParams", lrtp2Params)
-	t.Logf("LockReleaseTokenPool deployed via MCMS: %s", lrtp2InstanceID)
-
-	// Final factory state check
-	factoryFields = queryContractFields(t, participant, factoryPkgID, factoryCid)
-	require.Equal(t, "true", factoryFields["perPartyRouterFactoryDeployed"])
-	t.Logf("Final factory state verified. All deployments successful.")
 
 	// --- Step 8: MCMS-driven config on deployed contracts ---
 	gcCid := findNewContractCid(t, participant, ccipCommonPkgID, "CCIP.GlobalConfig", "GlobalConfig", ccipOwner, gcInstanceAddr)
@@ -436,7 +384,7 @@ func damlFingerprintsFromOnboardingReports(t *testing.T, reporter operations.Rep
 	return result
 }
 
-func uploadCCIPMCMSFactoryDARs(t *testing.T, participants []canton.Participant) (string, string, string) {
+func uploadCCIPMCMSFactoryDARs(t *testing.T, participants []canton.Participant) (string, string, string, string) {
 	t.Helper()
 
 	darPackages := []contracts.Package{
@@ -467,7 +415,7 @@ func uploadCCIPMCMSFactoryDARs(t *testing.T, participants []canton.Participant) 
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(packageIDs), len(darPackages))
 
-	return packageIDs[0], packageIDs[2], packageIDs[len(darPackages)-1]
+	return packageIDs[0], packageIDs[2], packageIDs[3], packageIDs[len(darPackages)-1]
 }
 
 func embeddedDARLoader(packageName, version string) ([]byte, error) {

@@ -50,6 +50,7 @@ type SharedTAREnvironment struct {
 type SharedCCIPMCMSEnvironment struct {
 	SharedCantonEnvironment
 	CCIPCommonPkgID string
+	CCIPRMNPkgID    string
 	FactoryPkgID    string
 	FactoryEncoder  factory.MCMSEncoder
 }
@@ -334,6 +335,7 @@ func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
 		mcmsPkgID := packageIDs[0]
 		mcmsTestPkgID := packageIDs[1]
 		ccipCommonPkgID := packageIDs[2]
+		ccipRMNPkgID := packageIDs[3]
 		factoryPkgID := packageIDs[len(packageIDs)-1]
 
 		signers := createSigners(t)
@@ -353,6 +355,7 @@ func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
 				Config:        New2of3Config(signers),
 			},
 			CCIPCommonPkgID: ccipCommonPkgID,
+			CCIPRMNPkgID:    ccipRMNPkgID,
 			FactoryPkgID:    factoryPkgID,
 			FactoryEncoder:  factoryEncoder,
 		}
@@ -425,6 +428,7 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 		mcmsPkgID := packageIDs[0]
 		mcmsTestPkgID := packageIDs[1]
 		ccipCommonPkgID := packageIDs[2]
+		ccipRMNPkgID := packageIDs[3]
 		factoryPkgID := packageIDs[len(packageIDs)-1]
 
 		signers := createSigners(t)
@@ -445,6 +449,7 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 					Config:        New2of3Config(signers),
 				},
 				CCIPCommonPkgID: ccipCommonPkgID,
+				CCIPRMNPkgID:    ccipRMNPkgID,
 				FactoryPkgID:    factoryPkgID,
 				FactoryEncoder:  factoryEncoder,
 			},
