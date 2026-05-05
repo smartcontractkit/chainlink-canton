@@ -17,11 +17,10 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	mcmsops "github.com/smartcontractkit/chainlink-canton/deployment/operations/mcms"
-	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
+	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
@@ -224,7 +223,7 @@ func (d DeployFactoryAndSetOwnerToMCMS) Apply(e cldf.Environment, config CantonC
 		participant.PartyID,
 		cantonmcms.ProposalConfig{
 			MCMSContract: cantonmcms.MCMSContractInfo{
-				RawInstanceAddress: contracts.RawInstanceAddress(mcmsRawAddr),
+				RawInstanceAddress: mcmsRawAddr,
 				InstanceAddress:    mcmsRawAddr.InstanceAddress(),
 			},
 			ChainSelector: mcms_types.ChainSelector(config.ChainSelector),

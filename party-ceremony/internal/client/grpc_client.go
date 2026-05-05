@@ -60,6 +60,7 @@ func transportCredentials(host string, port int) credentials.TransportCredential
 	if port == 443 {
 		return credentials.NewClientTLSFromCert(nil, host)
 	}
+
 	return insecure.NewCredentials()
 }
 
