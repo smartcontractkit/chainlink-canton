@@ -8,6 +8,15 @@ import (
 	"strconv"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	common_binding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
@@ -15,15 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
@@ -43,7 +43,7 @@ type CantonCurseAdapter struct {
 }
 
 // Curse implements [fastcurse.CurseAdapter].
-func (c *CantonCurseAdapter) Curse() *operations.Sequence[fastcurse.CurseInput, sequences.OnChainOutput, chain.BlockChains] {
+func (c *CantonCurseAdapter) Curse() *cldf_ops.Sequence[fastcurse.CurseInput, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"curse_rmn_remote",
 		semver.MustParse("1.0.0"),
@@ -68,6 +68,9 @@ func (c *CantonCurseAdapter) Curse() *operations.Sequence[fastcurse.CurseInput, 
 						Subject: types.TEXT(hex.EncodeToString(subject[:])),
 					},
 				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("execute curse operation: %w", err)
+				}
 			}
 
 			// TODO: MCMS batch operation?
@@ -227,7 +230,7 @@ func (c *CantonCurseAdapter) SubjectToSelector(subject fastcurse.Subject) (uint6
 }
 
 // Uncurse implements [fastcurse.CurseAdapter].
-func (c *CantonCurseAdapter) Uncurse() *operations.Sequence[fastcurse.CurseInput, sequences.OnChainOutput, chain.BlockChains] {
+func (c *CantonCurseAdapter) Uncurse() *cldf_ops.Sequence[fastcurse.CurseInput, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"uncurse_rmn_remote",
 		semver.MustParse("1.0.0"),
@@ -252,6 +255,9 @@ func (c *CantonCurseAdapter) Uncurse() *operations.Sequence[fastcurse.CurseInput
 						Subject: types.TEXT(hex.EncodeToString(subject[:])),
 					},
 				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("execute uncurse operation: %w", err)
+				}
 			}
 
 			// TODO: MCMS batch operation?

@@ -128,6 +128,7 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 			},
 		},
 	})
+	require.NoError(t, err)
 
 	subjects, err = sourceReader.GetRMNCursedSubjects(ctx)
 	require.NoError(t, err)
