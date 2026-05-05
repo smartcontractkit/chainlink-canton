@@ -1,0 +1,57 @@
+name: Squash and sign (per-commit)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/sign.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  sign:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disable other workflows for this signing run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Only currently-active *user-defined* workflows other than this one.
+          # System workflows like pages-build-deployment and dependabot-updates have
+          # paths outside .github/workflows/ and can't be disabled (the API returns 422).
+          gh workflow list --all --repo "${{ github.repository }}" --json id,state,path \
+            | jq -r '.[]
+                | select(
+                    .state == "active"
+                    and (.path | startswith(".github/workflows/"))
+                    and .path != ".github/workflows/sign.yml"
+                  )
+                | .id' \
+            > /tmp/squash-sign-disabled-ids
+          while read -r id; do
+            [ -z "$id" ] && continue
+            echo "Disabling $id"
+            gh api -X PUT "/repos/${{ github.repository }}/actions/workflows/$id/disable"
+          done < /tmp/squash-sign-disabled-ids
+
+      - uses: cfal/squash-sign-action@main
+        with:
+          squash: 'false'
+          reset-workflows: 'true'
+
+      - name: Re-enable workflows
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -f /tmp/squash-sign-disabled-ids ]; then
+            exit 0
+          fi
+          while read -r id; do
+            [ -z "$id" ] && continue
+            gh api -X PUT "/repos/${{ github.repository }}/actions/workflows/$id/enable" || true
+          done < /tmp/squash-sign-disabled-ids
