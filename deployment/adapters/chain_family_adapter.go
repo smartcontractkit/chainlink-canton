@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	ccipseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -14,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -156,10 +156,10 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 					LaneMandatedOutboundCCVs: laneMandatedOutboundCCVs,
 					DefaultExecutor:          localExecutor,
 					CantonLaneConfig:         &lanes.CantonLaneConfig{GlobalConfig: localGlobalConfig},
-					OnRamp:                   contracts.HexToInstanceAddress(input.OnRamp).Bytes(),
-					OffRamp:                  contracts.HexToInstanceAddress(input.OffRamp).Bytes(),
-					Router:                   contracts.HexToInstanceAddress(input.Router).Bytes(),
-					FeeQuoter:                contracts.HexToInstanceAddress(input.FeeQuoter).Bytes(),
+					OnRamp:                   input.OnRamp,
+					OffRamp:                  input.OffRamp,
+					Router:                   input.Router,
+					FeeQuoter:                input.FeeQuoter,
 				}
 
 				remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)
@@ -232,6 +232,67 @@ func (a *CantonChainFamilyAdapter) ResolveExecutor(ds datastore.DataStore, chain
 	}
 
 	return ref.Address, nil
+}
+
+// GetAddressBytesLength implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetAddressBytesLength() uint8 {
+	return 32
+}
+
+// GetChainFamilySelector implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetChainFamilySelector() [4]byte {
+	return CantonFamilySelector
+}
+
+// GetDefaultCommitteeVerifierRemoteChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig() ccipadapters.CommitteeVerifierRemoteChainDefaults {
+	return ccipadapters.CommitteeVerifierRemoteChainDefaults{
+		AllowlistEnabled:   false,
+		FeeUSDCents:        0,
+		GasForVerification: 100_000,
+		PayloadSizeBytes:   1_000,
+	}
+}
+
+// GetDefaultFeeQuoterDestChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccipadapters.FeeQuoterDestChainConfig {
+	return ccipadapters.FeeQuoterDestChainConfig{
+		OverrideExistingConfig:      false,
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         CantonFamilySelector,
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		LinkFeeMultiplierPercent:    0,
+		USDPerUnitGas:               big.NewInt(0),
+	}
+}
+
+// GetDefaultFinalityConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
+	return finality.Config{
+		WaitForFinality: true,
+	}
+}
+
+// GetDefaultRemoteChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig() ccipadapters.RemoteChainDefaults {
+	return ccipadapters.RemoteChainDefaults{
+		AllowTrafficFrom: true, // TODO: check what this does?
+		ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
+			USDCentsFee: 0,
+			Enabled:     true,
+		},
+		BaseExecutionGasCost:      50_000,
+		TokenReceiverAllowed:      false, // TODO: check what this does?
+		MessageNetworkFeeUSDCents: 0,
+		TokenNetworkFeeUSDCents:   0,
+	}
 }
 
 func findContractRef(ds datastore.DataStore, chainSelector uint64, contractType datastore.ContractType, version *semver.Version, qualifier string) (datastore.AddressRef, error) {

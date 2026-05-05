@@ -12,7 +12,7 @@ import (
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -27,8 +27,17 @@ import (
 type CantonAggregatorConfigAdapter struct{}
 
 var _ adapters.AggregatorConfigAdapter = (*CantonAggregatorConfigAdapter)(nil)
+var _ adapters.CommitteeVerifierOnchainAdapter = (*CantonCommitteeVerifierOnchain)(nil)
 
-func (a *CantonAggregatorConfigAdapter) ScanCommitteeStates(ctx context.Context, env deployment.Environment, chainSelector uint64) ([]*adapters.CommitteeState, error) {
+type CantonCommitteeVerifierOnchain struct{}
+
+// ApplySignatureConfigs implements [adapters.CommitteeVerifierOnchainAdapter].
+func (a *CantonCommitteeVerifierOnchain) ApplySignatureConfigs(ctx context.Context, env deployment.Environment, destChainSelector uint64, qualifier string, change adapters.SignatureConfigChange) error {
+	panic("unimplemented")
+}
+
+// ScanCommitteeStates implements [adapters.CommitteeVerifierOnchainAdapter].
+func (a *CantonCommitteeVerifierOnchain) ScanCommitteeStates(ctx context.Context, env deployment.Environment, chainSelector uint64) ([]*adapters.CommitteeState, error) {
 	refs := env.DataStore.Addresses().Filter(
 		datastore.AddressRefByType(datastore.ContractType(committee_verifier.ContractType)),
 		datastore.AddressRefByChainSelector(chainSelector),
@@ -88,6 +97,7 @@ func (a *CantonAggregatorConfigAdapter) ScanCommitteeStates(ctx context.Context,
 	return states, nil
 }
 
+// ResolveVerifierAddress implements [adapters.AggregatorConfigAdapter].
 func (a *CantonAggregatorConfigAdapter) ResolveVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
 	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
 		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
