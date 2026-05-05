@@ -113,6 +113,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure FeeQuoter instance ID: %w", err)
 		}
+		// TODO: what is this code doing? "link-token" string hardcoded
 		linkTokenID := input.FeeQuoterConfig.Template.LinkTokenInstrumentId
 		if linkTokenID.Admin == "" {
 			linkTokenID = splice_api_token_holding_v1.InstrumentId{

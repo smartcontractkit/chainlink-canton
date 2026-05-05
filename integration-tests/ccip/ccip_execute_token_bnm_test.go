@@ -165,7 +165,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	}
 	linkInstrumentId := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(partyCCIP),
-		Id:    "ChainLink",
+		Id:    "ChainLink", // TODO: we don't seem to have a standard name for link token instrumentID, do we?
 	}
 	hashedLinkInstrumentId := contracts.EncodeInstrumentID(linkInstrumentId)
 
