@@ -20,19 +20,14 @@ import CCIP.FactoryTest.FactoryCodecTest
   , encodeDeployOnRampParams
   , encodeDeployOffRampParams
   , encodeDeployPerPartyRouterFactoryParams
-  , encodeDeployRMNRemoteParams
   , encodeDeployCommitteeVerifierParams
   , encodeDeployExecutorParams
-  , encodeDeployLockReleaseTokenPoolParams
   , encodeDeployRateLimiterParams
   , encodeDeployCCIPSenderParams
   , encodeDeployCCIPReceiverParams
   )
 
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
-import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
-
-import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 finalityConfig n =
   if n == 0
@@ -482,42 +477,6 @@ testDeployPerPartyRouterFactory_MCMS = script do
 -- DEPLOYMENT TESTS - NON-SINGLETON CONTRACTS
 -- ===========================================================================
 
--- | Test DeployRMNRemote via MCMS entrypoint
--- RMNRemote has rmnOwner as signatory, so mcmsParty is used as rmnOwner
-testDeployRMNRemote_MCMS : Script ()
-testDeployRMNRemote_MCMS = script do
-  mcmsParty <- allocateParty "mcms_party"
-
-  let factoryInstanceId = "factory-rmn"
-
-  factoryCid <- submit mcmsParty do
-    createCmd CCIPFactory with
-      instanceId = factoryInstanceId
-      owner = mcmsParty
-      mcmsParty
-      usedInstanceIds = Map.empty
-      deployedContracts = Map.empty
-      perPartyRouterFactoryDeployed = False
-
-  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
-  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
-  -- Use mcmsParty as rmnOwner so authorization works within single party
-  let params = DeployRMNRemoteParams with
-        instanceId = "rmn-1"
-        rmnOwner = mcmsParty
-        ccipOwner = mcmsParty
-        customObservers = []
-        cursedSubjects = ["deadbeef"]
-      encoded = encodeDeployRMNRemoteParams params
-
-  submit mcmsParty do
-    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "DeployRMNRemote"
-      operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
-
-  pure ()
-
 -- | Test DeployCommitteeVerifier via MCMS entrypoint
 -- CommitteeVerifier has owner as signatory, so mcmsParty is used as owner
 testDeployCommitteeVerifier_MCMS : Script ()
@@ -554,49 +513,6 @@ testDeployCommitteeVerifier_MCMS = script do
   submit mcmsParty do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "DeployCommitteeVerifier"
-      operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
-
-  pure ()
-
--- | Test DeployLockReleaseTokenPool via MCMS entrypoint
--- LockReleaseTokenPool has poolOwner as signatory, so mcmsParty is used as poolOwner
-testDeployLockReleaseTokenPool_MCMS : Script ()
-testDeployLockReleaseTokenPool_MCMS = script do
-  mcmsParty <- allocateParty "mcms_party"
-  rateLimitAdmin <- allocateParty "rate_limit_admin"
-
-  let factoryInstanceId = "factory-lrtp"
-
-  factoryCid <- submit mcmsParty do
-    createCmd CCIPFactory with
-      instanceId = factoryInstanceId
-      owner = mcmsParty
-      mcmsParty
-      usedInstanceIds = Map.empty
-      deployedContracts = Map.empty
-      perPartyRouterFactoryDeployed = False
-
-  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
-  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
-  -- Use mcmsParty as poolOwner so authorization works within single party
-  let params = DeployLockReleaseTokenPoolParams with
-        instanceId = "lrtp-1"
-        poolOwner = mcmsParty
-        ccipOwner = mcmsParty
-        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "USDC"
-        decimals = 6
-        rateLimitAdmin = Some rateLimitAdmin
-        tokenAdminRegistry = RawInstanceAddress.make "tar-1" mcmsParty
-        feeQuoter = RawInstanceAddress.make "fq-1" mcmsParty
-        rmnRemote = RawInstanceAddress.make "rmn-1" mcmsParty
-        poolReceiveContext = MetadataV1.emptyChoiceContext
-        transferTimeout = RelativeHours 24
-      encoded = encodeDeployLockReleaseTokenPoolParams params
-
-  submit mcmsParty do
-    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "DeployLockReleaseTokenPool"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 
