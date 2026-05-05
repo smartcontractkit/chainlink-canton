@@ -140,16 +140,16 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			}
 
 			outboundDefaultCfg, inboundDefaultCfg := tokenadapters.GenerateTPRLConfigs(
-				remoteCfg.DefaultFinalityOutboundRateLimiterConfig,
-				remoteCfg.DefaultFinalityInboundRateLimiterConfig,
+				remoteCfg.OutboundRateLimiterConfig,
+				remoteCfg.InboundRateLimiterConfig,
 				uint8(parsedPool.Decimals),
 				remoteCfg.RemoteDecimals,
 				"canton",
 				semver.MustParse("2.0.0"),
 			)
 			_, inboundCustomCfg := tokenadapters.GenerateTPRLConfigs(
-				remoteCfg.CustomFinalityOutboundRateLimiterConfig,
-				remoteCfg.CustomFinalityInboundRateLimiterConfig,
+				remoteCfg.OutboundRateLimiterConfig, // TODO: how do we get the "custom finality" config?
+				remoteCfg.InboundRateLimiterConfig,  // TODO: how do we get the "custom finality" config?
 				uint8(parsedPool.Decimals),
 				remoteCfg.RemoteDecimals,
 				"canton",

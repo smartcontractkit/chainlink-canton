@@ -3,9 +3,10 @@ package adapters
 import (
 	"fmt"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -18,6 +19,12 @@ type CantonVerifierJobConfigAdapter struct{}
 
 var _ ccvadapters.VerifierConfigAdapter = (*CantonVerifierJobConfigAdapter)(nil)
 
+// GetSignerAddressFamily implements [adapters.VerifierConfigAdapter].
+func (a *CantonVerifierJobConfigAdapter) GetSignerAddressFamily() string {
+	return chainsel.FamilyCanton
+}
+
+// ResolveVerifierContractAddresses implements [adapters.VerifierConfigAdapter].
 func (a *CantonVerifierJobConfigAdapter) ResolveVerifierContractAddresses(
 	ds datastore.DataStore,
 	chainSelector uint64,

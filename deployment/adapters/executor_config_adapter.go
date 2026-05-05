@@ -5,7 +5,9 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	ccvadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
+	ccvexecutor "github.com/smartcontractkit/chainlink-ccv/executor"
+	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -41,7 +43,7 @@ func (a *CantonExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, 
 	return chains
 }
 
-func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, chainSelector uint64, qualifier string) (ccvadapters.ExecutorChainConfig, error) {
+func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, chainSelector uint64, qualifier string) (ccvexecutor.ChainConfiguration, error) {
 	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
 
 	offRampAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
@@ -49,7 +51,7 @@ func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, c
 		Version: offramp.Version,
 	}, chainSelector, toAddress)
 	if err != nil {
-		return ccvadapters.ExecutorChainConfig{}, fmt.Errorf("failed to get off ramp address for chain %d: %w", chainSelector, err)
+		return ccvexecutor.ChainConfiguration{}, fmt.Errorf("failed to get off ramp address for chain %d: %w", chainSelector, err)
 	}
 
 	rmnRemoteAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
@@ -57,7 +59,7 @@ func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, c
 		Version: rmn_remote.Version,
 	}, chainSelector, toAddress)
 	if err != nil {
-		return ccvadapters.ExecutorChainConfig{}, fmt.Errorf("failed to get rmn remote address for chain %d: %w", chainSelector, err)
+		return ccvexecutor.ChainConfiguration{}, fmt.Errorf("failed to get rmn remote address for chain %d: %w", chainSelector, err)
 	}
 
 	executorAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
@@ -66,12 +68,14 @@ func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, c
 		Version:   executor.Version,
 	}, chainSelector, toAddress)
 	if err != nil {
-		return ccvadapters.ExecutorChainConfig{}, fmt.Errorf("failed to get executor address for chain %d: %w", chainSelector, err)
+		return ccvexecutor.ChainConfiguration{}, fmt.Errorf("failed to get executor address for chain %d: %w", chainSelector, err)
 	}
 
-	return ccvadapters.ExecutorChainConfig{
-		OffRampAddress:       offRampAddr,
-		RmnAddress:           rmnRemoteAddr,
-		ExecutorProxyAddress: executorAddr,
+	return ccvexecutor.ChainConfiguration{
+		DestinationChainConfig: chainaccess.DestinationChainConfig{
+			OffRampAddress: offRampAddr,
+			RmnAddress:     rmnRemoteAddr,
+		},
+		DefaultExecutorAddress: executorAddr,
 	}, nil
 }

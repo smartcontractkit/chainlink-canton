@@ -141,7 +141,7 @@ var BuildConfig = operations.NewOperation(
 		refs = env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
 		tokenPools := make(map[string]edsConfig.TokenPool)
 		for _, ref := range refs {
-			if strings.Count(ref.Qualifier, "[default]") != 2 {
+			if strings.Count(ref.Qualifier, "[default]") != 3 { // TODO: this logic is really fragile and needs to be improved.
 				continue
 			}
 
