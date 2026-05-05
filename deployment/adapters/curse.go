@@ -34,6 +34,7 @@ var (
 func NewCantonCurseAdapter() *CantonCurseAdapter {
 	return &CantonCurseAdapter{
 		rmnRemoteAddressCache: make(map[uint64]contracts.InstanceAddress),
+		globalConfigCache:     make(map[uint64]contracts.InstanceAddress),
 	}
 }
 
@@ -139,7 +140,8 @@ func (c *CantonCurseAdapter) IsChainConnectedToTargetChain(e deployment.Environm
 		return false, fmt.Errorf("get global config: %w", err)
 	}
 
-	destNumeric := types.NUMERIC(strconv.FormatUint(targetSel, 10))
+	// TODO: we need a helper for this numeric conversion.
+	destNumeric := types.NUMERIC(fmt.Sprintf("%d.", targetSel))
 	destEnabled := globalConfigCreated.DestChainConfigs[destNumeric].IsEnabled
 
 	return bool(destEnabled), nil

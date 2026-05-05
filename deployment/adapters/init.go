@@ -46,7 +46,7 @@ func init() {
 	fastcurse.GetCurseRegistry().RegisterNewCurse(fastcurse.CurseRegistryInput{
 		CursingFamily:       chainsel.FamilyCanton,
 		CursingVersion:      rmn_remote.Version,
-		CurseAdapter:        &CantonCurseAdapter{},
-		CurseSubjectAdapter: &CantonCurseSubjectAdapter{},
+		CurseAdapter:        NewCantonCurseAdapter(),
+		CurseSubjectAdapter: NewCantonCurseSubjectAdapter(),
 	})
 }

@@ -83,10 +83,13 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 	require.NoError(t, err)
 
 	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
+	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, harness)
 	chainMap, err := harness.Lib.ChainsMap(ctx)
 	require.NoError(t, err)
 	cantonImpl := chainMap[cantonChain.ChainSelector()]
 	require.NotNil(t, cantonImpl)
+	evmImpl := chainMap[evmChain.ChainSelector()]
+	require.NotNil(t, evmImpl)
 
 	lggr := logger.Test(t)
 
@@ -117,14 +120,15 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, subjects)
 
-	subject := fastcurse.GenericSelectorToSubject(cantonChain.ChainSelector())
+	subject := fastcurse.GenericSelectorToSubject(evmChain.ChainSelector())
 
 	curseCS := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 	_, err = curseCS.Apply(*cldfEnv, fastcurse.RMNCurseConfig{
 		CurseActions: []fastcurse.CurseActionInput{
 			{
 				ChainSelector:        cantonChain.ChainSelector(),
-				SubjectChainSelector: cantonChain.ChainSelector(),
+				SubjectChainSelector: evmChain.ChainSelector(),
+				Version:              rmn_remote.Version,
 			},
 		},
 	})
@@ -140,7 +144,8 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 		CurseActions: []fastcurse.CurseActionInput{
 			{
 				ChainSelector:        cantonChain.ChainSelector(),
-				SubjectChainSelector: cantonChain.ChainSelector(),
+				SubjectChainSelector: evmChain.ChainSelector(),
+				Version:              rmn_remote.Version,
 			},
 		},
 	})
