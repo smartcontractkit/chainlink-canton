@@ -79,7 +79,7 @@ template CCIPFactory
 
         interface instance MCMSReceiver for CCIPFactory where
           view = MCMSReceiverView with
-            mcmsController = owner
+            mcmsController = mcmsParty
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do
@@ -207,7 +207,7 @@ template CCIPFactory
         -- Both owner and mcmsParty must authorize: owner gives up ownership,
         -- mcmsParty consents to become the new signatory.
         choice SetOwnerToMCMS : ContractId CCIPFactory
-            controller [owner, mcmsParty]
+            controller mcmsParty
             do
                 assertMsg "factory already MCMS controlled" (owner /= mcmsParty)
                 create this with

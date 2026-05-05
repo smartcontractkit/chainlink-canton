@@ -370,14 +370,14 @@ template MCMS
 
         now <- getTime
 
-        -- 1. Verify opId matches provided data
-        let computedOpId = hashTimelockOpId calls predecessor salt
-        assertMsg "mcms: computed operation ID does not match" $ computedOpId == opId
-
-        -- 2. Lookup in timelockTimestamps
+        -- 1. Lookup in timelockTimestamps before hashing caller-controlled call data.
         case Map.lookup opId timelockTimestamps of
           None -> abort "mcms: operation not found in timelock"
           Some readyTime -> do
+            -- 2. Verify opId matches provided data
+            let computedOpId = hashTimelockOpId calls predecessor salt
+            assertMsg "mcms: computed operation ID does not match" $ computedOpId == opId
+
             -- 3. Check not already done
             assertMsg "mcms: operation already executed" $ readyTime /= doneTimestamp
 
