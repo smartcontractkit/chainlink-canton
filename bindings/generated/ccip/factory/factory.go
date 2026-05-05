@@ -12,15 +12,12 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executor "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	feequoter "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	offramp "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
 	onramp "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
 	perpartyrouter "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	rmn "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	tokenadminregistry "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -38,7 +35,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "c24ecaf0a38cbbd7943b191208728703ae1fb060cc9971fd49161da17efee29c"
+	PackageID   = "bf3fc9ea24c9d42f1f27a9028e40a0c1cfaab6fe5aff80f667f7a6ce25ab7f43"
 	SDKVersion  = "3.4.10"
 )
 
@@ -312,27 +309,6 @@ func (t CCIPFactory) DeployPerPartyRouterFactoryWithPackageID(contractID string,
 	}
 }
 
-// DeployRMNRemote exercises the DeployRMNRemote choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployRMNRemote(contractID string, args DeployRMNRemote) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployRMNRemote",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployRMNRemoteWithPackageID exercises the DeployRMNRemote choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployRMNRemoteWithPackageID(contractID string, packageID string, args DeployRMNRemote) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployRMNRemote",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // DeployCommitteeVerifier exercises the DeployCommitteeVerifier choice on this CCIPFactory contract
 // This method uses the package name in the template ID
 func (t CCIPFactory) DeployCommitteeVerifier(contractID string, args DeployCommitteeVerifier) *model.ExerciseCommand {
@@ -371,27 +347,6 @@ func (t CCIPFactory) DeployExecutorWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "DeployExecutor",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployLockReleaseTokenPool exercises the DeployLockReleaseTokenPool choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployLockReleaseTokenPool(contractID string, args DeployLockReleaseTokenPool) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployLockReleaseTokenPool",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployLockReleaseTokenPoolWithPackageID exercises the DeployLockReleaseTokenPool choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployLockReleaseTokenPoolWithPackageID(contractID string, packageID string, args DeployLockReleaseTokenPool) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployLockReleaseTokenPool",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1076,118 +1031,6 @@ func (t *DeployGlobalConfigParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// DeployLockReleaseTokenPool is a Record type
-type DeployLockReleaseTokenPool struct {
-	Contract lockreleasetokenpool.LockReleaseTokenPool `json:"contract"`
-}
-
-// ToMap converts DeployLockReleaseTokenPool to a map for DAML arguments
-func (t DeployLockReleaseTokenPool) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
-
-	return m
-}
-
-func (t DeployLockReleaseTokenPool) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *DeployLockReleaseTokenPool) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DeployLockReleaseTokenPool to hex string (Canton MCMS format)
-func (t DeployLockReleaseTokenPool) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DeployLockReleaseTokenPool from hex string (Canton MCMS format)
-func (t *DeployLockReleaseTokenPool) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// DeployLockReleaseTokenPoolParams is a Record type
-type DeployLockReleaseTokenPoolParams struct {
-	InstanceId         types.TEXT                                 `json:"instanceId"`
-	PoolOwner          types.PARTY                                `json:"poolOwner"`
-	CcipOwner          types.PARTY                                `json:"ccipOwner"`
-	InstrumentId       splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
-	Decimals           types.INT64                                `json:"decimals"`
-	RateLimitAdmin     *types.PARTY                               `json:"rateLimitAdmin" hex:"optional"`
-	TokenAdminRegistry mcms.RawInstanceAddress                    `json:"tokenAdminRegistry"`
-	FeeQuoter          mcms.RawInstanceAddress                    `json:"feeQuoter"`
-	RmnRemote          mcms.RawInstanceAddress                    `json:"rmnRemote"`
-	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
-	TransferTimeout    lockreleasetokenpool.TransferTimeout       `json:"transferTimeout"`
-}
-
-// ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments
-func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["instanceId"] = string(t.InstanceId)
-
-	m["poolOwner"] = t.PoolOwner.ToMap()
-
-	m["ccipOwner"] = t.CcipOwner.ToMap()
-
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
-
-	m["decimals"] = int64(t.Decimals)
-
-	if t.RateLimitAdmin != nil {
-		m["rateLimitAdmin"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.RateLimitAdmin).ToMap(),
-		}
-	} else {
-		m["rateLimitAdmin"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
-	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
-
-	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
-
-	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
-
-	m["poolReceiveContext"] = model.NestedToDAMLValue(t.PoolReceiveContext)
-
-	m["transferTimeout"] = model.NestedToDAMLValue(t.TransferTimeout)
-
-	return m
-}
-
-func (t DeployLockReleaseTokenPoolParams) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *DeployLockReleaseTokenPoolParams) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DeployLockReleaseTokenPoolParams to hex string (Canton MCMS format)
-func (t DeployLockReleaseTokenPoolParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DeployLockReleaseTokenPoolParams from hex string (Canton MCMS format)
-func (t *DeployLockReleaseTokenPoolParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // DeployOffRamp is a Record type
 type DeployOffRamp struct {
 	Contract offramp.OffRamp `json:"contract"`
@@ -1445,102 +1288,6 @@ func (t DeployPerPartyRouterFactoryParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes DeployPerPartyRouterFactoryParams from hex string (Canton MCMS format)
 func (t *DeployPerPartyRouterFactoryParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// DeployRMNRemote is a Record type
-type DeployRMNRemote struct {
-	Contract rmn.RMNRemote `json:"contract"`
-}
-
-// ToMap converts DeployRMNRemote to a map for DAML arguments
-func (t DeployRMNRemote) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
-
-	return m
-}
-
-func (t DeployRMNRemote) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *DeployRMNRemote) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DeployRMNRemote to hex string (Canton MCMS format)
-func (t DeployRMNRemote) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DeployRMNRemote from hex string (Canton MCMS format)
-func (t *DeployRMNRemote) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// DeployRMNRemoteParams is a Record type
-type DeployRMNRemoteParams struct {
-	InstanceId      types.TEXT    `json:"instanceId"`
-	RmnOwner        types.PARTY   `json:"rmnOwner"`
-	CcipOwner       types.PARTY   `json:"ccipOwner"`
-	CustomObservers []types.PARTY `json:"customObservers"`
-	CursedSubjects  []types.TEXT  `json:"cursedSubjects"`
-}
-
-// ToMap converts DeployRMNRemoteParams to a map for DAML arguments
-func (t DeployRMNRemoteParams) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["instanceId"] = string(t.InstanceId)
-
-	m["rmnOwner"] = t.RmnOwner.ToMap()
-
-	m["ccipOwner"] = t.CcipOwner.ToMap()
-
-	m["customObservers"] = func() []any {
-		res := make([]any, 0, len(t.CustomObservers))
-		for _, e := range t.CustomObservers {
-			res = append(res, e.ToMap())
-		}
-		return res
-	}()
-
-	m["cursedSubjects"] = func() []any {
-		res := make([]any, 0, len(t.CursedSubjects))
-		for _, e := range t.CursedSubjects {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t DeployRMNRemoteParams) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *DeployRMNRemoteParams) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DeployRMNRemoteParams to hex string (Canton MCMS format)
-func (t DeployRMNRemoteParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DeployRMNRemoteParams from hex string (Canton MCMS format)
-func (t *DeployRMNRemoteParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1913,16 +1660,12 @@ type MCMSEncoder interface {
 	DeployFeeQuoterParams(args DeployFeeQuoterParams) (*bind.EncodedChoice, error)
 	DeployGlobalConfig(args DeployGlobalConfig) (*bind.EncodedChoice, error)
 	DeployGlobalConfigParams(args DeployGlobalConfigParams) (*bind.EncodedChoice, error)
-	DeployLockReleaseTokenPool(args DeployLockReleaseTokenPool) (*bind.EncodedChoice, error)
-	DeployLockReleaseTokenPoolParams(args DeployLockReleaseTokenPoolParams) (*bind.EncodedChoice, error)
 	DeployOffRamp(args DeployOffRamp) (*bind.EncodedChoice, error)
 	DeployOffRampParams(args DeployOffRampParams) (*bind.EncodedChoice, error)
 	DeployOnRamp(args DeployOnRamp) (*bind.EncodedChoice, error)
 	DeployOnRampParams(args DeployOnRampParams) (*bind.EncodedChoice, error)
 	DeployPerPartyRouterFactory(args DeployPerPartyRouterFactory) (*bind.EncodedChoice, error)
 	DeployPerPartyRouterFactoryParams(args DeployPerPartyRouterFactoryParams) (*bind.EncodedChoice, error)
-	DeployRMNRemote(args DeployRMNRemote) (*bind.EncodedChoice, error)
-	DeployRMNRemoteParams(args DeployRMNRemoteParams) (*bind.EncodedChoice, error)
 	DeployRateLimiter(args DeployRateLimiter) (*bind.EncodedChoice, error)
 	DeployRateLimiterParams(args DeployRateLimiterParams) (*bind.EncodedChoice, error)
 	DeployTokenAdminRegistry(args DeployTokenAdminRegistry) (*bind.EncodedChoice, error)
@@ -2019,16 +1762,6 @@ func (e *encoder) DeployGlobalConfigParams(args DeployGlobalConfigParams) (*bind
 	return e.EncodeChoiceArgs("DeployGlobalConfig", args)
 }
 
-// DeployLockReleaseTokenPool encodes parameters for the DeployLockReleaseTokenPool choice.
-func (e *encoder) DeployLockReleaseTokenPool(args DeployLockReleaseTokenPool) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployLockReleaseTokenPool", args)
-}
-
-// DeployLockReleaseTokenPoolParams encodes parameters for the DeployLockReleaseTokenPool choice.
-func (e *encoder) DeployLockReleaseTokenPoolParams(args DeployLockReleaseTokenPoolParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployLockReleaseTokenPool", args)
-}
-
 // DeployOffRamp encodes parameters for the DeployOffRamp choice.
 func (e *encoder) DeployOffRamp(args DeployOffRamp) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("DeployOffRamp", args)
@@ -2057,16 +1790,6 @@ func (e *encoder) DeployPerPartyRouterFactory(args DeployPerPartyRouterFactory) 
 // DeployPerPartyRouterFactoryParams encodes parameters for the DeployPerPartyRouterFactory choice.
 func (e *encoder) DeployPerPartyRouterFactoryParams(args DeployPerPartyRouterFactoryParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("DeployPerPartyRouterFactory", args)
-}
-
-// DeployRMNRemote encodes parameters for the DeployRMNRemote choice.
-func (e *encoder) DeployRMNRemote(args DeployRMNRemote) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployRMNRemote", args)
-}
-
-// DeployRMNRemoteParams encodes parameters for the DeployRMNRemote choice.
-func (e *encoder) DeployRMNRemoteParams(args DeployRMNRemoteParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployRMNRemote", args)
 }
 
 // DeployRateLimiter encodes parameters for the DeployRateLimiter choice.
