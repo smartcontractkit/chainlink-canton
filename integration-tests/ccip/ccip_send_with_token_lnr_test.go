@@ -521,8 +521,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			},
 			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
 				Enabled: true,
-				TokenPools: []config.TokenPool{
-					{
+				TokenPools: map[string]config.TokenPool{
+					tokenPoolAddress.InstanceAddress().Hex(): {
 						Type: config.TokenPoolTypeLockRelease,
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,

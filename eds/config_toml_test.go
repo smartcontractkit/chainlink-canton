@@ -11,29 +11,24 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 )
 
-//go:embed config.toml
+//go:embed testdata/config.toml
 var exampleConfigToml string
 
-//go:embed config_secrets.toml
+//go:embed testdata/config_secrets.toml
 var exampleSecretsConfigToml string
+
+//go:embed testdata/config_merged_golden.toml
+var exampleMergedGoldenToml string
 
 func TestExampleConfig(t *testing.T) {
 	t.Parallel()
 
-	// Read and parse configs separately
-	exampleConfig, err := config.Read(strings.NewReader(exampleConfigToml))
+	want, err := config.Read(strings.NewReader(exampleMergedGoldenToml))
 	require.NoError(t, err)
 
-	secretsConfig, err := config.Read(strings.NewReader(exampleSecretsConfigToml))
+	got, err := config.ReadAndMerge(strings.NewReader(exampleConfigToml), strings.NewReader(exampleSecretsConfigToml))
 	require.NoError(t, err)
+	require.NoError(t, got.Validate())
 
-	// Read and merge multiple config files
-	cfg, err := config.ReadAndMerge(strings.NewReader(exampleConfigToml), strings.NewReader(exampleSecretsConfigToml))
-	require.NoError(t, err)
-	err = cfg.Validate()
-	require.NoError(t, err)
-
-	// Check that the merge was successful
-	exampleConfig.Node.AuthConfig.JWT = secretsConfig.Node.AuthConfig.JWT
-	assert.Equal(t, exampleConfig, cfg)
+	assert.Equal(t, want, got)
 }
