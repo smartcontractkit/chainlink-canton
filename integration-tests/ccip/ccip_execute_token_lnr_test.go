@@ -678,12 +678,10 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	ccipReceiverCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
-	// Capture receiver's balance before execute
-	receiverHoldingsBefore, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
+	// Capture receiver's balance before execute (Amulet for this receiver).
+	receiverBalanceRatBefore, err := testhelpers.GetHoldingsBalance(t.Context(), receiverParticipant, &nativeInstrumentId, testhelpers.WithHoldingOwner(partyReceiver))
 	require.NoError(t, err)
-	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
+	receiverBalanceBefore, _ := new(big.Float).SetRat(receiverBalanceRatBefore).Float64()
 
 	tokenPoolAddressEDS, err := edsTesthelpers.GetTokenPoolForToken(t.Context(), ccipAPIClient, hashedInstrumentId)
 	require.NoError(t, err)
@@ -759,11 +757,9 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	}
 
 	// Verify receiver's balance increased by the expected transfer amount
-	receiverHoldingsAfter, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
+	receiverBalanceRatAfter, err := testhelpers.GetHoldingsBalance(t.Context(), receiverParticipant, &nativeInstrumentId, testhelpers.WithHoldingOwner(partyReceiver))
 	require.NoError(t, err)
-	receiverBalanceAfter := getHoldingsBalance(receiverHoldingsAfter)
+	receiverBalanceAfter, _ := new(big.Float).SetRat(receiverBalanceRatAfter).Float64()
 
 	actualTransferAmount := receiverBalanceAfter - receiverBalanceBefore
 	require.InDelta(t, tc.expectedTransferAmount, actualTransferAmount, 0.01, "Receiver balance should increase by transfer amount")
@@ -781,19 +777,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	}
 
 	t.Logf("✅ Success")
-}
-
-// getHoldingsBalance returns total balance across all holdings
-func getHoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
-	var total float64
-	for _, h := range holdings {
-		balanceStr := h.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()[2].GetValue().GetSum().(*apiv2.Value_Numeric).Numeric
-		balance, _ := new(big.Float).SetString(balanceStr)
-		balanceFloat, _ := balance.Float64()
-		total += balanceFloat
-	}
-
-	return total
 }
 
 // extractCreatedContractId returns the first created contract ID from a transaction response
