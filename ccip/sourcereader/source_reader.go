@@ -352,7 +352,7 @@ func ccipMessageSentEventToProtocol(evt *common.CCIPMessageSentEvent) (*protocol
 // receiptsBindingToProtocol converts binding []common.Receipt to []protocol.ReceiptWithBlob.
 func receiptsBindingToProtocol(receipts []common.Receipt) ([]protocol.ReceiptWithBlob, error) {
 	protoReceipts := make([]protocol.ReceiptWithBlob, 0, len(receipts))
-	for _, r := range receipts {
+	for i, r := range receipts {
 		decoded, err := protocol.NewUnknownAddressFromHex(string(r.IssuerAddress))
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode issuerAddress: %w, input: %s", err, r.IssuerAddress)
@@ -366,10 +366,23 @@ func receiptsBindingToProtocol(receipts []common.Receipt) ([]protocol.ReceiptWit
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode extra args: %w, input: %s", err, r.ExtraArgs)
 		}
+
+		gas := int64(r.DestGasLimit)
+		if gas < 0 {
+			return nil, fmt.Errorf("receipts[%d]: dest gas limit must be non-negative: %d", i, gas)
+		}
+		overhead := int64(r.DestBytesOverhead)
+		if overhead < 0 {
+			return nil, fmt.Errorf("receipts[%d]: dest bytes overhead must be non-negative: %d", i, overhead)
+		}
+		if overhead > math.MaxUint32 {
+			return nil, fmt.Errorf("receipts[%d]: dest bytes overhead overflows uint32: %d", i, overhead)
+		}
+
 		protoReceipts = append(protoReceipts, protocol.ReceiptWithBlob{
 			Issuer:            decoded,
-			DestGasLimit:      uint64(r.DestGasLimit),      //nolint:gosec // int64 is always non-negative
-			DestBytesOverhead: uint32(r.DestBytesOverhead), //nolint:gosec // int64 is always non-negative
+			DestGasLimit:      uint64(gas),
+			DestBytesOverhead: uint32(overhead),
 			FeeTokenAmount:    feeTokenAmount,
 			ExtraArgs:         protocol.ByteSlice(extraArgs),
 		})

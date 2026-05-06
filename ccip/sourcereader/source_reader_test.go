@@ -207,6 +207,55 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 	})
 }
 
+func TestReceiptsBindingToProtocol_numericBounds(t *testing.T) {
+	t.Parallel()
+	issuer := protocol.Keccak256([]byte("issuer"))
+	base := common.Receipt{
+		IssuerAddress:     types.TEXT(hex.EncodeToString(issuer[:])),
+		DestGasLimit:      1,
+		DestBytesOverhead: 1,
+		FeeTokenAmount:    types.NUMERIC("1."),
+		ExtraArgs:         types.TEXT(""),
+	}
+
+	t.Run("rejects negative dest gas limit", func(t *testing.T) {
+		t.Parallel()
+		r := base
+		r.DestGasLimit = -1
+		_, err := receiptsBindingToProtocol([]common.Receipt{r})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "receipts[0]: dest gas limit must be non-negative")
+	})
+
+	t.Run("rejects negative dest bytes overhead", func(t *testing.T) {
+		t.Parallel()
+		r := base
+		r.DestBytesOverhead = -1
+		_, err := receiptsBindingToProtocol([]common.Receipt{r})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "receipts[0]: dest bytes overhead must be non-negative")
+	})
+
+	t.Run("rejects dest bytes overhead above MaxUint32", func(t *testing.T) {
+		t.Parallel()
+		r := base
+		r.DestBytesOverhead = math.MaxUint32 + 1
+		_, err := receiptsBindingToProtocol([]common.Receipt{r})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "receipts[0]: dest bytes overhead overflows uint32")
+	})
+
+	t.Run("accepts dest bytes overhead equal to MaxUint32", func(t *testing.T) {
+		t.Parallel()
+		r := base
+		r.DestBytesOverhead = math.MaxUint32
+		got, err := receiptsBindingToProtocol([]common.Receipt{r})
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		require.Equal(t, uint32(math.MaxUint32), got[0].DestBytesOverhead)
+	})
+}
+
 func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 	t.Parallel()
 	const (
