@@ -28,6 +28,7 @@ import qualified DA.Text as Text
 import DA.Optional (fromSome)
 
 import qualified CCIP.FinalityConfig
+import qualified CCIP.NumericHex as NumericHex
 import qualified Splice.Api.Token.HoldingV1
 
 -- | MessageV1 struct matching EVM MessageV1Codec.sol exactly.
@@ -103,7 +104,7 @@ encodeMessageV1 message =
             <> (if byteCount message.finality.raw == 4
                 then message.finality.raw
                 else error "MessageCodecV1.encodeMessageV1: finality must be 4 bytes")
-            <> padLeft 64 "0" message.ccvAndExecutorHash            -- ccvAndExecutorHash (32 bytes = 64 hex chars)
+            <> NumericHex.padLeft 64 "0" message.ccvAndExecutorHash -- ccvAndExecutorHash (32 bytes = 64 hex chars)
 
         -- Variable length section - MUST match EVM order exactly
         variableSection =
@@ -179,53 +180,11 @@ encodeUint32 n =
 
 -- Convert a Numeric 0 to a hex-encoded uint64 (8 bytes)
 encodeUint64 : Numeric 0 -> Optional BytesHex
-encodeUint64 n =
-    let
-        -- Maximum value for uint64: 2^64 - 1 = 18446744073709551615
-        maxUint64 = 18446744073709551615.0
-    in
-        if n < 0.0 || n > maxUint64
-        then None
-        else
-            let
-                -- Convert numeric to string to preserve full precision
-                numStr = show n
-
-                -- Remove decimal point if present (since it's Numeric 0, should be whole number)
-                intStr = if Text.isSuffixOf ".0" numStr
-                         then Text.take (Text.length numStr - 2) numStr
-                         else numStr
-
-                -- Convert decimal string to hex without precision loss
-                hexStr = decimalStringToHex intStr
-
-                -- Pad to 16 hex characters (8 bytes) with leading zeros
-                paddedHex = padLeft 16 "0" hexStr
-            in
-                Some paddedHex
+encodeUint64 = NumericHex.encodeUint64
 
 -- Convert a Numeric 0 to a hex-encoded uint256 (32 bytes)
 encodeUint256 : Numeric 0 -> Optional BytesHex
-encodeUint256 n
-    | n < 0.0 = None
-    | exceedsMaxUint256 n = None
-    | otherwise =
-        let
-            -- Convert numeric to string to preserve full precision
-            numStr = show n
-
-            -- Remove decimal point if present (since it's Numeric 0, should be whole number)
-            intStr = if Text.isSuffixOf ".0" numStr
-                        then Text.take (Text.length numStr - 2) numStr
-                        else numStr
-
-            -- Convert decimal string to hex without precision loss
-            hexStr = decimalStringToHex intStr
-
-            -- Pad to 64 hex characters (32 bytes) with leading zeros
-            paddedHex = padLeft 64 "0" hexStr
-        in
-            Some paddedHex
+encodeUint256 = NumericHex.encodeUint256
 
 -- Compute 32-byte party address from Party.
 -- Returns keccak256(partyToText(party)) for privacy-preserving cross-chain addressing.
@@ -268,138 +227,6 @@ computeCCVAndExecutorHash ccvInstanceAddresses executorInstanceAddress =
         encoded = lengthPrefix <> encodedCCVs <> executorInstanceAddress
     in
         keccak256 encoded
-
--- Helpers
-
--- Check if a Numeric 0 exceeds uint256 max
-exceedsMaxUint256 : Numeric 0 -> Bool
-exceedsMaxUint256 n =
-    let
-        -- Maximum value for uint256 as string
-        maxUint256String = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
-
-        -- Convert input to string
-        numStr = show n
-        intStr = if Text.isSuffixOf ".0" numStr
-                 then Text.take (Text.length numStr - 2) numStr
-                 else numStr
-    in
-        compareDecimalStrings intStr maxUint256String
-
--- Compare two decimal strings numerically (returns True if first > second)
-compareDecimalStrings : Text -> Text -> Bool
-compareDecimalStrings str1 str2 =
-    let
-        len1 = Text.length str1
-        len2 = Text.length str2
-    in
-        (
-            (len1 > len2) ||
-            ((len1 >= len2) &&
-            (str1 > str2)))  -- Same length, can use lexicographic comparison
-
--- Helper to parse digits from a text string
-parseDigits : Text -> [Int] -> [Int]
-parseDigits str acc =
-    if Text.length str == 0 then reverse acc
-    else
-        let
-            firstChar = Text.take 1 str
-            rest = Text.drop 1 str
-            digit = case firstChar of
-                "0" -> 0
-                "1" -> 1
-                "2" -> 2
-                "3" -> 3
-                "4" -> 4
-                "5" -> 5
-                "6" -> 6
-                "7" -> 7
-                "8" -> 8
-                "9" -> 9
-                _ -> error ("Invalid digit: " <> firstChar)
-        in
-            parseDigits rest (digit :: acc)
-
--- Convert decimal string to hexadecimal string (preserves full precision)
-decimalStringToHex : Text -> Text
-decimalStringToHex "0" = "0"
-decimalStringToHex decStr =
-    let
-        -- Convert decimal string to list of digits
-        decimalDigits = parseDigits decStr []
-
-        -- Convert to hex using repeated division by 16
-        hexResult = bigIntToHex decimalDigits
-    in
-        if Text.length hexResult == 0 then "0" else hexResult
-
--- Divide a list of digits by a base, return (quotient digits, remainder)
-divideDigitsByBase : [Int] -> Int -> ([Int], Int)
-divideDigitsByBase digits base = divideDigitsByBaseHelper digits base 0 []
-
--- Helper function for digit division
-divideDigitsByBaseHelper : [Int] -> Int -> Int -> [Int] -> ([Int], Int)
-divideDigitsByBaseHelper [] base carry quotientAcc = (reverse quotientAcc, carry)
-divideDigitsByBaseHelper (d :: ds) base carry quotientAcc =
-    let
-        dividend = carry * 10 + d
-        newQuotient = dividend / base
-        newRemainder = dividend % base
-    in
-        if newQuotient == 0 && null quotientAcc
-        then divideDigitsByBaseHelper ds base newRemainder quotientAcc  -- Skip leading zeros in quotient
-        else divideDigitsByBaseHelper ds base newRemainder (newQuotient :: quotientAcc)
-
--- Convert big integer (list of decimal digits) to hex string
-bigIntToHex : [Int] -> Text
-bigIntToHex digits = bigIntToHexHelper digits ""
-
--- Helper for bigIntToHex
-bigIntToHexHelper : [Int] -> Text -> Text
-bigIntToHexHelper [] acc = acc
-bigIntToHexHelper ds acc =
-    case divideDigitsByBase ds 16 of
-        ([], 0) -> acc
-        ([], remainder) -> digitToHex remainder <> acc
-        (quotient, remainder) -> bigIntToHexHelper quotient (digitToHex remainder <> acc)
-
--- Convert single digit (0-15) to hex character
-digitToHex : Int -> Text
-digitToHex n = case n of
-    0 -> "0"
-    1 -> "1"
-    2 -> "2"
-    3 -> "3"
-    4 -> "4"
-    5 -> "5"
-    6 -> "6"
-    7 -> "7"
-    8 -> "8"
-    9 -> "9"
-    10 -> "a"
-    11 -> "b"
-    12 -> "c"
-    13 -> "d"
-    14 -> "e"
-    15 -> "f"
-    _ -> error ("Invalid hex digit: " <> show n)
-
--- Helper function to pad a string with a character on the left
-padLeft : Int -> Text -> Text -> Text
-padLeft targetLength padString str =
-    let
-        currentLength = Text.length str
-        paddingNeeded = targetLength - currentLength
-    in
-        if paddingNeeded <= 0 then str
-        else (padHelper paddingNeeded padString) <> str
-
--- Helper to create padding string by repeating a character
-padHelper : Int -> Text -> Text
-padHelper n padStr =
-    if n <= 0 then ""
-    else padStr <> padHelper (n - 1) padStr
 
 -- ===================================================
 -- |                     Decoding                    |

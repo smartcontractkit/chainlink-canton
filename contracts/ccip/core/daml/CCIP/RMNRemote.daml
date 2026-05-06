@@ -6,8 +6,9 @@ import DA.Crypto.Text (BytesHex)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Map qualified as Map
-import DA.Text qualified as Text
+import DA.Optional (fromSomeNote)
 
+import CCIP.NumericHex qualified as NumericHex
 import Chainlink.InstanceAddress (assertValidInstanceId)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import DA.Crypto.Text (byteCount)
@@ -39,87 +40,10 @@ globalCurseSubject = "01000000000000000000000000000001"
 -- Convert chain selector to 16-byte curse subject matching EVM: bytes16(uint128(chainSelector))
 chainSelectorToSubject : Numeric 0 -> BytesHex
 chainSelectorToSubject chainSelector =
-    let decStr = numericToDecimalString chainSelector
-        hexStr = decimalStringToHex decStr
-    in padLeft 32 "0" hexStr
-
--- Helper to convert Numeric 0 to decimal string (removes .0 suffix)
-numericToDecimalString : Numeric 0 -> Text
-numericToDecimalString n =
-    let str = show n
-    in if Text.isSuffixOf ".0" str
-       then Text.take (Text.length str - 2) str
-       else str
-
--- Helper to pad string on left
-padLeft : Int -> Text -> Text -> Text
-padLeft targetLen padChar str =
-    let currentLen = Text.length str
-        paddingNeeded = targetLen - currentLen
-    in if paddingNeeded <= 0
-       then str
-       else replicateText paddingNeeded padChar <> str
-
--- Replicate a text string n times
-replicateText : Int -> Text -> Text
-replicateText n t =
-    if n <= 0 then ""
-    else t <> replicateText (n - 1) t
-
--- Convert decimal string to hexadecimal string
-decimalStringToHex : Text -> Text
-decimalStringToHex "0" = "0"
-decimalStringToHex decStr =
-    let digits = parseDigits decStr []
-        hexResult = bigIntToHex digits
-    in if Text.length hexResult == 0 then "0" else hexResult
-
--- Parse decimal digits from text
-parseDigits : Text -> [Int] -> [Int]
-parseDigits str acc =
-    if Text.length str == 0 then reverse acc
-    else
-        let firstChar = Text.take 1 str
-            rest = Text.drop 1 str
-            digit = case firstChar of
-                "0" -> 0; "1" -> 1; "2" -> 2; "3" -> 3; "4" -> 4
-                "5" -> 5; "6" -> 6; "7" -> 7; "8" -> 8; "9" -> 9
-                _ -> error ("Invalid digit: " <> firstChar)
-        in parseDigits rest (digit :: acc)
-
--- Convert big integer (list of decimal digits) to hex string
-bigIntToHex : [Int] -> Text
-bigIntToHex digits = bigIntToHexHelper digits ""
-
-bigIntToHexHelper : [Int] -> Text -> Text
-bigIntToHexHelper [] acc = acc
-bigIntToHexHelper ds acc =
-    case divideDigitsByBase ds 16 of
-        ([], 0) -> acc
-        ([], remainder) -> digitToHex remainder <> acc
-        (quotient, remainder) -> bigIntToHexHelper quotient (digitToHex remainder <> acc)
-
--- Divide list of digits by base, return (quotient digits, remainder)
-divideDigitsByBase : [Int] -> Int -> ([Int], Int)
-divideDigitsByBase digits base = divideHelper digits base 0 []
-
-divideHelper : [Int] -> Int -> Int -> [Int] -> ([Int], Int)
-divideHelper [] _base carry quotientAcc = (reverse quotientAcc, carry)
-divideHelper (d :: ds) base carry quotientAcc =
-    let dividend = carry * 10 + d
-        newQuotient = dividend / base
-        newRemainder = dividend % base
-    in if newQuotient == 0 && null quotientAcc
-       then divideHelper ds base newRemainder quotientAcc
-       else divideHelper ds base newRemainder (newQuotient :: quotientAcc)
-
--- Convert single digit (0-15) to hex character
-digitToHex : Int -> Text
-digitToHex n = case n of
-    0 -> "0"; 1 -> "1"; 2 -> "2"; 3 -> "3"; 4 -> "4"
-    5 -> "5"; 6 -> "6"; 7 -> "7"; 8 -> "8"; 9 -> "9"
-    10 -> "a"; 11 -> "b"; 12 -> "c"; 13 -> "d"; 14 -> "e"; 15 -> "f"
-    _ -> error ("Invalid hex digit: " <> show n)
+    let subject =
+            fromSomeNote "RMNRemote: invalid chain selector"
+                (NumericHex.encodeUint64 chainSelector)
+    in NumericHex.padLeft 32 "0" subject
 
 mergeCustomObservers : Party -> Party -> [Party] -> [Party] -> [Party]
 mergeCustomObservers rmnOwner ccipOwner current additions =
