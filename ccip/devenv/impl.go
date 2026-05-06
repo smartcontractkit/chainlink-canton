@@ -46,7 +46,6 @@ import (
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -56,7 +55,6 @@ import (
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -319,11 +317,6 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 	}
 
 	return datastore.NewMemoryDataStore().Seal(), nil
-}
-
-// DeployContractsForSelector implements cciptestinterfaces.CCIP17Configuration.
-func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, topology *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
-	return ccv.DeployContractsForSelector(ctx, env, c, selector, topology)
 }
 
 func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint64) (lanes.ChainDefinition, lanes.CommitteeVerifierRemoteChainInput, error) {
@@ -706,68 +699,6 @@ func (c *Chain) FundAddresses(ctx context.Context, bc *blockchain.Input, address
 // FundNodes implements cciptestinterfaces.CCIP17Configuration.
 func (c *Chain) FundNodes(ctx context.Context, cls []*simple_node_set.Input, bc *blockchain.Input, linkAmount, nativeAmount *big.Int) error {
 	return nil // TODO: implement
-}
-
-// Curse implements cciptestinterfaces.CCIP17.
-func (c *Chain) Curse(ctx context.Context, subjects [][16]byte) error {
-	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
-	if err != nil {
-		return fmt.Errorf("get rmn remote address: %w", err)
-	}
-
-	instanceAddr := contracts.HexToInstanceAddress(rmnRemoteRef.Address)
-
-	c.logger.Info().
-		Uint64("chainSelector", c.chainDetails.ChainSelector).
-		Int("numSubjects", len(subjects)).
-		Msg("Cursing subjects on chain")
-	for _, subject := range subjects {
-		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Curse, c.chain, contract.ChoiceInput[rmn.Curse]{
-			InstanceAddress: instanceAddr,
-			Args: rmn.Curse{
-				Subject: types.TEXT(hex.EncodeToString(subject[:])),
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("curse subject: %w", err)
-		}
-		c.logger.Info().
-			Uint64("chainSelector", c.chainDetails.ChainSelector).
-			Msg("Cursed chain")
-	}
-
-	return nil
-}
-
-// Uncurse implements cciptestinterfaces.CCIP17.
-func (c *Chain) Uncurse(ctx context.Context, subjects [][16]byte) error {
-	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
-	if err != nil {
-		return fmt.Errorf("get rmn remote address: %w", err)
-	}
-
-	instanceAddr := contracts.HexToInstanceAddress(rmnRemoteRef.Address)
-
-	c.logger.Info().
-		Uint64("chainSelector", c.chainDetails.ChainSelector).
-		Int("numSubjects", len(subjects)).
-		Msg("Uncursing subjects on chain")
-	for _, subject := range subjects {
-		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Uncurse, c.chain, contract.ChoiceInput[rmn.Uncurse]{
-			InstanceAddress: instanceAddr,
-			Args: rmn.Uncurse{
-				Subject: types.TEXT(hex.EncodeToString(subject[:])),
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("uncurse subject: %w", err)
-		}
-		c.logger.Info().
-			Uint64("chainSelector", c.chainDetails.ChainSelector).
-			Msg("Uncursed chain")
-	}
-
-	return nil
 }
 
 // ExposeMetrics implements cciptestinterfaces.CCIP17.

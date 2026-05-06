@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -22,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
 )
 
 type CantonAggregatorConfigAdapter struct{}
@@ -164,18 +164,7 @@ func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapte
 
 func numericToUint64(n types.NUMERIC) (uint64, error) {
 	s := strings.TrimSpace(string(n))
-	if s == "" {
-		return 0, fmt.Errorf("empty numeric")
-	}
-	if i := strings.IndexByte(s, '.'); i >= 0 {
-		frac := strings.TrimRight(s[i+1:], "0")
-		if frac != "" {
-			return 0, fmt.Errorf("non-integer numeric %q", s)
-		}
-		s = s[:i]
-	}
-
-	return strconv.ParseUint(s, 10, 64)
+	return internalparse.Uint64Checked(s)
 }
 
 func normalizeSignerHex(hexKey string) string {
