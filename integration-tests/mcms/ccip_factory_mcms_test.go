@@ -330,7 +330,7 @@ func TestCCIP_MCMSFactoryDeploy_FullGovernance(t *testing.T) {
 	// --- Step 3: Bootstrap party calls SetOwnerToMCMS to transfer ownership ---
 	// This requires both parties to authorize: owner (controller) and mcmsParty (new signatory).
 	// We submit from participant with ActAs containing both parties.
-	factoryCid = setFactoryOwnerToMCMS(t, participant, factoryPkgID, bootstrapParty, mcmsParty, factoryCid)
+	factoryCid = setFactoryOwnerToMCMS(t, participant, factoryPkgID, mcmsParty, factoryCid)
 	t.Logf("SetOwnerToMCMS executed: new factory CID=%s", factoryCid)
 
 	// Verify ownership transferred to mcmsParty
@@ -683,7 +683,6 @@ func setFactoryOwnerToMCMS(
 	t *testing.T,
 	participant canton.Participant,
 	factoryPkgID string,
-	owner string,
 	mcmsParty string,
 	factoryCid string,
 ) string {
@@ -708,7 +707,7 @@ func setFactoryOwnerToMCMS(
 					},
 				},
 			}},
-			ActAs: []string{owner, mcmsParty},
+			ActAs: []string{mcmsParty},
 		},
 	})
 	require.NoError(t, err)
