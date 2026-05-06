@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"context"
-	"math/big"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -13,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 // getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
@@ -25,6 +22,10 @@ func getFeeChoiceArgumentMap(sendArgs ccipsender.Send) map[string]any {
 	return m
 }
 
+// quoteCCIPSenderFee submits CCIPSender.GetFee with TRANSACTION_SHAPE_LEDGER_EFFECTS so the
+// response includes the exercised return record. Callers that immediately Submit Send with the
+// same sendArgs must re-fetch EDS disclosures and patch sendArgs + disclosed contracts before Send,
+// or Canton may reject Send with LOCAL_VERDICT_INACTIVE_CONTRACTS.
 func quoteCCIPSenderFee(
 	t *testing.T,
 	participant canton.Participant,
@@ -49,13 +50,14 @@ func quoteCCIPSenderFee(
 			ActAs:              []string{partySender},
 			DisclosedContracts: disclosures,
 		},
+		// Ledger-effects shape is required for exercised choice results to appear in the
+		// transaction event stream; without it GetFee returns no matching Exercised events.
 		TransactionFormat: &apiv2.TransactionFormat{
 			EventFormat: &apiv2.EventFormat{
 				FiltersByParty: map[string]*apiv2.Filters{
 					partySender: {},
 				},
 			},
-			// GetFee is a nonconsuming choice, and you want the exercised event with its return value
 			TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_LEDGER_EFFECTS,
 		},
 	})
@@ -84,31 +86,4 @@ func quoteCCIPSenderFee(
 	}
 
 	return quote
-}
-
-func getHoldingsBalanceNumeric(t *testing.T, ctx context.Context, participant canton.Participant) *big.Rat {
-	t.Helper()
-
-	holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
-	require.NoError(t, err)
-
-	total := new(big.Rat)
-	for _, h := range holdings {
-		views := h.GetCreatedEvent().GetInterfaceViews()
-		if len(views) == 0 {
-			continue
-		}
-		fields := views[0].GetViewValue().GetFields()
-		if len(fields) < 3 {
-			continue
-		}
-		amountStr := fields[2].GetValue().GetNumeric()
-		amt, ok := new(big.Rat).SetString(amountStr)
-		require.Truef(t, ok, "invalid Numeric value %q", amountStr)
-		total.Add(total, amt)
-	}
-
-	return total
 }

@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "09689fed574b4a59fd891f11969ace97167cd6290a88877952702c77a8faa66d"
+	PackageID   = "f73a7ce303721318fa55ffeca26f00338d4855e45ab3752477206f245a49e540"
 	SDKVersion  = "3.4.10"
 )
 
@@ -842,10 +842,10 @@ func (t *GetRequiredCCVsForExecute) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
-	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	DestChainSelector     types.NUMERIC                              `json:"destChainSelector"`
-	Message               client.Canton2AnyMessage                   `json:"message"`
-	TokenPoolRequiredCCVs []mcms.RawInstanceAddress                  `json:"tokenPoolRequiredCCVs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Message           client.Canton2AnyMessage                   `json:"message"`
+	PoolReportedCCVs  []mcms.RawInstanceAddress                  `json:"poolReportedCCVs"`
 }
 
 // ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
@@ -858,9 +858,9 @@ func (t GetRequiredCCVsForSend) ToMap() map[string]any {
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
 
-	m["tokenPoolRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.TokenPoolRequiredCCVs))
-		for _, e := range t.TokenPoolRequiredCCVs {
+	m["poolReportedCCVs"] = func() []any {
+		res := make([]any, 0, len(t.PoolReportedCCVs))
+		for _, e := range t.PoolReportedCCVs {
 			res = append(res, model.NestedToDAMLValue(e))
 		}
 		return res

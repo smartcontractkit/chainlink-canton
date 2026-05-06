@@ -602,13 +602,20 @@ template LockReleaseTokenPool
                 assertMsg "ReleaseFromTicket: caller must be tokenReceiver"
                     (caller == ticket.tokenReceiver)
 
+                -- Defensive consistency check: every verified CCV instance must be
+                -- owned by a ticket signatory party.
+                let ticketSignatories = signatory ticket
+                Foldable.forA_ ticket.verifiedCCVs $ \verifiedCCV ->
+                    assertMsg ("ReleaseFromTicket: verified CCV owner is not a ticket signatory " <> show verifiedCCV)
+                        (RawInstanceAddress.ownerParty verifiedCCV `elem` ticketSignatories)
+
                 -- Validate the exact pool-required CCV instances are present on the ticket.
                 -- This preserves the configured instance-level trust model even when
                 -- multiple CCV instances share the same owner party.
                 remoteChainCfg <- case Map.lookup ticket.sourceChainSelector remoteChainConfigs of
                     None -> abort "ReleaseFromTicket: unsupported source chain"
                     Some cfg -> pure cfg
-                let requiredPoolCCVs = dedup remoteChainCfg.inboundCCVs
+                let requiredPoolCCVs = dedup ticket.requiredInboundPoolCCVs
                 Foldable.forA_ requiredPoolCCVs $ \requiredCCV ->
                     assertMsg ("ReleaseFromTicket: missing required pool CCV " <> show requiredCCV)
                         (requiredCCV `elem` ticket.verifiedCCVs)

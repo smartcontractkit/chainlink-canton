@@ -316,7 +316,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Native is Amulet
 	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
+		Id:    types.TEXT("Amulet"), // TODO: hardcoded
 	}
 
 	reporter := cld_ops.NewMemoryReporter()

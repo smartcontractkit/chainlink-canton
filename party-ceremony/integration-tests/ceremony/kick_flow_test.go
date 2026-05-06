@@ -65,18 +65,21 @@ func (s *KickFlowTestSuite) TestKickFlow() {
 	// Determine the kicked participant's namespace fingerprint. We need the DNS
 	// state to identify which owner fingerprint belongs to participant 3.
 	decNS := strings.SplitN(s.PartyID, "::", 2)[1]
-	dnsState, err := actors[0].client.GetDNS(t.Context(), decNS, synchronizerID)
+	dnsState, err := actors[0].deps.Client.GetDNS(t.Context(), decNS, synchronizerID)
 	require.NoError(t, err, "GetDNS after onboarding")
 	require.Len(t, dnsState.Owners, 3, "should have 3 owners after onboarding")
 
-	p2pState, err := actors[0].client.GetP2P(t.Context(), s.PartyID, synchronizerID)
+	p2pState, err := actors[0].deps.Client.GetP2P(t.Context(), s.PartyID, synchronizerID)
 	require.NoError(t, err, "GetP2P after onboarding")
 	require.Len(t, p2pState.Participants, 3, "should have 3 P2P participants after onboarding")
+	require.NotNil(t, p2pState.PartySigningKeys, "P2P signing keys should be present after onboarding")
+	_, kickedProtocolKeyB64, err := actors[2].deps.Client.GetProtocolKeyFingerprint(t.Context(), p2pState.PartySigningKeys.Keys)
+	require.NoError(t, err, "GetProtocolKeyFingerprint for kicked participant")
 
 	// Identify the kicked participant's namespace fingerprint. The fingerprint
 	// corresponding to actor[2] is discovered by asking their node for its own
 	// namespace fingerprint via GetNamespaceFingerprint.
-	kickedNSFP, err := actors[2].client.GetNamespaceFingerprint(t.Context(), onboardingNamespaceName, synchronizerID, dnsState.Owners)
+	kickedNSFP, err := actors[2].deps.Client.GetNamespaceFingerprint(t.Context(), s.onboardingNamespaceName(), synchronizerID, dnsState.Owners)
 	require.NoError(t, err, "GetNamespaceFingerprint for kicked participant")
 
 	kickedUID := actors[2].uid
@@ -105,9 +108,9 @@ func (s *KickFlowTestSuite) TestKickFlow() {
 	}
 
 	kickDeps := [3]ceremony.CantonDeps{
-		{Client: actors[0].client, Logger: logger.Test(t)},
-		{Client: actors[1].client, Logger: logger.Test(t)},
-		{Client: actors[2].client, Logger: logger.Test(t)},
+		s.OnboardingDeps(0),
+		s.OnboardingDeps(1),
+		s.OnboardingDeps(2),
 	}
 
 	// Run 1 (p1): reads state, creates DNS proposal, signs (1/3) → ErrThresholdNotMet.
@@ -137,14 +140,18 @@ func (s *KickFlowTestSuite) TestKickFlow() {
 	assert.NotContains(t, kickResult.Output.RemainingOwners, kickedNSFP, "kicked FP must be removed")
 
 	// ── Verify via topology read API ──────────────────────────────────────────
-	updatedDNS, err := actors[0].client.GetDNS(t.Context(), decNS, synchronizerID)
+	updatedDNS, err := actors[0].deps.Client.GetDNS(t.Context(), decNS, synchronizerID)
 	require.NoError(t, err, "GetDNS after kick")
 	assert.Len(t, updatedDNS.Owners, 2, "should have 2 owners after kick")
 	assert.NotContains(t, updatedDNS.Owners, kickedNSFP, "kicked fingerprint must be gone from DNS")
 
-	updatedP2P, err := actors[0].client.GetP2P(t.Context(), s.PartyID, synchronizerID)
+	updatedP2P, err := actors[0].deps.Client.GetP2P(t.Context(), s.PartyID, synchronizerID)
 	require.NoError(t, err, "GetP2P after kick")
 	assert.Len(t, updatedP2P.Participants, 2, "should have 2 P2P participants after kick")
+	require.NotNil(t, updatedP2P.PartySigningKeys, "P2P signing keys should remain active after kick")
+	assert.Len(t, updatedP2P.PartySigningKeys.Keys, 2, "kicked participant protocol signing key should be removed")
+	assert.NotContains(t, updatedP2P.PartySigningKeys.Keys, kickedProtocolKeyB64, "kicked participant protocol signing key must be removed")
+	assert.Equal(t, uint32(2), updatedP2P.PartySigningKeys.Threshold, "P2P signing-key threshold should be reduced")
 	for _, p := range updatedP2P.Participants {
 		assert.NotEqual(t, kickedUID, p.ParticipantUID, "kicked participant must be gone from P2P")
 	}
@@ -154,4 +161,5 @@ func (s *KickFlowTestSuite) TestKickFlow() {
 	kickResultCached, err := operations.ExecuteSequence(newKickBundle(), kick.KickSequence, kickDeps[0], kickInput)
 	require.NoError(t, err, "idempotent re-run should succeed")
 	assert.Equal(t, kickResult.Output, kickResultCached.Output, "cached result should match")
+	s.assertReportsDoNotContainKMS(sharedKickReporter)
 }

@@ -521,8 +521,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			},
 			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
 				Enabled: true,
-				TokenPools: []config.TokenPool{
-					{
+				TokenPools: map[string]config.TokenPool{
+					tokenPoolAddress.InstanceAddress().Hex(): {
 						Type: config.TokenPoolTypeLockRelease,
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
@@ -642,7 +642,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
-	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
+	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
+	require.NoError(t, err)
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
 	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
@@ -806,6 +807,35 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	require.NotEqual(t, "0", feeStr, "GetFee should return a positive fee")
 	require.NotEqual(t, "0", poolFeeStr, "GetFee should return a positive pool fee")
 
+	// quoteCCIPSenderFee uses TRANSACTION_SHAPE_LEDGER_EFFECTS; refresh EDS disclosures so the
+	// follow-up Send exercises current contract witnesses (avoids LOCAL_VERDICT_INACTIVE_CONTRACTS).
+	tokenPoolSendDisclosure, err = edsTesthelpers.GetTokenPoolSendDisclosure(t.Context(), tokenPoolAPIClient, msg, tokenPoolAddressEDS.InstanceAddress())
+	require.NoError(t, err)
+	ccipSendDisclosure, err = edsTesthelpers.GetCCIPSendDisclosure(t.Context(), ccipAPIClient, msg, nil, tokenPoolSendDisclosure.RequiredCCVs)
+	require.NoError(t, err)
+	ccvAddressEDS, err = contracts.RawInstanceAddressFromString(ccipSendDisclosure.CCVs[0])
+	require.NoError(t, err)
+	executorAddressEDS, err = contracts.RawInstanceAddressFromString(*ccipSendDisclosure.Executor)
+	require.NoError(t, err)
+	ccvSendDisclosure, err = edsTesthelpers.GetCCVSendDisclosure(t.Context(), ccvAPIClient, msg, ccvAddressEDS.InstanceAddress())
+	require.NoError(t, err)
+	executorSendDisclosure, err = edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
+	require.NoError(t, err)
+	sendArgs.Context = ccipSendDisclosure.ChoiceContext
+	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
+	sendArgs.CcvSendInputs[0].CcvExtraContext = ccvSendDisclosure.ChoiceContext
+	sendArgs.TokenTransferInput.TokenPoolCid = types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId)
+	sendArgs.TokenTransferInput.PoolExtraContext = tokenPoolSendDisclosure.ChoiceContext
+	sendArgs.ExecutorInput.ExecutorCid = types.CONTRACT_ID(executorSendDisclosure.ContractId)
+	sendArgs.ExecutorInput.ExecutorExtraContext = executorSendDisclosure.ChoiceContext
+	sendDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(
+		transferFactoryDisclosures,
+		ccipSendDisclosure.DisclosedContracts,
+		tokenPoolSendDisclosure.DisclosedContracts,
+		ccvSendDisclosure.DisclosedContracts,
+		executorSendDisclosure.DisclosedContracts,
+	)...)
+
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction.
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -855,7 +885,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	// Verify pool feeBps haircut: 10,000 smallest units with 5% feeBps => 9,500 bridged.
 	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
 
-	senderBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
+	senderBalanceAfter, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
+	require.NoError(t, err)
 	senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
 
 	t.Logf(

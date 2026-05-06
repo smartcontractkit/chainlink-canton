@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
@@ -30,7 +29,6 @@ import (
 )
 
 const (
-	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 2.0.0 [default] to LockReleaseTokenPool 2.0.0 [default])"
 	// 1e11 (10-decimal units) gives a stable non-dust transfer in this lane after fee handling.
 	evmToCantonTransferAmount = int64(100_000_000_000)
 )
@@ -115,7 +113,6 @@ func TestEVM2Canton_Basic(t *testing.T) {
 			Receiver: receiver,
 			Data:     []byte("Hello message transfer from EVM!"),
 		}, cciptestinterfaces.MessageOptions{
-			Version:           3,
 			ExecutionGasLimit: 200_000,
 			FinalityConfig:    0,
 			Executor:          executorAddress,
@@ -126,11 +123,11 @@ func TestEVM2Canton_Basic(t *testing.T) {
 					ArgsLen:    0,
 				},
 			},
-		})
+		}, 3)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 
-		sentEvent, err := srcChain.WaitOneSentEventBySeqNo(subtestCtx, dstSelector, seqNo, 15*time.Second)
+		sentEvent, err := srcChain.ConfirmSendOnSource(subtestCtx, dstSelector, cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 15*time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.Nil(t, sentEvent.Message.TokenTransfer)
@@ -152,7 +149,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 				srcSelector,
 				datastore.ContractType("BurnMintERC20WithDripToken"),
 				semver.MustParse("1.0.0"),
-				evmToCantonTokenQualifier,
+				burnMint20ToLockRelease20TokenQualifier(t),
 			),
 		)
 		require.NoError(t, err)
@@ -169,7 +166,6 @@ func TestEVM2Canton_Basic(t *testing.T) {
 				TokenAddress: srcToken,
 			},
 		}, cciptestinterfaces.MessageOptions{
-			Version:           3,
 			ExecutionGasLimit: 200_000,
 			FinalityConfig:    0,
 			Executor:          executorAddress,
@@ -180,12 +176,12 @@ func TestEVM2Canton_Basic(t *testing.T) {
 					ArgsLen:    0,
 				},
 			},
-		})
+		}, 3)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 		require.NotNil(t, sendMessageResult.Message.TokenTransfer)
 
-		sentEvent, err := srcChain.WaitOneSentEventBySeqNo(subtestCtx, dstSelector, seqNo, 15*time.Second)
+		sentEvent, err := srcChain.ConfirmSendOnSource(subtestCtx, dstSelector, cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 15*time.Second)
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.NotNil(t, sentEvent.Message.TokenTransfer)
@@ -201,13 +197,10 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
-		receiverHoldings, err := testhelpers.ListActiveContractsByInterfaceId(subtestCtx, receiverParticipant, &apiv2.Identifier{
-			PackageId:  "#splice-api-token-holding-v1",
-			ModuleName: "Splice.Api.Token.HoldingV1",
-			EntityName: "Holding",
-		})
+		totalHoldingsRat, err := testhelpers.GetHoldingsBalance(subtestCtx, receiverParticipant, nil)
 		require.NoError(t, err)
-		t.Logf("Canton receiver total holdings after execute: %.10f", devenvtests.HoldingsBalance(receiverHoldings))
+		totalHoldingsFloat, _ := new(big.Float).SetRat(totalHoldingsRat).Float64()
+		t.Logf("Canton receiver total holdings after execute: %.10f", totalHoldingsFloat)
 
 		srcBalanceAfter, err := srcChain.GetTokenBalance(subtestCtx, srcSender, srcToken)
 		require.NoError(t, err)

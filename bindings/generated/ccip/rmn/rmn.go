@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "aa89000d819c68a4fd528b2928a516c42dc58d89687e1de9b32a51d4011a791c"
+	PackageID   = "0f91b986c55c0426fece891a70f939a31dbb340d038a4ed0db1c1339b44162ea"
 	SDKVersion  = "3.4.10"
 )
 
@@ -733,6 +733,27 @@ func (t *RMNRemote) UnmarshalHex(data string) error {
 
 // Choice methods for RMNRemote
 
+// IsCursedForChain exercises the IsCursedForChain choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) IsCursedForChain(contractID string, args IsCursedForChain) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "IsCursedForChain",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsCursedForChainWithPackageID exercises the IsCursedForChain choice using the provided package ID instead of package name
+func (t RMNRemote) IsCursedForChainWithPackageID(contractID string, packageID string, args IsCursedForChain) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "IsCursedForChain",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // UncurseChain exercises the UncurseChain choice on this RMNRemote contract
 // This method uses the package name in the template ID
 func (t RMNRemote) UncurseChain(contractID string, args UncurseChain) *model.ExerciseCommand {
@@ -771,27 +792,6 @@ func (t RMNRemote) CurseChainWithPackageID(contractID string, packageID string, 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "CurseChain",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// IsCursedForChain exercises the IsCursedForChain choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) IsCursedForChain(contractID string, args IsCursedForChain) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "IsCursedForChain",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// IsCursedForChainWithPackageID exercises the IsCursedForChain choice using the provided package ID instead of package name
-func (t RMNRemote) IsCursedForChainWithPackageID(contractID string, packageID string, args IsCursedForChain) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "IsCursedForChain",
 		Arguments:  argsToMap(args),
 	}
 }

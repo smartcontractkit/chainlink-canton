@@ -93,7 +93,8 @@ template CCIPSender
             do
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
-                tokenPoolRequiredCCVs <- case (message.tokenTransfer, tokenPoolCid) of
+                    _ -> abort "sender: unsupported extraArgs version"
+                poolReportedCCVs <- case (message.tokenTransfer, tokenPoolCid) of
                     (None, None) -> pure []
                     (None, Some _) ->
                         abort "sender: tokenPoolCid provided without token transfer"
@@ -113,7 +114,7 @@ template CCIPSender
                     context = context
                     destChainSelector = destinationChainSelector
                     message = message
-                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
+                    poolReportedCCVs = poolReportedCCVs
 
         nonconsuming choice GetFee : GetFeeResult
             with

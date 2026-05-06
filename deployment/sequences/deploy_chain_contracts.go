@@ -137,6 +137,7 @@ var DeployChainContracts = operations.NewSequence(
 		}
 
 		// Deploy FeeQuoter
+		// TODO: what is this code doing? "link-token" string hardcoded
 		linkTokenId := input.FeeQuoterConfig.Template.LinkTokenInstrumentId
 		if linkTokenId.Admin == "" {
 			linkTokenId = splice_api_token_holding_v1.InstrumentId{

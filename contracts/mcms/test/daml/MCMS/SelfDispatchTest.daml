@@ -261,6 +261,42 @@ testScheduleBatch = script do
   debug "testScheduleBatch PASSED!"
   pure ()
 
+testExecuteScheduledBatchRejectsMissingOpId : Script ()
+testExecuteScheduledBatchRejectsMissingOpId = script do
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-missing-op")
+  let instanceAddress = "mcms-missing-op@" <> partyToText ccipOwner
+
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      instanceId = "mcms-missing-op"
+      chainId = 1
+      proposer = emptyRoleState
+      canceller = emptyRoleState
+      bypasser = emptyRoleState
+      minDelay = seconds 0
+      blockedFunctions = []
+      timelockTimestamps = Map.empty
+
+  submitMustFail ccipOwner do
+    exerciseCmd mcmsCid ExecuteScheduledBatch with
+      submitter = ccipOwner
+      opId = "missing-op-id"
+      calls = [TimelockCall with
+        targetInstanceAddress = instanceAddress
+        functionName = "UpdateMinDelay"
+        operationData = "0000000000000001"]
+      predecessor = zeroHash
+      salt = "73616c74"
+      targetCids = Map.empty
+
+  timestamp <- submit ccipOwner do
+    exerciseCmd mcmsCid GetTimestamp with
+      submitter = ccipOwner
+      opId = "missing-op-id"
+
+  assertMsg "Missing operation should remain absent after failed execution" $ timestamp == None
+
 -- | Test bypasser_execute_batch self-dispatch (immediate update_min_delay)
 -- Flow: Bypasser signs bypasser_execute_batch -> ExecuteOp (immediate execution)
 testBypasserExecuteBatch : Script ()

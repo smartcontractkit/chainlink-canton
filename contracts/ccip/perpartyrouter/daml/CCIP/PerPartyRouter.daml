@@ -689,7 +689,7 @@ template PerPartyRouter
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
                 destChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                tokenPoolRequiredCCVs : [RawInstanceAddress]
+                poolReportedCCVs : [RawInstanceAddress]
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -707,7 +707,7 @@ template PerPartyRouter
                     globalConfigCid = globalConfigCid
                     destChainSelector = destChainSelector
                     message = message
-                    tokenPoolRequiredCCVs = tokenPoolRequiredCCVs
+                    poolReportedCCVs = poolReportedCCVs
 
         -- | Get all required CCV raw instance addresses for executing a message.
         nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]

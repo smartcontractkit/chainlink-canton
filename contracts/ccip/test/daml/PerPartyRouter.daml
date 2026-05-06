@@ -809,6 +809,42 @@ testPrepareSendExtraArgs = script do
     Some smWithCustomCCV <- user `queryContractId` smWithCustomCCVCid
     smWithCustomCCV.requiredCCVs === [RawInstanceAddress.make "custom-ccv" user]
 
+    -- Quote-path required-CCV computation must merge sender/lane with pool CCVs
+    -- using outbound default/sentinel semantics.
+    let tokenOnlyMessage = CCIP.Client.Canton2AnyMessage with
+            receiver = receiver
+            payload = ""
+            tokenTransfer = Some (CCIP.Client.TokenTransfer with
+                token = feeTokenId
+                amount = 1.0)
+            feeToken = feeTokenId
+            extraArgs = basicExtraArgs 0
+    let poolCCV = RawInstanceAddress.make "pool-ccv" user
+
+    requiredCCVsWithEmptyPool <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig) do
+        exerciseCmd router CCIP.PerPartyRouter.GetRequiredCCVsForSend with
+            context = context
+            destChainSelector = destChainSelector
+            message = tokenOnlyMessage
+            poolReportedCCVs = []
+    requiredCCVsWithEmptyPool === [defaultCCV]
+
+    requiredCCVsWithSentinel <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig) do
+        exerciseCmd router CCIP.PerPartyRouter.GetRequiredCCVsForSend with
+            context = context
+            destChainSelector = destChainSelector
+            message = tokenOnlyMessage
+            poolReportedCCVs = [CCIP.Internal.useDefaultCCVs, poolCCV]
+    requiredCCVsWithSentinel === [defaultCCV, poolCCV]
+
+    requiredCCVsWithExplicitPool <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig) do
+        exerciseCmd router CCIP.PerPartyRouter.GetRequiredCCVsForSend with
+            context = context
+            destChainSelector = destChainSelector
+            message = tokenOnlyMessage
+            poolReportedCCVs = [poolCCV]
+    requiredCCVsWithExplicitPool === [poolCCV]
+
     submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context
