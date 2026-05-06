@@ -78,7 +78,6 @@ func TestUint64Checked(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -87,6 +86,7 @@ func TestUint64Checked(t *testing.T) {
 				require.Errorf(t, err, "expected error for input %q, got nil (value=%d)", tt.in, got)
 				return
 			}
+
 			require.NoErrorf(t, err, "unexpected error for input %q: %v", tt.in, err)
 			require.Equalf(t, tt.want, got, "Uint64Checked(%q)=%d, want %d", tt.in, got, tt.want)
 		})
