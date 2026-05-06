@@ -1,30 +1,27 @@
 packages:
   - coin
-  - ccip/ccipreceiver
-  - ccip/ccipsender
-  - ccip/ccvs
-  - ccip/executor
-  - ccip/common
-  - ccip/rmn
-  - ccip/feequoter
-  - ccip/tokenAdminRegistry
-  - ccip/onramp
-  - ccip/offramp
-  - ccip/client
-  - ccip/pools/interfaces
-  - ccip/pools/lockReleaseTokenPool
-  - ccip/pools/burnMintTokenPool
-  - ccip/perpartyrouter
-  - ccip/factory
-  - ccip/test
-
   - link
   - link/test
 
-  - mcms
+  - chainlink/api
+
+  - mcms/api
+  - mcms/core
   - mcms/test
   - mcms/test/globalconfig-v1
   - mcms/test/globalconfig-v1-upgraded
+
+  - ccip/core
+  - ccip/extension-api
+  - ccip/runtime
+  - ccip/sender
+  - ccip/receiver
+  - ccip/executor
+  - ccip/committee-verifier
+  - ccip/pools/lock-release-token-pool
+  - ccip/pools/burn-mint-token-pool
+  - ccip/factory
+  - ccip/test
 
   - test/interfaces
   - test/proxy
