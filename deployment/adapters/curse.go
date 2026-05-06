@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"slices"
-	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
@@ -24,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
 )
 
 var (
@@ -215,7 +215,7 @@ func (c *CantonCurseAdapter) ListConnectedChains(e deployment.Environment, selec
 	var sourceChainSelectors []uint64
 	for selectorNumeric, config := range globalConfigCreated.SourceChainConfigs {
 		if bool(config.IsEnabled) {
-			parsed, err := strconv.ParseUint(string(selectorNumeric), 10, 64)
+			parsed, err := internalparse.Uint64Checked(string(selectorNumeric))
 			if err != nil {
 				return nil, fmt.Errorf("parse source chain selector from GlobalConfig SourceChainConfigs map key %s: %w", selectorNumeric, err)
 			}
