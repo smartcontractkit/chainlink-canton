@@ -145,6 +145,66 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorContains(t, err, "block number is greater than latest offset")
 	})
+
+	t.Run("errors when block number is nil", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		stateClient := mocks.NewMockStateServiceClient(t)
+
+		stateClient.EXPECT().GetLedgerEnd(
+			mock.Anything,
+			mock.Anything,
+		).Return(&ledgerv2.GetLedgerEndResponse{Offset: 10}, nil)
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+		}
+
+		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{big.NewInt(0), nil})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "blockNumbers[1]: block number is nil")
+	})
+
+	t.Run("errors when block offset is negative", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		stateClient := mocks.NewMockStateServiceClient(t)
+
+		stateClient.EXPECT().GetLedgerEnd(
+			mock.Anything,
+			mock.Anything,
+		).Return(&ledgerv2.GetLedgerEndResponse{Offset: 10}, nil)
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+		}
+
+		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{big.NewInt(-1)})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "block offset must be non-negative")
+	})
+
+	t.Run("errors when block offset overflows uint64", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		stateClient := mocks.NewMockStateServiceClient(t)
+
+		stateClient.EXPECT().GetLedgerEnd(
+			mock.Anything,
+			mock.Anything,
+		).Return(&ledgerv2.GetLedgerEndResponse{Offset: 10}, nil)
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+		}
+
+		tooLarge := new(big.Int).SetUint64(math.MaxUint64)
+		tooLarge.Add(tooLarge, big.NewInt(1))
+
+		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{tooLarge})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "block offset overflows uint64")
+	})
 }
 
 func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {

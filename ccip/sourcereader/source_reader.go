@@ -403,16 +403,26 @@ func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big
 	}
 
 	headers := make(map[uint64]protocol.BlockHeader)
-	for _, blockNum := range blockNumbers {
-		if blockNum.Uint64() > latest.Number {
-			return nil, fmt.Errorf("block number is greater than latest offset: %d > %d", blockNum.Uint64(), latest.Number)
+	for i, blockNum := range blockNumbers {
+		if blockNum == nil {
+			return nil, fmt.Errorf("blockNumbers[%d]: block number is nil", i)
+		}
+		if blockNum.Sign() < 0 {
+			return nil, fmt.Errorf("blockNumbers[%d]: block offset must be non-negative: %s", i, blockNum.String())
+		}
+		if !blockNum.IsUint64() {
+			return nil, fmt.Errorf("blockNumbers[%d]: block offset overflows uint64: %s", i, blockNum.String())
+		}
+		u := blockNum.Uint64()
+		if u > latest.Number {
+			return nil, fmt.Errorf("blockNumbers[%d]: block number is greater than latest offset: %d > %d", i, u, latest.Number)
 		}
 
-		h := intToBytes32(blockNum.Uint64())
-		headers[blockNum.Uint64()] = protocol.BlockHeader{
-			Number:     blockNum.Uint64(),
+		h := intToBytes32(u)
+		headers[u] = protocol.BlockHeader{
+			Number:     u,
 			Hash:       h,
-			ParentHash: parentHash(blockNum.Uint64()),
+			ParentHash: parentHash(u),
 			// TODO: determine if we can get an offset's timestamp.
 			// Timestamp: time.Time{},
 		}
