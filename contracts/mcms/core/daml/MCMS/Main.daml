@@ -41,8 +41,8 @@ import MCMS.Types
 import MCMS.GroupVoting
 import MCMS.Crypto
 import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..))
-import MCMS.RawInstanceAddress (assertValidInstanceId)
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (assertValidInstanceId)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import MCMS.Codec
   ( decodeBlockedFunctionWithOffset
   , decodeSelfDispatchSetConfigWithOffset

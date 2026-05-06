@@ -7,8 +7,8 @@ import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex)
 import MCMS.MCMSReceiver
 import MCMS.GlobalConfig.Types
-import MCMS.RawInstanceAddress (assertValidInstanceId)
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (assertValidInstanceId)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 template GlobalConfigV1
     with
