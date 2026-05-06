@@ -642,7 +642,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
-	senderBalanceBefore := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
+	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
+	require.NoError(t, err)
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
 	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
@@ -855,7 +856,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	// Verify pool feeBps haircut: 10,000 smallest units with 5% feeBps => 9,500 bridged.
 	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
 
-	senderBalanceAfter := getHoldingsBalanceNumeric(t, t.Context(), senderParticipant)
+	senderBalanceAfter, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
+	require.NoError(t, err)
 	senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
 
 	t.Logf(

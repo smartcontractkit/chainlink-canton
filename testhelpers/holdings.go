@@ -33,12 +33,12 @@ func WithUnlockedHoldingsOnly() Filter {
 	}
 }
 
-// GetHoldingsBalance lists HoldingV1 contracts for the participant's party and returns the sum of amounts
-// for instrument (ledger Numeric as *big.Rat). Optionally filters by owner and/or unlocked holdings.
+// GetHoldingsBalance returns the sum of holding amounts in ledger Numeric units (*big.Rat).
+// If instrument is nil, amounts for all instruments are summed (filters still apply).
 func GetHoldingsBalance(
 	ctx context.Context,
 	participant canton.Participant,
-	instrument splice_api_token_holding_v1.InstrumentId,
+	instrument *splice_api_token_holding_v1.InstrumentId,
 	filters ...Filter,
 ) (*big.Rat, error) {
 	contracts, err := ListActiveContractsByInterfaceId(ctx, participant, holdingV1InterfaceID())
@@ -52,7 +52,10 @@ func GetHoldingsBalance(
 		if err != nil {
 			return nil, err
 		}
-		if !ok || hv.InstrumentId != instrument {
+		if !ok {
+			continue
+		}
+		if instrument != nil && hv.InstrumentId != *instrument {
 			continue
 		}
 		if !holdingPassesFilters(hv, filters) {

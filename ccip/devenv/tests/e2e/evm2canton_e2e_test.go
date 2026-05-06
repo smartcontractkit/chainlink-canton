@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
@@ -198,13 +197,10 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
-		receiverHoldings, err := testhelpers.ListActiveContractsByInterfaceId(subtestCtx, receiverParticipant, &apiv2.Identifier{
-			PackageId:  "#splice-api-token-holding-v1",
-			ModuleName: "Splice.Api.Token.HoldingV1",
-			EntityName: "Holding",
-		})
+		totalHoldingsRat, err := testhelpers.GetHoldingsBalance(subtestCtx, receiverParticipant, nil)
 		require.NoError(t, err)
-		t.Logf("Canton receiver total holdings after execute: %.10f", devenvtests.HoldingsBalance(receiverHoldings))
+		totalHoldingsFloat, _ := new(big.Float).SetRat(totalHoldingsRat).Float64()
+		t.Logf("Canton receiver total holdings after execute: %.10f", totalHoldingsFloat)
 
 		srcBalanceAfter, err := srcChain.GetTokenBalance(subtestCtx, srcSender, srcToken)
 		require.NoError(t, err)
