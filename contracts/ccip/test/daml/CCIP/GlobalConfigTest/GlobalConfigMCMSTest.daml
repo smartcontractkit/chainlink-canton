@@ -8,7 +8,7 @@ import DA.List
 import DA.Map qualified as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.GlobalConfig
 import CCIP.GlobalConfigCodecGen (
     encodeApplyDestChainConfigUpdatesParams,
@@ -18,7 +18,7 @@ import CCIP.GlobalConfigTypes (
     ApplyDestChainConfigUpdatesParams(..),
     ApplySourceChainConfigUpdatesParams(..),
     )
-import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)

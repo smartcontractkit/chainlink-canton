@@ -28,8 +28,8 @@ import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.Factory
-import MCMS.RawInstanceAddress (RawInstanceAddress(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
 import CCIP.ContextCodec (encodeChoiceContext)
 import CCIP.LockReleaseTokenPoolCodecGen (encodeTransferTimeout)

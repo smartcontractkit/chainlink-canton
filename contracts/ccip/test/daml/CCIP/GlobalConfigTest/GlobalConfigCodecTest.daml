@@ -12,7 +12,7 @@ import CCIP.GlobalConfigTypes (
     ApplyDestChainConfigUpdatesParams(..),
     ApplySourceChainConfigUpdatesParams(..),
     )
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)

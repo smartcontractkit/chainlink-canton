@@ -20,7 +20,7 @@ import CCIP.Tickets qualified as Tickets
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
 import Link.Token qualified as Link
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Splice.Api.Token.BurnMintV1 qualified as BurnMintV1
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1

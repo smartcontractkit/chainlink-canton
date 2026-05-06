@@ -7,11 +7,11 @@ import DA.Assert ((===))
 import DA.Map qualified as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.OffRamp
 import CCIP.OffRampTypes (OffRampDeps(..), SetDepsParams(..))
 import CCIP.OffRampCodecGen (encodeSetDepsParams)
-import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - SET DEPS

@@ -21,7 +21,7 @@ import qualified CCIP.PerPartyRouter
 import qualified CCIP.PerPartyRouterTypes
 import qualified CCIP.RMNRemote
 import qualified CCIP.TokenAdminRegistry
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 

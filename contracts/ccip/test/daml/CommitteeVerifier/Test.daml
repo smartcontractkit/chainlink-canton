@@ -12,7 +12,7 @@ import DA.Optional (fromSome)
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder

@@ -15,7 +15,7 @@ import CCIP.ExecutorTypes (
     SetDynamicConfigParams(..),
     ApplyAllowedCCVUpdatesParams(..),
     )
-import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
 
 finalityConfig n =
     if n == 0

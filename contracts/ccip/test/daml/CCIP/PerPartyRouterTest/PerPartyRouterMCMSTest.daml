@@ -8,11 +8,11 @@ import DA.Map qualified as Map
 import DA.Set qualified as Set
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.PerPartyRouter
 import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..))
 import CCIP.PerPartyRouterCodecGen (encodeSetDepsParams)
-import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
 -- PERPARTYROUTER MCMS ENTRYPOINT TESTS - SET DEPS
