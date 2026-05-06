@@ -21,6 +21,7 @@ func WithHoldingOwner(party string) Filter {
 	if p == "" {
 		return func(splice_api_token_holding_v1.HoldingView) bool { return true }
 	}
+
 	return func(hv splice_api_token_holding_v1.HoldingView) bool {
 		return string(hv.Owner) == p
 	}
@@ -82,6 +83,7 @@ func holdingPassesFilters(hv splice_api_token_holding_v1.HoldingView, filters []
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -106,6 +108,7 @@ func parseHoldingV1View(ac *apiv2.ActiveContract) (splice_api_token_holding_v1.H
 		}
 		return hv, true, nil
 	}
+
 	return splice_api_token_holding_v1.HoldingView{}, false, nil
 }
 

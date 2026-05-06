@@ -799,6 +799,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 
 	const tokenTransferAmountDecimal = "0.0000010000"
 
+	senderLinkBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &linkInstrumentId)
+	require.NoError(t, err)
+
 	executorRawOrHashedAddress := oapiCommon.RawOrHashedAddress{}
 	_ = executorRawOrHashedAddress.FromRawInstanceAddress(executorAddress.String())
 	msg := oapiCommon.Message{
@@ -979,10 +982,25 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 
 	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
 	require.True(t, ok, "quoted fee should parse as a decimal value")
-	tokenTransferAmount, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
+	// Fee token is Amulet (native); the bridged asset is LINK. Native holdings only pay
+	// the CCIP fee — unlike ccip_send_with_token_lnr_test where fee and transfer share
+	// the same instrument.
+	expectedSenderDelta := new(big.Rat).Set(quotedFeeAmount)
+	require.Zero(t, senderDelta.Cmp(expectedSenderDelta), "sender fee-token deduction should equal GetFee feeTokenAmount")
+
+	senderLinkBalanceAfter, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &linkInstrumentId)
+	require.NoError(t, err)
+	linkDelta := new(big.Rat).Sub(senderLinkBalanceBefore, senderLinkBalanceAfter)
+	tokenTransferAmountRat, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
 	require.True(t, ok, "token transfer amount should parse as a decimal value")
-	expectedSenderDelta := new(big.Rat).Add(tokenTransferAmount, quotedFeeAmount)
-	require.Zero(t, senderDelta.Cmp(expectedSenderDelta), "sender deduction should equal token amount plus quoted fee")
+	t.Logf(
+		"Sender LINK: before=%s after=%s deducted=%s",
+		senderLinkBalanceBefore,
+		senderLinkBalanceAfter,
+		linkDelta,
+	)
+	require.Positive(t, linkDelta.Sign(), "sender LINK balance should decrease after send")
+	require.Zero(t, linkDelta.Cmp(tokenTransferAmountRat), "sender LINK deduction should equal message token transfer amount")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
