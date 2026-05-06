@@ -655,6 +655,24 @@ func TestCCIPSend(t *testing.T) {
 	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, allDisclosures)
 	require.NotEqual(t, "0.0", string(quotedFee.FeeTokenAmount), "GetFee should return a positive fee")
 
+	// quoteCCIPSenderFee uses TRANSACTION_SHAPE_LEDGER_EFFECTS; refresh EDS disclosures so the
+	// follow-up Send exercises current contract witnesses (avoids LOCAL_VERDICT_INACTIVE_CONTRACTS).
+	ccipSendDisclosure, err = edsTesthelpers.GetCCIPSendDisclosure(t.Context(), ccipAPIClient, msg, nil, nil)
+	require.NoError(t, err)
+	ccvSendDisclosure, err = edsTesthelpers.GetCCVSendDisclosure(t.Context(), ccvAPIClient, msg, committeeVerifierAddress.InstanceAddress())
+	require.NoError(t, err)
+	executorSendDisclosure, err = edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddress.InstanceAddress(), ccipSendDisclosure.CCVs)
+	require.NoError(t, err)
+	sendArgs.Context = ccipSendDisclosure.ChoiceContext
+	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
+	sendArgs.ExecutorInput.ExecutorCid = types.CONTRACT_ID(executorSendDisclosure.ContractId)
+	allDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(
+		transferFactoryDisclosures,
+		ccipSendDisclosure.DisclosedContracts,
+		ccvSendDisclosure.DisclosedContracts,
+		executorSendDisclosure.DisclosedContracts,
+	)...)
+
 	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
 	require.NoError(t, err)
 	ccipOwnerBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), ccipParticipant, &nativeInstrumentId)

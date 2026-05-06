@@ -22,6 +22,10 @@ func getFeeChoiceArgumentMap(sendArgs ccipsender.Send) map[string]any {
 	return m
 }
 
+// quoteCCIPSenderFee submits CCIPSender.GetFee with TRANSACTION_SHAPE_LEDGER_EFFECTS so the
+// response includes the exercised return record. Callers that immediately Submit Send with the
+// same sendArgs must re-fetch EDS disclosures and patch sendArgs + disclosed contracts before Send,
+// or Canton may reject Send with LOCAL_VERDICT_INACTIVE_CONTRACTS.
 func quoteCCIPSenderFee(
 	t *testing.T,
 	participant canton.Participant,
@@ -46,13 +50,14 @@ func quoteCCIPSenderFee(
 			ActAs:              []string{partySender},
 			DisclosedContracts: disclosures,
 		},
+		// Ledger-effects shape is required for exercised choice results to appear in the
+		// transaction event stream; without it GetFee returns no matching Exercised events.
 		TransactionFormat: &apiv2.TransactionFormat{
 			EventFormat: &apiv2.EventFormat{
 				FiltersByParty: map[string]*apiv2.Filters{
 					partySender: {},
 				},
 			},
-			// GetFee is a nonconsuming choice, and you want the exercised event with its return value
 			TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_LEDGER_EFFECTS,
 		},
 	})

@@ -106,6 +106,7 @@ func parseHoldingV1View(ac *apiv2.ActiveContract) (splice_api_token_holding_v1.H
 		if err := ledger.RecordToStruct(vv, &hv); err != nil {
 			return splice_api_token_holding_v1.HoldingView{}, false, fmt.Errorf("parse HoldingV1 view: %w", err)
 		}
+
 		return hv, true, nil
 	}
 
