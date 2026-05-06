@@ -102,6 +102,20 @@ func main() {
 
 	// Assemble artifacts
 
+	err = os.MkdirAll(*artifactsDir, 0755)
+	if err != nil {
+		log.Fatalf("failed to create artifacts directory: %v", err)
+	}
+	matches, err := filepath.Glob(filepath.Join(*artifactsDir, "*.dar"))
+	if err != nil {
+		log.Fatalf("failed to list existing DAR artifacts: %v", err)
+	}
+	for _, match := range matches {
+		if err := os.Remove(match); err != nil {
+			log.Fatalf("failed to remove stale DAR artifact %q: %v", match, err)
+		}
+	}
+
 	// For each package, read the compiled DAR file from .daml/dist/
 	// Write the DAR files to the artifacts directory
 
