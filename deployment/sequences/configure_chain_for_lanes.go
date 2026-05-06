@@ -134,13 +134,13 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 
 		// FeeQuoter - Dest Chain Config
 		feeQuoterAddress := contracts.BytesToInstanceAddress(sourceChain.FeeQuoter)
-		_, err = operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
+		_, err = operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[feequoter.ApplyFeeQuoterDestChainConfigUpdates]{
 			InstanceAddress: feeQuoterAddress,
-			Args: feequoter.ApplyDestChainConfigUpdates2{
-				DestChainConfigArgs: []feequoter.DestChainConfigArgs2{
+			Args: feequoter.ApplyFeeQuoterDestChainConfigUpdates{
+				DestChainConfigArgs: []feequoter.FeeQuoterDestChainConfigArgs{
 					{
 						DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
-						DestChainConfig: feequoter.DestChainConfig2{
+						DestChainConfig: feequoter.FeeQuoterDestChainConfig{
 							IsEnabled:                   types.BOOL(destChain.FeeQuoterDestChainConfig.IsEnabled),
 							MaxDataBytes:                types.INT64(destChain.FeeQuoterDestChainConfig.MaxDataBytes),
 							MaxPerMsgGasLimit:           types.INT64(destChain.FeeQuoterDestChainConfig.MaxPerMsgGasLimit),
