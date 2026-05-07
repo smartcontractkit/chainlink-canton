@@ -2,7 +2,7 @@ module GlobalConfigTypes where
 
 import Daml.Script
 
-import qualified CCIP.GlobalConfigTypes
+import qualified CCIP.GlobalConfig
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 template ValidationHarness
@@ -17,21 +17,21 @@ template ValidationHarness
                 laneMandatedCCVs : [RawInstanceAddress]
             controller owner
             do
-                CCIP.GlobalConfigTypes.validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
+                CCIP.GlobalConfig.validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
         nonconsuming choice RunAssertNoDuplicates : ()
             with
                 addresses : [RawInstanceAddress]
             controller owner
             do
-                CCIP.GlobalConfigTypes.assertNoDuplicates addresses
+                CCIP.GlobalConfig.assertNoDuplicates addresses
         
         nonconsuming choice RunValidateNoEmptyAddresses : ()
             with
                 addresses : [RawInstanceAddress]
             controller owner
             do
-                CCIP.GlobalConfigTypes.validateNoEmptyAddresses addresses
+                CCIP.GlobalConfig.validateNoEmptyAddresses addresses
 
 testValidateDefaultAndMandatedCCVs : Script ()
 testValidateDefaultAndMandatedCCVs = do

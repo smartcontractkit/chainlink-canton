@@ -6,6 +6,7 @@ module CCIP.GlobalConfig
 
 import DA.Crypto.Text (byteCount)
 import DA.Foldable (forA_)
+import DA.List qualified as List
 import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
@@ -18,15 +19,39 @@ import CCIP.GlobalConfigTypes (
     SourceChainConfigArgs(..),
     ApplyDestChainConfigUpdatesParams(..),
     ApplySourceChainConfigUpdatesParams(..),
-    validateDefaultAndMandatedCCVs,
-    assertSourceChainMandatedCCVsNonEmpty,
-    isSourceChainConfigCCVsValid,
     )
 import CCIP.GlobalConfigCodecGen (decodeApplyDestChainConfigUpdatesParamsAt, decodeApplySourceChainConfigUpdatesParamsAt)
-import MCMS.RawInstanceAddress (assertValidInstanceId)
+import MCMS.RawInstanceAddress (RawInstanceAddress(..), assertValidInstanceId)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Crypto (assertValidHex)
+
+validateDefaultAndMandatedCCVs : [RawInstanceAddress] -> [RawInstanceAddress] -> Update ()
+validateDefaultAndMandatedCCVs defaultCCV laneMandatedCCVs = do
+  let totalLength = length defaultCCV + length laneMandatedCCVs
+  assertMsg "MustSpecifyDefaultOrRequiredCCVs: at least one CCV must be specified" (totalLength > 0)
+  let combined = defaultCCV <> laneMandatedCCVs
+  assertNoDuplicates combined
+  validateNoEmptyAddresses combined
+
+assertNoDuplicates : [RawInstanceAddress] -> Update ()
+assertNoDuplicates addresses = do
+  let duplicateCandidates =
+        List.filter
+          (\address -> length (List.filter (== address) addresses) > 1)
+          addresses
+  case duplicateCandidates of
+    duplicateAddress :: _ ->
+      assertMsg ("DuplicateCCVNotAllowed: " <> show duplicateAddress) False
+    [] -> pure ()
+
+validateNoEmptyAddresses : [RawInstanceAddress] -> Update ()
+validateNoEmptyAddresses addresses = do
+  let emptyAddresses = List.filter (\address -> address == RawInstanceAddress "") addresses
+  case emptyAddresses of
+    emptyAddress :: _ ->
+      assertMsg ("ZeroAddressNotAllowed") False
+    [] -> pure ()
 
 template GlobalConfig
     with
@@ -41,10 +66,9 @@ template GlobalConfig
         signatory ccipOwner
 
         ensure assertValidInstanceId instanceId
-            && chainSelector > 0.0 -- Local chain selector must be greater than zero
-            && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)  -- All destination chain selectors must be greater than zero and not equal to the local chain selector
-            && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)  -- All source chain selectors must be greater than zero and not equal to the local chain selector
-            && all isSourceChainConfigCCVsValid (Map.values sourceChainConfigs)
+            && chainSelector > 0.0
+            && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)
+            && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)
 
         nonconsuming choice GetDestChainConfig : Optional DestChainConfig
             with
@@ -105,7 +129,7 @@ template GlobalConfig
                     assertMsg "InvalidChainSelector: source chain selector must not be the same as the local chain selector" (sourceChainSelector /= chainSelector)
                     forA_ onRampAddresses $ \addr -> assertValidHex "onRampAddress" addr
                     validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
-                    assertSourceChainMandatedCCVsNonEmpty laneMandatedCCVs
+                    assertMsg "laneMandatedCCVs: at least one lane-mandated CCV required for source chain" (not (null laneMandatedCCVs))
 
                 -- Update
                 let newConfigs = foldl

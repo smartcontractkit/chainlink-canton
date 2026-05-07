@@ -2,7 +2,6 @@
 module CCIP.GlobalConfigTypes where
 
 import DA.Crypto.Text (BytesHex)
-import DA.List qualified as List
 
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
@@ -55,65 +54,6 @@ data SourceChainConfig = SourceChainConfig
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages from this source chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages from this source chain.
     deriving (Eq, Show)
-
--- | Ensures at least one CCV combined, no zero addresses, no duplicates within or across both sets.
--- | The default CCVs and lane mandated CCVs are validated together: at least one must be present,
--- | no empty addresses are allowed, and no duplicates are permitted within or across both lists.
-validateDefaultAndMandatedCCVs : [RawInstanceAddress] -> [RawInstanceAddress] -> Update ()
-validateDefaultAndMandatedCCVs defaultCCV laneMandatedCCVs = do
-  let defaultLength = length defaultCCV
-  let mandatedLength = length laneMandatedCCVs
-  let totalLength = defaultLength + mandatedLength
-
-  -- There must always be at least one default or mandated CCV. This ensures that any receiver who does not
-  -- specify CCVs will always have at least one CCV to validate the message.
-  assertMsg "MustSpecifyDefaultOrRequiredCCVs: at least one CCV must be specified" (totalLength > 0)
-
-  -- Check for duplicates and empty addresses in the default and mandated CCVs. We need to check for duplicates
-  -- between the two sets of CCVs as well as within each set. Doing these checks here means we can assume there are
-  -- no duplicates or empty addresses in the rest of the code.
-  let combined = defaultCCV <> laneMandatedCCVs
-  assertNoDuplicates combined
-  validateNoEmptyAddresses combined
-
-areDefaultAndMandatedCCVsValid : [RawInstanceAddress] -> [RawInstanceAddress] -> Bool
-areDefaultAndMandatedCCVsValid defaultCCVs laneMandatedCCVs =
-  let combined = defaultCCVs <> laneMandatedCCVs
-  in length combined > 0
-    && all (\address -> address /= RawInstanceAddress "") combined
-    && all (\address -> length (List.filter (== address) combined) == 1) combined
-
-isSourceChainConfigCCVsValid : SourceChainConfig -> Bool
-isSourceChainConfigCCVsValid SourceChainConfig{defaultCCVs, laneMandatedCCVs} =
-  length laneMandatedCCVs > 0
-    && areDefaultAndMandatedCCVsValid defaultCCVs laneMandatedCCVs
-
--- | Source-chain-specific strict check: every inbound lane must enforce at least one protocol-controlled
--- | verifier so message authenticity cannot be satisfied purely by receiver-chosen defaults.
-assertSourceChainMandatedCCVsNonEmpty : [RawInstanceAddress] -> Update ()
-assertSourceChainMandatedCCVsNonEmpty laneMandatedCCVs =
-  assertMsg "laneMandatedCCVs: at least one lane-mandated CCV required for source chain" (not (null laneMandatedCCVs))
-
--- | Asserts that there are no duplicate addresses within a list of RawInstanceAddresses.
-assertNoDuplicates : [RawInstanceAddress] -> Update ()
-assertNoDuplicates addresses = do
-  let duplicateCandidates =
-        List.filter
-          (\address -> length (List.filter (== address) addresses) > 1)
-          addresses
-  case duplicateCandidates of
-    duplicateAddress :: _ ->
-      assertMsg ("DuplicateCCVNotAllowed: " <> show duplicateAddress) False
-    [] -> pure ()
-
--- | Helper function to validate that no CCV addresses are empty strings.
-validateNoEmptyAddresses : [RawInstanceAddress] -> Update ()
-validateNoEmptyAddresses addresses = do
-  let emptyAddresses = List.filter (\address -> address == RawInstanceAddress "") addresses
-  case emptyAddresses of
-    emptyAddress :: _ ->
-      assertMsg ("ZeroAddressNotAllowed") False
-    [] -> pure ()
 
 -- ===========================================================================
 -- MCMS Choice Params Types

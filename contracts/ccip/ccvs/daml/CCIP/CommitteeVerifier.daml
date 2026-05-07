@@ -308,7 +308,7 @@ template CommitteeVerifier
                 -- consuming the active ExecutingMessageV1 and invalidating the executingMessageCid
                 -- held by the legitimate executor.
                 assertMsg "verifier: caller is not authorized for this executing message"
-                    (caller == execMsg.executor)
+                    (caller == execMsg.executor || caller == execMsg.receiver)
 
                 let message = execMsg.message
 
