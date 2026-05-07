@@ -1,4 +1,4 @@
--- | Full-precision Numeric 0 to hexadecimal helpers.
+-- | Full-precision decimal/hexadecimal helpers for protocol unsigned integers.
 --
 -- These helpers intentionally operate through decimal text rather than Int so
 -- uint64/uint256-sized protocol values do not lose precision on-ledger.
@@ -6,7 +6,10 @@ module CCIP.NumericHex
   ( encodeUint64
   , encodeUint256
   , numeric0ToDecimalString
+  , compareDecimalStrings
   , decimalStringToHex
+  , hexStringToDecimalString
+  , parseDecimalDigits
   , padLeft
   ) where
 
@@ -44,37 +47,36 @@ exceedsMaxUint256 n =
 -- | True when the first decimal string is numerically greater than the second.
 compareDecimalStrings : Text -> Text -> Bool
 compareDecimalStrings str1 str2 =
-    let len1 = Text.length str1
-        len2 = Text.length str2
-    in len1 > len2 || (len1 == len2 && str1 > str2)
+    let normalized1 = normalizeDecimalStringOrZero str1
+        normalized2 = normalizeDecimalStringOrZero str2
+        len1 = Text.length normalized1
+        len2 = Text.length normalized2
+    in len1 > len2 || (len1 == len2 && normalized1 > normalized2)
 
 -- | Convert decimal text to hexadecimal text without going through Int.
 decimalStringToHex : Text -> Text
 decimalStringToHex "0" = "0"
 decimalStringToHex decStr =
-    let digits = parseDigits decStr []
+    let digits = parseDecimalDigits decStr
         hexResult = bigIntToHex digits
     in if Text.length hexResult == 0 then "0" else hexResult
 
-parseDigits : Text -> [Int] -> [Int]
-parseDigits str acc =
-    if Text.length str == 0 then reverse acc
-    else
-        let firstChar = Text.take 1 str
-            rest = Text.drop 1 str
-            digit = case firstChar of
-                "0" -> 0
-                "1" -> 1
-                "2" -> 2
-                "3" -> 3
-                "4" -> 4
-                "5" -> 5
-                "6" -> 6
-                "7" -> 7
-                "8" -> 8
-                "9" -> 9
-                _ -> error ("Invalid digit: " <> firstChar)
-        in parseDigits rest (digit :: acc)
+parseDecimalDigits : Text -> [Int]
+parseDecimalDigits = map decimalDigitToInt . Text.explode
+
+decimalDigitToInt : Text -> Int
+decimalDigitToInt c = case c of
+    "0" -> 0
+    "1" -> 1
+    "2" -> 2
+    "3" -> 3
+    "4" -> 4
+    "5" -> 5
+    "6" -> 6
+    "7" -> 7
+    "8" -> 8
+    "9" -> 9
+    _ -> error ("Invalid digit: " <> c)
 
 bigIntToHex : [Int] -> Text
 bigIntToHex digits = bigIntToHexHelper digits ""
@@ -119,6 +121,94 @@ digitToHex n = case n of
     14 -> "e"
     15 -> "f"
     _ -> error ("Invalid hex digit: " <> show n)
+
+hexStringToDecimalString : Text -> Optional Text
+hexStringToDecimalString hex = do
+    hexDigits <- mapA hexDigit (Text.explode hex)
+    Some (normalizeDecimalStringOrZero (hexDigitsToDecimal hexDigits))
+
+hexDigit : Text -> Optional Int
+hexDigit c = case c of
+    "0" -> Some 0
+    "1" -> Some 1
+    "2" -> Some 2
+    "3" -> Some 3
+    "4" -> Some 4
+    "5" -> Some 5
+    "6" -> Some 6
+    "7" -> Some 7
+    "8" -> Some 8
+    "9" -> Some 9
+    "a" -> Some 10
+    "b" -> Some 11
+    "c" -> Some 12
+    "d" -> Some 13
+    "e" -> Some 14
+    "f" -> Some 15
+    "A" -> Some 10
+    "B" -> Some 11
+    "C" -> Some 12
+    "D" -> Some 13
+    "E" -> Some 14
+    "F" -> Some 15
+    _ -> None
+
+hexDigitsToDecimal : [Int] -> Text
+hexDigitsToDecimal digits =
+    foldl
+        (\acc d -> addDecimalStrings (multiplyDecimalBySmall acc 16) (show d))
+        "0"
+        digits
+
+multiplyDecimalBySmall : Text -> Int -> Text
+multiplyDecimalBySmall raw factor =
+    let digits = parseDecimalDigits raw
+        result = multiplyDigitsBySmall digits factor
+    in digitsToDecimalString result
+
+multiplyDigitsBySmall : [Int] -> Int -> [Int]
+multiplyDigitsBySmall digits factor = multiplyDigitsBySmallGo (reverse digits) factor 0 []
+
+multiplyDigitsBySmallGo : [Int] -> Int -> Int -> [Int] -> [Int]
+multiplyDigitsBySmallGo [] _ carry acc = if carry == 0 then acc else prependCarryDigits carry acc
+multiplyDigitsBySmallGo (d :: ds) factor carry acc =
+    let product = d * factor + carry
+        newDigit = product % 10
+        newCarry = product / 10
+    in multiplyDigitsBySmallGo ds factor newCarry (newDigit :: acc)
+
+prependCarryDigits : Int -> [Int] -> [Int]
+prependCarryDigits carry acc =
+    if carry < 10 then carry :: acc
+    else prependCarryDigits (carry / 10) ((carry % 10) :: acc)
+
+addDecimalStrings : Text -> Text -> Text
+addDecimalStrings a b =
+    let digitsA = reverse (parseDecimalDigits a)
+        digitsB = reverse (parseDecimalDigits b)
+        result = addDigitLists digitsA digitsB 0
+    in digitsToDecimalString (reverse result)
+
+addDigitLists : [Int] -> [Int] -> Int -> [Int]
+addDigitLists [] [] carry = if carry == 0 then [] else [carry]
+addDigitLists (a :: as) [] carry =
+    let total = a + carry
+    in (total % 10) :: addDigitLists as [] (total / 10)
+addDigitLists [] (b :: bs) carry =
+    let total = b + carry
+    in (total % 10) :: addDigitLists [] bs (total / 10)
+addDigitLists (a :: as) (b :: bs) carry =
+    let total = a + b + carry
+    in (total % 10) :: addDigitLists as bs (total / 10)
+
+digitsToDecimalString : [Int] -> Text
+digitsToDecimalString [] = "0"
+digitsToDecimalString digits = foldl (<>) "" (map show digits)
+
+normalizeDecimalStringOrZero : Text -> Text
+normalizeDecimalStringOrZero raw =
+    let stripped = Text.dropWhile (== "0") raw
+    in if Text.isEmpty stripped then "0" else stripped
 
 padLeft : Int -> Text -> Text -> Text
 padLeft targetLength padString str =

@@ -1,0 +1,151 @@
+module NumericHexTest where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Crypto.Text (byteCount)
+import DA.Optional
+import DA.Text qualified as Text
+
+import CCIP.NumericHex qualified as NumericHex
+
+maxNumeric0Text : Text
+maxNumeric0Text = "99999999999999999999999999999999999999"
+
+maxNumeric0Hex : Text
+maxNumeric0Hex = "4b3b4ca85a86c47a098a223fffffffff"
+
+maxUint256Text : Text
+maxUint256Text = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+
+maxUint256Hex : Text
+maxUint256Hex = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
+normalizeDecimalTextOrZero : Text -> Text
+normalizeDecimalTextOrZero raw =
+    let stripped = Text.dropWhile (== "0") raw
+    in if Text.isEmpty stripped then "0" else stripped
+
+assertDecimalHexRoundTrip : Text -> Script ()
+assertDecimalHexRoundTrip decimalText =
+    NumericHex.hexStringToDecimalString (NumericHex.decimalStringToHex decimalText)
+        === Some (normalizeDecimalTextOrZero decimalText)
+
+testNumericHex_Numeric0ToDecimalStringAndPadLeft : Script ()
+testNumericHex_Numeric0ToDecimalStringAndPadLeft = script do
+    NumericHex.numeric0ToDecimalString 0.0 === "0"
+    NumericHex.numeric0ToDecimalString 42.0 === "42"
+    NumericHex.numeric0ToDecimalString 18446744073709551615.0 === "18446744073709551615"
+    NumericHex.numeric0ToDecimalString 99999999999999999999999999999999999999.0 === maxNumeric0Text
+
+    NumericHex.padLeft 4 "0" "a" === "000a"
+    NumericHex.padLeft 4 "0" "abcd" === "abcd"
+    NumericHex.padLeft 2 "0" "abcd" === "abcd"
+    NumericHex.padLeft 64 "0" maxUint256Hex === maxUint256Hex
+
+    debug "testNumericHex_Numeric0ToDecimalStringAndPadLeft: PASSED"
+
+testNumericHex_CompareDecimalStrings : Script ()
+testNumericHex_CompareDecimalStrings = script do
+    NumericHex.compareDecimalStrings "0" "0" === False
+    NumericHex.compareDecimalStrings "000" "0" === False
+    NumericHex.compareDecimalStrings "1" "0" === True
+    NumericHex.compareDecimalStrings "2" "10" === False
+    NumericHex.compareDecimalStrings "10" "2" === True
+    NumericHex.compareDecimalStrings "0010" "10" === False
+    NumericHex.compareDecimalStrings "0001" "0000" === True
+    NumericHex.compareDecimalStrings "12345678901234567890" "12345678901234567889" === True
+    NumericHex.compareDecimalStrings maxNumeric0Text maxUint256Text === False
+    NumericHex.compareDecimalStrings maxUint256Text maxNumeric0Text === True
+
+    debug "testNumericHex_CompareDecimalStrings: PASSED"
+
+testNumericHex_DecimalStringToHex_Vectors : Script ()
+testNumericHex_DecimalStringToHex_Vectors = script do
+    NumericHex.decimalStringToHex "0" === "0"
+    NumericHex.decimalStringToHex "000000" === "0"
+    NumericHex.decimalStringToHex "1" === "1"
+    NumericHex.decimalStringToHex "15" === "f"
+    NumericHex.decimalStringToHex "16" === "10"
+    NumericHex.decimalStringToHex "255" === "ff"
+    NumericHex.decimalStringToHex "256" === "100"
+    NumericHex.decimalStringToHex "1000000000000000000" === "de0b6b3a7640000"
+    NumericHex.decimalStringToHex "12379813738877118345" === "abcdef0123456789"
+    NumericHex.decimalStringToHex maxNumeric0Text === maxNumeric0Hex
+    NumericHex.decimalStringToHex maxUint256Text === maxUint256Hex
+
+    debug "testNumericHex_DecimalStringToHex_Vectors: PASSED"
+
+testNumericHex_HexStringToDecimalString_Vectors : Script ()
+testNumericHex_HexStringToDecimalString_Vectors = script do
+    NumericHex.hexStringToDecimalString "0" === Some "0"
+    NumericHex.hexStringToDecimalString "0000" === Some "0"
+    NumericHex.hexStringToDecimalString "0000ff" === Some "255"
+    NumericHex.hexStringToDecimalString "1" === Some "1"
+    NumericHex.hexStringToDecimalString "f" === Some "15"
+    NumericHex.hexStringToDecimalString "10" === Some "16"
+    NumericHex.hexStringToDecimalString "ff" === Some "255"
+    NumericHex.hexStringToDecimalString "100" === Some "256"
+    NumericHex.hexStringToDecimalString "DE0B6B3A7640000" === Some "1000000000000000000"
+    NumericHex.hexStringToDecimalString "DEADBEEF" === Some "3735928559"
+    NumericHex.hexStringToDecimalString "abcdef0123456789" === Some "12379813738877118345"
+    NumericHex.hexStringToDecimalString "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff" === Some maxNumeric0Text
+    NumericHex.hexStringToDecimalString maxNumeric0Hex === Some maxNumeric0Text
+    NumericHex.hexStringToDecimalString maxUint256Hex === Some maxUint256Text
+    NumericHex.hexStringToDecimalString "0x10" === None
+    NumericHex.hexStringToDecimalString "xyz" === None
+
+    debug "testNumericHex_HexStringToDecimalString_Vectors: PASSED"
+
+testNumericHex_DecimalHex_RoundTrip : Script ()
+testNumericHex_DecimalHex_RoundTrip = script do
+    assertDecimalHexRoundTrip "0"
+    assertDecimalHexRoundTrip "000000"
+    assertDecimalHexRoundTrip "00000123"
+    assertDecimalHexRoundTrip "1000000000000000000"
+    assertDecimalHexRoundTrip "123456789123456789123456789"
+    assertDecimalHexRoundTrip maxNumeric0Text
+    assertDecimalHexRoundTrip maxUint256Text
+
+    debug "testNumericHex_DecimalHex_RoundTrip: PASSED"
+
+testNumericHex_EncodeUint64 : Script ()
+testNumericHex_EncodeUint64 = script do
+    NumericHex.encodeUint64 0.0 === Some "0000000000000000"
+    NumericHex.encodeUint64 1.0 === Some "0000000000000001"
+    NumericHex.encodeUint64 255.0 === Some "00000000000000ff"
+    NumericHex.encodeUint64 18446744073709551615.0 === Some "ffffffffffffffff"
+    NumericHex.encodeUint64 18446744073709551616.0 === None
+    NumericHex.encodeUint64 (-1.0) === None
+
+    assertMsg "uint64 encodings must be 8 bytes"
+        (all (\hex -> byteCount hex == 8)
+            [ fromSome (NumericHex.encodeUint64 0.0)
+            , fromSome (NumericHex.encodeUint64 1.0)
+            , fromSome (NumericHex.encodeUint64 18446744073709551615.0)
+            ])
+
+    debug "testNumericHex_EncodeUint64: PASSED"
+
+testNumericHex_EncodeUint256 : Script ()
+testNumericHex_EncodeUint256 = script do
+    NumericHex.encodeUint256 0.0
+        === Some "0000000000000000000000000000000000000000000000000000000000000000"
+    NumericHex.encodeUint256 1.0
+        === Some "0000000000000000000000000000000000000000000000000000000000000001"
+    NumericHex.encodeUint256 1000000.0
+        === Some "00000000000000000000000000000000000000000000000000000000000f4240"
+    NumericHex.encodeUint256 1000000000000000000.0
+        === Some "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+    NumericHex.encodeUint256 99999999999999999999999999999999999999.0
+        === Some "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
+    NumericHex.encodeUint256 (-1.0) === None
+
+    assertMsg "uint256 encodings must be 32 bytes"
+        (all (\hex -> byteCount hex == 32)
+            [ fromSome (NumericHex.encodeUint256 0.0)
+            , fromSome (NumericHex.encodeUint256 1.0)
+            , fromSome (NumericHex.encodeUint256 99999999999999999999999999999999999999.0)
+            ])
+
+    debug "testNumericHex_EncodeUint256: PASSED"

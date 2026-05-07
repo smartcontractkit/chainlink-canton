@@ -40,7 +40,7 @@ isUint256Bytes raw = byteCount raw == 32
 uint256BytesToDecimalText : BytesHex -> Optional Text
 uint256BytesToDecimalText raw =
     if not (isUint256Bytes raw) then None
-    else hexToDecimalString raw
+    else NumericHex.hexStringToDecimalString raw
 
 decimalTextToUint256Bytes : Text -> Optional BytesHex
 decimalTextToUint256Bytes raw = do
@@ -54,10 +54,9 @@ numeric0ToUint256Bytes n =
     decimalTextToUint256Bytes (NumericHex.numeric0ToDecimalString n)
 
 decimalTextFitsNumeric0 : Text -> Bool
-decimalTextFitsNumeric0 raw =
-    case normalizeDecimalText raw of
-        None -> False
-        Some normalized -> not (decimalTextGreaterThan normalized maxNumeric0DecimalText)
+decimalTextFitsNumeric0 raw = case parseNumeric0 raw of
+    Some _ -> True
+    None -> False
 
 calculateLocalAmountFromUint256Checked
     : Text
@@ -107,70 +106,22 @@ calculateLocalAmountFromDecimalTextChecked _label rawRemoteAmount remoteDecimals
 
 normalizeDecimalText : Text -> Optional Text
 normalizeDecimalText raw
-    | Text.length raw == 0 = None
-    | otherwise =
-        if allDecimalDigits raw
-        then Some (normalizeDecimalTextOrZero raw)
-        else None
+    | Text.isEmpty raw = None
+    | Text.isEmpty (Text.dropWhile Text.isDigit raw) = Some (normalizeDecimalTextOrZero raw)
+    | otherwise = None
 
 normalizeDecimalTextOrZero : Text -> Text
 normalizeDecimalTextOrZero raw =
-    let stripped = stripLeadingZeros raw
-    in if Text.length stripped == 0 then "0" else stripped
-
-allDecimalDigits : Text -> Bool
-allDecimalDigits raw =
-    if Text.length raw == 0 then True
-    else
-        let c = Text.take 1 raw
-            rest = Text.drop 1 raw
-        in isDecimalDigit c && allDecimalDigits rest
-
-isDecimalDigit : Text -> Bool
-isDecimalDigit c =
-    c == "0" || c == "1" || c == "2" || c == "3" || c == "4"
-        || c == "5" || c == "6" || c == "7" || c == "8" || c == "9"
-
-stripLeadingZeros : Text -> Text
-stripLeadingZeros raw
-    | Text.length raw == 0 = ""
-    | Text.take 1 raw == "0" = stripLeadingZeros (Text.drop 1 raw)
-    | otherwise = raw
+    let stripped = Text.dropWhile (== "0") raw
+    in if Text.isEmpty stripped then "0" else stripped
 
 decimalTextGreaterThan : Text -> Text -> Bool
-decimalTextGreaterThan a b =
-    let na = normalizeDecimalTextOrZero a
-        nb = normalizeDecimalTextOrZero b
-        la = Text.length na
-        lb = Text.length nb
-    in la > lb || (la == lb && na > nb)
+decimalTextGreaterThan = NumericHex.compareDecimalStrings
 
 parseNumeric0 : Text -> Optional (Numeric 0)
 parseNumeric0 raw = do
     normalized <- normalizeDecimalText raw
-    if decimalTextGreaterThan normalized maxNumeric0DecimalText then None
-    else Some (parseNumeric0Unchecked normalized)
-
-parseNumeric0Unchecked : Text -> Numeric 0
-parseNumeric0Unchecked raw =
-    if Text.length raw == 0 then 0.0
-    else
-        let len = Text.length raw
-            lastChar = Text.take 1 (Text.drop (len - 1) raw)
-            rest = Text.take (len - 1) raw
-            digit = case lastChar of
-                "0" -> 0.0
-                "1" -> 1.0
-                "2" -> 2.0
-                "3" -> 3.0
-                "4" -> 4.0
-                "5" -> 5.0
-                "6" -> 6.0
-                "7" -> 7.0
-                "8" -> 8.0
-                "9" -> 9.0
-                _ -> error ("parseNumeric0Unchecked: invalid decimal digit " <> lastChar)
-        in digit + 10.0 * parseNumeric0Unchecked rest
+    Text.parseNumeric normalized
 
 multiplyDecimalByPow10 : Text -> Int -> Optional Text
 multiplyDecimalByPow10 raw pow
@@ -178,7 +129,7 @@ multiplyDecimalByPow10 raw pow
     | otherwise =
         let normalized = normalizeDecimalTextOrZero raw
         in if normalized == "0" then Some "0"
-           else Some (normalized <> repeatText pow "0")
+           else Some (normalized <> Text.implode (replicate pow "0"))
 
 divideDecimalByPow10 : Text -> Int -> (Text, Text)
 divideDecimalByPow10 raw pow =
@@ -187,67 +138,14 @@ divideDecimalByPow10 raw pow =
     in if pow <= 0 then (normalized, "0")
        else if len <= pow then ("0", normalized)
        else
-          let splitAt = len - pow
-          in ( normalizeDecimalTextOrZero (Text.take splitAt normalized)
-             , normalizeDecimalTextOrZero (Text.drop splitAt normalized)
+          let (quotient, remainder) = Text.splitAt (len - pow) normalized
+          in ( normalizeDecimalTextOrZero quotient
+             , normalizeDecimalTextOrZero remainder
              )
-
-repeatText : Int -> Text -> Text
-repeatText n t =
-    if n <= 0 then ""
-    else t <> repeatText (n - 1) t
-
-hexToDecimalString : BytesHex -> Optional Text
-hexToDecimalString hex = do
-    hexDigits <- hexStringToDigits hex []
-    Some (normalizeDecimalTextOrZero (hexDigitsToDecimal hexDigits))
-
-hexStringToDigits : Text -> [Int] -> Optional [Int]
-hexStringToDigits raw acc =
-    if Text.length raw == 0 then Some acc
-    else
-        let c = Text.take 1 raw
-            rest = Text.drop 1 raw
-        in case hexDigit c of
-            None -> None
-            Some d -> hexStringToDigits rest (acc ++ [d])
-
-hexDigit : Text -> Optional Int
-hexDigit c = case c of
-    "0" -> Some 0
-    "1" -> Some 1
-    "2" -> Some 2
-    "3" -> Some 3
-    "4" -> Some 4
-    "5" -> Some 5
-    "6" -> Some 6
-    "7" -> Some 7
-    "8" -> Some 8
-    "9" -> Some 9
-    "a" -> Some 10
-    "b" -> Some 11
-    "c" -> Some 12
-    "d" -> Some 13
-    "e" -> Some 14
-    "f" -> Some 15
-    "A" -> Some 10
-    "B" -> Some 11
-    "C" -> Some 12
-    "D" -> Some 13
-    "E" -> Some 14
-    "F" -> Some 15
-    _ -> None
-
-hexDigitsToDecimal : [Int] -> Text
-hexDigitsToDecimal digits =
-    foldl
-        (\acc d -> addDecimalStrings (multiplyDecimalBySmall acc 16) (intDigitToDecimalText d))
-        "0"
-        digits
 
 multiplyDecimalBySmall : Text -> Int -> Text
 multiplyDecimalBySmall raw factor =
-    let digits = parseDigits raw []
+    let digits = NumericHex.parseDecimalDigits raw
         result = multiplyDigitsBySmall digits factor
     in digitsToDecimalString result
 
@@ -269,8 +167,8 @@ prependCarryDigits carry acc =
 
 addDecimalStrings : Text -> Text -> Text
 addDecimalStrings a b =
-    let digitsA = reverse (parseDigits a [])
-        digitsB = reverse (parseDigits b [])
+    let digitsA = reverse (NumericHex.parseDecimalDigits a)
+        digitsB = reverse (NumericHex.parseDecimalDigits b)
         result = addDigitLists digitsA digitsB 0
     in digitsToDecimalString (reverse result)
 
@@ -285,26 +183,6 @@ addDigitLists [] (b :: bs) carry =
 addDigitLists (a :: as) (b :: bs) carry =
     let total = a + b + carry
     in (total % 10) :: addDigitLists as bs (total / 10)
-
-parseDigits : Text -> [Int] -> [Int]
-parseDigits raw acc =
-    if Text.length raw == 0 then reverse acc
-    else
-        let c = Text.take 1 raw
-            rest = Text.drop 1 raw
-            digit = case c of
-                "0" -> 0
-                "1" -> 1
-                "2" -> 2
-                "3" -> 3
-                "4" -> 4
-                "5" -> 5
-                "6" -> 6
-                "7" -> 7
-                "8" -> 8
-                "9" -> 9
-                _ -> error ("parseDigits: invalid decimal digit " <> c)
-        in parseDigits rest (digit :: acc)
 
 digitsToDecimalString : [Int] -> Text
 digitsToDecimalString [] = "0"

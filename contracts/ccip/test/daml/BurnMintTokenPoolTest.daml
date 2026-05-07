@@ -4,7 +4,7 @@ import Daml.Script
 
 import DA.Assert
 import DA.Map qualified as Map
-import DA.Optional (fromSome, fromSomeNote)
+import DA.Optional (fromSome, fromSomeNote, isSome)
 import DA.Text qualified as Text
 import DA.TextMap qualified as TextMap
 
