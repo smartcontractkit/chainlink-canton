@@ -115,8 +115,8 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
                 feeQuoter = RawInstanceAddress.make "unused-feequoter-rrc" ccipOwner
                 rmnRemote = rmnRemoteAddr
             outboundSequenceNumbers = Map.empty
-            executedMessages = Set.empty
-            archivedExecutionContractIds = []
+            executedMessagesByPrefix = Map.empty
+            archivedExecutionContractIdsByPrefix = Map.empty
             customObservers = []
 
     receiverCid <- submit receiver do
@@ -250,8 +250,8 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
                 feeQuoter = RawInstanceAddress.make "unused-feequoter-rrc-defaults" ccipOwner
                 rmnRemote = rmnRemoteAddr
             outboundSequenceNumbers = Map.empty
-            executedMessages = Set.empty
-            archivedExecutionContractIds = []
+            executedMessagesByPrefix = Map.empty
+            archivedExecutionContractIdsByPrefix = Map.empty
             customObservers = []
 
     receiverCid <- submit receiver do

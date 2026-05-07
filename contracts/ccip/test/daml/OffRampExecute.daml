@@ -330,8 +330,8 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
                 feeQuoter = RawInstanceAddress.make "unused-feequoter-token-only" ccipOwner
                 rmnRemote = rmnRemoteAddr
             outboundSequenceNumbers = Map.empty
-            executedMessages = Set.empty
-            archivedExecutionContractIds = []
+            executedMessagesByPrefix = Map.empty
+            archivedExecutionContractIdsByPrefix = Map.empty
             customObservers = []
 
     let message = MessageCodecV1.MessageV1 with

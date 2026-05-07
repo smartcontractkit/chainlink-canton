@@ -6,6 +6,7 @@ import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Set (Set)
 import DA.Set qualified as Set
+import DA.Text qualified as Text
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional, isNone)
@@ -51,6 +52,13 @@ maxExecutedMessagesSize : Int
 -- setup instead of relying on script-runner limits.
 maxExecutedMessagesSize = 25000
 
+-- | Two hex digits (one byte) of the message id, sharding archive contracts for replay lookup.
+executionArchivePrefix : BytesHex -> Text
+executionArchivePrefix messageHash =
+    if Text.length messageHash < 2 then
+        error "router: messageId must have 2+ hex chars for archive prefix"
+    else Text.take 2 messageHash
+
 addFeeForParty : Map.Map Party Decimal -> Party -> Decimal -> Map.Map Party Decimal
 addFeeForParty allocs recipient amount =
     let existing = fromOptional 0.0 (Map.lookup recipient allocs)
@@ -74,20 +82,22 @@ buildCCVFeeAllocations ccvFees ccvAmounts =
 
 lookupExecutedMessage
     : BytesHex
-    -> Set BytesHex
-    -> [ContractId ArchivedExecutedMessages]
+    -> Map.Map Text (Set BytesHex)
+    -> Map.Map Text [ContractId ArchivedExecutedMessages]
     -> Update Bool
-lookupExecutedMessage messageHash executedMessages archivedExecutionContractIds =
-    if Set.member messageHash executedMessages then pure True else
-        -- Searches newest-to-oldest as a heuristic because recent messages are
-        -- more likely to be queried or replayed than older messages.
+lookupExecutedMessage messageHash executedByPrefix archivedByPrefix =
+    let p = executionArchivePrefix messageHash
+        active = fromOptional Set.empty (Map.lookup p executedByPrefix)
+        archivedForP = fromOptional [] (Map.lookup p archivedByPrefix)
+    in if Set.member messageHash active then pure True else
+        -- Newest archive last in the list; scan newest-to-oldest.
         foldlA
             (\found archivedExecutionContractId ->
                 if found then pure True else do
                     exercise archivedExecutionContractId IsExecuted with messageHash
             )
             False
-            (reverse archivedExecutionContractIds)
+            (reverse archivedForP)
 
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
@@ -149,8 +159,8 @@ template PerPartyRouterFactory
                     instanceId = instanceId
                     deps = deps
                     outboundSequenceNumbers = Map.empty
-                    executedMessages = Set.empty
-                    archivedExecutionContractIds = []
+                    executedMessagesByPrefix = Map.empty
+                    archivedExecutionContractIdsByPrefix = Map.empty
                     customObservers = []
 
                 newFactoryCid <- create this with
@@ -196,15 +206,15 @@ data CreateRouterResult = CreateRouterResult
         factory : ContractId PerPartyRouterFactory
     deriving (Eq, Show)
 
--- | Archived set of executed messages.
--- This is used as a simple solution to avoid re-creating big maps every time an execution ends.
--- The expectation is that there won't be many users that go past the maxExecutedMessageSize limit -
--- we will consider a cleaner sharding or offchain indexing solution if this changes.
+-- | Archived full chunk of executed messages for one archive prefix (see 'executionArchivePrefix').
+-- A new contract is only created when freezing an active bucket that has reached
+-- 'maxExecutedMessagesSize' entries for that prefix, so 'executedMessages' here is always full.
 template ArchivedExecutedMessages
     with
         ccipOwner : Party
         partyOwner : Party
         perPartyRouterInstanceId : Text
+        prefix : Text
         archiveIndex : Int
         executedMessages : Set BytesHex
     where
@@ -227,8 +237,10 @@ template PerPartyRouter
         partyOwner : Party
         deps : PerPartyRouterDeps
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
-        executedMessages : Set BytesHex
-        archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
+        -- Live executed message ids keyed by the first byte of the message hash (two hex digits).
+        executedMessagesByPrefix : Map.Map Text (Set BytesHex)
+        -- Frozen chunks per prefix; each contract holds a full set of size 'maxExecutedMessagesSize'.
+        archivedExecutionContractIdsByPrefix : Map.Map Text [ContractId ArchivedExecutedMessages]
         customObservers : [Party]
     where
         signatory ccipOwner
@@ -570,8 +582,8 @@ template PerPartyRouter
                 let messageId = keccak256 encodedMessage
                 alreadyExecuted <- lookupExecutedMessage
                     messageId
-                    executedMessages
-                    archivedExecutionContractIds
+                    executedMessagesByPrefix
+                    archivedExecutionContractIdsByPrefix
                 if alreadyExecuted then abort "message already executed successfully" else pure ()
 
                 exercise offRampCid CCIP.OffRamp.PrepareExecute with
@@ -625,8 +637,8 @@ template PerPartyRouter
 
                 alreadyExecuted <- lookupExecutedMessage
                     messageId
-                    executedMessages
-                    archivedExecutionContractIds
+                    executedMessagesByPrefix
+                    archivedExecutionContractIdsByPrefix
 
                 if alreadyExecuted then abort "message already executed successfully" else pure ()
 
@@ -638,21 +650,30 @@ template PerPartyRouter
                     tokenAdminRegistryCid = tokenAdminRegistryCid
                     tokenConfigCid = tokenConfigCid
 
+                let p = executionArchivePrefix result.messageId
+                    bucket = fromOptional Set.empty (Map.lookup p executedMessagesByPrefix)
+                    archList = fromOptional [] (Map.lookup p archivedExecutionContractIdsByPrefix)
                 routerCid <-
-                    if Set.size executedMessages >= maxExecutedMessagesSize then do
+                    if Set.size bucket >= maxExecutedMessagesSize then do
+                        assertMsg "router: rollover archives a full bucket only"
+                            (Set.size bucket == maxExecutedMessagesSize)
                         archivedExecutionMessagesCid <- create ArchivedExecutedMessages with
                             ccipOwner = ccipOwner
                             partyOwner = partyOwner
                             perPartyRouterInstanceId = instanceId
-                            archiveIndex = length archivedExecutionContractIds
-                            executedMessages = executedMessages
+                            prefix = p
+                            archiveIndex = length archList
+                            executedMessages = bucket
                         create this with
-                            executedMessages = Set.singleton result.messageId
-                            archivedExecutionContractIds =
-                                archivedExecutionContractIds <> [archivedExecutionMessagesCid]
+                            executedMessagesByPrefix =
+                                Map.insert p (Set.singleton result.messageId) executedMessagesByPrefix
+                            archivedExecutionContractIdsByPrefix =
+                                Map.insert p (archList ++ [archivedExecutionMessagesCid])
+                                    archivedExecutionContractIdsByPrefix
                     else
                         create this with
-                            executedMessages = Set.insert result.messageId executedMessages
+                            executedMessagesByPrefix =
+                                Map.insert p (Set.insert result.messageId bucket) executedMessagesByPrefix
 
                 pure ExecuteResult with
                     router = routerCid
@@ -670,8 +691,8 @@ template PerPartyRouter
             do
                 alreadyExecuted <- lookupExecutedMessage
                     messageHash
-                    executedMessages
-                    archivedExecutionContractIds
+                    executedMessagesByPrefix
+                    archivedExecutionContractIdsByPrefix
                 pure $ if alreadyExecuted
                     then CCIP.Internal.SUCCESS
                     else CCIP.Internal.UNTOUCHED

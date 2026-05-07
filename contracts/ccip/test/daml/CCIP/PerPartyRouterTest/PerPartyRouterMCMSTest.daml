@@ -40,8 +40,8 @@ testPerPartyRouterMCMSEntrypoint_SetDeps = script do
       partyOwner
       deps = initialDeps
       outboundSequenceNumbers = Map.empty
-      executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      executedMessagesByPrefix = Map.empty
+      archivedExecutionContractIdsByPrefix = Map.empty
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -98,8 +98,8 @@ testPerPartyRouterMCMSEntrypoint_SetDeps_Partial = script do
       partyOwner
       deps = initialDeps
       outboundSequenceNumbers = Map.empty
-      executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      executedMessagesByPrefix = Map.empty
+      archivedExecutionContractIdsByPrefix = Map.empty
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -156,8 +156,8 @@ testPerPartyRouterMCMSEntrypoint_UnknownFunction = script do
       partyOwner
       deps
       outboundSequenceNumbers = Map.empty
-      executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      executedMessagesByPrefix = Map.empty
+      archivedExecutionContractIdsByPrefix = Map.empty
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -192,8 +192,8 @@ testPerPartyRouterMCMSEntrypoint_InvalidParams = script do
       partyOwner
       deps
       outboundSequenceNumbers = Map.empty
-      executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      executedMessagesByPrefix = Map.empty
+      archivedExecutionContractIdsByPrefix = Map.empty
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -228,8 +228,8 @@ testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
       partyOwner
       deps
       outboundSequenceNumbers = Map.empty
-      executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      executedMessagesByPrefix = Map.empty
+      archivedExecutionContractIdsByPrefix = Map.empty
       customObservers = []
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
