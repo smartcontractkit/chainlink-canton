@@ -170,23 +170,20 @@ template CommitteeVerifier
                     assertMsg ("ApplyAllowListUpdates: invalid chain selector: " <> show args.destChainSelector ) (args.destChainSelector >= 0.0)
                     DA.Action.unless args.allowListEnabled $ do
                         assertMsg "ApplyAllowListUpdates: cannot add allowed senders if allowlist is not enabled" (null args.addedAllowListedSenders)
-                -- Update
+                -- Update allow-list fields only; remote chain rows must exist (owner: ApplyRemoteChainConfigUpdates).
                 let updatedRemoteChainConfigs = foldl
-                        (\configs args -> do
-                            let remoteChainConfig = case Map.lookup args.destChainSelector configs of
-                                    Some config -> config with
-                                                allowListEnabled = args.allowListEnabled
-                                                -- remove senders in removedAllowListedSenders from the existing list, then add senders in addedAllowListedSenders, and dedup the final list
-                                                allowedSendersList = dedup ((config.allowedSendersList \\ args.removedAllowListedSenders) <> args.addedAllowListedSenders)
-                                    None -> RemoteChainConfig with
-                                                feeUSDCents = 0.0
-                                                gasForVerification = 0
-                                                payloadSizeBytes = 0
-                                                allowListEnabled = args.allowListEnabled
-                                                -- no need to remove from the existing list since it doesn't exist, just add senders in addedAllowListedSenders and dedup
-                                                allowedSendersList = dedup (args.addedAllowListedSenders)
-                            Map.insert args.destChainSelector remoteChainConfig configs
-                            ) remoteChainConfigs allowListConfigArgsItems
+                        (\configs args ->
+                            case Map.lookup args.destChainSelector configs of
+                                Some config ->
+                                    let updated = config with
+                                            allowListEnabled = args.allowListEnabled
+                                            allowedSendersList =
+                                                dedup ((config.allowedSendersList \\ args.removedAllowListedSenders)
+                                                    <> args.addedAllowListedSenders)
+                                    in Map.insert args.destChainSelector updated configs
+                                None ->
+                                    error ("ApplyAllowListUpdates: unknown dest chain: " <> show args.destChainSelector))
+                        remoteChainConfigs allowListConfigArgsItems
                 create this with
                     remoteChainConfigs = updatedRemoteChainConfigs
 

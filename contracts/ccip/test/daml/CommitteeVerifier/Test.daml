@@ -648,26 +648,56 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
             config.allowListEnabled === True
             config.allowedSendersList === [allowedParty1, allowedParty3] -- party2 should be removed, party3 should be added
 
-    -- Test updating allow list for a non-existing chain selector, should add new config with allow list enabled and only the added senders in the list
-    ccvCid <- submit owner do
+    -- Unknown dest chain: allow-list updates must not onboard new RemoteChainConfig rows.
+    submitMustFail owner do
         exerciseCmd ccvCid CommitteeVerifier.ApplyAllowListUpdates with
             allowListConfigArgsItems = [
                 CommitteeVerifier.AllowListConfigArgs with
                     destChainSelector = 456.0
                     allowListEnabled = True
                     addedAllowListedSenders = [allowedParty2]
-                    removedAllowListedSenders = [allowedParty1] -- should be a no-op since party1 is not in the allow list for this chain, but included here to test that removing non-existing senders does not cause an error
+                    removedAllowListedSenders = []
                 ]
             caller = owner
-    gotCCV <- fromSome <$> queryContractId owner ccvCid
+    submitMustFail admin do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyAllowListUpdates with
+            allowListConfigArgsItems = [
+                CommitteeVerifier.AllowListConfigArgs with
+                    destChainSelector = 456.0
+                    allowListEnabled = True
+                    addedAllowListedSenders = [allowedParty2]
+                    removedAllowListedSenders = []
+                ]
+            caller = admin
+
+    ccvCid <- submit owner do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [
+                CommitteeVerifier.RemoteChainConfigArgs with
+                    remoteChainSelector = 456.0
+                    feeUSDCents = 25.0
+                    gasForVerification = 2000
+                    payloadSizeBytes = 128
+                    allowListEnabled = False]
+    ccvCid <- submit admin do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyAllowListUpdates with
+            allowListConfigArgsItems = [
+                CommitteeVerifier.AllowListConfigArgs with
+                    destChainSelector = 456.0
+                    allowListEnabled = True
+                    addedAllowListedSenders = [allowedParty2]
+                    removedAllowListedSenders = []
+                ]
+            caller = admin
+    gotCCV <- fromSome <$> queryContractId admin ccvCid
     case Map.lookup 456.0 gotCCV.remoteChainConfigs of
         None -> assertMsg "Missing config for chain 456" False
         Some config -> do
-            config.feeUSDCents === 0.0 -- new config should have default values for fee, gas, and payload size
-            config.gasForVerification === 0
-            config.payloadSizeBytes === 0
+            config.feeUSDCents === 25.0
+            config.gasForVerification === 2000
+            config.payloadSizeBytes === 128
             config.allowListEnabled === True
-            config.allowedSendersList === [allowedParty2] -- new config should be created with party2 in the allow list
+            config.allowedSendersList === [allowedParty2]
 
     -- Test updating allow list as allow list admin
     ccvCid <- submit admin do
