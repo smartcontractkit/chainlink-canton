@@ -1639,6 +1639,141 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
 
     debug "testReleaseFromTicketDecimalConversionOverflowFails: PASSED"
 
+testReleaseFromTicketDecimalConversionTruncatesToZeroFails : Script ()
+testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
+    ccipOwner <- allocateParty "ccip-owner-decimals-zero"
+    rmnOwner <- allocateParty "rmn-owner-decimals-zero"
+    poolOwner <- allocateParty "pool-owner-decimals-zero"
+    receiver <- allocateParty "receiver-decimals-zero"
+
+    let rmnInstanceId = "test-rmn-decimals-zero"
+    let tokenAdminRegistryInstanceId = "test-tar-decimals-zero"
+    let tokenPoolInstanceId = "test-lock-release-pool-decimals-zero"
+    let sourceChainSelector : Numeric 0 = 123.0
+    let originalPoolAmount : Decimal = 10.0
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
+        ccipOwner
+        poolOwner
+        tokenAdminRegistryInstanceId
+        testInstrumentId
+        tokenPoolInstanceId
+
+    poolHolding <- submit (actAs poolOwner <> actAs ccipOwner) do
+        createCmd TestToken.TestHolding with
+            admin = ccipOwner
+            owner = poolOwner
+            amount = originalPoolAmount
+            instrumentId = testInstrumentId
+
+    receiverPreapproval <- submit (actAs receiver <> actAs ccipOwner) do
+        createCmd TestToken.TestTransferPreapproval with
+            admin = ccipOwner
+            receiver = receiver
+
+    transferFactory <- submit ccipOwner do
+        createCmd TestToken.TestTransferFactory with
+            admin = ccipOwner
+            preapprovalCid = Some receiverPreapproval
+
+    (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
+        poolOwner
+        tokenPoolInstanceId
+        sourceChainSelector
+        RateLimiter.RateLimitDirection_Inbound
+        100000000000.0
+        10000000.0
+
+    let remoteChainCfg = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = finalityConfig 0
+            inboundRateLimiter = inboundRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = inboundRateLimiterAddr
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            poolOwner = poolOwner
+            ccipOwner = ccipOwner
+            instanceId = tokenPoolInstanceId
+            instrumentId = testInstrumentId
+            decimals = 6
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, remoteChainCfg)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-decimals-zero" ccipOwner rmnOwner
+
+    let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 18.0)
+    tokenReceiveTicket <- submit ccipOwner do
+        createCmd Tickets.TokenReceiveTicket with
+            tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+            ccipOwner = ccipOwner
+            ccvOwners = []
+            verifiedCCVs = []
+            requiredInboundPoolCCVs = []
+            poolOwner = poolOwner
+            receiver = receiver
+            tokenReceiver = receiver
+            instrumentId = testInstrumentId
+            amount = fromSome (MessageCodecV1.encodeUint256 999999999999.0)
+            sourcePoolData = sourcePoolData
+            messageId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            sourceChainSelector = sourceChainSelector
+            finality = finalityConfig 0
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
+    disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+
+    submitMustFail (actAs receiver
+                    <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedFactory
+                    <> disclose disclosedPreapproval <> disclose disclosedRmn
+                    <> disclose disclosedRateLimiter) do
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            rmnRemoteCid = rmnRemote
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            caller = receiver
+
+    receiverHoldings <- query @TestToken.TestHolding receiver
+    length receiverHoldings === 0
+
+    poolHoldingAfter <- queryContractId poolOwner poolHolding
+    let poolHoldingData = fromSome poolHoldingAfter
+    poolHoldingData.amount === originalPoolAmount
+
+    ticketAfter <- queryContractId ccipOwner tokenReceiveTicket
+    assertMsg "ticket should remain when conversion truncates to zero" (isSome ticketAfter)
+
+    rateLimiterAfter <- queryContractId poolOwner inboundRateLimiter
+    let rateLimiterData = fromSome rateLimiterAfter
+    rateLimiterData.tokens === 100000000000.0
+
+    debug "testReleaseFromTicketDecimalConversionTruncatesToZeroFails: PASSED"
+
 -- | Test ReleaseFromTicket rejects tickets where a verified CCV instance owner
 -- is not part of the ticket signatory set.
 testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory : Script ()
@@ -2334,6 +2469,15 @@ testAddTokenSendRejectsExtraDataBeyondQuotedOverhead = script do
             amount = fromSome (MessageCodecV1.encodeUint256 100.0)
             destTokenAddress = "0000000000000000000000000000000000000099"
             extraData = "0011223344"
+
+    submitMustFail ccipOwner do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSend with
+            poolInstanceId = "pool-extra-bound"
+            poolOwner = poolOwner
+            instrumentId = testTokenInstrumentId
+            amount = "00"
+            destTokenAddress = "0000000000000000000000000000000000000099"
+            extraData = ""
 
     debug "testAddTokenSendRejectsExtraDataBeyondQuotedOverhead: PASSED"
 

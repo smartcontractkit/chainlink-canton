@@ -432,6 +432,7 @@ template TokenAdminRegistry
                 assertTokenConfigForInstrument instanceId owner entryCount instrumentId config
                 pool <- registeredPoolOrAbort "TAR outbound send" config
                 assertRegisteredPoolCaller "TAR outbound send" caller poolInstanceId pool
+                assertMsg "TAR outbound send: token amount must be 32 bytes" (byteCount amount == 32)
 
                 exercise sendingMessageCid CCIP.SendingMessageV1.AddTokenSend with
                     poolInstanceId = poolInstanceId
