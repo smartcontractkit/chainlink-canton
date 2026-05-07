@@ -58,6 +58,11 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, harness)
 	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
 
+	// Prepare prerequisites for sending messages
+	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
+	require.True(t, ok, "Canton chain cantonImpl must be *devenv.Chain")
+	require.NoError(t, cantonImpl.PrepareSendPrerequisites(ctx))
+
 	for _, client := range harness.AggregatorClients {
 		t.Cleanup(func() {
 			client.Close()

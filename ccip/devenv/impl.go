@@ -169,6 +169,9 @@ type Chain struct {
 	lastSentEvent cciptestinterfaces.MessageSentEvent
 
 	cfg *ccv.Cfg
+
+	routerAddress contracts.InstanceAddress
+	senderAddress contracts.InstanceAddress
 }
 
 func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
@@ -816,24 +819,16 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 	return cciptestinterfaces.ExecutionStateChangedEvent{}, nil // TODO: implement on-chain confirmation
 }
 
-// SendMessage implements cciptestinterfaces.CCIP17.
-func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, dataProvider cciptestinterfaces.ExtraArgsDataProvider, messageVersion uint8) (cciptestinterfaces.MessageSentEvent, error) {
-	opts, ok := dataProvider.(cciptestinterfaces.MessageOptions)
-	if !ok {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports cciptestinterfaces.MessageOptions, got %T", dataProvider)
-	}
-	if messageVersion != 3 {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports message version 3, got %d", messageVersion)
-	}
+// SetupSendPrerequisites sets up Canton sender specific prerequisites for sending a message.
+// eg: deploy per-party router, deploy ccipsender contract...
+func (c *Chain) PrepareSendPrerequisites(ctx context.Context) error {
 	participant := c.chain.Participants[0]
 	party := participant.PartyID
-
-	seqNo := c.nextSeq + 1
 
 	// Router for sender party.
 	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, party)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
+		return fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
 
 	// Deploy a sender-owned CCIPSender contract.
@@ -847,9 +842,33 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		OwnerParty: types.PARTY(party),
 	})
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to deploy ccip sender contract: %w", err)
+		return fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
 	senderAddress := contracts.HexToInstanceAddress(out.Output.Address)
+
+	c.routerAddress = routerAddress
+	c.senderAddress = senderAddress
+
+	return nil
+}
+
+// SendMessage implements cciptestinterfaces.CCIP17.
+func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, dataProvider cciptestinterfaces.ExtraArgsDataProvider, messageVersion uint8) (cciptestinterfaces.MessageSentEvent, error) {
+	opts, ok := dataProvider.(cciptestinterfaces.MessageOptions)
+	if !ok {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports cciptestinterfaces.MessageOptions, got %T", dataProvider)
+	}
+	if messageVersion != 3 {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports message version 3, got %d", messageVersion)
+	}
+	var unset contracts.InstanceAddress
+	if c.routerAddress == unset || c.senderAddress == unset {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+			"canton SendMessage: router or sender address is unset; call PrepareSendPrerequisites once before trying to send messages",
+		)
+	}
+	participant := c.chain.Participants[0]
+	party := participant.PartyID
 
 	// Fee Token
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
@@ -910,9 +929,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 	// TODO come up with a better way of doing this
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", routerAddress, err)
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}
 	var disclosedContracts []*apiv2.DisclosedContract
 	sendArgs := ccipsender.Send{
@@ -1049,7 +1068,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	// Call CCIPSend
 	ccipSendReport, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Send, c.chain, contract.ChoiceInput[ccipsender.Send]{
-		InstanceAddress:    senderAddress,
+		InstanceAddress:    c.senderAddress,
 		Args:               sendArgs,
 		MCMSEnabled:        false,
 		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),
@@ -1138,14 +1157,14 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	if !foundCCIPMessageSent {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
 	}
+
+	seqNo := c.nextSeq + 1
 	if foundEncodedMessage {
 		// Prefer the sequence from the encoded message since local process state can be stale
 		// across repeated test runs against a long-lived environment.
 		seqNo = uint64(decodedMessage.SequenceNumber)
-	}
-	if foundEncodedMessage {
 		messageID = computedMessageID
-	} else if foundEventMessageID {
+	} else if !foundEventMessageID {
 		messageID = eventMessageID
 	} else {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("CCIPMessageSent event missing both messageId and encodedMessage")
