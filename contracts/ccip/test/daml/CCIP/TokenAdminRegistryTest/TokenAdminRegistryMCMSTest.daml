@@ -8,7 +8,7 @@ import DA.Optional (fromSomeNote)
 
 import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.TokenAdminRegistry
 import CCIP.TokenAdminRegistryCodecGen (encodeSetPoolParams, encodeProposeAdminParams, encodeTransferAdminParams, encodeAcceptAdminParams)
 import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))

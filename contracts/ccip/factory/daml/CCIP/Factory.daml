@@ -23,8 +23,8 @@ import CCIP.Codec
   , decodeInstrumentId
   )
 import qualified CCIP.Context
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
-import MCMS.RawInstanceAddress (assertValidInstanceId)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (assertValidInstanceId)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1

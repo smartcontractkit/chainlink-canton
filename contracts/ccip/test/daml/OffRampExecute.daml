@@ -25,7 +25,7 @@ import CCIP.OffRamp qualified as OffRamp
 import CCIP.OffRampTypes qualified as OffRamp
 import CCIP.PerPartyRouter qualified as PerPartyRouter
 import CCIP.PerPartyRouterTypes qualified as PerPartyRouter
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes

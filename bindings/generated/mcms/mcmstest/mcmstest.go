@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/api"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "mcms-test"
-	PackageID   = "cc4a59c3d5f4f3440d5fe35c6e176f5f93e1c1ffed03567a824d9d14eafbd920"
+	PackageID   = "633009c96676a8d3d5bc70cd60add4add04453bc4caf632800f1d00448abe5c2"
 	SDKVersion  = "3.4.10"
 )
 
@@ -296,7 +296,7 @@ func (t Counter) ResetWithPackageID(contractID string, packageID string, args Re
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this Counter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t Counter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t Counter) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Mock.Counter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -306,7 +306,7 @@ func (t Counter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceive
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t Counter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t Counter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Mock.Counter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -317,7 +317,7 @@ func (t Counter) MCMSReceiverEntrypointWithPackageID(contractID string, packageI
 
 // Verify interface implementations for Counter
 
-var _ mcms.IMCMSReceiver = (*Counter)(nil)
+var _ api.IMCMSReceiver = (*Counter)(nil)
 
 // ForgedReceiver is a Template type
 type ForgedReceiver struct {
@@ -421,7 +421,7 @@ func (t ForgedReceiver) ArchiveWithPackageID(contractID string, packageID string
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this ForgedReceiver contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t ForgedReceiver) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t ForgedReceiver) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Mock.ForgedReceiver", "MCMSReceiver"),
 		ContractID: contractID,
@@ -431,7 +431,7 @@ func (t ForgedReceiver) MCMSReceiverEntrypoint(contractID string, args mcms.MCMS
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t ForgedReceiver) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t ForgedReceiver) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Mock.ForgedReceiver", "MCMSReceiver"),
 		ContractID: contractID,
@@ -442,7 +442,7 @@ func (t ForgedReceiver) MCMSReceiverEntrypointWithPackageID(contractID string, p
 
 // Verify interface implementations for ForgedReceiver
 
-var _ mcms.IMCMSReceiver = (*ForgedReceiver)(nil)
+var _ api.IMCMSReceiver = (*ForgedReceiver)(nil)
 
 // GetInstanceAddressChoice is a Record type
 type GetInstanceAddressChoice struct {

@@ -22,7 +22,7 @@ import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.RateLimiter qualified as RateLimiter
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 import CCIP.Tickets qualified as Tickets
@@ -2690,7 +2690,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             owner = ccipOwner
             instanceId = feeQuoterInstanceId
             feeTokens = Set.fromList [feeTokenId]
-            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
+            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
                 maxPerMsgGasLimit = 5000000
@@ -2838,7 +2838,7 @@ testCalculateFeePrefersPoolOverride = script do
             owner = ccipOwner
             instanceId = "test-feequoter-pool-override"
             feeTokens = Set.fromList [feeTokenId]
-            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
+            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
                 maxPerMsgGasLimit = 5000000
@@ -2991,7 +2991,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             owner = ccipOwner
             instanceId = "test-feequoter-pool-disabled"
             feeTokens = Set.fromList [feeTokenId]
-            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
+            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
                 maxPerMsgGasLimit = 5000000
@@ -3140,7 +3140,7 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
             owner = owner
             instanceId = "test-feequoter-defaults"
             feeTokens = Set.fromList [linkToken]
-            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
+            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
                 maxPerMsgGasLimit = 5000000

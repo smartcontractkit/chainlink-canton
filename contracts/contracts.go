@@ -18,27 +18,37 @@ const (
 	Coin = Package("coin")
 	Link = Package("link")
 
-	MCMS         = Package("mcms")
+	ChainlinkAPI         = Package("chainlink-api")
+	ChainlinkInstanceAPI = ChainlinkAPI
+
+	MCMSAPI      = Package("mcms-api")
+	MCMSCore     = Package("mcms-core")
+	MCMS         = MCMSCore
 	MCMSTest     = Package("mcms-test")
 	GlobalConfig = Package("globalconfig")
 
-	CCIPClient               = Package("ccip-client")
-	CCIPCommon               = Package("ccip-common")
+	CCIPCore                 = Package("ccip-core")
+	CCIPExtensionAPI         = Package("ccip-extension-api")
+	CCIPRuntime              = Package("ccip-runtime")
+	CCIPMain                 = CCIPRuntime
 	CCIPSender               = Package("ccip-sender")
 	CCIPReceiver             = Package("ccip-receiver")
-	CCIPCommitteeVerifier    = Package("ccip-committeeverifier")
-	CCIPFeeQuoter            = Package("ccip-feequoter")
-	CCIPTokenAdminRegistry   = Package("ccip-tokenadminregistry")
-	CCIPOnRamp               = Package("ccip-onramp")
-	CCIPOffRamp              = Package("ccip-offramp")
-	CCIPPoolInterfaces       = Package("ccip-tokenpool-interfaces")
-	CCIPLockReleaseTokenPool = Package("ccip-lockreleasetokenpool")
-	CCIPBurnMintTokenPool    = Package("ccip-burnminttokenpool")
-	CCIPPerPartyRouter       = Package("ccip-perpartyrouter")
+	CCIPCommitteeVerifier    = Package("ccip-committee-verifier")
 	CCIPExecutor             = Package("ccip-executor")
+	CCIPLockReleaseTokenPool = Package("ccip-lock-release-token-pool")
+	CCIPBurnMintTokenPool    = Package("ccip-burn-mint-token-pool")
 	CCIPFactory              = Package("ccip-factory")
-	CCIPRMN                  = Package("ccip-rmn")
 	CCIPTest                 = Package("ccip-test")
+
+	CCIPClient             = CCIPCore
+	CCIPCommon             = CCIPCore
+	CCIPFeeQuoter          = CCIPCore
+	CCIPTokenAdminRegistry = CCIPCore
+	CCIPRMN                = CCIPCore
+	CCIPOnRamp             = CCIPRuntime
+	CCIPOffRamp            = CCIPRuntime
+	CCIPPerPartyRouter     = CCIPRuntime
+	CCIPPoolInterfaces     = CCIPExtensionAPI
 
 	SpliceApiTokenBurnMintV1            = Package("splice-api-token-burn-mint-v1")
 	SpliceApiTokenHoldingV1             = Package("splice-api-token-holding-v1")
@@ -52,27 +62,23 @@ var Versions map[Package][]string = map[Package][]string{
 	Coin: []string{"0.0.1", CurrentVersion},
 	Link: []string{"0.0.1", CurrentVersion},
 
-	MCMS:         []string{"0.0.1", CurrentVersion},
-	MCMSTest:     []string{"0.0.1", CurrentVersion},
+	ChainlinkAPI: []string{"1.0.0", CurrentVersion},
+	MCMSAPI:      []string{"1.0.0", CurrentVersion},
+	MCMSCore:     []string{"1.0.0", CurrentVersion},
+	MCMSTest:     []string{"1.0.0", CurrentVersion},
 	GlobalConfig: []string{"1.0.0", "2.0.0", CurrentVersion},
 
-	CCIPClient:               []string{"0.0.1", CurrentVersion},
-	CCIPCommon:               []string{"0.0.1", CurrentVersion},
-	CCIPSender:               []string{"0.0.1", CurrentVersion},
-	CCIPReceiver:             []string{"0.0.1", CurrentVersion},
-	CCIPCommitteeVerifier:    []string{"0.0.1", CurrentVersion},
-	CCIPFeeQuoter:            []string{"0.0.1", CurrentVersion},
-	CCIPTokenAdminRegistry:   []string{"0.0.1", CurrentVersion},
-	CCIPOnRamp:               []string{"0.0.1", CurrentVersion},
-	CCIPOffRamp:              []string{"0.0.1", CurrentVersion},
-	CCIPPoolInterfaces:       []string{"0.0.1", CurrentVersion},
-	CCIPLockReleaseTokenPool: []string{"0.0.1", CurrentVersion},
-	CCIPBurnMintTokenPool:    []string{"0.0.1", CurrentVersion},
-	CCIPPerPartyRouter:       []string{"0.0.1", CurrentVersion},
-	CCIPExecutor:             []string{"0.0.1", CurrentVersion},
-	CCIPFactory:              []string{"0.0.1", CurrentVersion},
-	CCIPRMN:                  []string{"0.0.1", CurrentVersion},
-	CCIPTest:                 []string{"0.0.1", CurrentVersion},
+	CCIPCore:                 []string{"1.0.0", CurrentVersion},
+	CCIPExtensionAPI:         []string{"1.0.0", CurrentVersion},
+	CCIPRuntime:              []string{"1.0.0", CurrentVersion},
+	CCIPSender:               []string{"1.0.0", CurrentVersion},
+	CCIPReceiver:             []string{"1.0.0", CurrentVersion},
+	CCIPCommitteeVerifier:    []string{"1.0.0", CurrentVersion},
+	CCIPExecutor:             []string{"1.0.0", CurrentVersion},
+	CCIPLockReleaseTokenPool: []string{"1.0.0", CurrentVersion},
+	CCIPBurnMintTokenPool:    []string{"1.0.0", CurrentVersion},
+	CCIPFactory:              []string{"1.0.0", CurrentVersion},
+	CCIPTest:                 []string{"1.0.0", CurrentVersion},
 
 	SpliceApiTokenBurnMintV1:            []string{"1.0.0"},
 	SpliceApiTokenHoldingV1:             []string{"1.0.0"},
@@ -107,25 +113,21 @@ var OutputDirs = map[Package][]string{
 	Coin: []string{"coin"},
 	Link: []string{"link"},
 
-	MCMS:     []string{"mcms"},
-	MCMSTest: []string{"mcms", "mcmstest"},
+	ChainlinkAPI: []string{"chainlink", "chainlinkapi"},
+	MCMSAPI:      []string{"mcms", "api"},
+	MCMSCore:     []string{"mcms", "core"},
+	MCMSTest:     []string{"mcms", "mcmstest"},
 
-	CCIPClient:               []string{"ccip", "client"},
-	CCIPReceiver:             []string{"ccip", "ccipreceiver"},
-	CCIPSender:               []string{"ccip", "ccipsender"},
-	CCIPCommitteeVerifier:    []string{"ccip", "ccvs"},
-	CCIPCommon:               []string{"ccip", "common"},
-	CCIPFeeQuoter:            []string{"ccip", "feequoter"},
-	CCIPPoolInterfaces:       []string{"ccip", "interfaces"},
+	CCIPCore:                 []string{"ccip", "core"},
+	CCIPExtensionAPI:         []string{"ccip", "extensionapi"},
+	CCIPRuntime:              []string{"ccip", "ccipruntime"},
+	CCIPReceiver:             []string{"ccip", "receiver"},
+	CCIPSender:               []string{"ccip", "sender"},
+	CCIPCommitteeVerifier:    []string{"ccip", "committeeverifier"},
+	CCIPExecutor:             []string{"ccip", "executor"},
 	CCIPLockReleaseTokenPool: []string{"ccip", "lockreleasetokenpool"},
 	CCIPBurnMintTokenPool:    []string{"ccip", "burnminttokenpool"},
-	CCIPOffRamp:              []string{"ccip", "offramp"},
-	CCIPOnRamp:               []string{"ccip", "onramp"},
-	CCIPPerPartyRouter:       []string{"ccip", "perpartyrouter"},
-	CCIPExecutor:             []string{"ccip", "executor"},
 	CCIPFactory:              []string{"ccip", "factory"},
-	CCIPRMN:                  []string{"ccip", "rmn"},
-	CCIPTokenAdminRegistry:   []string{"ccip", "tokenadminregistry"},
 
 	SpliceApiTokenBurnMintV1:            []string{"splice", "splice_api_token_burn_mint_v1"},
 	SpliceApiTokenHoldingV1:             []string{"splice", "splice_api_token_holding_v1"},

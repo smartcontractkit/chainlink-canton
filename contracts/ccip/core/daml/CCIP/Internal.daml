@@ -1,0 +1,109 @@
+module CCIP.Internal where
+
+import DA.List (dedup)
+import DA.Optional (fromOptional, isSome)
+import qualified CCIP.MessageCodecV1
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+data MessageExecutionState
+  = UNTOUCHED
+  | IN_PROGRESS
+  | SUCCESS
+  | FAILURE
+  deriving (Eq, Show)
+
+useDefaultCCVs : RawInstanceAddress
+useDefaultCCVs = RawInstanceAddress "default-ccvs"
+
+assertCCVInstanceId
+    : Text
+    -> [RawInstanceAddress]
+    -> Optional [RawInstanceAddress]
+    -> Text
+    -> Party
+    -> Update ()
+assertCCVInstanceId msg requiredCCVs extraAllowedCCVs ccvInstanceId caller =
+    let claimed = RawInstanceAddress.make ccvInstanceId caller
+        allowedCCVs = dedup (requiredCCVs ++ fromOptional [] extraAllowedCCVs)
+    in assertMsg msg (claimed `elem` allowedCCVs)
+
+resolveDefaultCCVs : [RawInstanceAddress] -> RawInstanceAddress -> [RawInstanceAddress] -> [RawInstanceAddress]
+resolveDefaultCCVs defaultCCVs useDefaultCCVs ccvs =
+    foldl (\acc ccv ->
+        if ccv == useDefaultCCVs
+        then acc ++ defaultCCVs
+        else acc ++ [ccv]
+    ) [] ccvs
+
+-- EVM-style required CCV resolution: empty means use defaults; otherwise the
+-- useDefaultCCVs sentinel expands in place.
+resolveRequiredCCVsWithDefaults : [RawInstanceAddress] -> [RawInstanceAddress] -> [RawInstanceAddress]
+resolveRequiredCCVsWithDefaults defaultCCVs ccvs =
+    case ccvs of
+        [] -> defaultCCVs
+        _ -> resolveDefaultCCVs defaultCCVs useDefaultCCVs ccvs
+
+resolveOptionalCCVs
+    : [RawInstanceAddress]
+    -> [RawInstanceAddress]
+    -> Int
+    -> ([RawInstanceAddress], Int)
+resolveOptionalCCVs requiredCCVs optionalCCVs optionalThreshold =
+    foldl
+        (\(remainingOptional, remainingThreshold) requiredCCV ->
+            if requiredCCV `elem` remainingOptional
+            then
+                ( filter (/= requiredCCV) remainingOptional
+                , if remainingThreshold > 0 then remainingThreshold - 1 else 0
+                )
+            else (remainingOptional, remainingThreshold)
+        )
+        (optionalCCVs, optionalThreshold)
+        requiredCCVs
+
+computeExecuteCCVs
+    : [RawInstanceAddress]
+    -> [RawInstanceAddress]
+    -> CCIP.MessageCodecV1.MessageV1
+    -> [RawInstanceAddress]
+    -> [RawInstanceAddress]
+    -> Int
+    -> Update ([RawInstanceAddress], [RawInstanceAddress], Int)
+computeExecuteCCVs defaultCCVs laneMandatedCCVs message receiverRequiredCCVs receiverOptionalCCVs receiverOptionalThreshold =
+    let isTokenOnlyTransfer =
+            message.messageData == ""
+            && message.ccipReceiveGasLimit == 0
+            && isSome message.tokenTransfer
+    in
+        if isTokenOnlyTransfer
+        then pure ([], [], 0)
+        else do
+            assertMsg "offramp: receiver required CCVs cannot contain duplicates" (dedup receiverRequiredCCVs == receiverRequiredCCVs)
+            assertMsg "offramp: receiver optional CCVs cannot contain duplicates" (dedup receiverOptionalCCVs == receiverOptionalCCVs)
+            assertMsg "offramp: receiver optional threshold must be non-negative" (receiverOptionalThreshold >= 0)
+            assertMsg "offramp: receiver optional threshold cannot be higher than number of optional CCVs" (receiverOptionalThreshold <= length receiverOptionalCCVs)
+            assertMsg "offramp: receiver optional CCVs cannot contain useDefaultCCVs sentinel" (useDefaultCCVs `notElem` receiverOptionalCCVs)
+            let resolvedRequired = resolveRequiredCCVsWithDefaults defaultCCVs receiverRequiredCCVs
+            let baseRequiredCCVs = dedup (resolvedRequired ++ laneMandatedCCVs)
+            let (baseOptionalCCVs, baseOptionalCCVThreshold) =
+                    resolveOptionalCCVs
+                        baseRequiredCCVs
+                        receiverOptionalCCVs
+                        receiverOptionalThreshold
+            pure (baseRequiredCCVs, baseOptionalCCVs, baseOptionalCCVThreshold)
+
+mergeInboundPoolCCVs
+    : [RawInstanceAddress]
+    -> [RawInstanceAddress]
+    -> [RawInstanceAddress]
+    -> Int
+    -> [RawInstanceAddress]
+    -> ([RawInstanceAddress], [RawInstanceAddress], Int)
+mergeInboundPoolCCVs sourceDefaultCCVs requiredCCVs optionalCCVs optionalCCVThreshold poolCCVs =
+    let resolvedPoolCCVs = resolveRequiredCCVsWithDefaults sourceDefaultCCVs poolCCVs
+        mergedRequiredCCVs = dedup (requiredCCVs ++ resolvedPoolCCVs)
+        (mergedOptionalCCVs, mergedOptionalCCVThreshold) =
+            resolveOptionalCCVs resolvedPoolCCVs optionalCCVs optionalCCVThreshold
+    in
+        (mergedRequiredCCVs, mergedOptionalCCVs, mergedOptionalCCVThreshold)

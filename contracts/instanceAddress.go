@@ -12,9 +12,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-
-	mcms_bindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 )
 
 type RawInstanceAddress string
@@ -51,8 +50,8 @@ func (r RawInstanceAddress) InstanceAddress() InstanceAddress {
 	return InstanceAddress(h.Sum(nil))
 }
 
-func (r RawInstanceAddress) Binding() mcms_bindings.RawInstanceAddress {
-	return mcms_bindings.RawInstanceAddress{
+func (r RawInstanceAddress) Binding() chainlinkapi.RawInstanceAddress {
+	return chainlinkapi.RawInstanceAddress{
 		Unpack: types.TEXT(r),
 	}
 }

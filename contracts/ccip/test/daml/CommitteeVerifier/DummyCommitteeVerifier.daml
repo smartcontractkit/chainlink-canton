@@ -5,7 +5,7 @@ import DA.Crypto.Text (BytesHex)
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.SendingMessageV1
 import CCIP.Interfaces.CrossChainVerifier
-import MCMS.RawInstanceAddress (assertValidInstanceId)
+import Chainlink.InstanceAddress (assertValidInstanceId)
 
 -- | Dummy version tag for testing
 dummyVersionTag : BytesHex

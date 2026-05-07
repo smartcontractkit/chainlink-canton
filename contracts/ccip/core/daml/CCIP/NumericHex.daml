@@ -1,0 +1,134 @@
+-- | Full-precision Numeric 0 to hexadecimal helpers.
+--
+-- These helpers intentionally operate through decimal text rather than Int so
+-- uint64/uint256-sized protocol values do not lose precision on-ledger.
+module CCIP.NumericHex
+  ( encodeUint64
+  , encodeUint256
+  , numeric0ToDecimalString
+  , decimalStringToHex
+  , padLeft
+  ) where
+
+import DA.Crypto.Text (BytesHex)
+import DA.Text qualified as Text
+
+-- | Convert a Numeric 0 to decimal text, removing Daml's trailing ".0".
+numeric0ToDecimalString : Numeric 0 -> Text
+numeric0ToDecimalString n =
+    let str = show n
+    in if Text.isSuffixOf ".0" str
+       then Text.take (Text.length str - 2) str
+       else str
+
+-- | Encode a Numeric 0 as an 8-byte uint64.
+encodeUint64 : Numeric 0 -> Optional BytesHex
+encodeUint64 n =
+    let maxUint64 = 18446744073709551615.0
+    in if n < 0.0 || n > maxUint64
+       then None
+       else Some (padLeft 16 "0" (decimalStringToHex (numeric0ToDecimalString n)))
+
+-- | Encode a Numeric 0 as a 32-byte uint256.
+encodeUint256 : Numeric 0 -> Optional BytesHex
+encodeUint256 n
+    | n < 0.0 = None
+    | exceedsMaxUint256 n = None
+    | otherwise = Some (padLeft 64 "0" (decimalStringToHex (numeric0ToDecimalString n)))
+
+exceedsMaxUint256 : Numeric 0 -> Bool
+exceedsMaxUint256 n =
+    let maxUint256String = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+    in compareDecimalStrings (numeric0ToDecimalString n) maxUint256String
+
+-- | True when the first decimal string is numerically greater than the second.
+compareDecimalStrings : Text -> Text -> Bool
+compareDecimalStrings str1 str2 =
+    let len1 = Text.length str1
+        len2 = Text.length str2
+    in len1 > len2 || (len1 == len2 && str1 > str2)
+
+-- | Convert decimal text to hexadecimal text without going through Int.
+decimalStringToHex : Text -> Text
+decimalStringToHex "0" = "0"
+decimalStringToHex decStr =
+    let digits = parseDigits decStr []
+        hexResult = bigIntToHex digits
+    in if Text.length hexResult == 0 then "0" else hexResult
+
+parseDigits : Text -> [Int] -> [Int]
+parseDigits str acc =
+    if Text.length str == 0 then reverse acc
+    else
+        let firstChar = Text.take 1 str
+            rest = Text.drop 1 str
+            digit = case firstChar of
+                "0" -> 0
+                "1" -> 1
+                "2" -> 2
+                "3" -> 3
+                "4" -> 4
+                "5" -> 5
+                "6" -> 6
+                "7" -> 7
+                "8" -> 8
+                "9" -> 9
+                _ -> error ("Invalid digit: " <> firstChar)
+        in parseDigits rest (digit :: acc)
+
+bigIntToHex : [Int] -> Text
+bigIntToHex digits = bigIntToHexHelper digits ""
+
+bigIntToHexHelper : [Int] -> Text -> Text
+bigIntToHexHelper [] acc = acc
+bigIntToHexHelper ds acc =
+    case divideDigitsByBase ds 16 of
+        ([], 0) -> acc
+        ([], remainder) -> digitToHex remainder <> acc
+        (quotient, remainder) -> bigIntToHexHelper quotient (digitToHex remainder <> acc)
+
+divideDigitsByBase : [Int] -> Int -> ([Int], Int)
+divideDigitsByBase digits base = divideHelper digits base 0 []
+
+divideHelper : [Int] -> Int -> Int -> [Int] -> ([Int], Int)
+divideHelper [] _base carry quotientAcc = (reverse quotientAcc, carry)
+divideHelper (d :: ds) base carry quotientAcc =
+    let dividend = carry * 10 + d
+        newQuotient = dividend / base
+        newRemainder = dividend % base
+    in if newQuotient == 0 && null quotientAcc
+       then divideHelper ds base newRemainder quotientAcc
+       else divideHelper ds base newRemainder (newQuotient :: quotientAcc)
+
+digitToHex : Int -> Text
+digitToHex n = case n of
+    0 -> "0"
+    1 -> "1"
+    2 -> "2"
+    3 -> "3"
+    4 -> "4"
+    5 -> "5"
+    6 -> "6"
+    7 -> "7"
+    8 -> "8"
+    9 -> "9"
+    10 -> "a"
+    11 -> "b"
+    12 -> "c"
+    13 -> "d"
+    14 -> "e"
+    15 -> "f"
+    _ -> error ("Invalid hex digit: " <> show n)
+
+padLeft : Int -> Text -> Text -> Text
+padLeft targetLength padString str =
+    let currentLength = Text.length str
+        paddingNeeded = targetLength - currentLength
+    in if paddingNeeded <= 0
+       then str
+       else padHelper paddingNeeded padString <> str
+
+padHelper : Int -> Text -> Text
+padHelper n padStr =
+    if n <= 0 then ""
+    else padStr <> padHelper (n - 1) padStr

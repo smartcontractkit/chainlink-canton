@@ -8,7 +8,7 @@ import CCIP.ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.Internal qualified as Internal
 import qualified CCIP.MessageCodecV1
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 
 finalityConfig n =

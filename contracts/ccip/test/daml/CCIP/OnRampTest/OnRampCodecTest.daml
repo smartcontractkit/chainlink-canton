@@ -7,7 +7,7 @@ import DA.Assert ((===))
 import CCIP.OnRamp (orderedVerifierDataByCCVs)
 import CCIP.OnRampTypes (OnRampDeps(..), SetDepsParams(..))
 import CCIP.OnRampCodecGen (encodeSetDepsParams, decodeSetDepsParamsAt, encodeOnRampDeps, decodeOnRampDepsAt)
-import MCMS.RawInstanceAddress (RawInstanceAddress(..), make, toInstanceAddress)
+import Chainlink.InstanceAddress (RawInstanceAddress(..), make, toInstanceAddress)
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 -- ===========================================================================

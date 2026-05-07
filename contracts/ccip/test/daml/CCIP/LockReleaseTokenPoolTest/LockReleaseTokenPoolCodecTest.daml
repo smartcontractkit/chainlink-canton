@@ -17,7 +17,7 @@ import CCIP.LockReleaseTokenPoolTypes (
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
     )
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.Context qualified as Context
 import CCIP.ContextCodec (encodeChoiceContext, decodeChoiceContextAt)
 import DA.TextMap qualified as TextMap

@@ -7,7 +7,7 @@ import DA.Assert ((===))
 import DA.Map qualified as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote
 import CCIP.RMNRemoteCodecGen
 import CCIP.RMNRemoteTypes

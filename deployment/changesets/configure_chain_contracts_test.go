@@ -196,19 +196,21 @@ func setupCantonEnv(t *testing.T) (*canton.Chain, cld_ops.Bundle, *cldf.Environm
 func uploadDARs(t *testing.T, participant canton.Participant, packages ...contracts.Package) {
 	t.Helper()
 
-	darData := make([]*participantv30.UploadDarRequest_UploadDarData, 0, len(packages))
+	// Upload one DAR per request: after DAR consolidation, the combined request can exceed
+	// Canton admin API's default 10 MiB gRPC message limit even though each DAR is valid.
 	for _, pkg := range packages {
 		dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
 		require.NoError(t, err, "failed to get DAR for %s", pkg)
-		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{Bytes: dar})
-	}
 
-	_, err := participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
-		Dars:               darData,
-		VetAllPackages:     true,
-		SynchronizeVetting: true,
-	})
-	require.NoError(t, err, "failed to upload DAR files")
+		_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+			Dars: []*participantv30.UploadDarRequest_UploadDarData{
+				{Bytes: dar},
+			},
+			VetAllPackages:     true,
+			SynchronizeVetting: true,
+		})
+		require.NoError(t, err, "failed to upload DAR for %s", pkg)
+	}
 }
 
 // uploadChainContractDARs uploads all CCIP chain contract DARs needed by DeployChainContracts.
