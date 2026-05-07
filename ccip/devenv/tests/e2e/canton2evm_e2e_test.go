@@ -28,8 +28,9 @@ import (
 )
 
 const (
-	cantonToEVMTokenTransferAmount = int64(1000)
-	cantonToEVMDecimalsScale       = int64(100_000_000) // Canton 10 decimals -> EVM 18 decimals
+	cantonToEVMTokenTransferAmount  = int64(1000)
+	cantonToEVMDecimalsScale        = int64(100_000_000) // Canton 10 decimals -> EVM 18 decimals
+	cantonToEVMTokenSequentialSends = 2
 )
 
 //nolint:paralleltest // we won't run this in parallel.
@@ -189,49 +190,53 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)
 
-		sendMessageResult, err := cantonChain.SendMessage(
-			subtestCtx,
-			evmChain.ChainSelector(),
-			cciptestinterfaces.MessageFields{
-				Receiver: receiver,
-				Data:     []byte("canton2evm token transfer"),
-				TokenAmount: cciptestinterfaces.TokenAmount{
-					Amount: big.NewInt(cantonToEVMTokenTransferAmount),
-				},
-			},
-			cciptestinterfaces.MessageOptions{
-				ExecutionGasLimit: 500_000,
-				FinalityConfig:    1,
-				Executor:          executorAddr,
-				CCVs: []protocol.CCV{
-					{
-						CCVAddress: ccvAddr,
-						Args:       []byte{},
-						ArgsLen:    0,
+		for sendIdx := range cantonToEVMTokenSequentialSends {
+			t.Logf("Token transfer send %d/%d", sendIdx+1, cantonToEVMTokenSequentialSends)
+			sendMessageResult, err := cantonChain.SendMessage(
+				subtestCtx,
+				evmChain.ChainSelector(),
+				cciptestinterfaces.MessageFields{
+					Receiver: receiver,
+					Data:     []byte("canton2evm token transfer"),
+					TokenAmount: cciptestinterfaces.TokenAmount{
+						Amount: big.NewInt(cantonToEVMTokenTransferAmount),
 					},
 				},
-			},
-			3,
-		)
-		require.NoError(t, err)
-		require.NotNil(t, sendMessageResult.Message)
-		require.NotNil(t, sendMessageResult.Message.TokenTransfer)
-		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
+				cciptestinterfaces.MessageOptions{
+					ExecutionGasLimit: 500_000,
+					FinalityConfig:    1,
+					Executor:          executorAddr,
+					CCVs: []protocol.CCV{
+						{
+							CCVAddress: ccvAddr,
+							Args:       []byte{},
+							ArgsLen:    0,
+						},
+					},
+				},
+				3,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, sendMessageResult.Message)
+			require.NotNil(t, sendMessageResult.Message.TokenTransfer)
+			seqNo := uint64(sendMessageResult.Message.SequenceNumber)
 
-		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
-		require.NoError(t, err)
-		require.NotNil(t, sentEvent.Message)
-		require.NotNil(t, sentEvent.Message.TokenTransfer)
+			sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+			require.NoError(t, err)
+			require.NotNil(t, sentEvent.Message)
+			require.NotNil(t, sentEvent.Message.TokenTransfer)
 
-		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
-		require.NoError(t, err)
-		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+			ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+			require.NoError(t, err)
+			require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		}
 
 		receiverBalanceAfter, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
 		expectedTransferAmount := new(big.Int).Mul(big.NewInt(cantonToEVMTokenTransferAmount), big.NewInt(cantonToEVMDecimalsScale))
-		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), expectedTransferAmount)
+		totalExpectedTransfer := new(big.Int).Mul(expectedTransferAmount, big.NewInt(cantonToEVMTokenSequentialSends))
+		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), totalExpectedTransfer)
 		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter)
 		t.Logf("EVM receiver token balance: before=%s after=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String())
 	})
