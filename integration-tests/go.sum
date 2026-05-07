@@ -797,10 +797,10 @@ github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260
 github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139/go.mod h1:1WcontO9PeuKdUf5HXfs3nuICtzUvFNnyCmrHkTCF9Y=
 github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260429214841-fb2e77efc1aa h1:mYKrhv8vZiy6Pn8V57WjcUfJ6ozbbmQXs8OwiVdqmkU=
 github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260429214841-fb2e77efc1aa/go.mod h1:Ls0oszLvhzV3/D0ivG85sh8qmmcsVhKplmepQdFq98E=
-github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260505152945-3371b76fd18c h1:HRGaZOzXUpzDElCPO6Fp1lg/3FftUiOH83VtnwyfPZs=
-github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260505152945-3371b76fd18c/go.mod h1:C+O5xWDAMEc/3VpOqIimCp81GFGtYLnHCEWVEe4zVUQ=
-github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260505152945-3371b76fd18c h1:ZolRfftgDYpKdWmoGrRnyoatxu5N9wDEogi7pNMsXS4=
-github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260505152945-3371b76fd18c/go.mod h1:DRH23Vz/5yxZ3rAADzp74kFS0HYhIiCMfKpBB9/vNbQ=
+github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260507160552-243e7c84b837 h1:UQDvvZHTtSKMFUx1QHOHSVC60eglWuy+QgsmzGIhURc=
+github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260507160552-243e7c84b837/go.mod h1:p11egcwMlucHYcohhQJbVs+XTUHPVRv3q/j6kQPa6Yc=
+github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260507160552-243e7c84b837 h1:F66cc+z3XGcy59b6FodkDhQHWkdw5Mm3QmMs5vlcvDc=
+github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260507160552-243e7c84b837/go.mod h1:/F4J+8XfpMxtRJ46L1z7UxBqW+2NIYgn6GcW5kUV2vA=
 github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260428205321-9ce8f4c44d23 h1:1Rt4HLpwbRN1YtBFcbsxSJYIiUP2wJ11qizevOEeCrs=
 github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260428205321-9ce8f4c44d23/go.mod h1:V+wrhuNve+JiFwoBr25d6y0lL1rYSCSJhTFyloL3ueo=
 github.com/smartcontractkit/chainlink-common v0.11.2-0.20260407150650-8115835abd6e h1:SLnJ0/55Rcn9/9OWrjhvhOTDW9+Bhd63v1tY4dvqtQM=
