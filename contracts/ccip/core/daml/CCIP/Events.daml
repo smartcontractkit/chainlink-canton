@@ -68,7 +68,8 @@ data TokenReceiveTicketClaimedEvent = TokenReceiveTicketClaimedEvent
         verifiedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
         tokenAdminRegistryInstanceId : Text
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
+        sourceAmount : BytesHex
+        localAmount : Numeric 0
         sourcePoolData : BytesHex
         messageId : BytesHex
         sourceChainSelector : Numeric 0

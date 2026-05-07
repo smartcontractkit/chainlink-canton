@@ -411,7 +411,7 @@ template TokenAdminRegistry
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 poolInstanceId : Text
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                amount : Numeric 0
+                amount : BytesHex
                 destTokenAddress : BytesHex
                 extraData : BytesHex
                 caller : Party

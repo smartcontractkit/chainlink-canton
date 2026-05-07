@@ -154,7 +154,7 @@ template ExecutingMessageV1
                 maybeTicketReceiver : Optional Party
                 maybeTokenReceiver : Optional Party
                 maybeInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
-                maybeAmount : Optional (Numeric 0)
+                maybeAmount : Optional BytesHex
                 returnData : BytesHex
             controller ccipOwner
             do

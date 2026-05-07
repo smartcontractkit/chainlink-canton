@@ -51,7 +51,7 @@ template TokenReceiveTicket
         tokenReceiver : Party       -- Who gets the tokens (may differ from receiver)
 
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
+        amount : BytesHex
         sourcePoolData : BytesHex
 
         messageId : BytesHex

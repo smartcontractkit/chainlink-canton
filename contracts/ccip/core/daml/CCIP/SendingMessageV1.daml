@@ -52,7 +52,7 @@ data TokenSendData = TokenSendData
         poolInstanceId : Text
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
+        amount : BytesHex
         destTokenAddress : BytesHex
         extraData : BytesHex
     deriving (Eq, Show)
@@ -467,7 +467,7 @@ template SendingMessageV1
                 poolInstanceId : Text
                 poolOwner : Party
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                amount : Numeric 0
+                amount : BytesHex
                 destTokenAddress : BytesHex
                 extraData : BytesHex
             controller ccipOwner

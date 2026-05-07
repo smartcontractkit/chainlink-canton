@@ -1,0 +1,331 @@
+-- | Helpers for exact uint256 wire amounts.
+--
+-- MessageV1 token amounts are source-denominated uint256 values. They can be
+-- larger than Canton's Numeric 0 range and must be preserved exactly until the
+-- destination pool applies source-to-local decimal conversion.
+module CCIP.Uint256
+  ( LocalAmountConversionResult(..)
+  , maxUint256DecimalText
+  , maxNumeric0DecimalText
+  , isUint256Bytes
+  , uint256BytesToDecimalText
+  , decimalTextToUint256Bytes
+  , numeric0ToUint256Bytes
+  , decimalTextFitsNumeric0
+  , calculateLocalAmountFromUint256Checked
+  , calculateLocalAmountFromDecimalTextChecked
+  ) where
+
+import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Text qualified as Text
+
+import CCIP.NumericHex qualified as NumericHex
+
+maxUint256DecimalText : Text
+maxUint256DecimalText = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+
+maxNumeric0DecimalText : Text
+maxNumeric0DecimalText = "99999999999999999999999999999999999999"
+
+data LocalAmountConversionResult = LocalAmountConversionResult
+    with
+        localAmount : Numeric 0
+        truncatedRemainder : Text
+        wasTruncated : Bool
+    deriving (Eq, Show)
+
+isUint256Bytes : BytesHex -> Bool
+isUint256Bytes raw = byteCount raw == 32
+
+uint256BytesToDecimalText : BytesHex -> Optional Text
+uint256BytesToDecimalText raw =
+    if not (isUint256Bytes raw) then None
+    else hexToDecimalString raw
+
+decimalTextToUint256Bytes : Text -> Optional BytesHex
+decimalTextToUint256Bytes raw = do
+    normalized <- normalizeDecimalText raw
+    if decimalTextGreaterThan normalized maxUint256DecimalText
+    then None
+    else Some (NumericHex.padLeft 64 "0" (NumericHex.decimalStringToHex normalized))
+
+numeric0ToUint256Bytes : Numeric 0 -> Optional BytesHex
+numeric0ToUint256Bytes n =
+    decimalTextToUint256Bytes (NumericHex.numeric0ToDecimalString n)
+
+decimalTextFitsNumeric0 : Text -> Bool
+decimalTextFitsNumeric0 raw =
+    case normalizeDecimalText raw of
+        None -> False
+        Some normalized -> not (decimalTextGreaterThan normalized maxNumeric0DecimalText)
+
+calculateLocalAmountFromUint256Checked
+    : Text
+    -> BytesHex
+    -> Int
+    -> Int
+    -> Optional LocalAmountConversionResult
+calculateLocalAmountFromUint256Checked label remoteAmountBytes remoteDecimals localDecimals = do
+    remoteAmountText <- uint256BytesToDecimalText remoteAmountBytes
+    calculateLocalAmountFromDecimalTextChecked label remoteAmountText remoteDecimals localDecimals
+
+calculateLocalAmountFromDecimalTextChecked
+    : Text
+    -> Text
+    -> Int
+    -> Int
+    -> Optional LocalAmountConversionResult
+calculateLocalAmountFromDecimalTextChecked _label rawRemoteAmount remoteDecimals localDecimals = do
+    remoteAmount <- normalizeDecimalText rawRemoteAmount
+    if decimalTextGreaterThan remoteAmount maxUint256DecimalText
+    then None
+    else if remoteDecimals < 0 || remoteDecimals > 255 || localDecimals < 0 || localDecimals > 255 then None
+    else
+        let diff = localDecimals - remoteDecimals
+        in if diff == 0 then do
+            local <- parseNumeric0 remoteAmount
+            Some LocalAmountConversionResult with
+                localAmount = local
+                truncatedRemainder = "0"
+                wasTruncated = False
+        else if diff > 0 then do
+            scaled <- multiplyDecimalByPow10 remoteAmount diff
+            local <- parseNumeric0 scaled
+            Some LocalAmountConversionResult with
+                localAmount = local
+                truncatedRemainder = "0"
+                wasTruncated = False
+        else do
+            let scalePow = abs diff
+            let (quotient, remainder) = divideDecimalByPow10 remoteAmount scalePow
+            local <- parseNumeric0 quotient
+            let normalizedRemainder = normalizeDecimalTextOrZero remainder
+            Some LocalAmountConversionResult with
+                localAmount = local
+                truncatedRemainder = normalizedRemainder
+                wasTruncated = normalizedRemainder /= "0"
+
+normalizeDecimalText : Text -> Optional Text
+normalizeDecimalText raw
+    | Text.length raw == 0 = None
+    | otherwise =
+        if allDecimalDigits raw
+        then Some (normalizeDecimalTextOrZero raw)
+        else None
+
+normalizeDecimalTextOrZero : Text -> Text
+normalizeDecimalTextOrZero raw =
+    let stripped = stripLeadingZeros raw
+    in if Text.length stripped == 0 then "0" else stripped
+
+allDecimalDigits : Text -> Bool
+allDecimalDigits raw =
+    if Text.length raw == 0 then True
+    else
+        let c = Text.take 1 raw
+            rest = Text.drop 1 raw
+        in isDecimalDigit c && allDecimalDigits rest
+
+isDecimalDigit : Text -> Bool
+isDecimalDigit c =
+    c == "0" || c == "1" || c == "2" || c == "3" || c == "4"
+        || c == "5" || c == "6" || c == "7" || c == "8" || c == "9"
+
+stripLeadingZeros : Text -> Text
+stripLeadingZeros raw
+    | Text.length raw == 0 = ""
+    | Text.take 1 raw == "0" = stripLeadingZeros (Text.drop 1 raw)
+    | otherwise = raw
+
+decimalTextGreaterThan : Text -> Text -> Bool
+decimalTextGreaterThan a b =
+    let na = normalizeDecimalTextOrZero a
+        nb = normalizeDecimalTextOrZero b
+        la = Text.length na
+        lb = Text.length nb
+    in la > lb || (la == lb && na > nb)
+
+parseNumeric0 : Text -> Optional (Numeric 0)
+parseNumeric0 raw = do
+    normalized <- normalizeDecimalText raw
+    if decimalTextGreaterThan normalized maxNumeric0DecimalText then None
+    else Some (parseNumeric0Unchecked normalized)
+
+parseNumeric0Unchecked : Text -> Numeric 0
+parseNumeric0Unchecked raw =
+    if Text.length raw == 0 then 0.0
+    else
+        let len = Text.length raw
+            lastChar = Text.take 1 (Text.drop (len - 1) raw)
+            rest = Text.take (len - 1) raw
+            digit = case lastChar of
+                "0" -> 0.0
+                "1" -> 1.0
+                "2" -> 2.0
+                "3" -> 3.0
+                "4" -> 4.0
+                "5" -> 5.0
+                "6" -> 6.0
+                "7" -> 7.0
+                "8" -> 8.0
+                "9" -> 9.0
+                _ -> error ("parseNumeric0Unchecked: invalid decimal digit " <> lastChar)
+        in digit + 10.0 * parseNumeric0Unchecked rest
+
+multiplyDecimalByPow10 : Text -> Int -> Optional Text
+multiplyDecimalByPow10 raw pow
+    | pow < 0 = None
+    | otherwise =
+        let normalized = normalizeDecimalTextOrZero raw
+        in if normalized == "0" then Some "0"
+           else Some (normalized <> repeatText pow "0")
+
+divideDecimalByPow10 : Text -> Int -> (Text, Text)
+divideDecimalByPow10 raw pow =
+    let normalized = normalizeDecimalTextOrZero raw
+        len = Text.length normalized
+    in if pow <= 0 then (normalized, "0")
+       else if len <= pow then ("0", normalized)
+       else
+          let splitAt = len - pow
+          in ( normalizeDecimalTextOrZero (Text.take splitAt normalized)
+             , normalizeDecimalTextOrZero (Text.drop splitAt normalized)
+             )
+
+repeatText : Int -> Text -> Text
+repeatText n t =
+    if n <= 0 then ""
+    else t <> repeatText (n - 1) t
+
+hexToDecimalString : BytesHex -> Optional Text
+hexToDecimalString hex = do
+    hexDigits <- hexStringToDigits hex []
+    Some (normalizeDecimalTextOrZero (hexDigitsToDecimal hexDigits))
+
+hexStringToDigits : Text -> [Int] -> Optional [Int]
+hexStringToDigits raw acc =
+    if Text.length raw == 0 then Some acc
+    else
+        let c = Text.take 1 raw
+            rest = Text.drop 1 raw
+        in case hexDigit c of
+            None -> None
+            Some d -> hexStringToDigits rest (acc ++ [d])
+
+hexDigit : Text -> Optional Int
+hexDigit c = case c of
+    "0" -> Some 0
+    "1" -> Some 1
+    "2" -> Some 2
+    "3" -> Some 3
+    "4" -> Some 4
+    "5" -> Some 5
+    "6" -> Some 6
+    "7" -> Some 7
+    "8" -> Some 8
+    "9" -> Some 9
+    "a" -> Some 10
+    "b" -> Some 11
+    "c" -> Some 12
+    "d" -> Some 13
+    "e" -> Some 14
+    "f" -> Some 15
+    "A" -> Some 10
+    "B" -> Some 11
+    "C" -> Some 12
+    "D" -> Some 13
+    "E" -> Some 14
+    "F" -> Some 15
+    _ -> None
+
+hexDigitsToDecimal : [Int] -> Text
+hexDigitsToDecimal digits =
+    foldl
+        (\acc d -> addDecimalStrings (multiplyDecimalBySmall acc 16) (intDigitToDecimalText d))
+        "0"
+        digits
+
+multiplyDecimalBySmall : Text -> Int -> Text
+multiplyDecimalBySmall raw factor =
+    let digits = parseDigits raw []
+        result = multiplyDigitsBySmall digits factor
+    in digitsToDecimalString result
+
+multiplyDigitsBySmall : [Int] -> Int -> [Int]
+multiplyDigitsBySmall digits factor = multiplyDigitsBySmallGo (reverse digits) factor 0 []
+
+multiplyDigitsBySmallGo : [Int] -> Int -> Int -> [Int] -> [Int]
+multiplyDigitsBySmallGo [] _ carry acc = if carry == 0 then acc else prependCarryDigits carry acc
+multiplyDigitsBySmallGo (d :: ds) factor carry acc =
+    let product = d * factor + carry
+        newDigit = product % 10
+        newCarry = product / 10
+    in multiplyDigitsBySmallGo ds factor newCarry (newDigit :: acc)
+
+prependCarryDigits : Int -> [Int] -> [Int]
+prependCarryDigits carry acc =
+    if carry < 10 then carry :: acc
+    else prependCarryDigits (carry / 10) ((carry % 10) :: acc)
+
+addDecimalStrings : Text -> Text -> Text
+addDecimalStrings a b =
+    let digitsA = reverse (parseDigits a [])
+        digitsB = reverse (parseDigits b [])
+        result = addDigitLists digitsA digitsB 0
+    in digitsToDecimalString (reverse result)
+
+addDigitLists : [Int] -> [Int] -> Int -> [Int]
+addDigitLists [] [] carry = if carry == 0 then [] else [carry]
+addDigitLists (a :: as) [] carry =
+    let total = a + carry
+    in (total % 10) :: addDigitLists as [] (total / 10)
+addDigitLists [] (b :: bs) carry =
+    let total = b + carry
+    in (total % 10) :: addDigitLists [] bs (total / 10)
+addDigitLists (a :: as) (b :: bs) carry =
+    let total = a + b + carry
+    in (total % 10) :: addDigitLists as bs (total / 10)
+
+parseDigits : Text -> [Int] -> [Int]
+parseDigits raw acc =
+    if Text.length raw == 0 then reverse acc
+    else
+        let c = Text.take 1 raw
+            rest = Text.drop 1 raw
+            digit = case c of
+                "0" -> 0
+                "1" -> 1
+                "2" -> 2
+                "3" -> 3
+                "4" -> 4
+                "5" -> 5
+                "6" -> 6
+                "7" -> 7
+                "8" -> 8
+                "9" -> 9
+                _ -> error ("parseDigits: invalid decimal digit " <> c)
+        in parseDigits rest (digit :: acc)
+
+digitsToDecimalString : [Int] -> Text
+digitsToDecimalString [] = "0"
+digitsToDecimalString digits = foldl (<>) "" (map intDigitToDecimalText digits)
+
+intDigitToDecimalText : Int -> Text
+intDigitToDecimalText n = case n of
+    0 -> "0"
+    1 -> "1"
+    2 -> "2"
+    3 -> "3"
+    4 -> "4"
+    5 -> "5"
+    6 -> "6"
+    7 -> "7"
+    8 -> "8"
+    9 -> "9"
+    10 -> "10"
+    11 -> "11"
+    12 -> "12"
+    13 -> "13"
+    14 -> "14"
+    15 -> "15"
+    _ -> error ("intDigitToDecimalText: invalid digit " <> show n)

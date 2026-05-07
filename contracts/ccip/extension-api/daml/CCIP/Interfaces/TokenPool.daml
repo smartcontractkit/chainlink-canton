@@ -36,7 +36,7 @@ interface ITokenPool where
     nonconsuming choice TokenPool_GetRequiredCCVs : [RawInstanceAddress]
         with
             remoteChainSelector : Numeric 0
-            amount : Decimal
+            sourceAmount : BytesHex
             finality : CCIP.FinalityConfig.FinalityConfig
             extraData : BytesHex
             direction : TransferDirection
