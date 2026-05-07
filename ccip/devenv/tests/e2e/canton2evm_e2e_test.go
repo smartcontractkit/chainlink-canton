@@ -61,7 +61,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	// Prepare prerequisites for sending messages
 	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
 	require.True(t, ok, "Canton chain cantonImpl must be *devenv.Chain")
-	require.NoError(t, cantonImpl.PrepareSendPrerequisites(ctx))
 
 	for _, client := range harness.AggregatorClients {
 		t.Cleanup(func() {
@@ -76,6 +75,11 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
+
+		// TODO: remove hardcoded values
+		require.NoError(t, cantonImpl.SetupSend(ctx, false))
+		require.NoError(t, cantonImpl.MintTokens(ctx, 2_000_000, 0)) // TODO: add a buffer here
+		require.NoError(t, cantonImpl.PrepareSendHoldings(ctx, 1, 1_000_000, nil))
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -160,6 +164,11 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
+
+		// TODO: remove hardcoded values
+		require.NoError(t, cantonImpl.SetupSend(ctx, true))
+		require.NoError(t, cantonImpl.MintTokens(ctx, 4_000_000, 4_000_000)) // TODO: add a buffer here
+		require.NoError(t, cantonImpl.PrepareSendHoldings(ctx, 2, 1_000_000, new(uint64(cantonToEVMTokenTransferAmount))))
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)

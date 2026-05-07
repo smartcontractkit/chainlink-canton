@@ -16,11 +16,21 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
+
+// TransferFactoryV2 is the transfer-instruction registry response (factory id, disclosures, choice context, transfer kind).
+type TransferFactoryV2 struct {
+	FactoryID          string
+	DisclosedContracts []*apiv2.DisclosedContract
+	ChoiceContextData  map[string]any
+	TransferKind       transferInstructionV1.TransferFactoryWithChoiceContextTransferKind
+}
 
 func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, error) {
 	values, ok := choiceContextData["values"].(map[string]any)
@@ -205,22 +215,57 @@ func GetRegistryAdmin(ctx context.Context, metadataClient tokenMetadataV1.Client
 	return registryInfoResponse.JSON200.AdminId, nil
 }
 
+// Deprecated: use GetTransferFactoryV2 where amount, instrumentId, and input holdings can be set.
 func GetTransferFactory(ctx context.Context, transferInstructionClient transferInstructionV1.ClientWithResponsesInterface, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, map[string]any, error) {
+	choice, err := GetTransferFactoryV2(ctx, transferInstructionClient, registryAdmin, splice_api_token_transfer_instruction_v1.Transfer{
+		Sender:   types.PARTY(sender),
+		Receiver: types.PARTY(receiver),
+		Amount:   types.NUMERIC("100.00"),
+		InstrumentId: splice_api_token_holding_v1.InstrumentId{
+			Admin: types.PARTY(registryAdmin),
+			Id:    types.TEXT("Amulet"),
+		},
+		RequestedAt:      types.TIMESTAMP(time.Now().Add(-time.Hour)),
+		ExecuteBefore:    types.TIMESTAMP(time.Now().Add(24 * time.Hour)),
+		InputHoldingCids: nil,
+		Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+	})
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	return choice.FactoryID, choice.DisclosedContracts, choice.ChoiceContextData, nil
+}
+
+// GetTransferFactoryV2 returns factory id, disclosures, choice context data, and transfer kind for the given transfer probe.
+// Callers should not reuse the same response across materially different transfers (see Splice OpenAPI notes).
+func GetTransferFactoryV2(
+	ctx context.Context,
+	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface,
+	registryAdmin string,
+	transfer splice_api_token_transfer_instruction_v1.Transfer,
+) (*TransferFactoryV2, error) {
+	inputCids := make([]string, 0, len(transfer.InputHoldingCids))
+	for _, c := range transfer.InputHoldingCids {
+		inputCids = append(inputCids, string(c))
+	}
+
+	now := time.Now()
 	transferFactoryResponse, err := transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
 			"expectedAdmin": registryAdmin,
 			"transfer": map[string]any{
-				"sender":   sender,
-				"receiver": receiver,
-				"amount":   "100.00",
+				"sender":   string(transfer.Sender),
+				"receiver": string(transfer.Receiver),
+				"amount":   string(transfer.Amount),
 				"instrumentId": map[string]any{
-					"admin": registryAdmin,
-					"id":    "Amulet",
+					"admin": string(transfer.InstrumentId.Admin),
+					"id":    string(transfer.InstrumentId.Id),
 				},
 				"lock":             nil,
-				"requestedAt":      time.Now().Add(time.Hour * -1).Format(time.RFC3339),
-				"executeBefore":    time.Now().Add(time.Hour * 24).Format(time.RFC3339),
-				"inputHoldingCids": []string{},
+				"requestedAt":      now.Add(time.Hour * -1).Format(time.RFC3339),
+				"executeBefore":    now.Add(time.Hour * 24).Format(time.RFC3339),
+				"inputHoldingCids": inputCids,
 				"meta": map[string]any{
 					"values": map[string]any{},
 				},
@@ -237,21 +282,24 @@ func GetTransferFactory(ctx context.Context, transferInstructionClient transferI
 		ExcludeDebugFields: nil,
 	})
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("error getting transferFactory response: %w", err)
+		return nil, fmt.Errorf("get transfer factory: %w", err)
 	}
 	if transferFactoryResponse.StatusCode() != http.StatusOK {
-		return "", nil, nil, fmt.Errorf("unexpected status code: %d: %v", transferFactoryResponse.StatusCode(), transferFactoryResponse.Body)
+		return nil, fmt.Errorf("get transfer factory: status %d: %v", transferFactoryResponse.StatusCode(), transferFactoryResponse.Body)
+	}
+	if transferFactoryResponse.JSON200 == nil {
+		return nil, fmt.Errorf("get transfer factory: empty response body")
 	}
 
 	var disclosedContracts []*apiv2.DisclosedContract
 	for _, contract := range transferFactoryResponse.JSON200.ChoiceContext.DisclosedContracts {
 		id, err := TemplateIdFromString(contract.TemplateId)
 		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to parse template id: %w", err)
+			return nil, fmt.Errorf("parse factory template id: %w", err)
 		}
 		createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
 		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to decode created event blob: %w", err)
+			return nil, fmt.Errorf("decode factory created event blob: %w", err)
 		}
 		disclosedContracts = append(disclosedContracts, &apiv2.DisclosedContract{
 			TemplateId:       id,
@@ -261,7 +309,12 @@ func GetTransferFactory(ctx context.Context, transferInstructionClient transferI
 		})
 	}
 
-	return transferFactoryResponse.JSON200.FactoryId, disclosedContracts, transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData, nil
+	return &TransferFactoryV2{
+		FactoryID:          transferFactoryResponse.JSON200.FactoryId,
+		DisclosedContracts: disclosedContracts,
+		ChoiceContextData:  transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData,
+		TransferKind:       transferFactoryResponse.JSON200.TransferKind,
+	}, nil
 }
 
 func AcceptPendingTransferInstruction(
@@ -302,7 +355,7 @@ func AcceptPendingTransferInstruction(
 		return fmt.Errorf("convert transfer instruction accept context: %w", err)
 	}
 
-	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
@@ -325,6 +378,7 @@ func AcceptPendingTransferInstruction(
 	if err != nil {
 		return fmt.Errorf("accept pending transfer instruction: %w", err)
 	}
+	fmt.Printf("Accepted pending transfer instruction: %v\n", res)
 
 	return nil
 }
