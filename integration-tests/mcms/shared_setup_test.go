@@ -30,14 +30,6 @@ type SharedCantonEnvironment struct {
 	Config        MCMSConfig
 }
 
-// SharedTwoParticipantEnvironment extends SharedCantonEnvironment with a second participant.
-// Used for tests that require a random user on a separate participant.
-type SharedTwoParticipantEnvironment struct {
-	SharedCantonEnvironment
-	UserParticipant canton.Participant
-	RandomUser      string
-}
-
 // SharedTAREnvironment extends SharedCantonEnvironment with TokenAdminRegistry package.
 // Used for tests that interact with TokenAdminRegistry contracts.
 type SharedTAREnvironment struct {
@@ -67,10 +59,6 @@ var (
 	sharedEnv     *SharedCantonEnvironment
 	sharedEnvOnce sync.Once
 	errSharedEnv  error
-
-	sharedTwoPartEnv     *SharedTwoParticipantEnvironment
-	sharedTwoPartEnvOnce sync.Once
-	errSharedTwoPartEnv  error
 
 	sharedTAREnv     *SharedTAREnvironment
 	sharedTAREnvOnce sync.Once
@@ -141,68 +129,6 @@ func GetSharedEnvironment(t *testing.T) *SharedCantonEnvironment {
 	require.NotNil(t, sharedEnv, "shared environment is nil")
 
 	return sharedEnv
-}
-
-// GetSharedTwoParticipantEnvironment initializes a shared environment with two participants.
-// Used by tests that need a separate user participant (e.g., testing contract disclosure).
-func GetSharedTwoParticipantEnvironment(t *testing.T) *SharedTwoParticipantEnvironment {
-	t.Helper()
-
-	sharedTwoPartEnvOnce.Do(func() {
-		env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
-		participant := env.Chain.Participants[0]
-		userParticipant := env.Chain.Participants[1]
-
-		// Upload MCMS DAR to both participants
-		mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
-		if err != nil {
-			errSharedTwoPartEnv = err
-			return
-		}
-
-		// Upload MCMS Test DAR (contains Counter) to both participants
-		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
-		if err != nil {
-			errSharedTwoPartEnv = err
-			return
-		}
-
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, mcmsTestDar}, participant, userParticipant)
-		if err != nil {
-			errSharedTwoPartEnv = err
-			return
-		}
-
-		if len(packageIDs) < 2 {
-			errSharedTwoPartEnv = err
-			return
-		}
-
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
-		signers := createSigners(t)
-		sortedSigners := SortSignersByAddress(signers)
-
-		sharedTwoPartEnv = &SharedTwoParticipantEnvironment{
-			SharedCantonEnvironment: SharedCantonEnvironment{
-				Participant:   participant,
-				McmsPkgID:     mcmsPkgID,
-				McmsTestPkgID: mcmsTestPkgID,
-				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
-				CcipOwner:     participant.PartyID,
-				Signers:       signers,
-				SortedSigners: sortedSigners,
-				Config:        New2of3Config(signers),
-			},
-			UserParticipant: userParticipant,
-			RandomUser:      userParticipant.PartyID,
-		}
-	})
-
-	require.NoError(t, errSharedTwoPartEnv, "failed to initialize two-participant environment")
-	require.NotNil(t, sharedTwoPartEnv, "two-participant environment is nil")
-
-	return sharedTwoPartEnv
 }
 
 // GetSharedTAREnvironment initializes a shared environment with TokenAdminRegistry support.
@@ -375,13 +301,10 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 		env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
 		participant := env.Chain.Participants[0]
 
-		// Ensure user has explicit CanActAs rights for the primary party
-		// This is needed for multi-party submissions where both parties must be authorized
-		testhelpers.GrantCanActAs(t, participant, participant.PartyID)
-
 		// Allocate a second party on the same participant for bootstrapping
 		// Use unique hint to avoid conflicts across test runs
-		bootstrapParty := testhelpers.AllocateParty(t, participant, fmt.Sprintf("bootstrap-%s", uuid.New().String()[:8]))
+		bootstrapParty := testhelpers.AllocateParty(t, participant, fmt.Sprintf("bootstrap-%s", uuid.NewString()[:8]))
+		testhelpers.GrantCanActAs(t, participant, bootstrapParty)
 
 		darPackages := []contracts.Package{
 			contracts.MCMS,
