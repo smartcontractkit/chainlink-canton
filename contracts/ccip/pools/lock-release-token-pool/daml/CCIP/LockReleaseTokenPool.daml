@@ -10,7 +10,7 @@ module CCIP.LockReleaseTokenPool (
     , module CCIP.LockReleaseTokenPoolTypes
   ) where
 
-import DA.Action (foldlA, when)
+import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
@@ -318,18 +318,22 @@ template LockReleaseTokenPool
                         remoteChainConfigs
                         remoteChainSelectorsToRemove
 
+                let chainSelectorsToAdd = map (\c -> c.remoteChainSelector) chainsToAdd
+                assertMsg "ApplyChainUpdates: duplicate remote chain selectors"
+                    (length chainSelectorsToAdd == length (dedup chainSelectorsToAdd))
+
                 -- Validate
                 forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, finalityConfig, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
                     assertMsg "ApplyChainUpdates: invalid chain selector" (remoteChainSelector > 0.0)
                     assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
                     -- If the chain already exists, the update should first remove it.
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
-                    -- Validate rate limiters
-                    assertMsg "ApplyChainUpdates: inbound/outbound rate limiters cannot be empty" (inboundRateLimiter /= RawInstanceAddress.empty && outboundRateLimiter /= RawInstanceAddress.empty)
-                    when (customFinalityRateLimiterRequired finalityConfig) $
-                        assertMsg "ApplyChainUpdates: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
-                            (inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
-                    assertMsg "ApplyChainUpdates: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
+                    CCIP.RateLimiter.assertDistinctRateLimiters "ApplyChainUpdates"
+                        inboundRateLimiter
+                        outboundRateLimiter
+                        (if customFinalityRateLimiterRequired finalityConfig
+                            then Some inboundCustomBlockConfirmationsRateLimiter
+                            else None)
                     -- Validate remote pools
                     assertMsg "ApplyChainUpdates: remotePools cannot contain empty address" ("" `notElem` remotePools)
                     assertMsg "ApplyChainUpdates: remotePools cannot contain duplicates" (length remotePools == length (dedup remotePools))
@@ -411,14 +415,15 @@ template LockReleaseTokenPool
                 -- Validate
                 forA_ rateLimitConfigArgs $ \arg -> do
                     assertMsg "SetRateLimitConfig: invalid chain selector" (arg.remoteChainSelector > 0.0)
-                    assertMsg "SetRateLimitConfig: inbound/outbound rate limiters cannot be empty" (arg.inboundRateLimiter /= RawInstanceAddress.empty && arg.outboundRateLimiter /= RawInstanceAddress.empty)
-                    assertMsg "SetRateLimitConfig: rate limiters cannot be the same for inbound and outbound" (arg.inboundRateLimiter /= arg.outboundRateLimiter)
                     cfg <- case Map.lookup arg.remoteChainSelector remoteChainConfigs of
                         None -> abort ("SetRateLimitConfig: unsupported chain selector: " <> show arg.remoteChainSelector)
                         Some cfg -> pure cfg
-                    when (customFinalityRateLimiterRequired cfg.finalityConfig) $
-                        assertMsg "SetRateLimitConfig: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
-                            (arg.inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
+                    CCIP.RateLimiter.assertDistinctRateLimiters "SetRateLimitConfig"
+                        arg.inboundRateLimiter
+                        arg.outboundRateLimiter
+                        (if customFinalityRateLimiterRequired cfg.finalityConfig
+                            then Some arg.inboundCustomBlockConfirmationsRateLimiter
+                            else None)
 
                 -- Update
                 let remoteChainConfigsUpdated = foldl
