@@ -49,9 +49,9 @@ import (
 //  5. Sign and execute the proposal on-chain via ScheduleBatch → ExecuteScheduledBatch
 //  6. Verify the GlobalConfig dest chain config was applied
 func TestMCMS_ChangesetProposalE2E(t *testing.T) {
-	//if os.Getenv("INTEGRATION_TEST") == "" {
+	// if os.Getenv("INTEGRATION_TEST") == "" {
 	//	t.Skip("Skipping integration test. Set INTEGRATION_TEST=1 to run.")
-	//}
+	// }
 
 	t.Parallel()
 
