@@ -69,7 +69,7 @@ jobs:
           RESPONSE=$(curl -s --fail -X POST \
             "${CANTON_OKTA_AUTHORIZER}/v1/token" \
             -u "${CANTON_OKTA_CLIENT_ID}:${CANTON_OKTA_CLIENT_SECRET}" \
-            -d "grant_type=client_credentials&scope=canton")
+            -d "grant_type=client_credentials&scope=daml_ledger_api")
           TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
           if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
             echo "::error::Failed to obtain Okta access token"
