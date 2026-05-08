@@ -10,8 +10,6 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/gogo/protobuf/jsonpb"
-	"github.com/gogo/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
@@ -23,17 +21,19 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
-// ListedHolding is one active HoldingV1 contract that matched list filters, with parsed amount.
+// ListedHolding is one on-ledger row for a token holding: the contract id, the HoldingV1 view
+// from the create event, and Amount parsed as *big.Rat for sums and comparisons.
 type ListedHolding struct {
 	ContractID string
 	View       splice_api_token_holding_v1.HoldingView
 	Amount     *big.Rat
 }
 
-// Filter selects HoldingV1 rows using the ledger contract id (created event) and the interface view.
+// Filter decides whether a holding row is included. It receives the contract id and the
+// HoldingV1 view parsed from the create event’s interface views.
 type Filter func(contractID string, hv splice_api_token_holding_v1.HoldingView) bool
 
-// WithHoldingOwner restricts the sum to holdings whose interface view owner equals party.
+// WithHoldingOwner keeps only holdings whose view owner matches party (after trimming).
 func WithHoldingOwner(party string) Filter {
 	p := strings.TrimSpace(party)
 	if p == "" {
@@ -45,22 +45,22 @@ func WithHoldingOwner(party string) Filter {
 	}
 }
 
-// WithUnlockedHoldingsOnly skips holdings with a non-nil Lock in the interface view.
+// WithUnlockedHoldingsOnly keeps only holdings with no Lock in the view (unlocked balance).
 func WithUnlockedHoldingsOnly() Filter {
 	return func(_ string, hv splice_api_token_holding_v1.HoldingView) bool {
 		return hv.Lock == nil
 	}
 }
 
-// WithUnlockedHoldingsOnly skips holdings with a non-nil Lock in the interface view.
+// ExcludeCIDs drops holdings whose contract id appears in cids.
 func ExcludeCIDs(cids []string) Filter {
 	return func(contractID string, _ splice_api_token_holding_v1.HoldingView) bool {
 		return !slices.Contains(cids, contractID)
 	}
 }
 
-// GetHoldingsBalance returns the sum of holding amounts in ledger Numeric units (*big.Rat).
-// If instrument is nil, amounts for all instruments are summed (filters still apply).
+// GetHoldingsBalance sums Numeric amounts for all holdings that pass filters.
+// If instrument is non-nil, only that instrument is included; if nil, every instrument counts.
 func GetHoldingsBalance(
 	ctx context.Context,
 	participant canton.Participant,
@@ -80,16 +80,14 @@ func GetHoldingsBalance(
 	return total, nil
 }
 
-// PickHoldingsForInstrument returns len(minAmounts) distinct HoldingV1 rows for instrument.
-// The i-th returned row corresponds to minAmounts[i]: each chosen holding has Amount >= minAmounts[i]
-// (nil entries in minAmounts are treated as zero minimum).
+// PickHoldingsForInstrument chooses len(minAmounts) different holdings for the given instrument.
 //
-// Callers choose how many holdings they need by the length of minAmounts (e.g. one entry for a single fee leg,
-// two entries for two same-instrument legs). For another instrument, call again with that instrument’s ID and filters.
+// Greedy: sort holdings by amount (largest first), sort slots by required minimum (largest first),
+// then for each slot assign the biggest holding that is still unused and meets that minimum.
+// Output index i matches minAmounts[i] (nil minimum counts as zero). filters narrow candidates.
 //
-// filters should narrow the ACS row set (e.g. WithHoldingOwner(party), WithUnlockedHoldingsOnly(), WithHoldingContractID(cid)).
-// Candidates are sorted by amount descending; slots with larger minimums are satisfied first, then each slot
-// gets the largest still-unused holding that meets its minimum.
+// Typical use: pass one minAmount for one leg, or several for multiple legs on the same instrument.
+// Use a separate call per instrument when you need holdings for different instruments.
 func PickHoldingsForInstrument(
 	ctx context.Context,
 	participant canton.Participant,
@@ -154,11 +152,12 @@ func PickHoldingsForInstrument(
 	return out, nil
 }
 
-// SplitHoldingSelfTransfer splits holding into two equal halves via a self-transfer (same sender and
-// receiver). The parent holding is consumed; the submit transaction must contain exactly two new
-// Splice.Amulet contracts for the same owner and instrument (parsed from createArguments).
+// SplitHoldingSelfTransfer turns one holding into two by submitting a transfer to yourself for half
+// the balance. The input contract is archived; the ledger creates two new Splice.Amulet contracts.
 //
-// registryAdmin is the instrument registry admin (see GetRegistryAdmin).
+// On success the committed transaction must contain exactly two Amulet create events for this owner
+// and instrument (DSO must match instrument.Admin). registryAdmin is the registry party used when
+// building the transfer factory (see GetRegistryAdmin).
 func SplitHoldingSelfTransfer(
 	ctx context.Context,
 	participant canton.Participant,
@@ -243,8 +242,6 @@ func SplitHoldingSelfTransfer(
 		return ListedHolding{}, ListedHolding{}, fmt.Errorf("submit transfer: %w", err)
 	}
 
-	debugPrintSplitHoldingSubmitResponseJSON(res)
-
 	children, err := splitChildrenFromSelfTransferTransaction(res.GetTransaction(), owner, holding.View.InstrumentId)
 	if err != nil {
 		return ListedHolding{}, ListedHolding{}, err
@@ -253,18 +250,8 @@ func SplitHoldingSelfTransfer(
 	return children[0], children[1], nil
 }
 
-// debugPrintSplitHoldingSubmitResponseJSON prints SubmitAndWaitForTransactionResponse as JSON (temporary debugging).
-// Uses gogo jsonpb: dazl ledger protos implement github.com/gogo/protobuf/proto.Message, not google.golang.org/protobuf.
-func debugPrintSplitHoldingSubmitResponseJSON(res proto.Message) {
-	m := jsonpb.Marshaler{Indent: "  ", EmitDefaults: true}
-	s, err := m.MarshalToString(res)
-	if err != nil {
-		fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON: %v\n", err)
-		return
-	}
-	fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON:\n%s\n", s)
-}
-
+// splitChildrenFromSelfTransferTransaction reads the two new Amulet contracts produced by
+// SplitHoldingSelfTransfer: same owner, instrument.Admin equal to Amulet dso, amounts from createArguments.
 func splitChildrenFromSelfTransferTransaction(
 	tx *apiv2.Transaction,
 	owner string,
@@ -274,22 +261,66 @@ func splitChildrenFromSelfTransferTransaction(
 		return nil, fmt.Errorf("split transfer: nil transaction")
 	}
 
+	wantAdmin := strings.TrimSpace(string(instrument.Admin))
 	var out []ListedHolding
 	for _, event := range tx.GetEvents() {
 		created := event.GetCreated()
 		if created == nil {
 			continue
 		}
-		if strings.TrimSpace(created.GetContractId()) == "" {
+		tid := created.GetTemplateId()
+		if tid == nil || tid.GetModuleName() != "Splice.Amulet" || tid.GetEntityName() != "Amulet" {
 			continue
 		}
-		row, matched, err := listedHoldingFromSpliceAmuletCreatedEvent(created, owner, instrument)
-		if err != nil {
-			return nil, fmt.Errorf("split transfer: %w", err)
+		cid := strings.TrimSpace(created.GetContractId())
+		if cid == "" {
+			continue
 		}
-		if matched {
-			out = append(out, row)
+		args := created.GetCreateArguments()
+		if args == nil {
+			continue
 		}
+
+		var dsoParty, ownerParty, initialAmount string
+		for _, f := range args.GetFields() {
+			switch f.GetLabel() {
+			case "dso":
+				dsoParty = strings.TrimSpace(f.GetValue().GetParty())
+			case "owner":
+				ownerParty = strings.TrimSpace(f.GetValue().GetParty())
+			case "amount":
+				expiring := f.GetValue().GetRecord()
+				if expiring == nil {
+					continue
+				}
+				for _, ef := range expiring.GetFields() {
+					if ef.GetLabel() == "initialAmount" {
+						initialAmount = strings.TrimSpace(ef.GetValue().GetNumeric())
+						break
+					}
+				}
+			}
+		}
+		if ownerParty != owner || dsoParty != wantAdmin {
+			continue
+		}
+
+		amt, ok := new(big.Rat).SetString(initialAmount)
+		if !ok {
+			return nil, fmt.Errorf("split transfer: invalid initialAmount %q", initialAmount)
+		}
+
+		out = append(out, ListedHolding{
+			ContractID: cid,
+			View: splice_api_token_holding_v1.HoldingView{
+				Owner:        types.PARTY(ownerParty),
+				InstrumentId: instrument,
+				Amount:       types.NUMERIC(initialAmount),
+				Lock:         nil,
+				Meta:         splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+			},
+			Amount: new(big.Rat).Set(amt),
+		})
 	}
 	if len(out) != 2 {
 		return nil, fmt.Errorf("split transfer: expected exactly 2 Amulet child creates (got %d)", len(out))
@@ -297,71 +328,9 @@ func splitChildrenFromSelfTransferTransaction(
 	return out, nil
 }
 
-// listedHoldingFromSpliceAmuletCreatedEvent builds ListedHolding from Splice.Amulet:Amulet createArguments.
-func listedHoldingFromSpliceAmuletCreatedEvent(
-	created *apiv2.CreatedEvent,
-	owner string,
-	instrument splice_api_token_holding_v1.InstrumentId,
-) (ListedHolding, bool, error) {
-	tid := created.GetTemplateId()
-	if tid == nil || tid.GetModuleName() != "Splice.Amulet" || tid.GetEntityName() != "Amulet" {
-		return ListedHolding{}, false, nil
-	}
-	args := created.GetCreateArguments()
-	if args == nil {
-		return ListedHolding{}, false, nil
-	}
-
-	var dsoParty, ownerParty, initialAmount string
-	for _, f := range args.GetFields() {
-		switch f.GetLabel() {
-		case "dso":
-			dsoParty = strings.TrimSpace(f.GetValue().GetParty())
-		case "owner":
-			ownerParty = strings.TrimSpace(f.GetValue().GetParty())
-		case "amount":
-			expiring := f.GetValue().GetRecord()
-			if expiring == nil {
-				continue
-			}
-			for _, ef := range expiring.GetFields() {
-				if ef.GetLabel() == "initialAmount" {
-					initialAmount = strings.TrimSpace(ef.GetValue().GetNumeric())
-				}
-			}
-		}
-	}
-	if ownerParty != owner {
-		return ListedHolding{}, false, nil
-	}
-	if strings.TrimSpace(string(instrument.Admin)) != dsoParty {
-		return ListedHolding{}, false, nil
-	}
-
-	amt, ok := new(big.Rat).SetString(initialAmount)
-	if !ok {
-		return ListedHolding{}, false, fmt.Errorf("amulet create: invalid initialAmount %q", initialAmount)
-	}
-
-	cid := strings.TrimSpace(created.GetContractId())
-	hv := splice_api_token_holding_v1.HoldingView{
-		Owner:        types.PARTY(ownerParty),
-		InstrumentId: instrument,
-		Amount:       types.NUMERIC(initialAmount),
-		Lock:         nil,
-		Meta:         splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
-	}
-
-	return ListedHolding{
-		ContractID: cid,
-		View:       hv,
-		Amount:     new(big.Rat).Set(amt),
-	}, true, nil
-}
-
-// listHoldingsForInstrument walks active HoldingV1 contracts, applies optional instrument and filters,
-// and returns rows with a non-empty contract id and a parseable amount (including zero).
-// If instrument is nil, all instruments match (same semantics as GetHoldingsBalance).
+// listHoldingsForInstrument loads active contracts that implement HoldingV1, parses each Holding view,
+// applies instrument and Filter predicates, and returns ListedHolding rows with parseable amounts.
+// instrument nil matches every instrument (same rule as GetHoldingsBalance).
 func listHoldingsForInstrument(
 	ctx context.Context,
 	participant canton.Participant,
@@ -414,6 +383,7 @@ func listHoldingsForInstrument(
 	return out, nil
 }
 
+// holdingPassesFilters returns true only if every Filter accepts the row.
 func holdingPassesFilters(contractID string, hv splice_api_token_holding_v1.HoldingView, filters []Filter) bool {
 	for _, f := range filters {
 		if !f(contractID, hv) {
@@ -424,6 +394,8 @@ func holdingPassesFilters(contractID string, hv splice_api_token_holding_v1.Hold
 	return true
 }
 
+// parseHoldingV1View finds the HoldingV1 interface view on a create event and decodes it into HoldingView.
+// If there is no such view, it returns ok=false and a zero view. A malformed view record returns an error.
 func parseHoldingV1View(created *apiv2.CreatedEvent) (splice_api_token_holding_v1.HoldingView, bool, error) {
 	if created == nil {
 		return splice_api_token_holding_v1.HoldingView{}, false, nil
@@ -449,7 +421,7 @@ func parseHoldingV1View(created *apiv2.CreatedEvent) (splice_api_token_holding_v
 	return splice_api_token_holding_v1.HoldingView{}, false, nil
 }
 
-// holdingV1InterfaceID is the canonical HoldingV1 ledger interface id (single place for module/entity strings).
+// holdingV1InterfaceID is the ledger Identifier for the Splice HoldingV1 interface (package name + module + entity).
 func holdingV1InterfaceID() *apiv2.Identifier {
 	return &apiv2.Identifier{
 		PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),

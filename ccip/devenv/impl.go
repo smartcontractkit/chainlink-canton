@@ -974,34 +974,34 @@ func (c *Chain) PrepareSendHoldings(
 	}
 	c.preparedTransferCIDs = []string{holding1.ContractID, holding2.ContractID}
 
-	// Final check
-	totalHoldings, err := testhelpers.PickHoldingsForInstrument(ctx, participant, c.feeTokenInstrument, []*big.Rat{nil, nil, nil, nil})
-	if err != nil {
-		return fmt.Errorf("pick total holdings: %w", err)
-	}
-	fmt.Println("Total holdings: ", totalHoldings)
+	// TODO: Remove
+	// // Final check
+	// totalHoldings, err := testhelpers.PickHoldingsForInstrument(ctx, participant, c.feeTokenInstrument, []*big.Rat{nil, nil, nil, nil})
+	// if err != nil {
+	// 	return fmt.Errorf("pick total holdings: %w", err)
+	// }
+	// fmt.Println("Total holdings: ", totalHoldings)
 	return nil
 }
 
 // MintTokens mint tokens for transfer and fees. To be used on devenv tests only.
 // this method won't work in staging/prod tests
 // TODO: add support for LINK instrument
-func (c *Chain) MintTokens(ctx context.Context, feeAmount uint64, transferAmount uint64) error {
+func (c *Chain) MintTokens(ctx context.Context, amount uint64) error {
 	participant := c.chain.Participants[0]
 	party := participant.PartyID
-	res, err := testhelpers.MintAMT(
+	_, err := testhelpers.MintAMT(
 		ctx,
 		participant,
 		c.validatorAPIClients.metadataClient,
 		c.validatorAPIClients.transferClient,
 		c.validatorAPIClients.scanClient,
 		party,
-		strconv.FormatUint(feeAmount+transferAmount, 10),
+		strconv.FormatUint(amount, 10),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to mint tokens: %w", err)
 	}
-	fmt.Println("Minted tokens: ", res)
 
 	return nil
 }
