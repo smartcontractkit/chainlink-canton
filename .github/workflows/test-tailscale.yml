@@ -1,19 +1,56 @@
+# Required secrets:
+#   TS_OAUTH_CLIENT_ID_CANTON  — Tailscale OAuth client ID (repo-wide)
+#   TS_AUDIENCE_CANTON         — Tailscale audience tag (repo-wide)
+#
+# Per environment (devnet, testnet, mainnet):
+#   CANTON_OKTA_AUTHORIZER_<ENV>     — Okta issuer URL (e.g. https://trial.okta.com/oauth2/default)
+#   CANTON_OKTA_CLIENT_ID_<ENV>      — Okta OAuth client ID for CI/CD
+#   CANTON_OKTA_CLIENT_SECRET_<ENV>  — Okta OAuth client secret for CI/CD
+
 name: Test Tailscale Connectivity
-run-name: Test Tailscale connectivity to Canton Devnet
+run-name: "Test Tailscale connectivity to Canton (${{ inputs.canton_environment || 'devnet' }})"
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      canton_environment:
+        description: "Canton environment to test"
+        type: choice
+        options:
+          - devnet
+          - testnet
+          - mainnet
+        default: devnet
 
 jobs:
   test-tailscale:
-    name: Test Tailscale Connectivity
+    name: "Test Tailscale Connectivity (${{ inputs.canton_environment }})"
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  
+      id-token: write
       contents: read
+
+    env:
+      CANTON_ENV: ${{ inputs.canton_environment }}
+      CANTON_OKTA_AUTHORIZER: >-
+        ${{
+          inputs.canton_environment == 'testnet' && secrets.CANTON_OKTA_AUTHORIZER_TESTNET ||
+          inputs.canton_environment == 'mainnet' && secrets.CANTON_OKTA_AUTHORIZER_MAINNET ||
+          secrets.CANTON_OKTA_AUTHORIZER_DEVNET
+        }}
+      CANTON_OKTA_CLIENT_ID: >-
+        ${{
+          inputs.canton_environment == 'testnet' && secrets.CANTON_OKTA_CLIENT_ID_TESTNET ||
+          inputs.canton_environment == 'mainnet' && secrets.CANTON_OKTA_CLIENT_ID_MAINNET ||
+          secrets.CANTON_OKTA_CLIENT_ID_DEVNET
+        }}
+      CANTON_OKTA_CLIENT_SECRET: >-
+        ${{
+          inputs.canton_environment == 'testnet' && secrets.CANTON_OKTA_CLIENT_SECRET_TESTNET ||
+          inputs.canton_environment == 'mainnet' && secrets.CANTON_OKTA_CLIENT_SECRET_MAINNET ||
+          secrets.CANTON_OKTA_CLIENT_SECRET_DEVNET
+        }}
 
     steps:
       - name: Checkout code
@@ -22,61 +59,28 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON_DEVNET }}
-          audience: ${{ secrets.TS_AUDIENCE_CANTON_DEVNET }}
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON }}
+          audience: ${{ secrets.TS_AUDIENCE_CANTON }}
           tags: tag:bcy-validators-gha
 
-      - name: Configure Tailscale for app connector routes
+      - name: Get Okta access token
+        id: okta
         run: |
-          sudo tailscale set --accept-routes=true
-          sudo tailscale set --operator=$USER
+          RESPONSE=$(curl -s --fail -X POST \
+            "${CANTON_OKTA_AUTHORIZER}/v1/token" \
+            -u "${CANTON_OKTA_CLIENT_ID}:${CANTON_OKTA_CLIENT_SECRET}" \
+            -d "grant_type=client_credentials&scope=canton")
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "::error::Failed to obtain Okta access token"
+            exit 1
+          fi
+          echo "::add-mask::${TOKEN}"
+          echo "access_token=${TOKEN}" >> "$GITHUB_OUTPUT"
 
-      - name: "[DEBUG] 1 - Tailscale node info"
+      - name: Verify Canton connectivity
         run: |
-          echo "=== Tailscale status (this node + peers) ==="
-          tailscale status || true
-          echo ""
-          echo "=== This node's Tailscale IP ==="
-          tailscale ip -4 || true
-          echo ""
-          echo "=== Tailscale debug prefs (confirm AcceptRoutes=true) ==="
-          tailscale debug prefs 2>&1 | head -30 || true
-
-      - name: "[DEBUG] 2 - DNS configuration (Split DNS shows app connector DoH)"
-        run: |
-          echo "=== Tailscale DNS status ==="
-          tailscale dns status || true
-          echo ""
-          echo "=== /etc/resolv.conf ==="
-          cat /etc/resolv.conf
-
-      - name: "[DEBUG] 3 - DNS resolution (LB IPs returned by app connector DoH)"
-        run: |
-          echo "=== getent hosts canton-devnet.bcy-v.metalhosts.com ==="
-          getent hosts canton-devnet.bcy-v.metalhosts.com || true
-      - name: "[DEBUG] 4 - Get route to canton-devnet.bcy-v.metalhosts.com IP"
-        run: |
-          echo "=== route get 35.182.74.119 ==="
-          route get 35.182.74.119 || true
-
-      - name: "[DEBUG] 5 - DNS resolution (LB IPs returned by app connector DoH)"
-        run: |
-          echo "=== getent hosts canton-devnet.bcy-v.metalhosts.com ==="
-          getent hosts canton-devnet.bcy-v.metalhosts.com || true
-
-
-      - name: "[DEBUG] 6 - Wait 15s for app connector route advertisement"
-        run: sleep 15
-
-      - name: "[DEBUG] 7 - Routes (expect LB IPs via tailscale0, but they are MISSING)"
-        run: |
-          echo "=== All routes via tailscale ==="
-          ip route show table all | grep tailscale || echo "(no tailscale routes found)"
-          echo ""
-          echo "=== Full routing table ==="
-          ip route show table all
-
-      - name: "[DEBUG] 8 - Connectivity test (403 = reached ALB via public internet, not via app connector)"
-        run: |
-          curl -v --connect-timeout 30 -H "Content-Type: application/json" \
-            https://canton-devnet.bcy-v.metalhosts.com/metrics/participant 2>&1 || true
+          curl --fail --connect-timeout 30 \
+            -H "Authorization: Bearer ${{ steps.okta.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            "https://canton-${CANTON_ENV}.bcy-v.metalhosts.com/api/json/v2/parties/ccipOwner::122009b21cd8f52c55fc9854f7b1771837fa661f47529956ed40708bf656905b5721"
