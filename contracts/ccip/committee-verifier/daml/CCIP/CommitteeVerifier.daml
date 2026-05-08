@@ -530,7 +530,8 @@ validateSignature messageHash publicKey r s =
     derSignature = CCIP.Crypto.DerEncoding.rawToDerSignature r s
     derPublicKey = CCIP.Crypto.DerEncoding.secp256k1PublicKeyToDer publicKey
   in
-    secp256k1WithEcdsaOnly derSignature messageHash derPublicKey
+    CCIP.Crypto.DerEncoding.isCanonicalLowS s
+      && secp256k1WithEcdsaOnly derSignature messageHash derPublicKey
 
 findValidSigners : BytesHex -> [(BytesHex, BytesHex)] -> [BytesHex] -> [(BytesHex, Bool)]
 findValidSigners messageHash signatures signerKeys =

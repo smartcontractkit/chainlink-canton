@@ -1,9 +1,23 @@
 module CCIP.Crypto.DerEncoding where
 
-import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Crypto.Text (BytesHex, byteCount, isUInt256Hex, minUInt256Hex)
 import DA.Text qualified as Text
 
 import qualified CCIP.Crypto.Hex
+
+-- secp256k1 group order / 2. Signatures with s above this are malleable high-S and rejected.
+secp256k1HalfOrder : BytesHex
+secp256k1HalfOrder = "7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0"
+
+-- | Returns True if s is a valid, non-zero 32-byte hex value no greater than the secp256k1 half-order.
+-- Rejects high-S signatures to match EVM behaviour: ecrecover with a hardcoded v=27 implicitly
+-- rejects high-S by recovering the wrong signer address, so Canton enforces the same rule explicitly.
+isCanonicalLowS : BytesHex -> Bool
+isCanonicalLowS s =
+  let normalizedS = Text.asciiToLower s
+  in isUInt256Hex normalizedS                  -- condition 1: valid 32-byte hex
+    && normalizedS /= minUInt256Hex            -- condition 2: not zero
+    && normalizedS <= secp256k1HalfOrder       -- condition 3: not high-S
 
 -- | Convert raw ECDSA signature (r, s) to DER format
 --

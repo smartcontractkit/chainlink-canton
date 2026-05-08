@@ -2,7 +2,7 @@ module CommitteeVerifier.Test where
 
 import Daml.Script
 
-import DA.Assert ((===))
+import DA.Assert ((===), assertMsg)
 import DA.Crypto.Text (keccak256)
 import DA.Foldable (forA_)
 import DA.List ((!!))
@@ -10,6 +10,7 @@ import DA.Map qualified as Map
 import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
+import CCIP.Crypto.DerEncoding qualified as DerEncoding
 import qualified CCIP.ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
@@ -23,6 +24,38 @@ finalityConfig n =
     if n == 0
     then FinalityCodec.WaitForFinality
     else FinalityCodec.BlockDepth n
+
+-- | Verifies that isCanonicalLowS correctly accepts canonical low-S values and
+-- rejects high-S, zero, and malformed inputs.
+--
+-- Background: go-ethereum's signing library always produces low-S signatures, so
+-- this check never rejects a real signature in practice. Its purpose is to make
+-- the protocol invariant explicit rather than relying on undocumented behaviour
+-- of the underlying Canton builtin.
+testCommitteeVerifier_SignatureCanonicalization : Script ()
+testCommitteeVerifier_SignatureCanonicalization = script do
+    let halfOrder      = "7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0"
+        halfOrderUpper = "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0"
+        aboveHalfOrder = "7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a1"
+        zeroS          = "0000000000000000000000000000000000000000000000000000000000000000"
+
+    -- ACCEPTED: these are valid canonical low-S values and should pass.
+
+    -- The exact half-order value is the highest s that counts as low-S.
+    assertMsg "s equal to half-order should be accepted" (DerEncoding.isCanonicalLowS halfOrder)
+    -- The check is case-insensitive, so uppercase hex is also valid.
+    assertMsg "uppercase hex should be accepted" (DerEncoding.isCanonicalLowS halfOrderUpper)
+
+    -- REJECTED: these are invalid and should fail.
+
+    -- One step above the half-order makes s a high-S value. A high-S signature
+    -- has a malleable twin (curve-order minus s) that would also verify against
+    -- the same key, so we reject it to prevent duplicate submissions.
+    assertMsg "s one above half-order is high-S and should be rejected" (not (DerEncoding.isCanonicalLowS aboveHalfOrder))
+    -- s equal to zero is not a valid ECDSA value — the signature equation breaks down.
+    assertMsg "s equal to zero should be rejected" (not (DerEncoding.isCanonicalLowS zeroS))
+    -- Input shorter than 32 bytes is not a valid s-value format.
+    assertMsg "s shorter than 32 bytes should be rejected" (not (DerEncoding.isCanonicalLowS "00"))
 
 -- | Helper to create a fresh ExecutingMessageV1 for each test.
 -- AddCCVVerification is a consuming choice, so each successful verify
