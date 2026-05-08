@@ -963,13 +963,23 @@ func (c *Chain) PrepareSendHoldings(
 	}
 
 	holding1, holding2, err = testhelpers.SplitHoldingSelfTransfer(
-		ctx, participant, c.validatorAPIClients.transferClient, c.registryAdmin, transferHolding[0],
+		ctx,
+		participant,
+		c.validatorAPIClients.transferClient,
+		c.registryAdmin,
+		transferHolding[0],
 	)
 	if err != nil {
 		return fmt.Errorf("split transfer holding: %w", err)
 	}
 	c.preparedTransferCIDs = []string{holding1.ContractID, holding2.ContractID}
 
+	// Final check
+	totalHoldings, err := testhelpers.PickHoldingsForInstrument(ctx, participant, c.feeTokenInstrument, []*big.Rat{nil, nil, nil, nil})
+	if err != nil {
+		return fmt.Errorf("pick total holdings: %w", err)
+	}
+	fmt.Println("Total holdings: ", totalHoldings)
 	return nil
 }
 
@@ -1307,6 +1317,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	c.lastSentDest = dest
 	c.lastSentSeq = seqNo
 	c.lastSentEvent = event
+	c.messagesSent += 1
 
 	return event, nil
 }

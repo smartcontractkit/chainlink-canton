@@ -7,8 +7,11 @@ import (
 	"math/big"
 	"slices"
 	"strings"
+	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/gogo/protobuf/jsonpb"
+	"github.com/gogo/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
@@ -152,11 +155,10 @@ func PickHoldingsForInstrument(
 }
 
 // SplitHoldingSelfTransfer splits holding into two equal halves via a self-transfer (same sender and
-// receiver). The input holding CID is consumed; two new HoldingV1 contracts with half the amount each
-// are returned (first two ACS rows with that amount, excluding the original CID).
+// receiver). The parent holding is consumed; the submit transaction must contain exactly two new
+// Splice.Amulet contracts for the same owner and instrument (parsed from createArguments).
 //
-// registryAdmin is the instrument registry admin (see GetRegistryAdmin). If the factory workflow
-// creates a pending transfer instruction, it is accepted as the holding owner.
+// registryAdmin is the instrument registry admin (see GetRegistryAdmin).
 func SplitHoldingSelfTransfer(
 	ctx context.Context,
 	participant canton.Participant,
@@ -175,21 +177,25 @@ func SplitHoldingSelfTransfer(
 
 	half := new(big.Rat).Quo(new(big.Rat).Set(holding.Amount), big.NewRat(2, 1))
 	halfStr := half.FloatString(10)
-	halfWire, ok := new(big.Rat).SetString(halfStr)
-	if !ok {
+	if _, ok := new(big.Rat).SetString(halfStr); !ok {
 		return ListedHolding{}, ListedHolding{}, fmt.Errorf("split: invalid half numeric %q", halfStr)
 	}
 
-	tf, err := GetTransferFactoryV2(ctx, transferInstructionClient, registryAdmin, splice_api_token_transfer_instruction_v1.Transfer{
-		Sender:       types.PARTY(owner),
-		Receiver:     types.PARTY(owner),
-		Amount:       types.NUMERIC(halfStr),
-		InstrumentId: holding.View.InstrumentId,
+	now := time.Now()
+	transferParams := splice_api_token_transfer_instruction_v1.Transfer{
+		Sender:        types.PARTY(owner),
+		Receiver:      types.PARTY(owner),
+		Amount:        types.NUMERIC(halfStr),
+		InstrumentId:  holding.View.InstrumentId,
+		RequestedAt:   types.TIMESTAMP(now.Add(-time.Hour)),
+		ExecuteBefore: types.TIMESTAMP(now.Add(24 * time.Hour)),
 		InputHoldingCids: []types.CONTRACT_ID{
 			types.CONTRACT_ID(holding.ContractID),
 		},
 		Meta: splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
-	})
+	}
+
+	tf, err := GetTransferFactoryV2(ctx, transferInstructionClient, registryAdmin, transferParams)
 	if err != nil {
 		return ListedHolding{}, ListedHolding{}, fmt.Errorf("get transfer factory: %w", err)
 	}
@@ -210,17 +216,8 @@ func SplitHoldingSelfTransfer(
 
 	exercise := splice_api_token_transfer_instruction_v1.TransferFactoryTransfer{
 		ExpectedAdmin: types.PARTY(registryAdmin),
-		Transfer: splice_api_token_transfer_instruction_v1.Transfer{
-			Sender:       types.PARTY(owner),
-			Receiver:     types.PARTY(owner),
-			Amount:       types.NUMERIC(halfStr),
-			InstrumentId: holding.View.InstrumentId,
-			InputHoldingCids: []types.CONTRACT_ID{
-				types.CONTRACT_ID(holding.ContractID),
-			},
-			Meta: splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
-		},
-		ExtraArgs: extraArgs,
+		Transfer:      transferParams,
+		ExtraArgs:     extraArgs,
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
@@ -246,48 +243,120 @@ func SplitHoldingSelfTransfer(
 		return ListedHolding{}, ListedHolding{}, fmt.Errorf("submit transfer: %w", err)
 	}
 
-	var pendingTI string
-	for _, event := range res.GetTransaction().GetEvents() {
-		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-			name := e.Created.GetTemplateId().GetEntityName()
-			if strings.Contains(name, "TransferInstruction") {
-				pendingTI = e.Created.GetContractId()
-			}
-		}
-	}
-	if pendingTI != "" {
-		if err := AcceptPendingTransferInstruction(ctx, participant, transferInstructionClient, owner, pendingTI); err != nil {
-			return ListedHolding{}, ListedHolding{}, err
-		}
-	}
+	debugPrintSplitHoldingSubmitResponseJSON(res)
 
-	rows, err := listHoldingsForInstrument(ctx, participant, &holding.View.InstrumentId, WithHoldingOwner(owner), WithUnlockedHoldingsOnly())
+	children, err := splitChildrenFromSelfTransferTransaction(res.GetTransaction(), owner, holding.View.InstrumentId)
 	if err != nil {
 		return ListedHolding{}, ListedHolding{}, err
 	}
 
-	return firstTwoHoldingsAfterHalfSplit(rows, holding.ContractID, halfWire)
+	return children[0], children[1], nil
 }
 
-func firstTwoHoldingsAfterHalfSplit(rows []ListedHolding, excludeCID string, half *big.Rat) (ListedHolding, ListedHolding, error) {
-	var first ListedHolding
-	var foundFirst bool
-	for _, row := range rows {
-		if row.ContractID == excludeCID {
-			continue
-		}
-		if row.Amount.Cmp(half) != 0 {
-			continue
-		}
-		if !foundFirst {
-			first, foundFirst = row, true
-			continue
-		}
+// debugPrintSplitHoldingSubmitResponseJSON prints SubmitAndWaitForTransactionResponse as JSON (temporary debugging).
+// Uses gogo jsonpb: dazl ledger protos implement github.com/gogo/protobuf/proto.Message, not google.golang.org/protobuf.
+func debugPrintSplitHoldingSubmitResponseJSON(res proto.Message) {
+	m := jsonpb.Marshaler{Indent: "  ", EmitDefaults: true}
+	s, err := m.MarshalToString(res)
+	if err != nil {
+		fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON: %v\n", err)
+		return
+	}
+	fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON:\n%s\n", s)
+}
 
-		return first, row, nil
+func splitChildrenFromSelfTransferTransaction(
+	tx *apiv2.Transaction,
+	owner string,
+	instrument splice_api_token_holding_v1.InstrumentId,
+) ([]ListedHolding, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("split transfer: nil transaction")
 	}
 
-	return ListedHolding{}, ListedHolding{}, fmt.Errorf("split: need 2 holdings at half amount %s (after excluding original cid)", half.FloatString(10))
+	var out []ListedHolding
+	for _, event := range tx.GetEvents() {
+		created := event.GetCreated()
+		if created == nil {
+			continue
+		}
+		if strings.TrimSpace(created.GetContractId()) == "" {
+			continue
+		}
+		row, matched, err := listedHoldingFromSpliceAmuletCreatedEvent(created, owner, instrument)
+		if err != nil {
+			return nil, fmt.Errorf("split transfer: %w", err)
+		}
+		if matched {
+			out = append(out, row)
+		}
+	}
+	if len(out) != 2 {
+		return nil, fmt.Errorf("split transfer: expected exactly 2 Amulet child creates (got %d)", len(out))
+	}
+	return out, nil
+}
+
+// listedHoldingFromSpliceAmuletCreatedEvent builds ListedHolding from Splice.Amulet:Amulet createArguments.
+func listedHoldingFromSpliceAmuletCreatedEvent(
+	created *apiv2.CreatedEvent,
+	owner string,
+	instrument splice_api_token_holding_v1.InstrumentId,
+) (ListedHolding, bool, error) {
+	tid := created.GetTemplateId()
+	if tid == nil || tid.GetModuleName() != "Splice.Amulet" || tid.GetEntityName() != "Amulet" {
+		return ListedHolding{}, false, nil
+	}
+	args := created.GetCreateArguments()
+	if args == nil {
+		return ListedHolding{}, false, nil
+	}
+
+	var dsoParty, ownerParty, initialAmount string
+	for _, f := range args.GetFields() {
+		switch f.GetLabel() {
+		case "dso":
+			dsoParty = strings.TrimSpace(f.GetValue().GetParty())
+		case "owner":
+			ownerParty = strings.TrimSpace(f.GetValue().GetParty())
+		case "amount":
+			expiring := f.GetValue().GetRecord()
+			if expiring == nil {
+				continue
+			}
+			for _, ef := range expiring.GetFields() {
+				if ef.GetLabel() == "initialAmount" {
+					initialAmount = strings.TrimSpace(ef.GetValue().GetNumeric())
+				}
+			}
+		}
+	}
+	if ownerParty != owner {
+		return ListedHolding{}, false, nil
+	}
+	if strings.TrimSpace(string(instrument.Admin)) != dsoParty {
+		return ListedHolding{}, false, nil
+	}
+
+	amt, ok := new(big.Rat).SetString(initialAmount)
+	if !ok {
+		return ListedHolding{}, false, fmt.Errorf("amulet create: invalid initialAmount %q", initialAmount)
+	}
+
+	cid := strings.TrimSpace(created.GetContractId())
+	hv := splice_api_token_holding_v1.HoldingView{
+		Owner:        types.PARTY(ownerParty),
+		InstrumentId: instrument,
+		Amount:       types.NUMERIC(initialAmount),
+		Lock:         nil,
+		Meta:         splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+	}
+
+	return ListedHolding{
+		ContractID: cid,
+		View:       hv,
+		Amount:     new(big.Rat).Set(amt),
+	}, true, nil
 }
 
 // listHoldingsForInstrument walks active HoldingV1 contracts, applies optional instrument and filters,
@@ -312,7 +381,7 @@ func listHoldingsForInstrument(
 		}
 		contractID := strings.TrimSpace(created.GetContractId())
 
-		hv, ok, err := parseHoldingV1View(ac)
+		hv, ok, err := parseHoldingV1View(ac.GetCreatedEvent())
 		if err != nil {
 			return nil, err
 		}
@@ -355,8 +424,7 @@ func holdingPassesFilters(contractID string, hv splice_api_token_holding_v1.Hold
 	return true
 }
 
-func parseHoldingV1View(ac *apiv2.ActiveContract) (splice_api_token_holding_v1.HoldingView, bool, error) {
-	created := ac.GetCreatedEvent()
+func parseHoldingV1View(created *apiv2.CreatedEvent) (splice_api_token_holding_v1.HoldingView, bool, error) {
 	if created == nil {
 		return splice_api_token_holding_v1.HoldingView{}, false, nil
 	}
