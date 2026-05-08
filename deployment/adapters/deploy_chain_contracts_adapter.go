@@ -46,21 +46,21 @@ func (c *CantonDeployChainContractsAdapter) SetContractParamsFromImportedConfig(
 	)
 }
 
-func (c *CantonDeployChainContractsAdapter) DeployChainContracts() *cldf_ops.Sequence[ccipadapters.DeployChainContractsInput, seqcore.OnChainOutput, cldf_chain.BlockChains] {
+func (c *CantonDeployChainContractsAdapter) DeployChainContracts() *cldf_ops.Sequence[ccipadapters.DeployChainContractsInput, ccipadapters.DeployChainContractsOutput, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"canton/deploy-chain-contracts",
 		semver.MustParse("2.0.0"),
 		"Deploys CCIP contracts on a Canton chain",
-		func(bundle cldf_ops.Bundle, chains cldf_chain.BlockChains, input ccipadapters.DeployChainContractsInput) (seqcore.OnChainOutput, error) {
+		func(bundle cldf_ops.Bundle, chains cldf_chain.BlockChains, input ccipadapters.DeployChainContractsInput) (ccipadapters.DeployChainContractsOutput, error) {
 			return DeployCantonChainContracts(bundle.GetContext(), bundle, chains, input)
 		},
 	)
 }
 
-func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, chains cldf_chain.BlockChains, input ccipadapters.DeployChainContractsInput) (seqcore.OnChainOutput, error) {
+func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, chains cldf_chain.BlockChains, input ccipadapters.DeployChainContractsInput) (ccipadapters.DeployChainContractsOutput, error) {
 	chain, ok := chains.CantonChains()[input.ChainSelector]
 	if !ok || len(chain.Participants) == 0 {
-		return seqcore.OnChainOutput{}, fmt.Errorf("canton chain %d not found or has no participants", input.ChainSelector)
+		return ccipadapters.DeployChainContractsOutput{}, fmt.Errorf("canton chain %d not found or has no participants", input.ChainSelector)
 	}
 
 	participant := chain.Participants[0]
@@ -68,12 +68,12 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 
 	nativeInstrumentID, err := lookupNativeInstrumentID(ctx, participant)
 	if err != nil {
-		return seqcore.OnChainOutput{}, err
+		return ccipadapters.DeployChainContractsOutput{}, err
 	}
 
 	factoryAddressRef, err := resolveFactoryAddressRef(input.ChainSelector, input.ExistingAddresses)
 	if err != nil {
-		return seqcore.OnChainOutput{}, err
+		return ccipadapters.DeployChainContractsOutput{}, err
 	}
 
 	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContractsFromFactory, chain, sequences.DeployChainContractsParams{
@@ -102,12 +102,15 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		Executors: executorParams(ownerParty, input.ContractParams.Executors),
 	})
 	if err != nil {
-		return seqcore.OnChainOutput{}, fmt.Errorf("failed to deploy canton chain contracts for selector %d: %w", input.ChainSelector, err)
+		return ccipadapters.DeployChainContractsOutput{}, fmt.Errorf("failed to deploy canton chain contracts for selector %d: %w", input.ChainSelector, err)
 	}
 
-	return seqcore.OnChainOutput{
-		Addresses: out.Output.Addresses,
-		BatchOps:  out.Output.BatchOps,
+	return ccipadapters.DeployChainContractsOutput{
+		OnChainOutput: seqcore.OnChainOutput{
+			Addresses: out.Output.Addresses,
+			BatchOps:  out.Output.BatchOps,
+		},
+		RefsToTransferOwnership: nil,
 	}, nil
 }
 

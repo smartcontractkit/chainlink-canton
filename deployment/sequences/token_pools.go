@@ -498,8 +498,10 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("tokenRef.address is required")
 		}
 		tokenRef := datastore.AddressRef{
-			Address:       tokenAddress,
-			Type:          datastore.ContractType("Token"),
+			Address: tokenAddress,
+			Type:    datastore.ContractType("Token"),
+			// TODO: what should this be set to?
+			Version:       input.TokenPoolVersion,
 			Qualifier:     qualifier,
 			ChainSelector: input.ChainSelector,
 		}
