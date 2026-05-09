@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-lock-release-token-pool"
-	PackageID   = "b2affb420779baeed6eb6a4776d2eb9cc421cb8cf4cd0d69feb66cc388ff9200"
+	PackageID   = "a54a4ac6ac22e67d7553676c2b28fc3478ad0dadb3ddb84fdc57a182212f2e24"
 	SDKVersion  = "3.4.10"
 )
 
@@ -492,7 +492,7 @@ func (t *GetFeeMCMSParams) UnmarshalHex(data string) error {
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
 	RemoteChainSelector types.NUMERIC                  `json:"remoteChainSelector"`
-	Amount              types.NUMERIC                  `json:"amount"`
+	SourceAmount        types.TEXT                     `json:"sourceAmount"`
 	Finality            core.FinalityConfig            `json:"finality"`
 	ExtraData           types.TEXT                     `json:"extraData"`
 	Direction           extensionapi.TransferDirection `json:"direction"`
@@ -505,7 +505,7 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 
 	m["remoteChainSelector"] = t.RemoteChainSelector
 
-	m["amount"] = t.Amount
+	m["sourceAmount"] = string(t.SourceAmount)
 
 	m["finality"] = model.NestedToDAMLValue(t.Finality)
 
@@ -544,7 +544,7 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type GetRequiredCCVsMCMSParams struct {
 	RemoteChainSelector types.NUMERIC                  `json:"remoteChainSelector"`
-	Amount              types.NUMERIC                  `json:"amount"`
+	SourceAmount        types.TEXT                     `json:"sourceAmount"`
 	Finality            core.FinalityConfig            `json:"finality"`
 	ExtraData           types.TEXT                     `json:"extraData"`
 	Direction           extensionapi.TransferDirection `json:"direction"`
