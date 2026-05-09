@@ -77,9 +77,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		// TODO: remove hardcoded values
-		require.NoError(t, cantonImpl.SetupSend(ctx, false))
 		require.NoError(t, cantonImpl.MintTokens(ctx, 2_000_000)) // TODO: add a buffer here
-		require.NoError(t, cantonImpl.PrepareSendHoldings(ctx, 1, 1_000_000, nil))
+		require.NoError(t, cantonImpl.SetupSend(ctx, 1_000_000, 0))
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -166,10 +165,9 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		// TODO: remove hardcoded values
-		require.NoError(t, cantonImpl.SetupSend(ctx, true))
-		require.NoError(t, cantonImpl.MintTokens(ctx, 2_000_000))                                                              // Holdings for fee TODO: add a buffer here
-		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMTokenTransferAmount))) // Holdings for token transfer TODO: add a buffer here
-		require.NoError(t, cantonImpl.PrepareSendHoldings(ctx, 2, 1_000_000, new(uint64(cantonToEVMTokenTransferAmount))))
+		require.NoError(t, cantonImpl.MintTokens(ctx, 2_000_000))                                                              // Holdings for fee TODO: add a buffer here?
+		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMTokenTransferAmount))) // Holdings for token transfer TODO: add a buffer here?
+		require.NoError(t, cantonImpl.SetupSend(ctx, 1_000_000, uint64(cantonToEVMTokenTransferAmount)))
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
