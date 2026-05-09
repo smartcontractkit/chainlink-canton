@@ -36,6 +36,7 @@ import CCIP.CommitteeVerifierTypes (
     TransferStorageLocationsAdminParams(..),
     UpdateStorageLocationsParams(..),
     )
+import DA.Text qualified as Text
 import qualified CCIP.Crypto.DerEncoding
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
@@ -544,8 +545,12 @@ countValidSigners : [(BytesHex, Bool)] -> Int
 countValidSigners validSignersMap =
     length (filter snd validSignersMap)
 
+isValidPublicKey : PublicKeyHex -> Bool
+isValidPublicKey key = byteCount key == 65 && Text.take 2 key == "04"
+
 isValidSignatureConfig : SignatureConfig -> Bool
 isValidSignatureConfig config =
     config.threshold > 0
         && length config.signerKeys >= config.threshold
         && length config.signerKeys == length (dedup config.signerKeys)
+        && all isValidPublicKey config.signerKeys
