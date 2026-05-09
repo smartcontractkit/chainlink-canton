@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "df69f0b1e923bbf07097a2e9b20d8b7c46e228ff8785980c5b8f9f3affaf7786"
+	PackageID   = "8a746ea4bd3b019da25bf526308d57d2af6d53af7cff8801fdbfbd76652dfba1"
 	SDKVersion  = "3.4.10"
 )
 
@@ -41,7 +41,6 @@ const (
 	GlobalCurseSubject       = types.TEXT("01000000000000000000000000000001")
 	UsdPerUsdCent            = types.NUMERIC("100000000.")
 	PremiumIdentity          = types.NUMERIC("10000000000.")
-	JuelsPerLocalLink        = types.NUMERIC("10000000000.")
 	E10PerPercent            = types.NUMERIC("100000000.")
 	BaseNumeric              = types.NUMERIC("100000000.")
 	BaseInt                  = types.INT64(100000000)
