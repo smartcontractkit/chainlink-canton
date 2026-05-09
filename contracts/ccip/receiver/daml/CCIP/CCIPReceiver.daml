@@ -18,7 +18,6 @@ import qualified CCIP.Context
 import qualified CCIP.FinalityConfig
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
-import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.PerPartyRouter
 import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
@@ -81,13 +80,12 @@ template CCIPReceiver
                     (Some _, None) ->
                         abort "receiver: tokenPoolCid required for token transfer"
                     (Some tt, Some poolCid) ->
-                        let tokenAmount : Decimal = CCIP.Math.numeric0ToDecimal tt.amount
-                            tokenExtraData : BytesHex = tt.extraData
+                        let tokenExtraData : BytesHex = tt.extraData
                         in
                         exercise poolCid
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = message.sourceChainSelector
-                                amount = tokenAmount
+                                sourceAmount = tt.amount
                                 finality = message.finality.requested
                                 extraData = tokenExtraData
                                 direction = CCIP.Interfaces.TokenPool.Inbound

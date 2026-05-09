@@ -1306,7 +1306,7 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
             poolInstanceId = "pool-receipt-mixed"
             poolOwner = poolOwner
             instrumentId = feeToken
-            amount = 1.0
+            amount = fromSome (MessageCodecV1.encodeUint256 1.0)
             destTokenAddress = "05"
             extraData = ""
 
