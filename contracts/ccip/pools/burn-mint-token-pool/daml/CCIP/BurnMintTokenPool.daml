@@ -315,6 +315,11 @@ template BurnMintTokenPool
                         remoteChainConfigs
                         remoteChainSelectorsToRemove
 
+                -- If the chain already exists, revert
+                let chainSelectorsToAdd = map (\u -> u.remoteChainSelector) chainsToAdd
+                assertMsg "ChainAlreadyExists: duplicate remoteChainSelector in chainsToAdd"
+                    (length chainSelectorsToAdd == length (dedup chainSelectorsToAdd))
+
                 -- Validate
                 forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, finalityConfig, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
                     assertMsg "ApplyChainUpdates: invalid chain selector" (remoteChainSelector > 0.0)
