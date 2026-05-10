@@ -2548,7 +2548,7 @@ testVerifyInboundMessage = script do
             tokenTransfer = Some MessageCodecV1.TokenTransferV1 with
                 amount = fromSome (MessageCodecV1.encodeUint256 5000000.0)
                 sourcePoolAddress = allowedSourcePool
-                sourceTokenAddress = "000000000000000000000000bbbbbbbbbbbbbbbb"
+                sourceTokenAddress = "000000000000000000000000dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
                 destTokenAddress = destTokenAddr
                 tokenReceiver = MessageCodecV1.encodePartyAddress receiver
                 extraData = ""
@@ -2667,7 +2667,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
             tokenTransfer = Some MessageCodecV1.TokenTransferV1 with
                 amount = fromSome (MessageCodecV1.encodeUint256 5000000.0)
                 sourcePoolAddress = allowedSourcePool
-                sourceTokenAddress = "000000000000000000000000bbbbbbbbbbbbbbbb"
+                sourceTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
                 destTokenAddress = destTokenAddr
                 tokenReceiver = MessageCodecV1.encodePartyAddress receiver
                 extraData = ""
@@ -2943,6 +2943,117 @@ testVerifyInboundMessageMissingChainConfig = script do
             caller = receiver
 
     debug "testVerifyInboundMessageMissingChainConfig: PASSED"
+
+-- | Test VerifyInboundMessage fails when sourceTokenAddress does not match
+-- the configured remoteTokenAddress for the source chain.
+testVerifyInboundMessage_RejectsMismatchedSourceToken : Script ()
+testVerifyInboundMessage_RejectsMismatchedSourceToken = script do
+    ccipOwner <- allocateParty "ccip-owner-mismatch"
+    poolOwner <- allocateParty "pool-owner-mismatch"
+    receiver <- allocateParty "receiver-mismatch"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+    let tokenAdminRegistryInstanceId = "test-tar-verify-mismatch"
+    let allowedSourcePool = "000000000000000000000000aaaaaaaaaaaaaaaa"
+    let configuredRemoteToken = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+    let wrongSourceToken = "ffffffffffffffffffffffffffffffffffffffff"
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
+        ccipOwner
+        poolOwner
+        tokenAdminRegistryInstanceId
+        testInstrumentId
+        "test-pool-verify-mismatch"
+
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = [allowedSourcePool]
+            remoteTokenAddress = configuredRemoteToken
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = finalityConfig 0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            poolOwner = poolOwner
+            ccipOwner = ccipOwner
+            instanceId = "test-pool-verify-mismatch"
+            instrumentId = testInstrumentId
+            decimals = 10
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-mismatch" "test-feequoter-verify-mismatch" ccipOwner ccipOwner
+
+    let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = messageFinality 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = Some MessageCodecV1.TokenTransferV1 with
+                amount = fromSome (MessageCodecV1.encodeUint256 5000000.0)
+                sourcePoolAddress = allowedSourcePool
+                sourceTokenAddress = wrongSourceToken
+                destTokenAddress = destTokenAddr
+                tokenReceiver = MessageCodecV1.encodePartyAddress receiver
+                extraData = ""
+            messageData = ""
+
+    let offRampInstanceAddress = RawInstanceAddress.make "test-offramp-mismatch" ccipOwner
+    let tarInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    executingMessageCid <- submit ccipOwner do
+        createCmd ExecutingMessageV1.ExecutingMessageV1 with
+            ccipOwner = ccipOwner
+            message = message
+            messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            receiver = receiver
+            tokenReceiver = Some receiver
+            executor = ccipOwner
+            observingParties = [receiver, ccipOwner, poolOwner]
+            ccvVerifications = []
+            ccvOwners = []
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverFinalityConfig = finalityConfig 2000
+            sourceDefaultCCVs = []
+            inboundPoolCCVs = None
+            deps = ExecutingMessageV1.ExecutingMessageDeps with
+                offRamp = offRampInstanceAddress
+                globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                tokenAdminRegistry = tarInstanceAddress
+            state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
+
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
+    submitMustFail (actAs poolOwner <> actAs ccipOwner <> actAs receiver
+                    <> disclose disclosedTar <> disclose disclosedTokenConfig) do
+        exerciseCmd tokenPool LockReleaseTokenPool.VerifyInboundMessage with
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            extraContext = MetadataV1.emptyChoiceContext
+            executingMessageCid = executingMessageCid
+            caller = receiver
+
+    debug "testVerifyInboundMessage_RejectsMismatchedSourceToken: PASSED"
 
 -- M-6: when pool custom fees are absent, CalculateFee falls back to FeeQuoter's
 -- per-destination token transfer fee config.
