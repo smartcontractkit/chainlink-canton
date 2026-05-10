@@ -116,7 +116,8 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
                 rmnRemote = rmnRemoteAddr
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.empty
-            archivedExecutionContractIds = []
+            archivedExecutionContractIds = Map.empty
+            archivedBucketSizes = Map.empty
             customObservers = []
 
     receiverCid <- submit receiver do
@@ -251,7 +252,8 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
                 rmnRemote = rmnRemoteAddr
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.empty
-            archivedExecutionContractIds = []
+            archivedExecutionContractIds = Map.empty
+            archivedBucketSizes = Map.empty
             customObservers = []
 
     receiverCid <- submit receiver do

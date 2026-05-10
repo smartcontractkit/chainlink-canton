@@ -2,10 +2,11 @@
 module CCIP.PerPartyRouter where
 
 import DA.Action (foldlA)
-import DA.List (dedup, unique)
+import DA.List (dedup, init, unique)
 import DA.Map qualified as Map
 import DA.Set (Set)
 import DA.Set qualified as Set
+import DA.Text qualified as Text
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional, isNone)
@@ -51,6 +52,78 @@ maxExecutedMessagesSize : Int
 -- setup instead of relying on script-runner limits.
 maxExecutedMessagesSize = 25000
 
+-- Maximum messages one ArchivedExecutedMessages contract may hold.
+-- A new archive is only created when appending would exceed this cap.
+maxArchivedSetSize : Int
+maxArchivedSetSize = maxExecutedMessagesSize
+
+executionArchiveBucketPrefixLength : Int
+executionArchiveBucketPrefixLength = 2
+
+executionArchiveBucket : BytesHex -> Text
+executionArchiveBucket messageHash = Text.take executionArchiveBucketPrefixLength messageHash
+
+bucketExecutedMessages : Set BytesHex -> Map.Map Text (Set BytesHex)
+bucketExecutedMessages messages =
+    foldl
+        (\buckets messageHash ->
+            let bucket = executionArchiveBucket messageHash
+                bucketMessages = fromOptional Set.empty (Map.lookup bucket buckets)
+            in Map.insert bucket (Set.insert messageHash bucketMessages) buckets
+        )
+        Map.empty
+        (Set.toList messages)
+
+-- Append to the most-recent archive for a bucket when it still has room;
+-- create a new one only when appending would exceed maxArchivedSetSize.
+archiveMessagesToBucket
+    : Party
+    -> Party
+    -> Text
+    -> Text
+    -> [ContractId ArchivedExecutedMessages]
+    -> Int
+    -> Set BytesHex
+    -> Update ([ContractId ArchivedExecutedMessages], Int)
+archiveMessagesToBucket owner partyOwner routerId bucket existingList existingSize newMessages =
+    let newCount = Set.size newMessages
+    in if existingSize > 0 && existingSize + newCount <= maxArchivedSetSize
+    then do
+        let lastCid = case reverse existingList of
+                [] -> error "router: bucket list empty despite existingSize > 0"
+                (x :: _) -> x
+        newCid <- exercise lastCid Append with additionalMessages = newMessages
+        pure (init existingList <> [newCid], existingSize + newCount)
+    else do
+        newCid <- create ArchivedExecutedMessages with
+            ccipOwner = owner
+            partyOwner = partyOwner
+            perPartyRouterInstanceId = routerId
+            archiveBucket = bucket
+            archiveIndex = length existingList
+            executedMessages = newMessages
+        pure (existingList <> [newCid], newCount)
+
+archiveExecutedMessageBuckets
+    : Party
+    -> Party
+    -> Text
+    -> Map.Map Text [ContractId ArchivedExecutedMessages]
+    -> Map.Map Text Int
+    -> Set BytesHex
+    -> Update (Map.Map Text [ContractId ArchivedExecutedMessages], Map.Map Text Int)
+archiveExecutedMessageBuckets owner partyOwner routerId archives bucketSizes messages =
+    foldlA
+        (\(newArchives, newSizes) (bucket, bucketMessages) -> do
+            let existingList = fromOptional [] (Map.lookup bucket newArchives)
+                existingSize = fromOptional 0 (Map.lookup bucket newSizes)
+            (updatedList, updatedSize) <- archiveMessagesToBucket
+                owner partyOwner routerId bucket existingList existingSize bucketMessages
+            pure (Map.insert bucket updatedList newArchives, Map.insert bucket updatedSize newSizes)
+        )
+        (archives, bucketSizes)
+        (Map.toList (bucketExecutedMessages messages))
+
 addFeeForParty : Map.Map Party Decimal -> Party -> Decimal -> Map.Map Party Decimal
 addFeeForParty allocs recipient amount =
     let existing = fromOptional 0.0 (Map.lookup recipient allocs)
@@ -75,19 +148,18 @@ buildCCVFeeAllocations ccvFees ccvAmounts =
 lookupExecutedMessage
     : BytesHex
     -> Set BytesHex
-    -> [ContractId ArchivedExecutedMessages]
+    -> Map.Map Text [ContractId ArchivedExecutedMessages]
     -> Update Bool
 lookupExecutedMessage messageHash executedMessages archivedExecutionContractIds =
-    if Set.member messageHash executedMessages then pure True else
-        -- Searches newest-to-oldest as a heuristic because recent messages are
-        -- more likely to be queried or replayed than older messages.
-        foldlA
-            (\found archivedExecutionContractId ->
-                if found then pure True else do
-                    exercise archivedExecutionContractId IsExecuted with messageHash
-            )
-            False
-            (reverse archivedExecutionContractIds)
+    if Set.member messageHash executedMessages then pure True
+    else case Map.lookup (executionArchiveBucket messageHash) archivedExecutionContractIds of
+        None -> pure False
+        Some bucketArchives ->
+            -- Newest-to-oldest: recent messages are more likely to be replayed.
+            foldlA
+                (\found cid -> if found then pure True else exercise cid IsExecuted with messageHash)
+                False
+                (reverse bucketArchives)
 
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
@@ -150,7 +222,8 @@ template PerPartyRouterFactory
                     deps = deps
                     outboundSequenceNumbers = Map.empty
                     executedMessages = Set.empty
-                    archivedExecutionContractIds = []
+                    archivedExecutionContractIds = Map.empty
+                    archivedBucketSizes = Map.empty
                     customObservers = []
 
                 newFactoryCid <- create this with
@@ -205,17 +278,34 @@ template ArchivedExecutedMessages
         ccipOwner : Party
         partyOwner : Party
         perPartyRouterInstanceId : Text
+        archiveBucket : Text
         archiveIndex : Int
         executedMessages : Set BytesHex
     where
         signatory ccipOwner
         observer partyOwner
+        ensure archiveBucket /= ""
+            && archiveIndex >= 0
+            && Set.size executedMessages > 0
+            && Set.size executedMessages <= maxArchivedSetSize
+
+        -- Append additional messages into this archive. Only allowed when
+        -- the result stays within maxArchivedSetSize; enforced by ensure.
+        choice Append : ContractId ArchivedExecutedMessages
+            with
+                additionalMessages : Set BytesHex
+            controller ccipOwner
+            do
+                create this with
+                    executedMessages = Set.union executedMessages additionalMessages
 
         nonconsuming choice IsExecuted : Bool
             with
                 messageHash : BytesHex
             controller ccipOwner
             do
+                assertMsg "router: archived executed message bucket mismatch"
+                    (executionArchiveBucket messageHash == archiveBucket)
                 pure $ Set.member messageHash executedMessages
 
 -- | Per-party router - state container with delegation to OnRamp/OffRamp.
@@ -228,7 +318,8 @@ template PerPartyRouter
         deps : PerPartyRouterDeps
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
         executedMessages : Set BytesHex
-        archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
+        archivedExecutionContractIds : Map.Map Text [ContractId ArchivedExecutedMessages]
+        archivedBucketSizes : Map.Map Text Int
         customObservers : [Party]
     where
         signatory ccipOwner
@@ -640,16 +731,17 @@ template PerPartyRouter
 
                 routerCid <-
                     if Set.size executedMessages >= maxExecutedMessagesSize then do
-                        archivedExecutionMessagesCid <- create ArchivedExecutedMessages with
-                            ccipOwner = ccipOwner
-                            partyOwner = partyOwner
-                            perPartyRouterInstanceId = instanceId
-                            archiveIndex = length archivedExecutionContractIds
-                            executedMessages = executedMessages
+                        (newArchives, newSizes) <- archiveExecutedMessageBuckets
+                            ccipOwner
+                            partyOwner
+                            instanceId
+                            archivedExecutionContractIds
+                            archivedBucketSizes
+                            executedMessages
                         create this with
                             executedMessages = Set.singleton result.messageId
-                            archivedExecutionContractIds =
-                                archivedExecutionContractIds <> [archivedExecutionMessagesCid]
+                            archivedExecutionContractIds = newArchives
+                            archivedBucketSizes = newSizes
                     else
                         create this with
                             executedMessages = Set.insert result.messageId executedMessages

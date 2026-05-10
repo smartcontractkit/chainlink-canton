@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "50f072f89866957306396c0f41d8b8344ea704fa90d70418e6f7e54d883a3861"
+	PackageID   = "c7d33536d1f7ec4a74d069563e30202da28153e9293fb55ab7bef590e223eb63"
 	SDKVersion  = "3.4.10"
 )
 
@@ -39,11 +39,12 @@ type Template interface {
 }
 
 const (
-	OffRampKey              = types.TEXT("off-ramp")
-	OnRampKey               = types.TEXT("on-ramp")
-	NoExecutionAddressBytes = types.TEXT("eba517d200000000000000000000000000000000000000000000000000000000")
-	MessageStaticSize       = types.INT64(69)
-	MaxExecutedMessagesSize = types.INT64(25000)
+	OffRampKey                         = types.TEXT("off-ramp")
+	OnRampKey                          = types.TEXT("on-ramp")
+	NoExecutionAddressBytes            = types.TEXT("eba517d200000000000000000000000000000000000000000000000000000000")
+	MessageStaticSize                  = types.INT64(69)
+	MaxExecutedMessagesSize            = types.INT64(25000)
+	ExecutionArchiveBucketPrefixLength = types.INT64(2)
 )
 
 func argsToMap(args any) map[string]any {
@@ -149,11 +150,48 @@ func (t *AddCustomObserversParams2) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// Append is a Record type
+type Append struct {
+	AdditionalMessages types.SET `json:"additionalMessages"`
+}
+
+// ToMap converts Append to a map for DAML arguments
+func (t Append) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["additionalMessages"] = model.NestedToDAMLValue(t.AdditionalMessages)
+
+	return m
+}
+
+func (t Append) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *Append) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes Append to hex string (Canton MCMS format)
+func (t Append) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Append from hex string (Canton MCMS format)
+func (t *Append) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ArchivedExecutedMessages is a Template type
 type ArchivedExecutedMessages struct {
 	CcipOwner                types.PARTY `json:"ccipOwner"`
 	PartyOwner               types.PARTY `json:"partyOwner"`
 	PerPartyRouterInstanceId types.TEXT  `json:"perPartyRouterInstanceId"`
+	ArchiveBucket            types.TEXT  `json:"archiveBucket"`
 	ArchiveIndex             types.INT64 `json:"archiveIndex"`
 	ExecutedMessages         types.SET   `json:"executedMessages"`
 }
@@ -182,6 +220,9 @@ func (t ArchivedExecutedMessages) CreateCommand() *model.CreateCommand {
 	args["perPartyRouterInstanceId"] = string(t.PerPartyRouterInstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["archiveBucket"] = string(t.ArchiveBucket)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["archiveIndex"] = int64(t.ArchiveIndex)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -205,6 +246,9 @@ func (t ArchivedExecutedMessages) CreateCommandWithPackageID(packageID string) *
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["perPartyRouterInstanceId"] = string(t.PerPartyRouterInstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["archiveBucket"] = string(t.ArchiveBucket)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["archiveIndex"] = int64(t.ArchiveIndex)
@@ -259,6 +303,27 @@ func (t ArchivedExecutedMessages) IsExecutedWithPackageID(contractID string, pac
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "ArchivedExecutedMessages"),
 		ContractID: contractID,
 		Choice:     "IsExecuted",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Append exercises the Append choice on this ArchivedExecutedMessages contract
+// This method uses the package name in the template ID
+func (t ArchivedExecutedMessages) Append(contractID string, args Append) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "ArchivedExecutedMessages"),
+		ContractID: contractID,
+		Choice:     "Append",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AppendWithPackageID exercises the Append choice using the provided package ID instead of package name
+func (t ArchivedExecutedMessages) AppendWithPackageID(contractID string, packageID string, args Append) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "ArchivedExecutedMessages"),
+		ContractID: contractID,
+		Choice:     "Append",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -2257,14 +2322,15 @@ func (t *OnRampDeps) UnmarshalHex(data string) error {
 
 // PerPartyRouter is a Template type
 type PerPartyRouter struct {
-	InstanceId                   types.TEXT                      `json:"instanceId"`
-	CcipOwner                    types.PARTY                     `json:"ccipOwner"`
-	PartyOwner                   types.PARTY                     `json:"partyOwner"`
-	Deps                         PerPartyRouterDeps              `json:"deps"`
-	OutboundSequenceNumbers      map[types.NUMERIC]types.NUMERIC `json:"outboundSequenceNumbers"`
-	ExecutedMessages             types.SET                       `json:"executedMessages"`
-	ArchivedExecutionContractIds []types.CONTRACT_ID             `json:"archivedExecutionContractIds"`
-	CustomObservers              []types.PARTY                   `json:"customObservers"`
+	InstanceId                   types.TEXT                         `json:"instanceId"`
+	CcipOwner                    types.PARTY                        `json:"ccipOwner"`
+	PartyOwner                   types.PARTY                        `json:"partyOwner"`
+	Deps                         PerPartyRouterDeps                 `json:"deps"`
+	OutboundSequenceNumbers      map[types.NUMERIC]types.NUMERIC    `json:"outboundSequenceNumbers"`
+	ExecutedMessages             types.SET                          `json:"executedMessages"`
+	ArchivedExecutionContractIds map[types.TEXT][]types.CONTRACT_ID `json:"archivedExecutionContractIds"`
+	ArchivedBucketSizes          map[types.TEXT]types.INT64         `json:"archivedBucketSizes"`
+	CustomObservers              []types.PARTY                      `json:"customObservers"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -2305,12 +2371,19 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 	args["executedMessages"] = model.NestedToDAMLValue(t.ExecutedMessages)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["archivedExecutionContractIds"] = func() []any {
-		res := make([]any, 0, len(t.ArchivedExecutionContractIds))
-		for _, e := range t.ArchivedExecutionContractIds {
-			res = append(res, e)
+	args["archivedExecutionContractIds"] = func() any {
+		if t.ArchivedExecutionContractIds == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
-		return res
+		return map[string]any{"_type": "genmap", "value": t.ArchivedExecutionContractIds}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["archivedBucketSizes"] = func() any {
+		if t.ArchivedBucketSizes == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.ArchivedBucketSizes}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -2356,12 +2429,19 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 	args["executedMessages"] = model.NestedToDAMLValue(t.ExecutedMessages)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["archivedExecutionContractIds"] = func() []any {
-		res := make([]any, 0, len(t.ArchivedExecutionContractIds))
-		for _, e := range t.ArchivedExecutionContractIds {
-			res = append(res, e)
+	args["archivedExecutionContractIds"] = func() any {
+		if t.ArchivedExecutionContractIds == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
-		return res
+		return map[string]any{"_type": "genmap", "value": t.ArchivedExecutionContractIds}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["archivedBucketSizes"] = func() any {
+		if t.ArchivedBucketSizes == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.ArchivedBucketSizes}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -3410,6 +3490,7 @@ func (t *SetDepsParams) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	AddCustomObservers(args AddCustomObservers2) (*bind.EncodedChoice, error)
 	AddCustomObserversParams(args AddCustomObserversParams2) (*bind.EncodedChoice, error)
+	Append(args Append) (*bind.EncodedChoice, error)
 	CCIPSend(args CCIPSend) (*bind.EncodedChoice, error)
 	CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error)
 	CreateRouter(args CreateRouter) (*bind.EncodedChoice, error)
@@ -3475,6 +3556,11 @@ func (e *encoder) AddCustomObservers(args AddCustomObservers2) (*bind.EncodedCho
 // AddCustomObserversParams encodes parameters for the AddCustomObservers choice.
 func (e *encoder) AddCustomObserversParams(args AddCustomObserversParams2) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddCustomObservers", args)
+}
+
+// Append encodes parameters for the Append choice.
+func (e *encoder) Append(args Append) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Append", args)
 }
 
 // CCIPSend encodes parameters for the CCIPSend choice.

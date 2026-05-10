@@ -41,7 +41,8 @@ testPerPartyRouterMCMSEntrypoint_SetDeps = script do
       deps = initialDeps
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      archivedExecutionContractIds = Map.empty
+      archivedBucketSizes = Map.empty
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -99,7 +100,8 @@ testPerPartyRouterMCMSEntrypoint_SetDeps_Partial = script do
       deps = initialDeps
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      archivedExecutionContractIds = Map.empty
+      archivedBucketSizes = Map.empty
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -157,7 +159,8 @@ testPerPartyRouterMCMSEntrypoint_UnknownFunction = script do
       deps
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      archivedExecutionContractIds = Map.empty
+      archivedBucketSizes = Map.empty
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -193,7 +196,8 @@ testPerPartyRouterMCMSEntrypoint_InvalidParams = script do
       deps
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      archivedExecutionContractIds = Map.empty
+      archivedBucketSizes = Map.empty
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -229,7 +233,8 @@ testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
       deps
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
-      archivedExecutionContractIds = []
+      archivedExecutionContractIds = Map.empty
+      archivedBucketSizes = Map.empty
       customObservers = []
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid

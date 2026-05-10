@@ -4,6 +4,7 @@ package ccipmain
 
 import ccipruntime "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipruntime"
 
+const ExecutionArchiveBucketPrefixLength = ccipruntime.ExecutionArchiveBucketPrefixLength
 const MaxExecutedMessagesSize = ccipruntime.MaxExecutedMessagesSize
 const MessageStaticSize = ccipruntime.MessageStaticSize
 const NoExecutionAddressBytes = ccipruntime.NoExecutionAddressBytes
@@ -15,6 +16,7 @@ const SDKVersion = ccipruntime.SDKVersion
 
 type AddCustomObservers2 = ccipruntime.AddCustomObservers2
 type AddCustomObserversParams2 = ccipruntime.AddCustomObserversParams2
+type Append = ccipruntime.Append
 type ArchivedExecutedMessages = ccipruntime.ArchivedExecutedMessages
 type CCIPSend = ccipruntime.CCIPSend
 type CCIPSendFromRouter = ccipruntime.CCIPSendFromRouter
