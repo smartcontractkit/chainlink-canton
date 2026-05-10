@@ -100,7 +100,9 @@ template GlobalConfig
                 forA_ sourceChainConfigUpdates $ \SourceChainConfigArgs{sourceChainSelector, onRampAddresses, defaultCCVs, laneMandatedCCVs} -> do
                     assertMsg "InvalidChainSelector: source chain selector must be greater than zero" (sourceChainSelector > 0.0)
                     assertMsg "InvalidChainSelector: source chain selector must not be the same as the local chain selector" (sourceChainSelector /= chainSelector)
-                    forA_ onRampAddresses $ \addr -> assertValidHex "onRampAddress" addr
+                    forA_ onRampAddresses $ \addr -> do
+                        assertMsg "InvalidOnRampAddress: onramp address must not be empty" (addr /= "")
+                        assertValidHex "onRampAddress" addr
                     validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
                 -- Update
