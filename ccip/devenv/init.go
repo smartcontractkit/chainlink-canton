@@ -2,7 +2,6 @@ package devenv
 
 import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/registry"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/chainconfig"
@@ -22,7 +21,7 @@ func init() {
 
 	// Register the Canton impl factory so the shared CCV harness can resolve the
 	// Canton family to this repo's devenv/test implementation.
-	ccv.RegisterImplFactory(chainsel.FamilyCanton, NewImplFactory())
+	ccv.RegisterImplFactory(chain_selectors.FamilyCanton, NewImplFactory())
 
 	// The other Canton adapters are registered via the init function in the adapters package
 }

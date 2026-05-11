@@ -222,10 +222,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 // 3. Use the hashed instance address to get the disclosure from EDS.
 func getHashedInstanceAddress(t *testing.T, rawInstanceAddressBytes protocol.UnknownAddress) protocol.UnknownAddress {
 	rawInstanceAddressAsHexStr := string(rawInstanceAddressBytes.Bytes())
-	t.Logf("rawInstanceAddressAsHexStr: %s", rawInstanceAddressAsHexStr)
 	rawInstanceAddress, err := contracts.RawInstanceAddressFromString(rawInstanceAddressAsHexStr)
-	t.Logf("rawInstanceAddress: %s", rawInstanceAddress.String())
 	require.NoError(t, err)
-	t.Logf("hashedInstanceAddress: %s", rawInstanceAddress.InstanceAddress().String())
+
 	return protocol.UnknownAddress(rawInstanceAddress.InstanceAddress().Bytes())
 }
