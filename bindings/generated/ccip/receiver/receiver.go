@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "7bab86ddeaeb173c7c625ad8016fd1f5990bd8eae6e4cb64c103985bbb7c9226"
+	PackageID   = "d5d301a1e08faab8dbf74c9a6c4c8df544f4e0b8c4317cb9c3f84394d7318d7d"
 	SDKVersion  = "3.4.10"
 )
 

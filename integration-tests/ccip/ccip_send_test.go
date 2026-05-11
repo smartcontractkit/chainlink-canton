@@ -24,6 +24,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/freeport"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -31,9 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/freeport"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
@@ -743,7 +744,9 @@ func TestCCIPSend(t *testing.T) {
 	quotedFeeAmount, ok := new(big.Rat).SetString(strings.TrimSuffix(string(quotedFee.FeeTokenAmount), "."))
 	require.True(t, ok, "quoted fee should parse as a decimal value")
 	require.Zero(t, senderDelta.Cmp(quotedFeeAmount), "sender deduction should match GetFee quote")
-	require.Zero(t, ccipOwnerDelta.Cmp(quotedFeeAmount), "ccipOwner should receive the full quoted fee in this no-token flow")
+	// In this test the executor is owned by ccipOwner (partyCCIP), so the executor fee
+	// and any owner residual both land on ccipOwner — the total still equals the quoted fee.
+	require.Zero(t, ccipOwnerDelta.Cmp(quotedFeeAmount), "ccipOwner should receive the full quoted fee (executor is also owned by ccipOwner in this test)")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
