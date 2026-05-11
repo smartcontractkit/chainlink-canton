@@ -97,21 +97,6 @@ func (a *CantonCommitteeVerifierOnchain) ScanCommitteeStates(ctx context.Context
 	return states, nil
 }
 
-// ResolveVerifierAddress implements [adapters.AggregatorConfigAdapter].
-func (a *CantonAggregatorConfigAdapter) ResolveVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
-	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
-		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
-		datastore.AddressRef{
-			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
-			Qualifier: qualifier,
-		},
-		datastore.AddressRef{
-			Type:      datastore.ContractType(committee_verifier.ContractType),
-			Qualifier: qualifier,
-		},
-	)
-}
-
 // ResolveDestinationVerifierAddress implements [adapters.AggregatorConfigAdapter].
 //
 // For Canton we want to resolve the aggregator destination verifier address to
