@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-extension-api"
-	PackageID   = "06944692382ad7832d19bd0ff7aa46448d63ffdbf089e933b537d2df51143d06"
+	PackageID   = "85ef447619c9aa7e03e00fa5a0ad9b07e01079ae3d5c93b2dbbe2bc37643996d"
 	SDKVersion  = "3.4.10"
 )
 

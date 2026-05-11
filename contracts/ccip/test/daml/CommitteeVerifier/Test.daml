@@ -595,6 +595,16 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
                 payloadSizeBytes = -1
                 allowListEnabled = False]
 
+    -- Negative verifier fee fields are rejected.
+    submitMustFail owner do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CommitteeVerifier.RemoteChainConfigArgs with
+                remoteChainSelector = 123.0
+                feeUSDCents = -1.0
+                gasForVerification = 5000
+                payloadSizeBytes = 200
+                allowListEnabled = False]
+
     pure ()
  
 testCommitteeVerifier_ApplyAllowListUpdates : Script ()
