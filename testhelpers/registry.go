@@ -215,7 +215,7 @@ func GetRegistryAdmin(ctx context.Context, metadataClient tokenMetadataV1.Client
 	return registryInfoResponse.JSON200.AdminId, nil
 }
 
-// Deprecated: use GetTransferFactoryV2 where amount, instrumentId, and input holdings can be set.
+// PREFERRED: use GetTransferFactoryV2 where amount, instrumentId, and input holdings can be set.
 func GetTransferFactory(ctx context.Context, transferInstructionClient transferInstructionV1.ClientWithResponsesInterface, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, map[string]any, error) {
 	choice, err := GetTransferFactoryV2(ctx, transferInstructionClient, registryAdmin, splice_api_token_transfer_instruction_v1.Transfer{
 		Sender:   types.PARTY(sender),

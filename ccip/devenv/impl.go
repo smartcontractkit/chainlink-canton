@@ -1018,7 +1018,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		splice_api_token_transfer_instruction_v1.Transfer{
 			Sender:           types.PARTY(party),
 			Receiver:         types.PARTY(party),
-			Amount:           types.NUMERIC(fields.TokenAmount.Amount.String()),
+			Amount:           types.NUMERIC("100.00"), // TODO: Setting this to the default value, should this be the estimated fee?
 			InstrumentId:     c.feeTokenInstrument,
 			InputHoldingCids: nil,
 			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
@@ -1245,7 +1245,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	// Set next holdings
-	err = c.setNextHoldings(update.GetTransaction().GetEvents(), parsedSend.foundEncodedMessage, fields.TokenAmount.Amount)
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, fields.TokenAmount.Amount)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
 	}
