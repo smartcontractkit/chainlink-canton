@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	cryptorand "crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"math/big"
@@ -1389,6 +1390,14 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 		return fmt.Errorf("refresh next fee holding from update: %w", err)
 	}
 	c.nextFeeCID = pickedFee[0].ContractID
+	c.logger.Info().Str("NextFeeCID", c.nextFeeCID).Msg("Selected next fee holding")
+	if payload, err := json.MarshalIndent(freshFeeHoldings, "", "  "); err != nil {
+		c.logger.Warn().Err(err).Msg("marshal freshFeeHoldings for log")
+	} else {
+		c.logger.Debug().
+			RawJSON("freshFeeHoldings", payload).
+			Msg("Fresh fee holdings parsed from send update")
+	}
 
 	if !hasTokenTransfer {
 		return nil
@@ -1410,6 +1419,7 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 		return fmt.Errorf("refresh next transfer holding from update: %w", err)
 	}
 	c.nextTransferCID = pickedTransfer[0].ContractID
+	c.logger.Info().Str("NextTransferCID", c.nextTransferCID).Msg("Selected next transfer holding")
 
 	return nil
 }
