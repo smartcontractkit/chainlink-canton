@@ -1278,10 +1278,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 			continue
 		}
 		tid := evCreated.GetTemplateId()
-		if tid.GetModuleName() != messageSentTemplateID.ModuleName || tid.GetPackageId() != messageSentTemplateID.PackageID {
-			continue
-		}
-		if tid.GetEntityName() != messageSentTemplateID.EntityName {
+		if tid.GetModuleName() != messageSentTemplateID.ModuleName || tid.GetEntityName() != messageSentTemplateID.EntityName {
 			continue
 		}
 		created = evCreated
