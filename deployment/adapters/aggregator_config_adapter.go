@@ -112,6 +112,60 @@ func (a *CantonAggregatorConfigAdapter) ResolveVerifierAddress(ds datastore.Data
 	)
 }
 
+// ResolveDestinationVerifierAddress implements [adapters.AggregatorConfigAdapter].
+//
+// For Canton we want to resolve the aggregator destination verifier address to
+// the raw instance address of the committee verifier so that users
+// see the raw address in the indexer's verifier results for a specific message.
+// This appears when users send a message from X -> Canton.
+func (a *CantonAggregatorConfigAdapter) ResolveDestinationVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
+		func(r datastore.AddressRef) (string, error) {
+			// The aggregator sends the raw destination instance address to the indexer so that users
+			// can more easily execute messages on Canton.
+			labels := r.Labels.List()
+			if len(labels) == 0 {
+				// Shouldn't happen, graceful fallback.
+				return r.Address, nil
+			}
+
+			// labels[0] is the raw instance address, but since the aggregator requires hex-encoded addresses,
+			// we need to hex-encode the string bytes before returning it.
+			hexEncoded := hex.EncodeToString([]byte(labels[0]))
+
+			return "0x" + hexEncoded, nil
+		},
+		datastore.AddressRef{
+			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+			Qualifier: qualifier,
+		},
+		datastore.AddressRef{
+			Type:      datastore.ContractType(committee_verifier.ContractType),
+			Qualifier: qualifier,
+		},
+	)
+}
+
+// ResolveSourceVerifierAddress implements [adapters.AggregatorConfigAdapter].
+//
+// For Canton we want to resolve the aggregator source verifier address to
+// the hashed instance address of the committee verifier. This is because
+// the actual raw instance address is not needed by users when sending messages
+// from Canton -> X.
+func (a *CantonAggregatorConfigAdapter) ResolveSourceVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
+		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
+		datastore.AddressRef{
+			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+			Qualifier: qualifier,
+		},
+		datastore.AddressRef{
+			Type:      datastore.ContractType(committee_verifier.ContractType),
+			Qualifier: qualifier,
+		},
+	)
+}
+
 func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapters.SignatureConfig, error) {
 	if cv == nil || len(cv.SignerConfigs) == 0 {
 		return nil, nil
