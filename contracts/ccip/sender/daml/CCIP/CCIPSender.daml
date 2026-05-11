@@ -5,7 +5,7 @@ module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
-import DA.Optional (isNone)
+import DA.Optional (fromSomeNote, isNone)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -22,6 +22,7 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import qualified CCIP.TokenAdminRegistry
+import qualified CCIP.Uint256
 import qualified Splice.Api.Token.HoldingV1
 
 import Chainlink.InstanceAddress (assertValidInstanceId)
@@ -100,11 +101,14 @@ template CCIPSender
                         abort "sender: tokenPoolCid provided without token transfer"
                     (Some _, None) ->
                         abort "sender: tokenPoolCid required for token transfer"
-                    (Some tt, Some tokenPoolCid) ->
+                    (Some tt, Some tokenPoolCid) -> do
+                        let sourceAmount = fromSomeNote
+                                "sender: token amount does not fit uint256"
+                                (CCIP.Uint256.numeric0ToUint256Bytes (CCIP.Math.decimalToNumeric0 tt.amount))
                         exercise tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = destinationChainSelector
-                                amount = tt.amount
+                                sourceAmount = sourceAmount
                                 finality = CCIP.FinalityConfig.WaitForFinality
                                 extraData = extraArgs.tokenArgs
                                 direction = CCIP.Interfaces.TokenPool.Outbound

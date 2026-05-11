@@ -56,6 +56,7 @@ import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
+import qualified CCIP.Uint256
 import qualified CCIP.RateLimiter
 import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
@@ -214,7 +215,7 @@ template LockReleaseTokenPool
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) GetRequiredCCVs
                     with
                         remoteChainSelector = arg.remoteChainSelector
-                        amount = arg.amount
+                        sourceAmount = arg.sourceAmount
                         finality = arg.finality
                         extraData = arg.extraData
                         direction = arg.direction
@@ -458,7 +459,7 @@ template LockReleaseTokenPool
         nonconsuming choice GetRequiredCCVs : [RawInstanceAddress]
             with
                 remoteChainSelector : Numeric 0
-                amount : Decimal
+                sourceAmount : BytesHex
                 finality : CCIP.FinalityConfig.FinalityConfig
                 extraData : BytesHex
                 direction : CCIP.Interfaces.TokenPool.TransferDirection
@@ -627,10 +628,16 @@ template LockReleaseTokenPool
                     expectedRateLimiter
                     rateLimiter
                 let sourceDecimals = parseSourcePoolDecimals decimals ticket.sourcePoolData
-                let localAmount = calculateLocalAmount
+                conversion <- case CCIP.Uint256.calculateLocalAmountFromUint256Checked
+                        "ReleaseFromTicket"
                         ticket.amount
                         sourceDecimals
-                        decimals
+                        decimals of
+                    None -> abort "ReleaseFromTicket: source amount cannot be represented as local amount"
+                    Some result -> pure result
+                assertMsg "ReleaseFromTicket: local amount rounds down to zero"
+                    (conversion.localAmount > 0.0)
+                let localAmount = conversion.localAmount
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
                     requested = localAmount
 
@@ -694,7 +701,8 @@ template LockReleaseTokenPool
                                 verifiedCCVs = ticket.verifiedCCVs
                                 tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
                                 instrumentId = ticket.instrumentId
-                                amount = ticket.amount
+                                sourceAmount = ticket.amount
+                                localAmount = localAmount
                                 sourcePoolData = ticket.sourcePoolData
                                 messageId = ticket.messageId
                                 sourceChainSelector = ticket.sourceChainSelector
@@ -720,7 +728,8 @@ template LockReleaseTokenPool
                                 verifiedCCVs = ticket.verifiedCCVs
                                 tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
                                 instrumentId = ticket.instrumentId
-                                amount = ticket.amount
+                                sourceAmount = ticket.amount
+                                localAmount = localAmount
                                 sourcePoolData = ticket.sourcePoolData
                                 messageId = ticket.messageId
                                 sourceChainSelector = ticket.sourceChainSelector
@@ -934,6 +943,9 @@ template LockReleaseTokenPool
                         Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
                         _ -> 0.0
                 let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
+                let amountAfterFeeBpsBytes = fromSomeNote
+                        "LockOrBurn: amountAfterFeeBps does not fit uint256"
+                        (CCIP.Uint256.numeric0ToUint256Bytes amountAfterFeeBps)
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.AddTokenSend with
@@ -941,7 +953,7 @@ template LockReleaseTokenPool
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
                         instrumentId = instrumentId
-                        amount = amountAfterFeeBps
+                        amount = amountAfterFeeBpsBytes
                         destTokenAddress = destTokenAddr
                         extraData = extraData
                         caller = poolOwner
