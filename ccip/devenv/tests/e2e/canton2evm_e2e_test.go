@@ -29,8 +29,8 @@ import (
 
 const (
 	cantonToEVMFeeAmount            = int64(2_000)
-	cantonToEVMTokenTransferAmount  = int64(1_000)
-	cantonToEVMDecimalsScale        = int64(100_000_000) // Canton 10 decimals -> EVM 18 decimals
+	cantonToEVMTokenTransferAmount  = int64(1_000)              // 1000 tokens (1000 * 10^10) on canton decimals
+	evmDecimalsScale                = int64(100000000000000000) // EVM 18 decimals
 	cantonToEVMTokenSequentialSends = 2
 )
 
@@ -246,10 +246,11 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		receiverBalanceAfter, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
-		expectedTransferAmount := new(big.Int).Mul(big.NewInt(cantonToEVMTokenTransferAmount), big.NewInt(cantonToEVMDecimalsScale))
-		totalExpectedTransfer := new(big.Int).Mul(expectedTransferAmount, big.NewInt(cantonToEVMTokenSequentialSends))
+
+		expectedTransferPerMessage := new(big.Int).Mul(big.NewInt(cantonToEVMTokenTransferAmount), big.NewInt(evmDecimalsScale))
+		totalExpectedTransfer := new(big.Int).Mul(expectedTransferPerMessage, big.NewInt(cantonToEVMTokenSequentialSends))
 		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), totalExpectedTransfer)
+		t.Logf("EVM receiver token balance: before=%s after=%s totalExpectedTransfer=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String(), totalExpectedTransfer.String())
 		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter)
-		t.Logf("EVM receiver token balance: before=%s after=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String())
 	})
 }

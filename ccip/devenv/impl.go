@@ -42,6 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
@@ -1227,90 +1228,127 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	// debugPrintSplitHoldingSubmitResponseJSON(update)
 
-	var messageID [32]byte
-	var eventMessageID [32]byte
-	var computedMessageID [32]byte
-	var decodedMessage protocol.Message
-	foundCCIPMessageSent := false
-	foundEventMessageID := false
-	foundEncodedMessage := false
-	for _, event := range update.GetTransaction().GetEvents() {
-		created := event.GetCreated()
-		if created == nil || created.GetTemplateId() == nil || created.GetTemplateId().GetEntityName() != "CCIPMessageSent" {
-			continue
-		}
-		foundCCIPMessageSent = true
-		fields := created.GetCreateArguments().GetFields()
-		for _, f := range fields {
-			if f.GetLabel() != "event" || f.GetValue().GetRecord() == nil {
-				continue
-			}
-			for _, eventField := range f.GetValue().GetRecord().GetFields() {
-				switch eventField.GetLabel() {
-				case "messageId":
-					decoded, err := hex.DecodeString(eventField.GetValue().GetText())
-					if err != nil || len(decoded) != 32 {
-						return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("decode messageId from CCIPMessageSent event: %w", err)
-					}
-					copy(eventMessageID[:], decoded)
-					foundEventMessageID = true
-				case "encodedMessage":
-					encodedMessage, err := hex.DecodeString(eventField.GetValue().GetText())
-					if err != nil {
-						return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("decode encodedMessage from CCIPMessageSent event: %w", err)
-					}
-					decodedMessagePtr, err := protocol.DecodeMessage(encodedMessage)
-					if err != nil {
-						return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("decode protocol message from encodedMessage: %w", err)
-					}
-					decodedMessage = *decodedMessagePtr
-					computedHash := gethcrypto.Keccak256(encodedMessage)
-					if len(computedHash) != len(computedMessageID) {
-						return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("computed encodedMessage hash has invalid length: %d", len(computedHash))
-					}
-					copy(computedMessageID[:], computedHash)
-					foundEncodedMessage = true
-				}
-			}
-		}
-
-		break
-	}
-	if !foundCCIPMessageSent {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
+	parsedSend, err := parseFirstCCIPMessageSentFromLedgerEvents(update.GetTransaction().GetEvents(), c.nextSeq)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, err
 	}
 
 	// Set next holdings
-	err = c.setNextHoldings(update.GetTransaction().GetEvents(), foundEncodedMessage)
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), parsedSend.foundEncodedMessage)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
 	}
 
-	seqNo := c.nextSeq + 1
+	event := cciptestinterfaces.MessageSentEvent{
+		MessageID:      parsedSend.messageID,
+		ReceiptIssuers: nil, // TODO: add them later, not currently needed
+	}
+	if parsedSend.foundEncodedMessage {
+		event.Message = new(parsedSend.decodedMessage)
+	}
+	c.nextSeq = parsedSend.seqNo
+	c.lastSentDest = dest
+	c.lastSentSeq = parsedSend.seqNo
+	c.lastSentEvent = event
+
+	return event, nil
+}
+
+// ccipMessageSentFromSendUpdate is the outcome of parsing a send transaction's first CCIPMessageSent
+// created event: wire identifiers, updated sequence, and optional decoded message body.
+type ccipMessageSentFromSendUpdate struct {
+	messageID           [32]byte
+	seqNo               uint64
+	foundEncodedMessage bool
+	decodedMessage      protocol.Message
+}
+
+// parseFirstCCIPMessageSentFromLedgerEvents scans events for the first created CCIPMessageSent
+// (module and entity name from generated bindings). previousSeq is the chain's last known sequence
+// before this send; returned seqNo is either previousSeq+1 or the sequence from the encoded payload
+// when that path is present.
+func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSeq uint64) (ccipMessageSentFromSendUpdate, error) {
+	messageSentTemplateID := contracts.TemplateIDFromBinding(ccipcore.CCIPMessageSent{})
+
+	// Find CCIPMessageSent event in the events
+	var created *apiv2.CreatedEvent
+	for _, event := range events {
+		evCreated := event.GetCreated()
+		if evCreated == nil || evCreated.GetTemplateId() == nil {
+			continue
+		}
+		tid := evCreated.GetTemplateId()
+		if tid.GetModuleName() != messageSentTemplateID.ModuleName || tid.GetPackageId() != messageSentTemplateID.PackageID {
+			continue
+		}
+		if tid.GetEntityName() != messageSentTemplateID.EntityName {
+			continue
+		}
+		created = evCreated
+		break
+	}
+	if created == nil {
+		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
+	}
+
+	parsed, err := bindings.UnmarshalCreatedEvent[ccipcore.CCIPMessageSent](created)
+	if err != nil {
+		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("unmarshal CCIPMessageSent created event: %w", err)
+	}
+	evt := parsed.Event
+
+	var (
+		foundEventMessageID, foundEncodedMessage bool
+		eventMessageID, computedMessageID        [32]byte
+		decodedMessage                           protocol.Message
+	)
+
+	if mid := string(evt.MessageId); mid != "" {
+		decoded, err := hex.DecodeString(mid)
+		if err != nil || len(decoded) != 32 {
+			return ccipMessageSentFromSendUpdate{}, fmt.Errorf("decode messageId from CCIPMessageSent event: %w", err)
+		}
+		copy(eventMessageID[:], decoded)
+		foundEventMessageID = true
+	}
+
+	if enc := string(evt.EncodedMessage); enc != "" {
+		encodedMessage, err := hex.DecodeString(enc)
+		if err != nil {
+			return ccipMessageSentFromSendUpdate{}, fmt.Errorf("decode encodedMessage from CCIPMessageSent event: %w", err)
+		}
+		decodedMessagePtr, err := protocol.DecodeMessage(encodedMessage)
+		if err != nil {
+			return ccipMessageSentFromSendUpdate{}, fmt.Errorf("decode protocol message from encodedMessage: %w", err)
+		}
+		decodedMessage = *decodedMessagePtr
+		computedHash := gethcrypto.Keccak256(encodedMessage)
+		if len(computedHash) != len(computedMessageID) {
+			return ccipMessageSentFromSendUpdate{}, fmt.Errorf("computed encodedMessage hash has invalid length: %d", len(computedHash))
+		}
+		copy(computedMessageID[:], computedHash)
+		foundEncodedMessage = true
+	}
+
+	seqNo := previousSeq + 1
+	var messageID [32]byte
 	if foundEncodedMessage {
 		// Prefer the sequence from the encoded message since local process state can be stale
 		// across repeated test runs against a long-lived environment.
 		seqNo = uint64(decodedMessage.SequenceNumber)
 		messageID = computedMessageID
-	} else if !foundEventMessageID {
+	} else if foundEventMessageID {
 		messageID = eventMessageID
 	} else {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("CCIPMessageSent event missing both messageId and encodedMessage")
+		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("CCIPMessageSent event missing both messageId and encodedMessage")
 	}
 
-	event := cciptestinterfaces.MessageSentEvent{
-		MessageID:      messageID,
-		ReceiptIssuers: nil, // TODO: add them later, not currently needed
-	}
-	if foundEncodedMessage {
-		event.Message = new(decodedMessage)
-	}
-	c.nextSeq = seqNo
-	c.lastSentDest = dest
-	c.lastSentSeq = seqNo
-	c.lastSentEvent = event
-
-	return event, nil
+	return ccipMessageSentFromSendUpdate{
+		messageID:           messageID,
+		seqNo:               seqNo,
+		foundEncodedMessage: foundEncodedMessage,
+		decodedMessage:      decodedMessage,
+	}, nil
 }
 
 // setNextHoldings sets fee and transfer holdings on Chain struct for next MessageSend
