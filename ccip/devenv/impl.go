@@ -18,8 +18,6 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/gogo/protobuf/jsonpb"
-	"github.com/gogo/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -854,6 +852,7 @@ func (c *Chain) SetupSend(
 	participant := c.chain.Participants[0]
 	party := participant.PartyID
 
+	// Deploy contracts //
 	// Router for sender party.
 	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, party)
 	if err != nil {
@@ -874,70 +873,69 @@ func (c *Chain) SetupSend(
 		return fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
 	senderAddress := contracts.HexToInstanceAddress(out.Output.Address)
-
-	// Tokens setup
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
 	if err != nil {
 		return fmt.Errorf("resolve registry admin: %w", err)
 	}
+	c.registryAdmin = registryAdmin
+	c.routerAddress = routerAddress
+	c.senderAddress = senderAddress
 
+	// Clients setup //
+	_, err = c.getValidatorAPIClients()
+	if err != nil {
+		return fmt.Errorf("get validator API clients: %w", err)
+	}
+
+	// Tokens setup //
+	// Setup fee holding
 	feeTokenInstrument := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(registryAdmin),
 		Id:    AMTInstrument,
 	}
+
+	baseFilters := []testhelpers.Filter{
+		testhelpers.WithHoldingOwner(party),
+		testhelpers.WithUnlockedHoldingsOnly(),
+	}
+	feeRows, err := testhelpers.ListHoldingsForInstrument(ctx, participant, &feeTokenInstrument, baseFilters...)
+	if err != nil {
+		return fmt.Errorf("list fee holdings for setup: %w", err)
+	}
+	selectedFee, err := testhelpers.SelectHoldingsForInstrument(feeRows, []*big.Rat{big.NewRat(int64(feeAmountPerMessage), 1)})
+	if err != nil || len(selectedFee) == 0 {
+		return fmt.Errorf("select fee holding for setup: %w", err)
+	}
+
+	c.feeTokenInstrument = feeTokenInstrument
+	c.nextFeeCID = selectedFee[0].ContractID
+
+	// End setup, no transfer holdings needed
+	if transferAmountPerMessage == 0 {
+		return nil
+	}
+
+	// Setup transfer holdings
 	// TODO: add support for LINK instrument
 	transferTokenInstrument := &splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(registryAdmin),
 		Id:    AMTInstrument,
 	}
 
-	// Clients setup
-	_, err = c.getValidatorAPIClients()
+	// Select transfer holding using another call here because fee/token might use different instruments
+	filters := append(baseFilters, testhelpers.ExcludeCIDs([]string{c.nextFeeCID})) // this filter is here in case fee and transfer use the same instrument
+	transferRows, err := testhelpers.ListHoldingsForInstrument(ctx, participant, transferTokenInstrument, filters...)
 	if err != nil {
-		return fmt.Errorf("get validator API clients: %w", err)
+		return fmt.Errorf("list transfer holdings for setup: %w", err)
+	}
+	selectedTransfer, err := testhelpers.SelectHoldingsForInstrument(transferRows, []*big.Rat{big.NewRat(int64(transferAmountPerMessage), 1)})
+	if err != nil || len(selectedTransfer) == 0 {
+		return fmt.Errorf("select transfer holding for setup: %w", err)
 	}
 
-	if transferAmountPerMessage > 0 {
-		c.transferTokenInstrument = transferTokenInstrument
-	} else {
-		c.transferTokenInstrument = nil
-		c.nextTransferCID = ""
-	}
-	c.routerAddress = routerAddress
-	c.senderAddress = senderAddress
-	c.feeTokenInstrument = feeTokenInstrument
-	c.registryAdmin = registryAdmin
+	c.transferTokenInstrument = transferTokenInstrument
+	c.nextTransferCID = selectedTransfer[0].ContractID
 
-	// TODO: START refactor this logic
-	baseFilters := []testhelpers.Filter{
-		testhelpers.WithHoldingOwner(party),
-		testhelpers.WithUnlockedHoldingsOnly(),
-	}
-	feeRows, err := testhelpers.ListHoldingsForInstrument(ctx, participant, &c.feeTokenInstrument, baseFilters...) // This should depend on instrument of fee/transfer
-	if err != nil {
-		return fmt.Errorf("list fee holdings for setup: %w", err)
-	}
-	if transferAmountPerMessage > 0 {
-		selected, err := testhelpers.SelectHoldingsForInstrument(feeRows, []*big.Rat{big.NewRat(int64(feeAmountPerMessage), 1), big.NewRat(int64(transferAmountPerMessage), 1)})
-		if err != nil {
-			return fmt.Errorf("select distinct fee and transfer holdings for setup: %w", err)
-		}
-		if selected[0].ContractID == selected[1].ContractID {
-			return fmt.Errorf("setup send: fee and transfer must use different holding CIDs")
-		}
-		c.nextFeeCID = selected[0].ContractID
-		c.nextTransferCID = selected[1].ContractID
-	} else {
-		selected, err := testhelpers.SelectHoldingsForInstrument(feeRows, []*big.Rat{big.NewRat(int64(feeAmountPerMessage), 1)})
-		if err != nil {
-			return fmt.Errorf("select fee holding for setup: %w", err)
-		}
-		c.nextFeeCID = selected[0].ContractID
-	}
-	// TODO: END refactor this logic
-
-	fmt.Printf("nextFeeCID: %s\n", c.nextFeeCID)
-	fmt.Printf("nextTransferCID: %s\n", c.nextTransferCID)
 	return nil
 }
 
@@ -1006,12 +1004,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				"canton SendMessage: fee and transfer holding CIDs must be different contracts",
 			)
 		}
-	}
-
-	spentFeeCID := c.nextFeeCID
-	var spentTransferCID string
-	if hasTokenTransfer {
-		spentTransferCID = c.nextTransferCID
 	}
 
 	feeTransferFactorycid, feeTransferFactoryDisclosures, feeTransferFactoryChoiceContextRaw, err := testhelpers.GetTransferFactory(
@@ -1233,7 +1225,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get update %q: %w", ccipSendReport.Output.ExecInfo.UpdateID, err)
 	}
 
-	debugPrintSplitHoldingSubmitResponseJSON(update)
+	// debugPrintSplitHoldingSubmitResponseJSON(update)
 
 	var messageID [32]byte
 	var eventMessageID [32]byte
@@ -1288,39 +1280,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
 	}
 
-	// TODO: START refactor this logic
-	txEvents := update.GetTransaction().GetEvents()
-	freshHoldings, err := testhelpers.ListedHoldingsFromTransactionEvents(txEvents)
+	// Set next holdings
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), foundEncodedMessage)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse holdings from send update: %w", err)
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
 	}
-	spentCIDs := []string{spentFeeCID}
-	if hasTokenTransfer && spentTransferCID != "" {
-		spentCIDs = append(spentCIDs, spentTransferCID)
-	}
-	refreshFilters := []testhelpers.Filter{
-		testhelpers.WithHoldingOwner(party),
-		testhelpers.WithUnlockedHoldingsOnly(),
-		testhelpers.ExcludeCIDs(spentCIDs),
-	}
-	if hasTokenTransfer && fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0 {
-		pool := testhelpers.ListedHoldingsMatchingInstrument(freshHoldings, c.feeTokenInstrument, refreshFilters...)
-		transferMin := new(big.Rat).SetInt(fields.TokenAmount.Amount)
-		picked, err := testhelpers.SelectHoldingsForInstrument(pool, []*big.Rat{big.NewRat(0, 1), transferMin})
-		if err != nil {
-			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("refresh next fee and transfer holdings from update: %w", err)
-		}
-		c.nextFeeCID = picked[0].ContractID
-		c.nextTransferCID = picked[1].ContractID
-	} else {
-		pool := testhelpers.ListedHoldingsMatchingInstrument(freshHoldings, c.feeTokenInstrument, refreshFilters...)
-		picked, err := testhelpers.SelectHoldingsForInstrument(pool, []*big.Rat{big.NewRat(0, 1)})
-		if err != nil {
-			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("refresh next fee holding from update: %w", err)
-		}
-		c.nextFeeCID = picked[0].ContractID
-	}
-	// TODO: END refactor this logic
 
 	seqNo := c.nextSeq + 1
 	if foundEncodedMessage {
@@ -1349,17 +1313,70 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	return event, nil
 }
 
-// debugPrintSplitHoldingSubmitResponseJSON prints SubmitAndWaitForTransactionResponse as JSON (temporary debugging).
-// Uses gogo jsonpb: dazl ledger protos implement github.com/gogo/protobuf/proto.Message, not google.golang.org/protobuf.
-func debugPrintSplitHoldingSubmitResponseJSON(res proto.Message) {
-	m := jsonpb.Marshaler{Indent: "  ", EmitDefaults: true}
-	s, err := m.MarshalToString(res)
-	if err != nil {
-		fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON: %v\n", err)
-		return
+// setNextHoldings sets fee and transfer holdings on Chain struct for next MessageSend
+// based on the events from the send update.
+func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool) error {
+	party := c.chain.Participants[0].PartyID
+
+	spentCIDs := []string{c.nextFeeCID}
+	if hasTokenTransfer && c.nextTransferCID != "" {
+		spentCIDs = append(spentCIDs, c.nextTransferCID)
 	}
-	fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON:\n%s\n", s)
+	refreshFilters := []testhelpers.Filter{
+		testhelpers.WithHoldingOwner(party),
+		testhelpers.WithUnlockedHoldingsOnly(),
+		testhelpers.ExcludeCIDs(spentCIDs),
+	}
+
+	// Select next fee holding
+	freshFeeHoldings, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(
+		events,
+		c.feeTokenInstrument,
+		refreshFilters...,
+	)
+	if err != nil {
+		return fmt.Errorf("parse fee holdings from send update: %w", err)
+	}
+	pickedFee, err := testhelpers.SelectHoldingsForInstrument(freshFeeHoldings, []*big.Rat{big.NewRat(0, 1)})
+	if err != nil {
+		return fmt.Errorf("refresh next fee holding from update: %w", err)
+	}
+	c.nextFeeCID = pickedFee[0].ContractID
+
+	if !hasTokenTransfer {
+		return nil
+	}
+
+	// Select next transfer holding
+	refreshFilters = append(refreshFilters[:len(refreshFilters)-1], testhelpers.ExcludeCIDs(append(spentCIDs, c.nextFeeCID))) // includes one more item in the filter to exclude the fee holding
+	freshTransferHoldings, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(
+		events,
+		*c.transferTokenInstrument,
+		refreshFilters...,
+	)
+	if err != nil {
+		return fmt.Errorf("parse transfer holdings from send update: %w", err)
+	}
+	pickedTransfer, err := testhelpers.SelectHoldingsForInstrument(freshTransferHoldings, []*big.Rat{big.NewRat(0, 1)})
+	if err != nil {
+		return fmt.Errorf("refresh next transfer holding from update: %w", err)
+	}
+	c.nextTransferCID = pickedTransfer[0].ContractID
+
+	return nil
 }
+
+// // debugPrintSplitHoldingSubmitResponseJSON prints SubmitAndWaitForTransactionResponse as JSON (temporary debugging).
+// // Uses gogo jsonpb: dazl ledger protos implement github.com/gogo/protobuf/proto.Message, not google.golang.org/protobuf.
+// func debugPrintSplitHoldingSubmitResponseJSON(res proto.Message) {
+// 	m := jsonpb.Marshaler{Indent: "  ", EmitDefaults: true}
+// 	s, err := m.MarshalToString(res)
+// 	if err != nil {
+// 		fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON: %v\n", err)
+// 		return
+// 	}
+// 	fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON:\n%s\n", s)
+// }
 
 func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
 	deadline := time.Now().Add(timeout)

@@ -52,6 +52,15 @@ func ExcludeCIDs(cids []string) Filter {
 	}
 }
 
+// HoldingV1InterfaceID is the ledger Identifier for the Splice HoldingV1 interface (package name + module + entity).
+func HoldingV1InterfaceID() *apiv2.Identifier {
+	return &apiv2.Identifier{
+		PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
+		ModuleName: "Splice.Api.Token.HoldingV1",
+		EntityName: "Holding",
+	}
+}
+
 // GetHoldingsBalance sums Numeric amounts for all holdings that pass filters.
 // If instrument is non-nil, only that instrument is included; if nil, every instrument counts.
 func GetHoldingsBalance(
@@ -71,61 +80,6 @@ func GetHoldingsBalance(
 	}
 
 	return total, nil
-}
-
-// ListHoldingsForInstrument loads active contracts that implement HoldingV1, parses each Holding view,
-// applies instrument and Filter predicates, and returns ListedHolding rows with parseable amounts.
-// instrument nil matches every instrument (same rule as GetHoldingsBalance).
-func ListHoldingsForInstrument(
-	ctx context.Context,
-	participant canton.Participant,
-	instrument *splice_api_token_holding_v1.InstrumentId,
-	filters ...Filter,
-) ([]ListedHolding, error) {
-	contracts, err := ListActiveContractsByInterfaceId(ctx, participant, HoldingV1InterfaceID())
-	if err != nil {
-		return nil, err
-	}
-
-	var out []ListedHolding
-	for _, ac := range contracts {
-		created := ac.GetCreatedEvent()
-		if created == nil || strings.TrimSpace(created.GetContractId()) == "" {
-			continue
-		}
-		contractID := strings.TrimSpace(created.GetContractId())
-
-		hv, ok, err := parseHoldingV1View(ac.GetCreatedEvent())
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			continue
-		}
-		if instrument != nil && hv.InstrumentId != *instrument {
-			continue
-		}
-		if !holdingPassesFilters(contractID, hv, filters) {
-			continue
-		}
-
-		amountRaw := strings.TrimSpace(string(hv.Amount))
-		if amountRaw == "" {
-			continue
-		}
-		amt, ok := new(big.Rat).SetString(amountRaw)
-		if !ok {
-			return nil, fmt.Errorf("invalid holding amount %q", amountRaw)
-		}
-
-		out = append(out, ListedHolding{
-			ContractID: contractID,
-			View:       hv,
-			Amount:     amt,
-		})
-	}
-
-	return out, nil
 }
 
 // SelectHoldingsForInstrument assigns len(minAmounts) different contract IDs from rows to output slots.
@@ -191,66 +145,91 @@ func SelectHoldingsForInstrument(rows []ListedHolding, minAmounts []*big.Rat) ([
 	return out, nil
 }
 
-// TODO: START refactor this logic
+// ListHoldingsForInstrument loads active contracts that implement HoldingV1, parses each Holding view,
+// applies instrument and Filter predicates, and returns ListedHolding rows with parseable amounts.
+// instrument nil matches every instrument (same rule as GetHoldingsBalance).
+func ListHoldingsForInstrument(
+	ctx context.Context,
+	participant canton.Participant,
+	instrument *splice_api_token_holding_v1.InstrumentId,
+	filters ...Filter,
+) ([]ListedHolding, error) {
+	contracts, err := ListActiveContractsByInterfaceId(ctx, participant, HoldingV1InterfaceID())
+	if err != nil {
+		return nil, err
+	}
 
-// ListedHoldingsFromTransactionEvents returns HoldingV1 rows parsed from Created events in a transaction.
-// It does not apply instrument or Filter predicates; callers should narrow with ListedHoldingsMatchingInstrument
-// or equivalent before SelectHoldingsForInstrument.
-func ListedHoldingsFromTransactionEvents(events []*apiv2.Event) ([]ListedHolding, error) {
 	var out []ListedHolding
-	for _, ev := range events {
-		if ev == nil {
-			continue
-		}
-		created := ev.GetCreated()
-		if created == nil || strings.TrimSpace(created.GetContractId()) == "" {
-			continue
-		}
-		contractID := strings.TrimSpace(created.GetContractId())
-
-		hv, ok, err := parseHoldingV1View(created)
+	for _, ac := range contracts {
+		var err error
+		out, err = appendListedHoldingIfSelected(out, ac.GetCreatedEvent(), instrument, filters)
 		if err != nil {
 			return nil, err
 		}
-		if !ok {
-			continue
-		}
-
-		amountRaw := strings.TrimSpace(string(hv.Amount))
-		if amountRaw == "" {
-			continue
-		}
-		amt, ok := new(big.Rat).SetString(amountRaw)
-		if !ok {
-			return nil, fmt.Errorf("invalid holding amount %q", amountRaw)
-		}
-
-		out = append(out, ListedHolding{
-			ContractID: contractID,
-			View:       hv,
-			Amount:     amt,
-		})
 	}
 
 	return out, nil
 }
 
-// ListedHoldingsMatchingInstrument returns rows whose view instrument matches inst and that pass all filters.
-func ListedHoldingsMatchingInstrument(rows []ListedHolding, inst splice_api_token_holding_v1.InstrumentId, filters ...Filter) []ListedHolding {
+// ListedHoldingsFromTransactionEventsForInstrument returns HoldingV1 rows parsed from Created events in a
+// transaction that match inst and pass all filters (same rules as ListHoldingsForInstrument).
+func ListedHoldingsFromTransactionEventsForInstrument(events []*apiv2.Event, inst splice_api_token_holding_v1.InstrumentId, filters ...Filter) ([]ListedHolding, error) {
 	var out []ListedHolding
-	for _, row := range rows {
-		if row.View.InstrumentId != inst {
+	for _, ev := range events {
+		if ev == nil {
 			continue
 		}
-		if !holdingPassesFilters(row.ContractID, row.View, filters) {
-			continue
+		var err error
+		out, err = appendListedHoldingIfSelected(out, ev.GetCreated(), &inst, filters)
+		if err != nil {
+			return nil, err
 		}
-		out = append(out, row)
 	}
-	return out
+	return out, nil
 }
 
-// TODO: END refactor this logic
+// appendListedHoldingIfSelected parses HoldingV1 from created; when instrument is non-nil, only that
+// instrument is kept. Appends to out when filters pass and amount parses; skips nil/empty creates.
+func appendListedHoldingIfSelected(
+	out []ListedHolding,
+	created *apiv2.CreatedEvent,
+	instrument *splice_api_token_holding_v1.InstrumentId,
+	filters []Filter,
+) ([]ListedHolding, error) {
+	if created == nil || strings.TrimSpace(created.GetContractId()) == "" {
+		return out, nil
+	}
+	contractID := strings.TrimSpace(created.GetContractId())
+
+	hv, ok, err := parseHoldingV1View(created)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return out, nil
+	}
+	if instrument != nil && hv.InstrumentId != *instrument {
+		return out, nil
+	}
+	if !holdingPassesFilters(contractID, hv, filters) {
+		return out, nil
+	}
+
+	amountRaw := strings.TrimSpace(string(hv.Amount))
+	if amountRaw == "" {
+		return out, nil
+	}
+	amt, ok := new(big.Rat).SetString(amountRaw)
+	if !ok {
+		return nil, fmt.Errorf("invalid holding amount %q", amountRaw)
+	}
+
+	return append(out, ListedHolding{
+		ContractID: contractID,
+		View:       hv,
+		Amount:     amt,
+	}), nil
+}
 
 // holdingPassesFilters returns true only if every Filter accepts the row.
 func holdingPassesFilters(contractID string, hv splice_api_token_holding_v1.HoldingView, filters []Filter) bool {
@@ -279,7 +258,7 @@ func parseHoldingV1View(created *apiv2.CreatedEvent) (splice_api_token_holding_v
 		if vv == nil {
 			continue
 		}
-		// TODOL can we use bindings.UnmarshalCreatedEvent instead?
+		// TODO: can we use bindings.UnmarshalCreatedEvent instead?
 		var hv splice_api_token_holding_v1.HoldingView
 		if err := ledger.RecordToStruct(vv, &hv); err != nil {
 			return splice_api_token_holding_v1.HoldingView{}, false, fmt.Errorf("parse HoldingV1 view: %w", err)
@@ -289,13 +268,4 @@ func parseHoldingV1View(created *apiv2.CreatedEvent) (splice_api_token_holding_v
 	}
 
 	return splice_api_token_holding_v1.HoldingView{}, false, nil
-}
-
-// HoldingV1InterfaceID is the ledger Identifier for the Splice HoldingV1 interface (package name + module + entity).
-func HoldingV1InterfaceID() *apiv2.Identifier {
-	return &apiv2.Identifier{
-		PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
-		ModuleName: "Splice.Api.Token.HoldingV1",
-		EntityName: "Holding",
-	}
 }

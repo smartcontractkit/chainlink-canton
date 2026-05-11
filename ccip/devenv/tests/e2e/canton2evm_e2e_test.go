@@ -28,7 +28,8 @@ import (
 )
 
 const (
-	cantonToEVMTokenTransferAmount  = int64(1000)
+	cantonToEVMFeeAmount            = int64(2_000)
+	cantonToEVMTokenTransferAmount  = int64(1_000)
 	cantonToEVMDecimalsScale        = int64(100_000_000) // Canton 10 decimals -> EVM 18 decimals
 	cantonToEVMTokenSequentialSends = 2
 )
@@ -57,8 +58,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, harness)
 	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
-
-	// Prepare prerequisites for sending messages
 	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
 	require.True(t, ok, "Canton chain cantonImpl must be *devenv.Chain")
 
@@ -76,9 +75,9 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		// TODO: remove hardcoded values
-		require.NoError(t, cantonImpl.MintTokens(ctx, 2_000_000)) // TODO: add a buffer here
-		require.NoError(t, cantonImpl.SetupSend(ctx, 1_000_000, 0))
+		// Setup message send
+		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(cantonToEVMFeeAmount)))
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), 0))
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -164,10 +163,10 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		// TODO: remove hardcoded values
-		require.NoError(t, cantonImpl.MintTokens(ctx, 2_000_000))                                                              // Holdings for fee TODO: add a buffer here?
-		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMTokenTransferAmount))) // Holdings for token transfer TODO: add a buffer here?
-		require.NoError(t, cantonImpl.SetupSend(ctx, 1_000_000, uint64(cantonToEVMTokenTransferAmount)))
+		// Setup message send
+		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMFeeAmount)))           // Holdings for fee
+		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMTokenTransferAmount))) // Holdings for token transfer
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), uint64(cantonToEVMTokenTransferAmount)))    // Setup with fee and token transfer amounts
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
