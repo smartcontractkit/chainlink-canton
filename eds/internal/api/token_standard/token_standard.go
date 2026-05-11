@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
@@ -54,9 +55,10 @@ func NewServer(
 	cfg config.TokenStandardAPIConfig,
 ) (*Server, error) {
 	s := &Server{
-		logger: logger.With().Str("component", "TokenStandardAPI").Logger(),
-		admin:  types.PARTY(cfg.Admin),
-		tokens: make(map[types.TEXT]TokenConfig),
+		logger:              logger.With().Str("component", "TokenStandardAPI").Logger(),
+		activeContractStore: activeContractStore,
+		admin:               types.PARTY(cfg.Admin),
+		tokens:              make(map[types.TEXT]TokenConfig),
 	}
 
 	for registryAddress, registry := range cfg.Registries {
@@ -82,8 +84,6 @@ func NewServer(
 	return s, nil
 }
 
-// Token Metadata V1
-
 func (s Server) GetRegistryInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, oapiTokenMetadataV1.GetRegistryInfoResponse{
 		AdminId: string(s.admin),
@@ -92,6 +92,8 @@ func (s Server) GetRegistryInfo(c *gin.Context) {
 		},
 	})
 }
+
+// Token Metadata V1
 
 func (s Server) ListInstruments(c *gin.Context, params oapiTokenMetadataV1.ListInstrumentsParams) {
 	pageSize := DefaultPageSize
@@ -184,8 +186,6 @@ func (s Server) GetInstrument(c *gin.Context, instrumentId string) {
 	})
 }
 
-// Transfer Instruction V1
-
 func (s Server) GetTransferFactory(c *gin.Context) {
 	var req oapiTransferInstruction.GetFactoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -236,6 +236,8 @@ func (s Server) GetTransferFactory(c *gin.Context) {
 
 	c.JSON(http.StatusOK, resp)
 }
+
+// Transfer Instruction V1
 
 func (s Server) GetTransferInstructionAcceptContext(c *gin.Context, transferInstructionId string) {
 	var req oapiTransferInstruction.GetChoiceContextRequest
@@ -293,4 +295,19 @@ func (s Server) GetTransferInstructionRejectContext(c *gin.Context, transferInst
 
 func (s Server) GetTransferInstructionWithdrawContext(c *gin.Context, transferInstructionId string) {
 	s.GetTransferInstructionAcceptContext(c, transferInstructionId)
+}
+
+var _ global.InstanceAddressFilter = &Server{}
+
+func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+	var out []contracts.InstanceAddress
+	for _, address := range addresses {
+		for _, tokenConfig := range s.tokens {
+			if address == tokenConfig.RegistryAddress {
+				out = append(out, address)
+			}
+		}
+	}
+
+	return out
 }

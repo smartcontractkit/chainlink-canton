@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
@@ -662,4 +663,57 @@ func (s Server) burnMintTokenPoolExecute(
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+var _ global.InstanceAddressFilter = &Server{}
+
+// FilterContracts returns the sub-set of addresses that are tracked by the Token Pool API Server.
+// This includes token pools themselves, and their rate limiters.
+func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+	// Reconstruct all contracts + rate limiters
+	var allContracts = make(map[contracts.InstanceAddress]bool, len(s.contractConfigs)*2)
+	for poolAddress, contractConfig := range s.contractConfigs {
+		allContracts[poolAddress] = true
+		activeContract, ok := s.activeContractStore.Get(poolAddress)
+		if !ok {
+			s.logger.Error().Stringer("address", poolAddress).Msg("active token pool contract not found while filtering contracts")
+			continue
+		}
+		switch contractConfig.Type {
+		case config.TokenPoolTypeLockRelease:
+			lockReleaseTokenPool, err := ParseLockReleaseTokenPool(activeContract.CreatedEvent)
+			if err != nil {
+				s.logger.Err(err).Stringer("address", poolAddress).Msg("failed to parse lock release token pool contract while filtering contracts")
+				continue
+			}
+			for _, remoteChainConfig := range lockReleaseTokenPool.RemoteChainConfigs {
+				allContracts[remoteChainConfig.OutboundRateLimiter] = true
+				allContracts[remoteChainConfig.InboundRateLimiter] = true
+				allContracts[remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter] = true
+			}
+		case config.TokenPoolTypeBurnMint:
+			burnMintTokenPool, err := ParseBurnMintTokenPool(activeContract.CreatedEvent)
+			if err != nil {
+				s.logger.Err(err).Stringer("address", poolAddress).Msg("failed to parse burn mint token pool contract while filtering contracts")
+				continue
+			}
+			for _, remoteChainConfig := range burnMintTokenPool.RemoteChainConfigs {
+				allContracts[remoteChainConfig.OutboundRateLimiter] = true
+				allContracts[remoteChainConfig.InboundRateLimiter] = true
+				allContracts[remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter] = true
+			}
+		default:
+			continue
+		}
+	}
+
+	// Filter requested contracts
+	var out []contracts.InstanceAddress
+	for _, address := range addresses {
+		if allContracts[address] {
+			out = append(out, address)
+		}
+	}
+
+	return out
 }

@@ -120,17 +120,14 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	router.Use(middleware.RequestMonitoringMiddleware(metrics))
 
 	errChan := make(chan error)
-	globalAPIServer, err := global.NewServer(ctx, logger, activeContractStore, cfg.GlobalAPIConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create Global API: %w", err)
-	}
-	oapiGlobal.RegisterHandlers(router, globalAPIServer)
+	var globalAddressFilters []global.InstanceAddressFilter
 	if cfg.CCIPAPIConfig.Enabled {
 		ccipAPIServer, err := ccip.NewServer(ctx, logger, activeContractStore, cfg.CCIPAPIConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create CCIP API: %w", err)
 		}
 		oapiCCIP.RegisterHandlers(router, ccipAPIServer)
+		globalAddressFilters = append(globalAddressFilters, ccipAPIServer)
 	}
 	if cfg.CCVAPIConfig.Enabled {
 		ccvAPIServer, err := ccv.NewServer(ctx, logger, activeContractStore, cfg.CCVAPIConfig)
@@ -138,6 +135,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			return fmt.Errorf("failed to create CCV API: %w", err)
 		}
 		oapiCCV.RegisterHandlers(router, ccvAPIServer)
+		globalAddressFilters = append(globalAddressFilters, ccvAPIServer)
 	}
 	if cfg.ExecutorAPIConfig.Enabled {
 		executorAPIServer, err := executor.NewServer(ctx, logger, activeContractStore, cfg.ExecutorAPIConfig)
@@ -145,6 +143,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			return fmt.Errorf("failed to create Executor API: %w", err)
 		}
 		oapiExecutor.RegisterHandlers(router, executorAPIServer)
+		globalAddressFilters = append(globalAddressFilters, executorAPIServer)
 	}
 	if cfg.TokenPoolAPIConfig.Enabled {
 		tokenPoolAPIServer, err := tokenpool.NewServer(ctx, logger, activeContractStore, instrumentHoldingStore, cfg.TokenPoolAPIConfig)
@@ -152,6 +151,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			return fmt.Errorf("failed to create TokenPool API: %w", err)
 		}
 		oapiTokenPool.RegisterHandlers(router, tokenPoolAPIServer)
+		globalAddressFilters = append(globalAddressFilters, tokenPoolAPIServer)
 
 		// Run instrument holding store in the background
 		// This should only be run if the TokenPool API is enabled, as it will fail if no filters are specified.
@@ -170,7 +170,17 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		}
 		oapiTokenMetadataV1.RegisterHandlers(router, tokenStandardAPIServer)
 		oapiTransferInstruction.RegisterHandlers(router, tokenStandardAPIServer)
+		globalAddressFilters = append(globalAddressFilters, tokenStandardAPIServer)
 	}
+
+	// Global API
+	// Passing all configured API implementations as filters, as the Global API should only return disclosures for
+	// addresses that are already returned as part of the other API implementations.
+	globalAPIServer, err := global.NewServer(ctx, logger, activeContractStore, cfg.GlobalAPIConfig, globalAddressFilters...)
+	if err != nil {
+		return fmt.Errorf("failed to create Global API: %w", err)
+	}
+	oapiGlobal.RegisterHandlers(router, globalAPIServer)
 
 	// Run update store in the background
 	go func(errChan chan<- error) {
