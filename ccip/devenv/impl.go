@@ -50,6 +50,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	cantonchangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -895,15 +896,17 @@ func (c *Chain) SetupSend(
 		Id:    AMTInstrument,
 	}
 
-	baseFilters := []testhelpers.Filter{
+	baseFilters := make([]testhelpers.Filter, 0, 3)
+	baseFilters = append(baseFilters,
 		testhelpers.WithHoldingOwner(party),
 		testhelpers.WithUnlockedHoldingsOnly(),
-	}
+	)
 	feeRows, err := testhelpers.ListHoldingsForInstrument(ctx, participant, &feeTokenInstrument, baseFilters...)
 	if err != nil {
 		return fmt.Errorf("list fee holdings for setup: %w", err)
 	}
-	selectedFee, err := testhelpers.SelectHoldingsForInstrument(feeRows, []*big.Rat{big.NewRat(int64(feeAmountPerMessage), 1)})
+	feeMin := new(big.Rat).SetUint64(feeAmountPerMessage)
+	selectedFee, err := testhelpers.SelectHoldingsForInstrument(feeRows, []*big.Rat{feeMin})
 	if err != nil || len(selectedFee) == 0 {
 		return fmt.Errorf("select fee holding for setup: %w", err)
 	}
@@ -929,7 +932,8 @@ func (c *Chain) SetupSend(
 	if err != nil {
 		return fmt.Errorf("list transfer holdings for setup: %w", err)
 	}
-	selectedTransfer, err := testhelpers.SelectHoldingsForInstrument(transferRows, []*big.Rat{big.NewRat(int64(transferAmountPerMessage), 1)})
+	transferMin := new(big.Rat).SetUint64(transferAmountPerMessage)
+	selectedTransfer, err := testhelpers.SelectHoldingsForInstrument(transferRows, []*big.Rat{transferMin})
 	if err != nil || len(selectedTransfer) == 0 {
 		return fmt.Errorf("select transfer holding for setup: %w", err)
 	}
@@ -1007,16 +1011,25 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 
-	feeTransferFactorycid, feeTransferFactoryDisclosures, feeTransferFactoryChoiceContextRaw, err := testhelpers.GetTransferFactory(
+	feeFactoryChoice, err := testhelpers.GetTransferFactoryV2(
 		ctx,
 		c.validatorAPIClients.transferClient,
 		c.registryAdmin,
-		party,
-		party,
+		splice_api_token_transfer_instruction_v1.Transfer{
+			Sender:           types.PARTY(party),
+			Receiver:         types.PARTY(party),
+			Amount:           types.NUMERIC(fields.TokenAmount.Amount.String()),
+			InstrumentId:     c.feeTokenInstrument,
+			InputHoldingCids: nil,
+			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+		},
 	)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve fee transfer factory from scan-proxy: %w", err)
 	}
+	feeTransferFactorycid := feeFactoryChoice.FactoryID
+	feeTransferFactoryDisclosures := feeFactoryChoice.DisclosedContracts
+	feeTransferFactoryChoiceContextRaw := feeFactoryChoice.ChoiceContextData
 	feeTransferFactoryChoiceContextValue, err := testhelpers.ChoiceContextFromData(feeTransferFactoryChoiceContextRaw)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse fee transfer factory choice context: %w", err)
@@ -1226,15 +1239,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get update %q: %w", ccipSendReport.Output.ExecInfo.UpdateID, err)
 	}
 
-	// debugPrintSplitHoldingSubmitResponseJSON(update)
-
 	parsedSend, err := parseFirstCCIPMessageSentFromLedgerEvents(update.GetTransaction().GetEvents(), c.nextSeq)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, err
 	}
 
 	// Set next holdings
-	err = c.setNextHoldings(update.GetTransaction().GetEvents(), parsedSend.foundEncodedMessage)
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), parsedSend.foundEncodedMessage, fields.TokenAmount.Amount)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
 	}
@@ -1282,6 +1293,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 			continue
 		}
 		created = evCreated
+
 		break
 	}
 	if created == nil {
@@ -1350,7 +1362,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 
 // setNextHoldings sets fee and transfer holdings on Chain struct for next MessageSend
 // based on the events from the send update.
-func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool) error {
+func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Int) error {
 	party := c.chain.Participants[0].PartyID
 
 	spentCIDs := []string{c.nextFeeCID}
@@ -1372,7 +1384,7 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool) er
 	if err != nil {
 		return fmt.Errorf("parse fee holdings from send update: %w", err)
 	}
-	pickedFee, err := testhelpers.SelectHoldingsForInstrument(freshFeeHoldings, []*big.Rat{big.NewRat(0, 1)})
+	pickedFee, err := testhelpers.SelectHoldingsForInstrument(freshFeeHoldings, []*big.Rat{big.NewRat(0, 1)}) // TODO: we'll have to consider real fee here once we go load tests
 	if err != nil {
 		return fmt.Errorf("refresh next fee holding from update: %w", err)
 	}
@@ -1392,7 +1404,8 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool) er
 	if err != nil {
 		return fmt.Errorf("parse transfer holdings from send update: %w", err)
 	}
-	pickedTransfer, err := testhelpers.SelectHoldingsForInstrument(freshTransferHoldings, []*big.Rat{big.NewRat(0, 1)})
+	transferValue := new(big.Rat).SetInt(tokenAmount)
+	pickedTransfer, err := testhelpers.SelectHoldingsForInstrument(freshTransferHoldings, []*big.Rat{transferValue})
 	if err != nil {
 		return fmt.Errorf("refresh next transfer holding from update: %w", err)
 	}
@@ -1400,18 +1413,6 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool) er
 
 	return nil
 }
-
-// // debugPrintSplitHoldingSubmitResponseJSON prints SubmitAndWaitForTransactionResponse as JSON (temporary debugging).
-// // Uses gogo jsonpb: dazl ledger protos implement github.com/gogo/protobuf/proto.Message, not google.golang.org/protobuf.
-// func debugPrintSplitHoldingSubmitResponseJSON(res proto.Message) {
-// 	m := jsonpb.Marshaler{Indent: "  ", EmitDefaults: true}
-// 	s, err := m.MarshalToString(res)
-// 	if err != nil {
-// 		fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON: %v\n", err)
-// 		return
-// 	}
-// 	fmt.Printf("debugPrintSplitHoldingSubmitResponseJSON:\n%s\n", s)
-// }
 
 func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
 	deadline := time.Now().Add(timeout)

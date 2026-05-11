@@ -87,9 +87,9 @@ func GetHoldingsBalance(
 // Rows must already be limited to a single instrument and any caller-side filters (for example via
 // ListHoldingsForInstrument with the desired instrument and Filter values).
 //
-// Greedy: sort rows by amount descending, sort slots by required minimum descending, then for each
-// slot choose the largest unused row whose amount meets that minimum. Output index i corresponds to
-// minAmounts[i]; a nil entry in minAmounts is treated as zero.
+// Greedy: sort rows by amount ascending, sort slots by required minimum
+// descending, then for each slot choose the smallest unused row whose amount meets that minimum.
+// Output index i corresponds to minAmounts[i]; a nil entry in minAmounts is treated as zero.
 // TODO: should receive instrument as parameter to allow instrument-specific selection
 func SelectHoldingsForInstrument(rows []ListedHolding, minAmounts []*big.Rat) ([]ListedHolding, error) {
 	if len(minAmounts) == 0 {
@@ -98,7 +98,7 @@ func SelectHoldingsForInstrument(rows []ListedHolding, minAmounts []*big.Rat) ([
 
 	rows = slices.Clone(rows)
 	slices.SortFunc(rows, func(a, b ListedHolding) int {
-		return b.Amount.Cmp(a.Amount)
+		return a.Amount.Cmp(b.Amount)
 	})
 
 	type slot struct {
@@ -130,6 +130,7 @@ func SelectHoldingsForInstrument(rows []ListedHolding, minAmounts []*big.Rat) ([
 				continue
 			}
 			chosen, found = row, true
+
 			break
 		}
 		if !found {
@@ -185,6 +186,7 @@ func ListedHoldingsFromTransactionEventsForInstrument(events []*apiv2.Event, ins
 			return nil, err
 		}
 	}
+
 	return out, nil
 }
 

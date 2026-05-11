@@ -29,8 +29,8 @@ import (
 
 const (
 	cantonToEVMFeeAmount            = int64(2_000)
-	cantonToEVMTokenTransferAmount  = int64(1_000)              // 1000 tokens (1000 * 10^10) on canton decimals
-	evmDecimalsScale                = int64(100000000000000000) // EVM 18 decimals
+	cantonToEVMTokenTransferAmount  = int64(1_000)                     // 1000 tokens (1000 * 10^10) on canton decimals
+	evmDecimalsScale                = int64(1_000_000_000_000_000_000) // EVM 18 decimals
 	cantonToEVMTokenSequentialSends = 2
 )
 
