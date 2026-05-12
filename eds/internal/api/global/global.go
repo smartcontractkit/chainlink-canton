@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
@@ -26,6 +28,13 @@ type Server struct {
 
 var _ oapiGlobal.ServerInterface = &Server{}
 
+// InstanceAddressFilter should be implemented by each of the other API implementations.
+// It is used by the Global API to determine if an explicit disclosure for an address should be returned.
+//
+// The Global API uses the ActiveContractStore to retrieve disclosures, but since the store keeps track of all
+// contracts of any given template that is registered with it, it e.g. does not fail when retrieving a LockReleaseTokenPool
+// that exists in the store but should not be made public since the Token Pool API has not been configured for it.
+// In this case, the Token Pool API's FilterContracts will only return contracts that it is explicitly configured for.
 type InstanceAddressFilter interface {
 	// FilterContracts returns the sub-set of contracts that are tracked by the InstanceAddressFilter
 	FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress
@@ -85,22 +94,29 @@ func (s Server) PostGetExplicitDisclosureBatch(c *gin.Context) {
 		}
 	}
 
+	// Ensure that all requested contracts are part of filteredAddresses
+	nonexistentAddresses := make(map[string]bool)
+	for _, requestedAddress := range requestedAddresses {
+		if ok := filteredAddresses[requestedAddress]; !ok {
+			nonexistentAddresses[requestedAddress.Hex()] = true
+		}
+	}
+	// Return an error if any of the requested addresses are invalid
+	if len(nonexistentAddresses) > 0 {
+		c.AbortWithStatusJSON(http.StatusNotFound, oapiCommon.ErrorResponse{Error: fmt.Sprintf("contracts not found: %s", strings.Join(maps.Keys(nonexistentAddresses), ", "))})
+		return
+	}
+
 	resp := oapiGlobal.GetExplicitDisclosureBatchResponse{
 		Disclosures: make([]oapiCommon.DisclosedContract, len(req.Addresses)),
 	}
 	for i, instanceAddress := range requestedAddresses {
-		// Validate that the address should be returned, if not return an error
-		if ok := filteredAddresses[instanceAddress]; !ok {
-			c.AbortWithStatusJSON(http.StatusNotFound, oapiCommon.ErrorResponse{Error: fmt.Sprintf("contract not found: %s", instanceAddress.Hex())})
-			return
-		}
-
 		// Get the active contract for this address.
 		// If the active contract cannot be found, something is misconfigured.
 		activeContract, ok := s.activeContractStore.Get(instanceAddress)
 		if !ok {
 			s.logger.Error().Stringer("address", instanceAddress).Msg("active contract not found for address that passed filters")
-			c.AbortWithStatusJSON(http.StatusNotFound, oapiCommon.ErrorResponse{Error: "active contract not found"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "active contract not found"})
 			return
 		}
 
