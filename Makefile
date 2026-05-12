@@ -90,6 +90,10 @@ start-devenv: build-ccv-images build-committeeverifier build-eds
 run-e2e-tests:
 	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run TestCanton2EVM_Basic
 
+.PHONY: run-canton-load-phase1
+run-canton-load-phase1: ## WASP Phase 1 stub load (no docker / devenv stack).
+	cd ccip/devenv/tests/load && go test -timeout 2m -v -count 1 -run '^TestCantonLoad_Phase1'
+
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests
 
