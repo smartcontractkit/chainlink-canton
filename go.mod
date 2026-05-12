@@ -43,7 +43,6 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260417081611-8bdbd9f45629
 	github.com/smartcontractkit/chainlink-deployments-framework v0.100.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.19
-	// Canton Phase 1 load stub; align with chainlink-ccv build/devenv.
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.2
 	github.com/smartcontractkit/go-daml v0.6.1-0.20260427221214-62fc94f51248
 	github.com/stretchr/testify v1.11.1
