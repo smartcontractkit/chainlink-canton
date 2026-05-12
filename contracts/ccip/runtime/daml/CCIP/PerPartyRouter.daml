@@ -445,7 +445,7 @@ template PerPartyRouter
                         caller = partyOwner
 
                 -- TODO: move to OnRamp
-                feeChangeCids <- if totalFee > 0.0
+                (feeChangeCids, pendingFeeInstructions) <- if totalFee > 0.0
                     then do
                         -- Fees owed to verifier owners.
                         let verifierFees = buildCCVFeeAllocations
@@ -486,26 +486,30 @@ template PerPartyRouter
                                         extraArgs = feeTokenExtraArgs
                                 case feeResult.output of
                                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
-                                        pure feeResult.senderChangeCids
-                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
-                                        acceptResult <- exercise transferInstructionCid
-                                            Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
-                                                extraArgs = feeTokenExtraArgs
-                                        case acceptResult.output of
-                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
-                                                pure feeResult.senderChangeCids
-                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
-                                                abort "fee transfer instruction failed"
-                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
-                                                abort "fee transfer instruction is still pending"
+                                        pure (feeResult.senderChangeCids, None)
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid
+                                        | recipient == ccipOwner -> do
+                                            acceptResult <- exercise transferInstructionCid
+                                                Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+                                                    extraArgs = feeTokenExtraArgs
+                                            case acceptResult.output of
+                                                Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
+                                                    pure (feeResult.senderChangeCids, None)
+                                                _ -> abort "fee transfer to ccipOwner failed"
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid ->
+                                        pure (feeResult.senderChangeCids, Some transferInstructionCid)
                                     _ -> abort "fee transfer did not complete"
 
                         foldlA
-                            (\currentHoldingCids (recipient, amount) ->
-                                executeFeeTransfer currentHoldingCids recipient amount)
-                            feeTokenHoldingCids
+                            (\(currentHoldingCids, pendingCids) (recipient, amount) -> do
+                                (newHoldingCids, maybePending) <- executeFeeTransfer currentHoldingCids recipient amount
+                                let newPending = case maybePending of
+                                        None -> []
+                                        Some cid -> [cid]
+                                pure (newHoldingCids, pendingCids ++ newPending))
+                            (feeTokenHoldingCids, [])
                             payoutEntries
-                    else pure []
+                    else pure ([], [])
 
                 result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with
                     routerPartyOwner = partyOwner
@@ -528,6 +532,7 @@ template PerPartyRouter
                     ccipMessageSent = result.ccipMessageSent
                     messageId = sendingMsg.messageId
                     feeChangeCids
+                    pendingFeeInstructions
 
         -- | Prepare an inbound message for execution.
         -- Performs early replay check and delegates to OffRamp.PrepareExecute.
@@ -786,6 +791,7 @@ data CCIPSendResult = CCIPSendResult
         ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
         messageId : BytesHex
         feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        pendingFeeInstructions : [ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction]
     deriving (Eq, Show)
 
 data ExecuteResult = ExecuteResult
