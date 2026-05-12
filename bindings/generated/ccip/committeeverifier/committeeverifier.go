@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "8cdf1f1022a4e44021640c97ae7ad4f1c38ed77c0173ff05657ddd32f4717b9c"
+	PackageID   = "64fc9ca0a7304db270459585283161730b887192ca99aae1dd0f7e5e5a8fe049"
 	SDKVersion  = "3.4.11"
 )
 
@@ -730,6 +730,27 @@ func (t CommitteeVerifier) VerifyMessageWithPackageID(contractID string, package
 	}
 }
 
+// ApplyAllowListUpdates exercises the ApplyAllowListUpdates choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) ApplyAllowListUpdates(contractID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "ApplyAllowListUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyAllowListUpdatesWithPackageID exercises the ApplyAllowListUpdates choice using the provided package ID instead of package name
+func (t CommitteeVerifier) ApplyAllowListUpdatesWithPackageID(contractID string, packageID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "ApplyAllowListUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // ApplyRemoteChainConfigUpdates exercises the ApplyRemoteChainConfigUpdates choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) ApplyRemoteChainConfigUpdates(contractID string, args ApplyRemoteChainConfigUpdates) *model.ExerciseCommand {
@@ -768,27 +789,6 @@ func (t CommitteeVerifier) ApplySignatureConfigsWithPackageID(contractID string,
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ApplySignatureConfigs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyAllowListUpdates exercises the ApplyAllowListUpdates choice on this CommitteeVerifier contract
-// This method uses the package name in the template ID
-func (t CommitteeVerifier) ApplyAllowListUpdates(contractID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "ApplyAllowListUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyAllowListUpdatesWithPackageID exercises the ApplyAllowListUpdates choice using the provided package ID instead of package name
-func (t CommitteeVerifier) ApplyAllowListUpdatesWithPackageID(contractID string, packageID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "ApplyAllowListUpdates",
 		Arguments:  argsToMap(args),
 	}
 }

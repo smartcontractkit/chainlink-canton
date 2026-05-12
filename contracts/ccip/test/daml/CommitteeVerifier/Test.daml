@@ -3,11 +3,12 @@ module CommitteeVerifier.Test where
 import Daml.Script
 
 import DA.Assert ((===))
-import DA.Crypto.Text (keccak256)
+import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable (forA_)
 import DA.List ((!!))
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
+import DA.Text qualified as Text
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
@@ -748,3 +749,90 @@ testCommitteeVerifier_SetDynamicConfig = script do
     assertMsg "Message sent observers not updated correctly" (gotCCV.messageSentObservers == [owner, admin])
 
     pure ()
+
+-- | 130 hex chars (04 + 128 body); unique per index. Used only for signature config validation tests.
+syntheticCommitteePubKey : Int -> BytesHex
+syntheticCommitteePubKey i =
+  let dec = show i
+      padCount = 128 - Text.length dec
+      body = foldl (<>) "" (replicate padCount "0") <> dec
+  in "04" <> body
+
+-- | Threshold above max encodable signatures in verifierResults must be rejected.
+testCommitteeVerifier_MaxSignaturesPerProofThreshold : Script ()
+testCommitteeVerifier_MaxSignaturesPerProofThreshold = script do
+  owner <- allocateParty "cv-max-threshold-owner"
+  let rmnRemoteInstanceAddress = RawInstanceAddress.make "test-rmn" owner
+  let n = CommitteeVerifier.maxCommitteeSignaturesPerProof
+  let keysN = map syntheticCommitteePubKey [0 .. (n - 1)]
+  let keysNPlus1 = map syntheticCommitteePubKey [0 .. n]
+
+  -- At the cap: create and update succeed.
+  ccvOk <- submit owner do
+    createCmd CommitteeVerifier.CommitteeVerifier with
+      instanceId = "test-ccv-max-threshold-ok"
+      owner = owner
+      ccipOwner = owner
+      versionTag = CommitteeVerifier.versionTagV2_0_0
+      allowListAdmin = None
+      messageSentObservers = []
+      storageLocations = []
+      storageLocationsAdmin = owner
+      pendingStorageLocationsAdmin = owner
+      remoteChainConfigs = Map.empty
+      signerConfigs = Map.fromList [
+          (123.0, CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 123.0, threshold = n, signerKeys = keysN)
+        ]
+      deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+  _ <- submit owner do
+    exerciseCmd ccvOk CommitteeVerifier.ApplySignatureConfigs with
+      sourceChainSelectorsToRemove = []
+      signatureConfigs = [
+          CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 456.0, threshold = n, signerKeys = keysN
+        ]
+
+  -- One past the cap: create fails.
+  submitMustFail owner do
+    createCmd CommitteeVerifier.CommitteeVerifier with
+      instanceId = "test-ccv-max-threshold-bad-create"
+      owner = owner
+      ccipOwner = owner
+      versionTag = CommitteeVerifier.versionTagV2_0_0
+      allowListAdmin = None
+      messageSentObservers = []
+      storageLocations = []
+      storageLocationsAdmin = owner
+      pendingStorageLocationsAdmin = owner
+      remoteChainConfigs = Map.empty
+      signerConfigs = Map.fromList [
+          (123.0, CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 123.0, threshold = n + 1, signerKeys = keysNPlus1)
+        ]
+      deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+  -- One past the cap: ApplySignatureConfigs fails.
+  ccvUpd <- submit owner do
+    createCmd CommitteeVerifier.CommitteeVerifier with
+      instanceId = "test-ccv-max-threshold-bad-update"
+      owner = owner
+      ccipOwner = owner
+      versionTag = CommitteeVerifier.versionTagV2_0_0
+      allowListAdmin = None
+      messageSentObservers = []
+      storageLocations = []
+      storageLocationsAdmin = owner
+      pendingStorageLocationsAdmin = owner
+      remoteChainConfigs = Map.empty
+      signerConfigs = Map.empty
+      deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+  submitMustFail owner do
+    exerciseCmd ccvUpd CommitteeVerifier.ApplySignatureConfigs with
+      sourceChainSelectorsToRemove = []
+      signatureConfigs = [
+          CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 789.0, threshold = n + 1, signerKeys = keysNPlus1
+        ]
+
+  pure ()
