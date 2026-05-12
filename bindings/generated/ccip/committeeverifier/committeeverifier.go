@@ -27,8 +27,8 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "4a169429cee6da8cc8942d31504f8df1210be314fc7854a1c38123c267958fd9"
-	SDKVersion  = "3.4.10"
+	PackageID   = "8cdf1f1022a4e44021640c97ae7ad4f1c38ed77c0173ff05657ddd32f4717b9c"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {

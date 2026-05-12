@@ -29,8 +29,8 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "50f072f89866957306396c0f41d8b8344ea704fa90d70418e6f7e54d883a3861"
-	SDKVersion  = "3.4.10"
+	PackageID   = "574163419a4dea2b3c9ddd7610e928cf0a31327e529b3042dc5069a2d463fe71"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
