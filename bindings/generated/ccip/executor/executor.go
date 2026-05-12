@@ -28,8 +28,8 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "a72e7405d329852fd872a3d703fc187d35eceb1e0ff1aeef2197864c79301321"
-	SDKVersion  = "3.4.10"
+	PackageID   = "64162ba19af54734b0ee5859b1ce745dce5aa405d04c997914051b542a3117a4"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {

@@ -29,8 +29,8 @@ var (
 
 const (
 	PackageName = "ccip-lock-release-token-pool"
-	PackageID   = "a54a4ac6ac22e67d7553676c2b28fc3478ad0dadb3ddb84fdc57a182212f2e24"
-	SDKVersion  = "3.4.10"
+	PackageID   = "3f011ab24dc408b99b373405e46307b9e08a23c36b020406366e17589011971f"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {

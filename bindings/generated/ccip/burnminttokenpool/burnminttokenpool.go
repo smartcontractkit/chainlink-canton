@@ -29,8 +29,8 @@ var (
 
 const (
 	PackageName = "ccip-burn-mint-token-pool"
-	PackageID   = "57f71eebc2d94b0dad6dc25f55b5b5726ebd7391beed82d038ea0aea083a28ed"
-	SDKVersion  = "3.4.10"
+	PackageID   = "9927635585038ac4c259aa18d6eabc0623a55f3c5edfbd6ee540aea8253d668c"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
