@@ -508,6 +508,29 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
     let rmnInstanceId = "test-rmn"
     let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId owner
 
+    -- Test invalid negative fee at creation
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv-negative-fee"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.fromList [
+                (123.0, CommitteeVerifier.RemoteChainConfig with
+                    feeUSDCents = -1.0,
+                     gasForVerification = 1000,
+                     payloadSizeBytes = 100,
+                     allowListEnabled = True,
+                     allowedSendersList = [allowedParty1, allowedParty2])
+                ]
+            signerConfigs = Map.empty
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
     ccvCid <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             instanceId = "test-ccv1"
@@ -574,7 +597,17 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
                 gasForVerification = 5000
                 payloadSizeBytes = 200
                 allowListEnabled = False]
-    
+
+    -- Test invalid negative fee
+    submitMustFail owner do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CommitteeVerifier.RemoteChainConfigArgs with
+                remoteChainSelector = 123.0
+                feeUSDCents = -1.0
+                gasForVerification = 5000
+                payloadSizeBytes = 200
+                allowListEnabled = False]
+
     -- Test invalid gas for verification
     submitMustFail owner do
         exerciseCmd ccvCid CommitteeVerifier.ApplyRemoteChainConfigUpdates with

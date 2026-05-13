@@ -56,6 +56,15 @@ signature_length : Int = 64
 signature_component_length : Int
 signature_component_length : Int = 32
 
+isValidRemoteChainConfig : RemoteChainConfig -> Bool
+isValidRemoteChainConfig config =
+    config.feeUSDCents >= 0.0
+
+assertNonNegativeFeeUSDCents : Text -> Numeric 0 -> Update ()
+assertNonNegativeFeeUSDCents label feeUSDCents =
+    assertMsg (label <> ": invalid feeUSDCents: " <> show feeUSDCents)
+        (feeUSDCents >= 0.0)
+
 template CommitteeVerifier
     with
         instanceId : Text
@@ -91,7 +100,9 @@ template CommitteeVerifier
         -- Ensure signer configs have a positive threshold, enough signers,
         -- and no duplicate signer keys.
         ensure assertValidInstanceId instanceId
-          && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
+          && versionTag /= ""
+          && all isValidRemoteChainConfig (Map.values remoteChainConfigs)
+          && all isValidSignatureConfig (Map.values signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
@@ -204,6 +215,7 @@ template CommitteeVerifier
                 -- Validate
                 forA_ remoteChainConfigArgs $ \args -> do
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
+                    assertNonNegativeFeeUSDCents "ApplyRemoteChainConfigUpdates" args.feeUSDCents
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid gas for verification: " <> show args.gasForVerification) (args.gasForVerification > 0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid payload size bytes: " <> show args.payloadSizeBytes) (args.payloadSizeBytes >= 0)
                 -- Update
@@ -362,6 +374,7 @@ template CommitteeVerifier
                     (sendingMsg.ccipOwner == ccipOwner)
                 let chainConfig = fromSomeNote "no fee config for dest chain"
                         (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
+                assertNonNegativeFeeUSDCents "CalculateFee" chainConfig.feeUSDCents
 
                 exercise sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
                     ccvInstanceId = instanceId
@@ -380,6 +393,7 @@ template CommitteeVerifier
             do
                 let chainConfig = fromSomeNote "no fee config for dest chain"
                         (Map.lookup destChainSelector remoteChainConfigs)
+                assertNonNegativeFeeUSDCents "GetFee" chainConfig.feeUSDCents
 
                 pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
                     ccvInstanceId = instanceId
