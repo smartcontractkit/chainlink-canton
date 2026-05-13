@@ -23,3 +23,4 @@ dependencies:
   - ../executor/.daml/dist/ccip-executor-1.0.0.dar
   - ../committee-verifier/.daml/dist/ccip-committee-verifier-1.0.0.dar
   - ../pools/lock-release-token-pool/.daml/dist/ccip-lock-release-token-pool-1.0.0.dar
+  - ../pools/burn-mint-token-pool/.daml/dist/ccip-burn-mint-token-pool-1.0.0.dar

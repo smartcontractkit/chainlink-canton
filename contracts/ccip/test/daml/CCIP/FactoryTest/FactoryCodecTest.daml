@@ -33,6 +33,8 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
 import CCIP.ContextCodec (encodeChoiceContext)
 import CCIP.LockReleaseTokenPoolCodecGen (encodeTransferTimeout)
+import qualified CCIP.BurnMintTokenPoolCodecGen
+import qualified CCIP.BurnMintTokenPoolTypes
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
@@ -136,6 +138,20 @@ encodeDeployLockReleaseTokenPoolParams params =
   <> encodeRawInstanceAddress params.rmnRemote
   <> encodeChoiceContext params.poolReceiveContext
   <> encodeTransferTimeout params.transferTimeout
+
+encodeDeployBurnMintTokenPoolParams : DeployBurnMintTokenPoolParams -> BytesHex
+encodeDeployBurnMintTokenPoolParams params =
+  encodeText params.instanceId
+  <> encodeParty params.poolOwner
+  <> encodeParty params.ccipOwner
+  <> encodeInstrumentId params.instrumentId
+  <> fromSome (encodeInt64 params.decimals)
+  <> encodeOptional params.rateLimitAdmin encodeParty
+  <> encodeRawInstanceAddress params.tokenAdminRegistry
+  <> encodeRawInstanceAddress params.feeQuoter
+  <> encodeRawInstanceAddress params.rmnRemote
+  <> encodeChoiceContext params.poolReceiveContext
+  <> CCIP.BurnMintTokenPoolCodecGen.encodeTransferTimeout params.transferTimeout
 
 encodeRateLimitDirection : RateLimitDirection -> BytesHex
 encodeRateLimitDirection RateLimitDirection_Outbound = fromSome (encodeUint8 0)
@@ -506,6 +522,77 @@ testDecodeDeployLockReleaseTokenPoolParams_Indefinite = script do
     None -> abort "Failed to decode DeployLockReleaseTokenPoolParams with Indefinite"
     Some decoded -> do
       decoded.transferTimeout === Indefinite
+      decoded.poolReceiveContext === MetadataV1.emptyChoiceContext
+      decoded.rateLimitAdmin === None
+
+  pure ()
+
+testDecodeDeployBurnMintTokenPoolParams : Script ()
+testDecodeDeployBurnMintTokenPoolParams = script do
+  poolOwner <- allocateParty "pool_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "token_admin"
+  rateLimitAdmin <- allocateParty "rate_limit_admin"
+  feeOwner <- allocateParty "fee_owner"
+  rmnOwner <- allocateParty "rmn_owner"
+
+  let params = DeployBurnMintTokenPoolParams with
+        instanceId = "bmtp-1"
+        poolOwner
+        ccipOwner
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+        decimals = 6
+        rateLimitAdmin = Some rateLimitAdmin
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.BurnMintTokenPoolTypes.RelativeHours 24
+      encoded = encodeDeployBurnMintTokenPoolParams params
+
+  case decodeDeployBurnMintTokenPoolParams encoded of
+    None -> abort "Failed to decode DeployBurnMintTokenPoolParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.poolOwner === params.poolOwner
+      decoded.ccipOwner === params.ccipOwner
+      decoded.instrumentId === params.instrumentId
+      decoded.decimals === params.decimals
+      decoded.rateLimitAdmin === params.rateLimitAdmin
+      decoded.tokenAdminRegistry === params.tokenAdminRegistry
+      decoded.feeQuoter === params.feeQuoter
+      decoded.rmnRemote === params.rmnRemote
+      decoded.poolReceiveContext === params.poolReceiveContext
+      decoded.transferTimeout === params.transferTimeout
+
+  pure ()
+
+testDecodeDeployBurnMintTokenPoolParams_Indefinite : Script ()
+testDecodeDeployBurnMintTokenPoolParams_Indefinite = script do
+  poolOwner <- allocateParty "pool_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "token_admin"
+  feeOwner <- allocateParty "fee_owner"
+  rmnOwner <- allocateParty "rmn_owner"
+
+  let params = DeployBurnMintTokenPoolParams with
+        instanceId = "bmtp-indefinite"
+        poolOwner
+        ccipOwner
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+        decimals = 18
+        rateLimitAdmin = None
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.BurnMintTokenPoolTypes.Indefinite
+      encoded = encodeDeployBurnMintTokenPoolParams params
+
+  case decodeDeployBurnMintTokenPoolParams encoded of
+    None -> abort "Failed to decode DeployBurnMintTokenPoolParams with Indefinite"
+    Some decoded -> do
+      decoded.transferTimeout === CCIP.BurnMintTokenPoolTypes.Indefinite
       decoded.poolReceiveContext === MetadataV1.emptyChoiceContext
       decoded.rateLimitAdmin === None
 
