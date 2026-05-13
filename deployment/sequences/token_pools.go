@@ -146,6 +146,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteCfg.RemoteDecimals,
 				"canton",
 				semver.MustParse("2.0.0"),
+				lockReleasePoolType.String(),
 			)
 			_, inboundCustomCfg := tokenadapters.GenerateTPRLConfigs(
 				remoteCfg.OutboundRateLimiterConfig, // TODO: how do we get the "custom finality" config?
@@ -154,6 +155,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteCfg.RemoteDecimals,
 				"canton",
 				semver.MustParse("2.0.0"),
+				lockReleasePoolType.String(),
 			)
 
 			meta := rateLimiterPoolMeta{InstanceId: parsedPool.InstanceId, PoolOwner: parsedPool.PoolOwner}

@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton ImplFactory
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -37,8 +37,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping Canton2EVM_Basic test in short mode")
 	}
-
-	ccv.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
 
 	configPath := "../../env-canton-evm-out.toml"
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
