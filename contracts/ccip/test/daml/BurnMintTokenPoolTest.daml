@@ -554,6 +554,7 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
       verifiedCCVs = []
       requiredInboundPoolCCVs = []
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
       poolOwner = poolOwner
       receiver = receiver
       tokenReceiver = receiver
@@ -824,6 +825,7 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
       verifiedCCVs = []
       requiredInboundPoolCCVs = []
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
       poolOwner = poolOwner
       receiver = receiver
       tokenReceiver = receiver
@@ -921,6 +923,7 @@ testBurnMintPoolReleaseFromTicketDecimalConversionTruncatesToZeroFails = script 
       verifiedCCVs = []
       requiredInboundPoolCCVs = []
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
       poolOwner = poolOwner
       receiver = receiver
       tokenReceiver = receiver
@@ -1017,6 +1020,7 @@ testBurnMintPoolReleaseFromTicketDecimalConversionOverflowFails = script do
       verifiedCCVs = []
       requiredInboundPoolCCVs = []
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
       poolOwner = poolOwner
       receiver = receiver
       tokenReceiver = receiver
@@ -1121,6 +1125,7 @@ testBurnMintPoolReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
       verifiedCCVs = [requiredCcv]
       requiredInboundPoolCCVs = [requiredCcv]
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
       poolOwner = poolOwner
       receiver = receiver
       tokenReceiver = receiver
@@ -1234,6 +1239,7 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
       verifiedCCVs = [otherCcv]
       requiredInboundPoolCCVs = [requiredCcv]
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
       poolOwner = poolOwner
       receiver = receiver
       tokenReceiver = receiver
@@ -1244,12 +1250,40 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
 
+  wrongPoolAddressTicketCid <- submit (actAs ccipOwner <> actAs ccvOwner) do
+    createCmd Tickets.TokenReceiveTicket with
+      ccipOwner = ccipOwner
+      ccvOwners = [ccvOwner]
+      verifiedCCVs = [requiredCcv]
+      requiredInboundPoolCCVs = [requiredCcv]
+      tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make "stale-burn-mint-pool-instance" poolOwner
+      poolOwner = poolOwner
+      receiver = receiver
+      tokenReceiver = receiver
+      instrumentId
+      amount = fromSome (MessageCodecV1.encodeUint256 30000000000.0)
+      sourcePoolData = ""
+      messageId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      sourceChainSelector = sourceChainSelector
+      finality = FinalityConfig.WaitForFinality
+
   disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
   disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
   disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemoteCid
   disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiterCid
   disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicketCid
+  disclosedWrongPoolTicket <- fromSome <$> queryDisclosure ccipOwner wrongPoolAddressTicketCid
   disclosedRegistry <- fromSome <$> queryDisclosure poolOwner registryCid
+
+  submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedWrongPoolTicket <> disclose disclosedRegistry) do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
+      tokenAdminRegistryCid = tokenAdminRegistryCid
+      tokenConfigCid = tokenConfigCid
+      rmnRemoteCid = rmnRemoteCid
+      extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
+      tokenReceiveTicketCid = wrongPoolAddressTicketCid
+      caller = receiver
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
@@ -1323,6 +1357,7 @@ testBurnMintPoolReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
       verifiedCCVs = [nonsignatoryVerifiedCCV]
       requiredInboundPoolCCVs = []
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
       poolOwner = poolOwner
       receiver = receiver
       tokenReceiver = receiver

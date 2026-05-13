@@ -639,6 +639,11 @@ template LockReleaseTokenPool
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "ReleaseFromTicket: ticket instrument must match pool instrument"
                     (ticket.instrumentId == instrumentId)
+                let poolAddress = RawInstanceAddress.make instanceId poolOwner
+                assertMsg "ReleaseFromTicket: ticket pool owner mismatch"
+                    (ticket.poolOwner == poolOwner)
+                assertMsg "ReleaseFromTicket: ticket pool address mismatch"
+                    (ticket.poolAddress == poolAddress)
 
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = poolOwner
@@ -705,6 +710,7 @@ template LockReleaseTokenPool
                         tokenConfigCid
                         ticketCid = tokenReceiveTicketCid
                         instrumentId = instrumentId
+                        poolInstanceId = instanceId
                         caller = poolOwner
 
                 -- Get inputs from extraContext
@@ -773,6 +779,7 @@ template LockReleaseTokenPool
                             event = CCIP.Events.TokenReceiveTicketClaimedEvent with
                                 verifiedCCVs = ticket.verifiedCCVs
                                 tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                poolAddress = ticket.poolAddress
                                 instrumentId = ticket.instrumentId
                                 sourceAmount = ticket.amount
                                 localAmount = localAmount
@@ -807,6 +814,7 @@ template LockReleaseTokenPool
                             event = CCIP.Events.TokenReceiveTicketClaimedEvent with
                                 verifiedCCVs = ticket.verifiedCCVs
                                 tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                poolAddress = ticket.poolAddress
                                 instrumentId = ticket.instrumentId
                                 sourceAmount = ticket.amount
                                 localAmount = localAmount

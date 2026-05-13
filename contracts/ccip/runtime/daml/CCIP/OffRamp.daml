@@ -232,7 +232,7 @@ template OffRamp
                     optionalCCVThreshold = baseOptionalCCVThreshold
                     receiverFinalityConfig = receiverFinalityConfig
                     sourceDefaultCCVs = sourceConfig.defaultCCVs
-                    inboundPoolCCVs = None
+                    inboundPoolVerification = None
                     deps = CCIP.ExecutingMessageV1.ExecutingMessageDeps with
                         offRamp = rawInstanceAddress this
                         globalConfig = deps.globalConfig
@@ -307,10 +307,10 @@ template OffRamp
                 -- Token transfers must complete the pool step before execution.
                 case execMsg.tokenReceiver of
                     None -> pure ()
-                    Some _ -> case execMsg.inboundPoolCCVs of
+                    Some _ -> case execMsg.inboundPoolVerification of
                         None -> abort "offramp: pool CCVs not set for token transfer"
-                        Some ccvs ->
-                            assertMsg "offramp: pool CCVs cannot contain duplicates" (unique ccvs)
+                        Some verification ->
+                            assertMsg "offramp: pool CCVs cannot contain duplicates" (unique verification.poolCCVs)
 
                 let requiredCCVAddresses =
                         map RawInstanceAddress.toInstanceAddress execMsg.requiredCCVs
@@ -345,7 +345,7 @@ template OffRamp
                         exercise executingMessageCid
                             CCIP.ExecutingMessageV1.FinalizeExecute with
                                 tokenAdminRegistryInstanceId = tokenAdminRegistry.instanceId
-                                maybePoolOwner = None
+                                maybePoolAddress = None
                                 maybeTicketReceiver = None
                                 maybeTokenReceiver = None
                                 maybeInstrumentId = None
