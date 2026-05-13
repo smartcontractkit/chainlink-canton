@@ -377,7 +377,9 @@ type encodableParams interface {
 		factory.DeployOffRampParams |
 		factory.DeployOnRampParams |
 		factory.DeployPerPartyRouterFactoryParams |
-		factory.DeployLockReleaseTokenPoolParams
+		factory.DeployLockReleaseTokenPoolParams |
+		factory.DeployBurnMintTokenPoolParams |
+		factory.DeployRateLimiterParams
 }
 
 // mcmsFactoryDeploy executes a single MCMS Bypasser operation to deploy a component via the factory.
@@ -487,6 +489,10 @@ func encodeFactoryParams[T encodableParams](t *testing.T, enc factory.MCMSEncode
 		result, err = enc.DeployPerPartyRouterFactoryParams(any(params).(factory.DeployPerPartyRouterFactoryParams))
 	case "DeployLockReleaseTokenPoolParams":
 		result, err = enc.DeployLockReleaseTokenPoolParams(any(params).(factory.DeployLockReleaseTokenPoolParams))
+	case "DeployBurnMintTokenPoolParams":
+		result, err = enc.DeployBurnMintTokenPoolParams(any(params).(factory.DeployBurnMintTokenPoolParams))
+	case "DeployRateLimiterParams":
+		result, err = enc.DeployRateLimiterParams(any(params).(factory.DeployRateLimiterParams))
 	default:
 		t.Fatalf("unknown encoder method: %s", methodName)
 	}
