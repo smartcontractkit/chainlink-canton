@@ -35,11 +35,11 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/smartcontractkit/chain-selectors v1.0.98
-	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260511074631-6e83588e6959
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260511074631-6e83588e6959
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260512180815-d7a89b0a5784
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260512180815-d7a89b0a5784
 	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260511080919-154c06f8f0c3
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260511080919-154c06f8f0c3
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260511080919-154c06f8f0c3
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260512185516-1a9a06a368a3
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260512185516-1a9a06a368a3
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260417081611-8bdbd9f45629
 	github.com/smartcontractkit/chainlink-deployments-framework v0.100.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.19

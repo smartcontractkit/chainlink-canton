@@ -140,6 +140,7 @@ func (a *CantonAggregatorConfigAdapter) ResolveDestinationVerifierAddress(ds dat
 func (a *CantonAggregatorConfigAdapter) ResolveSourceVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
 	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
 		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
+		// TODO: below is searching for the EVM verifier resolver, why?
 		datastore.AddressRef{
 			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
 			Qualifier: qualifier,
@@ -149,6 +150,29 @@ func (a *CantonAggregatorConfigAdapter) ResolveSourceVerifierAddress(ds datastor
 			Qualifier: qualifier,
 		},
 	)
+}
+
+// GetDeployedChains implements [adapters.AggregatorConfigAdapter].
+func (a *CantonAggregatorConfigAdapter) GetDeployedChains(ds datastore.DataStore, qualifier string) []uint64 {
+	if ds == nil {
+		return nil
+	}
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByQualifier(qualifier),
+		datastore.AddressRefByType(datastore.ContractType(committee_verifier.ContractType)),
+		datastore.AddressRefByVersion(committee_verifier.Version),
+	)
+	seen := make(map[uint64]struct{}, len(refs))
+	chains := make([]uint64, 0, len(refs))
+	for _, ref := range refs {
+		if _, exists := seen[ref.ChainSelector]; exists {
+			continue
+		}
+		seen[ref.ChainSelector] = struct{}{}
+		chains = append(chains, ref.ChainSelector)
+	}
+
+	return chains
 }
 
 func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapters.SignatureConfig, error) {
