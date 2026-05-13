@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "fd46f81dd1dfd9866a846fdc40e6100d0251860630d3e72185e3790b75bb394a"
+	PackageID   = "1d10bf1fd4ba6f0a5d469683ef3b6ad68a2055dde4be4e6110fe24e0b4af0394"
 	SDKVersion  = "3.4.11"
 )
 
@@ -772,6 +772,48 @@ func (t CommitteeVerifier) ApplySignatureConfigsWithPackageID(contractID string,
 	}
 }
 
+// GetFee exercises the GetFee choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t CommitteeVerifier) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CalculateFee exercises the CalculateFee choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // ApplyAllowListUpdates exercises the ApplyAllowListUpdates choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) ApplyAllowListUpdates(contractID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
@@ -810,27 +852,6 @@ func (t CommitteeVerifier) AcceptStorageLocationsAdminWithPackageID(contractID s
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "AcceptStorageLocationsAdmin",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CalculateFee exercises the CalculateFee choice on this CommitteeVerifier contract
-// This method uses the package name in the template ID
-func (t CommitteeVerifier) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "CalculateFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -874,27 +895,6 @@ func (t CommitteeVerifier) ArchiveWithPackageID(contractID string, packageID str
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
-	}
-}
-
-// GetFee exercises the GetFee choice on this CommitteeVerifier contract
-// This method uses the package name in the template ID
-func (t CommitteeVerifier) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "GetFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
-func (t CommitteeVerifier) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "GetFee",
-		Arguments:  argsToMap(args),
 	}
 }
 
