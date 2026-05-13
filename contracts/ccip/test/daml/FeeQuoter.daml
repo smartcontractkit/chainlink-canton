@@ -456,7 +456,8 @@ testFeeQuoter_ApplyPriceUpdatersUpdate = script do
                 gasPriceUpdates = []
             caller = priceUpdater
 
-    -- add owner as price updater
+    -- ApplyPriceUpdatersUpdate cannot add owner to priceUpdaters.
+    -- owner still updates via UpdatePrices when caller == owner.
     fq <- submit owner do
         exerciseCmd fq ApplyPriceUpdatersUpdate with
             addedPriceUpdaters = [owner]
