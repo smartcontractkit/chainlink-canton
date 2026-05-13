@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -14,6 +15,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -152,6 +154,16 @@ var DeployLockReleaseTokenPool = contract.NewExercise(contract.ExerciseParams[fa
 	EncodeMethod: encodeDeployLockReleaseTokenPool,
 })
 
+var DeployBurnMintTokenPool = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployBurnMintTokenPool]{
+	Name:         "canton/ccip/factory/deploy_burn_mint_token_pool",
+	Version:      Version,
+	Description:  "Deploys a BurnMintTokenPool through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployBurnMintTokenPool,
+	EncodeMethod: encodeDeployBurnMintTokenPool,
+})
+
 var DeployRateLimiter = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployRateLimiter]{
 	Name:         "canton/ccip/factory/deploy_rate_limiter",
 	Version:      Version,
@@ -248,6 +260,24 @@ func encodeDeployLockReleaseTokenPool(args factorybindings.DeployLockReleaseToke
 		CcipOwner:          c.CcipOwner,
 		InstrumentId:       c.InstrumentId,
 		Decimals:           c.Decimals,
+		RateLimitAdmin:     c.RateLimitAdmin,
+		TokenAdminRegistry: c.Deps.TokenAdminRegistry,
+		FeeQuoter:          c.Deps.FeeQuoter,
+		RmnRemote:          c.Deps.RmnRemote,
+		PoolReceiveContext: c.PoolReceiveContext,
+		TransferTimeout:    c.TransferTimeout,
+	})
+}
+
+func encodeDeployBurnMintTokenPool(args factorybindings.DeployBurnMintTokenPool) (*bind.EncodedChoice, error) {
+	c := args.Contract
+	return factoryEncoder.DeployBurnMintTokenPoolParams(factorybindings.DeployBurnMintTokenPoolParams{
+		InstanceId:         c.InstanceId,
+		PoolOwner:          c.PoolOwner,
+		CcipOwner:          c.CcipOwner,
+		InstrumentId:       c.InstrumentId,
+		Decimals:           c.Decimals,
+		RateLimitAdmin:     c.RateLimitAdmin,
 		TokenAdminRegistry: c.Deps.TokenAdminRegistry,
 		FeeQuoter:          c.Deps.FeeQuoter,
 		RmnRemote:          c.Deps.RmnRemote,
@@ -309,6 +339,57 @@ func writeBool(buf *bytes.Buffer, value types.BOOL) {
 		return
 	}
 	buf.WriteByte(0x00)
+}
+
+func writeNumeric0(buf *bytes.Buffer, value types.NUMERIC) error {
+	text := string(value)
+	if whole, fraction, ok := strings.Cut(text, "."); ok {
+		if strings.Trim(fraction, "0") != "" {
+			return fmt.Errorf("expected Numeric 0, got %q", text)
+		}
+		text = whole
+	}
+	writeLenPrefixedText(buf, types.TEXT(text))
+	return nil
+}
+
+func writeRawInstanceAddress(buf *bytes.Buffer, value chainlinkapi.RawInstanceAddress) {
+	writeLenPrefixedText(buf, value.Unpack)
+}
+
+func writeRawInstanceAddressList(buf *bytes.Buffer, values []chainlinkapi.RawInstanceAddress) error {
+	if len(values) > 255 {
+		return fmt.Errorf("too many raw instance addresses: %d", len(values))
+	}
+	buf.WriteByte(byte(len(values)))
+	for _, value := range values {
+		writeRawInstanceAddress(buf, value)
+	}
+	return nil
+}
+
+func writeRateLimitDirection(buf *bytes.Buffer, value common.RateLimitDirection) error {
+	switch value {
+	case common.RateLimitDirectionRateLimitDirection_Outbound:
+		buf.WriteByte(0x00)
+	case common.RateLimitDirectionRateLimitDirection_Inbound:
+		buf.WriteByte(0x01)
+	default:
+		return fmt.Errorf("unsupported rate limit direction: %s", value)
+	}
+	return nil
+}
+
+func writeRateLimitMode(buf *bytes.Buffer, value common.RateLimitMode) error {
+	switch value {
+	case common.RateLimitModeRateLimitMode_DefaultFinality:
+		buf.WriteByte(0x00)
+	case common.RateLimitModeRateLimitMode_CustomFinality:
+		buf.WriteByte(0x01)
+	default:
+		return fmt.Errorf("unsupported rate limit mode: %s", value)
+	}
+	return nil
 }
 
 func writeRequestedFinality(buf *bytes.Buffer, finality common.FinalityConfig) error {
