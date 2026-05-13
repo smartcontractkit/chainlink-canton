@@ -1115,6 +1115,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
             ccvOwners = []
             verifiedCCVs = []
             requiredInboundPoolCCVs = []
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -1481,7 +1482,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     submitMustFail (actAs receiver

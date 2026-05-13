@@ -696,6 +696,7 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
       verifiedCCVs = []
       requiredInboundPoolCCVs = []
       tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
       poolOwner = poolOwner
       receiver = receiver
       tokenReceiver = receiver
