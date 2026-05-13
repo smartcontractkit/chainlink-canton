@@ -28,6 +28,7 @@ import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.Factory
+import qualified CCIP.CommitteeVerifier
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
@@ -363,7 +364,7 @@ testDecodeDeployCommitteeVerifierParams = script do
         instanceId = "ccv-1"
         owner
         ccipOwner
-        versionTag = "01020304"
+        versionTag = CCIP.CommitteeVerifier.versionTagV2_0_0
         allowListAdmin = Some allowListAdmin
         --allowListAdmin = None
         messageSentObservers = [messageSentObserver]
