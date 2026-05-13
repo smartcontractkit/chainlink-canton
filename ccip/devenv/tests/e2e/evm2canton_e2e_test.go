@@ -217,12 +217,12 @@ func TestEVM2Canton_Basic(t *testing.T) {
 // after being hex-encoded.
 // Therefore, to get the hashed instance address and get the disclosure from EDS, we need to do
 // the following:
-// 1. Hex-decode vr.VerifierDestAddress to get the raw instance address string's bytes.
-// 2. Hash the raw instance address string to get the hashed instance address.
-// 3. Use the hashed instance address to get the disclosure from EDS.
+// 1. Convert the raw instance address bytes to a string.
+// 2. Convert the string to a raw instance address.
+// 3. Get the instance address from the raw instance address.
 func getHashedInstanceAddress(t *testing.T, rawInstanceAddressBytes protocol.UnknownAddress) protocol.UnknownAddress {
-	rawInstanceAddressAsHexStr := string(rawInstanceAddressBytes.Bytes())
-	rawInstanceAddress, err := contracts.RawInstanceAddressFromString(rawInstanceAddressAsHexStr)
+	rawInstanceAddressStr := string(rawInstanceAddressBytes.Bytes())
+	rawInstanceAddress, err := contracts.RawInstanceAddressFromString(rawInstanceAddressStr)
 	require.NoError(t, err)
 
 	return protocol.UnknownAddress(rawInstanceAddress.InstanceAddress().Bytes())

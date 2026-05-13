@@ -135,8 +135,10 @@ func (a *CantonAggregatorConfigAdapter) ResolveDestinationVerifierAddress(ds dat
 //
 // For Canton we want to resolve the aggregator source verifier address to
 // the hashed instance address of the committee verifier. This is because
-// the actual raw instance address is not needed by users when sending messages
-// from Canton -> X.
+// the CCIPMessageSentEvent onchain emits the hashed instance address,
+// and the aggregator checks that the source verifier address it is configured
+// with is present inside the message's CCV addresses.
+// https://github.com/smartcontractkit/chainlink-ccv/blob/33b00afa3061efc6faca53e5cfb9658e4ad9d6e1/aggregator/pkg/quorum/evm_quorum_validator.go#L49-L51.
 func (a *CantonAggregatorConfigAdapter) ResolveSourceVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
 	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
 		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
