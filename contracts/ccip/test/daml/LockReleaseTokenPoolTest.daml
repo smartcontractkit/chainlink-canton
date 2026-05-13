@@ -826,6 +826,9 @@ testLockOrBurnDeductsFeeBps = script do
     let tokenSendData = fromSome sm.tokenSendData
     -- 5% feeBps deducted from bridged amount.
     tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 47500000000.0)
+    rateLimiters <- query @RateLimiter.RateLimiter poolOwner
+    let [(_, updatedOutboundRateLimiter)] = rateLimiters
+    updatedOutboundRateLimiter.tokens === 52500000000.0
 
     debug "testLockOrBurnDeductsFeeBps: PASSED"
 
