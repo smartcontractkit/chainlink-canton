@@ -33,7 +33,7 @@ jobs:
         with:
           repository: smartcontractkit/chainlink-ccv
           path: chainlink-ccv
-          ref: c40f342b5ff632ff927ea3b15d311e05cb069889
+          ref: 5a8c962531320a7dda8cd5e91a48d4504ae777f0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -65,7 +65,7 @@ jobs:
         working-directory: chainlink-ccv/build/devenv
         run: |
           # Build all dependent services docker images
-          just build-docker-dev-ci
+          just build-docker-ci
         env:
           DOCKER_BUILDKIT: 1
 
