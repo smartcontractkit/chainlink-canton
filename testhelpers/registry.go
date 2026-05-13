@@ -164,6 +164,56 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 	}}}}, nil
 }
 
+// ChoiceContextFromStruct converts a decoded splice ChoiceContext (e.g. from EDS execute disclosures)
+// into the ledger API *apiv2.Value shape used by Execute choice arguments.
+// Use this when disclosure types expose ChoiceContext but not raw ContextData map (OpenAPI JSON).
+func ChoiceContextFromStruct(ctx splice_api_token_metadata_v1.ChoiceContext) (*apiv2.Value, error) {
+	if ctx.Values == nil {
+		return ChoiceContextFromData(map[string]any{"values": map[string]any{}})
+	}
+	values := make(map[string]any, len(ctx.Values))
+	for k, av := range ctx.Values {
+		entry, err := anyValueToChoiceContextDataEntry(av)
+		if err != nil {
+			return nil, fmt.Errorf("values[%q]: %w", k, err)
+		}
+		values[k] = entry
+	}
+	return ChoiceContextFromData(map[string]any{"values": values})
+}
+
+func anyValueToChoiceContextDataEntry(av splice_api_token_metadata_v1.AnyValue) (map[string]any, error) {
+	switch {
+	case av.AVText != nil:
+		return map[string]any{"tag": "AV_Text", "value": string(*av.AVText)}, nil
+	case av.AVInt != nil:
+		return map[string]any{"tag": "AV_Int", "value": float64(*av.AVInt)}, nil
+	case av.AVDecimal != nil:
+		return map[string]any{"tag": "AV_Decimal", "value": string(*av.AVDecimal)}, nil
+	case av.AVBool != nil:
+		return map[string]any{"tag": "AV_Bool", "value": bool(*av.AVBool)}, nil
+	case av.AVDate != nil:
+		t := time.Time(*av.AVDate)
+		return map[string]any{"tag": "AV_Date", "value": t.Format(time.DateOnly)}, nil
+	case av.AVTime != nil:
+		t := time.Time(*av.AVTime)
+		return map[string]any{"tag": "AV_Time", "value": t.Format(time.RFC3339)}, nil
+	case av.AVRelTime != nil:
+		d := time.Duration(*av.AVRelTime)
+		return map[string]any{"tag": "AV_RelTime", "value": float64(d.Microseconds())}, nil
+	case av.AVParty != nil:
+		return map[string]any{"tag": "AV_Party", "value": string(*av.AVParty)}, nil
+	case av.AVContractId != nil:
+		return map[string]any{"tag": "AV_ContractId", "value": string(*av.AVContractId)}, nil
+	case av.AVList != nil:
+		return nil, fmt.Errorf("AV_List is not supported in choice context conversion")
+	case av.AVMap != nil:
+		return nil, fmt.Errorf("AV_Map is not supported in choice context conversion")
+	default:
+		return nil, fmt.Errorf("empty or unsupported AnyValue")
+	}
+}
+
 // ExtractChoiceContextValues converts a Splice ChoiceContext proto value into
 // the typed map expected by TokenInput.ExtraArgs.Context.Values.
 func ExtractChoiceContextValues(choiceContext *apiv2.Value) map[string]splice_api_token_metadata_v1.AnyValue {

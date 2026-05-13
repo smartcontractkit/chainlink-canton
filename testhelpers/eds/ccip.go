@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -74,6 +75,7 @@ func GetTokenPoolForToken(ctx context.Context, ccipAPIClient oapiCCIP.ClientWith
 
 type CCIPExecuteDisclosure struct {
 	ChoiceContext      splice_api_token_metadata_v1.ChoiceContext
+	ContextData        map[string]interface{}
 	DisclosedContracts []*apiv2.DisclosedContract
 	TokenPool          *contracts.RawInstanceAddress
 }
@@ -118,6 +120,7 @@ func GetCCIPExecuteDisclosure(
 
 	return &CCIPExecuteDisclosure{
 		ChoiceContext:      choiceContext,
+		ContextData:        resp.JSON200.ContextData,
 		DisclosedContracts: disclosedContracts,
 		TokenPool:          tokenPool,
 	}, nil
@@ -130,6 +133,23 @@ type CCIPSendDisclosure struct {
 	Executor           *string
 }
 
+// applyCCVAddressToEDSUnion sets dst to either a RawInstanceAddress (instanceId@party) or a hashed
+// InstanceAddress (0x… 32-byte hex), matching how ccip/devenv passes opts.CCVs into GetCCIPSendDisclosure.
+func applyCCVAddressToEDSUnion(dst *oapiCommon.RawOrHashedAddress, v string) error {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return fmt.Errorf("empty CCV address")
+	}
+	if strings.Count(v, "@") == 1 {
+		if _, err := contracts.RawInstanceAddressFromString(v); err != nil {
+			return fmt.Errorf("invalid raw instance address %q: %w", v, err)
+		}
+		return dst.FromRawInstanceAddress(oapiCommon.RawInstanceAddress(v))
+	}
+	ia := contracts.HexToInstanceAddress(v)
+	return dst.FromInstanceAddress(oapiCommon.InstanceAddress(ia.Hex()))
+}
+
 func GetCCIPSendDisclosure(
 	ctx context.Context,
 	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,
@@ -139,11 +159,15 @@ func GetCCIPSendDisclosure(
 ) (*CCIPSendDisclosure, error) {
 	senderCCVs := make([]oapiCommon.RawOrHashedAddress, len(senderRequiredCCVs))
 	for i, v := range senderRequiredCCVs {
-		_ = senderCCVs[i].FromRawInstanceAddress(v)
+		if err := applyCCVAddressToEDSUnion(&senderCCVs[i], v); err != nil {
+			return nil, fmt.Errorf("sender required CCV[%d]: %w", i, err)
+		}
 	}
 	tokenPoolCCVs := make([]oapiCommon.RawOrHashedAddress, len(tokenPoolRequiredCCVs))
 	for i, v := range tokenPoolRequiredCCVs {
-		_ = tokenPoolCCVs[i].FromRawInstanceAddress(v)
+		if err := applyCCVAddressToEDSUnion(&tokenPoolCCVs[i], v); err != nil {
+			return nil, fmt.Errorf("token pool required CCV[%d]: %w", i, err)
+		}
 	}
 
 	resp, err := ccipAPIClient.PostCCIPSendWithResponse(ctx, oapiCCIP.CCIPSendRequest{
