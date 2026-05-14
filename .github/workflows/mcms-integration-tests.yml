@@ -18,6 +18,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: integration-tests/go.mod
+          cache-dependency-path: integration-tests/go.sum
       - name: Run Go tests
         run: |
           cd integration-tests/mcms
@@ -33,6 +34,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: integration-tests/go.mod
+          cache-dependency-path: integration-tests/go.sum
       - name: Run Go tests
         run: |
           cd integration-tests/mcms
@@ -48,6 +50,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: integration-tests/go.mod
+          cache-dependency-path: integration-tests/go.sum
       - name: Run Go tests
         run: |
           cd integration-tests/mcms
@@ -63,6 +66,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: integration-tests/go.mod
+          cache-dependency-path: integration-tests/go.sum
       - name: Run Go tests
         run: |
           cd integration-tests/mcms

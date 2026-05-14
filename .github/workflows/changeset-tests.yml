@@ -18,6 +18,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Run Go tests
         run: |
           cd deployment/changesets
@@ -32,6 +33,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Run Go tests
         run: |
           cd deployment/changesets
@@ -46,6 +48,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Run Go tests
         run: |
           cd deployment/changesets
