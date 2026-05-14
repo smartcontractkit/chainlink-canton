@@ -22,7 +22,7 @@ type ContractConfig struct{}
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore *store.ActiveContractStore
+	activeContractStore store.ActiveContractStoreInterface
 
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
@@ -32,7 +32,7 @@ var _ oapiCCV.ServerInterface = &Server{}
 func NewServer(
 	_ context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
+	activeContractStore store.ActiveContractStoreInterface,
 	config config.CCVAPIConfig,
 ) (*Server, error) {
 	s := &Server{

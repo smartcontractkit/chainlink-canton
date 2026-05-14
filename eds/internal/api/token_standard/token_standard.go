@@ -37,7 +37,7 @@ type TokenConfig struct {
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore *store.ActiveContractStore
+	activeContractStore store.ActiveContractStoreInterface
 
 	admin  types.PARTY
 	tokens map[types.TEXT]TokenConfig
@@ -51,7 +51,7 @@ var (
 func NewServer(
 	_ context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
+	activeContractStore store.ActiveContractStoreInterface,
 	cfg config.TokenStandardAPIConfig,
 ) (*Server, error) {
 	s := &Server{

@@ -40,8 +40,8 @@ type ContractConfig struct {
 
 type Server struct {
 	logger                 zerolog.Logger
-	activeContractStore    *store.ActiveContractStore
-	instrumentHoldingStore *store.InstrumentHoldingStore
+	activeContractStore    store.ActiveContractStoreInterface
+	instrumentHoldingStore store.InstrumentHoldingStoreInterface
 
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
@@ -51,8 +51,8 @@ var _ oapiTokenPool.ServerInterface = &Server{}
 func NewServer(
 	ctx context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
-	instrumentHoldingStore *store.InstrumentHoldingStore,
+	activeContractStore store.ActiveContractStoreInterface,
+	instrumentHoldingStore store.InstrumentHoldingStoreInterface,
 	cfg config.TokenPoolAPIConfig,
 ) (*Server, error) {
 	s := &Server{

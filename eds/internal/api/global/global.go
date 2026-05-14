@@ -20,7 +20,7 @@ import (
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore *store.ActiveContractStore
+	activeContractStore store.ActiveContractStoreInterface
 	addressFilters      []InstanceAddressFilter
 
 	maxBatchLimit int
@@ -43,7 +43,7 @@ type InstanceAddressFilter interface {
 func NewServer(
 	_ context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
+	activeContractStore store.ActiveContractStoreInterface,
 	config config.GlobalAPIConfig,
 	addressFilters ...InstanceAddressFilter,
 ) (*Server, error) {
@@ -71,6 +71,12 @@ func (s Server) PostGetExplicitDisclosureBatch(c *gin.Context) {
 
 	if len(req.Addresses) > s.maxBatchLimit {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "max batch limit exceeded"})
+		return
+	}
+
+	// Return early if no addresses have been requested
+	if len(req.Addresses) == 0 {
+		c.JSON(http.StatusOK, oapiGlobal.GetExplicitDisclosureBatchResponse{Disclosures: []oapiCommon.DisclosedContract{}})
 		return
 	}
 
