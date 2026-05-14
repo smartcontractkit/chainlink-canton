@@ -6,8 +6,10 @@ import (
 	"math/big"
 	"strings"
 
-	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
+	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/extensionapi"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
+	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/api"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -26,8 +28,8 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "d5e0b37cf4d8e07a8bffef5322ebfa21e8e5d5fb07682c291a9c1c8d0327ee63"
-	SDKVersion  = "3.4.10"
+	PackageID   = "fcad057659bb6059b07266cb7f77743650633e7f3c8af8e7de229e0be6d1304f"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -56,9 +58,9 @@ func argsToMap(args any) map[string]any {
 
 // ApplyAllowedCCVUpdates is a Record type
 type ApplyAllowedCCVUpdates struct {
-	CcvsToRemove        []mcms.RawInstanceAddress `json:"ccvsToRemove"`
-	CcvsToAdd           []mcms.RawInstanceAddress `json:"ccvsToAdd"`
-	CcvAllowlistEnabled types.BOOL                `json:"ccvAllowlistEnabled"`
+	CcvsToRemove        []chainlinkapi.RawInstanceAddress `json:"ccvsToRemove"`
+	CcvsToAdd           []chainlinkapi.RawInstanceAddress `json:"ccvsToAdd"`
+	CcvAllowlistEnabled types.BOOL                        `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts ApplyAllowedCCVUpdates to a map for DAML arguments
@@ -110,9 +112,9 @@ func (t *ApplyAllowedCCVUpdates) UnmarshalHex(data string) error {
 
 // ApplyAllowedCCVUpdatesParams is a Record type
 type ApplyAllowedCCVUpdatesParams struct {
-	CcvsToRemove        []mcms.RawInstanceAddress `json:"ccvsToRemove"`
-	CcvsToAdd           []mcms.RawInstanceAddress `json:"ccvsToAdd"`
-	CcvAllowlistEnabled types.BOOL                `json:"ccvAllowlistEnabled"`
+	CcvsToRemove        []chainlinkapi.RawInstanceAddress `json:"ccvsToRemove"`
+	CcvsToAdd           []chainlinkapi.RawInstanceAddress `json:"ccvsToAdd"`
+	CcvAllowlistEnabled types.BOOL                        `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts ApplyAllowedCCVUpdatesParams to a map for DAML arguments
@@ -331,9 +333,9 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 
 // DynamicConfig is a Record type
 type DynamicConfig struct {
-	FeeAggregator         *types.PARTY          `json:"feeAggregator" hex:"optional"`
-	AllowedFinalityConfig common.FinalityConfig `json:"allowedFinalityConfig"`
-	CcvAllowlistEnabled   types.BOOL            `json:"ccvAllowlistEnabled"`
+	FeeAggregator         *types.PARTY        `json:"feeAggregator" hex:"optional"`
+	AllowedFinalityConfig core.FinalityConfig `json:"allowedFinalityConfig"`
+	CcvAllowlistEnabled   types.BOOL          `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts DynamicConfig to a map for DAML arguments
@@ -387,7 +389,7 @@ type Executor struct {
 	Owner              types.PARTY                         `json:"owner"`
 	MaxCCVsPerMsg      types.INT64                         `json:"maxCCVsPerMsg"`
 	DynamicConfig      DynamicConfig                       `json:"dynamicConfig"`
-	AllowedCCVs        []mcms.RawInstanceAddress           `json:"allowedCCVs"`
+	AllowedCCVs        []chainlinkapi.RawInstanceAddress   `json:"allowedCCVs"`
 	RemoteChainConfigs map[types.NUMERIC]RemoteChainConfig `json:"remoteChainConfigs"`
 }
 
@@ -736,7 +738,7 @@ func (t Executor) ApplyAllowedCCVUpdatesWithPackageID(contractID string, package
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this Executor contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t Executor) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t Executor) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "MCMSReceiver"),
 		ContractID: contractID,
@@ -746,7 +748,7 @@ func (t Executor) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiv
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t Executor) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t Executor) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "MCMSReceiver"),
 		ContractID: contractID,
@@ -757,7 +759,7 @@ func (t Executor) MCMSReceiverEntrypointWithPackageID(contractID string, package
 
 // ExecutorCalculateFee exercises the Executor_CalculateFee choice on this Executor contract via the IIExecutor interface
 // This method uses the package name in the template ID
-func (t Executor) ExecutorCalculateFee(contractID string, args common.ExecutorCalculateFee) *model.ExerciseCommand {
+func (t Executor) ExecutorCalculateFee(contractID string, args extensionapi.ExecutorCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "IExecutor"),
 		ContractID: contractID,
@@ -767,7 +769,7 @@ func (t Executor) ExecutorCalculateFee(contractID string, args common.ExecutorCa
 }
 
 // ExecutorCalculateFeeWithPackageID exercises the Executor_CalculateFee choice using the provided package ID instead of package name
-func (t Executor) ExecutorCalculateFeeWithPackageID(contractID string, packageID string, args common.ExecutorCalculateFee) *model.ExerciseCommand {
+func (t Executor) ExecutorCalculateFeeWithPackageID(contractID string, packageID string, args extensionapi.ExecutorCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "IExecutor"),
 		ContractID: contractID,
@@ -778,7 +780,7 @@ func (t Executor) ExecutorCalculateFeeWithPackageID(contractID string, packageID
 
 // ExecutorGetFee exercises the Executor_GetFee choice on this Executor contract via the IIExecutor interface
 // This method uses the package name in the template ID
-func (t Executor) ExecutorGetFee(contractID string, args common.ExecutorGetFee) *model.ExerciseCommand {
+func (t Executor) ExecutorGetFee(contractID string, args extensionapi.ExecutorGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "IExecutor"),
 		ContractID: contractID,
@@ -788,7 +790,7 @@ func (t Executor) ExecutorGetFee(contractID string, args common.ExecutorGetFee) 
 }
 
 // ExecutorGetFeeWithPackageID exercises the Executor_GetFee choice using the provided package ID instead of package name
-func (t Executor) ExecutorGetFeeWithPackageID(contractID string, packageID string, args common.ExecutorGetFee) *model.ExerciseCommand {
+func (t Executor) ExecutorGetFeeWithPackageID(contractID string, packageID string, args extensionapi.ExecutorGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "IExecutor"),
 		ContractID: contractID,
@@ -799,9 +801,9 @@ func (t Executor) ExecutorGetFeeWithPackageID(contractID string, packageID strin
 
 // Verify interface implementations for Executor
 
-var _ mcms.IMCMSReceiver = (*Executor)(nil)
+var _ api.IMCMSReceiver = (*Executor)(nil)
 
-var _ common.IIExecutor = (*Executor)(nil)
+var _ extensionapi.IIExecutor = (*Executor)(nil)
 
 // GetAllowedCCVs is a Record type
 type GetAllowedCCVs struct {
@@ -1017,9 +1019,9 @@ func (t *GetDynamicConfigMCMSParams) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
-	DestChainSelector types.NUMERIC             `json:"destChainSelector"`
-	RequiredCCVs      []mcms.RawInstanceAddress `json:"requiredCCVs"`
-	Caller            types.PARTY               `json:"caller"`
+	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
+	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
+	Caller            types.PARTY                       `json:"caller"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -1066,8 +1068,8 @@ func (t *GetFee) UnmarshalHex(data string) error {
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type GetFeeMCMSParams struct {
-	DestChainSelector types.NUMERIC             `json:"destChainSelector"`
-	RequiredCCVs      []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
+	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
 }
 
 // MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.

@@ -10,7 +10,7 @@ import DA.TextMap qualified as TextMap
 
 import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.BurnMintTokenPool
 import CCIP.BurnMintTokenPoolCodecGen (
@@ -26,7 +26,7 @@ import CCIP.BurnMintTokenPoolTypes (
     SetTransferTimeoutParams(..),
     )
 import CCIP.ContextCodec (encodeChoiceContext)
-import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import qualified CCIP.Context
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1

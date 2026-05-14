@@ -122,6 +122,16 @@ var DeployPerPartyRouterFactory = contract.NewExercise(contract.ExerciseParams[f
 	EncodeMethod: encodeDeployPerPartyRouterFactory,
 })
 
+var SetOwnerToMCMS = contract.NewExercise(contract.ExerciseParams[factorybindings.SetOwnerToMCMS]{
+	Name:         "canton/ccip/factory/set_owner_to_mcms",
+	Version:      Version,
+	Description:  "Transfers CCIPFactory ownership from bootstrap owner to MCMS party",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.SetOwnerToMCMS,
+	EncodeMethod: factoryEncoder.SetOwnerToMCMS,
+})
+
 var DeployExecutor = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployExecutor]{
 	Name:         "canton/ccip/factory/deploy_executor",
 	Version:      Version,

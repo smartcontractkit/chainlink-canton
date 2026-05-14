@@ -1,0 +1,76 @@
+-- | Raw instance address type for human-readable contract identification.
+-- Format: "instanceId@partyId" - can be parsed to identify the contract and owner.
+module Chainlink.InstanceAddress where
+
+import DA.Crypto.Text (BytesHex, keccak256, toHex)
+import DA.Text qualified as Text
+
+-- | Raw instance address in format "instanceId@partyId".
+-- Human-readable form used for configuration and comparison.
+newtype RawInstanceAddress = RawInstanceAddress Text
+    deriving (Eq, Ord, Show)
+
+-- | Validate that an instanceId is non-empty and does not contain '@'.
+-- Intended for use in template ensure clauses.
+assertValidInstanceId : Text -> Bool
+assertValidInstanceId instanceId =
+    instanceId /= "" && not (Text.isInfixOf "@" instanceId)
+
+empty : RawInstanceAddress
+empty = RawInstanceAddress ""
+
+-- | Create a raw instance address from instanceId and owner.
+-- Validates that instanceId doesn't contain "@" separator.
+make : Text -> Party -> RawInstanceAddress
+make instanceId owner =
+    if Text.isInfixOf "@" instanceId
+    then error "RawInstanceAddress: instanceId cannot contain '@'"
+    else RawInstanceAddress (instanceId <> "@" <> partyToText owner)
+
+-- | Create an instance address string from instanceId and owner.
+-- Convenience wrapper around make + toText for callers that need Text.
+makeText : Text -> Party -> Text
+makeText instanceId owner =
+    let RawInstanceAddress raw = make instanceId owner
+    in raw
+
+-- | Unwrap a RawInstanceAddress to its underlying Text representation.
+toText : RawInstanceAddress -> Text
+toText (RawInstanceAddress raw) = raw
+
+-- | Asserts that a (instanceId, owner) pair matches the expected RawInstanceAddress.
+assertEqual : Text -> Text -> Party -> RawInstanceAddress -> Update ()
+assertEqual msg instanceId owner expected =
+    let computed = make instanceId owner
+    in assertMsg msg (computed == expected)
+
+-- | Extract the owner party from a raw instance address.
+-- The address format is "instanceId@partyId"; this returns the party after "@".
+ownerParty : RawInstanceAddress -> Party
+ownerParty (RawInstanceAddress raw) =
+    case Text.splitOn "@" raw of
+        [_, partyText] -> case partyFromText partyText of
+            Some p -> p
+            None -> error ("RawInstanceAddress: invalid party in address: " <> raw)
+        _ -> error ("RawInstanceAddress: malformed address: " <> raw)
+
+-- | Convert to 32-byte hashed instance address for message encoding.
+toInstanceAddress : RawInstanceAddress -> BytesHex
+toInstanceAddress (RawInstanceAddress raw) =
+    keccak256 (toHex raw)
+
+-- | Parse instanceId from instanceAddress format "instanceId@partyId".
+-- Returns the instanceId text before the @ separator.
+parseInstanceIdText : Text -> Optional Text
+parseInstanceIdText instanceAddress =
+    case Text.splitOn "@" instanceAddress of
+        [instId, _partyId] -> Some instId
+        _ -> None
+
+-- | Parse partyId from instanceAddress format "instanceId@partyId".
+-- Returns the partyId text after the @ separator.
+parsePartyIdText : Text -> Optional Text
+parsePartyIdText instanceAddress =
+    case Text.splitOn "@" instanceAddress of
+        [_instanceId, partyId] -> Some partyId
+        _ -> None

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/exp/maps"
@@ -180,8 +180,8 @@ func startEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Contai
 			fmt.Sprintf("%d/tcp", cfg.Server.Port),
 		},
 		HostConfigModifier: func(hc *container.HostConfig) {
-			hc.PortBindings = nat.PortMap{
-				nat.Port(fmt.Sprintf("%d/tcp", cfg.Server.Port)): []nat.PortBinding{
+			hc.PortBindings = network.PortMap{
+				network.MustParsePort(fmt.Sprintf("%d/tcp", cfg.Server.Port)): []network.PortBinding{
 					{HostPort: ""}, // Docker assigns a random free host port.
 				},
 			}
@@ -274,7 +274,7 @@ func (l *launcher) Launch(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get EDS container host: %w", err)
 	}
-	edsMappedPort, err := edsContainer.MappedPort(ctx, nat.Port(fmt.Sprintf("%d/tcp", edsCfg.Server.Port)))
+	edsMappedPort, err := edsContainer.MappedPort(ctx, fmt.Sprintf("%d/tcp", edsCfg.Server.Port))
 	if err != nil {
 		pm, _ := edsContainer.Ports(ctx) // Add all existing ports to error
 		return nil, fmt.Errorf("failed to get EDS container mapped port (ports: %v): %w", maps.Keys(pm), err)

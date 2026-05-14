@@ -15,7 +15,7 @@ import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.OnRamp qualified as OnRamp
 import CCIP.Tickets qualified as Tickets
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 import Splice.Api.Token.HoldingV1
@@ -40,8 +40,8 @@ finalityConfig n =
         blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex)
 
-testDestChainConfig : DestChainConfig
-testDestChainConfig = DestChainConfig with
+testDestChainConfig : FeeQuoterDestChainConfig
+testDestChainConfig = FeeQuoterDestChainConfig with
     isEnabled = True
     maxDataBytes = 100000
     maxPerMsgGasLimit = 1000000
@@ -249,8 +249,8 @@ setup = script do
         exerciseCmd fq GetFeeTokens with caller = owner
     Set.fromList resultFeeTokens === Set.fromList [instrumentIdLINK, instrumentIdUSDC]
 
-    -- test ApplyDestChainConfigUpdates
-    let destChainConfig1 = DestChainConfig with
+    -- test ApplyFeeQuoterDestChainConfigUpdates
+    let destChainConfig1 = FeeQuoterDestChainConfig with
             isEnabled = True
             maxDataBytes = 5000
             destGasOverhead = 30000
@@ -260,7 +260,7 @@ setup = script do
             maxPerMsgGasLimit = 2000000
             defaultTokenFeeUSD = usdToCents 0.50
             defaultTokenDestGasOverhead = 0
-    let destChainConfig2 = DestChainConfig with
+    let destChainConfig2 = FeeQuoterDestChainConfig with
             isEnabled = True
             maxDataBytes = 8000
             destGasOverhead = 40000
@@ -271,12 +271,12 @@ setup = script do
             defaultTokenFeeUSD = usdToCents 0.25
             defaultTokenDestGasOverhead = 0
     fq <- submit owner do
-        exerciseCmd fq ApplyDestChainConfigUpdates with
+        exerciseCmd fq ApplyFeeQuoterDestChainConfigUpdates with
             destChainConfigArgs = [
-                    (DestChainConfigArgs with
+                    (FeeQuoterDestChainConfigArgs with
                         destChainSelector = destChainSelector1
                         destChainConfig = destChainConfig1),
-                    (DestChainConfigArgs with
+                    (FeeQuoterDestChainConfigArgs with
                         destChainSelector = destChainSelector2
                         destChainConfig = destChainConfig2)
                 ]
@@ -296,18 +296,18 @@ setup = script do
 
     -- try setting an invalid config (destChainSelector = 0.0), should fail
     submitMustFail owner do
-        exerciseCmd fq ApplyDestChainConfigUpdates with
+        exerciseCmd fq ApplyFeeQuoterDestChainConfigUpdates with
             destChainConfigArgs = [
-                    (DestChainConfigArgs with
+                    (FeeQuoterDestChainConfigArgs with
                         destChainSelector = 0.0
                         destChainConfig = destChainConfig1)
                 ]
 
     -- try setting an invalid config (destChainSelector = -123.0), should fail
     submitMustFail owner do
-        exerciseCmd fq ApplyDestChainConfigUpdates with
+        exerciseCmd fq ApplyFeeQuoterDestChainConfigUpdates with
             destChainConfigArgs = [
-                    (DestChainConfigArgs with
+                    (FeeQuoterDestChainConfigArgs with
                         destChainSelector = -123.0
                         destChainConfig = destChainConfig1)
                 ]
@@ -397,9 +397,9 @@ setup = script do
     -- try setting an invalid config (defaultTxGasLimit = 0), should fail
     let invalidDestChainConfig = destChainConfig1 with defaultTxGasLimit = 0
     submitMustFail owner do
-        exerciseCmd fq ApplyDestChainConfigUpdates with
+        exerciseCmd fq ApplyFeeQuoterDestChainConfigUpdates with
             destChainConfigArgs = [
-                    (DestChainConfigArgs with
+                    (FeeQuoterDestChainConfigArgs with
                         destChainSelector = destChainSelector1
                         destChainConfig = invalidDestChainConfig)
                 ]
@@ -456,7 +456,8 @@ testFeeQuoter_ApplyPriceUpdatersUpdate = script do
                 gasPriceUpdates = []
             caller = priceUpdater
 
-    -- add owner as price updater
+    -- ApplyPriceUpdatersUpdate cannot add owner to priceUpdaters.
+    -- owner still updates via UpdatePrices when caller == owner.
     fq <- submit owner do
         exerciseCmd fq ApplyPriceUpdatersUpdate with
             addedPriceUpdaters = [owner]
@@ -1306,7 +1307,7 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
             poolInstanceId = "pool-receipt-mixed"
             poolOwner = poolOwner
             instrumentId = feeToken
-            amount = 1.0
+            amount = fromSome (MessageCodecV1.encodeUint256 1.0)
             destTokenAddress = "05"
             extraData = ""
 

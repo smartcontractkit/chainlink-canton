@@ -25,7 +25,7 @@ import CCIP.OffRamp qualified as OffRamp
 import CCIP.OffRampTypes qualified as OffRamp
 import CCIP.PerPartyRouter qualified as PerPartyRouter
 import CCIP.PerPartyRouterTypes qualified as PerPartyRouter
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
@@ -348,7 +348,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             receiver = MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
             tokenTransfer = Some (MessageCodecV1.TokenTransferV1 with
-                amount = 1000000.0
+                amount = fromSome (MessageCodecV1.encodeUint256 1000000.0)
                 sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000005"
                 sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
                 destTokenAddress = MessageCodecV1.encodeInstrumentId feeToken
@@ -482,7 +482,7 @@ testTokenAdminRegistryFinalizeExecuteRequiresOwner = script do
             receiver = MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
             tokenTransfer = Some (MessageCodecV1.TokenTransferV1 with
-                amount = 1000000.0
+                amount = fromSome (MessageCodecV1.encodeUint256 1000000.0)
                 sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000005"
                 sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
                 destTokenAddress = MessageCodecV1.encodeInstrumentId feeToken

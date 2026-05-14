@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 )
 
 // TODO these shouldn't be needed
@@ -31,8 +29,12 @@ func ReplacePackageIdWithNameInTemplateID(templateID, packageName string) string
 	return packageName + ":" + parts[1] + ":" + parts[2]
 }
 
+type templateBinding interface {
+	GetTemplateID() string
+}
+
 // TemplateIDFromBinding is a convenience function to get a TemplateID from a generated binding.
-func TemplateIDFromBinding(template common.Template) TemplateID {
+func TemplateIDFromBinding(template templateBinding) TemplateID {
 	templateId, err := TemplateIDFromString(template.GetTemplateID())
 	if err != nil {
 		panic(err)

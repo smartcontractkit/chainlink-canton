@@ -4,8 +4,8 @@ import DA.Map qualified as Map
 import DA.Crypto.Text (byteCount)
 import MCMS.MCMSReceiver
 import MCMS.Codec (decodeInt64At)
-import MCMS.RawInstanceAddress (assertValidInstanceId)
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (assertValidInstanceId)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 -- ===========================================================================
 -- COUNTER CONTRACT (Implements MCMSReceiver)

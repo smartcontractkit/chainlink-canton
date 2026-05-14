@@ -26,7 +26,7 @@ import qualified CCIP.OffRamp
 import qualified CCIP.OffRampTypes as CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
 import qualified CCIP.PerPartyRouterTypes as CCIP.PerPartyRouter
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
@@ -235,7 +235,7 @@ testCCIPSend = script do
             instanceId = "test-feequoter"
             owner = ccipOwner
             feeTokens = Set.fromList [testFeeTokenId]
-            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
                 maxPerMsgGasLimit = 1000000
@@ -691,7 +691,7 @@ testPrepareSendExtraArgs = script do
             instanceId = "test-feequoter"
             owner = ccipOwner
             feeTokens = Set.fromList [feeTokenId]
-            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
                 maxPerMsgGasLimit = 1000000
@@ -941,7 +941,7 @@ testPrepareSendRejectsOversizedPayload = script do
             instanceId = feeQuoterInstanceId
             owner = ccipOwner
             feeTokens = Set.fromList [testFeeTokenId]
-            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
                 maxDataBytes = 4
                 maxPerMsgGasLimit = 1000000
@@ -1536,7 +1536,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             instanceId = feeQuoterInstanceId
             owner = ccipOwner
             feeTokens = Set.fromList [testFeeTokenId]
-            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
                 maxPerMsgGasLimit = 1000000

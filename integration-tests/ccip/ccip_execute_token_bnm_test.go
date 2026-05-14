@@ -40,6 +40,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/link"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
@@ -165,7 +166,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	}
 	linkInstrumentId := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(partyCCIP),
-		Id:    "ChainLink",
+		Id:    "ChainLink", // TODO: we don't seem to have a standard name for link token instrumentID, do we?
 	}
 	hashedLinkInstrumentId := contracts.EncodeInstrumentID(linkInstrumentId)
 
@@ -577,7 +578,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -661,12 +662,10 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	ccipReceiverCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
-	// Capture receiver's balance before execute
-	receiverHoldingsBefore, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
+	// Capture receiver's balance before execute (LINK for this receiver).
+	receiverBalanceRatBefore, err := testhelpers.GetHoldingsBalance(t.Context(), receiverParticipant, &linkInstrumentId, testhelpers.WithHoldingOwner(partyReceiver))
 	require.NoError(t, err)
-	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
+	receiverBalanceBefore, _ := new(big.Float).SetRat(receiverBalanceRatBefore).Float64()
 
 	tokenPoolAddressEDS, err := edsTesthelpers.GetTokenPoolForToken(t.Context(), ccipAPIClient, hashedLinkInstrumentId)
 	require.NoError(t, err)
@@ -677,7 +676,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	tokenPoolDisclosure, err := edsTesthelpers.GetTokenPoolExecuteDisclosure(t.Context(), tokenPoolAPIClient, encodedMessageHex, tokenPoolAddressEDS.InstanceAddress())
 	require.NoError(t, err)
 
-	executeArgs := ccipreceiver.Execute2{
+	executeArgs := ccipreceiver.Execute{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
@@ -720,11 +719,9 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	t.Log("CCIPReceiver.Execute completed")
 
 	// Verify receiver's balance increased by the expected transfer amount
-	receiverHoldingsAfter, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
+	receiverBalanceRatAfter, err := testhelpers.GetHoldingsBalance(t.Context(), receiverParticipant, &linkInstrumentId, testhelpers.WithHoldingOwner(partyReceiver))
 	require.NoError(t, err)
-	receiverBalanceAfter := getHoldingsBalance(receiverHoldingsAfter)
+	receiverBalanceAfter, _ := new(big.Float).SetRat(receiverBalanceRatAfter).Float64()
 
 	actualTransferAmount := receiverBalanceAfter - receiverBalanceBefore
 	require.InDelta(t, tc.expectedTransferAmount, actualTransferAmount, 0.01, "Receiver balance should increase by transfer amount")

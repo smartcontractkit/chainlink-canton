@@ -1,0 +1,105 @@
+-- | Types for BurnMintTokenPool, extracted to avoid circular dependencies
+module CCIP.BurnMintTokenPoolTypes where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified CCIP.FinalityConfig
+import Chainlink.InstanceAddress (RawInstanceAddress)
+
+data ChainUpdate = ChainUpdate
+    with
+        remoteChainSelector : Numeric 0                                 -- Chain selector for this config update
+        remotePools : [BytesHex]                                        -- Allowed remote pool addresses for this chain
+        remoteTokenAddress : BytesHex                                   -- The token address on the remote chain
+        inboundCCVs : [RawInstanceAddress]                              -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]                             -- Required CCVs for outgoing transfers
+        finalityConfig : CCIP.FinalityConfig.FinalityConfig             -- Allowed finality policy, "WaitForFinality" means finalized-only
+        inboundRateLimiter : RawInstanceAddress                         -- Required rate limiter for incoming transfers
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
+        outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
+    deriving (Eq, Show)
+
+data RemoteChainConfig = RemoteChainConfig
+    with 
+        remotePools : [BytesHex]                                        -- Allowed remote pool addresses for this chain
+        remoteTokenAddress : BytesHex                                   -- The token address on the remote chain
+        inboundCCVs : [RawInstanceAddress]                              -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]                             -- Required CCVs for outgoing transfers
+        finalityConfig : CCIP.FinalityConfig.FinalityConfig             -- Allowed finality policy, "WaitForFinality" means finalized-only
+        inboundRateLimiter : RawInstanceAddress                         -- Required rate limiter for incoming transfers
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
+        outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
+    deriving (Eq, Show)
+
+data TokenTransferFeeConfigArgs = TokenTransferFeeConfigArgs
+    with
+        destChainSelector : Numeric 0 -- Chain selector for this config update
+        isEnabled : Bool              -- Whether this config is enabled
+        destGasOverhead : Int         -- Gas charged to execute the token transfer on the destination chain.
+        destBytesOverhead : Int       -- Data availability bytes.
+        feeUSDCents : Numeric 0       -- Fee to charge for token transfers, multiples of 0.01 USD.
+        feeBps : Numeric 0            -- Proportional token fee in bps, applied by the pool during LockOrBurn.
+    deriving (Eq, Show)
+
+data TokenTransferFeeConfig = TokenTransferFeeConfig
+    with
+        isEnabled : Bool        -- Whether this config is enabled
+        destGasOverhead : Int   -- Gas charged to execute the token transfer on the destination chain.
+        destBytesOverhead : Int -- Data availability bytes.
+        feeUSDCents : Numeric 0 -- Fee to charge for token transfers, multiples of 0.01 USD.
+        feeBps : Numeric 0      -- Proportional token fee in bps, applied by the pool during LockOrBurn.
+    deriving (Eq, Show)
+
+data RateLimitConfigArgs = RateLimitConfigArgs
+    with
+        remoteChainSelector : Numeric 0
+        inboundRateLimiter : RawInstanceAddress
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress
+        outboundRateLimiter : RawInstanceAddress
+    deriving (Eq, Show)
+
+-- | Transfer timeout configuration for pending TransferInstructions.
+-- Some tokens (e.g., Amulet) have expiry constraints and reject transfers with
+-- executeBefore times beyond the token's expiry. Use RelativeHours for such tokens.
+-- Tokens without expiry (e.g., TestToken) can use Indefinite.
+data TransferTimeout
+    = Indefinite          -- Use maxTime (year 9999) - for tokens without expiry
+    | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
+    deriving (Eq, Show)
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- ===========================================================================
+
+-- | Params for SetDynamicConfig choice
+data SetDynamicConfigParams = SetDynamicConfigParams
+    with
+        rateLimitAdmin : Optional Party
+    deriving (Eq, Show)
+
+-- | Params for ApplyChainUpdates choice
+data ApplyChainUpdatesParams = ApplyChainUpdatesParams
+    with
+        remoteChainSelectorsToRemove : [Numeric 0]
+        chainsToAdd : [ChainUpdate]
+    deriving (Eq, Show)
+
+-- | Params for ApplyTokenTransferFeeConfigUpdates choice
+data ApplyTokenTransferFeeConfigUpdatesParams = ApplyTokenTransferFeeConfigUpdatesParams
+    with
+        tokenTransferFeeConfigArgs : [TokenTransferFeeConfigArgs]
+        disableTokenTransferFeeConfigArgs : [Numeric 0]
+    deriving (Eq, Show)
+
+-- | Params for SetRateLimitConfig choice
+data SetRateLimitConfigParams = SetRateLimitConfigParams
+    with
+        rateLimitConfigArgs : [RateLimitConfigArgs]
+        caller : Party
+    deriving (Eq, Show)
+
+-- | Params for SetTransferTimeout choice
+data SetTransferTimeoutParams = SetTransferTimeoutParams
+    with
+        transferTimeout : TransferTimeout
+    deriving (Eq, Show)

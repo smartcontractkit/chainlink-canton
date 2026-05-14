@@ -1,0 +1,256 @@
+module Uint256Test where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Crypto.Text (byteCount)
+import DA.Optional
+
+import CCIP.Uint256 qualified as Uint256
+
+maxUint256Hex : Text
+maxUint256Hex = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
+maxNumeric0Hex : Text
+maxNumeric0Hex = "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
+
+oneAboveMaxNumeric0Text : Text
+oneAboveMaxNumeric0Text = "100000000000000000000000000000000000000"
+
+oneAboveMaxNumeric0Hex : Text
+oneAboveMaxNumeric0Hex = "000000000000000000000000000000004b3b4ca85a86c47a098a224000000000"
+
+-- Unit tests for exact uint256 decimal text <-> 32-byte wire conversion.
+testUint256_DecimalTextToBytes_Vectors : Script ()
+testUint256_DecimalTextToBytes_Vectors = script do
+    Uint256.decimalTextToUint256Bytes "0"
+        === Some "0000000000000000000000000000000000000000000000000000000000000000"
+    Uint256.decimalTextToUint256Bytes "000000"
+        === Some "0000000000000000000000000000000000000000000000000000000000000000"
+    Uint256.decimalTextToUint256Bytes "1"
+        === Some "0000000000000000000000000000000000000000000000000000000000000001"
+    Uint256.decimalTextToUint256Bytes "15"
+        === Some "000000000000000000000000000000000000000000000000000000000000000f"
+    Uint256.decimalTextToUint256Bytes "16"
+        === Some "0000000000000000000000000000000000000000000000000000000000000010"
+    Uint256.decimalTextToUint256Bytes "255"
+        === Some "00000000000000000000000000000000000000000000000000000000000000ff"
+    Uint256.decimalTextToUint256Bytes "256"
+        === Some "0000000000000000000000000000000000000000000000000000000000000100"
+    Uint256.decimalTextToUint256Bytes "1000000000000000000"
+        === Some "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+    Uint256.decimalTextToUint256Bytes Uint256.maxNumeric0DecimalText
+        === Some maxNumeric0Hex
+    Uint256.decimalTextToUint256Bytes oneAboveMaxNumeric0Text
+        === Some oneAboveMaxNumeric0Hex
+    Uint256.decimalTextToUint256Bytes Uint256.maxUint256DecimalText
+        === Some maxUint256Hex
+
+    assertMsg "all encoded uint256 vectors must be 32 bytes"
+        (all (\hex -> byteCount hex == 32)
+            [ fromSome (Uint256.decimalTextToUint256Bytes "0")
+            , fromSome (Uint256.decimalTextToUint256Bytes "1")
+            , fromSome (Uint256.decimalTextToUint256Bytes "1000000000000000000")
+            , fromSome (Uint256.decimalTextToUint256Bytes Uint256.maxUint256DecimalText)
+            ])
+
+    debug "testUint256_DecimalTextToBytes_Vectors: PASSED"
+
+-- Unit tests for 32-byte wire uint256 -> exact decimal text conversion.
+testUint256_BytesToDecimalText_Vectors : Script ()
+testUint256_BytesToDecimalText_Vectors = script do
+    Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000000"
+        === Some "0"
+    Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000001"
+        === Some "1"
+    Uint256.uint256BytesToDecimalText "000000000000000000000000000000000000000000000000000000000000000f"
+        === Some "15"
+    Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000010"
+        === Some "16"
+    Uint256.uint256BytesToDecimalText "00000000000000000000000000000000000000000000000000000000000000ff"
+        === Some "255"
+    Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000100"
+        === Some "256"
+    Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+        === Some "1000000000000000000"
+    Uint256.uint256BytesToDecimalText maxNumeric0Hex
+        === Some Uint256.maxNumeric0DecimalText
+    Uint256.uint256BytesToDecimalText oneAboveMaxNumeric0Hex
+        === Some oneAboveMaxNumeric0Text
+    Uint256.uint256BytesToDecimalText maxUint256Hex
+        === Some Uint256.maxUint256DecimalText
+    Uint256.uint256BytesToDecimalText "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+        === Some Uint256.maxUint256DecimalText
+
+    Uint256.isUint256Bytes maxUint256Hex === True
+    Uint256.isUint256Bytes "00" === False
+    Uint256.isUint256Bytes (maxUint256Hex <> "00") === False
+    Uint256.uint256BytesToDecimalText "00" === None
+    Uint256.uint256BytesToDecimalText (maxUint256Hex <> "00") === None
+
+    debug "testUint256_BytesToDecimalText_Vectors: PASSED"
+
+-- Input validation should reject non-integer decimal text and uint256 overflow.
+testUint256_DecimalTextValidation : Script ()
+testUint256_DecimalTextValidation = script do
+    Uint256.decimalTextToUint256Bytes "" === None
+    Uint256.decimalTextToUint256Bytes " " === None
+    Uint256.decimalTextToUint256Bytes "-1" === None
+    Uint256.decimalTextToUint256Bytes "+1" === None
+    Uint256.decimalTextToUint256Bytes "1.0" === None
+    Uint256.decimalTextToUint256Bytes "1_000" === None
+    Uint256.decimalTextToUint256Bytes "abc" === None
+
+    Uint256.decimalTextToUint256Bytes Uint256.maxUint256DecimalText
+        === Some maxUint256Hex
+    Uint256.decimalTextToUint256Bytes (Uint256.maxUint256DecimalText <> "0")
+        === None
+    Uint256.decimalTextToUint256Bytes "115792089237316195423570985008687907853269984665640564039457584007913129639936"
+        === None
+
+    Uint256.decimalTextFitsNumeric0 "0" === True
+    Uint256.decimalTextFitsNumeric0 "000" === True
+    Uint256.decimalTextFitsNumeric0 Uint256.maxNumeric0DecimalText === True
+    Uint256.decimalTextFitsNumeric0 oneAboveMaxNumeric0Text === False
+    Uint256.decimalTextFitsNumeric0 Uint256.maxUint256DecimalText === False
+    Uint256.decimalTextFitsNumeric0 "-1" === False
+    Uint256.decimalTextFitsNumeric0 "1.0" === False
+
+    debug "testUint256_DecimalTextValidation: PASSED"
+
+-- Numeric 0 helper covers the Canton-originating outbound path.
+testUint256_Numeric0ToBytes : Script ()
+testUint256_Numeric0ToBytes = script do
+    Uint256.numeric0ToUint256Bytes 0.0
+        === Some "0000000000000000000000000000000000000000000000000000000000000000"
+    Uint256.numeric0ToUint256Bytes 1.0
+        === Some "0000000000000000000000000000000000000000000000000000000000000001"
+    Uint256.numeric0ToUint256Bytes 1000000000000000000.0
+        === Some "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+    Uint256.numeric0ToUint256Bytes 99999999999999999999999999999999999999.0
+        === Some maxNumeric0Hex
+    Uint256.numeric0ToUint256Bytes (-1.0) === None
+
+    debug "testUint256_Numeric0ToBytes: PASSED"
+
+-- Equal-decimal conversion preserves amount exactly and rejects values outside Numeric 0.
+testUint256_LocalConversion_EqualDecimals : Script ()
+testUint256_LocalConversion_EqualDecimals = script do
+    let zero = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "zero" "0" 18 18)
+    zero.localAmount === 0.0
+    zero.truncatedRemainder === "0"
+    zero.wasTruncated === False
+
+    let normal = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "normal" "123456789" 6 6)
+    normal.localAmount === 123456789.0
+    normal.truncatedRemainder === "0"
+    normal.wasTruncated === False
+
+    let maxNumeric = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "max" Uint256.maxNumeric0DecimalText 18 18)
+    maxNumeric.localAmount === 99999999999999999999999999999999999999.0
+    maxNumeric.wasTruncated === False
+
+    Uint256.calculateLocalAmountFromDecimalTextChecked "one-above" oneAboveMaxNumeric0Text 18 18
+        === None
+    Uint256.calculateLocalAmountFromDecimalTextChecked "above-uint256" (Uint256.maxUint256DecimalText <> "0") 80 0
+        === None
+
+    debug "testUint256_LocalConversion_EqualDecimals: PASSED"
+
+-- Downscaling floors toward zero before parsing to Numeric 0, matching integer token units.
+testUint256_LocalConversion_Downscale : Script ()
+testUint256_LocalConversion_Downscale = script do
+    let exact = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "exact" "1000000000000000000" 18 6)
+    exact.localAmount === 1000000.0
+    exact.truncatedRemainder === "0"
+    exact.wasTruncated === False
+
+    let fractional = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "fractional" "123456789123456789" 18 6)
+    fractional.localAmount === 123456.0
+    fractional.truncatedRemainder === "789123456789"
+    fractional.wasTruncated === True
+
+    let belowUnit = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "below-unit" "999999999999" 18 6)
+    belowUnit.localAmount === 0.0
+    belowUnit.truncatedRemainder === "999999999999"
+    belowUnit.wasTruncated === True
+
+    let maxDecimalGapBelowUnit = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "max-gap-below-unit" "1" 255 0)
+    maxDecimalGapBelowUnit.localAmount === 0.0
+    maxDecimalGapBelowUnit.truncatedRemainder === "1"
+    maxDecimalGapBelowUnit.wasTruncated === True
+
+    let exactUnit = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "exact-unit" "1000000000000" 18 6)
+    exactUnit.localAmount === 1.0
+    exactUnit.truncatedRemainder === "0"
+    exactUnit.wasTruncated === False
+
+    let leadingZeros = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "leading-zeros" "0001234500" 4 2)
+    leadingZeros.localAmount === 12345.0
+    leadingZeros.truncatedRemainder === "0"
+    leadingZeros.wasTruncated === False
+
+    let largeSourceFitsAfterDownscale = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "large-source" oneAboveMaxNumeric0Text 20 18)
+    largeSourceFitsAfterDownscale.localAmount === 1000000000000000000000000000000000000.0
+    largeSourceFitsAfterDownscale.truncatedRemainder === "0"
+    largeSourceFitsAfterDownscale.wasTruncated === False
+
+    let maxUint256ToOne = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256" Uint256.maxUint256DecimalText 77 0)
+    maxUint256ToOne.localAmount === 1.0
+    maxUint256ToOne.truncatedRemainder === "15792089237316195423570985008687907853269984665640564039457584007913129639935"
+    maxUint256ToOne.wasTruncated === True
+
+    let maxUint256ToZero = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256-zero" Uint256.maxUint256DecimalText 78 0)
+    maxUint256ToZero.localAmount === 0.0
+    maxUint256ToZero.truncatedRemainder === Uint256.maxUint256DecimalText
+    maxUint256ToZero.wasTruncated === True
+
+    debug "testUint256_LocalConversion_Downscale: PASSED"
+
+-- Upscaling appends zeros and rejects results that overflow Canton's Numeric 0 range.
+testUint256_LocalConversion_Upscale : Script ()
+testUint256_LocalConversion_Upscale = script do
+    let sixToEighteen = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "six-to-eighteen" "123456" 6 18)
+    sixToEighteen.localAmount === 123456000000000000.0
+    sixToEighteen.truncatedRemainder === "0"
+    sixToEighteen.wasTruncated === False
+
+    let zeroToEighteen = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "zero-to-eighteen" "1" 0 18)
+    zeroToEighteen.localAmount === 1000000000000000000.0
+
+    let zeroMaxGap = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "zero-max-gap" "0" 0 255)
+    zeroMaxGap.localAmount === 0.0
+    zeroMaxGap.truncatedRemainder === "0"
+    zeroMaxGap.wasTruncated === False
+
+    let boundary = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "boundary" "99999999999999999999999999" 6 18)
+    boundary.localAmount === 99999999999999999999999999000000000000.0
+
+    Uint256.calculateLocalAmountFromDecimalTextChecked "overflow" "100000000000000000000000000" 6 18
+        === None
+    Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-negative-decimals" "1" (-1) 18
+        === None
+    Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-local-decimals" "1" 18 256
+        === None
+    Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-remote-decimals" "1" 256 18
+        === None
+
+    debug "testUint256_LocalConversion_Upscale: PASSED"
+
+-- The byte-based conversion path is the one used by inbound token pools.
+testUint256_LocalConversion_FromBytes : Script ()
+testUint256_LocalConversion_FromBytes = script do
+    let amount = fromSome (Uint256.decimalTextToUint256Bytes "123456789123456789")
+    let converted = fromSome (Uint256.calculateLocalAmountFromUint256Checked "from-bytes" amount 18 6)
+    converted.localAmount === 123456.0
+    converted.truncatedRemainder === "789123456789"
+    converted.wasTruncated === True
+
+    let large = fromSome (Uint256.decimalTextToUint256Bytes oneAboveMaxNumeric0Text)
+    let downscaled = fromSome (Uint256.calculateLocalAmountFromUint256Checked "large-downscale" large 20 18)
+    downscaled.localAmount === 1000000000000000000000000000000000000.0
+
+    Uint256.calculateLocalAmountFromUint256Checked "bad-length" "00" 18 6
+        === None
+
+    debug "testUint256_LocalConversion_FromBytes: PASSED"

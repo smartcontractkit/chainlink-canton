@@ -8,7 +8,7 @@ import CCIP.ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.Internal qualified as Internal
 import qualified CCIP.MessageCodecV1
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 
 finalityConfig n =
@@ -155,7 +155,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
                 sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000005"
                 destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
                 tokenReceiver = CCIP.MessageCodecV1.encodePartyAddress receiver
-                amount = 1.0
+                amount = fromSome (CCIP.MessageCodecV1.encodeUint256 1.0)
                 extraData = "")
             messageData = ""
 
@@ -235,7 +235,7 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
                 sourceTokenAddress = sourceTokenAddress
                 destTokenAddress = destTokenAddress
                 tokenReceiver = CCIP.MessageCodecV1.encodePartyAddress receiver
-                amount = 10.0
+                amount = fromSome (CCIP.MessageCodecV1.encodeUint256 10.0)
                 extraData = "")
             messageData = ""
 
@@ -270,7 +270,7 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
             maybeTicketReceiver = Some receiver
             maybeTokenReceiver = Some receiver
             maybeInstrumentId = Some (HoldingV1.InstrumentId with admin = ccipOwner, id = "TEST")
-            maybeAmount = Some 10.0
+            maybeAmount = Some (fromSome (CCIP.MessageCodecV1.encodeUint256 10.0))
             returnData = ""
 
     ticketCid <- case finalizeResult.tokenReceiveTicket of
@@ -309,7 +309,7 @@ testFinalizeExecuteFailsWithoutInboundPoolCCVsForTokenTicket = do
                 sourceTokenAddress = sourceTokenAddress
                 destTokenAddress = destTokenAddress
                 tokenReceiver = CCIP.MessageCodecV1.encodePartyAddress receiver
-                amount = 10.0
+                amount = fromSome (CCIP.MessageCodecV1.encodeUint256 10.0)
                 extraData = "")
             messageData = ""
 
@@ -344,5 +344,5 @@ testFinalizeExecuteFailsWithoutInboundPoolCCVsForTokenTicket = do
             maybeTicketReceiver = Some receiver
             maybeTokenReceiver = Some receiver
             maybeInstrumentId = Some instrumentId
-            maybeAmount = Some 10.0
+            maybeAmount = Some (fromSome (CCIP.MessageCodecV1.encodeUint256 10.0))
             returnData = ""

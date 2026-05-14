@@ -1,0 +1,150 @@
+module CCIP.RateLimiter where
+
+import DA.Map qualified as Map
+import DA.Time (convertRelTimeToMicroseconds, subTime)
+import DA.Crypto.Text (BytesHex, byteCount)
+
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
+import qualified CCIP.Context
+
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (assertValidInstanceId)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Codec (decodeBoolAt, decodeNumeric0At)
+
+rateLimiterKey : Text
+rateLimiterKey = "rate-limiter"
+
+lookupRateLimiterCid : ChoiceContext -> Update (ContractId RateLimiter)
+lookupRateLimiterCid ctx = CCIP.Context.getFromContextU ctx rateLimiterKey
+
+rawInstanceAddress : RateLimiter -> RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress rl = RawInstanceAddress.make rl.instanceId rl.poolOwner
+
+data RateLimitDirection
+    = RateLimitDirection_Outbound
+    | RateLimitDirection_Inbound
+    deriving (Eq, Show)
+
+data RateLimitMode
+    = RateLimitMode_DefaultFinality
+    | RateLimitMode_CustomFinality
+    deriving (Eq, Show)
+
+data ConsumeCapacityResult = ConsumeCapacityResult
+    with
+        rateLimiterCid : ContractId RateLimiter
+        availableBeforeConsume : Numeric 0
+        consumed : Numeric 0
+    deriving (Eq, Show)
+
+elapsedSeconds : Time -> Time -> Numeric 0
+elapsedSeconds start end =
+    let micros = convertRelTimeToMicroseconds (subTime end start)
+        secs : Int = max 0 (micros / 1000000)
+    in intToNumeric secs
+
+availableTokensAt : Time -> RateLimiter -> Numeric 0
+availableTokensAt now rl =
+    if not rl.isEnabled then
+        rl.capacity
+    else
+        min rl.capacity (rl.tokens + (elapsedSeconds rl.lastUpdated now * rl.rate))
+
+template RateLimiter
+    with
+        instanceId : Text
+        poolInstanceId : Text
+        poolOwner : Party
+        remoteChainSelector : Numeric 0
+        direction : RateLimitDirection
+        mode : RateLimitMode
+        isEnabled : Bool
+        capacity : Numeric 0
+        rate : Numeric 0
+        tokens : Numeric 0
+        lastUpdated : Time
+    where
+        signatory poolOwner
+        ensure assertValidInstanceId instanceId
+
+        choice SetConfig : ContractId RateLimiter
+            with
+                newIsEnabled : Bool
+                newCapacity : Numeric 0
+                newRate : Numeric 0
+            controller poolOwner
+            do
+                assertMsg "RateLimiter: enabled config requires rate <= capacity"
+                    (not newIsEnabled || newRate <= newCapacity)
+                assertMsg "RateLimiter: disabled config must have zero capacity and zero rate"
+                    (newIsEnabled || (newCapacity == 0.0 && newRate == 0.0))
+                now <- getTime
+                create this with
+                    isEnabled = newIsEnabled
+                    capacity = newCapacity
+                    rate = newRate
+                    tokens = newCapacity
+                    lastUpdated = now
+
+        nonconsuming choice ConsumeCapacity : ConsumeCapacityResult
+            with
+                requested : Numeric 0
+            controller poolOwner
+            do
+                if not isEnabled || requested == 0.0 then
+                    pure ConsumeCapacityResult with
+                        rateLimiterCid = self
+                        availableBeforeConsume = availableTokensAt lastUpdated this
+                        consumed = requested
+                else do
+                    now <- getTime
+                    let available = availableTokensAt now this
+
+                    assertMsg "RateLimiter: request exceeds capacity"
+                        (requested <= capacity)
+                    assertMsg "RateLimiter: insufficient capacity"
+                        (requested <= available)
+
+                    archive self
+                    newCid <- create this with
+                        tokens = available - requested
+                        lastUpdated = now
+
+                    pure ConsumeCapacityResult with
+                        rateLimiterCid = newCid
+                        availableBeforeConsume = available
+                        consumed = requested
+
+        interface instance MCMSReceiver for RateLimiter where
+          view = MCMSReceiverView with
+            mcmsController = poolOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let selfAddress = RawInstanceAddress.makeText instanceId poolOwner
+            selfCid <- case Map.lookup selfAddress contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> selfAddress
+              Some cid -> pure (coerceContractId cid : ContractId RateLimiter)
+
+            case functionName of
+              "SetConfig" -> do
+                case decodeSetConfigParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetConfig"
+                  Some ((newIsEnabled, newCapacity, newRate), finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetConfig" (finalOffset == byteCount operationData)
+                    newCid <- exercise selfCid SetConfig with
+                      newIsEnabled
+                      newCapacity
+                      newRate
+                    pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+-- | Decode SetConfig params: (Bool, Numeric 0, Numeric 0)
+decodeSetConfigParams : BytesHex -> Optional ((Bool, Numeric 0, Numeric 0), Int)
+decodeSetConfigParams encoded = do
+    (newIsEnabled, offset1) <- decodeBoolAt encoded 0
+    (newCapacity, offset2) <- decodeNumeric0At encoded offset1
+    (newRate, finalOffset) <- decodeNumeric0At encoded offset2
+    Some ((newIsEnabled, newCapacity, newRate), finalOffset)

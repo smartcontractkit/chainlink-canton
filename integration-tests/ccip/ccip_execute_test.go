@@ -316,7 +316,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Native is Amulet
 	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
+		Id:    types.TEXT("Amulet"), // TODO: hardcoded
 	}
 
 	reporter := cld_ops.NewMemoryReporter()
@@ -557,7 +557,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
@@ -645,7 +645,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress())
 	require.NoError(t, err)
 
-	executeArgs := ccipreceiver.Execute2{
+	executeArgs := ccipreceiver.Execute{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),

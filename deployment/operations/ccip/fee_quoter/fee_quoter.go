@@ -81,12 +81,12 @@ var RemoveFeeTokens = contract.NewExercise(contract.ExerciseParams[feequoter.Rem
 	EncodeMethod: feeQuoterEncoder.RemoveFeeTokens,
 })
 
-var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyDestChainConfigUpdates2]{
+var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyFeeQuoterDestChainConfigUpdates]{
 	Name:         "canton/ccip/fee_quoter/apply_dest_chain_config_updates",
 	Version:      Version,
 	Description:  "Applies destination chain configuration updates to the FeeQuoter",
 	ContractType: ContractType,
-	Validate: func(input feequoter.ApplyDestChainConfigUpdates2) error {
+	Validate: func(input feequoter.ApplyFeeQuoterDestChainConfigUpdates) error {
 		for _, cfg := range input.DestChainConfigArgs {
 			if cfg.DestChainConfig.LinkFeeMultiplierPercent == "" {
 				return fmt.Errorf("linkFeeMultiplierPercent cannot be empty for dest chain %s", cfg.DestChainSelector)
@@ -96,6 +96,6 @@ var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[f
 		return nil
 	},
 	Template:     feequoter.FeeQuoter{},
-	Method:       feequoter.FeeQuoter{}.ApplyDestChainConfigUpdates,
-	EncodeMethod: feeQuoterEncoder.ApplyDestChainConfigUpdates,
+	Method:       feequoter.FeeQuoter{}.ApplyFeeQuoterDestChainConfigUpdates,
+	EncodeMethod: feeQuoterEncoder.ApplyFeeQuoterDestChainConfigUpdates,
 })

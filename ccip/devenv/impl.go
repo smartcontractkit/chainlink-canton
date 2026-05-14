@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -46,7 +45,6 @@ import (
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -56,7 +54,6 @@ import (
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -319,11 +316,6 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 	}
 
 	return datastore.NewMemoryDataStore().Seal(), nil
-}
-
-// DeployContractsForSelector implements cciptestinterfaces.CCIP17Configuration.
-func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, topology *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
-	return ccv.DeployContractsForSelector(ctx, env, c, selector, topology)
 }
 
 func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint64) (lanes.ChainDefinition, lanes.CommitteeVerifierRemoteChainInput, error) {
@@ -708,68 +700,6 @@ func (c *Chain) FundNodes(ctx context.Context, cls []*simple_node_set.Input, bc 
 	return nil // TODO: implement
 }
 
-// Curse implements cciptestinterfaces.CCIP17.
-func (c *Chain) Curse(ctx context.Context, subjects [][16]byte) error {
-	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
-	if err != nil {
-		return fmt.Errorf("get rmn remote address: %w", err)
-	}
-
-	instanceAddr := contracts.HexToInstanceAddress(rmnRemoteRef.Address)
-
-	c.logger.Info().
-		Uint64("chainSelector", c.chainDetails.ChainSelector).
-		Int("numSubjects", len(subjects)).
-		Msg("Cursing subjects on chain")
-	for _, subject := range subjects {
-		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Curse, c.chain, contract.ChoiceInput[rmn.Curse]{
-			InstanceAddress: instanceAddr,
-			Args: rmn.Curse{
-				Subject: types.TEXT(hex.EncodeToString(subject[:])),
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("curse subject: %w", err)
-		}
-		c.logger.Info().
-			Uint64("chainSelector", c.chainDetails.ChainSelector).
-			Msg("Cursed chain")
-	}
-
-	return nil
-}
-
-// Uncurse implements cciptestinterfaces.CCIP17.
-func (c *Chain) Uncurse(ctx context.Context, subjects [][16]byte) error {
-	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
-	if err != nil {
-		return fmt.Errorf("get rmn remote address: %w", err)
-	}
-
-	instanceAddr := contracts.HexToInstanceAddress(rmnRemoteRef.Address)
-
-	c.logger.Info().
-		Uint64("chainSelector", c.chainDetails.ChainSelector).
-		Int("numSubjects", len(subjects)).
-		Msg("Uncursing subjects on chain")
-	for _, subject := range subjects {
-		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Uncurse, c.chain, contract.ChoiceInput[rmn.Uncurse]{
-			InstanceAddress: instanceAddr,
-			Args: rmn.Uncurse{
-				Subject: types.TEXT(hex.EncodeToString(subject[:])),
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("uncurse subject: %w", err)
-		}
-		c.logger.Info().
-			Uint64("chainSelector", c.chainDetails.ChainSelector).
-			Msg("Uncursed chain")
-	}
-
-	return nil
-}
-
 // ExposeMetrics implements cciptestinterfaces.CCIP17.
 func (c *Chain) ExposeMetrics(ctx context.Context, source, dest uint64) ([]string, *prometheus.Registry, error) {
 	return nil, nil, nil // TODO: implement
@@ -820,47 +750,24 @@ func (c *Chain) GetTokenBalance(ctx context.Context, address, tokenAddress proto
 		}
 	}
 
-	holdingContracts, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
-		PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
-		ModuleName: "Splice.Api.Token.HoldingV1",
-		EntityName: "Holding",
-	})
+	// TODO: this currently gets all holdings. Differentiate by tokenAddress
+	// need to map tokenAddress -> splice_api_token_holding_v1.InstrumentId
+	totalRat, err := testhelpers.GetHoldingsBalance(ctx, participant, nil,
+		testhelpers.WithHoldingOwner(ownerParty),
+		testhelpers.WithUnlockedHoldingsOnly(),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("list active token holdings: %w", err)
+		return nil, fmt.Errorf("get holdings balance: %w", err)
 	}
 
-	total := big.NewInt(0)
 	scale := new(big.Int).Exp(big.NewInt(10), big.NewInt(10), nil)
 	scaleRat := new(big.Rat).SetInt(scale)
-	for _, holding := range holdingContracts {
-		views := holding.GetCreatedEvent().GetInterfaceViews()
-		if len(views) == 0 || views[0].GetViewValue() == nil {
-			continue
-		}
-		fields := views[0].GetViewValue().GetFields()
-		if len(fields) < 4 {
-			continue
-		}
-		ownerField := fields[0].GetValue().GetParty()
-		amountRaw := strings.TrimSpace(fields[2].GetValue().GetNumeric())
-		locked := fields[3].GetValue().GetOptional().GetValue() != nil
-
-		if ownerField != ownerParty || amountRaw == "" || locked {
-			continue
-		}
-
-		amountRat, ok := new(big.Rat).SetString(amountRaw)
-		if !ok {
-			return nil, fmt.Errorf("invalid holding amount %q", fields[2].GetValue().GetNumeric())
-		}
-		amountRat.Mul(amountRat, scaleRat)
-		if !amountRat.IsInt() {
-			return nil, fmt.Errorf("holding amount scale exceeds 10: %q", fields[2].GetValue().GetNumeric())
-		}
-		total.Add(total, amountRat.Num())
+	scaled := new(big.Rat).Mul(totalRat, scaleRat)
+	if !scaled.IsInt() {
+		return nil, fmt.Errorf("holding balance scale exceeds 10 decimals for total %s", totalRat.FloatString(12))
 	}
 
-	return total, nil
+	return scaled.Num(), nil
 }
 
 // NativeBalance implements cciptestinterfaces.CCIP17.
