@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -22,15 +23,19 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
 	ccipcommon "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
+	spliceholding "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	splicemeta "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	oapiEDSCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/scripts/staging/internal/stagingenv"
@@ -47,8 +52,10 @@ import (
 
 // This script calls the CCV indexer, Canton EDS (HTTPS under *.ccip.stage.internal.griddle.sh), then
 // the Canton participant ledger. Those internal hostnames usually require corporate VPN; if a single
-// VPN profile cannot reach both indexer and Canton, run through indexer/auth/EDS first, then use
-// -vpn-switch-wait before any ledger Submit (the program sleeps and logs when to switch).
+// VPN profile cannot reach both indexer and Canton, host EDS HTTP may succeed while Canton gRPC differs.
+// Flag -vpn-switch-wait sleeps once during disclosure prep before the first Canton gRPC call that needs ledger:
+// token messages scan the Canton pool/inbound RL/holdings right after CCIP/CCV EDS, so pause then; otherwise pause
+// after disclosures and before the first ledger Submit (router/receiver/create/execute paths).
 
 const (
 	defaultIndexerURL             = ""
@@ -112,7 +119,7 @@ func main() {
 		ledgerTimeout           = flag.Duration("ledger-timeout", ledgerTimeoutDefault, "How long to allow post-handoff Canton ledger operations")
 		pollInterval            = flag.Duration("poll-interval", pollIntervalDefault, "How often to poll the indexer")
 		expectedVerifierResults = flag.Int("expected-verifier-results", defaultExpectedResults, "Expected number of verifier results before execution")
-		vpnSwitchWait           = flag.Duration("vpn-switch-wait", vpnSwitchWaitDefault, "Pause after auth/indexer fetch before the first Canton ledger transaction")
+		vpnSwitchWait           = flag.Duration("vpn-switch-wait", vpnSwitchWaitDefault, "Pause before Canton gRPC ledger work: before scans for token-pool disclosures if this message transfers tokens to ledger, otherwise after disclosures and before Submit")
 		printJSONOnly           = flag.Bool("print-json-only", false, "Print the fetched indexer result JSON and exit")
 		receiverMinBlockConfs   = flag.Int64("receiver-min-block-confirmations", -1, "CCIPReceiver receiverFinalityConfig: block depth (BlockDepth); 0 = WaitForFinality; default uses message finality")
 		userID                  = flag.String("user-id", stagingenv.String(defaultUserID, "STAGING_CANTON_USER_ID"), "Canton user ID")
@@ -252,15 +259,15 @@ func main() {
 		fatalf("re-decoded message on-ramp %x does not match indexer message on-ramp %x", decSanity.OnRampAddress, message.OnRampAddress)
 	}
 
-	execInputs, err := getExecuteInputs(ctx, strings.TrimSuffix(strings.TrimSpace(*edsURL), "/"), message, resp, encodedMessage, *ccvOverride, &logger)
+	execInputs, usedVPNWaitBeforeTokenPoolLedgerFallback, err := getExecuteInputs(ctx, strings.TrimSuffix(strings.TrimSpace(*edsURL), "/"), message, resp, encodedMessage, *ccvOverride, participant, transferInstructionClient, *vpnSwitchWait, &logger)
 	if err != nil {
 		fatalf("get execute disclosures: %v", err)
 	}
 
-	if *vpnSwitchWait > 0 {
+	if !usedVPNWaitBeforeTokenPoolLedgerFallback && *vpnSwitchWait > 0 {
 		logger.Info().
 			Dur("wait", *vpnSwitchWait).
-			Str("hint", "Canton ledger gRPC and/or EDS may need a different VPN path than the indexer").
+			Str("hint", "Canton ledger gRPC may need a different VPN path than the indexer or hosted EDS").
 			Msg("indexer/auth/EDS disclosures done — switch VPN now before Canton ledger transactions")
 		time.Sleep(*vpnSwitchWait)
 	}
@@ -367,14 +374,14 @@ func main() {
 		if err != nil {
 			fatalf("get registry admin: %v", err)
 		}
-		transferFactoryCID, transferFactoryDisclosures, transferFactoryContext, err := getTransferFactory(ledgerCtx, transferInstructionClient, registryAdmin, *partyID, *partyID)
+		_, transferFactoryDisclosures, _, err := getTransferFactory(ledgerCtx, transferInstructionClient, registryAdmin, *partyID, *partyID)
 		if err != nil {
 			fatalf("get transfer factory: %v", err)
 		}
 		disclosedContracts = append(disclosedContracts, transferFactoryDisclosures...)
-		execInputs.TransferFactoryCID = transferFactoryCID
-		execInputs.TransferFactoryContext = transferFactoryContext
 	}
+
+	disclosedContracts = dedupeDisclosedContractsPreserveOrder(disclosedContracts)
 
 	ccvInputs := make([]*apiv2.Value, len(execInputs.CCVContractIDs))
 	for i := range execInputs.CCVContractIDs {
@@ -978,6 +985,32 @@ func holdingsBalance(holdings []*apiv2.ActiveContract) float64 {
 	return total
 }
 
+// dedupeDisclosedContractsPreserveOrder drops duplicate contract IDs (Canton rejects duplicate disclosed CIDs).
+// First occurrence wins so ledger-built token-pool disclosures are not replaced by a later GetTransferFactory copy.
+func dedupeDisclosedContractsPreserveOrder(in []*apiv2.DisclosedContract) []*apiv2.DisclosedContract {
+	if len(in) <= 1 {
+		return in
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]*apiv2.DisclosedContract, 0, len(in))
+	for _, d := range in {
+		if d == nil {
+			continue
+		}
+		id := d.GetContractId()
+		if id == "" {
+			out = append(out, d)
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, d)
+	}
+	return out
+}
+
 func flattenRecordFields(record *apiv2.Record) map[string]string {
 	if record == nil {
 		return nil
@@ -1208,6 +1241,352 @@ func deployReceiver(ctx context.Context, participant cldfcanton.Participant, par
 	return contractID, nil
 }
 
+// normalizeDAMLNumericKeyForChainSelectorLookup maps DAML Decimal/Numeric key strings onto integer chain selectors:
+// RemoteChainConfigs use Numeric keys rendered as "123" or with a decimal suffix (e.g. "123.") or fractions.
+func normalizeDAMLNumericKeyForChainSelectorLookup(raw string) string {
+	s := strings.TrimSpace(raw)
+	dot := strings.IndexByte(s, '.')
+	if dot >= 0 {
+		s = strings.TrimSpace(s[:dot])
+	}
+	return strings.TrimSpace(s)
+}
+
+func uint64FromDAMLNumericKeyExecute(s string) (uint64, error) {
+	s = normalizeDAMLNumericKeyForChainSelectorLookup(s)
+	if s == "" {
+		return 0, fmt.Errorf("empty numeric key")
+	}
+	val, ok := new(big.Int).SetString(s, 10)
+	if !ok {
+		return 0, fmt.Errorf("parse numeric key %q", s)
+	}
+	if val.Sign() < 0 || val.Cmp(new(big.Int).SetUint64(^uint64(0))) > 0 {
+		return 0, fmt.Errorf("numeric key not in uint64 range: %q", s)
+	}
+	return val.Uint64(), nil
+}
+
+func remoteChainConfigForLRTPExecute(
+	cfg map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig,
+	selector uint64,
+) (lockreleasetokenpool.RemoteChainConfig, error) {
+	if len(cfg) == 0 {
+		return lockreleasetokenpool.RemoteChainConfig{}, fmt.Errorf("lock/release pool has no remote chain configs")
+	}
+	decStr := strconv.FormatUint(selector, 10)
+	for _, keyFmt := range []string{decStr, decStr + "."} {
+		if remoteCfg, ok := cfg[types.NUMERIC(keyFmt)]; ok {
+			return remoteCfg, nil
+		}
+	}
+	var keys []string
+	for k, remoteCfg := range cfg {
+		keys = append(keys, string(k))
+		sel, err := uint64FromDAMLNumericKeyExecute(string(k))
+		if err != nil {
+			continue
+		}
+		if sel == selector {
+			return remoteCfg, nil
+		}
+	}
+	return lockreleasetokenpool.RemoteChainConfig{}, fmt.Errorf("remote chain config not found for selector %d (numeric keys present: %s)", selector, strings.Join(keys, ", "))
+}
+
+func activeContractToProtoDisclosure(ac *apiv2.ActiveContract) *apiv2.DisclosedContract {
+	created := ac.GetCreatedEvent()
+	return &apiv2.DisclosedContract{
+		TemplateId:       created.GetTemplateId(),
+		ContractId:       created.GetContractId(),
+		CreatedEventBlob: created.GetCreatedEventBlob(),
+		SynchronizerId:   ac.GetSynchronizerId(),
+	}
+}
+
+func interfaceViewRecordForExecute(interfaceViews []*apiv2.InterfaceView, expectedInterfaceID *apiv2.Identifier) (*apiv2.Record, error) {
+	for _, iv := range interfaceViews {
+		if iv.GetInterfaceId().GetModuleName() == expectedInterfaceID.GetModuleName() &&
+			iv.GetInterfaceId().GetEntityName() == expectedInterfaceID.GetEntityName() {
+			return iv.GetViewValue(), nil
+		}
+	}
+	return nil, fmt.Errorf("no interface view found for %s:%s", expectedInterfaceID.GetModuleName(), expectedInterfaceID.GetEntityName())
+}
+
+var spliceHoldingInterfaceID = &apiv2.Identifier{
+	PackageId:  "#splice-api-token-holding-v1",
+	ModuleName: "Splice.Api.Token.HoldingV1",
+	EntityName: "Holding",
+}
+
+func disclosedLRTPHoldingsForPoolOwnerInstrument(
+	ctx context.Context,
+	participant cldfcanton.Participant,
+	poolOwner types.PARTY,
+	instrument spliceholding.InstrumentId,
+) ([]*apiv2.DisclosedContract, []splicemeta.AnyValue, error) {
+	offset, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("ledger end for holdings: %w", err)
+	}
+
+	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: offset.GetOffset(),
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
+				participant.PartyID: {
+					Cumulative: []*apiv2.CumulativeFilter{{
+						IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
+							InterfaceId:             spliceHoldingInterfaceID,
+							IncludeInterfaceView:    true,
+							IncludeCreatedEventBlob: true,
+						}},
+					}},
+				},
+			},
+			Verbose: true,
+		},
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("scan holdings contracts: %w", err)
+	}
+	defer stream.CloseSend()
+
+	type holdingRow struct {
+		cid string
+		dc  *apiv2.DisclosedContract
+		av  splicemeta.AnyValue
+	}
+	var rows []holdingRow
+
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("receive holdings: %w", err)
+		}
+		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
+		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
+			continue
+		}
+		active := entry.ActiveContract
+		created := active.GetCreatedEvent()
+		rec, err := interfaceViewRecordForExecute(created.GetInterfaceViews(), spliceHoldingInterfaceID)
+		if err != nil {
+			continue
+		}
+		var view spliceholding.HoldingView
+		if err := ledger.RecordToStruct(rec, &view); err != nil {
+			continue
+		}
+		if view.Owner != poolOwner ||
+			view.InstrumentId.Admin != instrument.Admin ||
+			view.InstrumentId.Id != instrument.Id {
+			continue
+		}
+		cid := types.CONTRACT_ID(created.GetContractId())
+		rows = append(rows, holdingRow{
+			cid: created.GetContractId(),
+			dc:  activeContractToProtoDisclosure(active),
+			av:  splicemeta.AnyValue{AVContractId: new(types.CONTRACT_ID(cid))},
+		})
+	}
+
+	sort.Slice(rows, func(i, j int) bool { return rows[i].cid < rows[j].cid })
+
+	disc := make([]*apiv2.DisclosedContract, 0, len(rows))
+	values := make([]splicemeta.AnyValue, 0, len(rows))
+	for _, r := range rows {
+		disc = append(disc, r.dc)
+		values = append(values, r.av)
+	}
+	return disc, values, nil
+}
+
+// instrumentTransferFactoryEDS mirrors eds/internal/api/tokenpool/token_standard.go GetTransferFactory (FactoryTypeURL)
+// poolOwner as sender/receiver and expectedAdmin instrumentId.Admin.
+func instrumentTransferFactoryEDS(
+	ctx context.Context,
+	client transferInstructionV1.ClientWithResponsesInterface,
+	poolOwner types.PARTY,
+	instrument spliceholding.InstrumentId,
+) (string, []*apiv2.DisclosedContract, splicemeta.ChoiceContext, error) {
+	resp, err := client.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
+		ChoiceArguments: map[string]any{
+			"expectedAdmin": string(instrument.Admin),
+			"transfer": map[string]any{
+				"sender":   string(poolOwner),
+				"receiver": string(poolOwner),
+				"amount":   "1.0",
+				"instrumentId": map[string]any{
+					"admin": string(instrument.Admin),
+					"id":    string(instrument.Id),
+				},
+				"lock":             nil,
+				"requestedAt":      time.Now().Add(-10 * time.Second).Format(time.RFC3339),
+				"executeBefore":    time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+				"inputHoldingCids": []string{},
+				"meta": map[string]any{
+					"values": map[string]any{},
+				},
+			},
+			"extraArgs": map[string]any{
+				"context": map[string]any{
+					"values": map[string]any{},
+				},
+				"meta": map[string]any{
+					"values": map[string]any{},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return "", nil, splicemeta.ChoiceContext{}, fmt.Errorf("GetTransferFactory: %w", err)
+	}
+	if resp.StatusCode() != http.StatusOK || resp.JSON200 == nil {
+		return "", nil, splicemeta.ChoiceContext{}, fmt.Errorf("GetTransferFactory: status %d: %s", resp.StatusCode(), string(resp.Body))
+	}
+
+	disclosedContracts := make([]*apiv2.DisclosedContract, 0, len(resp.JSON200.ChoiceContext.DisclosedContracts))
+	for _, contract := range resp.JSON200.ChoiceContext.DisclosedContracts {
+		disclosedContract, err := disclosedContractToProto(oapiEDSCommon.DisclosedContract{
+			TemplateId:       contract.TemplateId,
+			ContractId:       contract.ContractId,
+			CreatedEventBlob: contract.CreatedEventBlob,
+			SynchronizerId:   contract.SynchronizerId,
+		})
+		if err != nil {
+			return "", nil, splicemeta.ChoiceContext{}, err
+		}
+		disclosedContracts = append(disclosedContracts, disclosedContract)
+	}
+
+	tfChoice, err := contracts.ChoiceContextFromData(resp.JSON200.ChoiceContext.ChoiceContextData)
+	if err != nil {
+		return "", nil, splicemeta.ChoiceContext{}, fmt.Errorf("transfer factory choice context: %w", err)
+	}
+	return resp.JSON200.FactoryId, disclosedContracts, tfChoice, nil
+}
+
+// ledgerLockReleaseExecuteTokenPoolEDS reconstructs eds/internal/api/tokenpool lockReleaseTokenPoolExecute output
+// (pool extra context + disclosures for pool, inbound RL, splice holdings, and optional instrument transfer factory).
+func ledgerLockReleaseExecuteTokenPoolEDS(
+	ctx context.Context,
+	participant cldfcanton.Participant,
+	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface,
+	message *protocol.Message,
+	tpInst contracts.InstanceAddress,
+	logger *zerolog.Logger,
+) (contractID string, poolExtra *apiv2.Value, disclosed []*apiv2.DisclosedContract, err error) {
+	if message == nil {
+		return "", nil, nil, fmt.Errorf("nil message")
+	}
+	activePool, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
+		tpInst,
+	)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("find lock/release token pool: %w", err)
+	}
+	parsedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("parse lock/release pool: %w", err)
+	}
+
+	srcSel := uint64(message.SourceChainSelector)
+	remoteCfg, err := remoteChainConfigForLRTPExecute(parsedPool.RemoteChainConfigs, srcSel)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	rawRL := remoteCfg.InboundCustomBlockConfirmationsRateLimiter
+	if message.Finality == protocol.FinalityWaitForFinality {
+		rawRL = remoteCfg.InboundRateLimiter
+	}
+	rawInbound, err := contracts.RawInstanceAddressFromString(strings.TrimSpace(string(rawRL.Unpack)))
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("parse inbound rate limiter raw for source selector %d: %w", srcSel, err)
+	}
+	activeRL, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		ccipcommon.RateLimiter{}.GetTemplateID(),
+		rawInbound.InstanceAddress(),
+	)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("find inbound rate limiter: %w", err)
+	}
+
+	holdingDisclosed, holdingValues, err := disclosedLRTPHoldingsForPoolOwnerInstrument(ctx, participant, parsedPool.PoolOwner, parsedPool.InstrumentId)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("token pool splice holdings for pool owner/instrument: %w", err)
+	}
+	if len(holdingDisclosed) == 0 && logger != nil {
+		logger.Warn().
+			Str("poolOwner", string(parsedPool.PoolOwner)).
+			Str("instrumentAdmin", string(parsedPool.InstrumentId.Admin)).
+			Str("instrumentId", string(parsedPool.InstrumentId.Id)).
+			Msg("ledger token-pool execute overlay: zero splice holdings matched pool owner/instrument — execute may fail if liquidity is missing")
+	}
+
+	choice := splicemeta.ChoiceContext{Values: map[string]splicemeta.AnyValue{
+		string(ccipcommon.RateLimiterKey): {
+			AVContractId: new(types.CONTRACT_ID(activeRL.GetCreatedEvent().GetContractId())),
+		},
+		string(lockreleasetokenpool.TokenPoolHoldingsContextKey): {
+			AVList: &holdingValues,
+		},
+	}}
+
+	var factoryDisclosures []*apiv2.DisclosedContract
+	factoryCID, tfDisclosures, tfCtx, err := instrumentTransferFactoryEDS(ctx, transferInstructionClient, parsedPool.PoolOwner, parsedPool.InstrumentId)
+	if err != nil {
+		if logger != nil {
+			logger.Warn().Err(err).Msg("ledger token-pool execute overlay: instrument GetTransferFactory failed; proceeding without embedded transfer-factory keys in pool context (token-standard may reject if required)")
+		}
+	} else {
+		tfCID := types.CONTRACT_ID(factoryCID)
+		choice.Values[string(lockreleasetokenpool.TransferFactoryContextKey)] = splicemeta.AnyValue{
+			AVContractId: &tfCID,
+		}
+		cp := tfCtx.Values
+		if len(cp) > 0 {
+			choice.Values[string(lockreleasetokenpool.TransferFactoryExtraArgsContextValuesContextKey)] =
+				splicemeta.AnyValue{AVMap: &cp}
+		}
+		factoryDisclosures = tfDisclosures
+	}
+
+	poolExtraVal, err := testhelpers.ChoiceContextFromStruct(choice)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("encode pool execute choice context: %w", err)
+	}
+
+	var out []*apiv2.DisclosedContract
+	out = append(out, holdingDisclosed...)
+	out = append(out, factoryDisclosures...)
+	out = append(out, activeContractToProtoDisclosure(activePool), activeContractToProtoDisclosure(activeRL))
+
+	poolCID := activePool.GetCreatedEvent().GetContractId()
+	if logger != nil {
+		logger.Info().
+			Str("poolCid", poolCID).
+			Str("inboundRlCid", activeRL.GetCreatedEvent().GetContractId()).
+			Uint64("sourceChainSelector", srcSel).
+			Int("holdingContracts", len(holdingDisclosed)).
+			Bool("embeddedInstrumentTransferFactory", len(factoryDisclosures) > 0).
+			Msg("built token pool execute disclosures from Canton ledger + token-standard")
+	}
+
+	return poolCID, poolExtraVal, out, nil
+}
+
 func getExecuteInputs(
 	ctx context.Context,
 	edsBaseURL string,
@@ -1215,20 +1594,20 @@ func getExecuteInputs(
 	resp v1.VerifierResultsByMessageIDResponse,
 	encodedMessage []byte,
 	ccvOverride string,
+	participant cldfcanton.Participant,
+	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface,
+	vpnPauseBeforeLedgerTokenPoolFallback time.Duration,
 	logger *zerolog.Logger,
-) (*executeInputs, error) {
+) (*executeInputs, bool, error) {
+	usedVPNWaitBeforeTokenPoolLedgerFallback := false
 	httpClient := &http.Client{Timeout: 15 * time.Second}
 	ccipCl, err := oapiCCIP.NewClientWithResponses(edsBaseURL, oapiCCIP.WithHTTPClient(httpClient))
 	if err != nil {
-		return nil, fmt.Errorf("ccip eds client: %w", err)
+		return nil, false, fmt.Errorf("ccip eds client: %w", err)
 	}
 	ccvCl, err := oapiCCV.NewClientWithResponses(edsBaseURL, oapiCCV.WithHTTPClient(httpClient))
 	if err != nil {
-		return nil, fmt.Errorf("ccv eds client: %w", err)
-	}
-	tpCl, err := oapiTokenPool.NewClientWithResponses(edsBaseURL, oapiTokenPool.WithHTTPClient(httpClient))
-	if err != nil {
-		return nil, fmt.Errorf("token pool eds client: %w", err)
+		return nil, false, fmt.Errorf("ccv eds client: %w", err)
 	}
 
 	ccvs := make([]contracts.InstanceAddress, len(resp.Results))
@@ -1251,11 +1630,11 @@ func getExecuteInputs(
 	encHex := hex.EncodeToString(encodedMessage)
 	ccipDisc, err := eds.GetCCIPExecuteDisclosure(ctx, ccipCl, encHex)
 	if err != nil {
-		return nil, fmt.Errorf("ccip execute disclosure: %w", err)
+		return nil, false, fmt.Errorf("ccip execute disclosure: %w", err)
 	}
 	choiceContext, err := testhelpers.ChoiceContextFromStruct(ccipDisc.ChoiceContext)
 	if err != nil {
-		return nil, fmt.Errorf("ccip execute choice context: %w", err)
+		return nil, false, fmt.Errorf("ccip execute choice context: %w", err)
 	}
 
 	disclosedContracts := append([]*apiv2.DisclosedContract(nil), ccipDisc.DisclosedContracts...)
@@ -1265,12 +1644,12 @@ func getExecuteInputs(
 	for i, ccv := range ccvs {
 		ccvDisc, err := eds.GetCCVExecuteDisclosure(ctx, ccvCl, encHex, ccv)
 		if err != nil {
-			return nil, fmt.Errorf("ccv execute disclosure for %s: %w", ccv.String(), err)
+			return nil, false, fmt.Errorf("ccv execute disclosure for %s: %w", ccv.String(), err)
 		}
 		ccvContractIDs[i] = &apiv2.Value_ContractId{ContractId: ccvDisc.ContractId}
 		ccvCtx, err := testhelpers.ChoiceContextFromStruct(ccvDisc.ChoiceContext)
 		if err != nil {
-			return nil, fmt.Errorf("ccv execute choice context for %s: %w", ccv.String(), err)
+			return nil, false, fmt.Errorf("ccv execute choice context for %s: %w", ccv.String(), err)
 		}
 		ccvExtraContexts[i] = ccvCtx
 		disclosedContracts = append(disclosedContracts, ccvDisc.DisclosedContracts...)
@@ -1278,45 +1657,51 @@ func getExecuteInputs(
 
 	var poolExtraContext *apiv2.Value
 	var tokenPoolContractID *apiv2.Value_ContractId
-	var tokenPoolHoldingContractIDs []*apiv2.Value
-
 	if message.TokenTransfer != nil && ccipDisc.TokenPool != nil {
 		tpInst := (*ccipDisc.TokenPool).InstanceAddress()
-		tpd, err := eds.GetTokenPoolExecuteDisclosure(ctx, tpCl, encHex, tpInst)
-		if err != nil {
-			return nil, fmt.Errorf("token pool execute disclosure: %w", err)
+		if logger != nil {
+			logger.Info().
+				Str("tokenPoolAddress", tpInst.Hex()).
+				Msg("building token pool execute disclosures from Canton ledger + token-standard (token pool EDS not used)")
 		}
-		tokenPoolContractID = &apiv2.Value_ContractId{ContractId: tpd.ContractId}
-		poolExtraContext, err = testhelpers.ChoiceContextFromStruct(tpd.ChoiceContext)
-		if err != nil {
-			return nil, fmt.Errorf("token pool execute choice context: %w", err)
+		if vpnPauseBeforeLedgerTokenPoolFallback > 0 {
+			if logger != nil {
+				logger.Info().
+					Dur("wait", vpnPauseBeforeLedgerTokenPoolFallback).
+					Str("hint", "Canton participant ledger gRPC scans the token pool — switch VPN if indexer/EDS used a different path").
+					Msg("pause before ledger token pool execute — switch VPN if needed")
+			}
+			time.Sleep(vpnPauseBeforeLedgerTokenPoolFallback)
+			usedVPNWaitBeforeTokenPoolLedgerFallback = true
 		}
-		disclosedContracts = append(disclosedContracts, tpd.DisclosedContracts...)
+		cidL, ctxL, discL, errL := ledgerLockReleaseExecuteTokenPoolEDS(ctx, participant, transferInstructionClient, &message, tpInst, logger)
+		if errL != nil {
+			return nil, usedVPNWaitBeforeTokenPoolLedgerFallback, fmt.Errorf("token pool execute from ledger: %w", errL)
+		}
+		tokenPoolContractID = &apiv2.Value_ContractId{ContractId: cidL}
+		poolExtraContext = ctxL
+		disclosedContracts = append(disclosedContracts, discL...)
 	}
 
 	return &executeInputs{
-		DisclosedContracts:   disclosedContracts,
-		ChoiceContext:        choiceContext,
-		PoolExtraContext:     poolExtraContext,
-		CCVContractIDs:       ccvContractIDs,
-		CCVExtraContexts:     ccvExtraContexts,
-		VerifierResultsHex:   verifierResultsHex,
-		TokenPoolContractID:  tokenPoolContractID,
-		TokenPoolHoldingCIDs: tokenPoolHoldingContractIDs,
-	}, nil
+		DisclosedContracts:  disclosedContracts,
+		ChoiceContext:       choiceContext,
+		PoolExtraContext:    poolExtraContext,
+		CCVContractIDs:      ccvContractIDs,
+		CCVExtraContexts:    ccvExtraContexts,
+		VerifierResultsHex:  verifierResultsHex,
+		TokenPoolContractID: tokenPoolContractID,
+	}, usedVPNWaitBeforeTokenPoolLedgerFallback, nil
 }
 
 type executeInputs struct {
-	DisclosedContracts     []*apiv2.DisclosedContract
-	ChoiceContext          *apiv2.Value
-	PoolExtraContext       *apiv2.Value
-	CCVContractIDs         []*apiv2.Value_ContractId
-	CCVExtraContexts       []*apiv2.Value
-	VerifierResultsHex     []string
-	TokenPoolContractID    *apiv2.Value_ContractId
-	TokenPoolHoldingCIDs   []*apiv2.Value
-	TransferFactoryCID     string
-	TransferFactoryContext *apiv2.Value
+	DisclosedContracts  []*apiv2.DisclosedContract
+	ChoiceContext       *apiv2.Value
+	PoolExtraContext    *apiv2.Value
+	CCVContractIDs      []*apiv2.Value_ContractId
+	CCVExtraContexts    []*apiv2.Value
+	VerifierResultsHex  []string
+	TokenPoolContractID *apiv2.Value_ContractId
 }
 
 func (e *executeInputs) RequiresTokenRelease() bool {
@@ -1332,26 +1717,12 @@ func (e *executeInputs) TokenTransferValue(tokenReceiverParty string) *apiv2.Val
 	if poolExtraContext == nil {
 		poolExtraContext = emptyCCIPContext()
 	}
-	extraArgsContext := e.TransferFactoryContext
-	if extraArgsContext == nil {
-		extraArgsContext = emptyCCIPContext()
-	}
-	tokenPoolHoldings := e.TokenPoolHoldingCIDs
-	if tokenPoolHoldings == nil {
-		tokenPoolHoldings = []*apiv2.Value{}
-	}
 
+	// Must match CCIP.CCIPReceiver:TokenTransferInput (tokenPoolCid, tokenReceiverParty, poolExtraContext only).
+	// Transfer factory / holdings live in poolExtraContext from ledgerLockReleaseExecuteTokenPoolEDS.
 	return &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 		{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: e.TokenPoolContractID}},
 		{Label: "tokenReceiverParty", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: tokenReceiverParty}}},
-		{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-			{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: e.TransferFactoryCID}}},
-			{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "context", Value: extraArgsContext},
-				{Label: "meta", Value: emptyMetadata()},
-			}}}}},
-			{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: tokenPoolHoldings}}}},
-		}}}}},
 		{Label: "poolExtraContext", Value: poolExtraContext},
 	}}}}}}}
 }
@@ -1518,15 +1889,6 @@ func choiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 }
 
 func emptyCCIPContext() *apiv2.Value {
-	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{
-			Label: "values",
-			Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
-		},
-	}}}}
-}
-
-func emptyMetadata() *apiv2.Value {
 	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 		{
 			Label: "values",

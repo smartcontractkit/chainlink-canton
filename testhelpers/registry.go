@@ -22,6 +22,176 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
+func coerceChoiceContextJSONArray(rawValue any) ([]any, error) {
+	if rawValue == nil {
+		return []any{}, nil
+	}
+	xs, ok := rawValue.([]any)
+	if ok {
+		return xs, nil
+	}
+	return nil, fmt.Errorf("expected JSON array for AV_List ([]any), got %T", rawValue)
+}
+
+func choiceContextTaggedPayload(tag string, rawValue any) (*apiv2.Value, error) {
+	switch tag {
+	case "AV_Text":
+		valueString, ok := rawValue.(string)
+		if !ok {
+			return nil, fmt.Errorf("AV_Text value is not a string: %T", rawValue)
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_Text{Text: valueString}}, nil
+	case "AV_Int":
+		switch val := rawValue.(type) {
+		case string:
+			valueInt, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+			}
+			return &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}, nil
+		case json.Number:
+			valueInt, err := strconv.ParseInt(val.String(), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+			}
+			return &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}, nil
+		case float64:
+			if val < 0 || val > float64(^uint64(0)) {
+				return nil, fmt.Errorf("AV_Int value is out of range for uint64: %f", val)
+			}
+			return &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(val)}}, nil
+		default:
+			return nil, fmt.Errorf("AV_Int value is not a string or number: %T", rawValue)
+		}
+	case "AV_Decimal":
+		valueString, ok := rawValue.(string)
+		if !ok {
+			return nil, fmt.Errorf("AV_Decimal value is not a string: %T", rawValue)
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: valueString}}, nil
+	case "AV_Bool":
+		valueBool, ok := rawValue.(bool)
+		if !ok {
+			return nil, fmt.Errorf("AV_Bool value is not a bool: %T", rawValue)
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: valueBool}}, nil
+	case "AV_Date":
+		valueString, ok := rawValue.(string)
+		if !ok {
+			return nil, fmt.Errorf("AV_Date value is not a string: %T", rawValue)
+		}
+		t, err := time.Parse(time.DateOnly, valueString)
+		if err != nil {
+			return nil, fmt.Errorf("AV_Date value is not a DateOnly time: %s", valueString)
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_Date{Date: int32(t.Unix() / 86400)}}, nil //nolint:gosec // days since epoch
+	case "AV_Time":
+		valueString, ok := rawValue.(string)
+		if !ok {
+			return nil, fmt.Errorf("AV_Time value is not a string: %T", rawValue)
+		}
+		t, err := time.Parse(time.RFC3339, valueString)
+		if err != nil {
+			return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: t.UnixMicro()}}, nil
+	case "AV_RelTime":
+		switch val := rawValue.(type) {
+		case string:
+			valueInt, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+			}
+			return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+				{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}},
+			}}}}, nil
+		case json.Number:
+			valueInt, err := strconv.ParseInt(val.String(), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
+			}
+			return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+				{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}},
+			}}}}, nil
+		case float64:
+			if val < 0 || val > float64(^uint64(0)) {
+				return nil, fmt.Errorf("AV_Int value is out of range for uint64: %f", val)
+			}
+			return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+				{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(val)}}},
+			}}}}, nil
+		default:
+			return nil, fmt.Errorf("AV_Int value is not a string or number: %T", rawValue)
+		}
+	case "AV_Party":
+		valueString, ok := rawValue.(string)
+		if !ok {
+			return nil, fmt.Errorf("AV_Party is not a string: %T", rawValue)
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_Party{Party: valueString}}, nil
+	case "AV_ContractId":
+		valueString, ok := rawValue.(string)
+		if !ok {
+			return nil, fmt.Errorf("AV_ContractId value is not a string: %T", rawValue)
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: valueString}}, nil
+	case "AV_List":
+		xs, err := coerceChoiceContextJSONArray(rawValue)
+		if err != nil {
+			return nil, err
+		}
+		elems := make([]*apiv2.Value, 0, len(xs))
+		for i, xt := range xs {
+			em, ok := xt.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("AV_List element %d: expected {tag,value} map, got %T", i, xt)
+			}
+			cv, err := choiceContextTaggedMapElementToLedgerVariant(em)
+			if err != nil {
+				return nil, fmt.Errorf("AV_List element %d: %w", i, err)
+			}
+			elems = append(elems, cv)
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: elems}}}, nil
+	case "AV_Map":
+		mm, ok := rawValue.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("AV_Map expects object map[string]any, got %T", rawValue)
+		}
+		es := make([]*apiv2.TextMap_Entry, 0, len(mm))
+		for mk, mv := range mm {
+			em, ok := mv.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("AV_Map key %q: expected {tag,value} map, got %T", mk, mv)
+			}
+			mv2, err := choiceContextTaggedMapElementToLedgerVariant(em)
+			if err != nil {
+				return nil, fmt.Errorf("AV_Map key %q: %w", mk, err)
+			}
+			es = append(es, &apiv2.TextMap_Entry{Key: mk, Value: mv2})
+		}
+		return &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: es}}}, nil
+	default:
+		return nil, fmt.Errorf("unimplemented tag in choice context conversion: %v", tag)
+	}
+}
+
+func choiceContextTaggedMapElementToLedgerVariant(elem map[string]any) (*apiv2.Value, error) {
+	tag, ok := elem["tag"].(string)
+	if !ok {
+		return nil, fmt.Errorf(`choice-context element missing string "tag"`)
+	}
+	raw := elem["value"]
+	payload, err := choiceContextTaggedPayload(tag, raw)
+	if err != nil {
+		return nil, err
+	}
+	return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
+		Constructor: tag,
+		Value:       payload,
+	}}}, nil
+}
+
 func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, error) {
 	values, ok := choiceContextData["values"].(map[string]any)
 	if !ok {
@@ -32,128 +202,15 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 	// AnyValue is a variant
 	var fields []*apiv2.TextMap_Entry
 	for k, v := range values {
-		f := v.(map[string]any)
-		tag := f["tag"].(string)
-		rawValue := f["value"]
-
-		var value *apiv2.Value
-		switch tag {
-		case "AV_Text":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Text value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Text{Text: valueString}}
-		case "AV_Int":
-			// Int64s are encoded as JSON numbers or strings, depending on the encoder settings
-			switch val := rawValue.(type) {
-			case string:
-				valueInt, err := strconv.ParseInt(val, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
-				}
-				value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}
-			case json.Number:
-				valueInt, err := strconv.ParseInt(val.String(), 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
-				}
-				value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}
-			case float64:
-				// Some encoders may encode int64s as JSON numbers, which are float64s in Go. This can cause precision loss for large int64s, but we can still parse them if they fit within uint64.
-				if val < 0 || val > float64(^uint64(0)) {
-					return nil, fmt.Errorf("AV_Int value is out of range for uint64: %f", val)
-				}
-				value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(val)}}
-			default:
-				return nil, fmt.Errorf("AV_Int value is not a string or number: %T", rawValue)
-			}
-		case "AV_Decimal":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Decimal value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: valueString}}
-		case "AV_Bool":
-			valueBool, ok := rawValue.(bool)
-			if !ok {
-				return nil, fmt.Errorf("AV_Bool value is not a bool: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: valueBool}}
-		case "AV_Date":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Date value is not a string: %T", rawValue)
-			}
-			t, err := time.Parse(time.DateOnly, valueString)
-			if err != nil {
-				return nil, fmt.Errorf("AV_Date value is not a DateOnly time: %s", valueString)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Date{Date: int32(t.Unix() / 86400)}} //nolint:gosec // days since epoch
-		case "AV_Time":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Time value is not a string: %T", rawValue)
-			}
-			t, err := time.Parse(time.RFC3339, valueString)
-			if err != nil {
-				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: t.UnixMicro()}}
-		case "AV_RelTime":
-			// Int64s are encoded as JSON numbers or strings, depending on the encoder settings
-			switch val := rawValue.(type) {
-			case string:
-				valueInt, err := strconv.ParseInt(val, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
-				}
-				value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-					{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}},
-				}}}}
-			case json.Number:
-				valueInt, err := strconv.ParseInt(val.String(), 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("AV_Int value is not a valid uint64 string: %s", val)
-				}
-				value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-					{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: valueInt}}},
-				}}}}
-			case float64:
-				// Some encoders may encode int64s as JSON numbers, which are float64s in Go. This can cause precision loss for large int64s, but we can still parse them if they fit within uint64.
-				if val < 0 || val > float64(^uint64(0)) {
-					return nil, fmt.Errorf("AV_Int value is out of range for uint64: %f", val)
-				}
-				value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-					{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(val)}}},
-				}}}}
-			default:
-				return nil, fmt.Errorf("AV_Int value is not a string or number: %T", rawValue)
-			}
-		case "AV_Party":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_Party is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Party{Party: valueString}}
-		case "AV_ContractId":
-			valueString, ok := rawValue.(string)
-			if !ok {
-				return nil, fmt.Errorf("AV_ContractId value is not a string: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: valueString}}
-		default:
-			// TODO Add lists and maps
-			return nil, fmt.Errorf("unimplemented tag: %v", tag)
+		vm, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf(`choice-context values[%q]: expected {"tag","value"} map, got %T`, k, v)
 		}
-
-		fields = append(fields, &apiv2.TextMap_Entry{
-			Key: k,
-			Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-				Constructor: tag,
-				Value:       value,
-			}}},
-		})
+		ev, err := choiceContextTaggedMapElementToLedgerVariant(vm)
+		if err != nil {
+			return nil, fmt.Errorf("choice-context values[%q]: %w", k, err)
+		}
+		fields = append(fields, &apiv2.TextMap_Entry{Key: k, Value: ev})
 	}
 
 	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -206,9 +263,33 @@ func anyValueToChoiceContextDataEntry(av splice_api_token_metadata_v1.AnyValue) 
 	case av.AVContractId != nil:
 		return map[string]any{"tag": "AV_ContractId", "value": string(*av.AVContractId)}, nil
 	case av.AVList != nil:
-		return nil, fmt.Errorf("AV_List is not supported in choice context conversion")
+		lst := av.AVList
+		if lst == nil || len(*lst) == 0 {
+			return map[string]any{"tag": "AV_List", "value": []any{}}, nil
+		}
+		out := make([]any, len(*lst))
+		for i, elt := range *lst {
+			nm, err := anyValueToChoiceContextDataEntry(elt)
+			if err != nil {
+				return nil, fmt.Errorf("AV_List[%d]: %w", i, err)
+			}
+			out[i] = nm
+		}
+		return map[string]any{"tag": "AV_List", "value": out}, nil
 	case av.AVMap != nil:
-		return nil, fmt.Errorf("AV_Map is not supported in choice context conversion")
+		m := av.AVMap
+		if m == nil || len(*m) == 0 {
+			return map[string]any{"tag": "AV_Map", "value": map[string]any{}}, nil
+		}
+		next := make(map[string]any, len(*m))
+		for kk, vv := range *m {
+			nm, err := anyValueToChoiceContextDataEntry(vv)
+			if err != nil {
+				return nil, fmt.Errorf("AV_Map[%q]: %w", kk, err)
+			}
+			next[kk] = nm
+		}
+		return map[string]any{"tag": "AV_Map", "value": next}, nil
 	default:
 		return nil, fmt.Errorf("empty or unsupported AnyValue")
 	}

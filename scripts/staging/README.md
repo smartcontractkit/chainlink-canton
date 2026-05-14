@@ -39,7 +39,7 @@ go run -mod=mod ./scripts/staging/send_staging_evm_to_canton \
 ```sh
 go run -mod=mod ./scripts/staging/send_staging_evm_to_canton \
   -data 'hello from evm to canton with token' \
-  -token 0x7fa86664F404f3D63813cD9a6d07d66dd9085691 \
+  -token 0x9B60300062EE88A1446A86fd84f349a0F15bb485 \
   -token-amount 1000000000000
 ```
 
