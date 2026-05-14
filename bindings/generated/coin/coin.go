@@ -27,8 +27,8 @@ var (
 
 const (
 	PackageName = "coin"
-	PackageID   = "be5b08c56cc4b3813bce037b17b01439e16175ce63893dc2f1625d5ca2a8917b"
-	SDKVersion  = "3.4.10"
+	PackageID   = "c8832c06868ae8e0ef5d811b1cf7e6418a8d0a224e7d8b35385a453c8e3b3074"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
