@@ -26,8 +26,6 @@ import CCIP.FactoryTest.FactoryCodecTest
   , encodeDeployLockReleaseTokenPoolParams
   , encodeDeployBurnMintTokenPoolParams
   , encodeDeployRateLimiterParams
-  , encodeDeployCCIPSenderParams
-  , encodeDeployCCIPReceiverParams
   )
 
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
@@ -715,76 +713,6 @@ testDeployRateLimiter_MCMS = script do
   submit mcmsParty do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "DeployRateLimiter"
-      operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
-
-  pure ()
-
--- | Test DeployCCIPSender via MCMS entrypoint
--- CCIPSender has owner as signatory, so mcmsParty is used as owner
-testDeployCCIPSender_MCMS : Script ()
-testDeployCCIPSender_MCMS = script do
-  mcmsParty <- allocateParty "mcms_party"
-
-  let factoryInstanceId = "factory-sender"
-
-  factoryCid <- submit mcmsParty do
-    createCmd CCIPFactory with
-      instanceId = factoryInstanceId
-      owner = mcmsParty
-      mcmsParty
-      usedInstanceIds = Map.empty
-      deployedContracts = Map.empty
-      perPartyRouterFactoryDeployed = False
-
-  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
-  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
-  -- Use mcmsParty as owner so authorization works within single party
-  let params = DeployCCIPSenderParams with
-        instanceId = "sender-1"
-        owner = mcmsParty
-      encoded = encodeDeployCCIPSenderParams params
-
-  submit mcmsParty do
-    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "DeployCCIPSender"
-      operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
-
-  pure ()
-
--- | Test DeployCCIPReceiver via MCMS entrypoint
--- CCIPReceiver has owner as signatory, so mcmsParty is used as owner
-testDeployCCIPReceiver_MCMS : Script ()
-testDeployCCIPReceiver_MCMS = script do
-  mcmsParty <- allocateParty "mcms_party"
-
-  let factoryInstanceId = "factory-receiver"
-
-  factoryCid <- submit mcmsParty do
-    createCmd CCIPFactory with
-      instanceId = factoryInstanceId
-      owner = mcmsParty
-      mcmsParty
-      usedInstanceIds = Map.empty
-      deployedContracts = Map.empty
-      perPartyRouterFactoryDeployed = False
-
-  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
-  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
-  -- Use mcmsParty as owner so authorization works within single party
-  let params = DeployCCIPReceiverParams with
-        instanceId = "receiver-1"
-        owner = mcmsParty
-        requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
-        optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
-        optionalThreshold = 20
-        receiverFinalityConfig = finalityConfig 7
-      encoded = encodeDeployCCIPReceiverParams params
-
-  submit mcmsParty do
-    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "DeployCCIPReceiver"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 

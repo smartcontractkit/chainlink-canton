@@ -22,7 +22,6 @@ import MCMS.Codec
 import CCIP.Codec
   ( encodeInstrumentId
   , encodeRawInstanceAddress
-  , encodeRawInstanceAddressList
   )
 import qualified Splice.Api.Token.HoldingV1
 
@@ -172,20 +171,6 @@ encodeDeployRateLimiterParams params =
   <> encodeBool params.isEnabled
   <> encodeNumeric0 params.capacity
   <> encodeNumeric0 params.rate
-
-encodeDeployCCIPSenderParams : DeployCCIPSenderParams -> BytesHex
-encodeDeployCCIPSenderParams params =
-  encodeText params.instanceId
-  <> encodeParty params.owner
-
-encodeDeployCCIPReceiverParams : DeployCCIPReceiverParams -> BytesHex
-encodeDeployCCIPReceiverParams params =
-  encodeText params.instanceId
-  <> encodeParty params.owner
-  <> encodeRawInstanceAddressList params.requiredCCVs
-  <> encodeRawInstanceAddressList params.optionalCCVs
-  <> fromSome (encodeInt64 params.optionalThreshold)
-  <> encodeRequestedFinality params.receiverFinalityConfig
 
 -- ===========================================================================
 -- ROUND-TRIP TESTS
@@ -651,71 +636,6 @@ testDecodeDeployRateLimiterParams_Inbound = script do
       decoded.direction === RateLimitDirection_Inbound
       decoded.mode === RateLimitMode_CustomFinality
       decoded.isEnabled === False
-
-  pure ()
-
-testDecodeDeployCCIPSenderParams : Script ()
-testDecodeDeployCCIPSenderParams = script do
-  owner <- allocateParty "owner"
-
-  let params = DeployCCIPSenderParams with
-        instanceId = "sender-1"
-        owner
-      encoded = encodeDeployCCIPSenderParams params
-
-  case decodeDeployCCIPSenderParams encoded of
-    None -> abort "Failed to decode DeployCCIPSenderParams"
-    Some decoded -> do
-      decoded.instanceId === params.instanceId
-      decoded.owner === params.owner
-
-  pure ()
-
-testDecodeDeployCCIPReceiverParams : Script ()
-testDecodeDeployCCIPReceiverParams = script do
-  owner <- allocateParty "owner"
-
-  let params = DeployCCIPReceiverParams with
-        instanceId = "receiver-1"
-        owner
-        requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
-        optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
-        optionalThreshold = 20
-        receiverFinalityConfig = finalityConfig 42
-      encoded = encodeDeployCCIPReceiverParams params
-
-  case decodeDeployCCIPReceiverParams encoded of
-    None -> abort "Failed to decode DeployCCIPReceiverParams"
-    Some decoded -> do
-      decoded.instanceId === params.instanceId
-      decoded.owner === params.owner
-      decoded.requiredCCVs === params.requiredCCVs
-      decoded.optionalCCVs === params.optionalCCVs
-      decoded.optionalThreshold === params.optionalThreshold
-      decoded.receiverFinalityConfig === params.receiverFinalityConfig
-
-  pure ()
-
-testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs : Script ()
-testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
-  owner <- allocateParty "owner"
-
-  let params = DeployCCIPReceiverParams with
-        instanceId = "receiver-empty"
-        owner
-        requiredCCVs = []
-        optionalCCVs = []
-        optionalThreshold = 0
-        receiverFinalityConfig = finalityConfig 0
-      encoded = encodeDeployCCIPReceiverParams params
-
-  case decodeDeployCCIPReceiverParams encoded of
-    None -> abort "Failed to decode with empty requiredCCVs"
-    Some decoded -> do
-      decoded.requiredCCVs === []
-      decoded.optionalCCVs === []
-      decoded.optionalThreshold === 0
-      decoded.receiverFinalityConfig === finalityConfig 0
 
   pure ()
 

@@ -45,8 +45,6 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.Executor
 import qualified CCIP.ExecutorTypes
 import qualified CCIP.RateLimiter
-import qualified CCIP.CCIPSender
-import qualified CCIP.CCIPReceiver
 import qualified CCIP.FinalityConfig
 import CCIP.ContextCodec (decodeChoiceContextAt)
 import CCIP.LockReleaseTokenPoolCodecGen (decodeTransferTimeoutAt)
@@ -190,22 +188,6 @@ template CCIPFactory
                 rateLimiterContract <- mkRateLimiterContract params
                 deployResult <- exercise selfCid DeployRateLimiter with
                   contract = rateLimiterContract
-                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
-                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
-                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
-
-              "DeployCCIPSender" -> do
-                params <- requireDecoded "DeployCCIPSender" (decodeDeployCCIPSenderParams operationData)
-                deployResult <- exercise selfCid DeployCCIPSender with
-                  contract = mkCCIPSenderContract params
-                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
-                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
-                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
-
-              "DeployCCIPReceiver" -> do
-                params <- requireDecoded "DeployCCIPReceiver" (decodeDeployCCIPReceiverParams operationData)
-                deployResult <- exercise selfCid DeployCCIPReceiver with
-                  contract = mkCCIPReceiverContract params
                 let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
@@ -459,44 +441,6 @@ template CCIPFactory
                     factoryCid = newFactoryCid
                     deployedCid = coerceContractId deployedCid
 
-        choice DeployCCIPSender : DeployResult
-            with
-                contract : CCIP.CCIPSender.CCIPSender
-            controller owner
-            do
-                assertFactoryIsMCMSControlled this
-                let componentKey = "ccip-sender:" <> contract.instanceId
-                assertComponentNotDeployed componentKey deployedContracts
-                assertInstanceIdUnused contract.instanceId usedInstanceIds
-
-                deployedCid <- create contract
-                newFactoryCid <- create this with
-                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
-                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
-
-                pure DeployResult with
-                    factoryCid = newFactoryCid
-                    deployedCid = coerceContractId deployedCid
-
-        choice DeployCCIPReceiver : DeployResult
-            with
-                contract : CCIP.CCIPReceiver.CCIPReceiver
-            controller owner
-            do
-                assertFactoryIsMCMSControlled this
-                let componentKey = "ccip-receiver:" <> contract.instanceId
-                assertComponentNotDeployed componentKey deployedContracts
-                assertInstanceIdUnused contract.instanceId usedInstanceIds
-
-                deployedCid <- create contract
-                newFactoryCid <- create this with
-                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
-                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
-
-                pure DeployResult with
-                    factoryCid = newFactoryCid
-                    deployedCid = coerceContractId deployedCid
-
 data DeployResult = DeployResult
     with
         factoryCid : ContractId CCIPFactory
@@ -633,22 +577,6 @@ data DeployRateLimiterParams = DeployRateLimiterParams
         isEnabled : Bool
         capacity : Numeric 0
         rate : Numeric 0
-    deriving (Eq, Show)
-
-data DeployCCIPSenderParams = DeployCCIPSenderParams
-    with
-        instanceId : Text
-        owner : Party
-    deriving (Eq, Show)
-
-data DeployCCIPReceiverParams = DeployCCIPReceiverParams
-    with
-        instanceId : Text
-        owner : Party
-        requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
-        optionalCCVs : [RawInstanceAddress.RawInstanceAddress]
-        optionalThreshold : Int
-        receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
     deriving (Eq, Show)
 
 requireDecoded : Text -> Optional a -> Update a
@@ -803,20 +731,6 @@ mkRateLimiterContract params = do
         tokens = params.capacity
         lastUpdated = now
       )
-
-mkCCIPSenderContract : DeployCCIPSenderParams -> CCIP.CCIPSender.CCIPSender
-mkCCIPSenderContract params = CCIP.CCIPSender.CCIPSender with
-    instanceId = params.instanceId
-    owner = params.owner
-
-mkCCIPReceiverContract : DeployCCIPReceiverParams -> CCIP.CCIPReceiver.CCIPReceiver
-mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
-    instanceId = params.instanceId
-    owner = params.owner
-    requiredCCVs = params.requiredCCVs
-    optionalCCVs = params.optionalCCVs
-    optionalThreshold = params.optionalThreshold
-    receiverFinalityConfig = params.receiverFinalityConfig
 
 decodeRequestedFinalityAt : BytesHex -> Int -> Optional (CCIP.FinalityConfig.FinalityConfig, Int)
 decodeRequestedFinalityAt encoded offset = do
@@ -1056,32 +970,6 @@ decodeDeployRateLimiterParams encoded = do
         isEnabled
         capacity
         rate
-
-decodeDeployCCIPSenderParams : BytesHex -> Optional DeployCCIPSenderParams
-decodeDeployCCIPSenderParams encoded = do
-    (instanceId, offset1) <- decodeTextAt encoded 0
-    (owner, finalOffset) <- decodePartyAt encoded offset1
-    assertOffset finalOffset (byteCount encoded)
-    Some DeployCCIPSenderParams with
-        instanceId
-        owner
-
-decodeDeployCCIPReceiverParams : BytesHex -> Optional DeployCCIPReceiverParams
-decodeDeployCCIPReceiverParams encoded = do
-    (instanceId, offset1) <- decodeTextAt encoded 0
-    (owner, offset2) <- decodePartyAt encoded offset1
-    (requiredCCVs, offset3) <- decodeList encoded offset2 decodeRawInstanceAddressAt
-    (optionalCCVs, offset4) <- decodeList encoded offset3 decodeRawInstanceAddressAt
-    (optionalThreshold, offset5) <- decodeInt64At encoded offset4
-    (receiverFinalityConfig, finalOffset) <- decodeRequestedFinalityAt encoded offset5
-    assertOffset finalOffset (byteCount encoded)
-    Some DeployCCIPReceiverParams with
-        instanceId
-        owner
-        requiredCCVs
-        optionalCCVs
-        optionalThreshold
-        receiverFinalityConfig
 
 assertFactoryIsMCMSControlled : CCIPFactory -> Update ()
 assertFactoryIsMCMSControlled factory =
