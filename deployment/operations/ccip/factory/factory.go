@@ -15,7 +15,6 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
-	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -350,21 +349,6 @@ func writeNumeric0(buf *bytes.Buffer, value types.NUMERIC) error {
 		text = whole
 	}
 	writeLenPrefixedText(buf, types.TEXT(text))
-	return nil
-}
-
-func writeRawInstanceAddress(buf *bytes.Buffer, value chainlinkapi.RawInstanceAddress) {
-	writeLenPrefixedText(buf, value.Unpack)
-}
-
-func writeRawInstanceAddressList(buf *bytes.Buffer, values []chainlinkapi.RawInstanceAddress) error {
-	if len(values) > 255 {
-		return fmt.Errorf("too many raw instance addresses: %d", len(values))
-	}
-	buf.WriteByte(byte(len(values)))
-	for _, value := range values {
-		writeRawInstanceAddress(buf, value)
-	}
 	return nil
 }
 
