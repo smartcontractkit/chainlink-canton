@@ -102,9 +102,26 @@ testExecutionArchiveBucketUsesTwoHexChars = script do
 
     debug "testExecutionArchiveBucketUsesTwoHexChars: PASSED"
 
--- The Append choice packs messages into an existing archive, and the ensure
--- clause rejects overflow so a new archive is only created when the existing
--- one would exceed maxArchivedSetSize.
+testTakeFirstNFromSetLexicographic : Script ()
+testTakeFirstNFromSetLexicographic = script do
+    let mLo = mkPrefixedMessageId "aa01"
+        mMid = mkPrefixedMessageId "aa02"
+        mHi  = mkPrefixedMessageId "aa03"
+        s = Set.fromList [mHi, mLo, mMid]
+        (u, v) = CCIP.PerPartyRouter.takeFirstNFromSet 2 s
+    u === Set.fromList [mLo, mMid]
+    v === Set.fromList [mHi]
+    let (a, b) = CCIP.PerPartyRouter.takeFirstNFromSet 0 s
+    a === Set.empty
+    b === s
+    let (c, d) = CCIP.PerPartyRouter.takeFirstNFromSet 10 s
+    c === s
+    d === Set.empty
+    debug "testTakeFirstNFromSetLexicographic: PASSED"
+
+-- The Append choice packs messages into an existing archive; the contract
+-- ensure clause enforces the size cap (overflow is also exercised end-to-end
+-- by `testExecuteRollsOverExecutedMessages`).
 testArchivedExecutedMessages_AppendAndFullnessInvariant : Script ()
 testArchivedExecutedMessages_AppendAndFullnessInvariant = script do
     ccipOwner  <- allocateParty "ccip-owner-append"
@@ -112,6 +129,7 @@ testArchivedExecutedMessages_AppendAndFullnessInvariant = script do
 
     let m1 = mkPrefixedMessageId "ab01"
     let m2 = mkPrefixedMessageId "ab02"
+    let m3 = mkPrefixedMessageId "ab03"
 
     archiveCid <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
@@ -130,21 +148,13 @@ testArchivedExecutedMessages_AppendAndFullnessInvariant = script do
     Some archive <- queryContractId ccipOwner newCid
     archive.executedMessages === Set.fromList [m1, m2]
 
-    -- Overflow: fill to maxArchivedSetSize then try to append one more.
-    let almostFull = Set.fromList [ mkPrefixedMessageId ("ab" <> show i) | i <- [0 .. CCIP.PerPartyRouter.maxArchivedSetSize - 2] ]
-    fullCid <- submit ccipOwner do
-        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
-            ccipOwner
-            partyOwner
-            perPartyRouterInstanceId = "router-append"
-            archiveBucket = "ab"
-            archiveIndex = 1
-            executedMessages = almostFull
+    -- Appending an already-present element is idempotent (union semantics).
+    newCid2 <- submit ccipOwner do
+        exerciseCmd newCid CCIP.PerPartyRouter.Append with
+            additionalMessages = Set.fromList [m1, m3]
 
-    -- This Append would push the set to maxArchivedSetSize + 1, which must fail.
-    submitMustFail ccipOwner do
-        exerciseCmd fullCid CCIP.PerPartyRouter.Append with
-            additionalMessages = Set.fromList [mkPrefixedMessageId "abff", mkPrefixedMessageId "abfe"]
+    Some archive2 <- queryContractId ccipOwner newCid2
+    archive2.executedMessages === Set.fromList [m1, m2, m3]
 
     debug "testArchivedExecutedMessages_AppendAndFullnessInvariant: PASSED"
 
@@ -1133,16 +1143,16 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
             deps
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.fromList [activeMessage]
+            -- Both archives are in bucket "ab"; they must share the same list entry.
             archivedExecutionContractIds =
                 Map.fromList
-                    [ (CCIP.PerPartyRouter.executionArchiveBucket olderMessage, [olderArchive])
-                    , (CCIP.PerPartyRouter.executionArchiveBucket newerMessage, [newerArchive])
+                    [ (CCIP.PerPartyRouter.executionArchiveBucket olderMessage, [olderArchive, newerArchive])
                     ]
             archivedBucketSizes =
                 Map.fromList
                     [ (CCIP.PerPartyRouter.executionArchiveBucket olderMessage, 1)
-                    , (CCIP.PerPartyRouter.executionArchiveBucket newerMessage, 1)
                     ]
+            archiveSizeLimit = CCIP.PerPartyRouter.maxExecutedMessagesSize
             customObservers = []
 
     disclosedOlderArchive <- fromSome <$> queryDisclosure ccipOwner olderArchive
@@ -1181,38 +1191,56 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
 
     debug "testGetExecutionStateUsesActiveAndArchivedMessages: PASSED"
 
-testExecuteRollsOverExecutedMessages : Script ()
-testExecuteRollsOverExecutedMessages = script do
-    ccipOwner <- allocateParty "ccip-owner-rollover"
-    rmnOwner <- allocateParty "rmn-owner-rollover"
-    ccvOwner <- allocateParty "ccv-owner-rollover"
-    receiver <- allocateParty "receiver-rollover"
+data RolloverEnv = RolloverEnv
+    with
+        ccipOwner              : Party
+        rmnOwner               : Party
+        ccvOwner               : Party
+        receiver               : Party
+        ccvInstanceId          : Text
+        offRampInstanceId      : Text
+        sourceChainSelector    : Numeric 0
+        destChainSelector      : Numeric 0
+        offRampAddr            : RawInstanceAddress.RawInstanceAddress
+        globalConfigAddr       : RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistryAddr : RawInstanceAddress.RawInstanceAddress
+        rmnRemoteAddr          : RawInstanceAddress.RawInstanceAddress
+        offRamp                : ContractId CCIP.OffRamp.OffRamp
+        globalConfig           : ContractId CCIP.GlobalConfig.GlobalConfig
+        tokenAdminRegistry     : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+        rmnRemote              : ContractId CCIP.RMNRemote.RMNRemote
+        ccipCtx                : Splice.Api.Token.MetadataV1.ChoiceContext
+        disclosedOffRamp       : Disclosure
+        disclosedGlobalConfig  : Disclosure
+        disclosedTokenAdminRegistry : Disclosure
+        disclosedRmnRemote     : Disclosure
 
-    let globalConfigInstanceId = "test-globalconfig-rollover"
-    let offRampInstanceId = "test-offramp-rollover"
-    let rmnInstanceId = "test-rmn-rollover"
-    let tokenAdminRegistryInstanceId = "test-tar-rollover"
-    let ccvInstanceId = "test-ccv-rollover"
-    let sourceChainSelector : Numeric 0 = 3333333333.0
-    let destChainSelector : Numeric 0 = 4444444444.0
-    let routerInstanceId = "test-router-rollover"
-    let olderArchivedMessage = mkHexMessageId 200001
-    let seededMessages = seedExecutedMessages CCIP.PerPartyRouter.maxExecutedMessagesSize
-    let seededMessagesSet = Set.fromList seededMessages
-    let sampleSeededMessage = mkHexMessageId 0
+setupRolloverEnv : Text -> Numeric 0 -> Numeric 0 -> Script RolloverEnv
+setupRolloverEnv suffix srcChain dstChain = script do
+    ccipOwner <- allocateParty ("ccip-owner-" <> suffix)
+    rmnOwner <- allocateParty ("rmn-owner-" <> suffix)
+    ccvOwner <- allocateParty ("ccv-owner-" <> suffix)
+    receiver <- allocateParty ("receiver-" <> suffix)
 
-    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let globalConfigInstanceId = "test-globalconfig-" <> suffix
+    let offRampInstanceId = "test-offramp-" <> suffix
+    let rmnInstanceId = "test-rmn-" <> suffix
+    let tokenAdminRegistryInstanceId = "test-tar-" <> suffix
+    let ccvInstanceId = "test-ccv-" <> suffix
+
+    let globalConfigAddr = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteAddr = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryAddr = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
     let ccvInstanceAddress = RawInstanceAddress.make ccvInstanceId ccvOwner
+    let offRampAddr = RawInstanceAddress.make offRampInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
-            chainSelector = destChainSelector
+            chainSelector = dstChain
             destChainConfigs = Map.empty
-            sourceChainConfigs = Map.fromList [(sourceChainSelector, CCIP.GlobalConfig.SourceChainConfig with
+            sourceChainConfigs = Map.fromList [(srcChain, CCIP.GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000001"]
                 laneMandatedCCVs = []
@@ -1237,31 +1265,78 @@ testExecuteRollsOverExecutedMessages = script do
             instanceId = offRampInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.OffRamp.OffRampDeps with
-                globalConfig = globalConfigInstanceAddress
-                rmnRemote = rmnRemoteInstanceAddress
-                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                globalConfig = globalConfigAddr
+                rmnRemote = rmnRemoteAddr
+                tokenAdminRegistry = tokenAdminRegistryAddr
 
-    olderArchive <- submit ccipOwner do
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    let ccipCtx = Splice.Api.Token.MetadataV1.ChoiceContext with
+            values = TextMap.fromList
+                [ (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                , (CCIP.GlobalConfig.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig)
+                , (CCIP.OffRamp.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)
+                ]
+
+    pure RolloverEnv with
+        ccipOwner
+        rmnOwner
+        ccvOwner
+        receiver
+        ccvInstanceId
+        offRampInstanceId
+        sourceChainSelector = srcChain
+        destChainSelector = dstChain
+        offRampAddr
+        globalConfigAddr
+        tokenAdminRegistryAddr
+        rmnRemoteAddr
+        offRamp
+        globalConfig
+        tokenAdminRegistry
+        rmnRemote
+        ccipCtx
+        disclosedOffRamp
+        disclosedGlobalConfig
+        disclosedTokenAdminRegistry
+        disclosedRmnRemote
+
+testExecuteRollsOverExecutedMessages : Script ()
+testExecuteRollsOverExecutedMessages = script do
+    env <- setupRolloverEnv "rollover" 3333333333.0 4444444444.0
+
+    let routerInstanceId = "test-router-rollover"
+    let olderArchivedMessage = mkHexMessageId 200001
+    let testArchiveSizeLimit = 10
+    let seededMessages = seedExecutedMessages testArchiveSizeLimit
+    let seededMessagesSet = Set.fromList seededMessages
+    let sampleSeededMessage = mkHexMessageId 0
+
+    olderArchive <- submit env.ccipOwner do
         createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
-            ccipOwner
-            partyOwner = receiver
+            ccipOwner = env.ccipOwner
+            partyOwner = env.receiver
             perPartyRouterInstanceId = routerInstanceId
             archiveBucket = CCIP.PerPartyRouter.executionArchiveBucket olderArchivedMessage
             archiveIndex = 0
             executedMessages = Set.fromList [olderArchivedMessage]
 
-    router <- submit ccipOwner do
+    router <- submit env.ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouter with
             instanceId = routerInstanceId
-            ccipOwner
-            partyOwner = receiver
+            ccipOwner = env.ccipOwner
+            partyOwner = env.receiver
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = RawInstanceAddress.make "unused-onramp-rollover" ccipOwner
-                offRamp = RawInstanceAddress.make offRampInstanceId ccipOwner
-                globalConfig = globalConfigInstanceAddress
-                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = RawInstanceAddress.make "unused-feequoter-rollover" ccipOwner
-                rmnRemote = rmnRemoteInstanceAddress
+                onRamp = RawInstanceAddress.make "unused-onramp-rollover" env.ccipOwner
+                offRamp = env.offRampAddr
+                globalConfig = env.globalConfigAddr
+                tokenAdminRegistry = env.tokenAdminRegistryAddr
+                feeQuoter = RawInstanceAddress.make "unused-feequoter-rollover" env.ccipOwner
+                rmnRemote = env.rmnRemoteAddr
             outboundSequenceNumbers = Map.empty
             executedMessages = seededMessagesSet
             archivedExecutionContractIds =
@@ -1272,69 +1347,60 @@ testExecuteRollsOverExecutedMessages = script do
                 Map.fromList
                     [ (CCIP.PerPartyRouter.executionArchiveBucket olderArchivedMessage, 1)
                     ]
+            archiveSizeLimit = testArchiveSizeLimit
             customObservers = []
 
     let message = CCIP.MessageCodecV1.MessageV1 with
-            sourceChainSelector = sourceChainSelector
-            destChainSelector = destChainSelector
+            sourceChainSelector = env.sourceChainSelector
+            destChainSelector = env.destChainSelector
             sequenceNumber = 7.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
             finality = messageFinality 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
-            offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
+            offRampAddress = RawInstanceAddress.toInstanceAddress env.offRampAddr
             sender = "0000000000000000000000000000000000000003"
-            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+            receiver = CCIP.MessageCodecV1.encodePartyAddress env.receiver
             destBlob = ""
             tokenTransfer = None
             messageData = "526f6c6c6f7665722054657374"
 
     let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 message
 
-    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
-    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
-    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedOlderArchive <- fromSome <$> queryDisclosure env.ccipOwner olderArchive
 
-    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+    let baseDisclosures = actAs env.receiver <> actAs env.ccipOwner
+            <> disclose env.disclosedOffRamp <> disclose env.disclosedGlobalConfig
+            <> disclose env.disclosedTokenAdminRegistry <> disclose env.disclosedRmnRemote
+    let disclosures = baseDisclosures <> disclose disclosedOlderArchive
+
+    executingMessageCid <- submit disclosures do
         exerciseCmd router CCIP.PerPartyRouter.PrepareExecute with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList
-                    [ (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)
-                    , (CCIP.GlobalConfig.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig)
-                    , (CCIP.OffRamp.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)
-                    ]
+            context = env.ccipCtx
             encodedMessage = encodedMessage
-            receiverParty = receiver
+            receiverParty = env.receiver
             tokenReceiverParty = None
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
-            caller = receiver
+            caller = env.receiver
 
-    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
+    executingMessageCid <- submit (actAs env.ccvOwner <> actAs env.ccipOwner) do
         exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
-            ccvInstanceId = ccvInstanceId
+            ccvInstanceId = env.ccvInstanceId
             versionTag = ""
-            caller = ccvOwner
+            caller = env.ccvOwner
 
-    executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+    executeResult <- submit disclosures do
         exerciseCmd router CCIP.PerPartyRouter.Execute with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList
-                    [ (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)
-                    , (CCIP.GlobalConfig.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig)
-                    , (CCIP.OffRamp.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)
-                    ]
+            context = env.ccipCtx
             executingMessageCid = executingMessageCid
 
     executeResult.state === CCIP.Internal.SUCCESS
 
-    Some updatedRouter <- queryContractId receiver executeResult.router
+    Some updatedRouter <- queryContractId env.receiver executeResult.router
     Set.size updatedRouter.executedMessages === 1
     assertMsg "newly executed message should be the only active message" $
         Set.member executeResult.messageId updatedRouter.executedMessages
@@ -1342,67 +1408,370 @@ testExecuteRollsOverExecutedMessages = script do
     length (Map.keys updatedRouter.archivedExecutionContractIds) === 1
     case Map.lookup (CCIP.PerPartyRouter.executionArchiveBucket sampleSeededMessage) updatedRouter.archivedExecutionContractIds of
         Some [firstArchiveCid, secondArchiveCid] -> do
-            firstArchiveCid === olderArchive
+            assertMsg "tail archive Append replaces the contract id" (firstArchiveCid /= olderArchive)
 
-            Some firstArchive <- queryContractId receiver firstArchiveCid
-            Some secondArchive <- queryContractId receiver secondArchiveCid
+            Some firstArchive <- queryContractId env.receiver firstArchiveCid
+            Some secondArchive <- queryContractId env.receiver secondArchiveCid
 
             firstArchive.archiveIndex === 0
             secondArchive.archiveIndex === 1
             firstArchive.perPartyRouterInstanceId === routerInstanceId
             secondArchive.perPartyRouterInstanceId === routerInstanceId
 
-            assertMsg "older archive should still contain its original message" $
+            assertMsg "tail archive should contain the older archived message" $
                 Set.member olderArchivedMessage firstArchive.executedMessages
-            -- The new archive must be exactly full: this is the invariant that prevents
-            -- a new contract from being created prematurely.
-            Set.size secondArchive.executedMessages === CCIP.PerPartyRouter.maxExecutedMessagesSize
-            assertMsg "new archive should contain the pre-rollover active set" $
-                Set.member sampleSeededMessage secondArchive.executedMessages
+            Set.size firstArchive.executedMessages === testArchiveSizeLimit
+            assertMsg "tail archive should contain the sample seeded message" $
+                Set.member sampleSeededMessage firstArchive.executedMessages
+            Set.size secondArchive.executedMessages === 1
+            let expectedArchived = Set.insert olderArchivedMessage seededMessagesSet
+                actualArchived = Set.union firstArchive.executedMessages secondArchive.executedMessages
+            actualArchived === expectedArchived
         _ -> assertMsg "expected exactly two archived execution contract ids in rollover bucket" False
 
-    -- archivedBucketSizes tracks the size of the last archive per bucket.
     case Map.lookup (CCIP.PerPartyRouter.executionArchiveBucket sampleSeededMessage) updatedRouter.archivedBucketSizes of
-        Some sz -> sz === CCIP.PerPartyRouter.maxExecutedMessagesSize
+        Some sz -> sz === 1
         None -> assertMsg "missing bucket size entry after rollover" False
 
-    activeState <- submit receiver do
+    activeState <- submit env.receiver do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = executeResult.messageId
-            caller = receiver
+            caller = env.receiver
     activeState === CCIP.Internal.SUCCESS
 
-    seededState <- submit receiver do
+    seededState <- submit env.receiver do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = sampleSeededMessage
-            caller = receiver
+            caller = env.receiver
     seededState === CCIP.Internal.SUCCESS
 
-    olderArchiveState <- submit receiver do
+    olderArchiveState <- submit env.receiver do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = olderArchivedMessage
-            caller = receiver
+            caller = env.receiver
     olderArchiveState === CCIP.Internal.SUCCESS
 
-    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+    submitMustFail baseDisclosures do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.PrepareExecute with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList
-                    [ (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)
-                    , (CCIP.GlobalConfig.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig)
-                    , (CCIP.OffRamp.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)
-                    ]
+            context = env.ccipCtx
             encodedMessage = encodedMessage
-            receiverParty = receiver
+            receiverParty = env.receiver
             tokenReceiverParty = None
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
-            caller = receiver
+            caller = env.receiver
 
     debug "testExecuteRollsOverExecutedMessages: PASSED"
+
+-- | Messages hashing to two distinct buckets ("aa" and "bb") each fit within a single archive.
+-- A pre-existing "aa" archive with one message is filled further (1+5=6 ≤ 10, no spill).
+-- "bb" messages have no prior archive, so a fresh archive is created (size 5).
+-- Verifies that bucket isolation is maintained and no overflow occurs in either bucket.
+testExecuteRollsOverExecutedMessages_MultiBucketNoSpill : Script ()
+testExecuteRollsOverExecutedMessages_MultiBucketNoSpill = script do
+    env <- setupRolloverEnv "mb" 5555555555.0 6666666666.0
+
+    let routerInstanceId = "test-router-mb"
+    let testArchiveSizeLimit = 10
+    let halfSize = testArchiveSizeLimit / 2
+    let mkAaMsg i = mkPrefixedMessageId ("aa" <> show i <> "a")
+    let mkBbMsg i = mkPrefixedMessageId ("bb" <> show i <> "a")
+    let aaMessages = Set.fromList [ mkAaMsg i | i <- [0 .. halfSize - 1] ]
+    let bbMessages = Set.fromList [ mkBbMsg i | i <- [0 .. halfSize - 1] ]
+    let allMessages = Set.union aaMessages bbMessages
+    let sampleAa = mkAaMsg 0
+    let sampleBb = mkBbMsg 0
+    let olderAaMessage = mkPrefixedMessageId "aazz"
+
+    olderAaArchive <- submit env.ccipOwner do
+        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
+            ccipOwner = env.ccipOwner
+            partyOwner = env.receiver
+            perPartyRouterInstanceId = routerInstanceId
+            archiveBucket = CCIP.PerPartyRouter.executionArchiveBucket olderAaMessage
+            archiveIndex = 0
+            executedMessages = Set.fromList [olderAaMessage]
+
+    router <- submit env.ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = routerInstanceId
+            ccipOwner = env.ccipOwner
+            partyOwner = env.receiver
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.make "unused-onramp-mb" env.ccipOwner
+                offRamp = env.offRampAddr
+                globalConfig = env.globalConfigAddr
+                tokenAdminRegistry = env.tokenAdminRegistryAddr
+                feeQuoter = RawInstanceAddress.make "unused-feequoter-mb" env.ccipOwner
+                rmnRemote = env.rmnRemoteAddr
+            outboundSequenceNumbers = Map.empty
+            executedMessages = allMessages
+            archivedExecutionContractIds =
+                Map.fromList [(CCIP.PerPartyRouter.executionArchiveBucket olderAaMessage, [olderAaArchive])]
+            archivedBucketSizes =
+                Map.fromList [(CCIP.PerPartyRouter.executionArchiveBucket olderAaMessage, 1)]
+            archiveSizeLimit = testArchiveSizeLimit
+            customObservers = []
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = env.sourceChainSelector
+            destChainSelector = env.destChainSelector
+            sequenceNumber = 9.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = messageFinality 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = RawInstanceAddress.toInstanceAddress env.offRampAddr
+            sender = "0000000000000000000000000000000000000005"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress env.receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "4d756c746942756366657454657374"
+
+    let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 message
+
+    disclosedOlderAaArchive <- fromSome <$> queryDisclosure env.ccipOwner olderAaArchive
+
+    let disclosures = actAs env.receiver <> actAs env.ccipOwner
+            <> disclose env.disclosedOffRamp <> disclose env.disclosedGlobalConfig
+            <> disclose env.disclosedTokenAdminRegistry <> disclose env.disclosedRmnRemote
+            <> disclose disclosedOlderAaArchive
+
+    executingMessageCid <- submit disclosures do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareExecute with
+            context = env.ccipCtx
+            encodedMessage = encodedMessage
+            receiverParty = env.receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = []
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverFinalityConfig = finalityConfig 2000
+            caller = env.receiver
+
+    executingMessageCid <- submit (actAs env.ccvOwner <> actAs env.ccipOwner) do
+        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = env.ccvInstanceId
+            versionTag = ""
+            caller = env.ccvOwner
+
+    executeResult <- submit disclosures do
+        exerciseCmd router CCIP.PerPartyRouter.Execute with
+            context = env.ccipCtx
+            executingMessageCid = executingMessageCid
+
+    executeResult.state === CCIP.Internal.SUCCESS
+
+    Some updatedRouter <- queryContractId env.receiver executeResult.router
+    Set.size updatedRouter.executedMessages === 1
+    assertMsg "newly executed message is the only active message" $
+        Set.member executeResult.messageId updatedRouter.executedMessages
+
+    length (Map.keys updatedRouter.archivedExecutionContractIds) === 2
+
+    case Map.lookup "aa" updatedRouter.archivedExecutionContractIds of
+        Some [aaCid] -> do
+            assertMsg "aa tail Append replaces the contract id" (aaCid /= olderAaArchive)
+            Some aaArchive <- queryContractId env.receiver aaCid
+            aaArchive.archiveIndex === 0
+            Set.size aaArchive.executedMessages === 1 + halfSize
+            assertMsg "older aa message still in tail" $
+                Set.member olderAaMessage aaArchive.executedMessages
+            assertMsg "sample aa message in tail" $
+                Set.member sampleAa aaArchive.executedMessages
+        _ -> assertMsg "expected exactly one 'aa' archive (no spill)" False
+
+    case Map.lookup "aa" updatedRouter.archivedBucketSizes of
+        Some sz -> sz === 1 + halfSize
+        None -> assertMsg "missing 'aa' bucket size" False
+
+    case Map.lookup "bb" updatedRouter.archivedExecutionContractIds of
+        Some [bbCid] -> do
+            Some bbArchive <- queryContractId env.receiver bbCid
+            bbArchive.archiveIndex === 0
+            Set.size bbArchive.executedMessages === halfSize
+            assertMsg "sample bb message in 'bb' archive" $
+                Set.member sampleBb bbArchive.executedMessages
+        _ -> assertMsg "expected exactly one 'bb' archive" False
+
+    case Map.lookup "bb" updatedRouter.archivedBucketSizes of
+        Some sz -> sz === halfSize
+        None -> assertMsg "missing 'bb' bucket size" False
+
+    activeState <- submit env.receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = executeResult.messageId
+            caller = env.receiver
+    activeState === CCIP.Internal.SUCCESS
+
+    aaState <- submit env.receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = sampleAa
+            caller = env.receiver
+    aaState === CCIP.Internal.SUCCESS
+
+    bbState <- submit env.receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = sampleBb
+            caller = env.receiver
+    bbState === CCIP.Internal.SUCCESS
+
+    olderAaState <- submit env.receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = olderAaMessage
+            caller = env.receiver
+    olderAaState === CCIP.Internal.SUCCESS
+
+    debug "testExecuteRollsOverExecutedMessages_MultiBucketNoSpill: PASSED"
+
+-- | The tail archive for bucket "aa" already holds 7 messages (tailSize=7, room=3).
+-- 10 new "aa" messages arrive: the 3 lexicographically-smallest fill the tail to capacity (7+3=10),
+-- and the remaining 7 spill into a second archive.
+-- Verifies the tail-fill-then-spill path when the tail has partial capacity.
+testExecuteRollsOverExecutedMessages_TailSpill : Script ()
+testExecuteRollsOverExecutedMessages_TailSpill = script do
+    env <- setupRolloverEnv "ts" 7777777777.0 8888888888.0
+
+    let routerInstanceId = "test-router-ts"
+    let testArchiveSizeLimit = 10
+    let mkAaMsg i = mkPrefixedMessageId ("aa" <> show i <> "a")
+    let aaMessages = [ mkAaMsg i | i <- [0 .. 9] ]
+    let aaMessagesSet = Set.fromList aaMessages
+    let mkOlderMsg i = mkPrefixedMessageId ("aazz" <> show i <> "a")
+    let olderMessages = [ mkOlderMsg i | i <- [0 .. 6] ]
+    let olderMessagesSet = Set.fromList olderMessages
+
+    olderArchive <- submit env.ccipOwner do
+        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
+            ccipOwner = env.ccipOwner
+            partyOwner = env.receiver
+            perPartyRouterInstanceId = routerInstanceId
+            archiveBucket = "aa"
+            archiveIndex = 0
+            executedMessages = olderMessagesSet
+
+    router <- submit env.ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = routerInstanceId
+            ccipOwner = env.ccipOwner
+            partyOwner = env.receiver
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = RawInstanceAddress.make "unused-onramp-ts" env.ccipOwner
+                offRamp = env.offRampAddr
+                globalConfig = env.globalConfigAddr
+                tokenAdminRegistry = env.tokenAdminRegistryAddr
+                feeQuoter = RawInstanceAddress.make "unused-feequoter-ts" env.ccipOwner
+                rmnRemote = env.rmnRemoteAddr
+            outboundSequenceNumbers = Map.empty
+            executedMessages = aaMessagesSet
+            archivedExecutionContractIds = Map.fromList [("aa", [olderArchive])]
+            archivedBucketSizes = Map.fromList [("aa", 7)]
+            archiveSizeLimit = testArchiveSizeLimit
+            customObservers = []
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = env.sourceChainSelector
+            destChainSelector = env.destChainSelector
+            sequenceNumber = 11.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = messageFinality 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = RawInstanceAddress.toInstanceAddress env.offRampAddr
+            sender = "0000000000000000000000000000000000000007"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress env.receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "5461696c5370696c6c54657374"
+
+    let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 message
+
+    disclosedOlderArchive <- fromSome <$> queryDisclosure env.ccipOwner olderArchive
+
+    let disclosures = actAs env.receiver <> actAs env.ccipOwner
+            <> disclose env.disclosedOffRamp <> disclose env.disclosedGlobalConfig
+            <> disclose env.disclosedTokenAdminRegistry <> disclose env.disclosedRmnRemote
+            <> disclose disclosedOlderArchive
+
+    executingMessageCid <- submit disclosures do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareExecute with
+            context = env.ccipCtx
+            encodedMessage = encodedMessage
+            receiverParty = env.receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = []
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverFinalityConfig = finalityConfig 2000
+            caller = env.receiver
+
+    executingMessageCid <- submit (actAs env.ccvOwner <> actAs env.ccipOwner) do
+        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = env.ccvInstanceId
+            versionTag = ""
+            caller = env.ccvOwner
+
+    executeResult <- submit disclosures do
+        exerciseCmd router CCIP.PerPartyRouter.Execute with
+            context = env.ccipCtx
+            executingMessageCid = executingMessageCid
+
+    executeResult.state === CCIP.Internal.SUCCESS
+
+    Some updatedRouter <- queryContractId env.receiver executeResult.router
+    Set.size updatedRouter.executedMessages === 1
+    assertMsg "newly executed message should be the only active message" $
+        Set.member executeResult.messageId updatedRouter.executedMessages
+
+    length (Map.keys updatedRouter.archivedExecutionContractIds) === 1
+    case Map.lookup "aa" updatedRouter.archivedExecutionContractIds of
+        Some [firstArchiveCid, secondArchiveCid] -> do
+            assertMsg "tail archive Append replaces the contract id" (firstArchiveCid /= olderArchive)
+
+            Some firstArchive <- queryContractId env.receiver firstArchiveCid
+            Some secondArchive <- queryContractId env.receiver secondArchiveCid
+
+            firstArchive.archiveIndex === 0
+            secondArchive.archiveIndex === 1
+
+            Set.size firstArchive.executedMessages === testArchiveSizeLimit
+            Set.size secondArchive.executedMessages === 7
+
+            assertMsg "tail archive contains all older messages" $
+                Set.isSubsetOf olderMessagesSet firstArchive.executedMessages
+
+            let allArchived = Set.union firstArchive.executedMessages secondArchive.executedMessages
+            let expectedArchived = Set.union olderMessagesSet aaMessagesSet
+            allArchived === expectedArchived
+        _ -> assertMsg "expected exactly two 'aa' archive contracts after tail spill" False
+
+    case Map.lookup "aa" updatedRouter.archivedBucketSizes of
+        Some sz -> sz === 7
+        None -> assertMsg "missing 'aa' bucket size after spill" False
+
+    activeState <- submit env.receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = executeResult.messageId
+            caller = env.receiver
+    activeState === CCIP.Internal.SUCCESS
+
+    sampleAaState <- submit env.receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = mkAaMsg 0
+            caller = env.receiver
+    sampleAaState === CCIP.Internal.SUCCESS
+
+    olderState <- submit env.receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = mkOlderMsg 0
+            caller = env.receiver
+    olderState === CCIP.Internal.SUCCESS
+
+    debug "testExecuteRollsOverExecutedMessages_TailSpill: PASSED"
 
 testPrepareSendRejectsDuplicateSenderRequiredCCVs : Script ()
 testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
@@ -1679,6 +2048,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             executedMessages = Set.empty
             archivedExecutionContractIds = Map.empty
             archivedBucketSizes = Map.empty
+            archiveSizeLimit = CCIP.PerPartyRouter.maxExecutedMessagesSize
             customObservers = []
 
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp

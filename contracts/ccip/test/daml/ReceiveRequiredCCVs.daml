@@ -118,6 +118,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
             executedMessages = Set.empty
             archivedExecutionContractIds = Map.empty
             archivedBucketSizes = Map.empty
+            archiveSizeLimit = CCIP.PerPartyRouter.maxExecutedMessagesSize
             customObservers = []
 
     receiverCid <- submit receiver do
@@ -254,6 +255,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
             executedMessages = Set.empty
             archivedExecutionContractIds = Map.empty
             archivedBucketSizes = Map.empty
+            archiveSizeLimit = CCIP.PerPartyRouter.maxExecutedMessagesSize
             customObservers = []
 
     receiverCid <- submit receiver do

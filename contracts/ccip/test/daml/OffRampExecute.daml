@@ -333,6 +333,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             executedMessages = Set.empty
             archivedExecutionContractIds = Map.empty
             archivedBucketSizes = Map.empty
+            archiveSizeLimit = PerPartyRouter.maxExecutedMessagesSize
             customObservers = []
 
     let message = MessageCodecV1.MessageV1 with

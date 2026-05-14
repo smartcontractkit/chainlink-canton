@@ -43,6 +43,7 @@ testPerPartyRouterMCMSEntrypoint_SetDeps = script do
       executedMessages = Set.empty
       archivedExecutionContractIds = Map.empty
       archivedBucketSizes = Map.empty
+      archiveSizeLimit = maxExecutedMessagesSize
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -102,6 +103,7 @@ testPerPartyRouterMCMSEntrypoint_SetDeps_Partial = script do
       executedMessages = Set.empty
       archivedExecutionContractIds = Map.empty
       archivedBucketSizes = Map.empty
+      archiveSizeLimit = maxExecutedMessagesSize
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -161,6 +163,7 @@ testPerPartyRouterMCMSEntrypoint_UnknownFunction = script do
       executedMessages = Set.empty
       archivedExecutionContractIds = Map.empty
       archivedBucketSizes = Map.empty
+      archiveSizeLimit = maxExecutedMessagesSize
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -198,6 +201,7 @@ testPerPartyRouterMCMSEntrypoint_InvalidParams = script do
       executedMessages = Set.empty
       archivedExecutionContractIds = Map.empty
       archivedBucketSizes = Map.empty
+      archiveSizeLimit = maxExecutedMessagesSize
       customObservers = []
 
   let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
@@ -235,6 +239,7 @@ testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
       executedMessages = Set.empty
       archivedExecutionContractIds = Map.empty
       archivedBucketSizes = Map.empty
+      archiveSizeLimit = maxExecutedMessagesSize
       customObservers = []
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid

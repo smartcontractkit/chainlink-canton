@@ -2,7 +2,7 @@
 module CCIP.PerPartyRouter where
 
 import DA.Action (foldlA)
-import DA.List (dedup, init, unique)
+import DA.List (dedup, init, last, unique)
 import DA.Map qualified as Map
 import DA.Set (Set)
 import DA.Set qualified as Set
@@ -74,8 +74,53 @@ bucketExecutedMessages messages =
         Map.empty
         (Set.toList messages)
 
--- Append to the most-recent archive for a bucket when it still has room;
--- create a new one only when appending would exceed maxArchivedSetSize.
+takeFirstNFromSet : Int -> Set BytesHex -> (Set BytesHex, Set BytesHex)
+takeFirstNFromSet n messages =
+    if n <= 0
+    then (Set.empty, messages)
+    else
+        -- Set.toList returns elements in ascending order (Set is a sorted map internally)
+        let elems = Set.toList messages
+        in (Set.fromList (take n elems), Set.fromList (drop n elems))
+
+-- | Fill the tail archive before creating new ones (tail-fill-then-spill).
+-- `tailSize` is the number of messages in the last archive in `archives`,
+-- or 0 when `archives` is empty. Every non-tail archive is full.
+packRemainingIntoArchives
+    : Party
+    -> Party
+    -> Text
+    -> Text
+    -> [ContractId ArchivedExecutedMessages]
+    -> Int
+    -> Int
+    -> Set BytesHex
+    -> Update ([ContractId ArchivedExecutedMessages], Int)
+packRemainingIntoArchives owner partyOwner routerId bucket archives tailSize archiveSizeLimit remaining =
+    if Set.null remaining
+    then pure (archives, tailSize)
+    else
+        let canFillTail = not (null archives) && tailSize > 0 && tailSize < archiveSizeLimit
+        in if canFillTail
+            then do
+                let room = archiveSizeLimit - tailSize
+                    (fillChunk, rest) = takeFirstNFromSet room remaining
+                newCid <- exercise (last archives) Append with additionalMessages = fillChunk
+                packRemainingIntoArchives owner partyOwner routerId bucket
+                    (init archives <> [newCid]) (tailSize + Set.size fillChunk) archiveSizeLimit rest
+            else do
+                let (chunk, rest) = takeFirstNFromSet archiveSizeLimit remaining
+                newCid <- create ArchivedExecutedMessages with
+                    ccipOwner = owner
+                    partyOwner = partyOwner
+                    perPartyRouterInstanceId = routerId
+                    archiveBucket = bucket
+                    archiveIndex = length archives
+                    executedMessages = chunk
+                packRemainingIntoArchives owner partyOwner routerId bucket
+                    (archives <> [newCid]) (Set.size chunk) archiveSizeLimit rest
+
+-- | Append into the tail archive while there is room, then create further archives if needed.
 archiveMessagesToBucket
     : Party
     -> Party
@@ -83,26 +128,15 @@ archiveMessagesToBucket
     -> Text
     -> [ContractId ArchivedExecutedMessages]
     -> Int
+    -> Int
     -> Set BytesHex
     -> Update ([ContractId ArchivedExecutedMessages], Int)
-archiveMessagesToBucket owner partyOwner routerId bucket existingList existingSize newMessages =
-    let newCount = Set.size newMessages
-    in if existingSize > 0 && existingSize + newCount <= maxArchivedSetSize
-    then do
-        let lastCid = case reverse existingList of
-                [] -> error "router: bucket list empty despite existingSize > 0"
-                (x :: _) -> x
-        newCid <- exercise lastCid Append with additionalMessages = newMessages
-        pure (init existingList <> [newCid], existingSize + newCount)
-    else do
-        newCid <- create ArchivedExecutedMessages with
-            ccipOwner = owner
-            partyOwner = partyOwner
-            perPartyRouterInstanceId = routerId
-            archiveBucket = bucket
-            archiveIndex = length existingList
-            executedMessages = newMessages
-        pure (existingList <> [newCid], newCount)
+archiveMessagesToBucket owner partyOwner routerId bucket existingList existingSize archiveSizeLimit newMessages =
+    if Set.null newMessages
+    then pure (existingList, existingSize)
+    else if existingSize > 0 && null existingList
+    then error "router: bucket size set but archive list empty"
+    else packRemainingIntoArchives owner partyOwner routerId bucket existingList existingSize archiveSizeLimit newMessages
 
 archiveExecutedMessageBuckets
     : Party
@@ -110,15 +144,16 @@ archiveExecutedMessageBuckets
     -> Text
     -> Map.Map Text [ContractId ArchivedExecutedMessages]
     -> Map.Map Text Int
+    -> Int
     -> Set BytesHex
     -> Update (Map.Map Text [ContractId ArchivedExecutedMessages], Map.Map Text Int)
-archiveExecutedMessageBuckets owner partyOwner routerId archives bucketSizes messages =
+archiveExecutedMessageBuckets owner partyOwner routerId archives bucketSizes archiveSizeLimit messages =
     foldlA
         (\(newArchives, newSizes) (bucket, bucketMessages) -> do
             let existingList = fromOptional [] (Map.lookup bucket newArchives)
                 existingSize = fromOptional 0 (Map.lookup bucket newSizes)
             (updatedList, updatedSize) <- archiveMessagesToBucket
-                owner partyOwner routerId bucket existingList existingSize bucketMessages
+                owner partyOwner routerId bucket existingList existingSize archiveSizeLimit bucketMessages
             pure (Map.insert bucket updatedList newArchives, Map.insert bucket updatedSize newSizes)
         )
         (archives, bucketSizes)
@@ -224,6 +259,7 @@ template PerPartyRouterFactory
                     executedMessages = Set.empty
                     archivedExecutionContractIds = Map.empty
                     archivedBucketSizes = Map.empty
+                    archiveSizeLimit = maxExecutedMessagesSize
                     customObservers = []
 
                 newFactoryCid <- create this with
@@ -289,8 +325,6 @@ template ArchivedExecutedMessages
             && Set.size executedMessages > 0
             && Set.size executedMessages <= maxArchivedSetSize
 
-        -- Append additional messages into this archive. Only allowed when
-        -- the result stays within maxArchivedSetSize; enforced by ensure.
         choice Append : ContractId ArchivedExecutedMessages
             with
                 additionalMessages : Set BytesHex
@@ -320,11 +354,13 @@ template PerPartyRouter
         executedMessages : Set BytesHex
         archivedExecutionContractIds : Map.Map Text [ContractId ArchivedExecutedMessages]
         archivedBucketSizes : Map.Map Text Int
+        archiveSizeLimit : Int
         customObservers : [Party]
     where
         signatory ccipOwner
         observer partyOwner :: customObservers
         ensure assertValidInstanceId instanceId && unique customObservers
+            && archiveSizeLimit > 0 && archiveSizeLimit <= maxArchivedSetSize
 
         nonconsuming choice GetFee : CCIP.OnRamp.GetFeeFromRouterResult
             with
@@ -730,13 +766,14 @@ template PerPartyRouter
                     tokenConfigCid = tokenConfigCid
 
                 routerCid <-
-                    if Set.size executedMessages >= maxExecutedMessagesSize then do
+                    if Set.size executedMessages >= archiveSizeLimit then do
                         (newArchives, newSizes) <- archiveExecutedMessageBuckets
                             ccipOwner
                             partyOwner
                             instanceId
                             archivedExecutionContractIds
                             archivedBucketSizes
+                            archiveSizeLimit
                             executedMessages
                         create this with
                             executedMessages = Set.singleton result.messageId

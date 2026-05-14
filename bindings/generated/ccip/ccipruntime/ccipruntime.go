@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "c7d33536d1f7ec4a74d069563e30202da28153e9293fb55ab7bef590e223eb63"
+	PackageID   = "8e32693ab8bc5209f5eb7dc784dbc2bb03a1d5ef9ae6507a43b8ee9ec3a2640a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2330,6 +2330,7 @@ type PerPartyRouter struct {
 	ExecutedMessages             types.SET                          `json:"executedMessages"`
 	ArchivedExecutionContractIds map[types.TEXT][]types.CONTRACT_ID `json:"archivedExecutionContractIds"`
 	ArchivedBucketSizes          map[types.TEXT]types.INT64         `json:"archivedBucketSizes"`
+	ArchiveSizeLimit             types.INT64                        `json:"archiveSizeLimit"`
 	CustomObservers              []types.PARTY                      `json:"customObservers"`
 }
 
@@ -2385,6 +2386,9 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 		}
 		return map[string]any{"_type": "genmap", "value": t.ArchivedBucketSizes}
 	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["archiveSizeLimit"] = int64(t.ArchiveSizeLimit)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["customObservers"] = func() []any {
@@ -2443,6 +2447,9 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 		}
 		return map[string]any{"_type": "genmap", "value": t.ArchivedBucketSizes}
 	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["archiveSizeLimit"] = int64(t.ArchiveSizeLimit)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["customObservers"] = func() []any {
@@ -2504,27 +2511,6 @@ func (t PerPartyRouter) CCIPSendWithPackageID(contractID string, packageID strin
 	}
 }
 
-// Execute exercises the Execute choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) Execute(contractID string, args Execute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "Execute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ExecuteWithPackageID exercises the Execute choice using the provided package ID instead of package name
-func (t PerPartyRouter) ExecuteWithPackageID(contractID string, packageID string, args Execute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "Execute",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // GetExecutionState exercises the GetExecutionState choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) GetExecutionState(contractID string, args GetExecutionState) *model.ExerciseCommand {
@@ -2542,6 +2528,27 @@ func (t PerPartyRouter) GetExecutionStateWithPackageID(contractID string, packag
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetExecutionState",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Execute exercises the Execute choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) Execute(contractID string, args Execute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "Execute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ExecuteWithPackageID exercises the Execute choice using the provided package ID instead of package name
+func (t PerPartyRouter) ExecuteWithPackageID(contractID string, packageID string, args Execute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "Execute",
 		Arguments:  argsToMap(args),
 	}
 }
