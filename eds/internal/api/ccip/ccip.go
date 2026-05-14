@@ -39,7 +39,7 @@ const MaxNumCCVs = 64
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore *store.ActiveContractStore
+	activeContractStore store.ActiveContractStoreInterface
 
 	perPartyRouterFactory contracts.InstanceAddress
 	onRamp                contracts.InstanceAddress
@@ -55,7 +55,7 @@ var _ oapiCCIP.ServerInterface = &Server{}
 func NewServer(
 	_ context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
+	activeContractStore store.ActiveContractStoreInterface,
 	config config.CCIPAPIConfig,
 ) (*Server, error) {
 	s := &Server{

@@ -670,6 +670,10 @@ var _ global.InstanceAddressFilter = &Server{}
 // FilterContracts returns the sub-set of addresses that are tracked by the Token Pool API Server.
 // This includes token pools themselves, and their rate limiters.
 func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+	if len(addresses) == 0 {
+		return nil
+	}
+
 	// Reconstruct all contracts + rate limiters
 	var allContracts = make(map[contracts.InstanceAddress]bool, len(s.contractConfigs)*2)
 	for poolAddress, contractConfig := range s.contractConfigs {

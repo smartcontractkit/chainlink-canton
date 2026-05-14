@@ -61,10 +61,18 @@ func NewServer(
 		tokens:              make(map[types.TEXT]TokenConfig),
 	}
 
-	for registryAddress, registry := range cfg.Registries {
+	for _, registry := range cfg.Registries {
+		// Validate config
+		if len(registry.TokenId) == 0 {
+			return nil, fmt.Errorf("empty TokenId in config")
+		}
+		if _, ok := s.tokens[types.TEXT(registry.TokenId)]; ok {
+			return nil, fmt.Errorf("duplicate TokenId in config: %s", registry.TokenId)
+		}
+
 		s.tokens[types.TEXT(registry.TokenId)] = TokenConfig{
 			Type:            registry.TokenType,
-			RegistryAddress: contracts.HexToInstanceAddress(registryAddress),
+			RegistryAddress: registry.InstanceAddress,
 		}
 		switch registry.TokenType {
 		case config.TokenTypeLINK:
@@ -78,6 +86,8 @@ func NewServer(
 					PartyID:    registry.PartyID,
 				},
 			)
+		default:
+			return nil, fmt.Errorf("unsupported token type: %s", registry.TokenType)
 		}
 	}
 
