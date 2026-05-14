@@ -120,12 +120,12 @@ func UnwrapTimelockCalls(calls []mcms.TimelockCall) []TimelockCall {
 }
 
 // NewMCMSEncoder creates an MCMS encoder for the given package ID.
-// Usage: encoder := NewMCMSEncoder(mcmsPkgID)
+// Usage: encoder := NewMCMSEncoder()
 //
 //	choice, _ := encoder.ScheduleBatch(params)
 //	proposal.AddOperation(instanceAddress, choice.Choice, choice.OperationData)
-func NewMCMSEncoder(pkgID string) mcms.MCMSEncoder {
-	return mcms.NewContract(pkgID, "MCMS.Main", "MCMS").Encoder()
+func NewMCMSEncoder() mcms.MCMSEncoder {
+	return mcms.NewContract(fmt.Sprintf("#%s", mcms.PackageName), "MCMS.Main", "MCMS").Encoder()
 }
 
 // MustEncodeScheduleBatch encodes ScheduleBatchParams and returns the full EncodedChoice.
