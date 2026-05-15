@@ -21,15 +21,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton ImplFactory
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 )
 
 const (
-	cantonToEVMTokenTransferAmount = int64(1000)
-	cantonToEVMDecimalsScale       = int64(100_000_000) // Canton 10 decimals -> EVM 18 decimals
+	cantonToEVMFeeAmount            = int64(2_000)
+	cantonToEVMTokenTransferAmount  = int64(1_000)                     // 1000 tokens (1000 * 10^10) on canton decimals
+	evmDecimalsScale                = int64(1_000_000_000_000_000_000) // EVM 18 decimals
+	cantonToEVMTokenSequentialSends = 2
 )
 
 //nolint:paralleltest // we won't run this in parallel.
@@ -54,6 +56,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, harness)
 	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
+	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
+	require.True(t, ok, "Canton chain cantonImpl must be *devenv.Chain")
 
 	for _, client := range harness.AggregatorClients {
 		t.Cleanup(func() {
@@ -68,6 +72,10 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
+
+		// Setup message send
+		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(cantonToEVMFeeAmount)))
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), 0))
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -153,6 +161,11 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
+		// Setup message send
+		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMFeeAmount)))           // Holdings for fee
+		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMTokenTransferAmount))) // Holdings for token transfer
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), uint64(cantonToEVMTokenTransferAmount)))    // Setup with fee and token transfer amounts
+
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
 		ccvAddr, err := tcapi.GetContractAddress(
@@ -187,50 +200,55 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)
 
-		sendMessageResult, err := cantonChain.SendMessage(
-			subtestCtx,
-			evmChain.ChainSelector(),
-			cciptestinterfaces.MessageFields{
-				Receiver: receiver,
-				Data:     []byte("canton2evm token transfer"),
-				TokenAmount: cciptestinterfaces.TokenAmount{
-					Amount: big.NewInt(cantonToEVMTokenTransferAmount),
-				},
-			},
-			cciptestinterfaces.MessageOptions{
-				ExecutionGasLimit: 500_000,
-				FinalityConfig:    1,
-				Executor:          executorAddr,
-				CCVs: []protocol.CCV{
-					{
-						CCVAddress: ccvAddr,
-						Args:       []byte{},
-						ArgsLen:    0,
+		for sendIdx := range cantonToEVMTokenSequentialSends {
+			t.Logf("Token transfer send %d/%d", sendIdx+1, cantonToEVMTokenSequentialSends)
+			sendMessageResult, err := cantonChain.SendMessage(
+				subtestCtx,
+				evmChain.ChainSelector(),
+				cciptestinterfaces.MessageFields{
+					Receiver: receiver,
+					Data:     []byte("canton2evm token transfer"),
+					TokenAmount: cciptestinterfaces.TokenAmount{
+						Amount: big.NewInt(cantonToEVMTokenTransferAmount),
 					},
 				},
-			},
-			3,
-		)
-		require.NoError(t, err)
-		require.NotNil(t, sendMessageResult.Message)
-		require.NotNil(t, sendMessageResult.Message.TokenTransfer)
-		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
+				cciptestinterfaces.MessageOptions{
+					ExecutionGasLimit: 500_000,
+					FinalityConfig:    1,
+					Executor:          executorAddr,
+					CCVs: []protocol.CCV{
+						{
+							CCVAddress: ccvAddr,
+							Args:       []byte{},
+							ArgsLen:    0,
+						},
+					},
+				},
+				3,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, sendMessageResult.Message)
+			require.NotNil(t, sendMessageResult.Message.TokenTransfer)
+			seqNo := uint64(sendMessageResult.Message.SequenceNumber)
 
-		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
-		require.NoError(t, err)
-		require.NotNil(t, sentEvent.Message)
-		require.NotNil(t, sentEvent.Message.TokenTransfer)
+			sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+			require.NoError(t, err)
+			require.NotNil(t, sentEvent.Message)
+			require.NotNil(t, sentEvent.Message.TokenTransfer)
 
-		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
-		require.NoError(t, err)
-		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+			ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+			require.NoError(t, err)
+			require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		}
 
 		receiverBalanceAfter, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
-		expectedTransferAmount := new(big.Int).Mul(big.NewInt(cantonToEVMTokenTransferAmount), big.NewInt(cantonToEVMDecimalsScale))
-		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), expectedTransferAmount)
+
+		expectedTransferPerMessage := new(big.Int).Mul(big.NewInt(cantonToEVMTokenTransferAmount), big.NewInt(evmDecimalsScale))
+		totalExpectedTransfer := new(big.Int).Mul(expectedTransferPerMessage, big.NewInt(cantonToEVMTokenSequentialSends))
+		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), totalExpectedTransfer)
+		t.Logf("EVM receiver token balance: before=%s after=%s totalExpectedTransfer=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String(), totalExpectedTransfer.String())
 		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter)
-		t.Logf("EVM receiver token balance: before=%s after=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String())
 	})
 }
