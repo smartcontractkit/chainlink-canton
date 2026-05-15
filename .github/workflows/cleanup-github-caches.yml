@@ -1,0 +1,36 @@
+# ref: https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manage-caches#force-deleting-cache-entries
+name: Cleanup github runner caches on closed pull requests
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Cleanup
+        run: |
+          echo "Fetching list of cache for PR #$PR"
+          cachesHead=$(gh cache list --ref refs/pull/$PR/head --json id,ref,key,sizeInBytes,version,lastAccessedAt)
+          cachesMerge=$(gh cache list --ref refs/pull/$PR/merge --json id,ref,key,sizeInBytes,version,lastAccessedAt)
+          caches=$(echo "$cachesHead $cachesMerge" | jq -s 'add')
+          
+          echo "Total caches found: $(echo $caches | jq length)"
+          echo $caches | jq
+
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting caches..."
+          for cacheKey in $(echo $caches | jq '.[].id')
+          do
+              echo $cacheKey
+              gh cache delete $cacheKey
+          done
+          echo "Done"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}

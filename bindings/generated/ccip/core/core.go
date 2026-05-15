@@ -26,8 +26,8 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "df69f0b1e923bbf07097a2e9b20d8b7c46e228ff8785980c5b8f9f3affaf7786"
-	SDKVersion  = "3.4.10"
+	PackageID   = "ba08c97bc3f5646c303f9ee38a957817ff7fb5424c775c477506c7feb222bde3"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {

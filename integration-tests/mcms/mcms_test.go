@@ -9,16 +9,17 @@ import (
 	"testing"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 // ===========================================================================
@@ -619,11 +620,7 @@ func createMCMS(ctx context.Context, participant canton.Participant, owner strin
 				{
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
+							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
 								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: baseMcmsId}}},
@@ -675,11 +672,7 @@ func setMCMSConfig(ctx context.Context, participant canton.Participant, owner st
 				{
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
+							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
 							ContractId: mcmsCid,
 							Choice:     "SetConfig",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -749,11 +742,7 @@ func setMCMSRoot(ctx context.Context, participant canton.Participant, owner stri
 				{
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
+							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{

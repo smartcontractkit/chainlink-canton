@@ -826,9 +826,9 @@ func findActiveRateLimiterByInstanceID(ctx context.Context, participant canton.P
 		return nil, err
 	}
 
-	for i := len(rateLimiters) - 1; i >= 0; i-- {
-		if getRateLimiterInstanceID(rateLimiters[i]) == instanceID {
-			return rateLimiters[i], nil
+	for _, v := range slices.Backward(rateLimiters) {
+		if getRateLimiterInstanceID(v) == instanceID {
+			return v, nil
 		}
 	}
 

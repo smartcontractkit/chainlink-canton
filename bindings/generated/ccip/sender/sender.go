@@ -26,8 +26,8 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "499972d5d1759b80feaa4dc1af644d8c638d9f33f2a866dbed005e715119b0c1"
-	SDKVersion  = "3.4.10"
+	PackageID   = "9b23a22e3b0f2fc48c94746a13bd5786bc87909a81f852dfc8551cfeb3f349e6"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
