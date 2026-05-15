@@ -16,6 +16,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -32,21 +33,21 @@ import (
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 )
 
-func (c *Chain) getEDSOutput() (*output, error) {
-	edsOut, err := util.OpaqueToConcreteStrict[output](c.cfg.GenericServices[c.ChainSelector()].Output)
+func (c *Chain) getEDSURL() (string, error) {
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get generic services output for chain %d: %w", c.ChainSelector(), err)
+		return "", fmt.Errorf("failed to get EDS URL: %w", err)
 	}
 
-	return edsOut, nil
+	return edsURL, nil
 }
 
 func (c *Chain) GetPerPartyRouterFactoryDisclosure(ctx context.Context, partyId string) (*edsTesthelpers.PerPartyRouterFactoryDisclosure, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return nil, err
 	}
-	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(edsOut.EDSURL)
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(edsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP EDS client: %w", err)
 	}
@@ -55,11 +56,11 @@ func (c *Chain) GetPerPartyRouterFactoryDisclosure(ctx context.Context, partyId 
 }
 
 func (c *Chain) GetTokenPoolForToken(ctx context.Context, token contracts.EncodedInstrumentID) (contracts.RawInstanceAddress, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return contracts.RawInstanceAddress(""), err
 	}
-	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(edsOut.EDSURL)
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(edsURL)
 	if err != nil {
 		return contracts.RawInstanceAddress(""), fmt.Errorf("failed to create CCIP EDS client: %w", err)
 	}
@@ -68,11 +69,11 @@ func (c *Chain) GetTokenPoolForToken(ctx context.Context, token contracts.Encode
 }
 
 func (c *Chain) GetTokenPoolSendDisclosure(ctx context.Context, message oapiCommon.Message, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolSendDisclosure, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return nil, err
 	}
-	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(edsOut.EDSURL)
+	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(edsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Token Pool EDS client: %w", err)
 	}
@@ -81,11 +82,11 @@ func (c *Chain) GetTokenPoolSendDisclosure(ctx context.Context, message oapiComm
 }
 
 func (c *Chain) GetCCIPSendDisclosure(ctx context.Context, message oapiCommon.Message, senderRequiredCCVs, tokenPoolRequiredCCVs []string) (*edsTesthelpers.CCIPSendDisclosure, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return nil, err
 	}
-	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(edsOut.EDSURL)
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(edsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP EDS client: %w", err)
 	}
@@ -94,11 +95,11 @@ func (c *Chain) GetCCIPSendDisclosure(ctx context.Context, message oapiCommon.Me
 }
 
 func (c *Chain) GetCCVSendDisclosure(ctx context.Context, message oapiCommon.Message, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVSendDisclosure, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return nil, err
 	}
-	ccvAPIClient, err := oapiCCV.NewClientWithResponses(edsOut.EDSURL)
+	ccvAPIClient, err := oapiCCV.NewClientWithResponses(edsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCV EDS client: %w", err)
 	}
@@ -107,11 +108,11 @@ func (c *Chain) GetCCVSendDisclosure(ctx context.Context, message oapiCommon.Mes
 }
 
 func (c *Chain) GetExecutorSendDisclosure(ctx context.Context, message oapiCommon.Message, executorAddress contracts.InstanceAddress, ccvAddresses []string) (*edsTesthelpers.ExecutorDisclosure, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return nil, err
 	}
-	executorAPIClient, err := oapiExecutor.NewClientWithResponses(edsOut.EDSURL)
+	executorAPIClient, err := oapiExecutor.NewClientWithResponses(edsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Executor EDS client: %w", err)
 	}
@@ -120,11 +121,11 @@ func (c *Chain) GetExecutorSendDisclosure(ctx context.Context, message oapiCommo
 }
 
 func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessageHex string, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolExecuteDisclosure, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return nil, err
 	}
-	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(edsOut.EDSURL)
+	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(edsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Token Pool EDS client: %w", err)
 	}
@@ -133,11 +134,11 @@ func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessag
 }
 
 func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex string) (*edsTesthelpers.CCIPExecuteDisclosure, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return nil, err
 	}
-	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(edsOut.EDSURL)
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(edsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP EDS client: %w", err)
 	}
@@ -146,11 +147,11 @@ func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex 
 }
 
 func (c *Chain) GetCCVExecuteDisclosure(ctx context.Context, encodedMessageHex string, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVExecuteDisclosure, error) {
-	edsOut, err := c.getEDSOutput()
+	edsURL, err := c.getEDSURL()
 	if err != nil {
 		return nil, err
 	}
-	ccvAPIClient, err := oapiCCV.NewClientWithResponses(edsOut.EDSURL)
+	ccvAPIClient, err := oapiCCV.NewClientWithResponses(edsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCV EDS client: %w", err)
 	}
@@ -282,13 +283,28 @@ func (l *launcher) Launch(
 
 	// return the EDS config
 	// Add the config and container URL to the output
+	edsURL := fmt.Sprintf("http://%s:%s", host, edsMappedPort.Port())
 	opaqueConfig, err := util.ConcreteToOpaque(output{
 		EDSConfig: *edsCfg,
-		EDSURL:    fmt.Sprintf("http://%s:%s", host, edsMappedPort.Port()),
+		EDSURL:    edsURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert output to opaque config: %w", err)
 	}
+
+	// Update the CLDF env datastore with the EDS URL,
+	// so that we can fetch it in the Canton chain impl.
+	// env.DataStore is immutable, so we need to create a new memory data store
+	// and merge the existing data store into it.
+	// Then we save the EDS URL to the new data store.
+	ds := datastore.NewMemoryDataStore()
+	if err := ds.Merge(env.DataStore); err != nil {
+		return nil, fmt.Errorf("failed to merge existing datastore: %w", err)
+	}
+	if err := deployment.SaveEDSURL(ds, edsURL); err != nil {
+		return nil, fmt.Errorf("failed to save EDS URL: %w", err)
+	}
+	env.DataStore = ds.Seal()
 
 	return opaqueConfig, nil
 }

@@ -180,8 +180,6 @@ type Chain struct {
 	lastSentSeq   uint64
 	lastSentEvent cciptestinterfaces.MessageSentEvent
 
-	cfg *ccv.Cfg
-
 	// Send setup prerequisites
 	routerAddress       contracts.InstanceAddress
 	senderAddress       contracts.InstanceAddress
@@ -200,7 +198,8 @@ type validatorAPIClients struct {
 	transferClient transferInstructionV1.ClientWithResponsesInterface
 }
 
-func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
+// NOTE: ccv.Cfg will be removed in the future.
+func New(ctx context.Context, _ *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
 	if err != nil {
 		return nil, fmt.Errorf("get chain details for chain %s: %w", chainID, err)
@@ -212,7 +211,6 @@ func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment
 		chain:        chain,
 		chainDetails: chainDetails,
 		logger:       logger,
-		cfg:          cfg,
 	}, nil
 }
 

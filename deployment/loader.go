@@ -12,7 +12,8 @@ import (
 )
 
 type CantonConfigs struct {
-	EDS *edsConfig.Config `json:"eds"`
+	EDS    *edsConfig.Config `json:"eds"`
+	EDSURL string            `json:"eds_url"`
 }
 
 type CantonEnvMetadata struct {
@@ -111,4 +112,28 @@ func SaveEDSConfig(ds datastore.MutableDataStore, cfg *edsConfig.Config) error {
 	cantonMeta.CantonConfigs.EDS = cfg
 
 	return saveCantonEnvMetadata(ds, cantonMeta)
+}
+
+func SaveEDSURL(ds datastore.MutableDataStore, url string) error {
+	cantonMeta, err := loadOrCreateCantonEnvMetadata(ds)
+	if err != nil {
+		return err
+	}
+
+	cantonMeta.CantonConfigs.EDSURL = url
+
+	return saveCantonEnvMetadata(ds, cantonMeta)
+}
+
+func GetEDSURL(ds datastore.DataStore) (string, error) {
+	cantonMeta, err := loadCantonEnvMetadata(ds)
+	if err != nil {
+		return "", err
+	}
+
+	if cantonMeta.CantonConfigs == nil || cantonMeta.CantonConfigs.EDSURL == "" {
+		return "", fmt.Errorf("EDS URL not found in env metadata")
+	}
+
+	return cantonMeta.CantonConfigs.EDSURL, nil
 }
