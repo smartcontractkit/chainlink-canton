@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-lock-release-token-pool"
-	PackageID   = "f60a561685c6fdc60584dbada5e52fbd37d76dbf5dc987ff8cc3a43b6cb265ab"
+	PackageID   = "4c521c56f7f2e6b38bc8b16b52aedd79998077587b3698c9d6a897237599f2c3"
 	SDKVersion  = "3.4.11"
 )
 
@@ -63,6 +63,162 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AddPoolReceiveContextContractValue is a Record type
+type AddPoolReceiveContextContractValue struct {
+	ContextKey       types.TEXT        `json:"contextKey"`
+	ReferredContract types.CONTRACT_ID `json:"referredContract"`
+}
+
+// ToMap converts AddPoolReceiveContextContractValue to a map for DAML arguments
+func (t AddPoolReceiveContextContractValue) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	m["referredContract"] = model.NestedToDAMLValue(t.ReferredContract)
+
+	return m
+}
+
+func (t AddPoolReceiveContextContractValue) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPoolReceiveContextContractValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPoolReceiveContextContractValue to hex string (Canton MCMS format)
+func (t AddPoolReceiveContextContractValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPoolReceiveContextContractValue from hex string (Canton MCMS format)
+func (t *AddPoolReceiveContextContractValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddPoolReceiveContextContractValueParams is a Record type
+type AddPoolReceiveContextContractValueParams struct {
+	ContextKey              types.TEXT                      `json:"contextKey"`
+	ReferentInstanceAddress chainlinkapi.RawInstanceAddress `json:"referentInstanceAddress"`
+}
+
+// ToMap converts AddPoolReceiveContextContractValueParams to a map for DAML arguments
+func (t AddPoolReceiveContextContractValueParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	m["referentInstanceAddress"] = model.NestedToDAMLValue(t.ReferentInstanceAddress)
+
+	return m
+}
+
+func (t AddPoolReceiveContextContractValueParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPoolReceiveContextContractValueParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPoolReceiveContextContractValueParams to hex string (Canton MCMS format)
+func (t AddPoolReceiveContextContractValueParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPoolReceiveContextContractValueParams from hex string (Canton MCMS format)
+func (t *AddPoolReceiveContextContractValueParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddPoolReceiveContextNonContractValue is a Record type
+type AddPoolReceiveContextNonContractValue struct {
+	ContextKey types.TEXT                            `json:"contextKey"`
+	Value      splice_api_token_metadata_v1.AnyValue `json:"value"`
+}
+
+// ToMap converts AddPoolReceiveContextNonContractValue to a map for DAML arguments
+func (t AddPoolReceiveContextNonContractValue) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	m["value"] = model.NestedToDAMLValue(t.Value)
+
+	return m
+}
+
+func (t AddPoolReceiveContextNonContractValue) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPoolReceiveContextNonContractValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPoolReceiveContextNonContractValue to hex string (Canton MCMS format)
+func (t AddPoolReceiveContextNonContractValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPoolReceiveContextNonContractValue from hex string (Canton MCMS format)
+func (t *AddPoolReceiveContextNonContractValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddPoolReceiveContextNonContractValueParams is a Record type
+type AddPoolReceiveContextNonContractValueParams struct {
+	ContextKey   types.TEXT `json:"contextKey"`
+	ValuePayload types.TEXT `json:"valuePayload"`
+}
+
+// ToMap converts AddPoolReceiveContextNonContractValueParams to a map for DAML arguments
+func (t AddPoolReceiveContextNonContractValueParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	m["valuePayload"] = string(t.ValuePayload)
+
+	return m
+}
+
+func (t AddPoolReceiveContextNonContractValueParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPoolReceiveContextNonContractValueParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPoolReceiveContextNonContractValueParams to hex string (Canton MCMS format)
+func (t AddPoolReceiveContextNonContractValueParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPoolReceiveContextNonContractValueParams from hex string (Canton MCMS format)
+func (t *AddPoolReceiveContextNonContractValueParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ApplyChainUpdates is a Record type
@@ -420,6 +576,38 @@ func (t ChainUpdate) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ChainUpdate from hex string (Canton MCMS format)
 func (t *ChainUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ClearPoolReceiveContext is a Record type
+type ClearPoolReceiveContext struct {
+}
+
+// ToMap converts ClearPoolReceiveContext to a map for DAML arguments
+func (t ClearPoolReceiveContext) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t ClearPoolReceiveContext) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ClearPoolReceiveContext) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ClearPoolReceiveContext to hex string (Canton MCMS format)
+func (t ClearPoolReceiveContext) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ClearPoolReceiveContext from hex string (Canton MCMS format)
+func (t *ClearPoolReceiveContext) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1074,23 +1262,86 @@ func (t LockReleaseTokenPool) SetDynamicConfigWithPackageID(contractID string, p
 	}
 }
 
-// SetPoolReceiveContext exercises the SetPoolReceiveContext choice on this LockReleaseTokenPool contract
+// AddPoolReceiveContextNonContractValue exercises the AddPoolReceiveContextNonContractValue choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) SetPoolReceiveContext(contractID string, args SetPoolReceiveContext) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) AddPoolReceiveContextNonContractValue(contractID string, args AddPoolReceiveContextNonContractValue) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "SetPoolReceiveContext",
+		Choice:     "AddPoolReceiveContextNonContractValue",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// SetPoolReceiveContextWithPackageID exercises the SetPoolReceiveContext choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) SetPoolReceiveContextWithPackageID(contractID string, packageID string, args SetPoolReceiveContext) *model.ExerciseCommand {
+// AddPoolReceiveContextNonContractValueWithPackageID exercises the AddPoolReceiveContextNonContractValue choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) AddPoolReceiveContextNonContractValueWithPackageID(contractID string, packageID string, args AddPoolReceiveContextNonContractValue) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "SetPoolReceiveContext",
+		Choice:     "AddPoolReceiveContextNonContractValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddPoolReceiveContextContractValue exercises the AddPoolReceiveContextContractValue choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) AddPoolReceiveContextContractValue(contractID string, args AddPoolReceiveContextContractValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "AddPoolReceiveContextContractValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddPoolReceiveContextContractValueWithPackageID exercises the AddPoolReceiveContextContractValue choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) AddPoolReceiveContextContractValueWithPackageID(contractID string, packageID string, args AddPoolReceiveContextContractValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "AddPoolReceiveContextContractValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemovePoolReceiveContextValue exercises the RemovePoolReceiveContextValue choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) RemovePoolReceiveContextValue(contractID string, args RemovePoolReceiveContextValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "RemovePoolReceiveContextValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemovePoolReceiveContextValueWithPackageID exercises the RemovePoolReceiveContextValue choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) RemovePoolReceiveContextValueWithPackageID(contractID string, packageID string, args RemovePoolReceiveContextValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "RemovePoolReceiveContextValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ClearPoolReceiveContext exercises the ClearPoolReceiveContext choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) ClearPoolReceiveContext(contractID string, args ClearPoolReceiveContext) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "ClearPoolReceiveContext",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ClearPoolReceiveContextWithPackageID exercises the ClearPoolReceiveContext choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) ClearPoolReceiveContextWithPackageID(contractID string, packageID string, args ClearPoolReceiveContext) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "ClearPoolReceiveContext",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1525,6 +1776,78 @@ func (t *RemoteChainConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// RemovePoolReceiveContextValue is a Record type
+type RemovePoolReceiveContextValue struct {
+	ContextKey types.TEXT `json:"contextKey"`
+}
+
+// ToMap converts RemovePoolReceiveContextValue to a map for DAML arguments
+func (t RemovePoolReceiveContextValue) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	return m
+}
+
+func (t RemovePoolReceiveContextValue) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemovePoolReceiveContextValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemovePoolReceiveContextValue to hex string (Canton MCMS format)
+func (t RemovePoolReceiveContextValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemovePoolReceiveContextValue from hex string (Canton MCMS format)
+func (t *RemovePoolReceiveContextValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RemovePoolReceiveContextValueParams is a Record type
+type RemovePoolReceiveContextValueParams struct {
+	ContextKey types.TEXT `json:"contextKey"`
+}
+
+// ToMap converts RemovePoolReceiveContextValueParams to a map for DAML arguments
+func (t RemovePoolReceiveContextValueParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	return m
+}
+
+func (t RemovePoolReceiveContextValueParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemovePoolReceiveContextValueParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemovePoolReceiveContextValueParams to hex string (Canton MCMS format)
+func (t RemovePoolReceiveContextValueParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemovePoolReceiveContextValueParams from hex string (Canton MCMS format)
+func (t *RemovePoolReceiveContextValueParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetDynamicConfig is a Record type
 type SetDynamicConfig struct {
 	RateLimitAdmin *types.PARTY `json:"rateLimitAdmin" hex:"optional"`
@@ -1613,42 +1936,6 @@ func (t SetDynamicConfigParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetDynamicConfigParams from hex string (Canton MCMS format)
 func (t *SetDynamicConfigParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// SetPoolReceiveContext is a Record type
-type SetPoolReceiveContext struct {
-	NewPoolReceiveContext splice_api_token_metadata_v1.ChoiceContext `json:"newPoolReceiveContext"`
-}
-
-// ToMap converts SetPoolReceiveContext to a map for DAML arguments
-func (t SetPoolReceiveContext) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["newPoolReceiveContext"] = model.NestedToDAMLValue(t.NewPoolReceiveContext)
-
-	return m
-}
-
-func (t SetPoolReceiveContext) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *SetPoolReceiveContext) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes SetPoolReceiveContext to hex string (Canton MCMS format)
-func (t SetPoolReceiveContext) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes SetPoolReceiveContext from hex string (Canton MCMS format)
-func (t *SetPoolReceiveContext) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2153,12 +2440,17 @@ func (t *VerifyOutboundCCVsMCMSParams) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AddPoolReceiveContextContractValue(args AddPoolReceiveContextContractValue) (*bind.EncodedChoice, error)
+	AddPoolReceiveContextContractValueParams(args AddPoolReceiveContextContractValueParams) (*bind.EncodedChoice, error)
+	AddPoolReceiveContextNonContractValue(args AddPoolReceiveContextNonContractValue) (*bind.EncodedChoice, error)
+	AddPoolReceiveContextNonContractValueParams(args AddPoolReceiveContextNonContractValueParams) (*bind.EncodedChoice, error)
 	ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice, error)
 	ApplyChainUpdatesParams(args ApplyChainUpdatesParams) (*bind.EncodedChoice, error)
 	ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error)
 	ApplyTokenTransferFeeConfigUpdatesParams(args ApplyTokenTransferFeeConfigUpdatesParams) (*bind.EncodedChoice, error)
 	CalculateFee(args CalculateFee) (*bind.EncodedChoice, error)
 	CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error)
+	ClearPoolReceiveContext(args ClearPoolReceiveContext) (*bind.EncodedChoice, error)
 	GetFee(args GetFee) (*bind.EncodedChoice, error)
 	GetFeeMCMSParams(args GetFeeMCMSParams) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
@@ -2167,9 +2459,10 @@ type MCMSEncoder interface {
 	LockOrBurnMCMSParams(args LockOrBurnMCMSParams) (*bind.EncodedChoice, error)
 	ReleaseFromTicket(args ReleaseFromTicket) (*bind.EncodedChoice, error)
 	ReleaseFromTicketMCMSParams(args ReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error)
+	RemovePoolReceiveContextValue(args RemovePoolReceiveContextValue) (*bind.EncodedChoice, error)
+	RemovePoolReceiveContextValueParams(args RemovePoolReceiveContextValueParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
 	SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error)
-	SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
@@ -2208,6 +2501,26 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
+// AddPoolReceiveContextContractValue encodes parameters for the AddPoolReceiveContextContractValue choice.
+func (e *encoder) AddPoolReceiveContextContractValue(args AddPoolReceiveContextContractValue) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPoolReceiveContextContractValue", args)
+}
+
+// AddPoolReceiveContextContractValueParams encodes parameters for the AddPoolReceiveContextContractValue choice.
+func (e *encoder) AddPoolReceiveContextContractValueParams(args AddPoolReceiveContextContractValueParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPoolReceiveContextContractValue", args)
+}
+
+// AddPoolReceiveContextNonContractValue encodes parameters for the AddPoolReceiveContextNonContractValue choice.
+func (e *encoder) AddPoolReceiveContextNonContractValue(args AddPoolReceiveContextNonContractValue) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPoolReceiveContextNonContractValue", args)
+}
+
+// AddPoolReceiveContextNonContractValueParams encodes parameters for the AddPoolReceiveContextNonContractValue choice.
+func (e *encoder) AddPoolReceiveContextNonContractValueParams(args AddPoolReceiveContextNonContractValueParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPoolReceiveContextNonContractValue", args)
+}
+
 // ApplyChainUpdates encodes parameters for the ApplyChainUpdates choice.
 func (e *encoder) ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyChainUpdates", args)
@@ -2236,6 +2549,11 @@ func (e *encoder) CalculateFee(args CalculateFee) (*bind.EncodedChoice, error) {
 // CalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the CalculateFee choice.
 func (e *encoder) CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CalculateFee", args)
+}
+
+// ClearPoolReceiveContext encodes parameters for the ClearPoolReceiveContext choice.
+func (e *encoder) ClearPoolReceiveContext(args ClearPoolReceiveContext) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ClearPoolReceiveContext", args)
 }
 
 // GetFee encodes parameters for the GetFee choice.
@@ -2278,6 +2596,16 @@ func (e *encoder) ReleaseFromTicketMCMSParams(args ReleaseFromTicketMCMSParams) 
 	return e.EncodeChoiceArgs("ReleaseFromTicket", args)
 }
 
+// RemovePoolReceiveContextValue encodes parameters for the RemovePoolReceiveContextValue choice.
+func (e *encoder) RemovePoolReceiveContextValue(args RemovePoolReceiveContextValue) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemovePoolReceiveContextValue", args)
+}
+
+// RemovePoolReceiveContextValueParams encodes parameters for the RemovePoolReceiveContextValue choice.
+func (e *encoder) RemovePoolReceiveContextValueParams(args RemovePoolReceiveContextValueParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemovePoolReceiveContextValue", args)
+}
+
 // SetDynamicConfig encodes parameters for the SetDynamicConfig choice.
 func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
@@ -2286,11 +2614,6 @@ func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, 
 // SetDynamicConfigParams encodes parameters for the SetDynamicConfig choice.
 func (e *encoder) SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
-}
-
-// SetPoolReceiveContext encodes parameters for the SetPoolReceiveContext choice.
-func (e *encoder) SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetPoolReceiveContext", args)
 }
 
 // SetRateLimitConfig encodes parameters for the SetRateLimitConfig choice.

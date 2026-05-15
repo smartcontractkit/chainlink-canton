@@ -28,8 +28,11 @@ import CCIP.LockReleaseTokenPoolCodecGen (
     decodeApplyTokenTransferFeeConfigUpdatesParamsAt,
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
+    decodeAddPoolReceiveContextNonContractValueParamsAt,
+    decodeAddPoolReceiveContextContractValueParamsAt,
+    decodeRemovePoolReceiveContextValueParamsAt,
     )
-import CCIP.ContextCodec (decodeChoiceContextAt)
+import CCIP.ContextCodec (decodeAnyValueAt)
 import CCIP.LockReleaseTokenPoolTypes (
     TokenTransferFeeConfig(..),
     RemoteChainConfig(..),
@@ -42,6 +45,9 @@ import CCIP.LockReleaseTokenPoolTypes (
     ApplyTokenTransferFeeConfigUpdatesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
+    AddPoolReceiveContextNonContractValueParams(..),
+    AddPoolReceiveContextContractValueParams(..),
+    RemovePoolReceiveContextValueParams(..),
     )
 
 import qualified Splice.Api.Token.HoldingV1
@@ -435,15 +441,44 @@ template LockReleaseTokenPool
                 create this with
                     remoteChainConfigs = remoteChainConfigsUpdated
 
-        -- Set the pool receive context (for preapproval CIDs in Splice token patterns).
+        -- Add or replace one receive-context entry with a non-contract AnyValue (for preapproval CIDs in Splice token patterns).
         -- The context is merged into extraArgs for inbound transfers.
-        --
-        -- Callable by poolOwner
-        choice SetPoolReceiveContext : ContractId LockReleaseTokenPool
+        choice AddPoolReceiveContextNonContractValue : ContractId LockReleaseTokenPool
             with
-                newPoolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                contextKey : Text
+                value : Splice.Api.Token.MetadataV1.AnyValue
             controller poolOwner
-            do create this with poolReceiveContext = newPoolReceiveContext
+            do
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.insert contextKey value poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        -- Add or replace one receive-context entry with AV_ContractId from an already-resolved ContractId ().
+        -- (for preapproval CIDs in Splice token patterns).
+        -- The context is merged into extraArgs for inbound transfers.
+        choice AddPoolReceiveContextContractValue : ContractId LockReleaseTokenPool
+            with
+                contextKey : Text
+                referredContract : ContractId ()
+            controller poolOwner
+            do
+                let av = Splice.Api.Token.MetadataV1.AV_ContractId (coerceContractId referredContract)
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.insert contextKey av poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        choice RemovePoolReceiveContextValue : ContractId LockReleaseTokenPool
+            with
+                contextKey : Text
+            controller poolOwner
+            do
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.delete contextKey poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        choice ClearPoolReceiveContext : ContractId LockReleaseTokenPool
+            controller poolOwner
+            do create this with poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         -- Set the transfer timeout for pending TransferInstructions.
         -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
@@ -1010,14 +1045,39 @@ template LockReleaseTokenPool
                             rateLimitConfigArgs
                             caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-                "SetPoolReceiveContext" -> do
-                    case decodeChoiceContextAt operationData 0 of
-                        None -> abort "E_INVALID_PARAMS: SetPoolReceiveContext"
-                        Some (newPoolReceiveContext, finalOffset) -> do
-                            assertMsg "E_TRAILING_BYTES: SetPoolReceiveContext" (finalOffset == byteCount operationData)
-                            newCid <- exercise selfCid SetPoolReceiveContext with
-                                newPoolReceiveContext
+                "AddPoolReceiveContextNonContractValue" -> do
+                    case decodeAddPoolReceiveContextNonContractValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue"
+                        Some (AddPoolReceiveContextNonContractValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue" (finalOffset == byteCount operationData)
+                            (value, innerOff) <- case decodeAnyValueAt valuePayload 0 of
+                                None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue:valuePayload"
+                                Some p -> pure p
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue:valuePayload" (innerOff == byteCount valuePayload)
+                            newCid <- exercise selfCid AddPoolReceiveContextNonContractValue with contextKey, value
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "AddPoolReceiveContextContractValue" -> do
+                    case decodeAddPoolReceiveContextContractValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextContractValue"
+                        Some (AddPoolReceiveContextContractValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextContractValue" (finalOffset == byteCount operationData)
+                            let refAddr = RawInstanceAddress.toText referentInstanceAddress
+                            referred <- case Map.lookup refAddr contractIds of
+                                None -> abort ("E_REFERENT_CONTRACT_NOT_IN_MAP: " <> refAddr)
+                                Some c -> pure c
+                            newCid <- exercise selfCid AddPoolReceiveContextContractValue with contextKey, referredContract = referred
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "RemovePoolReceiveContextValue" -> do
+                    case decodeRemovePoolReceiveContextValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: RemovePoolReceiveContextValue"
+                        Some (RemovePoolReceiveContextValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: RemovePoolReceiveContextValue" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid RemovePoolReceiveContextValue with contextKey
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "ClearPoolReceiveContext" -> do
+                    assertMsg "E_TRAILING_BYTES: ClearPoolReceiveContext" (byteCount operationData == 0)
+                    newCid <- exercise selfCid ClearPoolReceiveContext
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "SetTransferTimeout" -> do
                     case decodeSetTransferTimeoutParamsAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: SetTransferTimeout"
