@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+
+	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 )
 
@@ -52,6 +54,16 @@ func UnmarshalCreatedEvent[T any](event *apiv2.CreatedEvent) (*T, error) {
 	}
 
 	return &result, nil
+}
+
+func MarshalTemplateToRecord(v model.CreateCommander) *apiv2.Record {
+	if v == nil {
+		return nil
+	}
+
+	createCommand := v.CreateCommand()
+
+	return ledger.MapToRecord(createCommand.Arguments)
 }
 
 // GetEntityName extracts the entity name from a template ID.
