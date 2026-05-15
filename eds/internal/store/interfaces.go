@@ -15,8 +15,6 @@ var (
 )
 
 // ActiveContractStoreInterface provides read access to active contracts and the ability to register templates.
-//
-//mockery:generate: true
 type ActiveContractStoreInterface interface {
 	// Get returns the active contract for the given instance address.
 	Get(address contracts.InstanceAddress) (*apiv2.ActiveContract, bool)
@@ -29,8 +27,6 @@ type ActiveContractStoreInterface interface {
 }
 
 // InstrumentHoldingStoreInterface provides read access to instrument holdings and the ability to register parties.
-//
-//mockery:generate: true
 type InstrumentHoldingStoreInterface interface {
 	// GetHolding returns the active holdings for the given party and instrument ID.
 	GetHolding(party types.PARTY, instrumentId splice_api_token_holding_v1.InstrumentId) ([]*apiv2.ActiveContract, bool)
