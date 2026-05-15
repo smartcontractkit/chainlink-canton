@@ -120,6 +120,10 @@ func SaveEDSURL(ds datastore.MutableDataStore, url string) error {
 		return err
 	}
 
+	if cantonMeta.CantonConfigs == nil {
+		cantonMeta.CantonConfigs = &CantonConfigs{}
+	}
+
 	cantonMeta.CantonConfigs.EDSURL = url
 
 	return saveCantonEnvMetadata(ds, cantonMeta)
