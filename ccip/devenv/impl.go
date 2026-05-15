@@ -1019,10 +1019,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		splice_api_token_transfer_instruction_v1.Transfer{
 			Sender:           types.PARTY(party),
 			Receiver:         types.PARTY(party),
-			Amount:           types.NUMERIC("100.00"), // TODO: Setting this to the default value, should this be the estimated fee?
+			Amount:           types.NUMERIC("100.00"), // TransferFactory API doesn't actually do anything with this value, anything should work here
 			InstrumentId:     c.feeTokenInstrument,
-			InputHoldingCids: nil,
-			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+			InputHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(c.nextFeeCID)},
+			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}}, // The API doesn't actually use that value
 		},
 	)
 	if err != nil {
