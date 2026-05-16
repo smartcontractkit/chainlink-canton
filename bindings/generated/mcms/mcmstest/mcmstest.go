@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "mcms-test"
-	PackageID   = "d81c8e0b390e03c69c7fa85a47d370e312fd6e489a0373470b9d200c8d2e3617"
+	PackageID   = "d03c146239dbead3ab1209f2103c862509664747a21937beaa611009c3c54857"
 	SDKVersion  = "3.4.11"
 )
 
