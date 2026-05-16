@@ -33,7 +33,7 @@ jobs:
         with:
           repository: smartcontractkit/chainlink-ccv
           path: chainlink-ccv
-          ref: d5fefb60d212d6dd56e5b712c5e4b4cf6bece821
+          ref: b267c86fd00e73e3e1ce94338d7f7cbde637f79a
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
