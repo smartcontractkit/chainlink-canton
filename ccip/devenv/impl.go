@@ -29,8 +29,8 @@ import (
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
-	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainimpl"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	ccvservices "github.com/smartcontractkit/chainlink-ccv/build/devenv/services"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccv/deployment"
@@ -76,7 +76,7 @@ const AMTInstrument = types.TEXT("Amulet")
 var (
 	_                       cciptestinterfaces.CCIP17              = &Chain{}
 	_                       cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_                       ccv.ImplFactory                        = &ImplFactory{}
+	_                       chainimpl.ImplFactory                  = &ImplFactory{}
 	cantonTokenPoolVersion                                         = semver.MustParse("2.0.0")
 	cantonDeployDarPackages                                        = []contracts.Package{
 		contracts.CCIPFactory,
@@ -109,8 +109,8 @@ func NewImplFactory() *ImplFactory {
 }
 
 // New implements [registry.ImplFactory].
-func (i *ImplFactory) New(ctx context.Context, cfg *ccv.Cfg, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
-	return New(ctx, cfg, lggr, env, bc.ChainID)
+func (i *ImplFactory) New(ctx context.Context, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
+	return New(ctx, lggr, env, bc.ChainID)
 }
 
 // NewEmpty implements [registry.ImplFactory].
@@ -199,7 +199,7 @@ type validatorAPIClients struct {
 }
 
 // NOTE: ccv.Cfg will be removed in the future.
-func New(ctx context.Context, _ *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
+func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
 	if err != nil {
 		return nil, fmt.Errorf("get chain details for chain %s: %w", chainID, err)
