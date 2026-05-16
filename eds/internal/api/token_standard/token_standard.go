@@ -2,6 +2,7 @@ package token_standard
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -199,7 +200,12 @@ func (s Server) GetInstrument(c *gin.Context, instrumentId string) {
 func (s Server) GetTransferFactory(c *gin.Context) {
 	var req oapiTransferInstruction.GetFactoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiTransferInstruction.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiTransferInstruction.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 
@@ -252,7 +258,12 @@ func (s Server) GetTransferFactory(c *gin.Context) {
 func (s Server) GetTransferInstructionAcceptContext(c *gin.Context, transferInstructionId string) {
 	var req oapiTransferInstruction.GetChoiceContextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiTransferInstruction.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiTransferInstruction.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 

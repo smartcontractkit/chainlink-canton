@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -54,7 +55,12 @@ func NewServer(
 func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 	var req oapiExecutor.ExecutorSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiCommon.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 
