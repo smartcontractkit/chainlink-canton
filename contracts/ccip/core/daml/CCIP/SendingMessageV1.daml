@@ -52,7 +52,7 @@ data TokenSendData = TokenSendData
         poolInstanceId : Text
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
+        amount : BytesHex
         destTokenAddress : BytesHex
         extraData : BytesHex
     deriving (Eq, Show)
@@ -467,7 +467,7 @@ template SendingMessageV1
                 poolInstanceId : Text
                 poolOwner : Party
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                amount : Numeric 0
+                amount : BytesHex
                 destTokenAddress : BytesHex
                 extraData : BytesHex
             controller ccipOwner
@@ -479,6 +479,7 @@ template SendingMessageV1
                 quotedTokenSendFee <- case tokenSendFee of
                     None -> abort "sendingMessage: token send fee must be finalized before token data"
                     Some fee -> pure fee
+                assertMsg "sendingMessage: token amount must be 32 bytes" (byteCount amount == 32)
                 assertMsg "sendingMessage: pool extraData exceeds quoted destBytesOverhead"
                     (byteCount extraData <= quotedTokenSendFee.destBytesOverhead)
 

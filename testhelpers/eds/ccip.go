@@ -89,7 +89,7 @@ func GetCCIPExecuteDisclosure(
 	if err != nil {
 		return nil, fmt.Errorf("error calling CCIPExecute: %w", err)
 	}
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 	}
 
@@ -154,7 +154,7 @@ func GetCCIPSendDisclosure(
 	if err != nil {
 		return nil, fmt.Errorf("error calling CCIPSend: %w", err)
 	}
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 	}
 

@@ -27,8 +27,8 @@ var (
 
 const (
 	PackageName = "ccip-extension-api"
-	PackageID   = "475472624c3506d8a173ecabc34d1ef42cb5a477ad77f27a6a2132ecc677e41e"
-	SDKVersion  = "3.4.10"
+	PackageID   = "e987d505412f013b39d91fcabd798ebda998245db3f5fd036a22c76af55249f4"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -1003,7 +1003,7 @@ func (t *TokenPoolGetFee) UnmarshalHex(data string) error {
 // TokenPoolGetRequiredCCVs is a Record type
 type TokenPoolGetRequiredCCVs struct {
 	RemoteChainSelector types.NUMERIC       `json:"remoteChainSelector"`
-	Amount              types.NUMERIC       `json:"amount"`
+	SourceAmount        types.TEXT          `json:"sourceAmount"`
 	Finality            core.FinalityConfig `json:"finality"`
 	ExtraData           types.TEXT          `json:"extraData"`
 	Direction           TransferDirection   `json:"direction"`
@@ -1016,7 +1016,7 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
 
 	m["remoteChainSelector"] = t.RemoteChainSelector
 
-	m["amount"] = t.Amount
+	m["sourceAmount"] = string(t.SourceAmount)
 
 	m["finality"] = model.NestedToDAMLValue(t.Finality)
 

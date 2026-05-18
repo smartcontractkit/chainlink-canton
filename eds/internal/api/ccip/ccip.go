@@ -13,8 +13,6 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
-
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -25,9 +23,11 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
@@ -39,7 +39,7 @@ const MaxNumCCVs = 64
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore *store.ActiveContractStore
+	activeContractStore store.ActiveContractStoreInterface
 
 	perPartyRouterFactory contracts.InstanceAddress
 	onRamp                contracts.InstanceAddress
@@ -55,7 +55,7 @@ var _ oapiCCIP.ServerInterface = &Server{}
 func NewServer(
 	_ context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
+	activeContractStore store.ActiveContractStoreInterface,
 	config config.CCIPAPIConfig,
 ) (*Server, error) {
 	s := &Server{
@@ -530,4 +530,25 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 		TokenPool:          tokenPool,
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+var _ global.InstanceAddressFilter = &Server{}
+
+// FilterContracts returns the sub-set of contracts that are tracked by the CCIP API Server
+func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+	var out []contracts.InstanceAddress
+	for _, address := range addresses {
+		switch address {
+		case s.perPartyRouterFactory,
+			s.onRamp,
+			s.offRamp,
+			s.globalConfig,
+			s.tokenAdminRegistry,
+			s.rmnRemote,
+			s.feeQuoter:
+			out = append(out, address)
+		}
+	}
+
+	return out
 }

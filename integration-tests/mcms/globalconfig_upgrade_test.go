@@ -3,13 +3,13 @@ package tests
 import (
 	"testing"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -53,21 +53,21 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	// Phase 2: Create GlobalConfigV1 and verify basic operations
 	// ===================================================================
 
-	v1Cid := createGlobalConfigV1(t, participant, gcV1PkgID, ccipOwner, configInstanceID)
+	v1Cid := createGlobalConfigV1(t, participant, ccipOwner, configInstanceID)
 	t.Logf("Created GlobalConfigV1: %s", v1Cid)
 
-	instId := queryGlobalConfigInstanceId(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	instId := queryGlobalConfigInstanceId(t, participant, ccipOwner, v1Cid, "V1")
 	require.Equal(t, configInstanceID, instId, "V1 instanceId should match")
 
 	// Exercise UpdateDestChainConfig via MCMSReceiver_Entrypoint to prove V1 works
 	instanceAddr := configInstanceID + "@" + ccipOwner
 	v1Cid = exerciseMCMSReceiverEntrypoint(
-		t, participant, mcmsPkgID, ccipOwner, v1Cid,
+		t, participant, ccipOwner, v1Cid,
 		"UpdateDestChainConfig", "", map[string]string{instanceAddr: v1Cid},
 	)
 	t.Logf("V1 after UpdateDestChainConfig: %s", v1Cid)
 
-	instId = queryGlobalConfigInstanceId(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	instId = queryGlobalConfigInstanceId(t, participant, ccipOwner, v1Cid, "V1")
 	require.Equal(t, configInstanceID, instId, "V1 instanceId should still match after update")
 
 	// ===================================================================
@@ -93,17 +93,17 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	// ===================================================================
 
 	v2Cid := exerciseMCMSReceiverEntrypoint(
-		t, participant, mcmsPkgID, ccipOwner, v1Cid,
+		t, participant, ccipOwner, v1Cid,
 		"MigrateToV2", "", map[string]string{instanceAddr: v1Cid},
 	)
 	t.Logf("MigrateToV2 created V2: %s", v2Cid)
 
 	// V2 should have the same instanceId as V1
-	instIdV2 := queryGlobalConfigInstanceId(t, participant, gcV2PkgID, ccipOwner, v2Cid, "V2")
+	instIdV2 := queryGlobalConfigInstanceId(t, participant, ccipOwner, v2Cid, "V2")
 	require.Equal(t, configInstanceID, instIdV2, "V2 instanceId should match V1's")
 
 	// V1 should still be alive (non-consuming migration)
-	instIdV1 := queryGlobalConfigInstanceId(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	instIdV1 := queryGlobalConfigInstanceId(t, participant, ccipOwner, v1Cid, "V1")
 	require.Equal(t, configInstanceID, instIdV1, "V1 should still be queryable after non-consuming migrate")
 	t.Log("Confirmed V1 and V2 coexist")
 
@@ -112,30 +112,30 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	// ===================================================================
 
 	v2Cid = exerciseMCMSReceiverEntrypoint(
-		t, participant, mcmsPkgID, ccipOwner, v2Cid,
+		t, participant, ccipOwner, v2Cid,
 		"SetNewFeature", "true", map[string]string{instanceAddr: v2Cid},
 	)
 	t.Logf("V2 after SetNewFeature: %s", v2Cid)
 
-	featureEnabled := queryNewFeatureEnabled(t, participant, gcV2PkgID, ccipOwner, v2Cid)
+	featureEnabled := queryNewFeatureEnabled(t, participant, ccipOwner, v2Cid)
 	require.True(t, featureEnabled, "newFeatureEnabled should be true after SetNewFeature")
 
 	// ===================================================================
 	// Phase 6: Archive V1 explicitly, verify only V2 remains
 	// ===================================================================
 
-	archiveGlobalConfig(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	archiveGlobalConfig(t, participant, ccipOwner, v1Cid, "V1")
 	t.Log("Archived GlobalConfigV1")
 
 	// V1 should no longer be queryable
-	_, err = tryQueryGlobalConfigInstanceId(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	_, err = tryQueryGlobalConfigInstanceId(t, participant, ccipOwner, v1Cid, "V1")
 	require.Error(t, err)
 	// Error message is CONTRACT_NOT_FOUND(11,e5da79f1): Contract could not be found with id <id>
 	require.Contains(t, err.Error(), "CONTRACT_NOT_FOUND")
 	t.Logf("Confirmed V1 is archived (error: %s)", err)
 
 	// V2 should still be fully operational
-	instIdV2 = queryGlobalConfigInstanceId(t, participant, gcV2PkgID, ccipOwner, v2Cid, "V2")
+	instIdV2 = queryGlobalConfigInstanceId(t, participant, ccipOwner, v2Cid, "V2")
 	require.Equal(t, configInstanceID, instIdV2, "V2 should still be operational after V1 archival")
 	t.Log("SCU upgrade test complete: V1 archived, V2 operational")
 }
@@ -147,7 +147,7 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 func createGlobalConfigV1(
 	t *testing.T,
 	participant canton.Participant,
-	pkgID, owner, instanceID string,
+	owner, instanceID string,
 ) string {
 	t.Helper()
 
@@ -171,7 +171,7 @@ func createGlobalConfigV1(
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  pkgID,
+							PackageId:  "#globalconfig",
 							ModuleName: "MCMS.GlobalConfig.V1",
 							EntityName: "GlobalConfigV1",
 						},
@@ -193,7 +193,7 @@ func createGlobalConfigV1(
 func exerciseMCMSReceiverEntrypoint(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID, owner, contractID string,
+	owner, contractID string,
 	functionName, operationData string,
 	contractIds map[string]string,
 ) string {
@@ -222,7 +222,7 @@ func exerciseMCMSReceiverEntrypoint(
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
+							PackageId:  mcms.PackageName,
 							ModuleName: "MCMS.MCMSReceiver",
 							EntityName: "MCMSReceiver",
 						},
@@ -254,12 +254,12 @@ func exerciseMCMSReceiverEntrypoint(
 func queryGlobalConfigInstanceId(
 	t *testing.T,
 	participant canton.Participant,
-	pkgID, owner, contractID string,
+	owner, contractID string,
 	version string,
 ) string {
 	t.Helper()
 
-	result, err := tryQueryGlobalConfigInstanceId(t, participant, pkgID, owner, contractID, version)
+	result, err := tryQueryGlobalConfigInstanceId(t, participant, owner, contractID, version)
 	require.NoError(t, err)
 
 	return result
@@ -270,7 +270,7 @@ func queryGlobalConfigInstanceId(
 func tryQueryGlobalConfigInstanceId(
 	t *testing.T,
 	participant canton.Participant,
-	pkgID, owner, contractID string,
+	owner, contractID string,
 	version string,
 ) (string, error) {
 	t.Helper()
@@ -299,7 +299,7 @@ func tryQueryGlobalConfigInstanceId(
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  pkgID,
+							PackageId:  "#globalconfig",
 							ModuleName: moduleName,
 							EntityName: entityName,
 						},
@@ -332,7 +332,7 @@ func tryQueryGlobalConfigInstanceId(
 func queryNewFeatureEnabled(
 	t *testing.T,
 	participant canton.Participant,
-	pkgID, owner, contractID string,
+	owner, contractID string,
 ) bool {
 	t.Helper()
 
@@ -349,7 +349,7 @@ func queryNewFeatureEnabled(
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  pkgID,
+							PackageId:  "#globalconfig",
 							ModuleName: "MCMS.GlobalConfig.V2",
 							EntityName: "GlobalConfigV2",
 						},
@@ -385,7 +385,7 @@ func queryNewFeatureEnabled(
 func archiveGlobalConfig(
 	t *testing.T,
 	participant canton.Participant,
-	pkgID, owner, contractID string,
+	owner, contractID string,
 	version string,
 ) {
 	t.Helper()
@@ -412,7 +412,7 @@ func archiveGlobalConfig(
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  pkgID,
+							PackageId:  "#globalconfig",
 							ModuleName: moduleName,
 							EntityName: entityName,
 						},

@@ -26,8 +26,8 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "b9f04d25bdd3b5f62153f6b40c1bcb5e46c20ade1b5b1ca878104d29ccb5ad62"
-	SDKVersion  = "3.4.10"
+	PackageID   = "ba08c97bc3f5646c303f9ee38a957817ff7fb5424c775c477506c7feb222bde3"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -45,6 +45,8 @@ const (
 	E10PerPercent            = types.NUMERIC("100000000.")
 	BaseNumeric              = types.NUMERIC("100000000.")
 	BaseInt                  = types.INT64(100000000)
+	MaxUint256DecimalText    = types.TEXT("115792089237316195423570985008687907853269984665640564039457584007913129639935")
+	MaxNumeric0DecimalText   = types.TEXT("99999999999999999999999999999999999999")
 	RmnRemoteKey             = types.TEXT("rmn-remote")
 	FeeQuoterKey             = types.TEXT("fee-quoter")
 	WaitForFinalityFlag      = types.TEXT("00000000")
@@ -496,7 +498,7 @@ type AddTokenSend struct {
 	PoolInstanceId   types.TEXT                               `json:"poolInstanceId"`
 	PoolOwner        types.PARTY                              `json:"poolOwner"`
 	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount           types.NUMERIC                            `json:"amount"`
+	Amount           types.TEXT                               `json:"amount"`
 	DestTokenAddress types.TEXT                               `json:"destTokenAddress"`
 	ExtraData        types.TEXT                               `json:"extraData"`
 }
@@ -511,7 +513,7 @@ func (t AddTokenSend) ToMap() map[string]any {
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
-	m["amount"] = t.Amount
+	m["amount"] = string(t.Amount)
 
 	m["destTokenAddress"] = string(t.DestTokenAddress)
 
@@ -3809,7 +3811,7 @@ type FinalizeExecute struct {
 	MaybeTicketReceiver          *types.PARTY                              `json:"maybeTicketReceiver" hex:"optional"`
 	MaybeTokenReceiver           *types.PARTY                              `json:"maybeTokenReceiver" hex:"optional"`
 	MaybeInstrumentId            *splice_api_token_holding_v1.InstrumentId `json:"maybeInstrumentId" hex:"optional"`
-	MaybeAmount                  *types.NUMERIC                            `json:"maybeAmount" hex:"optional"`
+	MaybeAmount                  *types.TEXT                               `json:"maybeAmount" hex:"optional"`
 	ReturnData                   types.TEXT                                `json:"returnData"`
 }
 
@@ -3870,7 +3872,7 @@ func (t FinalizeExecute) ToMap() map[string]any {
 	if t.MaybeAmount != nil {
 		m["maybeAmount"] = map[string]any{
 			"_type": "optional",
-			"value": *t.MaybeAmount,
+			"value": string(*t.MaybeAmount),
 		}
 	} else {
 		m["maybeAmount"] = map[string]any{
@@ -5184,6 +5186,48 @@ func (e *IssuerType) UnmarshalHex(data string) error {
 }
 
 var _ types.ENUM = IssuerType("")
+
+// LocalAmountConversionResult is a Record type
+type LocalAmountConversionResult struct {
+	LocalAmount        types.NUMERIC `json:"localAmount"`
+	TruncatedRemainder types.TEXT    `json:"truncatedRemainder"`
+	WasTruncated       types.BOOL    `json:"wasTruncated"`
+}
+
+// ToMap converts LocalAmountConversionResult to a map for DAML arguments
+func (t LocalAmountConversionResult) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["localAmount"] = t.LocalAmount
+
+	m["truncatedRemainder"] = string(t.TruncatedRemainder)
+
+	m["wasTruncated"] = bool(t.WasTruncated)
+
+	return m
+}
+
+func (t LocalAmountConversionResult) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LocalAmountConversionResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LocalAmountConversionResult to hex string (Canton MCMS format)
+func (t LocalAmountConversionResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LocalAmountConversionResult from hex string (Canton MCMS format)
+func (t *LocalAmountConversionResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // MessageExecutionState is an enum type
 type MessageExecutionState string
@@ -8753,7 +8797,7 @@ type TokenReceiveTicket struct {
 	Receiver                     types.PARTY                              `json:"receiver"`
 	TokenReceiver                types.PARTY                              `json:"tokenReceiver"`
 	InstrumentId                 splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount                       types.NUMERIC                            `json:"amount"`
+	Amount                       types.TEXT                               `json:"amount"`
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageId                    types.TEXT                               `json:"messageId"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
@@ -8819,9 +8863,8 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
-	if t.Amount != "" {
-		args["amount"] = t.Amount
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["amount"] = string(t.Amount)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["sourcePoolData"] = string(t.SourcePoolData)
@@ -8891,9 +8934,8 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
-	if t.Amount != "" {
-		args["amount"] = t.Amount
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["amount"] = string(t.Amount)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["sourcePoolData"] = string(t.SourcePoolData)
@@ -9125,7 +9167,8 @@ type TokenReceiveTicketClaimedEvent struct {
 	VerifiedCCVs                 []chainlinkapi.RawInstanceAddress        `json:"verifiedCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
 	InstrumentId                 splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount                       types.NUMERIC                            `json:"amount"`
+	SourceAmount                 types.TEXT                               `json:"sourceAmount"`
+	LocalAmount                  types.NUMERIC                            `json:"localAmount"`
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageId                    types.TEXT                               `json:"messageId"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
@@ -9149,7 +9192,9 @@ func (t TokenReceiveTicketClaimedEvent) ToMap() map[string]any {
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
-	m["amount"] = t.Amount
+	m["sourceAmount"] = string(t.SourceAmount)
+
+	m["localAmount"] = t.LocalAmount
 
 	m["sourcePoolData"] = string(t.SourcePoolData)
 
@@ -9329,7 +9374,7 @@ type TokenSendData struct {
 	PoolInstanceId   types.TEXT                               `json:"poolInstanceId"`
 	PoolOwner        types.PARTY                              `json:"poolOwner"`
 	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount           types.NUMERIC                            `json:"amount"`
+	Amount           types.TEXT                               `json:"amount"`
 	DestTokenAddress types.TEXT                               `json:"destTokenAddress"`
 	ExtraData        types.TEXT                               `json:"extraData"`
 }
@@ -9344,7 +9389,7 @@ func (t TokenSendData) ToMap() map[string]any {
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
-	m["amount"] = t.Amount
+	m["amount"] = string(t.Amount)
 
 	m["destTokenAddress"] = string(t.DestTokenAddress)
 
@@ -9509,19 +9554,19 @@ func (t *TokenTransferFeeConfig) UnmarshalHex(data string) error {
 
 // TokenTransferV1 is a Record type
 type TokenTransferV1 struct {
-	Amount             types.NUMERIC `json:"amount"`
-	SourcePoolAddress  types.TEXT    `json:"sourcePoolAddress"`
-	SourceTokenAddress types.TEXT    `json:"sourceTokenAddress"`
-	DestTokenAddress   types.TEXT    `json:"destTokenAddress"`
-	TokenReceiver      types.TEXT    `json:"tokenReceiver"`
-	ExtraData          types.TEXT    `json:"extraData"`
+	Amount             types.TEXT `json:"amount"`
+	SourcePoolAddress  types.TEXT `json:"sourcePoolAddress"`
+	SourceTokenAddress types.TEXT `json:"sourceTokenAddress"`
+	DestTokenAddress   types.TEXT `json:"destTokenAddress"`
+	TokenReceiver      types.TEXT `json:"tokenReceiver"`
+	ExtraData          types.TEXT `json:"extraData"`
 }
 
 // ToMap converts TokenTransferV1 to a map for DAML arguments
 func (t TokenTransferV1) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["amount"] = t.Amount
+	m["amount"] = string(t.Amount)
 
 	m["sourcePoolAddress"] = string(t.SourcePoolAddress)
 

@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
@@ -21,7 +22,7 @@ type ContractConfig struct{}
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore *store.ActiveContractStore
+	activeContractStore store.ActiveContractStoreInterface
 
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
@@ -31,7 +32,7 @@ var _ oapiExecutor.ServerInterface = &Server{}
 func NewServer(
 	_ context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
+	activeContractStore store.ActiveContractStoreInterface,
 	config config.ExecutorAPIConfig,
 ) (*Server, error) {
 	s := &Server{
@@ -110,4 +111,18 @@ func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+var _ global.InstanceAddressFilter = &Server{}
+
+// FilterContracts returns the sub-set of contracts that are tracked by the Executor API Server
+func (s *Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+	var out []contracts.InstanceAddress
+	for _, address := range addresses {
+		if _, ok := s.contractConfigs[address]; ok {
+			out = append(out, address)
+		}
+	}
+
+	return out
 }

@@ -146,6 +146,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteCfg.RemoteDecimals,
 				"canton",
 				semver.MustParse("2.0.0"),
+				lockReleasePoolType.String(),
 			)
 			_, inboundCustomCfg := tokenadapters.GenerateTPRLConfigs(
 				remoteCfg.OutboundRateLimiterConfig, // TODO: how do we get the "custom finality" config?
@@ -154,6 +155,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteCfg.RemoteDecimals,
 				"canton",
 				semver.MustParse("2.0.0"),
+				lockReleasePoolType.String(),
 			)
 
 			meta := rateLimiterPoolMeta{InstanceId: parsedPool.InstanceId, PoolOwner: parsedPool.PoolOwner}
@@ -498,8 +500,10 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("tokenRef.address is required")
 		}
 		tokenRef := datastore.AddressRef{
-			Address:       tokenAddress,
-			Type:          datastore.ContractType("Token"),
+			Address: tokenAddress,
+			Type:    datastore.ContractType("Token"),
+			// TODO: what should this be set to?
+			Version:       input.TokenPoolVersion,
 			Qualifier:     qualifier,
 			ChainSelector: input.ChainSelector,
 		}

@@ -10,7 +10,7 @@ concurrency:
 jobs:
   test-deploy-chain-contracts:
     name: TestDeployChainContracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-4cores-16GB
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -18,13 +18,14 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Run Go tests
         run: |
           cd deployment/changesets
           go test -v -count 1 -timeout 20m -run TestDeployChainContracts ./...
   test-deploy-coin:
     name: TestDeployCoin
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-4cores-16GB
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -32,13 +33,14 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Run Go tests
         run: |
           cd deployment/changesets
           go test -v -count 1 -timeout 20m -run TestDeployCoin ./...
   test-deploy-tps:
     name: TestDeployTokenPool
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-4cores-16GB
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -46,6 +48,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Run Go tests
         run: |
           cd deployment/changesets

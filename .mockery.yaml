@@ -1,6 +1,10 @@
 dir: ./internal/mocks
 pkgname: mocks
 template: testify
+formatter: goimports
+formatter-options:
+  goimports:
+    local-prefix: github.com/smartcontractkit/chainlink-canton
 
 include-auto-generated: true
 
@@ -18,3 +22,24 @@ packages:
       ServerStreamingClient:
         config:
           filename: "mock_ServerStreamingClient.go"
+
+  github.com/smartcontractkit/chainlink-canton/eds/internal/store:
+    interfaces:
+      ActiveContractStoreInterface:
+        config:
+          dir: ./eds/internal/mocks/
+          structname: MockActiveContractStore
+          filename: "mock_ActiveContractStore.go"
+      InstrumentHoldingStoreInterface:
+        config:
+          dir: ./eds/internal/mocks/
+          structname: MockInstrumentHoldingStore
+          filename: "mock_InstrumentHoldingStore.go"
+
+  github.com/smartcontractkit/chainlink-canton/eds/internal/api/global:
+    interfaces:
+      InstanceAddressFilter:
+        config:
+          dir: ./eds/internal/mocks/
+          structname: MockInstanceAddressFilter
+          filename: "mock_InstanceAddressFilter.go"
