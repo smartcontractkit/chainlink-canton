@@ -108,12 +108,12 @@ func NewImplFactory() *ImplFactory {
 	return &ImplFactory{}
 }
 
-// New implements [registry.ImplFactory].
-func (i *ImplFactory) New(ctx context.Context, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
-	return New(ctx, lggr, env, bc.ChainID)
+// New implements [chainimpl.ImplFactory].
+func (i *ImplFactory) New(ctx context.Context, lggr zerolog.Logger, env *deployment.Environment, chainSelector uint64) (cciptestinterfaces.CCIP17, error) {
+	return New(ctx, lggr, env, chainSelector)
 }
 
-// NewEmpty implements [registry.ImplFactory].
+// NewEmpty implements [chainimpl.ImplFactory].
 func (i *ImplFactory) NewEmpty() cciptestinterfaces.CCIP17Configuration {
 	return NewEmptyCCIP17Canton(
 		log.
@@ -198,11 +198,17 @@ type validatorAPIClients struct {
 	transferClient transferInstructionV1.ClientWithResponsesInterface
 }
 
-// NOTE: ccv.Cfg will be removed in the future.
-func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
-	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
+func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainSelector uint64) (*Chain, error) {
+	chainFamily, err := chainsel.GetSelectorFamily(chainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("get chain details for chain %s: %w", chainID, err)
+		return nil, fmt.Errorf("get chain family for chain %d: %w", chainSelector, err)
+	}
+	if chainFamily != chainsel.FamilyCanton {
+		return nil, fmt.Errorf("chain %d is not a canton chain", chainSelector)
+	}
+	chainDetails, err := chainsel.GetChainDetails(chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("get chain details for chain %d: %w", chainSelector, err)
 	}
 	chain := e.BlockChains.CantonChains()[chainDetails.ChainSelector]
 
