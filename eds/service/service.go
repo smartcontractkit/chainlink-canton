@@ -117,7 +117,10 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 
 	// Create HTTP Server
 	router := gin.Default()
-	router.Use(middleware.RequestMonitoringMiddleware(metrics))
+	router.Use(
+		middleware.RequestMonitoringMiddleware(metrics),
+		middleware.RequestSizeLimiterMiddleware(cfg.Server.MaxRequestSizeBytes),
+	)
 
 	errChan := make(chan error)
 	var globalAddressFilters []global.InstanceAddressFilter
