@@ -33,17 +33,8 @@ import (
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 )
 
-func (c *Chain) getEDSURL() (string, error) {
-	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
-	if err != nil {
-		return "", fmt.Errorf("failed to get EDS URL: %w", err)
-	}
-
-	return edsURL, nil
-}
-
 func (c *Chain) GetPerPartyRouterFactoryDisclosure(ctx context.Context, partyId string) (*edsTesthelpers.PerPartyRouterFactoryDisclosure, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +47,7 @@ func (c *Chain) GetPerPartyRouterFactoryDisclosure(ctx context.Context, partyId 
 }
 
 func (c *Chain) GetTokenPoolForToken(ctx context.Context, token contracts.EncodedInstrumentID) (contracts.RawInstanceAddress, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return contracts.RawInstanceAddress(""), err
 	}
@@ -69,7 +60,7 @@ func (c *Chain) GetTokenPoolForToken(ctx context.Context, token contracts.Encode
 }
 
 func (c *Chain) GetTokenPoolSendDisclosure(ctx context.Context, message oapiCommon.Message, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolSendDisclosure, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +73,7 @@ func (c *Chain) GetTokenPoolSendDisclosure(ctx context.Context, message oapiComm
 }
 
 func (c *Chain) GetCCIPSendDisclosure(ctx context.Context, message oapiCommon.Message, senderRequiredCCVs, tokenPoolRequiredCCVs []string) (*edsTesthelpers.CCIPSendDisclosure, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +86,7 @@ func (c *Chain) GetCCIPSendDisclosure(ctx context.Context, message oapiCommon.Me
 }
 
 func (c *Chain) GetCCVSendDisclosure(ctx context.Context, message oapiCommon.Message, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVSendDisclosure, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +99,7 @@ func (c *Chain) GetCCVSendDisclosure(ctx context.Context, message oapiCommon.Mes
 }
 
 func (c *Chain) GetExecutorSendDisclosure(ctx context.Context, message oapiCommon.Message, executorAddress contracts.InstanceAddress, ccvAddresses []string) (*edsTesthelpers.ExecutorDisclosure, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +112,7 @@ func (c *Chain) GetExecutorSendDisclosure(ctx context.Context, message oapiCommo
 }
 
 func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessageHex string, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolExecuteDisclosure, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +125,7 @@ func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessag
 }
 
 func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex string) (*edsTesthelpers.CCIPExecuteDisclosure, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +138,7 @@ func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex 
 }
 
 func (c *Chain) GetCCVExecuteDisclosure(ctx context.Context, encodedMessageHex string, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVExecuteDisclosure, error) {
-	edsURL, err := c.getEDSURL()
+	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
 	}
