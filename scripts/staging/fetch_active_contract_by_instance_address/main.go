@@ -14,6 +14,19 @@
 // --template '#ccip-common:CCIP.GlobalConfig:GlobalConfig' \
 // --instance-address '{"address":"0xa95f120fc972c72e75d74c880c26ba982c60b123c74aa9e5b18e138a59e0916a"}' \
 // --instance-id globalconfig-szvgb
+//
+// HTML report (writes report.html; open in a browser):
+// go run ./scripts/staging/fetch_active_contract_by_instance_address \
+//   --format html --html-out ./scripts/staging/fetch_active_contract_by_instance_address/report.html \
+//   --template '#ccip-common:CCIP.GlobalConfig:GlobalConfig' \
+//   --instance-address '{"address":"0xa95f120fc972c72e75d74c880c26ba982c60b123c74aa9e5b18e138a59e0916a"}' \
+//   --instance-id globalconfig-szvgb
+
+// go run ./scripts/staging/fetch_active_contract_by_instance_address \
+//   --format html --html-out ./scripts/staging/fetch_active_contract_by_instance_address/report.html \
+//   --template '#ccip-committeeverifier:CCIP.CommitteeVerifier:CommitteeVerifier' \
+//   --instance-address '{"address":"0xf11b7b25ed8ac60beecb78e58fba954dd9b75f13b1b67ff0983b55aab52dfcd1"}' \
+//   --instance-id committeeverifier-suoid
 
 package main
 
@@ -71,6 +84,8 @@ func main() {
 		maxScanContracts int
 		pretty           bool
 		payloadOnly      bool
+		outputFormat     string
+		htmlOut          string
 	)
 
 	flag.StringVar(&grpcURL, "grpc-url", defaultDevnetValidatorHTTPS,
@@ -98,6 +113,8 @@ func main() {
 		"Abort after N ACS contracts with no match (0=unlimited); use to debug endless scans")
 	flag.BoolVar(&pretty, "pretty", true, "Pretty-print JSON output")
 	flag.BoolVar(&payloadOnly, "payload-only", false, "Print only the create-argument map as JSON (no metadata envelope)")
+	flag.StringVar(&outputFormat, "format", "json", "Output format: json (default) or html")
+	flag.StringVar(&htmlOut, "html-out", "", "When --format html, write to this file instead of stdout")
 
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Fetch one active Canton contract by InstanceAddress hash using ACS.\n\n")
@@ -240,12 +257,30 @@ func main() {
 		out = envelope
 	}
 
-	enc := json.NewEncoder(os.Stdout)
-	if pretty {
-		enc.SetIndent("", "  ")
-	}
-	if err := enc.Encode(out); err != nil {
-		fatalf("encode JSON: %v", err)
+	switch strings.ToLower(strings.TrimSpace(outputFormat)) {
+	case "", "json":
+		enc := json.NewEncoder(os.Stdout)
+		if pretty {
+			enc.SetIndent("", "  ")
+		}
+		if err := enc.Encode(out); err != nil {
+			fatalf("encode JSON: %v", err)
+		}
+	case "html":
+		w := io.Writer(os.Stdout)
+		if p := strings.TrimSpace(htmlOut); p != "" {
+			f, err := os.Create(p)
+			if err != nil {
+				fatalf("create html output %s: %v", p, err)
+			}
+			defer f.Close()
+			w = f
+		}
+		if err := writeHTMLReport(w, templateID, instanceIDHint, contractID, out, ""); err != nil {
+			fatalf("write HTML: %v", err)
+		}
+	default:
+		fatalf("unknown --format %q (use json or html)", outputFormat)
 	}
 }
 

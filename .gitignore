@@ -5,7 +5,9 @@ navigator.log
 
 .idea
 .vscode
-.cursor/
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
 .DS_Store
 
 go.work
@@ -16,4 +18,5 @@ logs/
 
 vendor/
 scripts/staging/.env
+scripts/staging/fetch_active_contract_by_instance_address/report.html
 eds/staging_testnet_canton.local.toml
