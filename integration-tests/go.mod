@@ -29,7 +29,7 @@ require (
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260512180815-d7a89b0a5784
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260512180815-d7a89b0a5784
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260513104050-c40f342b5ff6
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260518065630-109f00366c4f
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260417081611-8bdbd9f45629
 	github.com/smartcontractkit/chainlink-deployments-framework v0.102.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
@@ -270,8 +270,8 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260306142855-8d629e752265 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260513104050-c40f342b5ff6 // indirect
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260513104050-c40f342b5ff6 // indirect
+	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260518065630-109f00366c4f // indirect
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260518065630-109f00366c4f // indirect
 	github.com/smartcontractkit/chainlink-common/keystore v1.0.2 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260427132147-1ef18876ae9b // indirect
