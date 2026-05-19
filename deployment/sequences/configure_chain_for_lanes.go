@@ -14,13 +14,13 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
@@ -60,9 +60,20 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 
 		sourceChain := input.Source
 		destChain := input.Dest
+		participant := chain.Participants[0]
+		mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
+		var proposalOutputs []contract.ExerciseOutput
+
+		globalConfigRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.CantonLaneConfig.GlobalConfig)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("global config raw instance address: %w", err)
+		}
+		feeQuoterRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.CantonLaneConfig.FeeQuoterRef)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("fee quoter raw instance address: %w", err)
+		}
 
 		// GlobalConfig - Dest Chain Config
-		globalConfigAddress := contracts.HexToInstanceAddress(sourceChain.CantonLaneConfig.GlobalConfig.Address)
 		isEnabled := len(destChain.Router) > 0
 		defaultExecutor, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.DefaultExecutor)
 		if err != nil {
@@ -84,11 +95,10 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			}
 			defaultOutboundCCVs = append(defaultOutboundCCVs, outboundCCV.Binding())
 		}
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("getting global config dest chain config args: %w", err)
-		}
-		_, err = operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[common.ApplyDestChainConfigUpdates]{
-			InstanceAddress: globalConfigAddress,
+		destChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[common.ApplyDestChainConfigUpdates]{
+			InstanceAddress:    globalConfigRaw.InstanceAddress(),
+			RawInstanceAddress: globalConfigRaw.String(),
+			MCMSEnabled:        mcmsEnabled,
 			Args: common.ApplyDestChainConfigUpdates{
 				DestChainConfigUpdates: []common.DestChainConfigArgs{
 					{
@@ -110,11 +120,19 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to global config: %w", err)
 		}
+		if mcmsEnabled && !destChainConfigReport.Output.Executed() {
+			proposalOutputs = append(proposalOutputs, destChainConfigReport.Output)
+		}
 
 		// Executor - Dest Chain Config
-		executorAddress := contracts.HexToInstanceAddress(sourceChain.DefaultExecutor.Address)
-		_, err = operations.ExecuteOperation(b, executor2.ApplyDestChainUpdates, chain, contract.ChoiceInput[executor.ApplyDestChainUpdates]{
-			InstanceAddress: executorAddress,
+		executorRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.DefaultExecutor)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("getting default executor raw instance address: %w", err)
+		}
+		executorReport, err := operations.ExecuteOperation(b, executor2.ApplyDestChainUpdates, chain, contract.ChoiceInput[executor.ApplyDestChainUpdates]{
+			InstanceAddress:    executorRaw.InstanceAddress(),
+			RawInstanceAddress: executorRaw.String(),
+			MCMSEnabled:        mcmsEnabled,
 			Args: executor.ApplyDestChainUpdates{
 				DestChainSelectorsToRemove: nil,
 				DestChainSelectorsToAdd: []executor.RemoteChainConfigArgs{
@@ -131,11 +149,15 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to executor: %w", err)
 		}
+		if mcmsEnabled && !executorReport.Output.Executed() {
+			proposalOutputs = append(proposalOutputs, executorReport.Output)
+		}
 
 		// FeeQuoter - Dest Chain Config
-		feeQuoterAddress := contracts.BytesToInstanceAddress(sourceChain.FeeQuoter)
-		_, err = operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[feequoter.ApplyFeeQuoterDestChainConfigUpdates]{
-			InstanceAddress: feeQuoterAddress,
+		feeQuoterDestConfigReport, err := operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[feequoter.ApplyFeeQuoterDestChainConfigUpdates]{
+			InstanceAddress:    feeQuoterRaw.InstanceAddress(),
+			RawInstanceAddress: feeQuoterRaw.String(),
+			MCMSEnabled:        mcmsEnabled,
 			Args: feequoter.ApplyFeeQuoterDestChainConfigUpdates{
 				DestChainConfigArgs: []feequoter.FeeQuoterDestChainConfigArgs{
 					{
@@ -158,16 +180,21 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("applying dest chain config updates to fee quoter: %w", err)
 		}
+		if mcmsEnabled && !feeQuoterDestConfigReport.Output.Executed() {
+			proposalOutputs = append(proposalOutputs, feeQuoterDestConfigReport.Output)
+		}
 
-		_, err = operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
-			InstanceAddress: feeQuoterAddress,
-			Args: feequoter.ApplyPriceUpdatersUpdate{
-				AddedPriceUpdaters:   []types.PARTY{types.PARTY(chain.Participants[0].PartyID)},
-				RemovedPriceUpdaters: nil,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("ensuring price updater on fee quoter: %w", err)
+		if !mcmsEnabled {
+			_, err = operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
+				InstanceAddress: feeQuoterRaw.InstanceAddress(),
+				Args: feequoter.ApplyPriceUpdatersUpdate{
+					AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
+					RemovedPriceUpdaters: nil,
+				},
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("ensuring price updater on fee quoter: %w", err)
+			}
 		}
 
 		tokenPriceUpdates, err := tokenPriceUpdatesFromParams(destChain.TokenPrices)
@@ -176,8 +203,10 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		}
 
 		// FeeQuoter - Update prices.
-		_, err = operations.ExecuteOperation(b, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
-			InstanceAddress: feeQuoterAddress,
+		updatePricesReport, err := operations.ExecuteOperation(b, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
+			InstanceAddress:    feeQuoterRaw.InstanceAddress(),
+			RawInstanceAddress: feeQuoterRaw.String(),
+			MCMSEnabled:        mcmsEnabled,
 			Args: feequoter.UpdatePrices{
 				PriceUpdates: feequoter.PriceUpdates{
 					TokenPriceUpdates: tokenPriceUpdates,
@@ -194,6 +223,9 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("updating prices in fee quoter: %w", err)
 		}
+		if mcmsEnabled && !updatePricesReport.Output.Executed() {
+			proposalOutputs = append(proposalOutputs, updatePricesReport.Output)
+		}
 
 		// CommitteeVerifier - Dest Chain Config
 		for _, verifierConfig := range input.Source.CommitteeVerifiers {
@@ -206,7 +238,18 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			}
 		}
 
-		return sequences.OnChainOutput{}, nil
+		if !mcmsEnabled {
+			return sequences.OnChainOutput{}, nil
+		}
+		batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for lane configuration: %w", err)
+		}
+		if len(batchOp.Transactions) == 0 {
+			return sequences.OnChainOutput{}, nil
+		}
+
+		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	},
 )
 
@@ -224,9 +267,15 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 
 		sourceChain := input.Source
 		destChain := input.Dest
+		mcmsEnabled := len(chain.Participants[0].ReadAsPartyIDs) > 0
+		var proposalOutputs []contract.ExerciseOutput
+
+		globalConfigRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(destChain.CantonLaneConfig.GlobalConfig)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("global config raw instance address: %w", err)
+		}
 
 		// GlobalConfig - Source Chain Config
-		globalConfigAddress := contracts.HexToInstanceAddress(destChain.CantonLaneConfig.GlobalConfig.Address)
 		laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(destChain.LaneMandatedInboundCCVs))
 		for _, ccv := range destChain.LaneMandatedInboundCCVs {
 			inboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
@@ -243,16 +292,13 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			}
 			defaultInboundCCVs = append(defaultInboundCCVs, inboundCCV.Binding())
 		}
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("getting global config dest chain config args: %w", err)
-		}
-		// TODO input doesn't support multiple OnRamps
-		// TODO Must pad EVM addresses to 32 bytes
 		inboundOnRampAddresses := []types.TEXT{
 			types.TEXT(hex.EncodeToString(gethcommon.LeftPadBytes(sourceChain.OnRamp, 32))),
 		}
-		_, err = operations.ExecuteOperation(b, global_config.ApplySourceChainConfigUpdates, chain, contract.ChoiceInput[common.ApplySourceChainConfigUpdates]{
-			InstanceAddress: globalConfigAddress,
+		sourceChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplySourceChainConfigUpdates, chain, contract.ChoiceInput[common.ApplySourceChainConfigUpdates]{
+			InstanceAddress:    globalConfigRaw.InstanceAddress(),
+			RawInstanceAddress: globalConfigRaw.String(),
+			MCMSEnabled:        mcmsEnabled,
 			Args: common.ApplySourceChainConfigUpdates{
 				SourceChainConfigUpdates: []common.SourceChainConfigArgs{
 					{
@@ -268,6 +314,9 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("applying source chain config updates to global config: %w", err)
 		}
+		if mcmsEnabled && !sourceChainConfigReport.Output.Executed() {
+			proposalOutputs = append(proposalOutputs, sourceChainConfigReport.Output)
+		}
 
 		// CommitteeVerifier - Source Chain Config
 		for _, verifierConfig := range input.Dest.CommitteeVerifiers {
@@ -280,7 +329,18 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			}
 		}
 
-		return sequences.OnChainOutput{}, nil
+		if !mcmsEnabled {
+			return sequences.OnChainOutput{}, nil
+		}
+		batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for lane configuration: %w", err)
+		}
+		if len(batchOp.Transactions) == 0 {
+			return sequences.OnChainOutput{}, nil
+		}
+
+		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 	},
 )
 

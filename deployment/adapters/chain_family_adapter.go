@@ -81,6 +81,17 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 				return ccipseq.OnChainOutput{}, fmt.Errorf("runtime datastore is not set")
 			}
 
+			localFeeQuoter, err := findContractRef(
+				ds,
+				input.ChainSelector,
+				datastore.ContractType(fee_quoter.ContractType),
+				fee_quoter.Version,
+				"",
+			)
+			if err != nil {
+				return ccipseq.OnChainOutput{}, fmt.Errorf("resolve fee quoter: %w", err)
+			}
+
 			localGlobalConfig, err := findContractRef(
 				ds,
 				input.ChainSelector,
@@ -155,7 +166,10 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 					DefaultOutboundCCVs:      defaultOutboundCCVs,
 					LaneMandatedOutboundCCVs: laneMandatedOutboundCCVs,
 					DefaultExecutor:          localExecutor,
-					CantonLaneConfig:         &lanes.CantonLaneConfig{GlobalConfig: localGlobalConfig},
+					CantonLaneConfig: &lanes.CantonLaneConfig{
+						GlobalConfig: localGlobalConfig,
+						FeeQuoterRef: localFeeQuoter,
+					},
 					OnRamp:                   input.OnRamp,
 					OffRamp:                  input.OffRamp,
 					Router:                   input.Router,
