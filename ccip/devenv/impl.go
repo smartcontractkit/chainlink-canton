@@ -30,7 +30,7 @@ import (
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainimpl"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainreg"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	ccvservices "github.com/smartcontractkit/chainlink-ccv/build/devenv/services"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccv/deployment"
@@ -76,7 +76,7 @@ const AMTInstrument = types.TEXT("Amulet")
 var (
 	_                       cciptestinterfaces.CCIP17              = &Chain{}
 	_                       cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_                       chainimpl.ImplFactory                  = &ImplFactory{}
+	_                       chainreg.ImplFactory                   = &ImplFactory{}
 	cantonTokenPoolVersion                                         = semver.MustParse("2.0.0")
 	cantonDeployDarPackages                                        = []contracts.Package{
 		contracts.CCIPFactory,
