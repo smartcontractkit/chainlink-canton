@@ -10,6 +10,7 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip => github.com/smartcontractkit/chainlink-ccip v0.0.0-20260416055149-75c017f534ca
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
+	// github.com/smartcontractkit/go-daml => ../go-daml
 	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
 	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )
@@ -42,7 +43,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260417081611-8bdbd9f45629
 	github.com/smartcontractkit/chainlink-deployments-framework v0.101.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.1
-	github.com/smartcontractkit/go-daml v0.0.0-20260514231151-fecd433dede9
+	// github.com/smartcontractkit/go-daml v0.6.1-0.20260427221214-62fc94f51248
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
 	go.opentelemetry.io/otel v1.43.0
@@ -55,6 +56,8 @@ require (
 	google.golang.org/grpc v1.81.0
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+require github.com/smartcontractkit/go-daml v0.0.0-20260331185746-126b4945e013
 
 require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.50.1 // indirect

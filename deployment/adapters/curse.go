@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	common_binding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -22,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
 )
@@ -33,14 +35,16 @@ var (
 
 func NewCantonCurseAdapter() *CantonCurseAdapter {
 	return &CantonCurseAdapter{
-		rmnRemoteAddressCache: make(map[uint64]contracts.InstanceAddress),
-		globalConfigCache:     make(map[uint64]contracts.InstanceAddress),
+		rmnRemoteAddressCache:    make(map[uint64]contracts.InstanceAddress),
+		rmnRemoteRawAddressCache: make(map[uint64]contracts.RawInstanceAddress),
+		globalConfigCache:        make(map[uint64]contracts.InstanceAddress),
 	}
 }
 
 type CantonCurseAdapter struct {
-	rmnRemoteAddressCache map[uint64]contracts.InstanceAddress
-	globalConfigCache     map[uint64]contracts.InstanceAddress
+	rmnRemoteAddressCache    map[uint64]contracts.InstanceAddress
+	rmnRemoteRawAddressCache map[uint64]contracts.RawInstanceAddress
+	globalConfigCache        map[uint64]contracts.InstanceAddress
 }
 
 // Curse implements [fastcurse.CurseAdapter].
@@ -50,6 +54,8 @@ func (c *CantonCurseAdapter) Curse() *cldf_ops.Sequence[fastcurse.CurseInput, se
 		semver.MustParse("1.0.0"),
 		"Cursing subjects with RMNRemote",
 		func(b cldf_ops.Bundle, chains chain.BlockChains, in fastcurse.CurseInput) (output sequences.OnChainOutput, err error) {
+			var proposalOutputs []contract.ExerciseOutput
+
 			chain, ok := chains.CantonChains()[in.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
@@ -61,10 +67,16 @@ func (c *CantonCurseAdapter) Curse() *cldf_ops.Sequence[fastcurse.CurseInput, se
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMNRemote instance address cached for chain %d", chain.Selector)
 			}
 
-			// TODO: should this be a CLDF sequence instead?
+			// Get the RMNRemote raw instance address for MCMS
+			rawInstanceAddr, ok := c.rmnRemoteRawAddressCache[chain.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("no RMNRemote raw instance address cached for chain %d", chain.Selector)
+			}
+
 			for _, subject := range in.Subjects {
-				_, err = cldf_ops.ExecuteOperation(b, rmn_remote.Curse, chain, contract.ChoiceInput[rmn.Curse]{
-					InstanceAddress: instanceAddr,
+				curseOut, err := cldf_ops.ExecuteOperation(b, rmn_remote.Curse, chain, contract.ChoiceInput[rmn.Curse]{
+					InstanceAddress:    instanceAddr,
+					RawInstanceAddress: string(rawInstanceAddr),
 					Args: rmn.Curse{
 						Subject: types.TEXT(hex.EncodeToString(subject[:])),
 					},
@@ -72,9 +84,19 @@ func (c *CantonCurseAdapter) Curse() *cldf_ops.Sequence[fastcurse.CurseInput, se
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("execute curse operation: %w", err)
 				}
+				proposalOutputs = append(proposalOutputs, curseOut.Output)
 			}
 
-			// TODO: MCMS batch operation?
+			// Build batch operations from all proposal outputs
+			if len(proposalOutputs) > 0 {
+				batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build proposal batch for curse: %w", err)
+				}
+				if len(batchOp.Transactions) > 0 {
+					output.BatchOps = []mcms_types.BatchOperation{batchOp}
+				}
+			}
 
 			return output, nil
 		},
@@ -93,7 +115,14 @@ func (c *CantonCurseAdapter) Initialize(e deployment.Environment, selector uint6
 		return fmt.Errorf("get global config address: %w", err)
 	}
 
+	// Get raw instance address for MCMS
+	rmnRemoteRawAddr, err := dsutils.GetRawInstanceAddressFromAddressRef(rmnRemoteRef)
+	if err != nil {
+		return fmt.Errorf("get rmn remote raw instance address: %w", err)
+	}
+
 	c.rmnRemoteAddressCache[selector] = contracts.HexToInstanceAddress(rmnRemoteRef.Address)
+	c.rmnRemoteRawAddressCache[selector] = rmnRemoteRawAddr
 	c.globalConfigCache[selector] = contracts.HexToInstanceAddress(globalConfigRef.Address)
 
 	return nil
@@ -238,6 +267,8 @@ func (c *CantonCurseAdapter) Uncurse() *cldf_ops.Sequence[fastcurse.CurseInput, 
 		semver.MustParse("1.0.0"),
 		"Uncursing subjects with RMNRemote",
 		func(b cldf_ops.Bundle, chains chain.BlockChains, in fastcurse.CurseInput) (output sequences.OnChainOutput, err error) {
+			var proposalOutputs []contract.ExerciseOutput
+
 			chain, ok := chains.CantonChains()[in.ChainSelector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
@@ -249,10 +280,16 @@ func (c *CantonCurseAdapter) Uncurse() *cldf_ops.Sequence[fastcurse.CurseInput, 
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMNRemote instance address cached for chain %d", chain.Selector)
 			}
 
-			// TODO: should this be a CLDF sequence instead?
+			// Get the RMNRemote raw instance address for MCMS
+			rawInstanceAddr, ok := c.rmnRemoteRawAddressCache[chain.Selector]
+			if !ok {
+				return sequences.OnChainOutput{}, fmt.Errorf("no RMNRemote raw instance address cached for chain %d", chain.Selector)
+			}
+
 			for _, subject := range in.Subjects {
-				_, err = cldf_ops.ExecuteOperation(b, rmn_remote.Uncurse, chain, contract.ChoiceInput[rmn.Uncurse]{
-					InstanceAddress: instanceAddr,
+				uncurseOut, err := cldf_ops.ExecuteOperation(b, rmn_remote.Uncurse, chain, contract.ChoiceInput[rmn.Uncurse]{
+					InstanceAddress:    instanceAddr,
+					RawInstanceAddress: string(rawInstanceAddr),
 					Args: rmn.Uncurse{
 						Subject: types.TEXT(hex.EncodeToString(subject[:])),
 					},
@@ -260,9 +297,19 @@ func (c *CantonCurseAdapter) Uncurse() *cldf_ops.Sequence[fastcurse.CurseInput, 
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("execute uncurse operation: %w", err)
 				}
+				proposalOutputs = append(proposalOutputs, uncurseOut.Output)
 			}
 
-			// TODO: MCMS batch operation?
+			// Build batch operations from all proposal outputs
+			if len(proposalOutputs) > 0 {
+				batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to build proposal batch for uncurse: %w", err)
+				}
+				if len(batchOp.Transactions) > 0 {
+					output.BatchOps = []mcms_types.BatchOperation{batchOp}
+				}
+			}
 
 			return output, nil
 		},

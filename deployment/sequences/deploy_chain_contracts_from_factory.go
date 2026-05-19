@@ -300,7 +300,7 @@ func newChoiceInput[ARGS any](
 		InstanceAddress:    rawInstanceAddress.InstanceAddress(),
 		RawInstanceAddress: rawInstanceAddress.String(),
 		Args:               args,
-		MCMSEnabled:        proposalDriven,
+		DisableMCMS:        !proposalDriven,
 	}
 }
 

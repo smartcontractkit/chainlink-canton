@@ -69,10 +69,12 @@ type ChoiceInput[ARGS any] struct {
 	// The InstanceAddress this operation is targeting. Will be resolved to an active contract.
 	InstanceAddress contracts.InstanceAddress `json:"instanceAddress"`
 	// RawInstanceAddress is the "instanceId@partyId" format required by the Canton MCMS SDK
-	// for AdditionalFields.TargetInstanceAddress. Must be set when MCMSEnabled is true.
+	// for AdditionalFields.TargetInstanceAddress. Must be set when MCMS is enabled (DisableMCMS is false).
 	RawInstanceAddress string `json:"rawInstanceAddress,omitempty"`
 	Args               ARGS   `json:"args"`
-	MCMSEnabled        bool   `json:"mcmsEnabled,omitempty"`
+	// DisableMCMS, when true, executes the operation directly on-chain bypassing MCMS.
+	// When false (zero value), the operation generates an MCMS proposal transaction.
+	DisableMCMS        bool `json:"disableMCMS,omitempty"`
 	DisclosedContracts []DisclosedContract
 }
 
@@ -120,13 +122,13 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 				}
 			}
 
-			// If MCMS enabled, encode and return without executing on-chain
-			if input.MCMSEnabled {
+			// If MCMS enabled (DisableMCMS is false), encode and return without executing on-chain
+			if !input.DisableMCMS {
 				if params.EncodeMethod == nil {
-					return ExerciseOutput{}, fmt.Errorf("MCMSEnabled is true but no EncodeMethod is defined for operation %s", params.Name)
+					return ExerciseOutput{}, fmt.Errorf("MCMS is enabled but no EncodeMethod is defined for operation %s", params.Name)
 				}
 				if input.RawInstanceAddress == "" {
-					return ExerciseOutput{}, fmt.Errorf("MCMSEnabled is true but RawInstanceAddress is empty for operation %s", params.Name)
+					return ExerciseOutput{}, fmt.Errorf("MCMS is enabled but RawInstanceAddress is empty for operation %s", params.Name)
 				}
 				encodedChoice, err := params.EncodeMethod(input.Args)
 				if err != nil {
@@ -145,7 +147,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 
 			// Direct execution path
 			participant := deps.Participants[0]
-
+			fmt.Println("MCMS PARTYID: ", participant.PartyID)
 			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, participant.PartyID, params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)

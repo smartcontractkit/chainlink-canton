@@ -13,10 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
@@ -49,6 +51,8 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
+		var proposalOutputs []contract.ExerciseOutput
+
 		remoteChainConfigArgs := make([]ccvs.RemoteChainConfigArgs, 0, len(input.RemoteChains))
 		allowListArgs := make([]ccvs.AllowListConfigArgs, 0, len(input.RemoteChains))
 		for remoteSelector, remoteConfig := range input.RemoteChains {
@@ -72,9 +76,14 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 
 		for _, addressRef := range input.CommitteeVerifier {
 			address := contracts.HexToInstanceAddress(addressRef.Address)
+			rawInstanceAddress, err := dsutils.GetRawInstanceAddressFromAddressRef(addressRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("getting committee verifier raw instance address: %w", err)
+			}
 
-			_, err = operations.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.ChoiceInput[ccvs.ApplyRemoteChainConfigUpdates]{
-				InstanceAddress: address,
+			remoteChainOut, err := operations.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.ChoiceInput[ccvs.ApplyRemoteChainConfigUpdates]{
+				InstanceAddress:    address,
+				RawInstanceAddress: string(rawInstanceAddress),
 				Args: ccvs.ApplyRemoteChainConfigUpdates{
 					RemoteChainConfigArgs: remoteChainConfigArgs,
 				},
@@ -82,9 +91,11 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply remote chain configs to CommitteeVerifier at address %s: %w", address.Hex(), err)
 			}
+			proposalOutputs = append(proposalOutputs, remoteChainOut.Output)
 
-			_, err = operations.ExecuteOperation(b, committee_verifier.ApplyAllowListUpdates, chain, contract.ChoiceInput[ccvs.ApplyAllowListUpdates]{
-				InstanceAddress: address,
+			allowListOut, err := operations.ExecuteOperation(b, committee_verifier.ApplyAllowListUpdates, chain, contract.ChoiceInput[ccvs.ApplyAllowListUpdates]{
+				InstanceAddress:    address,
+				RawInstanceAddress: string(rawInstanceAddress),
 				Args: ccvs.ApplyAllowListUpdates{
 					AllowListConfigArgsItems: allowListArgs,
 				},
@@ -92,9 +103,22 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply allow list updates to CommitteeVerifier at address %s: %w", address.Hex(), err)
 			}
+			proposalOutputs = append(proposalOutputs, allowListOut.Output)
 		}
 
-		return sequences.OnChainOutput{}, nil
+		// Build batch operations from all proposal outputs
+		out := sequences.OnChainOutput{}
+		if len(proposalOutputs) > 0 {
+			batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build proposal batch for committee verifier config: %w", err)
+			}
+			if len(batchOp.Transactions) > 0 {
+				out.BatchOps = []mcms_types.BatchOperation{batchOp}
+			}
+		}
+
+		return out, nil
 	},
 )
 
@@ -107,6 +131,8 @@ var ConfigureCommitteeVerifierAsDest = operations.NewSequence(
 		if !ok {
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
+
+		var proposalOutputs []contract.ExerciseOutput
 
 		signatureConfigs := make([]ccvs.SignatureConfig, 0, len(input.RemoteChains))
 		for remoteSelector, remoteConfig := range input.RemoteChains {
@@ -129,9 +155,14 @@ var ConfigureCommitteeVerifierAsDest = operations.NewSequence(
 
 		for _, addressRef := range input.CommitteeVerifier {
 			address := contracts.HexToInstanceAddress(addressRef.Address)
+			rawInstanceAddress, err := dsutils.GetRawInstanceAddressFromAddressRef(addressRef)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("getting committee verifier raw instance address: %w", err)
+			}
 
-			_, err := operations.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.ChoiceInput[ccvs.ApplySignatureConfigs]{
-				InstanceAddress: address,
+			sigConfigOut, err := operations.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.ChoiceInput[ccvs.ApplySignatureConfigs]{
+				InstanceAddress:    address,
+				RawInstanceAddress: string(rawInstanceAddress),
 				Args: ccvs.ApplySignatureConfigs{
 					SourceChainSelectorsToRemove: nil, // This doesn't support removing chains
 					SignatureConfigs:             signatureConfigs,
@@ -140,8 +171,21 @@ var ConfigureCommitteeVerifierAsDest = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply signature configs to CommitteeVerifier at address %s: %w", address.Hex(), err)
 			}
+			proposalOutputs = append(proposalOutputs, sigConfigOut.Output)
 		}
 
-		return sequences.OnChainOutput{}, nil
+		// Build batch operations from all proposal outputs
+		out := sequences.OnChainOutput{}
+		if len(proposalOutputs) > 0 {
+			batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build proposal batch for committee verifier config: %w", err)
+			}
+			if len(batchOp.Transactions) > 0 {
+				out.BatchOps = []mcms_types.BatchOperation{batchOp}
+			}
+		}
+
+		return out, nil
 	},
 )

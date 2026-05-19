@@ -189,7 +189,7 @@ func (d DeployFactoryAndSetOwnerToMCMS) Apply(e cldf.Environment, config CantonC
 		InstanceAddress:    factoryRawAddr.InstanceAddress(),
 		RawInstanceAddress: string(factoryRawAddr),
 		Args:               factorybindings.SetOwnerToMCMS{},
-		MCMSEnabled:        true,
+		// DisableMCMS defaults to false, so MCMS is enabled by default
 	})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to encode SetOwnerToMCMS: %w", err)

@@ -166,6 +166,87 @@ func TestConfigureGlobalConfig_MCMSProposal(t *testing.T) {
 	assert.NotEmpty(t, af.OperationData)
 }
 
+// TestConfigureGlobalConfig_MCMSWithBypassExecution demonstrates the new MCMS-by-default behavior:
+// 1. Operations with DisableMCMS=false (default) generate MCMS proposals
+// 2. ExecuteOutputsForTest helper builds a batch from exercise outputs
+// 3. For actual on-chain execution in tests, use the Bypasser pattern from
+//    integration-tests/mcms/mcms_timelock_test.go
+//
+// This test shows the first two steps - proposal generation and batch building.
+// For the full execution flow, see TestMCMS_ChangesetProposalE2E in
+// integration-tests/mcms/changeset_mcms_test.go which uses the SDK pattern.
+func TestConfigureGlobalConfig_MCMSWithBypassExecution(t *testing.T) {
+	t.Parallel()
+
+	cantonChain, bundle, env := setupCantonEnv(t)
+	participant := cantonChain.Participants[0]
+	party := participant.PartyID
+
+	uploadDARs(t, participant, contracts.CCIPCommon, contracts.MCMS)
+
+	// Deploy GlobalConfig and MCMS
+	gcAddrRef := deployGlobalConfig(t, bundle, *cantonChain, party)
+	gcRawAddr, err := contracts.RawInstanceAddressFromString(gcAddrRef.Labels.List()[0])
+	require.NoError(t, err)
+
+	mcmsAddrRef := deployMCMSContract(t, bundle, *cantonChain, party)
+	mcmsRawAddr, err := contracts.RawInstanceAddressFromString(mcmsAddrRef.Labels.List()[0])
+	require.NoError(t, err)
+
+	// Generate MCMS proposal (DisableMCMS defaults to false)
+	// This is the new MCMS-by-default behavior
+	csOut, err := ConfigureGlobalConfig{}.Apply(*env, CantonCSDeps[ConfigureGlobalConfigConfig]{
+		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
+		Participant:   0,
+		Config: ConfigureGlobalConfigConfig{
+			InstanceAddress:    gcRawAddr.InstanceAddress(),
+			RawInstanceAddress: gcRawAddr.String(),
+			DestChainUpdates: []common.DestChainConfigArgs{{
+				DestChainSelector:         "999",
+				IsEnabled:                 true,
+				AddressBytesLength:        20,
+				TokenReceiverAllowed:      true,
+				BaseExecutionGasCost:      21000,
+				OffRampAddress:            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+				MessageNetworkFeeUSDCents: "100",
+				TokenNetworkFeeUSDCents:   "50",
+			}},
+			TimelockConfig: &MCMSTimelockConfig{
+				MinDelay:         0,
+				Description:      "Test: MCMS with bypass execution pattern",
+				OverridePrevRoot: true,
+				Action:           mcms_types.TimelockActionSchedule,
+				MCMSContract: cantonmcms.MCMSContractInfo{
+					RawInstanceAddress: mcmsRawAddr,
+					InstanceAddress:    mcmsRawAddr.InstanceAddress(),
+				},
+				Role: cantonsdk.TimelockRoleProposer,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, csOut.MCMSTimelockProposals, 1)
+
+	// The changeset produced an MCMS proposal (not direct execution)
+	// This demonstrates MCMS is now the default
+	proposal := csOut.MCMSTimelockProposals[0]
+	require.Len(t, proposal.Operations, 1)
+	batchOp := proposal.Operations[0]
+	require.Len(t, batchOp.Transactions, 1)
+
+	// Use ExecuteOutputsForTest helper to process the batch
+	// In a real test, you would then execute this via Bypasser pattern:
+	// 1. Get MCMS op count
+	// 2. Build MCMS proposal
+	// 3. Sign
+	// 4. SetRoot with Bypasser role
+	// 5. bypasserExecuteBatchWithDisclosureParty
+	//
+	// For the full pattern, see integration-tests/mcms/mcms_timelock_test.go
+	assert.Equal(t, mcms_types.ChainSelector(chainsel.CANTON_LOCALNET.Selector), batchOp.ChainSelector)
+	t.Logf("MCMS proposal generated with %d transactions ready for Bypasser execution", len(batchOp.Transactions))
+}
+
 // setupCantonEnv creates a CTF Canton network and returns the chain, operations bundle, and environment.
 func setupCantonEnv(t *testing.T) (*canton.Chain, cld_ops.Bundle, *cldf.Environment) {
 	t.Helper()

@@ -55,6 +55,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	cantonchangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
+	cantonds "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -319,9 +320,17 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 		return nil, fmt.Errorf("resolve registry admin: %w", err)
 	}
 
-	feeQuoterAddress := contracts.HexToInstanceAddress(feeQuoterRef.Address)
+	feeQuoterRaw, err := cantonds.GetRawInstanceAddressFromAddressRef(feeQuoterRef)
+	if err != nil {
+		return nil, fmt.Errorf("resolve FeeQuoter raw instance address for chain %d: %w", selector, err)
+	}
+	feeQuoterAddress := feeQuoterRaw.InstanceAddress()
+	// Devenv does not deploy MCMS; exercise ops default to proposal mode. Bypass MCMS here
+	// until devenv runs the factory + MCMS path with test auto-execution.
 	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
-		InstanceAddress: feeQuoterAddress,
+		InstanceAddress:    feeQuoterAddress,
+		RawInstanceAddress: feeQuoterRaw.String(),
+		DisableMCMS:          true,
 		Args: feequoter.ApplyPriceUpdatersUpdate{
 			AddedPriceUpdaters: []types.PARTY{types.PARTY(participant.PartyID)},
 		},
@@ -331,7 +340,9 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 	}
 
 	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
-		InstanceAddress: feeQuoterAddress,
+		InstanceAddress:    feeQuoterAddress,
+		RawInstanceAddress: feeQuoterRaw.String(),
+		DisableMCMS:          true,
 		Args: feequoter.UpdatePrices{
 			PriceUpdates: feequoter.PriceUpdates{
 				TokenPriceUpdates: []feequoter.TokenPriceUpdate{{
@@ -1199,7 +1210,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	ccipSendReport, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Send, c.chain, contract.ChoiceInput[ccipsender.Send]{
 		InstanceAddress:    c.senderAddress,
 		Args:               sendArgs,
-		MCMSEnabled:        false,
+		DisableMCMS:        true,
 		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),
 	})
 	if err != nil {

@@ -40,6 +40,10 @@ import (
 //
 //	changeset → MCMS proposal generation → on-chain MCMS signing/execution → state verification.
 //
+// This test demonstrates the SDK-based MCMS execution pattern (alternative to the helper functions
+// in mcms_timelock_test.go). For tests using the operations framework with DisableMCMS=false
+// (the default), use cantonmcms.ExecuteOutputsForTest() to build batches from exercise outputs.
+//
 // Flow:
 //  1. Deploy CCIP chain contracts (GlobalConfig, CCV, RMN, etc.)
 //  2. Deploy MCMS contract with 2-of-3 signer config

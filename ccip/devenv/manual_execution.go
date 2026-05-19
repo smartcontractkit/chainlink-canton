@@ -68,6 +68,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 			PartyOwner: types.PARTY(partyId),
 			InstanceId: types.TEXT(routerInstanceID.String()),
 		},
+		DisableMCMS: true,
 	})
 	routerAddress = routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
 

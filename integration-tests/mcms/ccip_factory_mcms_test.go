@@ -31,6 +31,11 @@ import (
 // 2. MCMS takes ownership (SetOwnerToMCMS)
 // 3. All CCIP components deployed through MCMS Bypasser operations targeting the factory
 // 4. Factory state verified to contain all deployed contracts
+//
+// NOTE: This test uses the manual MCMS encoding pattern. For tests using the operations
+// framework with DisableMCMS=false (the new default), use cantonmcms.ExecuteOutputsForTest()
+// to build batches from exercise outputs, then execute via the Bypasser pattern.
+// See mcms_timelock_test.go for the Bypasser execution helpers.
 func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	t.Parallel()
 

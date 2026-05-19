@@ -69,7 +69,7 @@ func (d ConfigureGlobalConfig) Apply(e cldf.Environment, config CantonCSDeps[Con
 			Args: common.ApplyDestChainConfigUpdates{
 				DestChainConfigUpdates: config.Config.DestChainUpdates,
 			},
-			MCMSEnabled: mcmsEnabled,
+			DisableMCMS: !mcmsEnabled,
 		})
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to apply dest chain config updates: %w", err)
@@ -84,7 +84,7 @@ func (d ConfigureGlobalConfig) Apply(e cldf.Environment, config CantonCSDeps[Con
 			Args: common.ApplySourceChainConfigUpdates{
 				SourceChainConfigUpdates: config.Config.SourceChainUpdates,
 			},
-			MCMSEnabled: mcmsEnabled,
+			DisableMCMS: !mcmsEnabled,
 		})
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to apply source chain config updates: %w", err)

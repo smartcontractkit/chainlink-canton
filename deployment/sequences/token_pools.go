@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
@@ -79,6 +80,8 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("existing datastore is required")
 		}
 
+		var allProposalOutputs []contract.ExerciseOutput
+
 		cantonChain, ok := chains.CantonChains()[input.ChainSelector]
 		if !ok || len(cantonChain.Participants) == 0 {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("canton chain with selector %d not found", input.ChainSelector)
@@ -104,15 +107,29 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("resolve token admin registry: %w", err)
 		}
-		_, err = operations.ExecuteSequence(b, RegisterTokenPool, cantonChain, RegisterTokenPoolInput{
-			TokenAdminRegistryInstanceAddress: contracts.HexToInstanceAddress(registryRef.Address),
-			InstrumentId:                      parsedPool.InstrumentId,
-			PoolInstanceID:                    string(parsedPool.InstanceId),
-			CcipParty:                         string(parsedPool.CcipOwner),
-			PoolOwnerParty:                    string(parsedPool.PoolOwner),
+		// Get raw instance address for MCMS
+		registryRawAddr, err := dsutils.GetRawInstanceAddressFromAddressRef(registryRef)
+		if err != nil {
+			return ccipsequences.OnChainOutput{}, fmt.Errorf("getting token admin registry raw instance address: %w", err)
+		}
+
+		registerOut, err := operations.ExecuteSequence(b, RegisterTokenPool, cantonChain, RegisterTokenPoolInput{
+			TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(registryRef.Address),
+			TokenAdminRegistryRawInstanceAddress: string(registryRawAddr),
+			InstrumentId:                         parsedPool.InstrumentId,
+			PoolInstanceID:                       string(parsedPool.InstanceId),
+			CcipParty:                            string(parsedPool.CcipOwner),
+			PoolOwnerParty:                       string(parsedPool.PoolOwner),
 		})
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("register token pool with token admin registry: %w", err)
+		}
+		// Collect any proposal outputs from token pool registration
+		if len(registerOut.Output.BatchOps) > 0 {
+			allProposalOutputs = append(allProposalOutputs, contract.ExerciseOutput{
+				ChainSelector: registerOut.Output.BatchOps[0].ChainSelector,
+				Tx:            registerOut.Output.BatchOps[0].Transactions[0],
+			})
 		}
 
 		out := ccipsequences.OnChainOutput{}
@@ -251,7 +268,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 					OutboundRateLimiter:                        update.OutboundRateLimiter,
 				})
 			}
-			_, err = operations.ExecuteOperation(b, lock_release_token_pool.ApplyChainUpdates, cantonChain, contract.ChoiceInput[lockreleasetokenpool.ApplyChainUpdates]{
+			applyUpdatesOut, err := operations.ExecuteOperation(b, lock_release_token_pool.ApplyChainUpdates, cantonChain, contract.ChoiceInput[lockreleasetokenpool.ApplyChainUpdates]{
 				InstanceAddress: poolAddress,
 				Args: lockreleasetokenpool.ApplyChainUpdates{
 					RemoteChainSelectorsToRemove: []types.NUMERIC{},
@@ -260,11 +277,22 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			})
 			if err != nil {
 				if strings.Contains(err.Error(), "ApplyChainUpdates: chain already exists:") {
+					// Build final output with any collected proposals
+					if len(allProposalOutputs) > 0 {
+						batchOp, err := contract.NewBatchOperationFromExercises(allProposalOutputs)
+						if err != nil {
+							return out, fmt.Errorf("failed to build proposal batch: %w", err)
+						}
+						if len(batchOp.Transactions) > 0 {
+							out.BatchOps = []mcms_types.BatchOperation{batchOp}
+						}
+					}
 					return out, nil
 				}
 
 				return out, fmt.Errorf("apply remote chain updates to lock/release pool: %w", err)
 			}
+			allProposalOutputs = append(allProposalOutputs, applyUpdatesOut.Output)
 		case burnMintPoolType:
 			burnMintUpdates := make([]burnminttokenpool.ChainUpdate, 0, len(updates))
 			for _, update := range updates {
@@ -280,7 +308,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 					OutboundRateLimiter:                        update.OutboundRateLimiter,
 				})
 			}
-			_, err = operations.ExecuteOperation(b, burn_mint_token_pool.ApplyChainUpdates, cantonChain, contract.ChoiceInput[burnminttokenpool.ApplyChainUpdates]{
+			applyUpdatesOut, err := operations.ExecuteOperation(b, burn_mint_token_pool.ApplyChainUpdates, cantonChain, contract.ChoiceInput[burnminttokenpool.ApplyChainUpdates]{
 				InstanceAddress: poolAddress,
 				Args: burnminttokenpool.ApplyChainUpdates{
 					RemoteChainSelectorsToRemove: []types.NUMERIC{},
@@ -289,13 +317,35 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			})
 			if err != nil {
 				if strings.Contains(err.Error(), "ApplyChainUpdates: chain already exists:") {
+					// Build final output with any collected proposals
+					if len(allProposalOutputs) > 0 {
+						batchOp, err := contract.NewBatchOperationFromExercises(allProposalOutputs)
+						if err != nil {
+							return out, fmt.Errorf("failed to build proposal batch: %w", err)
+						}
+						if len(batchOp.Transactions) > 0 {
+							out.BatchOps = []mcms_types.BatchOperation{batchOp}
+						}
+					}
 					return out, nil
 				}
 
 				return out, fmt.Errorf("apply remote chain updates to burn/mint pool: %w", err)
 			}
+			allProposalOutputs = append(allProposalOutputs, applyUpdatesOut.Output)
 		default:
 			return out, fmt.Errorf("unsupported Canton token pool type %q", logicalPoolType)
+		}
+
+		// Build final output with all collected proposals
+		if len(allProposalOutputs) > 0 {
+			batchOp, err := contract.NewBatchOperationFromExercises(allProposalOutputs)
+			if err != nil {
+				return out, fmt.Errorf("failed to build proposal batch: %w", err)
+			}
+			if len(batchOp.Transactions) > 0 {
+				out.BatchOps = []mcms_types.BatchOperation{batchOp}
+			}
 		}
 
 		return out, nil
@@ -476,16 +526,20 @@ var DeployTokenPoolForToken = operations.NewSequence(
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("parse raw token pool label: %w", err)
 		}
-		_, err = operations.ExecuteSequence(b, RegisterTokenPool, cantonChain, RegisterTokenPoolInput{
-			TokenAdminRegistryInstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address),
-			InstrumentId:                      instrumentID,
-			PoolInstanceID:                    rawPoolAddr.InstanceID(),
-			CcipParty:                         participant.PartyID,
-			PoolOwnerParty:                    participant.PartyID,
+		registerOut, err := operations.ExecuteSequence(b, RegisterTokenPool, cantonChain, RegisterTokenPoolInput{
+			TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address),
+			TokenAdminRegistryRawInstanceAddress: string(tokenAdminRegistryRaw),
+			InstrumentId:                         instrumentID,
+			PoolInstanceID:                       rawPoolAddr.InstanceID(),
+			CcipParty:                            participant.PartyID,
+			PoolOwnerParty:                       participant.PartyID,
 		})
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("register Canton token pool: %w", err)
 		}
+		// Note: DeployTokenPoolForToken returns addresses, not BatchOps
+		// The caller should handle MCMS proposals from nested sequences if needed
+		_ = registerOut
 
 		logicalRef := datastore.AddressRef{
 			Address:       deployOutput.Address,

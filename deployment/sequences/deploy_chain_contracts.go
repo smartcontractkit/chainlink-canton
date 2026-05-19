@@ -171,7 +171,8 @@ var DeployChainContracts = operations.NewSequence(
 		// token price is sufficient to register it as usable for fees.
 		if input.FeeQuoterConfig.USDPerNative != nil {
 			_, err = operations.ExecuteOperation(b, fee_quoter.UpdatePrices, deps, contract.ChoiceInput[feequoter.UpdatePrices]{
-				InstanceAddress: feeQuoterRawInstanceAddress.InstanceAddress(),
+				InstanceAddress:    feeQuoterRawInstanceAddress.InstanceAddress(),
+				RawInstanceAddress: feeQuoterRawInstanceAddress.String(),
 				Args: feequoter.UpdatePrices{
 					PriceUpdates: feequoter.PriceUpdates{
 						TokenPriceUpdates: []feequoter.TokenPriceUpdate{

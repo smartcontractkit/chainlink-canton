@@ -92,6 +92,17 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 				return ccipseq.OnChainOutput{}, fmt.Errorf("resolve global config: %w", err)
 			}
 
+			localFeeQuoter, err := findContractRef(
+				ds,
+				input.ChainSelector,
+				datastore.ContractType(fee_quoter.ContractType),
+				fee_quoter.Version,
+				"",
+			)
+			if err != nil {
+				return ccipseq.OnChainOutput{}, fmt.Errorf("resolve fee quoter: %w", err)
+			}
+
 			localCommitteeVerifiers := convertCommitteeVerifierConfigs(input.CommitteeVerifiers)
 			var out ccipseq.OnChainOutput
 
@@ -155,11 +166,14 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 					DefaultOutboundCCVs:      defaultOutboundCCVs,
 					LaneMandatedOutboundCCVs: laneMandatedOutboundCCVs,
 					DefaultExecutor:          localExecutor,
-					CantonLaneConfig:         &lanes.CantonLaneConfig{GlobalConfig: localGlobalConfig},
-					OnRamp:                   input.OnRamp,
-					OffRamp:                  input.OffRamp,
-					Router:                   input.Router,
-					FeeQuoter:                input.FeeQuoter,
+					CantonLaneConfig: &lanes.CantonLaneConfig{
+						GlobalConfig: localGlobalConfig,
+						FeeQuoterRef: localFeeQuoter,
+					},
+					OnRamp:    input.OnRamp,
+					OffRamp:   input.OffRamp,
+					Router:    input.Router,
+					FeeQuoter: input.FeeQuoter,
 				}
 
 				remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)

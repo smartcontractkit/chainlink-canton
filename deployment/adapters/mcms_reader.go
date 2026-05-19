@@ -38,9 +38,10 @@ func (r *CantonMCMSReader) GetChainMetadata(
 		ctx = e.GetContext()
 	}
 
+	fmt.Println("PARTICIPANT: ", participant.PartyID)
 	inspector := cantonsdk.NewInspector(
 		participant.LedgerServices.State,
-		participant.PartyID,
+		"ccipOwner::1220644bd9e52834e8fba90d4607beed37b65991cc2b5377d5d40d07d3db36d4ed51",
 		timelockRoleForAction(input.TimelockAction),
 	)
 
