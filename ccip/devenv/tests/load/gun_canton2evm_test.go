@@ -9,16 +9,16 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainimpl"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	ccvload "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/load"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/stretchr/testify/require"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
+	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
@@ -66,7 +66,7 @@ func TestCanton2EVM_Load(t *testing.T) {
 		t.Skipf("skipping Canton→EVM load test: %v (start devenv to generate %s)", err, configPath)
 	}
 
-	ccv.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
+	chainimpl.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
 
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
