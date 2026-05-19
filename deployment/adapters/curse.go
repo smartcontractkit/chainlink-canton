@@ -130,14 +130,10 @@ func (c *CantonCurseAdapter) getGlobalConfig(ctx context.Context, chain canton.C
 	}
 
 	participant := chain.Participants[0]
-	queryParty := participant.PartyID
-	if len(participant.ReadAsPartyIDs) > 0 {
-		queryParty = participant.ReadAsPartyIDs[0]
-	}
 	active, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
 		participant.LedgerServices.State,
-		queryParty,
+		contract.LedgerQueryParties(participant),
 		common_binding.GlobalConfig{}.GetTemplateID(),
 		globalConfig,
 	)
@@ -199,14 +195,10 @@ func (c *CantonCurseAdapter) IsSubjectCursedOnChain(e deployment.Environment, se
 	}
 
 	participant := cantonChain.Participants[0]
-	queryParty := participant.PartyID
-	if len(participant.ReadAsPartyIDs) > 0 {
-		queryParty = participant.ReadAsPartyIDs[0]
-	}
 	active, err := contract.FindActiveContractByInstanceAddress(
 		e.GetContext(),
 		participant.LedgerServices.State,
-		queryParty,
+		contract.LedgerQueryParties(participant),
 		rmn.RMNRemote{}.GetTemplateID(),
 		rmnRemoteRaw.InstanceAddress(),
 	)

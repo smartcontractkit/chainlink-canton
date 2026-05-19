@@ -122,7 +122,7 @@ func findTokenConfigByInstanceAddress(
 	activeContract, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
 		stateClient,
-		ccipParty,
+		[]string{ccipParty},
 		tokenadminregistry.TokenConfig{}.GetTemplateID(),
 		contracts.InstanceID(hex.EncodeToString(contracts.EncodeInstrumentID(instrumentId).Bytes())).RawInstanceAddress(types.PARTY(ccipParty)).InstanceAddress(),
 	)

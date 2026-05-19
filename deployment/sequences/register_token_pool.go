@@ -48,10 +48,7 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	// ReadAsPartyIDs are CanReadAs rights for parties the operator cannot ActAs (e.g. ccip owner).
 	// When present, exercises must be encoded as MCMS proposals instead of submitted directly.
 	mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
-	queryParty := participant.PartyID
-	if mcmsEnabled {
-		queryParty = participant.ReadAsPartyIDs[0]
-	}
+	queryParties := contract.LedgerQueryParties(participant)
 
 	instrumentId := input.InstrumentId
 	ccipParty := input.CcipParty
@@ -60,7 +57,7 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 
 	var proposalOutputs []contract.ExerciseOutput
 
-	existingTokenConfigCid, tokenConfigFound, err := findTokenConfigCid(b, deps, queryParty, tokenConfigAddress)
+	existingTokenConfigCid, tokenConfigFound, err := findTokenConfigCid(b, deps, queryParties, tokenConfigAddress)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config: %w", err)
 	}
@@ -98,7 +95,7 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	}
 
 	if !mcmsEnabled && err == nil {
-		tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, queryParty, tokenConfigAddress)
+		tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, queryParties, tokenConfigAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config after propose: %w", err)
 		}
@@ -126,7 +123,7 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 			proposalOutputs = append(proposalOutputs, acceptReport.Output)
 		}
 		if !mcmsEnabled {
-			tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, queryParty, tokenConfigAddress)
+			tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, queryParties, tokenConfigAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config after accept admin role: %w", err)
 			}
@@ -173,12 +170,12 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 }
 
-func findTokenConfigCid(b operations.Bundle, deps canton.Chain, queryParty string, address contracts.InstanceAddress) (types.CONTRACT_ID, bool, error) {
+func findTokenConfigCid(b operations.Bundle, deps canton.Chain, queryParties []string, address contracts.InstanceAddress) (types.CONTRACT_ID, bool, error) {
 	participant := deps.Participants[0]
 	contractID, err := contract.FindActiveContractIDByInstanceAddress(
 		b.GetContext(),
 		participant.LedgerServices.State,
-		queryParty,
+		queryParties,
 		tokenadminregistry.TokenConfig{}.GetTemplateID(),
 		address,
 	)

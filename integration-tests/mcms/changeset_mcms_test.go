@@ -289,7 +289,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 
 	// Re-resolve the GlobalConfig (it may have a new contract ID after the update)
 	updatedGC, err := opcontract.FindActiveContractByInstanceAddress(
-		t.Context(), participant.LedgerServices.State, party,
+		t.Context(), participant.LedgerServices.State, []string{party},
 		common.GlobalConfig{}.GetTemplateID(), gcRaw.InstanceAddress(),
 	)
 	require.NoError(t, err, "find updated GlobalConfig")
