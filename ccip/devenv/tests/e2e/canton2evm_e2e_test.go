@@ -40,8 +40,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		t.Skip("skipping Canton2EVM_Basic test in short mode")
 	}
 
-	ccv.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
-
 	configPath := "../../env-canton-evm-out.toml"
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)

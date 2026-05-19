@@ -2,21 +2,21 @@ package tests
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/mcmstest"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -26,8 +26,6 @@ func TestMCMS_Timelock(t *testing.T) {
 	// Use shared environment for participant, package, signers
 	sharedEnv := GetSharedEnvironment(t)
 	participant := sharedEnv.Participant
-	mcmsPkgID := sharedEnv.McmsPkgID
-	mcmsTestPkgID := sharedEnv.McmsTestPkgID
 	mcmsEncoder := sharedEnv.McmsEncoder
 	ccipOwner := sharedEnv.CcipOwner
 	cfg := sharedEnv.Config
@@ -38,12 +36,12 @@ func TestMCMS_Timelock(t *testing.T) {
 	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsID, ccipOwner)
 
 	// Deploy MCMS with minDelay=0 for testing (self-dispatch tests will update it)
-	mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, baseMcmsID, cfg, 0, nil)
+	mcmsCid := createMCMSMultiRole(t, participant, ccipOwner, chainID, baseMcmsID, cfg, 0, nil)
 
 	// Deploy Counter
 	counterBaseID := "counter-timelock-" + uuid.New().String()[:8]
 	counterInstanceAddr := fmt.Sprintf("%s@%s", counterBaseID, ccipOwner)
-	counterCid := createCounter(t, participant, mcmsTestPkgID, ccipOwner, counterBaseID)
+	counterCid := createCounter(t, participant, ccipOwner, counterBaseID)
 	counterTargetInstanceAddr := counterInstanceAddr
 
 	t.Run("ScheduleAndExecute", func(t *testing.T) {
@@ -77,7 +75,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		signatures, err := proposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
 
-		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, signatures)
+		mcmsCid = setRootWithRole(t, participant, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, signatures)
 
 		// 2) Schedule a batch to increment counter (immediate, delay=0)
 		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
@@ -85,13 +83,13 @@ func TestMCMS_Timelock(t *testing.T) {
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
 
-		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
+		mcmsCid = scheduleBatch(t, participant, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		// 3) Execute immediately (delay is 0, so it's ready right away)
-		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
+		mcmsCid = executeScheduledBatch(t, participant, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
 
 		// 4) Verify counter incremented
-		val := queryCounterValue(t, participant, mcmsTestPkgID, counterBaseID)
+		val := queryCounterValue(t, participant, counterBaseID)
 		require.Equal(t, int64(1), val)
 	})
 
@@ -101,7 +99,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		// Fresh MCMS for this subtest (avoid cross-subtest opCount coupling)
 		base := "mcms-timelock-cancel-" + uuid.New().String()[:8]
 		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid2 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
+		mcmsCid2 := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 0, nil)
 
 		// Define calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{{
@@ -129,11 +127,11 @@ func TestMCMS_Timelock(t *testing.T) {
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := scheduleProposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
-		mcmsCid2 = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, "Proposer", scheduleProposal, validUntil, sigs)
+		mcmsCid2 = setRootWithRole(t, participant, ccipOwner, mcmsCid2, "Proposer", scheduleProposal, validUntil, sigs)
 
 		opProof, err := scheduleProposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid2 = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, scheduleProposal.Operations[0], opProof)
+		mcmsCid2 = scheduleBatch(t, participant, ccipOwner, mcmsCid2, scheduleProposal.Operations[0], opProof)
 
 		// Encode cancel params using encoder pattern
 		cancelParams := mcms.CancelBatchParams{OpId: types.TEXT(opID)}
@@ -146,14 +144,14 @@ func TestMCMS_Timelock(t *testing.T) {
 			Build()
 		cancelSigs, err := cancelProposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
-		mcmsCid2 = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, "Canceller", cancelProposal, validUntil, cancelSigs)
+		mcmsCid2 = setRootWithRole(t, participant, ccipOwner, mcmsCid2, "Canceller", cancelProposal, validUntil, cancelSigs)
 
 		cancelProof, err := cancelProposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid2 = cancelBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, cancelProposal.Operations[0], cancelProof)
+		mcmsCid2 = cancelBatch(t, participant, ccipOwner, mcmsCid2, cancelProposal.Operations[0], cancelProof)
 
 		// Should now be gone; ExecuteScheduledBatch should fail with not found.
-		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
+		err = executeScheduledBatchExpectError(t, participant, ccipOwner, mcmsCid2, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "mcms: operation not found in timelock", "expected 'mcms: operation not found in timelock', got: %v", err)
 	})
@@ -163,7 +161,7 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		base := "mcms-timelock-blocked-" + uuid.New().String()[:8]
 		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid3 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, []mcms.BlockedFunction{
+		mcmsCid3 := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 1_000_000, []mcms.BlockedFunction{
 			{TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr), FunctionName: types.TEXT("dangerous_function")},
 		})
 
@@ -192,12 +190,12 @@ func TestMCMS_Timelock(t *testing.T) {
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
-		mcmsCid3 = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid3, "Proposer", proposal, validUntil, sigs)
+		mcmsCid3 = setRootWithRole(t, participant, ccipOwner, mcmsCid3, "Proposer", proposal, validUntil, sigs)
 
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
 
-		err = scheduleBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid3, proposal.Operations[0], opProof)
+		err = scheduleBatchExpectError(t, participant, ccipOwner, mcmsCid3, proposal.Operations[0], opProof)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "mcms: function blocked:", "expected 'mcms: function blocked:', got: %v", err)
 	})
@@ -216,7 +214,7 @@ func createSigners(t *testing.T) []*MCMSSigner {
 	return signers
 }
 
-func createCounter(t *testing.T, participant canton.Participant, mcmsTestPkgID, owner, instanceID string) string {
+func createCounter(t *testing.T, participant canton.Participant, owner, instanceID string) string {
 	t.Helper()
 
 	// Use bindings to create Counter - provides type safety and tests bindings work correctly
@@ -232,11 +230,7 @@ func createCounter(t *testing.T, participant canton.Participant, mcmsTestPkgID, 
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsTestPkgID,
-							ModuleName: "MCMS.Mock.Counter",
-							EntityName: "Counter",
-						},
+						TemplateId:      contracts.IdentifierFromBinding(mcmstest.Counter{}),
 						CreateArguments: ledger.ConvertToRecord(counter),
 					},
 				},
@@ -252,7 +246,6 @@ func createCounter(t *testing.T, participant canton.Participant, mcmsTestPkgID, 
 func createMCMSMultiRole(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	chainID int64,
 	baseMcmsID string,
@@ -269,11 +262,7 @@ func createMCMSMultiRole(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:      contracts.IdentifierFromBinding(mcms.MCMS{}),
 						CreateArguments: ledger.ConvertToRecord(mcmsContract),
 					},
 				},
@@ -352,7 +341,6 @@ func buildMCMSMultiRoleContract(
 func setRootWithRole(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 	roleConstructor string,
@@ -362,13 +350,12 @@ func setRootWithRole(
 ) string {
 	t.Helper()
 
-	return setRootWithRoleAndDisclosureParty(t, participant, mcmsPkgID, owner, owner, mcmsCid, roleConstructor, proposal, validUntil, signatures)
+	return setRootWithRoleAndDisclosureParty(t, participant, owner, owner, mcmsCid, roleConstructor, proposal, validUntil, signatures)
 }
 
 func setRootWithRoleAndDisclosureParty(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	submitter string,
 	disclosureParty string,
 	mcmsCid string,
@@ -416,7 +403,7 @@ func setRootWithRoleAndDisclosureParty(
 		Signatures:    bindingSignatures,
 	}
 
-	disclosedContracts := mcmsDisclosureForSubmitter(t, participant, mcmsPkgID, submitter, disclosureParty, mcmsCid)
+	disclosedContracts := mcmsDisclosureForSubmitter(t, participant, submitter, disclosureParty, mcmsCid)
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -424,11 +411,7 @@ func setRootWithRoleAndDisclosureParty(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "SetRoot",
 						ChoiceArgument: ledger.MapToValue(setRootArgs),
@@ -446,13 +429,12 @@ func setRootWithRoleAndDisclosureParty(
 		}
 	}
 
-	return findRefreshedMCMSCid(t, participant, disclosureParty, mcmsPkgID, mcmsCid)
+	return findRefreshedMCMSCid(t, participant, disclosureParty, mcmsCid)
 }
 
 func scheduleBatch(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 	op MCMSOp,
@@ -482,11 +464,7 @@ func scheduleBatch(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -520,7 +498,6 @@ func toTextSlice(s []string) []types.TEXT {
 func scheduleBatchExpectError(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 	op MCMSOp,
@@ -550,11 +527,7 @@ func scheduleBatchExpectError(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -572,7 +545,6 @@ func scheduleBatchExpectError(
 func executeScheduledBatch(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 	opID string,
@@ -599,11 +571,7 @@ func executeScheduledBatch(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteScheduledBatch",
 						ChoiceArgument: ledger.MapToValue(executeArgs),
@@ -642,7 +610,6 @@ func toContractIDMap(m map[string]string) map[types.TEXT]types.CONTRACT_ID {
 func executeScheduledBatchExpectError(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 	opID string,
@@ -668,11 +635,7 @@ func executeScheduledBatchExpectError(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteScheduledBatch",
 						ChoiceArgument: ledger.MapToValue(executeArgs),
@@ -689,7 +652,6 @@ func executeScheduledBatchExpectError(
 func cancelBatch(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 	op MCMSOp,
@@ -718,11 +680,7 @@ func cancelBatch(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -743,13 +701,9 @@ func cancelBatch(
 	return ""
 }
 
-func queryCounterValue(t *testing.T, participant canton.Participant, mcmsTestPkgID, instanceID string) int64 {
+func queryCounterValue(t *testing.T, participant canton.Participant, instanceID string) int64 {
 	t.Helper()
-	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
-		PackageId:  mcmsTestPkgID,
-		ModuleName: "MCMS.Mock.Counter",
-		EntityName: "Counter",
-	})
+	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, contracts.IdentifierFromBinding(mcmstest.Counter{}))
 	require.NoError(t, err)
 	for _, contract := range counterContracts {
 		var inst string
@@ -774,7 +728,6 @@ func queryCounterValue(t *testing.T, participant canton.Participant, mcmsTestPkg
 func bypasserExecuteBatch(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 	targetCids map[string]string,
@@ -783,13 +736,12 @@ func bypasserExecuteBatch(
 ) string {
 	t.Helper()
 
-	return bypasserExecuteBatchWithDisclosureParty(t, participant, mcmsPkgID, owner, owner, mcmsCid, targetCids, op, opProof)
+	return bypasserExecuteBatchWithDisclosureParty(t, participant, owner, owner, mcmsCid, targetCids, op, opProof)
 }
 
 func bypasserExecuteBatchWithDisclosureParty(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	submitter string,
 	disclosureParty string,
 	mcmsCid string,
@@ -815,7 +767,7 @@ func bypasserExecuteBatchWithDisclosureParty(
 		TargetCids: toContractIDMap(targetCids),
 	}
 
-	disclosedContracts := mcmsDisclosureForSubmitter(t, participant, mcmsPkgID, submitter, disclosureParty, mcmsCid)
+	disclosedContracts := mcmsDisclosureForSubmitter(t, participant, submitter, disclosureParty, mcmsCid)
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -823,11 +775,7 @@ func bypasserExecuteBatchWithDisclosureParty(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -845,13 +793,12 @@ func bypasserExecuteBatchWithDisclosureParty(
 		}
 	}
 
-	return findRefreshedMCMSCid(t, participant, disclosureParty, mcmsPkgID, mcmsCid)
+	return findRefreshedMCMSCid(t, participant, disclosureParty, mcmsCid)
 }
 
 func mcmsDisclosureForSubmitter(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	submitter string,
 	disclosureParty string,
 	mcmsCid string,
@@ -866,7 +813,6 @@ func mcmsDisclosureForSubmitter(
 	queryParticipant.PartyID = disclosureParty
 	disclosedMcms, err := testhelpers.GetDisclosedContractById(t.Context(), queryParticipant, mcmsCid)
 	require.NoError(t, err, "disclose MCMS contract %s from party %s", mcmsCid, disclosureParty)
-	require.Equal(t, mcmsPkgID, disclosedMcms.GetTemplateId().GetPackageId())
 
 	return []*apiv2.DisclosedContract{disclosedMcms}
 }
@@ -875,22 +821,17 @@ func findRefreshedMCMSCid(
 	t *testing.T,
 	participant canton.Participant,
 	party string,
-	mcmsPkgID string,
 	oldCid string,
 ) string {
 	t.Helper()
 
 	queryParticipant := participant
 	queryParticipant.PartyID = party
-	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), queryParticipant, &apiv2.Identifier{
-		PackageId:  mcmsPkgID,
-		ModuleName: "MCMS.Main",
-		EntityName: "MCMS",
-	})
+	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), queryParticipant, contracts.IdentifierFromBinding(mcms.MCMS{}))
 	require.NoError(t, err)
 
-	for i := len(activeContracts) - 1; i >= 0; i-- {
-		cid := activeContracts[i].GetCreatedEvent().GetContractId()
+	for _, v := range slices.Backward(activeContracts) {
+		cid := v.GetCreatedEvent().GetContractId()
 		if cid != oldCid {
 			return cid
 		}
@@ -904,7 +845,6 @@ func findRefreshedMCMSCid(
 func queryMinDelay(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 ) int64 {
@@ -920,11 +860,7 @@ func queryMinDelay(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "GetMinDelay",
 						ChoiceArgument: ledger.MapToValue(getMinDelayArgs),
@@ -953,7 +889,6 @@ func queryMinDelay(
 func queryBlockedFunctionsCount(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
 ) int64 {
@@ -969,11 +904,7 @@ func queryBlockedFunctionsCount(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "GetBlockedFunctionsCount",
 						ChoiceArgument: ledger.MapToValue(getBlockedFunctionsCountArgs),
@@ -1004,8 +935,6 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 	// Use shared environment for participant, package, signers
 	sharedEnv := GetSharedEnvironment(t)
 	participant := sharedEnv.Participant
-	mcmsPkgID := sharedEnv.McmsPkgID
-	mcmsTestPkgID := sharedEnv.McmsTestPkgID
 	mcmsEncoder := sharedEnv.McmsEncoder
 	ccipOwner := sharedEnv.CcipOwner
 	cfg := sharedEnv.Config
@@ -1017,7 +946,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 
 		base := "mcms-sd-delay-" + uuid.New().String()[:8]
 		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, nil)
+		mcmsCid := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
 		// Define calls and salt first so we can encode them
 		// Define calls and salt first so we can encode them
@@ -1046,22 +975,22 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
-		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
+		mcmsCid = setRootWithRole(t, participant, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
 
 		// 2) Schedule batch: self-dispatch update_min_delay to 1s
 		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
+		mcmsCid = scheduleBatch(t, participant, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		// 3) Wait for delay
 		time.Sleep(1500 * time.Millisecond)
 
 		// 4) Execute - empty targetCids (all self-dispatch)
-		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, nil)
+		mcmsCid = executeScheduledBatch(t, participant, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, nil)
 
 		// 5) Verify minDelay changed to 1s (1_000_000 microseconds)
-		delay := queryMinDelay(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
+		delay := queryMinDelay(t, participant, ccipOwner, mcmsCid)
 		require.Equal(t, int64(1_000_000), delay, "minDelay should be 1s after self-dispatch")
 	})
 
@@ -1070,7 +999,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 
 		base := "mcms-sd-block-" + uuid.New().String()[:8]
 		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, nil)
+		mcmsCid := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
 		// Define calls and salt first so we can encode them
 		bf := mcms.BlockedFunction{TargetInstanceAddress: "some-target@owner", FunctionName: "dangerous_op"}
@@ -1098,17 +1027,17 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
-		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
+		mcmsCid = setRootWithRole(t, participant, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
 
 		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
+		mcmsCid = scheduleBatch(t, participant, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		time.Sleep(1500 * time.Millisecond)
-		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, nil)
+		mcmsCid = executeScheduledBatch(t, participant, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, nil)
 
-		count := queryBlockedFunctionsCount(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
+		count := queryBlockedFunctionsCount(t, participant, ccipOwner, mcmsCid)
 		require.Equal(t, int64(1), count, "should have 1 blocked function after self-dispatch")
 	})
 
@@ -1117,7 +1046,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 
 		base := "mcms-sd-bypass-" + uuid.New().String()[:8]
 		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
+		mcmsCid := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 0, nil)
 
 		// Define calls first so we can encode them
 		// Define calls first so we can encode them
@@ -1139,14 +1068,14 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
-		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Bypasser", proposal, validUntil, sigs)
+		mcmsCid = setRootWithRole(t, participant, ccipOwner, mcmsCid, "Bypasser", proposal, validUntil, sigs)
 
 		// Execute immediately (no delay)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid = bypasserExecuteBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, nil, proposal.Operations[0], opProof)
+		mcmsCid = bypasserExecuteBatch(t, participant, ccipOwner, mcmsCid, nil, proposal.Operations[0], opProof)
 
-		delay := queryMinDelay(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
+		delay := queryMinDelay(t, participant, ccipOwner, mcmsCid)
 		require.Equal(t, int64(2_000_000), delay, "minDelay should be 2s after bypasser self-dispatch")
 	})
 
@@ -1155,10 +1084,10 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 
 		base := "mcms-sd-mixed-" + uuid.New().String()[:8]
 		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
+		mcmsCid := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 0, nil)
 
 		counterBase := "counter-mixed-" + uuid.New().String()[:8]
-		counterCid := createCounter(t, participant, mcmsTestPkgID, ccipOwner, counterBase)
+		counterCid := createCounter(t, participant, ccipOwner, counterBase)
 		counterTargetInstanceAddr := fmt.Sprintf("%s@%s", counterBase, ccipOwner)
 
 		// Define mixed calls and salt first so we can encode them
@@ -1185,22 +1114,22 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
-		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
+		mcmsCid = setRootWithRole(t, participant, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
 
 		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
+		mcmsCid = scheduleBatch(t, participant, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		time.Sleep(1500 * time.Millisecond)
 
 		// targetCids only has 1 entry (for the external counter call)
-		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
+		mcmsCid = executeScheduledBatch(t, participant, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
 
-		delay := queryMinDelay(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
+		delay := queryMinDelay(t, participant, ccipOwner, mcmsCid)
 		require.Equal(t, int64(1_000_000), delay, "minDelay should be 1s after mixed batch")
 
-		val := queryCounterValue(t, participant, mcmsTestPkgID, counterBase)
+		val := queryCounterValue(t, participant, counterBase)
 		require.Equal(t, int64(1), val, "counter should be incremented")
 	})
 }

@@ -251,6 +251,7 @@ func GetTransferFactoryV2(
 	}
 
 	now := time.Now()
+	// TODO: check if we can use the bindings for this
 	transferFactoryResponse, err := transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
 			"expectedAdmin": registryAdmin,
