@@ -76,7 +76,7 @@ jobs:
           git config --global user.email ""
           git config --local merge.ours.driver true
           git fetch origin ${{ github.event.client_payload.pull_request.base.ref }}
-          git merge --no-commit --squash "origin/${{ github.event.client_payload.pull_request.base.ref }}"
+          git merge --no-edit "origin/${{ github.event.client_payload.pull_request.base.ref }}"
       - name: Install Go
         uses: actions/setup-go@v6
         with:
