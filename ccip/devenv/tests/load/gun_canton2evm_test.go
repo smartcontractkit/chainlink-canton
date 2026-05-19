@@ -20,8 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/stretchr/testify/require"
 
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
-	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton chainreg
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -173,7 +172,7 @@ func TestCanton2EVM_Load(t *testing.T) {
 	require.NoError(t, err)
 	p.Wait()
 
-	require.Greater(t, gun.CallCount(), int64(0), "gun should have completed at least one message")
+	require.Positive(t, gun.CallCount(), "gun should have completed at least one message")
 	require.LessOrEqual(t, gun.MaxConcurrentObserved(), int32(1),
 		"Gun.Call must not overlap (Canton holdings 1-wide)")
 }
@@ -205,5 +204,6 @@ func discoverEVMDestinations(t *testing.T, ctx context.Context, in *ccv.Cfg, lib
 		dests = append(dests, EVMDestination{Chain: chain, Receiver: receiver})
 		seen[details.ChainSelector] = struct{}{}
 	}
+
 	return dests
 }

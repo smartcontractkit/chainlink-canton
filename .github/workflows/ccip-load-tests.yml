@@ -1,0 +1,65 @@
+name: CCIP Canton Load Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      message_rate:
+        description: 'CANTON_LOAD_MESSAGE_RATE (e.g. 1/1s, 1/20s)'
+        required: false
+        default: '1/1s'
+        type: string
+      load_duration:
+        description: 'CANTON_LOAD_DURATION (Go duration, e.g. 90s, 10m)'
+        required: false
+        default: '90s'
+        type: string
+      test_timeout:
+        description: 'go test -timeout value (must exceed load duration + teardown)'
+        required: false
+        default: '20m'
+        type: string
+      canton_ref:
+        description: 'chainlink-canton git ref (empty = workflow ref)'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: ccip-load-${{ github.actor }}
+  cancel-in-progress: false
+
+jobs:
+  canton2evm-load:
+    permissions:
+      id-token: write
+      contents: read
+    name: Canton→EVM load (devenv)
+    runs-on: ubuntu-latest-8cores-32GB
+    timeout-minutes: 120
+    steps:
+      - name: Check out workflow ref
+        uses: actions/checkout@v6
+
+      - name: Setup CCIP devenv
+        uses: ./.github/actions/setup-ccip-devenv
+        with:
+          canton-ref: ${{ inputs.canton_ref }}
+          ccv-iam-role: ${{ secrets.CCV_IAM_ROLE }}
+          jd-registry: ${{ secrets.JD_REGISTRY }}
+          jd-image: ${{ secrets.JD_IMAGE }}
+
+      - name: Run TestCanton2EVM_Load
+        working-directory: chainlink-canton/ccip/devenv/tests/load
+        env:
+          CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
+          CANTON_LOAD_DURATION: ${{ inputs.load_duration }}
+        run: |
+          go test -timeout ${{ inputs.test_timeout }} -v -count 1 -run '^TestCanton2EVM_Load$'
+
+      - name: Upload devenv logs
+        if: always()
+        uses: ./chainlink-canton/.github/actions/upload-ccip-devenv-logs
+        with:
+          test-package-dir: load
+          log-dump-suffix: ccip-load-tests
+          artifact-name: container-logs-ccip-load-tests

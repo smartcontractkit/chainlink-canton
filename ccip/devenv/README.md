@@ -64,6 +64,20 @@ cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestCanton2
 
 If the out file is missing the test skips with a hint.
 
+### CI (on demand)
+
+The **CCIP Canton Load Tests** workflow (`ccip-load-tests.yml`) can be triggered manually from GitHub Actions
+(`workflow_dispatch`). It reuses the same devenv setup as the CCIP E2E workflow. Inputs:
+
+| Input | Default | Maps to |
+|---|---|---|
+| `message_rate` | `1/1s` | `CANTON_LOAD_MESSAGE_RATE` |
+| `load_duration` | `90s` | `CANTON_LOAD_DURATION` |
+| `test_timeout` | `20m` | `go test -timeout` |
+| `canton_ref` | workflow ref | chainlink-canton checkout |
+
+chainlink-ccv is pinned in `.github/actions/setup-ccip-devenv` (same as CCIP E2E).
+
 ## Shortcut
 
 If you want to build docker images, spin up a new env, and run the test in a single command, the following is useful:

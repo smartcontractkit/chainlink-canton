@@ -40,7 +40,7 @@ type Canton2EVMGun struct {
 	cantonChain cciptestinterfaces.CCIP17
 
 	destinations []EVMDestination
-	destCursor   atomic.Uint64
+	destCursor   atomic.Int64
 
 	ccvAddr      protocol.UnknownAddress
 	executorAddr protocol.UnknownAddress
@@ -73,6 +73,7 @@ func NewCanton2EVMGun(
 	if confirmExecTimeout <= 0 {
 		confirmExecTimeout = 5 * time.Minute
 	}
+
 	return &Canton2EVMGun{
 		lib:                lib,
 		cantonChain:        cantonChain,
@@ -86,8 +87,10 @@ func NewCanton2EVMGun(
 
 // nextDestination picks the next EVM destination round-robin.
 func (g *Canton2EVMGun) nextDestination() EVMDestination {
+	n := len(g.destinations)
 	i := g.destCursor.Add(1) - 1
-	return g.destinations[int(i%uint64(len(g.destinations)))]
+
+	return g.destinations[int(i%int64(n))]
 }
 
 // Call implements wasp.Gun: send a Canton→EVM message, confirm send, assert verifier, confirm exec on the picked EVM dest.
@@ -122,7 +125,7 @@ func (g *Canton2EVMGun) Call(gen *wasp.Generator) *wasp.Response {
 	dest := g.nextDestination()
 	subtestCtx := t.Context()
 	n := g.calls.Load()
-	data := []byte(fmt.Sprintf("canton2evm load n=%d dest=%d", n, dest.Chain.ChainSelector()))
+	data := fmt.Appendf(nil, "canton2evm load n=%d dest=%d", n, dest.Chain.ChainSelector())
 
 	sendRes, err := g.cantonChain.SendMessage(
 		subtestCtx,
