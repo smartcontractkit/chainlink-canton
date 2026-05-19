@@ -9,8 +9,8 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainimpl"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	ccvload "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/load"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton chainreg
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -66,36 +67,22 @@ func TestCanton2EVM_Load(t *testing.T) {
 		t.Skipf("skipping Canton→EVM load test: %v (start devenv to generate %s)", err, configPath)
 	}
 
-	chainimpl.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
-
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 
 	ctx := ccv.Plog.WithContext(t.Context())
-	harness, err := tcapi.NewTestHarness(
-		ctx,
-		configPath,
-		in,
-		chainsel.FamilyEVM,
-		chainsel.FamilyCanton,
-	)
+	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath, chainsel.FamilyEVM, chainsel.FamilyCanton)
 	require.NoError(t, err)
 
-	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
+	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, lib)
 	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
 	require.True(t, ok, "Canton chain must be *cantondevenv.Chain")
 
-	destinations := discoverEVMDestinations(t, ctx, in, harness)
+	destinations := discoverEVMDestinations(t, ctx, in, lib)
 	require.NotEmpty(t, destinations, "need at least one EVM destination in the env file")
 	t.Logf("Canton→EVM load destinations: %d EVM chain(s)", len(destinations))
 	for _, d := range destinations {
 		t.Logf("  - selector=%d receiver=%x", d.Chain.ChainSelector(), d.Receiver)
-	}
-
-	for _, client := range harness.AggregatorClients {
-		t.Cleanup(func() {
-			client.Close()
-		})
 	}
 
 	t.Cleanup(func() {
@@ -103,8 +90,10 @@ func TestCanton2EVM_Load(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	ds, err := lib.DataStore()
+	require.NoError(t, err)
 	ccvAddr, err := tcapi.GetContractAddress(
-		in,
+		ds,
 		cantonChain.ChainSelector(),
 		datastore.ContractType(canton_committee_verifier.ContractType),
 		canton_committee_verifier.Version.String(),
@@ -113,7 +102,7 @@ func TestCanton2EVM_Load(t *testing.T) {
 	)
 	require.NoError(t, err)
 	executorAddr, err := tcapi.GetContractAddress(
-		in,
+		ds,
 		cantonChain.ChainSelector(),
 		datastore.ContractType(executor.ContractType),
 		executor.Version.String(),
@@ -152,7 +141,7 @@ func TestCanton2EVM_Load(t *testing.T) {
 	require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), 0))
 
 	gun, err := NewCanton2EVMGun(
-		&harness,
+		lib,
 		cantonChain,
 		destinations,
 		ccvAddr,
@@ -190,10 +179,10 @@ func TestCanton2EVM_Load(t *testing.T) {
 }
 
 // discoverEVMDestinations enumerates every Anvil blockchain in the env, resolves its CCIP17
-// implementation via the harness's chain map, and captures an EOA receiver per chain.
-func discoverEVMDestinations(t *testing.T, ctx context.Context, in *ccv.Cfg, harness tcapi.TestHarness) []EVMDestination {
+// implementation via lib's chain map, and captures an EOA receiver per chain.
+func discoverEVMDestinations(t *testing.T, ctx context.Context, in *ccv.Cfg, lib ccv.Lib) []EVMDestination {
 	t.Helper()
-	chainMap, err := harness.Lib.ChainsMap(ctx)
+	chainMap, err := lib.ChainsMap(ctx)
 	require.NoError(t, err)
 
 	dests := make([]EVMDestination, 0)

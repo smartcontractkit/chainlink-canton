@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
@@ -36,7 +36,7 @@ type Canton2EVMGun struct {
 	maxConcurrent int32
 	calls         atomic.Int64
 
-	harness     *tcapi.TestHarness
+	lib         ccv.Lib
 	cantonChain cciptestinterfaces.CCIP17
 
 	destinations []EVMDestination
@@ -53,7 +53,7 @@ type Canton2EVMGun struct {
 // the gun selects one per Call using round-robin. ccvAddr and executorAddr are source-side
 // (Canton) and shared across all destinations.
 func NewCanton2EVMGun(
-	harness *tcapi.TestHarness,
+	lib ccv.Lib,
 	cantonChain cciptestinterfaces.CCIP17,
 	destinations []EVMDestination,
 	ccvAddr, executorAddr protocol.UnknownAddress,
@@ -74,7 +74,7 @@ func NewCanton2EVMGun(
 		confirmExecTimeout = 5 * time.Minute
 	}
 	return &Canton2EVMGun{
-		harness:            harness,
+		lib:                lib,
 		cantonChain:        cantonChain,
 		destinations:       destinations,
 		ccvAddr:            ccvAddr,
@@ -159,7 +159,7 @@ func (g *Canton2EVMGun) Call(gen *wasp.Generator) *wasp.Response {
 		return &wasp.Response{Failed: true, Error: fmt.Sprintf("ConfirmSendOnSource (dest=%d): %v", dest.Chain.ChainSelector(), err), Duration: time.Since(start)}
 	}
 
-	devenvtests.AssertSingleVerifierResult(t, subtestCtx, g.harness, [32]byte(sentEvent.MessageID))
+	devenvtests.AssertSingleVerifierResult(t, subtestCtx, g.lib, sentEvent.MessageID)
 
 	ev, err := dest.Chain.ConfirmExecOnDest(
 		subtestCtx,
