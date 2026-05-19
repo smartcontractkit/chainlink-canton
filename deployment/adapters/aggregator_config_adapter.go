@@ -97,10 +97,29 @@ func (a *CantonCommitteeVerifierOnchain) ScanCommitteeStates(ctx context.Context
 	return states, nil
 }
 
-// ResolveVerifierAddress implements [adapters.AggregatorConfigAdapter].
-func (a *CantonAggregatorConfigAdapter) ResolveVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+// ResolveDestinationVerifierAddress implements [adapters.AggregatorConfigAdapter].
+//
+// For Canton we want to resolve the aggregator destination verifier address to
+// the raw instance address of the committee verifier so that users
+// see the raw address in the indexer's verifier results for a specific message.
+// This appears when users send a message from X -> Canton.
+func (a *CantonAggregatorConfigAdapter) ResolveDestinationVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
 	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
-		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
+		func(r datastore.AddressRef) (string, error) {
+			// The aggregator sends the raw destination instance address to the indexer so that users
+			// can more easily execute messages on Canton.
+			labels := r.Labels.List()
+			if len(labels) == 0 {
+				// Shouldn't happen, graceful fallback.
+				return r.Address, nil
+			}
+
+			// labels[0] is the raw instance address, but since the aggregator requires hex-encoded addresses,
+			// we need to hex-encode the string bytes before returning it.
+			hexEncoded := hex.EncodeToString([]byte(labels[0]))
+
+			return "0x" + hexEncoded, nil
+		},
 		datastore.AddressRef{
 			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
 			Qualifier: qualifier,
@@ -110,6 +129,52 @@ func (a *CantonAggregatorConfigAdapter) ResolveVerifierAddress(ds datastore.Data
 			Qualifier: qualifier,
 		},
 	)
+}
+
+// ResolveSourceVerifierAddress implements [adapters.AggregatorConfigAdapter].
+//
+// For Canton we want to resolve the aggregator source verifier address to
+// the hashed instance address of the committee verifier. This is because
+// the CCIPMessageSentEvent onchain emits the hashed instance address,
+// and the aggregator checks that the source verifier address it is configured
+// with is present inside the message's CCV addresses.
+// https://github.com/smartcontractkit/chainlink-ccv/blob/33b00afa3061efc6faca53e5cfb9658e4ad9d6e1/aggregator/pkg/quorum/evm_quorum_validator.go#L49-L51.
+func (a *CantonAggregatorConfigAdapter) ResolveSourceVerifierAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	return dsutils.FindAndFormatFirstRef(ds, chainSelector,
+		func(r datastore.AddressRef) (string, error) { return r.Address, nil },
+		// TODO: below is searching for the EVM verifier resolver, why?
+		datastore.AddressRef{
+			Type:      datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
+			Qualifier: qualifier,
+		},
+		datastore.AddressRef{
+			Type:      datastore.ContractType(committee_verifier.ContractType),
+			Qualifier: qualifier,
+		},
+	)
+}
+
+// GetDeployedChains implements [adapters.AggregatorConfigAdapter].
+func (a *CantonAggregatorConfigAdapter) GetDeployedChains(ds datastore.DataStore, qualifier string) []uint64 {
+	if ds == nil {
+		return nil
+	}
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByQualifier(qualifier),
+		datastore.AddressRefByType(datastore.ContractType(committee_verifier.ContractType)),
+		datastore.AddressRefByVersion(committee_verifier.Version),
+	)
+	seen := make(map[uint64]struct{}, len(refs))
+	chains := make([]uint64, 0, len(refs))
+	for _, ref := range refs {
+		if _, exists := seen[ref.ChainSelector]; exists {
+			continue
+		}
+		seen[ref.ChainSelector] = struct{}{}
+		chains = append(chains, ref.ChainSelector)
+	}
+
+	return chains
 }
 
 func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapters.SignatureConfig, error) {

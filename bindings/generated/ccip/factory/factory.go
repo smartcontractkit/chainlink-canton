@@ -34,8 +34,8 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "c320621240531456b94e403045b99885d55d2301da6cfa4526ca27a4d519304b"
-	SDKVersion  = "3.4.10"
+	PackageID   = "43b9dc8e7f8228bdcf9b3c2086a0388fc436dda20c376115ebfdd762909f6ad6"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
