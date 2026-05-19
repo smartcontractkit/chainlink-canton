@@ -15,6 +15,7 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainreg"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -202,7 +203,7 @@ func startEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Contai
 
 type launcher struct{}
 
-var _ ccv.Launcher = &launcher{}
+var _ chainreg.Launcher = &launcher{}
 
 func NewLauncher() *launcher {
 	return &launcher{}

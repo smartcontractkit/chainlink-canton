@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
+	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -68,21 +68,15 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := ccv.Plog.WithContext(t.Context())
-	harness, err := tcapi.NewTestHarness(
-		ctx,
-		configPath,
-		in,
-		chainsel.FamilyEVM,
-		chainsel.FamilyCanton,
-	)
+	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath)
 	require.NoError(t, err)
 
-	cldfEnv, err := harness.Lib.CLDFEnvironment()
+	cldfEnv, err := lib.CLDFEnvironment()
 	require.NoError(t, err)
 
-	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
-	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, harness)
-	chainMap, err := harness.Lib.ChainsMap(ctx)
+	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, lib)
+	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, lib)
+	chainMap, err := lib.ChainsMap(ctx)
 	require.NoError(t, err)
 	cantonImpl := chainMap[cantonChain.ChainSelector()]
 	require.NotNil(t, cantonImpl)

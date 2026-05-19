@@ -100,3 +100,9 @@ build-run-e2e-tests: start-devenv run-e2e-tests
 .PHONY: mocks
 mocks:
 	go run github.com/vektra/mockery/v3@v3.7.0
+
+.PHONY: git-generated-merge-config
+git-generated-merge-config:
+	echo 'bindings/generated/** merge=ours' >> .git/info/attributes
+	echo 'contracts/dars/** merge=ours' >> .git/info/attributes
+	git config --local merge.ours.driver true
