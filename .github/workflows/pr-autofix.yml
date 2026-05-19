@@ -68,6 +68,11 @@ jobs:
           git fetch origin "$branch"
           expected_remote_head="$(git rev-parse "origin/${branch}")"
           echo "expected_remote_head=${expected_remote_head}" >> "$GITHUB_OUTPUT"
+      - name: merge target branch
+        run: |
+          make git-merge-config
+          git fetch origin ${{ github.event.client_payload.pull_request.base.ref }}
+          git merge --no-commit "origin/${{ github.event.client_payload.pull_request.base.ref }}"
       - name: Install Go
         uses: actions/setup-go@v6
         with:
@@ -85,7 +90,7 @@ jobs:
       - name: Create commit
         id: commit
         run: |
-          if git diff --quiet; then
+          if git diff --quiet && git diff --cached --quiet; then
             echo "No changes to commit"
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else
