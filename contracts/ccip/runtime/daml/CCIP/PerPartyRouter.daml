@@ -451,18 +451,23 @@ template PerPartyRouter
                         let verifierFees = buildCCVFeeAllocations
                                 sendingMsg.ccvFees
                                 sendingMsg.ccvFeeTokenAmounts
-                        -- Add pool fee (if token send), then compute owner residual.
+                        -- Add pool fee (if token send).
                         let verifierAndPoolFees = case sendingMsg.tokenSendFee of
                                 None -> verifierFees
                                 Some poolFee ->
                                     addFeeForParty verifierFees poolFee.poolOwner sendingMsg.tokenSendFeeTokenAmount
-                        -- Sum of verifier + pool fee allocations; excludes owner residual (ccipOwner).
-                        let allocatedNonOwnerFees = sumAllocatedFees verifierAndPoolFees
+                        -- Add executor fee (if executor is used).
+                        let verifierPoolAndExecutorFees = case sendingMsg.executorFee of
+                                None -> verifierAndPoolFees
+                                Some executorFee ->
+                                    addFeeForParty verifierAndPoolFees executorFee.executorOwner sendingMsg.executorFeeTokenAmount
+                        -- Sum of all third-party allocations; excludes owner residual (ccipOwner).
+                        let allocatedNonOwnerFees = sumAllocatedFees verifierPoolAndExecutorFees
                         let ownerResidual = totalFee - allocatedNonOwnerFees
                         assertMsg "router: fee allocation exceeds total fee"
                             (ownerResidual >= 0.0)
                         -- Add owner residual so map now includes all fee recipients.
-                        let recipientFees = addFeeForParty verifierAndPoolFees ccipOwner ownerResidual
+                        let recipientFees = addFeeForParty verifierPoolAndExecutorFees ccipOwner ownerResidual
                         -- Convert to transfer list and skip zero-amount transfers.
                         let payoutEntries = filter (\entry -> snd entry > 0.0) (Map.toList recipientFees)
 

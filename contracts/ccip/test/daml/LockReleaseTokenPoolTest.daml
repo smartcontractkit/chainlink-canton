@@ -67,13 +67,18 @@ unsafeDecodeRequestedFinality finalityConfig =
 
 messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
-mkPoolContext : ContractId RateLimiter.RateLimiter -> ContractId TransferInstructionV1.TransferFactory -> [ContractId HoldingV1.Holding] -> MetadataV1.ChoiceContext
-mkPoolContext rateLimiterCid burnMintFactoryCid tokenPoolHoldings = MetadataV1.ChoiceContext with
-  values = TextMap.fromList
-    [ (RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)
-    , (LockReleaseTokenPool.transferFactoryContextKey, CCIP.Context.toAnyValue burnMintFactoryCid)
-    , (LockReleaseTokenPool.tokenPoolHoldingsContextKey, CCIP.Context.toAnyValue tokenPoolHoldings)
-    ]
+mkPoolContext : ContractId RateLimiter.RateLimiter -> ContractId TransferInstructionV1.TransferFactory -> [ContractId HoldingV1.Holding] -> [(Party, ContractId TestToken.TestTransferPreapproval)] -> MetadataV1.ChoiceContext
+mkPoolContext rateLimiterCid burnMintFactoryCid tokenPoolHoldings preapprovals =
+  let preapprovalMap = TextMap.fromList [(show p, MetadataV1.AV_ContractId $ coerceContractId cid) | (p, cid) <- preapprovals]
+      extraArgsContextEntry = case preapprovals of
+        [] -> []
+        _  -> [(LockReleaseTokenPool.transferFactoryExtraArgsContextValuesContextKey, MetadataV1.AV_Map preapprovalMap)]
+  in MetadataV1.ChoiceContext with
+       values = TextMap.fromList (
+         [ (RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)
+         , (LockReleaseTokenPool.transferFactoryContextKey, CCIP.Context.toAnyValue burnMintFactoryCid)
+         , (LockReleaseTokenPool.tokenPoolHoldingsContextKey, CCIP.Context.toAnyValue tokenPoolHoldings)
+         ] ++ extraArgsContextEntry)
 
 template ParseSourcePoolDecimalsHarness
   with
@@ -244,7 +249,6 @@ testLockOrBurn = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some poolPreapproval
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
@@ -364,7 +368,7 @@ testLockOrBurn = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 0.0 
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) []
+            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     -- Test that LockOrBurn with a negative amount fails.
@@ -379,7 +383,7 @@ testLockOrBurn = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = -5.0
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) []
+            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     -- LockOrBurn stores token data via AddTokenSend
@@ -394,7 +398,7 @@ testLockOrBurn = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5.0
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) []
+            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -479,7 +483,6 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some poolPreapproval
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
@@ -594,7 +597,7 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5.0
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId existingPoolHolding]
+            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId existingPoolHolding] [(poolOwner, poolPreapproval)]
             caller = sender
 
     assertMsg "Pool should see one new holding plus one existing holding" (length result.poolChangeCids == 2)
@@ -667,7 +670,6 @@ testLockOrBurnDeductsFeeBps = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some poolPreapproval
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
@@ -782,7 +784,7 @@ testLockOrBurnDeductsFeeBps = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5.0
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) []
+            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     Some sm <- queryContractId ccipOwner result.sendingMessageCid
@@ -827,7 +829,6 @@ testReleaseFromTicket = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some receiverPreapproval
 
     -- Deploy TokenAdminRegistry and register pool
     (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
@@ -917,7 +918,7 @@ testReleaseFromTicket = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     -- Verify result is completed
@@ -988,7 +989,6 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some receiverPreapproval
 
     (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
         ccipOwner
@@ -1090,7 +1090,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     case result.output of
@@ -1138,7 +1138,6 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some receiverPreapproval
 
     (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
         ccipOwner
@@ -1221,7 +1220,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
 -- | Test ReleaseFromTicket converts source decimals to local decimals.
@@ -1272,7 +1271,6 @@ testReleaseFromTicketDecimalConversion = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some receiverPreapproval
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
@@ -1342,7 +1340,7 @@ testReleaseFromTicketDecimalConversion = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     case result.output of
@@ -1416,7 +1414,6 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some receiverPreapproval
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
@@ -1486,7 +1483,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     case result.output of
@@ -1550,7 +1547,6 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some receiverPreapproval
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
@@ -1620,7 +1616,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     receiverHoldings <- query @TestToken.TestHolding receiver
@@ -1686,7 +1682,6 @@ testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some receiverPreapproval
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
@@ -1755,7 +1750,7 @@ testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     receiverHoldings <- query @TestToken.TestHolding receiver
@@ -1824,7 +1819,6 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
     transferFactory <- submit ccipOwner do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
-            preapprovalCid = Some receiverPreapproval
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
@@ -1893,7 +1887,7 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
             rmnRemoteCid = rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding]
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     debug "testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory: PASSED"
