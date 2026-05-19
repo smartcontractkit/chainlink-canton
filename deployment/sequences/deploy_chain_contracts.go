@@ -65,6 +65,9 @@ type FeeQuoterParams struct {
 }
 
 type DeployChainContractsParams struct {
+	// OwnerParty is the Canton instance owner (decentralized party); used for instanceId@owner addresses.
+	OwnerParty string
+	// CCIPOwnerParty is the operational ccipOwner on product templates (lanes, admin roles, etc.).
 	CCIPOwnerParty     string
 	CommitteeVerifiers []CommitteeVerifierParams
 	Executors          []ExecutorParams
@@ -75,6 +78,10 @@ type DeployChainContractsParams struct {
 	FactoryAddressRef datastore.AddressRef
 	// ProposalDriven enables MCMS proposal generation for factory-backed deploys.
 	ProposalDriven bool
+	// CcvRegistryBinding is used for OnRamp deps when CommitteeVerifiers is empty (CCV deployed separately).
+	CcvRegistryBinding mcms.RawInstanceAddress
+	// RmnRemoteRawInstanceAddress is required when deploying CommitteeVerifiers (CCV factory path).
+	RmnRemoteRawInstanceAddress contracts.RawInstanceAddress
 	// The InstrumentId of the native token
 	NativeInstrumentId splice_api_token_holding_v1.InstrumentId
 }

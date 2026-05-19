@@ -87,12 +87,7 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 		tokenTransferFeeConfigs = map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{}
 	}
 
-	factoryRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		config.ChainSelector,
-		datastore.ContractType(factoryops.ContractType),
-		factoryops.Version,
-		"",
-	))
+	factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierPools)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("resolve CCIPFactory: %w", err)
 	}

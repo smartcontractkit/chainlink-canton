@@ -50,6 +50,9 @@ func (d DeployCCIPFactory) VerifyPreconditions(e cldf.Environment, config Canton
 	if config.Config.Params.OwnerParty == "" {
 		return fmt.Errorf("owner party is required")
 	}
+	if config.Config.Params.Qualifier == "" {
+		return fmt.Errorf("factory qualifier is required")
+	}
 
 	return nil
 }
