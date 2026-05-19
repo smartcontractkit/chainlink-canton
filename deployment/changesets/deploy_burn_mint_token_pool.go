@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -116,9 +117,11 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 	}
 
 	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {
+		tarInstanceID := contracts.InstanceID(hex.EncodeToString(cfg.TokenAdminRegistryInstanceAddress.Bytes()))
 		regInput := sequences.RegisterTokenPoolInput{
-			TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
-			InstrumentId:                      cfg.InstrumentId,
+			TokenAdminRegistryInstanceAddress:    cfg.TokenAdminRegistryInstanceAddress,
+			TokenAdminRegistryRawInstanceAddress: tarInstanceID.RawInstanceAddress(types.PARTY(cfg.CcipOwner)),
+			InstrumentId:                         cfg.InstrumentId,
 			CcipParty:                         cfg.CcipOwner,
 			PoolOwnerParty:                    cfg.PoolOwner,
 			PoolInstanceID:                    rawPoolAddr.InstanceID(),
