@@ -41,7 +41,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260518065630-109f00366c4f
 	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260518065630-109f00366c4f
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
-	github.com/smartcontractkit/chainlink-deployments-framework v0.104.1-0.20260519071845-f1b2bd1cca70
+	github.com/smartcontractkit/chainlink-deployments-framework v0.104.1-0.20260519231458-0ee773cbb26c
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260514231151-fecd433dede9
 	github.com/stretchr/testify v1.11.1
@@ -338,7 +338,7 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20260304194147-a03701e2c02e // indirect
-	github.com/smartcontractkit/mcms v0.43.1-0.20260515150551-16b18dab10da
+	github.com/smartcontractkit/mcms v0.45.0
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.0 // indirect

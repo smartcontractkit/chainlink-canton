@@ -8,9 +8,11 @@ import (
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	mcmsops "github.com/smartcontractkit/chainlink-canton/deployment/operations/mcms"
@@ -248,4 +250,85 @@ func (s SetFactoryOwnerToMCMS) Apply(e cldf.Environment, config CantonCSDeps[Set
 	return cldf.ChangesetOutput{
 		MCMSTimelockProposals: []mcms.TimelockProposal{*proposal},
 	}, nil
+}
+
+// --- DeployCCIPFactory (direct deploy, no MCMS handoff; e.g. devenv pre-deploy) ---
+
+type DeployCCIPFactoryParams struct {
+	OwnerParty string `json:"ownerParty" yaml:"ownerParty"`
+	MCMSParty  string `json:"mcmsParty,omitempty" yaml:"mcmsParty,omitempty"`
+	InstanceID string `json:"instanceID,omitempty" yaml:"instanceID,omitempty"`
+	Qualifier  string `json:"qualifier,omitempty" yaml:"qualifier,omitempty"`
+}
+
+type DeployCCIPFactoryConfig struct {
+	Params DeployCCIPFactoryParams `json:"params" yaml:"params"`
+}
+
+type DeployCCIPFactory struct{}
+
+var _ cldf.ChangeSetV2[CantonCSDeps[DeployCCIPFactoryConfig]] = DeployCCIPFactory{}
+
+func (d DeployCCIPFactory) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployCCIPFactoryConfig]) error {
+	chain, ok := e.BlockChains.CantonChains()[config.ChainSelector]
+	if !ok {
+		return fmt.Errorf("canton chain %v not found", config.ChainSelector)
+	}
+	if config.Participant < 0 || config.Participant >= len(chain.Participants) {
+		return fmt.Errorf("participant index %d out of range for canton chain %d with %d participants", config.Participant, config.ChainSelector, len(chain.Participants))
+	}
+	if config.Config.Params.OwnerParty == "" {
+		return fmt.Errorf("owner party is required")
+	}
+	if config.Config.Params.Qualifier == "" {
+		return fmt.Errorf("factory qualifier is required")
+	}
+
+	return nil
+}
+
+func (d DeployCCIPFactory) Apply(e cldf.Environment, config CantonCSDeps[DeployCCIPFactoryConfig]) (cldf.ChangesetOutput, error) {
+	ds := datastore.NewMemoryDataStore()
+	chain := e.BlockChains.CantonChains()[config.ChainSelector]
+
+	addrRef, err := deployCCIPFactory(e.OperationsBundle, chain, config.Config.Params)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("deploy CCIPFactory: %w", err)
+	}
+	if err := ds.AddressRefStore.Add(addrRef); err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("store address ref: %w", err)
+	}
+
+	return cldf.ChangesetOutput{DataStore: ds}, nil
+}
+
+func deployCCIPFactory(b operations.Bundle, chain canton.Chain, params DeployCCIPFactoryParams) (datastore.AddressRef, error) {
+	ownerParty := types.PARTY(params.OwnerParty)
+	mcmsParty := ownerParty
+	if params.MCMSParty != "" {
+		mcmsParty = types.PARTY(params.MCMSParty)
+	}
+
+	var qualifier *string
+	if params.Qualifier != "" {
+		qualifier = &params.Qualifier
+	}
+
+	deployReport, err := operations.ExecuteOperation(b, factoryops.Deploy, chain, opcontract.DeployInput[factorybindings.CCIPFactory]{
+		Qualifier: qualifier,
+		Template: factorybindings.CCIPFactory{
+			InstanceId:                    types.TEXT(params.InstanceID),
+			Owner:                         ownerParty,
+			McmsParty:                     mcmsParty,
+			UsedInstanceIds:               map[types.TEXT]types.BOOL{},
+			DeployedContracts:             map[types.TEXT]types.CONTRACT_ID{},
+			PerPartyRouterFactoryDeployed: types.BOOL(false),
+		},
+		OwnerParty: ownerParty,
+	})
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("deploy CCIPFactory: %w", err)
+	}
+
+	return deployReport.Output, nil
 }
