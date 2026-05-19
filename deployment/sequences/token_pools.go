@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldfcanton "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -649,12 +650,12 @@ func tokenPoolRateLimiterQualifier(tokenPoolAddress, direction, remoteSelectorKe
 	return fmt.Sprintf("%s-%s-%s", tokenPoolAddress, direction, remoteSelectorKey)
 }
 
-func tokenPoolRateLimiterDatastoreType(direction string) datastore.ContractType {
+func tokenPoolRateLimiterDatastoreType(direction string) deployment.ContractType {
 	if direction == "outbound" {
-		return datastore.ContractType(rate_limiter.ContractTypeOutbound)
+		return rate_limiter.ContractTypeOutbound
 	}
 
-	return datastore.ContractType(rate_limiter.ContractTypeInbound)
+	return rate_limiter.ContractTypeInbound
 }
 
 // findTokenPoolRateLimiterInDataStore returns a ref from the input datastore when a rate limiter was
@@ -663,7 +664,7 @@ func tokenPoolRateLimiterDatastoreType(direction string) datastore.ContractType 
 func findTokenPoolRateLimiterInDataStore(
 	ds datastore.DataStore,
 	chainSelector uint64,
-	rlType datastore.ContractType,
+	rlType deployment.ContractType,
 	qualifier string,
 ) (datastore.AddressRef, mcms.RawInstanceAddress, bool, error) {
 	if ds == nil {
@@ -672,7 +673,7 @@ func findTokenPoolRateLimiterInDataStore(
 
 	matches := ds.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSelector),
-		datastore.AddressRefByType(rlType),
+		datastore.AddressRefByType(datastore.ContractType(rlType)),
 		datastore.AddressRefByVersion(rate_limiter.Version),
 		datastore.AddressRefByQualifier(qualifier),
 	)

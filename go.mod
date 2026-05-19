@@ -8,10 +8,9 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 replace (
 	// Align root chainlink-ccip with chains/evm + deployment (same commit); avoids MVS picking v0.1.1-solana.* and ambiguous imports.
 	github.com/smartcontractkit/chainlink-ccip => github.com/smartcontractkit/chainlink-ccip v0.0.0-20260416055149-75c017f534ca
-	github.com/smartcontractkit/chainlink-ccip/deployment => /Users/sish/Desktop/chainlink-ccip/deployment
-	github.com/smartcontractkit/chainlink-deployments-framework => /Users/sish/Desktop/chainlink-deployments-framework
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
+	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.41.2-0.20260423204345-3cd8c2672428
 	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
 	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )
@@ -42,7 +41,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260518065630-109f00366c4f
 	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260518065630-109f00366c4f
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
-	github.com/smartcontractkit/chainlink-deployments-framework v0.101.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.104.1-0.20260519071845-f1b2bd1cca70
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260514231151-fecd433dede9
 	github.com/stretchr/testify v1.11.1
@@ -231,7 +230,6 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgtype v1.14.4 // indirect
-	github.com/jackc/pgx/v4 v4.18.3 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jinzhu/copier v0.4.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
