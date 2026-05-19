@@ -357,6 +357,10 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	if err != nil {
 		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("failed to get GlobalConfig address for chain %d: %w", selector, err)
 	}
+	feeQuoter, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(selector, datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
+	if err != nil {
+		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("failed to get FeeQuoter address for chain %d: %w", selector, err)
+	}
 	c.logger.Debug().Str("GlobalConfig", globalConfig.Address).Msg("Resolved GlobalConfig")
 
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), c.chain.Participants[0])
@@ -398,6 +402,7 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 		BaseExecutionGasCost: 1,
 		CantonLaneConfig: &lanes.CantonLaneConfig{
 			GlobalConfig: globalConfig,
+			FeeQuoterRef: feeQuoter,
 		},
 	}
 	cvConfig := lanes.CommitteeVerifierRemoteChainInput{
