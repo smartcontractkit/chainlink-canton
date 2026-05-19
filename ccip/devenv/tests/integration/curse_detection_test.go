@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register the canton impl factory
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -62,8 +62,6 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping TestIntegration_SourceReader_CurseDetection test in short mode")
 	}
-
-	ccv.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
 
 	configPath := "../../env-canton-evm-out.toml"
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)

@@ -29,8 +29,8 @@ import (
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
-	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainimpl"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	ccvservices "github.com/smartcontractkit/chainlink-ccv/build/devenv/services"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccv/deployment"
@@ -76,7 +76,7 @@ const AMTInstrument = types.TEXT("Amulet")
 var (
 	_                       cciptestinterfaces.CCIP17              = &Chain{}
 	_                       cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_                       ccv.ImplFactory                        = &ImplFactory{}
+	_                       chainimpl.ImplFactory                  = &ImplFactory{}
 	cantonTokenPoolVersion                                         = semver.MustParse("2.0.0")
 	cantonDeployDarPackages                                        = []contracts.Package{
 		contracts.CCIPFactory,
@@ -108,12 +108,12 @@ func NewImplFactory() *ImplFactory {
 	return &ImplFactory{}
 }
 
-// New implements [registry.ImplFactory].
-func (i *ImplFactory) New(ctx context.Context, cfg *ccv.Cfg, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
-	return New(ctx, cfg, lggr, env, bc.ChainID)
+// New implements [chainimpl.ImplFactory].
+func (i *ImplFactory) New(ctx context.Context, lggr zerolog.Logger, env *deployment.Environment, chainSelector uint64) (cciptestinterfaces.CCIP17, error) {
+	return New(ctx, lggr, env, chainSelector)
 }
 
-// NewEmpty implements [registry.ImplFactory].
+// NewEmpty implements [chainimpl.ImplFactory].
 func (i *ImplFactory) NewEmpty() cciptestinterfaces.CCIP17Configuration {
 	return NewEmptyCCIP17Canton(
 		log.
@@ -180,8 +180,6 @@ type Chain struct {
 	lastSentSeq   uint64
 	lastSentEvent cciptestinterfaces.MessageSentEvent
 
-	cfg *ccv.Cfg
-
 	// Send setup prerequisites
 	routerAddress       contracts.InstanceAddress
 	senderAddress       contracts.InstanceAddress
@@ -200,10 +198,17 @@ type validatorAPIClients struct {
 	transferClient transferInstructionV1.ClientWithResponsesInterface
 }
 
-func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
-	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
+func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainSelector uint64) (*Chain, error) {
+	chainFamily, err := chainsel.GetSelectorFamily(chainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("get chain details for chain %s: %w", chainID, err)
+		return nil, fmt.Errorf("get chain family for chain %d: %w", chainSelector, err)
+	}
+	if chainFamily != chainsel.FamilyCanton {
+		return nil, fmt.Errorf("chain %d is not a canton chain", chainSelector)
+	}
+	chainDetails, err := chainsel.GetChainDetails(chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("get chain details for chain %d: %w", chainSelector, err)
 	}
 	chain := e.BlockChains.CantonChains()[chainDetails.ChainSelector]
 
@@ -212,7 +217,6 @@ func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment
 		chain:        chain,
 		chainDetails: chainDetails,
 		logger:       logger,
-		cfg:          cfg,
 	}, nil
 }
 

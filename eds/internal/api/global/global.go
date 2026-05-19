@@ -2,6 +2,7 @@ package global
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -65,7 +66,12 @@ func NewServer(
 func (s Server) PostGetExplicitDisclosureBatch(c *gin.Context) {
 	var req oapiGlobal.GetExplicitDisclosureBatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiCommon.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 

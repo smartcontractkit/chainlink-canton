@@ -141,6 +141,12 @@ func newAccessor(sourceReader chainaccess.SourceReader) chainaccess.Accessor {
 	}
 }
 
+// Close implements [chainaccess.Accessor].
+func (a *accessor) Close() error {
+	// Nothing to close.
+	return nil
+}
+
 func (a *accessor) SourceReader() (chainaccess.SourceReader, error) {
 	return a.sourceReader, nil
 }
