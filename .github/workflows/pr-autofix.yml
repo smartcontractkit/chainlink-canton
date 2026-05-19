@@ -70,7 +70,9 @@ jobs:
           echo "expected_remote_head=${expected_remote_head}" >> "$GITHUB_OUTPUT"
       - name: merge target branch
         run: |
-          make git-merge-config
+          echo 'bindings/generated/** merge=ours' >> .git/info/attributes
+          echo 'contracts/dars/** merge=ours' >> .git/info/attributes
+          git config --local merge.ours.driver true
           git fetch origin ${{ github.event.client_payload.pull_request.base.ref }}
           git merge --no-commit "origin/${{ github.event.client_payload.pull_request.base.ref }}"
       - name: Install Go
