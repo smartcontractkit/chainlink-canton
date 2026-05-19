@@ -6,11 +6,13 @@ import (
 	"crypto/ed25519"
 	cryptorand "crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -27,8 +29,8 @@ import (
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
-	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainreg"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	ccvservices "github.com/smartcontractkit/chainlink-ccv/build/devenv/services"
 	ccipOffchain "github.com/smartcontractkit/chainlink-ccv/deployment"
@@ -41,12 +43,15 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
+	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	cantonchangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -58,13 +63,20 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
+
+// TODO: move this to share between devenv and integration tests
+// and define a const for LINK instrument
+const AMTInstrument = types.TEXT("Amulet")
 
 var (
 	_                       cciptestinterfaces.CCIP17              = &Chain{}
 	_                       cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_                       ccv.ImplFactory                        = &ImplFactory{}
+	_                       chainreg.ImplFactory                   = &ImplFactory{}
 	cantonTokenPoolVersion                                         = semver.MustParse("2.0.0")
 	cantonDeployDarPackages                                        = []contracts.Package{
 		contracts.CCIPFactory,
@@ -96,12 +108,12 @@ func NewImplFactory() *ImplFactory {
 	return &ImplFactory{}
 }
 
-// New implements [registry.ImplFactory].
-func (i *ImplFactory) New(ctx context.Context, cfg *ccv.Cfg, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
-	return New(ctx, cfg, lggr, env, bc.ChainID)
+// New implements [chainimpl.ImplFactory].
+func (i *ImplFactory) New(ctx context.Context, lggr zerolog.Logger, env *deployment.Environment, chainSelector uint64) (cciptestinterfaces.CCIP17, error) {
+	return New(ctx, lggr, env, chainSelector)
 }
 
-// NewEmpty implements [registry.ImplFactory].
+// NewEmpty implements [chainimpl.ImplFactory].
 func (i *ImplFactory) NewEmpty() cciptestinterfaces.CCIP17Configuration {
 	return NewEmptyCCIP17Canton(
 		log.
@@ -168,13 +180,35 @@ type Chain struct {
 	lastSentSeq   uint64
 	lastSentEvent cciptestinterfaces.MessageSentEvent
 
-	cfg *ccv.Cfg
+	// Send setup prerequisites
+	routerAddress       contracts.InstanceAddress
+	senderAddress       contracts.InstanceAddress
+	registryAdmin       string
+	validatorAPIClients validatorAPIClients
+
+	feeTokenInstrument      splice_api_token_holding_v1.InstrumentId
+	nextFeeCID              string // holding CID to be used as fee on next message send
+	transferTokenInstrument *splice_api_token_holding_v1.InstrumentId
+	nextTransferCID         string // holding CID to be used as transfer on next message send
 }
 
-func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
-	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
+type validatorAPIClients struct {
+	scanClient     scanProxy.ClientWithResponsesInterface
+	metadataClient tokenMetadataV1.ClientWithResponsesInterface
+	transferClient transferInstructionV1.ClientWithResponsesInterface
+}
+
+func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainSelector uint64) (*Chain, error) {
+	chainFamily, err := chainsel.GetSelectorFamily(chainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("get chain details for chain %s: %w", chainID, err)
+		return nil, fmt.Errorf("get chain family for chain %d: %w", chainSelector, err)
+	}
+	if chainFamily != chainsel.FamilyCanton {
+		return nil, fmt.Errorf("chain %d is not a canton chain", chainSelector)
+	}
+	chainDetails, err := chainsel.GetChainDetails(chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("get chain details for chain %d: %w", chainSelector, err)
 	}
 	chain := e.BlockChains.CantonChains()[chainDetails.ChainSelector]
 
@@ -183,7 +217,6 @@ func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment
 		chain:        chain,
 		chainDetails: chainDetails,
 		logger:       logger,
-		cfg:          cfg,
 	}, nil
 }
 
@@ -816,24 +849,21 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 	return cciptestinterfaces.ExecutionStateChangedEvent{}, nil // TODO: implement on-chain confirmation
 }
 
-// SendMessage implements cciptestinterfaces.CCIP17.
-func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, dataProvider cciptestinterfaces.ExtraArgsDataProvider, messageVersion uint8) (cciptestinterfaces.MessageSentEvent, error) {
-	opts, ok := dataProvider.(cciptestinterfaces.MessageOptions)
-	if !ok {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports cciptestinterfaces.MessageOptions, got %T", dataProvider)
-	}
-	if messageVersion != 3 {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports message version 3, got %d", messageVersion)
-	}
+// SetupSend sets up Canton sender specific prerequisites for sending a message.
+// eg: deploy per-party router, deploy ccipsender contract...
+func (c *Chain) SetupSend(
+	ctx context.Context,
+	feeAmountPerMessage uint64,
+	transferAmountPerMessage uint64,
+) error {
 	participant := c.chain.Participants[0]
 	party := participant.PartyID
 
-	seqNo := c.nextSeq + 1
-
+	// Deploy contracts //
 	// Router for sender party.
 	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, party)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
+		return fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
 
 	// Deploy a sender-owned CCIPSender contract.
@@ -847,51 +877,175 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		OwnerParty: types.PARTY(party),
 	})
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to deploy ccip sender contract: %w", err)
+		return fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
 	senderAddress := contracts.HexToInstanceAddress(out.Output.Address)
-
-	// Fee Token
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve registry admin: %w", err)
+		return fmt.Errorf("resolve registry admin: %w", err)
 	}
-	feeTokenInstrument := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
-	}
-	// Mint holding for sender
-	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
+	c.registryAdmin = registryAdmin
+	c.routerAddress = routerAddress
+	c.senderAddress = senderAddress
+
+	// Clients setup //
+	_, err = c.getValidatorAPIClients()
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("creating validator API clients: %w", err)
-	}
-	senderFeeInputCid, err := testhelpers.MintAMT(ctx, participant, metadataClient, transferClient, scanClient, party, "1000000.00")
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to mint sender fee input holding: %w", err)
+		return fmt.Errorf("get validator API clients: %w", err)
 	}
 
-	feeTransferFactorycid, feeTransferFactoryDisclosures, feeTransferFactoryChoiceContextRaw, err := testhelpers.GetTransferFactory(
+	// Tokens setup //
+	// Setup fee holding
+	feeTokenInstrument := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(registryAdmin),
+		Id:    AMTInstrument,
+	}
+
+	baseFilters := make([]testhelpers.Filter, 0, 3)
+	baseFilters = append(baseFilters,
+		testhelpers.WithHoldingOwner(party),
+		testhelpers.WithUnlockedHoldingsOnly(),
+	)
+	feeRows, err := testhelpers.ListHoldingsForInstrument(ctx, participant, &feeTokenInstrument, baseFilters...)
+	if err != nil {
+		return fmt.Errorf("list fee holdings for setup: %w", err)
+	}
+	feeMin := new(big.Rat).SetUint64(feeAmountPerMessage)
+	selectedFee, err := testhelpers.SelectHoldingsForInstrument(feeRows, []*big.Rat{feeMin})
+	if err != nil || len(selectedFee) == 0 {
+		return fmt.Errorf("select fee holding for setup: %w", err)
+	}
+
+	c.feeTokenInstrument = feeTokenInstrument
+	c.nextFeeCID = selectedFee[0].ContractID
+
+	// End setup, no transfer holdings needed
+	if transferAmountPerMessage == 0 {
+		return nil
+	}
+
+	// Setup transfer holdings
+	// TODO: add support for LINK instrument
+	transferTokenInstrument := &splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(registryAdmin),
+		Id:    AMTInstrument,
+	}
+
+	// Select transfer holding using another call here because fee/token might use different instruments
+	filters := append(baseFilters, testhelpers.ExcludeCIDs([]string{c.nextFeeCID})) // this filter is here in case fee and transfer use the same instrument
+	transferRows, err := testhelpers.ListHoldingsForInstrument(ctx, participant, transferTokenInstrument, filters...)
+	if err != nil {
+		return fmt.Errorf("list transfer holdings for setup: %w", err)
+	}
+	transferMin := new(big.Rat).SetUint64(transferAmountPerMessage)
+	selectedTransfer, err := testhelpers.SelectHoldingsForInstrument(transferRows, []*big.Rat{transferMin})
+	if err != nil || len(selectedTransfer) == 0 {
+		return fmt.Errorf("select transfer holding for setup: %w", err)
+	}
+
+	c.transferTokenInstrument = transferTokenInstrument
+	c.nextTransferCID = selectedTransfer[0].ContractID
+
+	return nil
+}
+
+// MintTokens mint tokens for transfer and fees. To be used on devenv tests only.
+// this method won't work in staging/prod tests
+// TODO: add support for LINK instrument
+func (c *Chain) MintTokens(ctx context.Context, amount uint64) error {
+	participant := c.chain.Participants[0]
+	party := participant.PartyID
+
+	validatorAPIClients, err := c.getValidatorAPIClients()
+	if err != nil {
+		return fmt.Errorf("get validator API clients: %w", err)
+	}
+
+	_, err = testhelpers.MintAMT(
 		ctx,
-		transferClient,
-		registryAdmin,
+		participant,
+		validatorAPIClients.metadataClient,
+		validatorAPIClients.transferClient,
+		validatorAPIClients.scanClient,
 		party,
-		party,
+		strconv.FormatUint(amount, 10),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to mint tokens: %w", err)
+	}
+
+	return nil
+}
+
+// SendMessage implements cciptestinterfaces.CCIP17.
+func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, dataProvider cciptestinterfaces.ExtraArgsDataProvider, messageVersion uint8) (cciptestinterfaces.MessageSentEvent, error) {
+	opts, ok := dataProvider.(cciptestinterfaces.MessageOptions)
+	if !ok {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports cciptestinterfaces.MessageOptions, got %T", dataProvider)
+	}
+	if messageVersion != 3 {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage only supports message version 3, got %d", messageVersion)
+	}
+	var unset contracts.InstanceAddress
+	if c.routerAddress == unset || c.senderAddress == unset {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+			"canton SendMessage: router or sender address is unset; call SetupSend once before trying to send messages",
+		)
+	}
+
+	hasTokenTransfer := c.transferTokenInstrument != nil && fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
+
+	participant := c.chain.Participants[0]
+	party := participant.PartyID
+
+	if strings.TrimSpace(c.nextFeeCID) == "" {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+			"canton SendMessage: next fee holding CID is unset; call SetupSend after minting",
+		)
+	}
+	if hasTokenTransfer {
+		if strings.TrimSpace(c.nextTransferCID) == "" {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+				"canton SendMessage: next transfer holding CID is unset; call SetupSend after minting",
+			)
+		}
+		if c.nextFeeCID == c.nextTransferCID {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+				"canton SendMessage: fee and transfer holding CIDs must be different contracts",
+			)
+		}
+	}
+
+	feeFactoryChoice, err := testhelpers.GetTransferFactoryV2(
+		ctx,
+		c.validatorAPIClients.transferClient,
+		c.registryAdmin,
+		splice_api_token_transfer_instruction_v1.Transfer{
+			Sender:           types.PARTY(party),
+			Receiver:         types.PARTY(party),
+			Amount:           types.NUMERIC("100.00"), // TransferFactory API doesn't actually do anything with this value, anything should work here
+			InstrumentId:     c.feeTokenInstrument,
+			InputHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(c.nextFeeCID)},
+			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}}, // The API doesn't actually use that value
+		},
 	)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve fee transfer factory from scan-proxy: %w", err)
 	}
+	feeTransferFactorycid := feeFactoryChoice.FactoryID
+	feeTransferFactoryDisclosures := feeFactoryChoice.DisclosedContracts
+	feeTransferFactoryChoiceContextRaw := feeFactoryChoice.ChoiceContextData
 	feeTransferFactoryChoiceContextValue, err := testhelpers.ChoiceContextFromData(feeTransferFactoryChoiceContextRaw)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse fee transfer factory choice context: %w", err)
 	}
 
 	// Collect Disclosures
-	hasTokenTransfer := fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 	outgoingMessage := oapiCommon.Message{
 		DestinationChainSelector: strconv.FormatUint(dest, 10),
 		FeeToken: oapiCommon.InstrumentId{
-			Admin: oapiCommon.PartyId(feeTokenInstrument.Admin),
-			Id:    string(feeTokenInstrument.Id),
+			Admin: oapiCommon.PartyId(c.feeTokenInstrument.Admin),
+			Id:    string(c.feeTokenInstrument.Id),
 		},
 		Executor: struct {
 			Address *oapiCommon.RawOrHashedAddress `json:"address,omitempty"`
@@ -901,18 +1055,19 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Receiver: hex.EncodeToString(fields.Receiver),
 	}
 	if hasTokenTransfer {
+		// TODO: move this to the other line also branching by tokenTransfer
 		outgoingMessage.TokenTransfer = &oapiCommon.TokenTransfer{
-			Amount: "0.0000001000",
+			Amount: fields.TokenAmount.Amount.String(),
 			Token: oapiCommon.InstrumentId{
-				Admin: oapiCommon.PartyId(feeTokenInstrument.Admin),
-				Id:    string(feeTokenInstrument.Id),
+				Admin: oapiCommon.PartyId(c.transferTokenInstrument.Admin),
+				Id:    string(c.transferTokenInstrument.Id),
 			},
 		}
 	}
 	// TODO come up with a better way of doing this
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", routerAddress, err)
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}
 	var disclosedContracts []*apiv2.DisclosedContract
 	sendArgs := ccipsender.Send{
@@ -921,7 +1076,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Message: ccipclient.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
-			FeeToken: feeTokenInstrument,
+			FeeToken: c.feeTokenInstrument,
 			ExtraArgs: ccipclient.ExtraArgs{
 				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit: types.INT64(opts.ExecutionGasLimit),
@@ -932,7 +1087,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			},
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
-			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(senderFeeInputCid)},
+			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(c.nextFeeCID)},
 			FeeTokenTransferFactory: types.CONTRACT_ID(feeTransferFactorycid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(feeTransferFactoryChoiceContextValue)},
@@ -950,15 +1105,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	// Token Pool
 	var tokenPoolRequiredCCVs []string
 	if hasTokenTransfer {
-		// TODO - use different instrument?
-		// Mint holding to be used for token transfer
-		tokenTransferHoldingCid, err := testhelpers.MintAMT(ctx, participant, metadataClient, transferClient, scanClient, party, "1000000.00")
-		if err != nil {
-			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to mint sender fee input holding: %w", err)
-		}
-
 		// Get Token Pool
-		token := contracts.EncodeInstrumentID(feeTokenInstrument)
+		token := contracts.EncodeInstrumentID(c.feeTokenInstrument)
 		tokenPoolAddress, err := c.GetTokenPoolForToken(ctx, token)
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get token pool for token %s: %w", token.String(), err)
@@ -977,7 +1125,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			Amount: types.NUMERIC(outgoingMessage.TokenTransfer.Amount),
 		}
 		sendArgs.TokenTransferInput = &ccipsender.TokenTransferInput{
-			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
+			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(c.nextTransferCID)},
 			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
 			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
 		}
@@ -1049,7 +1197,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	// Call CCIPSend
 	ccipSendReport, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Send, c.chain, contract.ChoiceInput[ccipsender.Send]{
-		InstanceAddress:    senderAddress,
+		InstanceAddress:    c.senderAddress,
 		Args:               sendArgs,
 		MCMSEnabled:        false,
 		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),
@@ -1068,8 +1216,18 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						participant.PartyID: {
 							Cumulative: []*apiv2.CumulativeFilter{
 								{
-									IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{
-										WildcardFilter: &apiv2.WildcardFilter{
+									IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+										TemplateFilter: &apiv2.TemplateFilter{
+											TemplateId:              contracts.TemplateIDFromBinding(ccipcore.CCIPMessageSent{}).ToLedgerIdentifier(),
+											IncludeCreatedEventBlob: true,
+										},
+									},
+								},
+								{
+									IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{
+										InterfaceFilter: &apiv2.InterfaceFilter{
+											InterfaceId:             testhelpers.HoldingV1InterfaceID(),
+											IncludeInterfaceView:    true,
 											IncludeCreatedEventBlob: false,
 										},
 									},
@@ -1086,84 +1244,188 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get update %q: %w", ccipSendReport.Output.ExecInfo.UpdateID, err)
 	}
 
-	var messageID [32]byte
-	var eventMessageID [32]byte
-	var computedMessageID [32]byte
-	var decodedMessage protocol.Message
-	foundCCIPMessageSent := false
-	foundEventMessageID := false
-	foundEncodedMessage := false
-	for _, event := range update.GetTransaction().GetEvents() {
-		created := event.GetCreated()
-		if created == nil || created.GetTemplateId() == nil || created.GetTemplateId().GetEntityName() != "CCIPMessageSent" {
+	parsedSend, err := parseFirstCCIPMessageSentFromLedgerEvents(update.GetTransaction().GetEvents(), c.nextSeq)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, err
+	}
+
+	// Set next holdings
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, fields.TokenAmount.Amount)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
+	}
+
+	event := cciptestinterfaces.MessageSentEvent{
+		MessageID:      parsedSend.messageID,
+		ReceiptIssuers: nil, // TODO: add them later, not currently needed
+	}
+	if parsedSend.foundEncodedMessage {
+		event.Message = new(parsedSend.decodedMessage)
+	}
+	c.nextSeq = parsedSend.seqNo
+	c.lastSentDest = dest
+	c.lastSentSeq = parsedSend.seqNo
+	c.lastSentEvent = event
+
+	return event, nil
+}
+
+// ccipMessageSentFromSendUpdate is the outcome of parsing a send transaction's first CCIPMessageSent
+// created event: wire identifiers, updated sequence, and optional decoded message body.
+type ccipMessageSentFromSendUpdate struct {
+	messageID           [32]byte
+	seqNo               uint64
+	foundEncodedMessage bool
+	decodedMessage      protocol.Message
+}
+
+// parseFirstCCIPMessageSentFromLedgerEvents scans events for the first created CCIPMessageSent
+// (module and entity name from generated bindings). previousSeq is the chain's last known sequence
+// before this send; returned seqNo is either previousSeq+1 or the sequence from the encoded payload
+// when that path is present.
+func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSeq uint64) (ccipMessageSentFromSendUpdate, error) {
+	messageSentTemplateID := contracts.TemplateIDFromBinding(ccipcore.CCIPMessageSent{})
+
+	// Find CCIPMessageSent event in the events
+	var created *apiv2.CreatedEvent
+	for _, event := range events {
+		evCreated := event.GetCreated()
+		if evCreated == nil || evCreated.GetTemplateId() == nil {
 			continue
 		}
-		foundCCIPMessageSent = true
-		fields := created.GetCreateArguments().GetFields()
-		for _, f := range fields {
-			if f.GetLabel() != "event" || f.GetValue().GetRecord() == nil {
-				continue
-			}
-			for _, eventField := range f.GetValue().GetRecord().GetFields() {
-				switch eventField.GetLabel() {
-				case "messageId":
-					decoded, err := hex.DecodeString(eventField.GetValue().GetText())
-					if err != nil || len(decoded) != 32 {
-						return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("decode messageId from CCIPMessageSent event: %w", err)
-					}
-					copy(eventMessageID[:], decoded)
-					foundEventMessageID = true
-				case "encodedMessage":
-					encodedMessage, err := hex.DecodeString(eventField.GetValue().GetText())
-					if err != nil {
-						return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("decode encodedMessage from CCIPMessageSent event: %w", err)
-					}
-					decodedMessagePtr, err := protocol.DecodeMessage(encodedMessage)
-					if err != nil {
-						return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("decode protocol message from encodedMessage: %w", err)
-					}
-					decodedMessage = *decodedMessagePtr
-					computedHash := gethcrypto.Keccak256(encodedMessage)
-					if len(computedHash) != len(computedMessageID) {
-						return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("computed encodedMessage hash has invalid length: %d", len(computedHash))
-					}
-					copy(computedMessageID[:], computedHash)
-					foundEncodedMessage = true
-				}
-			}
+		tid := evCreated.GetTemplateId()
+		if tid.GetModuleName() != messageSentTemplateID.ModuleName || tid.GetEntityName() != messageSentTemplateID.EntityName {
+			continue
 		}
+		created = evCreated
 
 		break
 	}
-	if !foundCCIPMessageSent {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
+	if created == nil {
+		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
 	}
+
+	parsed, err := bindings.UnmarshalCreatedEvent[ccipcore.CCIPMessageSent](created)
+	if err != nil {
+		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("unmarshal CCIPMessageSent created event: %w", err)
+	}
+	evt := parsed.Event
+
+	var (
+		foundEventMessageID, foundEncodedMessage bool
+		eventMessageID, computedMessageID        [32]byte
+		decodedMessage                           protocol.Message
+	)
+
+	if mid := string(evt.MessageId); mid != "" {
+		decoded, err := hex.DecodeString(mid)
+		if err != nil || len(decoded) != 32 {
+			return ccipMessageSentFromSendUpdate{}, fmt.Errorf("decode messageId from CCIPMessageSent event: %w", err)
+		}
+		copy(eventMessageID[:], decoded)
+		foundEventMessageID = true
+	}
+
+	if enc := string(evt.EncodedMessage); enc != "" {
+		encodedMessage, err := hex.DecodeString(enc)
+		if err != nil {
+			return ccipMessageSentFromSendUpdate{}, fmt.Errorf("decode encodedMessage from CCIPMessageSent event: %w", err)
+		}
+		decodedMessagePtr, err := protocol.DecodeMessage(encodedMessage)
+		if err != nil {
+			return ccipMessageSentFromSendUpdate{}, fmt.Errorf("decode protocol message from encodedMessage: %w", err)
+		}
+		decodedMessage = *decodedMessagePtr
+		computedHash := gethcrypto.Keccak256(encodedMessage)
+		if len(computedHash) != len(computedMessageID) {
+			return ccipMessageSentFromSendUpdate{}, fmt.Errorf("computed encodedMessage hash has invalid length: %d", len(computedHash))
+		}
+		copy(computedMessageID[:], computedHash)
+		foundEncodedMessage = true
+	}
+
+	seqNo := previousSeq + 1
+	var messageID [32]byte
 	if foundEncodedMessage {
 		// Prefer the sequence from the encoded message since local process state can be stale
 		// across repeated test runs against a long-lived environment.
 		seqNo = uint64(decodedMessage.SequenceNumber)
-	}
-	if foundEncodedMessage {
 		messageID = computedMessageID
 	} else if foundEventMessageID {
 		messageID = eventMessageID
 	} else {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("CCIPMessageSent event missing both messageId and encodedMessage")
+		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("CCIPMessageSent event missing both messageId and encodedMessage")
 	}
 
-	event := cciptestinterfaces.MessageSentEvent{
-		MessageID:      messageID,
-		ReceiptIssuers: nil, // TODO: add them later, not currently needed
-	}
-	if foundEncodedMessage {
-		event.Message = new(decodedMessage)
-	}
-	c.nextSeq = seqNo
-	c.lastSentDest = dest
-	c.lastSentSeq = seqNo
-	c.lastSentEvent = event
+	return ccipMessageSentFromSendUpdate{
+		messageID:           messageID,
+		seqNo:               seqNo,
+		foundEncodedMessage: foundEncodedMessage,
+		decodedMessage:      decodedMessage,
+	}, nil
+}
 
-	return event, nil
+// setNextHoldings sets fee and transfer holdings on Chain struct for next MessageSend
+// based on the events from the send update.
+func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Int) error {
+	party := c.chain.Participants[0].PartyID
+
+	spentCIDs := []string{c.nextFeeCID}
+	if hasTokenTransfer && c.nextTransferCID != "" {
+		spentCIDs = append(spentCIDs, c.nextTransferCID)
+	}
+	refreshFilters := []testhelpers.Filter{
+		testhelpers.WithHoldingOwner(party),
+		testhelpers.WithUnlockedHoldingsOnly(),
+		testhelpers.ExcludeCIDs(spentCIDs),
+	}
+
+	// Select next fee holding
+	freshFeeHoldings, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(
+		events,
+		c.feeTokenInstrument,
+		refreshFilters...,
+	)
+	if err != nil {
+		return fmt.Errorf("parse fee holdings from send update: %w", err)
+	}
+	pickedFee, err := testhelpers.SelectHoldingsForInstrument(freshFeeHoldings, []*big.Rat{big.NewRat(0, 1)}) // TODO: we'll have to consider real fee here once we go load tests
+	if err != nil {
+		return fmt.Errorf("refresh next fee holding from update: %w", err)
+	}
+	c.nextFeeCID = pickedFee[0].ContractID
+	c.logger.Info().Str("NextFeeCID", c.nextFeeCID).Msg("Selected next fee holding")
+	if payload, err := json.MarshalIndent(freshFeeHoldings, "", "  "); err != nil {
+		c.logger.Warn().Err(err).Msg("marshal freshFeeHoldings for log")
+	} else {
+		c.logger.Debug().
+			RawJSON("freshFeeHoldings", payload).
+			Msg("Fresh fee holdings parsed from send update")
+	}
+
+	if !hasTokenTransfer {
+		return nil
+	}
+
+	// Select next transfer holding
+	refreshFilters = append(refreshFilters[:len(refreshFilters)-1], testhelpers.ExcludeCIDs(append(spentCIDs, c.nextFeeCID))) // includes one more item in the filter to exclude the fee holding
+	freshTransferHoldings, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(
+		events,
+		*c.transferTokenInstrument,
+		refreshFilters...,
+	)
+	if err != nil {
+		return fmt.Errorf("parse transfer holdings from send update: %w", err)
+	}
+	transferValue := new(big.Rat).SetInt(tokenAmount)
+	pickedTransfer, err := testhelpers.SelectHoldingsForInstrument(freshTransferHoldings, []*big.Rat{transferValue})
+	if err != nil {
+		return fmt.Errorf("refresh next transfer holding from update: %w", err)
+	}
+	c.nextTransferCID = pickedTransfer[0].ContractID
+	c.logger.Info().Str("NextTransferCID", c.nextTransferCID).Msg("Selected next transfer holding")
+
+	return nil
 }
 
 func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
@@ -1184,4 +1446,27 @@ func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, tim
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
+}
+
+// getValidatorAPIClients gets validator API clients from Chain struct cache or
+// creates them if they are not already created.
+func (c *Chain) getValidatorAPIClients() (validatorAPIClients, error) {
+	participant := c.chain.Participants[0]
+	if c.validatorAPIClients.scanClient != nil {
+		return c.validatorAPIClients, nil
+	}
+
+	// Clients setup
+	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(participant)
+	if err != nil {
+		return validatorAPIClients{}, fmt.Errorf("creating validator API clients: %w", err)
+	}
+
+	c.validatorAPIClients = validatorAPIClients{
+		scanClient:     scanClient,
+		metadataClient: metadataClient,
+		transferClient: transferClient,
+	}
+
+	return c.validatorAPIClients, nil
 }

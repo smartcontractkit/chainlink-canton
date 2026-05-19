@@ -74,6 +74,7 @@ import (
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
@@ -557,6 +558,20 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 					},
 				},
 			},
+			TokenStandardAPIConfig: config.TokenStandardAPIConfig{
+				Enabled: true,
+				Admin:   partyCCIP,
+				Registries: map[string]config.Registry{
+					linkRegistryAddress.InstanceAddress().Hex(): {
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: linkRegistryAddress.InstanceAddress(),
+						},
+						TokenType: config.TokenTypeLINK,
+						TokenId:   "LINK",
+					},
+				},
+			},
 		})
 		log.Info().Err(err).Msg("EDS terminated")
 		if !errors.Is(err, context.Canceled) {
@@ -567,6 +582,8 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	}()
 
 	// Create EDS clients
+	globalAPIClient, err := oapiGlobal.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create GlobalConfig API client")
 	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create CCIP API client")
 	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
@@ -840,6 +857,23 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	executorSendDisclosure, err := edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
+
+	// Sanity check - validate that all disclosures can be queried from the Global EDS API endpoint
+	// TODO: these EDS-specific tests should be separated
+	disclosedContracts, err := edsTesthelpers.GetGlobalDisclosureBatch(t.Context(), globalAPIClient, []contracts.InstanceAddress{
+		perPartyRouterFactoryAddress.InstanceAddress(),
+		globalConfigAddress.InstanceAddress(),
+		feeQuoterAddress.InstanceAddress(),
+		onRampAddress.InstanceAddress(),
+		offRampAddress.InstanceAddress(),
+		tokenAdminRegistryAddress.InstanceAddress(),
+		rmnRemoteAddress.InstanceAddress(),
+		committeeVerifierAddress.InstanceAddress(),
+		executorAddress.InstanceAddress(),
+		linkRegistryAddress.InstanceAddress(),
+	})
+	require.NoError(t, err)
+	require.Lenf(t, disclosedContracts, 10, "expected to retrieve disclosures for all queried addresses")
 
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;

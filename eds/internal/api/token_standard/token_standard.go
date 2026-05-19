@@ -2,6 +2,7 @@ package token_standard
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
@@ -36,7 +38,7 @@ type TokenConfig struct {
 
 type Server struct {
 	logger              zerolog.Logger
-	activeContractStore *store.ActiveContractStore
+	activeContractStore store.ActiveContractStoreInterface
 
 	admin  types.PARTY
 	tokens map[types.TEXT]TokenConfig
@@ -50,19 +52,28 @@ var (
 func NewServer(
 	_ context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
+	activeContractStore store.ActiveContractStoreInterface,
 	cfg config.TokenStandardAPIConfig,
 ) (*Server, error) {
 	s := &Server{
-		logger: logger.With().Str("component", "TokenStandardAPI").Logger(),
-		admin:  types.PARTY(cfg.Admin),
-		tokens: make(map[types.TEXT]TokenConfig),
+		logger:              logger.With().Str("component", "TokenStandardAPI").Logger(),
+		activeContractStore: activeContractStore,
+		admin:               types.PARTY(cfg.Admin),
+		tokens:              make(map[types.TEXT]TokenConfig),
 	}
 
-	for registryAddress, registry := range cfg.Registries {
+	for _, registry := range cfg.Registries {
+		// Validate config
+		if len(registry.TokenId) == 0 {
+			return nil, fmt.Errorf("empty TokenId in config")
+		}
+		if _, ok := s.tokens[types.TEXT(registry.TokenId)]; ok {
+			return nil, fmt.Errorf("duplicate TokenId in config: %s", registry.TokenId)
+		}
+
 		s.tokens[types.TEXT(registry.TokenId)] = TokenConfig{
 			Type:            registry.TokenType,
-			RegistryAddress: contracts.HexToInstanceAddress(registryAddress),
+			RegistryAddress: registry.InstanceAddress,
 		}
 		switch registry.TokenType {
 		case config.TokenTypeLINK:
@@ -76,13 +87,13 @@ func NewServer(
 					PartyID:    registry.PartyID,
 				},
 			)
+		default:
+			return nil, fmt.Errorf("unsupported token type: %s", registry.TokenType)
 		}
 	}
 
 	return s, nil
 }
-
-// Token Metadata V1
 
 func (s Server) GetRegistryInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, oapiTokenMetadataV1.GetRegistryInfoResponse{
@@ -92,6 +103,8 @@ func (s Server) GetRegistryInfo(c *gin.Context) {
 		},
 	})
 }
+
+// Token Metadata V1
 
 func (s Server) ListInstruments(c *gin.Context, params oapiTokenMetadataV1.ListInstrumentsParams) {
 	pageSize := DefaultPageSize
@@ -184,12 +197,15 @@ func (s Server) GetInstrument(c *gin.Context, instrumentId string) {
 	})
 }
 
-// Transfer Instruction V1
-
 func (s Server) GetTransferFactory(c *gin.Context) {
 	var req oapiTransferInstruction.GetFactoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiTransferInstruction.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiTransferInstruction.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 
@@ -237,10 +253,17 @@ func (s Server) GetTransferFactory(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// Transfer Instruction V1
+
 func (s Server) GetTransferInstructionAcceptContext(c *gin.Context, transferInstructionId string) {
 	var req oapiTransferInstruction.GetChoiceContextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiTransferInstruction.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiTransferInstruction.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 
@@ -293,4 +316,19 @@ func (s Server) GetTransferInstructionRejectContext(c *gin.Context, transferInst
 
 func (s Server) GetTransferInstructionWithdrawContext(c *gin.Context, transferInstructionId string) {
 	s.GetTransferInstructionAcceptContext(c, transferInstructionId)
+}
+
+var _ global.InstanceAddressFilter = &Server{}
+
+func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+	var out []contracts.InstanceAddress
+	for _, address := range addresses {
+		for _, tokenConfig := range s.tokens {
+			if address == tokenConfig.RegistryAddress {
+				out = append(out, address)
+			}
+		}
+	}
+
+	return out
 }

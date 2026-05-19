@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "fc88decfdcfe69568f5681584f6cfd8cb0c092828c95d7b7cbf8a150740f2c30"
+	PackageID   = "427155a2a7a0befc1fad98ead39cc26262dec0a9adcbe6c4f35f2b00a93674c0"
 	SDKVersion  = "3.4.11"
 )
 
@@ -470,11 +470,10 @@ func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
 
 // CCIPSendResult is a Record type
 type CCIPSendResult struct {
-	Router                 types.CONTRACT_ID   `json:"router"`
-	CcipMessageSent        types.CONTRACT_ID   `json:"ccipMessageSent"`
-	MessageId              types.TEXT          `json:"messageId"`
-	FeeChangeCids          []types.CONTRACT_ID `json:"feeChangeCids"`
-	PendingFeeInstructions []types.CONTRACT_ID `json:"pendingFeeInstructions"`
+	Router          types.CONTRACT_ID   `json:"router"`
+	CcipMessageSent types.CONTRACT_ID   `json:"ccipMessageSent"`
+	MessageId       types.TEXT          `json:"messageId"`
+	FeeChangeCids   []types.CONTRACT_ID `json:"feeChangeCids"`
 }
 
 // ToMap converts CCIPSendResult to a map for DAML arguments
@@ -490,14 +489,6 @@ func (t CCIPSendResult) ToMap() map[string]any {
 	m["feeChangeCids"] = func() []any {
 		res := make([]any, 0, len(t.FeeChangeCids))
 		for _, e := range t.FeeChangeCids {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	m["pendingFeeInstructions"] = func() []any {
-		res := make([]any, 0, len(t.PendingFeeInstructions))
-		for _, e := range t.PendingFeeInstructions {
 			res = append(res, e)
 		}
 		return res

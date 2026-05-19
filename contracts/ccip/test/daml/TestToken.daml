@@ -4,6 +4,7 @@
 module TestToken where
 
 import DA.Action (foldlA)
+import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
@@ -138,12 +139,12 @@ template TestTransferInstruction
       transferInstruction_updateImpl _self _arg =
         abort "TestTransferInstruction: update not supported"
 
--- | TransferFactory (like ExternalPartyAmuletRules).
--- Checks for preapproval; if exists -> direct, else -> pending.
+-- Looks up the preapproval CID from extraArgs.context keyed by show(receiver).
+-- Callers pass preapprovals via feeTokenExtraArgs.context (CCIPSend) or via the
+-- transfer-factory-extra-args-context-values entry in the pool extraContext (LockOrBurn).
 template TestTransferFactory
   with
     admin : Party
-    preapprovalCid : Optional (ContractId TestTransferPreapproval)
   where
     signatory admin
 
@@ -156,12 +157,15 @@ template TestTransferFactory
 
         -- Check if this is a self-transfer or has preapproval
         let isSelfTransfer = transfer.sender == transfer.receiver
+        let preapprovalOpt = case TextMap.lookup (show transfer.receiver) arg.extraArgs.context.values of
+              Some (MetadataV1.AV_ContractId cid) -> Some (coerceContractId cid : ContractId TestTransferPreapproval)
+              _ -> None
 
-        case (isSelfTransfer, preapprovalCid) of
+        case (isSelfTransfer, preapprovalOpt) of
           -- Self-transfer: direct (like Canton Coin)
           (True, _) -> executeDirect admin transfer
 
-          -- Has preapproval: use it for direct transfer
+          -- Has preapproval in context: use it for direct transfer
           (False, Some paCid) -> do
             exercise paCid Send with
               sender = transfer.sender
@@ -174,13 +178,6 @@ template TestTransferFactory
 
       transferFactory_publicFetchImpl _self _arg =
         pure (view (toInterface @TransferV1.TransferFactory this))
-
-    -- Update preapproval reference
-    choice SetPreapproval : ContractId TestTransferFactory
-      with
-        newPreapprovalCid : Optional (ContractId TestTransferPreapproval)
-      controller admin
-      do create this with preapprovalCid = newPreapprovalCid
 
 -- Helper: Sum inputs, validate ownership/instrument, and archive them.
 sumAndArchiveInputs : Party -> Party -> HoldingV1.InstrumentId -> [ContractId HoldingV1.Holding] -> Update Decimal
