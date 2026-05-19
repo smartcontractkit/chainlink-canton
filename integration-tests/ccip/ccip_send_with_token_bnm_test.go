@@ -82,7 +82,7 @@ import (
 	// Import to register adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 
-	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
+	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 // TestBnMTokenPool_FullSendFlow tests full send flow with token transfer.
@@ -268,7 +268,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Resolve contracts
 	globalConfigRef, globalConfigAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_config.ContractType, global_config.Version, "")
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	feeQuoterRef, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
+	_, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
 	require.NoError(t, err, "failed to get FeeQuoter address")
 	_, onRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), onramp.ContractType, onramp.Version, "")
 	require.NoError(t, err, "failed to get OnRamp address")
@@ -310,6 +310,8 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		},
 	}
 
+	cantonadapters.SetRuntimeDataStore(cldfEnv.DataStore)
+
 	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
 		Source: &lanes.ChainDefinition{
 			Selector: env.Chain.ChainSelector(),
@@ -336,7 +338,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			DefaultOutboundCCVs:      nil,
 			CantonLaneConfig: &lanes.CantonLaneConfig{
 				GlobalConfig: globalConfigRef,
-				FeeQuoterRef: feeQuoterRef,
 			},
 			DefaultExecutor: executorRef,
 			FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),

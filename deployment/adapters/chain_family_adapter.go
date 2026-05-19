@@ -36,10 +36,13 @@ var (
 	runtimeDataStore   datastore.DataStore
 )
 
+// SetRuntimeDataStore sets the datastore used while running Canton adapter and sequence flows.
 func SetRuntimeDataStore(ds datastore.DataStore) {
 	runtimeDataStoreMu.Lock()
-	defer runtimeDataStoreMu.Unlock()
 	runtimeDataStore = ds
+	runtimeDataStoreMu.Unlock()
+	// Sequences cannot import adapters (import cycle); register a getter instead.
+	dsutil.RegisterRuntimeDataStoreGetter(getRuntimeDataStore)
 }
 
 func getRuntimeDataStore() datastore.DataStore {
@@ -79,17 +82,6 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 			ds := getRuntimeDataStore()
 			if ds == nil {
 				return ccipseq.OnChainOutput{}, fmt.Errorf("runtime datastore is not set")
-			}
-
-			localFeeQuoter, err := findContractRef(
-				ds,
-				input.ChainSelector,
-				datastore.ContractType(fee_quoter.ContractType),
-				fee_quoter.Version,
-				"",
-			)
-			if err != nil {
-				return ccipseq.OnChainOutput{}, fmt.Errorf("resolve fee quoter: %w", err)
 			}
 
 			localGlobalConfig, err := findContractRef(
@@ -168,7 +160,6 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 					DefaultExecutor:          localExecutor,
 					CantonLaneConfig: &lanes.CantonLaneConfig{
 						GlobalConfig: localGlobalConfig,
-						FeeQuoterRef: localFeeQuoter,
 					},
 					OnRamp:                   input.OnRamp,
 					OffRamp:                  input.OffRamp,
