@@ -12,10 +12,12 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.Factory
 import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified Splice.Api.Token.HoldingV1
+import qualified Link.Token
 
 import CCIP.FactoryTest.FactoryCodecTest
   ( encodeDeployGlobalConfigParams
   , encodeDeployFeeQuoterParams
+  , encodeDeployLinkTokenParams
   , encodeDeployTokenAdminRegistryParams
   , encodeDeployOnRampParams
   , encodeDeployOffRampParams
@@ -338,6 +340,79 @@ testDeployFeeQuoter_MCMS = script do
   submit mcmsParty do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "DeployFeeQuoter"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
+-- | Test DeployLinkToken via MCMS entrypoint
+-- LinkRegistry has registryAdmin as signatory, so the factory owner is used as registryAdmin.
+testDeployLinkToken_MCMS : Script ()
+testDeployLinkToken_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+
+  let factoryInstanceId = "factory-link"
+      linkInstanceId = "link-token-1"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "LINK"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = DeployLinkTokenParams with
+        instanceId = linkInstanceId
+        instrumentId
+      encoded = encodeDeployLinkTokenParams params
+
+  submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployLinkToken"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  registries <- query @Link.Token.LinkRegistry mcmsParty
+  case filter (\(_, registry) -> registry.instanceId == linkInstanceId) registries of
+    [(_, registry)] -> do
+      registry.registryAdmin === mcmsParty
+      registry.registryInstrumentId === instrumentId
+    _ -> abort "Expected exactly one deployed LinkRegistry"
+
+  pure ()
+
+-- | LinkRegistry's instrument admin must match the factory owner / registry admin.
+testDeployLinkToken_AdminMismatch_Rejected : Script ()
+testDeployLinkToken_AdminMismatch_Rejected = script do
+  mcmsParty <- allocateParty "mcms_party"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let factoryInstanceId = "factory-link-admin-mismatch"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = DeployLinkTokenParams with
+        instanceId = "link-token-bad-admin"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      encoded = encodeDeployLinkTokenParams params
+
+  submitMustFail mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployLinkToken"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 

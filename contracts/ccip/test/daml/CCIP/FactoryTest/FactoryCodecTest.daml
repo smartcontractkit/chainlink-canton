@@ -64,6 +64,11 @@ encodeDeployFeeQuoterParams params =
   encodeText params.instanceId
   <> encodeInstrumentId params.linkTokenInstrumentId
 
+encodeDeployLinkTokenParams : DeployLinkTokenParams -> BytesHex
+encodeDeployLinkTokenParams params =
+  encodeText params.instanceId
+  <> encodeInstrumentId params.instrumentId
+
 encodeDeployTokenAdminRegistryParams : DeployTokenAdminRegistryParams -> BytesHex
 encodeDeployTokenAdminRegistryParams params =
   encodeText params.instanceId
@@ -220,6 +225,23 @@ testDecodeDeployFeeQuoterParams = script do
     Some decoded -> do
       decoded.instanceId === params.instanceId
       decoded.linkTokenInstrumentId === params.linkTokenInstrumentId
+
+  pure ()
+
+testDecodeDeployLinkTokenParams : Script ()
+testDecodeDeployLinkTokenParams = script do
+  tokenAdmin <- allocateParty "LinkTokenAdmin"
+
+  let params = DeployLinkTokenParams with
+        instanceId = "link-token-1"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      encoded = encodeDeployLinkTokenParams params
+
+  case decodeDeployLinkTokenParams encoded of
+    None -> abort "Failed to decode DeployLinkTokenParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.instrumentId === params.instrumentId
 
   pure ()
 

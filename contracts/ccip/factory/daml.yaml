@@ -13,6 +13,7 @@ data-dependencies:
 dependencies:
   - daml-prim
   - daml-stdlib
+  - ../../link/.daml/dist/link-0.0.1.dar
   - ../../chainlink/api/.daml/dist/chainlink-api-1.0.0.dar
   - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
   - ../core/.daml/dist/ccip-core-1.0.0.dar

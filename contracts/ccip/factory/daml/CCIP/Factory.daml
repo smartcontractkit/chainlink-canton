@@ -28,6 +28,7 @@ import Chainlink.InstanceAddress (assertValidInstanceId)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
+import qualified Link.Token
 
 import qualified CCIP.GlobalConfig
 import qualified CCIP.FeeQuoter
@@ -107,6 +108,14 @@ template CCIPFactory
                 params <- requireDecoded "DeployFeeQuoter" (decodeDeployFeeQuoterParams operationData)
                 deployResult <- exercise selfCid DeployFeeQuoter with
                   contract = mkFeeQuoterContract owner params
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
+
+              "DeployLinkToken" -> do
+                params <- requireDecoded "DeployLinkToken" (decodeDeployLinkTokenParams operationData)
+                deployResult <- exercise selfCid DeployLinkToken with
+                  contract = mkLinkTokenContract owner params
                 let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
@@ -249,6 +258,25 @@ template CCIPFactory
                 newFactoryCid <- create this with
                     usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
                     deployedContracts = Map.insert "fee-quoter" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployLinkToken : DeployResult
+            with
+                contract : Link.Token.LinkRegistry
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "link-token" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+                assertMsg "E_LINK_TOKEN_ADMIN_MISMATCH" (contract.registryAdmin == owner && contract.registryInstrumentId.admin == owner)
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "link-token" (coerceContractId deployedCid) deployedContracts
 
                 pure DeployResult with
                     factoryCid = newFactoryCid
@@ -469,6 +497,12 @@ data DeployFeeQuoterParams = DeployFeeQuoterParams
         linkTokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
     deriving (Eq, Show)
 
+data DeployLinkTokenParams = DeployLinkTokenParams
+    with
+        instanceId : Text
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+    deriving (Eq, Show)
+
 data DeployTokenAdminRegistryParams = DeployTokenAdminRegistryParams
     with
         instanceId : Text
@@ -604,6 +638,14 @@ mkFeeQuoterContract owner params = CCIP.FeeQuoter.FeeQuoter with
     usdPerToken = Map.empty
     linkTokenInstrumentId = params.linkTokenInstrumentId
     priceUpdaters = []
+
+mkLinkTokenContract : Party -> DeployLinkTokenParams -> Link.Token.LinkRegistry
+mkLinkTokenContract owner params = Link.Token.LinkRegistry with
+    registryAdmin = owner
+    registryInstrumentId = params.instrumentId
+    instanceId = params.instanceId
+    registryMeta = Splice.Api.Token.MetadataV1.emptyMetadata
+    transferPreapprovals = Map.empty
 
 mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.TokenAdminRegistry.TokenAdminRegistry
 mkTokenAdminRegistryContract owner params = CCIP.TokenAdminRegistry.TokenAdminRegistry with
@@ -763,6 +805,15 @@ decodeDeployFeeQuoterParams encoded = do
     Some DeployFeeQuoterParams with
         instanceId
         linkTokenInstrumentId
+
+decodeDeployLinkTokenParams : BytesHex -> Optional DeployLinkTokenParams
+decodeDeployLinkTokenParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (instrumentId, finalOffset) <- decodeInstrumentId encoded offset1
+    assertOffset finalOffset (byteCount encoded)
+    Some DeployLinkTokenParams with
+        instanceId
+        instrumentId
 
 decodeDeployTokenAdminRegistryParams : BytesHex -> Optional DeployTokenAdminRegistryParams
 decodeDeployTokenAdminRegistryParams encoded = do
