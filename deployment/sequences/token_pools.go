@@ -139,18 +139,28 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				return out, fmt.Errorf("resolve outbound CCVs for remote chain %d: %w", remoteSelector, err)
 			}
 
+			defaultOutboundBucket, _ := remoteCfg.GetOutboundRateLimitBuckets().DefaultBucket()
+			defaultInboundBucket, _ := remoteCfg.GetInboundRateLimitBuckets().DefaultBucket()
 			outboundDefaultCfg, inboundDefaultCfg := tokenadapters.GenerateTPRLConfigs(
-				remoteCfg.OutboundRateLimiterConfig,
-				remoteCfg.InboundRateLimiterConfig,
+				defaultOutboundBucket.RateLimit,
+				defaultInboundBucket.RateLimit,
 				uint8(parsedPool.Decimals),
 				remoteCfg.RemoteDecimals,
 				"canton",
 				semver.MustParse("2.0.0"),
 				lockReleasePoolType.String(),
 			)
+			ffOutboundBucket, ffOutboundExists := remoteCfg.GetOutboundRateLimitBuckets().FastFinalityBucket()
+			ffInboundBucket, ffInboundExists := remoteCfg.GetInboundRateLimitBuckets().FastFinalityBucket()
+			customOutboundInput := defaultOutboundBucket.RateLimit
+			customInboundInput := defaultInboundBucket.RateLimit
+			if ffOutboundExists && ffInboundExists {
+				customOutboundInput = ffOutboundBucket.RateLimit
+				customInboundInput = ffInboundBucket.RateLimit
+			}
 			_, inboundCustomCfg := tokenadapters.GenerateTPRLConfigs(
-				remoteCfg.OutboundRateLimiterConfig, // TODO: how do we get the "custom finality" config?
-				remoteCfg.InboundRateLimiterConfig,  // TODO: how do we get the "custom finality" config?
+				customOutboundInput,
+				customInboundInput,
 				uint8(parsedPool.Decimals),
 				remoteCfg.RemoteDecimals,
 				"canton",
