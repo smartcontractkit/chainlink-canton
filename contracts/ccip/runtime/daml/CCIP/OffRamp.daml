@@ -111,6 +111,7 @@ template OffRamp
                             (null tokenPoolRequiredCCVs)
                         pure baseRequiredCCVs
                     Some _ -> do
+                        CCIP.Internal.assertMaxCCVListLength "offramp: token pool required CCVs" tokenPoolRequiredCCVs
                         let (mergedRequiredCCVs, _, _) =
                                 CCIP.Internal.mergeInboundPoolCCVs
                                     sourceConfig.defaultCCVs
@@ -118,6 +119,7 @@ template OffRamp
                                     baseOptionalCCVs
                                     baseOptionalCCVThreshold
                                     tokenPoolRequiredCCVs
+                        CCIP.Internal.assertMaxCCVListLength "offramp: required CCVs" mergedRequiredCCVs
                         pure mergedRequiredCCVs
                 pure finalRequiredCCVs
 

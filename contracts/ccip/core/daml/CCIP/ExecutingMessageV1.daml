@@ -129,6 +129,7 @@ template ExecutingMessageV1
                 assertMsg "executingMessage: inbound pool verification only valid for token transfers"
                     (isSome tokenReceiver)
                 assertMsg "SetInboundPoolCCVs: already set" (isNone inboundPoolCCVs)
+                CCIP.Internal.assertMaxCCVListLength "executingMessage: inbound pool CCVs" poolCCVs
                 assertMsg "SetInboundPoolCCVs: duplicate CCVs not allowed" (unique poolCCVs)
                 let (mergedRequiredCCVs, mergedOptionalCCVs, mergedOptionalCCVThreshold) =
                         CCIP.Internal.mergeInboundPoolCCVs
@@ -137,6 +138,8 @@ template ExecutingMessageV1
                             optionalCCVs
                             optionalCCVThreshold
                             poolCCVs
+                CCIP.Internal.assertMaxCCVListLength "executingMessage: resolved required CCVs" mergedRequiredCCVs
+                CCIP.Internal.assertMaxCCVListLength "executingMessage: resolved optional CCVs" mergedOptionalCCVs
                 create this with
                     requiredCCVs = mergedRequiredCCVs
                     optionalCCVs = mergedOptionalCCVs
@@ -167,9 +170,13 @@ template ExecutingMessageV1
                         assertMsg "executingMessage: token receiver mismatch"
                             (Some resolvedTokenReceiver == tokenReceiver)
                         resolvedInboundPoolCCVs <- case inboundPoolCCVs of
-                            Some poolCCVs -> pure (dedup (CCIP.Internal.resolveRequiredCCVsWithDefaults
-                                sourceDefaultCCVs
-                                poolCCVs))
+                            Some poolCCVs -> do
+                                CCIP.Internal.assertMaxCCVListLength "executingMessage: inbound pool CCVs" poolCCVs
+                                let resolved = dedup (CCIP.Internal.resolveRequiredCCVsWithDefaults
+                                        sourceDefaultCCVs
+                                        poolCCVs)
+                                CCIP.Internal.assertMaxCCVListLength "executingMessage: resolved inbound pool CCVs" resolved
+                                pure resolved
                             None -> abort "executingMessage: missing inbound pool CCVs for token ticket"
                         sourcePoolData <- case message.tokenTransfer of
                             Some tokenTransfer -> pure tokenTransfer.extraData

@@ -268,18 +268,24 @@ template OnRamp
                         extraArgs <- case message.extraArgs of
                                 CCIP.Client.V3 v3 -> pure v3
                                 _ -> abort "onramp: unsupported extraArgs version"
+                        let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
+                        CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                        CCIP.Internal.assertMaxCCVListLength "onramp: pool-reported CCVs" poolReportedCCVs
+                        assertMsg "onramp: pool-reported CCVs cannot contain duplicates"
+                            (unique poolReportedCCVs)
                         let senderRequiredCCVs =
                                 computeRequiredCCVsForSend
                                     config
                                     message
                                     extraArgs
-                                    (map (.ccvAddress) extraArgs.ccvs)
+                                    senderRequestedCCVs
                         let finalRequiredCCVs = case message.tokenTransfer of
                                 None -> senderRequiredCCVs
                                 Some _ ->
                                     dedup (senderRequiredCCVs ++ CCIP.Internal.resolveRequiredCCVsWithDefaults
                                         config.defaultCCVs
                                         poolReportedCCVs)
+                        CCIP.Internal.assertMaxCCVListLength "onramp: required CCVs" finalRequiredCCVs
                         pure finalRequiredCCVs
 
         -- | Build SendingMessageV1 for outbound message.
@@ -339,6 +345,8 @@ template OnRamp
                 -- Parse extraArgs and validate fields
                 extraArgs <- case message.extraArgs of
                         CCIP.Client.V3 v3 -> pure v3
+                let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
+                CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
                 assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
@@ -346,7 +354,7 @@ template OnRamp
                 Foldable.forA_ extraArgs.ccvs (\ccvExtraArg ->
                     assertValidHex "ccvArgs" ccvExtraArg.ccvArgs)
                 assertMsg "onramp: CCVs cannot contain duplicates"
-                    (unique (map (.ccvAddress) extraArgs.ccvs))
+                    (unique senderRequestedCCVs)
                 case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> pure ()
                     CCIP.Client.Executor_UseDefault executorArgs ->
@@ -372,7 +380,8 @@ template OnRamp
                             destConfig
                             message
                             extraArgs
-                            (map (.ccvAddress) extraArgs.ccvs)
+                            senderRequestedCCVs
+                CCIP.Internal.assertMaxCCVListLength "onramp: required CCVs" resolvedSenderRequiredCCVs
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 assertMsg "onramp: sequence number exceeds uint64"
@@ -474,6 +483,11 @@ template OnRamp
             do
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
+                let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
+                CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                CCIP.Internal.assertMaxCCVListLength "onramp: CCV fee quotes" ccvFeeQuotes
+                assertMsg "onramp: CCVs cannot contain duplicates"
+                    (unique senderRequestedCCVs)
                 let executorArgs = case extraArgs.executor of
                         CCIP.Client.Executor_NoExecutor -> ""
                         CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
