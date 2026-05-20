@@ -16,73 +16,16 @@ jobs:
     name: CCIP E2E tests
     runs-on: ubuntu-latest-8cores-32GB
     steps:
-      - name: Free up disk space
-        uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
-
-      - name: Enable S3 Cache for Self-Hosted Runners
-        uses: runs-on/action@cd2b598b0515d39d78c38a02d529db87d2196d1e # v2.0.3
-
-      - name: Check out chainlink-canton
+      # Required so later local composite actions resolve on disk (see actions/checkout#335).
+      - name: Check out workflow ref
         uses: actions/checkout@v6
+
+      - name: Setup CCIP devenv
+        uses: ./.github/actions/setup-ccip-devenv
         with:
-          repository: smartcontractkit/chainlink-canton
-          path: chainlink-canton
-
-      - name: Check out chainlink-ccv
-        uses: actions/checkout@v6
-        with:
-          repository: smartcontractkit/chainlink-ccv
-          path: chainlink-ccv
-          ref: 8eaeb5f036e177733b82983ab074eb8ca60d88c2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-
-      - name: Install Just
-        uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
-
-      - name: Authenticate to AWS ECR (JD)
-        uses: ./chainlink-canton/.github/actions/aws-ecr-auth
-        with:
-          role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
-          aws-region: us-west-2
-          registry-type: private
-          registries: ${{ secrets.JD_REGISTRY }}
-
-      - name: Install Go
-        uses: actions/setup-go@v6
-        with:
-          cache: true
-          go-version-file: chainlink-canton/go.mod
-          cache-dependency-path: chainlink-canton/go.sum
-
-      - name: Download Go dependencies
-        working-directory: chainlink-canton
-        run: |
-          go mod download
-
-      - name: Build CCIP Docker images
-        working-directory: chainlink-ccv/build/devenv
-        run: |
-          # Build all dependent services docker images
-          just build-docker-dev-ci
-        env:
-          DOCKER_BUILDKIT: 1
-
-      - name: Build canton committee verifier docker image
-        working-directory: chainlink-canton
-        run: make build-committeeverifier
-
-      - name: Build EDS docker image
-        working-directory: chainlink-canton
-        run: make build-eds
-
-      - name: Spin up CCIP environment
-        working-directory: chainlink-canton/ccip/devenv
-        env:
-          JD_IMAGE: ${{ secrets.JD_IMAGE }}
-        run: |
-          go run cmd/ccv/main.go up env-canton-evm.toml
+          ccv-iam-role: ${{ secrets.CCV_IAM_ROLE }}
+          jd-registry: ${{ secrets.JD_REGISTRY }}
+          jd-image: ${{ secrets.JD_IMAGE }}
 
       - name: Run CCIP TestEVM2Canton_Basic test
         working-directory: chainlink-canton/ccip/devenv/tests/e2e
@@ -105,38 +48,27 @@ jobs:
         continue-on-error: true
         id: test_run_sourcereader_curse_detection
 
-      - name: Run CCIP EVM2Canton token transfer 
+      - name: Run CCIP EVM2Canton token transfer
         working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
           go test -timeout 8m -v -count 1 -run 'TestEVM2Canton_Basic/token_transfer'
         continue-on-error: true
         id: test_run_evm2canton_token_transfer
 
-      - name: Run CCIP Canton2EVM token transfer 
+      - name: Run CCIP Canton2EVM token transfer
         working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
           go test -timeout 8m -v -count 1 -run 'TestCanton2EVM_Basic/EOA_receiver_and_default_committee_verifier_token_transfer$'
         continue-on-error: true
         id: test_run_canton2evm_token_transfer
 
-      - name: Dump logs if they're not already dumped
+      - name: Upload devenv logs
         if: always()
-        working-directory: chainlink-canton/ccip/devenv/tests/e2e
-        run: |
-          if [ ! -d "logs" ] || [ -z "$(ls -A logs)" ]; then
-            echo "Logs not found or empty. Dumping logs manually..."
-            cd ../.. && go run cmd/ccv/main.go dl --dir-suffix "ccip-e2e-tests"
-          else
-            echo "Logs already exist. Skipping manual dump."
-          fi
-
-      - name: Upload Logs
-        if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./chainlink-canton/.github/actions/upload-ccip-devenv-logs
         with:
-          name: container-logs-ccip-e2e-tests
-          path: chainlink-canton/ccip/devenv/tests/e2e/logs
-          retention-days: 1
+          test-package-dir: e2e
+          log-dump-suffix: ccip-e2e-tests
+          artifact-name: container-logs-ccip-e2e-tests
 
       - name: Check test results
         if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton2evm_basic.outcome == 'failure' || steps.test_run_sourcereader_curse_detection.outcome == 'failure' || steps.test_run_evm2canton_token_transfer.outcome == 'failure' || steps.test_run_canton2evm_token_transfer.outcome == 'failure')
