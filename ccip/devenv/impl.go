@@ -655,8 +655,8 @@ func (c *Chain) GetTokenTransferConfigs(
 
 				remoteChains[rs] = tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 					RemotePool:                &pair.remote,
-					InboundRateLimiterConfig:  tokenscore.RateLimiterConfigFloatInput{},
-					OutboundRateLimiterConfig: tokenscore.RateLimiterConfigFloatInput{},
+					InboundRateLimiterConfig:  &tokenscore.RateLimiterConfigFloatInput{},
+					OutboundRateLimiterConfig: &tokenscore.RateLimiterConfigFloatInput{},
 					OutboundCCVs:              ccvRefs,
 					InboundCCVs:               ccvRefs,
 					// TODO: what to set for these?
