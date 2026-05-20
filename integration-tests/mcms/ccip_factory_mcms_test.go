@@ -68,17 +68,20 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	// 1. RMNRemote (no deps)
 	// 2. GlobalConfig (no deps)
 	// 3. TokenAdminRegistry (no deps)
-	// 4. FeeQuoter (no deps beyond link token)
-	// 5. CommitteeVerifier (deps: RMNRemote)
-	// 6. OffRamp (deps: GlobalConfig, RMNRemote, TAR)
-	// 7. OnRamp (deps: GlobalConfig, RMNRemote, TAR, FeeQuoter, CCV)
-	// 8. PerPartyRouterFactory (deps: all of the above)
+	// 4. LinkToken (needed by FeeQuoter)
+	// 5. FeeQuoter (deps: LinkToken instrument id)
+	// 6. CommitteeVerifier (deps: RMNRemote)
+	// 7. OffRamp (deps: GlobalConfig, RMNRemote, TAR)
+	// 8. OnRamp (deps: GlobalConfig, RMNRemote, TAR, FeeQuoter, CCV)
+	// 9. PerPartyRouterFactory (deps: all of the above)
 
 	rmnInstanceID := "rmn-" + uid
 	rmnInstanceAddr := fmt.Sprintf("%s@%s", rmnInstanceID, ccipOwner)
 	gcInstanceID := "gc-" + uid
 	tarInstanceID := "tar-" + uid
 	tarInstanceAddr := fmt.Sprintf("%s@%s", tarInstanceID, ccipOwner)
+	linkInstanceID := "link-" + uid
+	linkInstrumentID := splice.InstrumentId{Admin: types.PARTY(ccipOwner), Id: "link-token"}
 	fqInstanceID := "fq-" + uid
 	fqInstanceAddr := fmt.Sprintf("%s@%s", fqInstanceID, ccipOwner)
 	ccvInstanceID := "ccv-" + uid
@@ -115,15 +118,23 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployTokenAdminRegistryParams", tarParams)
 	t.Logf("TokenAdminRegistry deployed: %s", tarInstanceID)
 
-	// 4. Deploy FeeQuoter
+	// 4. Deploy LinkToken
+	linkParams := factory.DeployLinkTokenParams{
+		InstanceId:   types.TEXT(linkInstanceID),
+		InstrumentId: linkInstrumentID,
+	}
+	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLinkTokenParams", linkParams)
+	t.Logf("LinkToken deployed: %s", linkInstanceID)
+
+	// 5. Deploy FeeQuoter
 	fqParams := factory.DeployFeeQuoterParams{
 		InstanceId:            types.TEXT(fqInstanceID),
-		LinkTokenInstrumentId: splice.InstrumentId{Admin: types.PARTY(ccipOwner), Id: "link-token"},
+		LinkTokenInstrumentId: linkInstrumentID,
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployFeeQuoterParams", fqParams)
 	t.Logf("FeeQuoter deployed: %s", fqInstanceID)
 
-	// 5. Deploy CommitteeVerifier (deps: RMNRemote)
+	// 6. Deploy CommitteeVerifier (deps: RMNRemote)
 	ccvParams := factory.DeployCommitteeVerifierParams{
 		InstanceId:                   types.TEXT(ccvInstanceID),
 		Owner:                        types.PARTY(ccipOwner),
@@ -139,7 +150,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployCommitteeVerifierParams", ccvParams)
 	t.Logf("CommitteeVerifier deployed: %s", ccvInstanceID)
 
-	// 6. Deploy OffRamp (deps: GlobalConfig, RMNRemote, TAR)
+	// 7. Deploy OffRamp (deps: GlobalConfig, RMNRemote, TAR)
 	gcInstanceAddr := fmt.Sprintf("%s@%s", gcInstanceID, ccipOwner)
 	offRampParams := factory.DeployOffRampParams{
 		InstanceId:         types.TEXT(offRampInstanceID),
@@ -150,7 +161,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployOffRampParams", offRampParams)
 	t.Logf("OffRamp deployed: %s", offRampInstanceID)
 
-	// 7. Deploy OnRamp (deps: GlobalConfig, RMNRemote, TAR, FeeQuoter, CCV)
+	// 8. Deploy OnRamp (deps: GlobalConfig, RMNRemote, TAR, FeeQuoter, CCV)
 	onRampParams := factory.DeployOnRampParams{
 		InstanceId:         types.TEXT(onRampInstanceID),
 		GlobalConfig:       mcms.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
@@ -163,7 +174,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployOnRampParams", onRampParams)
 	t.Logf("OnRamp deployed: %s", onRampInstanceID)
 
-	// 8. Deploy PerPartyRouterFactory (deps: all)
+	// 9. Deploy PerPartyRouterFactory (deps: all)
 	pprParams := factory.DeployPerPartyRouterFactoryParams{
 		InstanceId:         types.TEXT(pprInstanceID),
 		OnRamp:             mcms.RawInstanceAddress{Unpack: types.TEXT(onRampInstanceAddr)},
@@ -373,6 +384,7 @@ type encodableParams interface {
 		factory.DeployGlobalConfigParams |
 		factory.DeployTokenAdminRegistryParams |
 		factory.DeployFeeQuoterParams |
+		factory.DeployLinkTokenParams |
 		factory.DeployCommitteeVerifierParams |
 		factory.DeployOffRampParams |
 		factory.DeployOnRampParams |
@@ -479,6 +491,8 @@ func encodeFactoryParams[T encodableParams](t *testing.T, enc factory.MCMSEncode
 		result, err = enc.DeployTokenAdminRegistryParams(any(params).(factory.DeployTokenAdminRegistryParams))
 	case "DeployFeeQuoterParams":
 		result, err = enc.DeployFeeQuoterParams(any(params).(factory.DeployFeeQuoterParams))
+	case "DeployLinkTokenParams":
+		result, err = enc.DeployLinkTokenParams(any(params).(factory.DeployLinkTokenParams))
 	case "DeployCommitteeVerifierParams":
 		result, err = enc.DeployCommitteeVerifierParams(any(params).(factory.DeployCommitteeVerifierParams))
 	case "DeployOffRampParams":
