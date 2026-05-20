@@ -141,7 +141,7 @@ template FeeQuoter
                     assertMsg ("token price must be positive: " <> tpu.instrumentId.id) (tpu.usdPerToken > 0.0)
                     ) priceUpdates.tokenPriceUpdates
                 Foldable.mapA_ (\gpu ->
-                    assertMsg ("gas price must be non-negative for chain " <> show gpu.destChainSelector) (gpu.usdPerUnitGas >= 0.0)
+                    assertMsg ("gas price must be positive for chain " <> show gpu.destChainSelector) (gpu.usdPerUnitGas > 0.0)
                     ) priceUpdates.gasPriceUpdates
 
                 now <- getTime

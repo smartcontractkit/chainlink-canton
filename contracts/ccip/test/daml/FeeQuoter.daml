@@ -513,6 +513,67 @@ testFeeQuoter_ApplyPriceUpdatersUpdate = script do
 
     pure ()
 
+testFeeQuoter_UpdatePricesRejectsInvalidGasPrice : Script ()
+testFeeQuoter_UpdatePricesRejectsInvalidGasPrice = script do
+    owner <- allocateParty "owner-gas-price-validation"
+
+    let instrumentIdLINK = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+    let destChainSelector : Numeric 0 = 1234567890.0
+
+    fq <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-gas-validation"
+            feeTokens = Set.fromList [instrumentIdLINK]
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.empty
+            linkTokenInstrumentId = instrumentIdLINK
+            priceUpdaters = [owner]
+
+    submitMustFail owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = [
+                        GasPriceUpdate with
+                            destChainSelector = destChainSelector
+                            usdPerUnitGas = 0.0
+                    ]
+            caller = owner
+
+    submitMustFail owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = [
+                        GasPriceUpdate with
+                            destChainSelector = destChainSelector
+                            usdPerUnitGas = -0.01
+                    ]
+            caller = owner
+
+    fq <- submit owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = [
+                        GasPriceUpdate with
+                            destChainSelector = destChainSelector
+                            usdPerUnitGas = 0.045
+                    ]
+            caller = owner
+
+    result <- submit owner do
+        exerciseCmd fq GetDestinationChainGasPrice with
+            destChainSelector = destChainSelector
+            caller = owner
+    result.price === 0.045
+
+    debug "testFeeQuoter_UpdatePricesRejectsInvalidGasPrice: PASSED"
 
 testFinalizeFeeUsesEVMScaledPrices = script do
     owner <- allocateParty "owner-finalize-fee"
@@ -597,7 +658,7 @@ testFinalizeFeeUsesEVMScaledPrices = script do
 
     debug "testFinalizeFeeUsesEVMScaledPrices: PASSED"
 
--- H-1: Non-unity premium (90% = LINK discount) applies only to premium fees.
+-- Non-unity premium (90% = LINK discount) applies only to premium fees.
 -- Executor fee is converted at par (no premium).
 testAddCCVFeeRejectsWrongRawInstanceAddress : Script ()
 testAddCCVFeeRejectsWrongRawInstanceAddress = script do
@@ -800,7 +861,7 @@ testFinalizeFee_PremiumAndExecutor = script do
 
     debug "testFinalizeFee_PremiumAndExecutor: PASSED"
 
--- H-1: Small fee edge case with truncation.
+-- Small fee edge case with truncation.
 -- Verifies that very small USD fees truncate correctly to integer token amounts.
 testFinalizeFee_SmallFee = script do
     owner <- allocateParty "owner-small"
