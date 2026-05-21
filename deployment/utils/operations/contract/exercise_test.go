@@ -68,7 +68,9 @@ func TestFindActiveContractByInstanceAddress_multiPartyVisibility(t *testing.T) 
 			fbp[poolOwnerA] != nil &&
 			fbp[poolOwnerB] != nil
 	}), mock.Anything).
-		Return(newFakeActiveContractsStream(ctx, acsStream), nil).
+		RunAndReturn(func(context.Context, *apiv2.GetActiveContractsRequest, ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse], error) {
+			return newFakeActiveContractsStream(ctx, acsStream), nil
+		}).
 		Times(len(ledger))
 
 	for _, want := range ledger {
