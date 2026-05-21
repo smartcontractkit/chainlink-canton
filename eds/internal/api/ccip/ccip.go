@@ -11,10 +11,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
@@ -29,13 +29,14 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
 // MaxNumCCVs is a sane limit on the maximum number of CCVs requestable by a client.
-// This is a defense in depth measure to prevent abuse of the API.
+// This is a defense-in-depth measure to prevent abuse of the API.
 const MaxNumCCVs = 64
 
 type Server struct {
@@ -189,6 +190,7 @@ func (s Server) GetTokenAdminRegistryToken(c *gin.Context, instrumentId oapiComm
 }
 
 func (s Server) PostCCIPSend(c *gin.Context) {
+	// Parse and validate request
 	var req oapiCCIP.CCIPSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
@@ -197,6 +199,10 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 
+		return
+	}
+	if err := parse.ValidateMessage(req.Message); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("invalid message: %s", err.Error())})
 		return
 	}
 	if req.SenderRequiredCCVs != nil && len(*req.SenderRequiredCCVs) > MaxNumCCVs {
