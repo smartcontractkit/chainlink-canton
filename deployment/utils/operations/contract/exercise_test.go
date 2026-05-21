@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -69,7 +68,7 @@ func TestFindActiveContractByInstanceAddress_multiPartyVisibility(t *testing.T) 
 			fbp[poolOwnerB] != nil
 	}), mock.Anything).
 		RunAndReturn(func(context.Context, *apiv2.GetActiveContractsRequest, ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse], error) {
-			return newFakeActiveContractsStream(acsStream), nil
+			return newACSStreamMock(t, acsStream), nil
 		}).
 		Times(len(ledger))
 
@@ -105,48 +104,15 @@ func makeActiveContractACSResponse(instanceID, signatory, contractID string) *ap
 	}
 }
 
-type fakeActiveContractsStream struct {
-	responses []*apiv2.GetActiveContractsResponse
-	idx       int
-}
+func newACSStreamMock(t *testing.T, responses []*apiv2.GetActiveContractsResponse) *mocks.MockServerStreamingClient[apiv2.GetActiveContractsResponse] {
+	t.Helper()
 
-func newFakeActiveContractsStream(responses []*apiv2.GetActiveContractsResponse) *fakeActiveContractsStream {
-	return &fakeActiveContractsStream{responses: responses}
-}
-
-func (s *fakeActiveContractsStream) Recv() (*apiv2.GetActiveContractsResponse, error) {
-	if s.idx < len(s.responses) {
-		resp := s.responses[s.idx]
-		s.idx++
-
-		return resp, nil
+	stream := mocks.NewMockServerStreamingClient[apiv2.GetActiveContractsResponse](t)
+	for _, resp := range responses {
+		stream.EXPECT().Recv().Return(resp, nil).Once()
 	}
+	stream.EXPECT().Recv().Return(nil, io.EOF).Once()
+	stream.EXPECT().CloseSend().Return(nil).Once()
 
-	return nil, io.EOF
+	return stream
 }
-
-func (s *fakeActiveContractsStream) Header() (metadata.MD, error) {
-	return metadata.MD{}, nil
-}
-
-func (s *fakeActiveContractsStream) Trailer() metadata.MD {
-	return metadata.MD{}
-}
-
-func (s *fakeActiveContractsStream) CloseSend() error {
-	return nil
-}
-
-func (s *fakeActiveContractsStream) Context() context.Context {
-	return context.Background()
-}
-
-func (s *fakeActiveContractsStream) SendMsg(any) error {
-	return nil
-}
-
-func (s *fakeActiveContractsStream) RecvMsg(any) error {
-	return nil
-}
-
-var _ grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse] = (*fakeActiveContractsStream)(nil)
