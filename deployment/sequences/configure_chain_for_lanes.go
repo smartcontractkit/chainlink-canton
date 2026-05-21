@@ -47,20 +47,38 @@ func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
 	return types.NUMERIC(s)
 }
 
+// ConfigureLaneLegInput carries the lane update plus a datastore for MCMS fee quoter resolution.
+type ConfigureLaneLegInput struct {
+	Lane      lanes.UpdateLanesInput
+	DataStore datastore.DataStore
+}
+
+var ConfigureLaneLegAsSourceWithDataStore = operations.NewSequence(
+	"CantonConfigureLaneLegAsSourceWithDataStore",
+	semver.MustParse("2.0.0"),
+	"Configures a lane leg as source on CCIP 2.0.0",
+	configureLaneLegAsSource,
+)
+
 var ConfigureLaneLegAsSource = operations.NewSequence(
 	"CantonConfigureLaneLegAsSource",
 	semver.MustParse("2.0.0"),
 	"Configures a lane leg as source on CCIP 2.0.0",
 	func(b operations.Bundle, deps chain.BlockChains, input lanes.UpdateLanesInput) (output sequences.OnChainOutput, err error) {
-		b.Logger.Infof("Canton Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
+		return configureLaneLegAsSource(b, deps, ConfigureLaneLegInput{Lane: input})
+	},
+)
 
-		chain, ok := deps.CantonChains()[input.Source.Selector]
+func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input ConfigureLaneLegInput) (output sequences.OnChainOutput, err error) {
+		b.Logger.Infof("Canton Configuring lane leg as source. src: %+v, dest: %+v", input.Lane.Source, input.Lane.Dest)
+
+		chain, ok := deps.CantonChains()[input.Lane.Source.Selector]
 		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.Source.Selector)
+			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.Lane.Source.Selector)
 		}
 
-		sourceChain := input.Source
-		destChain := input.Dest
+		sourceChain := input.Lane.Source
+		destChain := input.Lane.Dest
 		participant := chain.Participants[0]
 		mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
 		var proposalOutputs []contract.ExerciseOutput
@@ -73,22 +91,14 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("global config raw instance address: %w", err)
 		}
-		if len(sourceChain.FeeQuoter) == 0 {
-			return sequences.OnChainOutput{}, fmt.Errorf("fee quoter address bytes are required on source chain")
-		}
-		ds := dsutils.RuntimeDataStore()
-		if ds == nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("runtime datastore is not set")
-		}
-		feeQuoterRaw, err := dsutils.GetRawInstanceAddressFromInstanceAddressBytes(
-			ds,
+		feeQuoterAddrs, err := dsutils.ResolveFeeQuoterExerciseAddrs(
+			input.DataStore,
 			sourceChain.Selector,
-			datastore.ContractType(feequoterop.ContractType),
-			feequoterop.Version,
 			sourceChain.FeeQuoter,
+			mcmsEnabled,
 		)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("fee quoter raw instance address: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("fee quoter addresses: %w", err)
 		}
 
 		// GlobalConfig - Dest Chain Config
@@ -173,8 +183,8 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 
 		// FeeQuoter - Dest Chain Config
 		feeQuoterDestConfigReport, err := operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[feequoter.ApplyFeeQuoterDestChainConfigUpdates]{
-			InstanceAddress:    feeQuoterRaw.InstanceAddress(),
-			RawInstanceAddress: feeQuoterRaw.String(),
+			InstanceAddress:    feeQuoterAddrs.InstanceAddress,
+			RawInstanceAddress: feeQuoterAddrs.RawInstanceAddress,
 			MCMSEnabled:        mcmsEnabled,
 			Args: feequoter.ApplyFeeQuoterDestChainConfigUpdates{
 				DestChainConfigArgs: []feequoter.FeeQuoterDestChainConfigArgs{
@@ -204,7 +214,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 
 		if !mcmsEnabled {
 			_, err = operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
-				InstanceAddress: feeQuoterRaw.InstanceAddress(),
+				InstanceAddress: feeQuoterAddrs.InstanceAddress,
 				Args: feequoter.ApplyPriceUpdatersUpdate{
 					AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
 					RemovedPriceUpdaters: nil,
@@ -222,8 +232,8 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 
 		// FeeQuoter - Update prices.
 		updatePricesReport, err := operations.ExecuteOperation(b, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
-			InstanceAddress:    feeQuoterRaw.InstanceAddress(),
-			RawInstanceAddress: feeQuoterRaw.String(),
+			InstanceAddress:    feeQuoterAddrs.InstanceAddress,
+			RawInstanceAddress: feeQuoterAddrs.RawInstanceAddress,
 			MCMSEnabled:        mcmsEnabled,
 			Args: feequoter.UpdatePrices{
 				PriceUpdates: feequoter.PriceUpdates{
@@ -246,7 +256,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		}
 
 		// CommitteeVerifier - Dest Chain Config
-		for _, verifierConfig := range input.Source.CommitteeVerifiers {
+		for _, verifierConfig := range input.Lane.Source.CommitteeVerifiers {
 			_, err = operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsSource, deps, ConfigureCommitteeVerifierAsSourceInput{
 				ChainSelector:           chain.Selector,
 				CommitteeVerifierConfig: verifierConfig,
@@ -268,8 +278,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		}
 
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
-	},
-)
+}
 
 var ConfigureLaneLegAsDest = operations.NewSequence(
 	"CantonConfigureLaneLegAsDest",

@@ -7,7 +7,52 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 )
+
+// FeeQuoterExerciseAddrs holds Canton fee quoter addresses for on-ledger exercises.
+type FeeQuoterExerciseAddrs struct {
+	InstanceAddress    contracts.InstanceAddress
+	RawInstanceAddress string
+}
+
+// ResolveFeeQuoterExerciseAddrs resolves fee quoter addresses from ChainDefinition.FeeQuoter
+// bytes (via GetFQAddress in topology). MCMS paths also need the raw instance address label,
+// looked up from ds by matching the instance-address hash.
+func ResolveFeeQuoterExerciseAddrs(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	feeQuoterBytes []byte,
+	mcmsEnabled bool,
+) (FeeQuoterExerciseAddrs, error) {
+	if len(feeQuoterBytes) == 0 {
+		return FeeQuoterExerciseAddrs{}, fmt.Errorf("fee quoter address bytes are required")
+	}
+
+	addrs := FeeQuoterExerciseAddrs{
+		InstanceAddress: contracts.BytesToInstanceAddress(feeQuoterBytes),
+	}
+	if !mcmsEnabled {
+		return addrs, nil
+	}
+	if ds == nil {
+		return FeeQuoterExerciseAddrs{}, fmt.Errorf("datastore is required to resolve fee quoter raw instance address for MCMS")
+	}
+
+	raw, err := GetRawInstanceAddressFromInstanceAddressBytes(
+		ds,
+		chainSelector,
+		datastore.ContractType(feequoterop.ContractType),
+		feequoterop.Version,
+		feeQuoterBytes,
+	)
+	if err != nil {
+		return FeeQuoterExerciseAddrs{}, err
+	}
+	addrs.RawInstanceAddress = raw.String()
+
+	return addrs, nil
+}
 
 // AddressRefFromInstanceAddressBytes finds the datastore ref whose Address matches the
 // given 32-byte Canton instance address hash.
@@ -49,9 +94,6 @@ func AddressRefFromInstanceAddressBytes(
 
 // GetRawInstanceAddressFromInstanceAddressBytes resolves instanceId@party from the
 // datastore label for a contract identified by its instance-address bytes.
-//
-// Used when lane input carries only ChainDefinition.FeeQuoter ([]byte hash) but on-ledger
-// or MCMS paths need RawInstanceAddress; the datastore ref is looked up by matching Address.
 func GetRawInstanceAddressFromInstanceAddressBytes(
 	ds datastore.DataStore,
 	chainSelector uint64,

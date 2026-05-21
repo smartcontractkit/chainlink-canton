@@ -87,39 +87,77 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 		tokenTransferFeeConfigs = map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{}
 	}
 
-	factoryRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		config.ChainSelector,
-		datastore.ContractType(factoryops.ContractType),
-		factoryops.Version,
-		"",
-	))
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("resolve CCIPFactory: %w", err)
-	}
-	factoryRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(factoryRef)
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("resolve CCIPFactory raw address: %w", err)
-	}
+	var rawPoolAddr contracts.RawInstanceAddress
+	var addressRef datastore.AddressRef
 
-	var poolInstanceID contracts.InstanceID
-	if cfg.InstanceID != "" {
-		poolInstanceID = contracts.InstanceID(cfg.InstanceID)
-	} else {
-		poolInstanceID, err = contracts.NewInstanceID("lockreleasetokenpool")
+	if mcmsEnabled {
+		factoryRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+			config.ChainSelector,
+			datastore.ContractType(factoryops.ContractType),
+			factoryops.Version,
+			"",
+		))
 		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("ensure lock/release pool instance ID: %w", err)
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve CCIPFactory: %w", err)
 		}
-	}
-	poolOwner := types.PARTY(cfg.PoolOwner)
-	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, factoryops.DeployLockReleaseTokenPool, chain, contract.ChoiceInput[factorybindings.DeployLockReleaseTokenPool]{
-		InstanceAddress:    factoryRaw.InstanceAddress(),
-		RawInstanceAddress: factoryRaw.String(),
-		MCMSEnabled:        mcmsEnabled,
-		Args: factorybindings.DeployLockReleaseTokenPool{
-			Contract: lockreleasetokenpool.LockReleaseTokenPool{
-				InstanceId:              types.TEXT(poolInstanceID),
+		factoryRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(factoryRef)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve CCIPFactory raw address: %w", err)
+		}
+
+		var poolInstanceID contracts.InstanceID
+		if cfg.InstanceID != "" {
+			poolInstanceID = contracts.InstanceID(cfg.InstanceID)
+		} else {
+			poolInstanceID, err = contracts.NewInstanceID("lockreleasetokenpool")
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("ensure lock/release pool instance ID: %w", err)
+			}
+		}
+		poolOwner := types.PARTY(cfg.PoolOwner)
+		_, err = cld_ops.ExecuteOperation(e.OperationsBundle, factoryops.DeployLockReleaseTokenPool, chain, contract.ChoiceInput[factorybindings.DeployLockReleaseTokenPool]{
+			InstanceAddress:    factoryRaw.InstanceAddress(),
+			RawInstanceAddress: factoryRaw.String(),
+			MCMSEnabled:        true,
+			Args: factorybindings.DeployLockReleaseTokenPool{
+				Contract: lockreleasetokenpool.LockReleaseTokenPool{
+					InstanceId:              types.TEXT(poolInstanceID),
+					CcipOwner:               types.PARTY(cfg.CcipOwner),
+					PoolOwner:               poolOwner,
+					InstrumentId:            cfg.InstrumentId,
+					Decimals:                types.INT64(cfg.Decimals),
+					RemoteChainConfigs:      remoteChainConfigs,
+					TokenTransferFeeConfigs: tokenTransferFeeConfigs,
+					PoolReceiveContext:      poolReceiveContext,
+					TransferTimeout:         transferTimeout,
+					Deps:                    cfg.Deps,
+				},
+			},
+		})
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+
+		rawPoolAddr = poolInstanceID.RawInstanceAddress(poolOwner)
+		addressRef = datastore.AddressRef{
+			Address:       rawPoolAddr.InstanceAddress().String(),
+			Labels:        datastore.NewLabelSet(rawPoolAddr.String()),
+			ChainSelector: config.ChainSelector,
+			Type:          datastore.ContractType(lock_release_token_pool.ContractType),
+			Version:       lock_release_token_pool.Version,
+			Qualifier:     cfg.Qualifier,
+		}
+	} else {
+		qualifier := new(cfg.Qualifier)
+		if cfg.Qualifier == "" {
+			qualifier = nil
+		}
+		out, err := cld_ops.ExecuteOperation(e.OperationsBundle, lock_release_token_pool.Deploy, chain, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
+			Qualifier: qualifier,
+			Template: lockreleasetokenpool.LockReleaseTokenPool{
 				CcipOwner:               types.PARTY(cfg.CcipOwner),
-				PoolOwner:               poolOwner,
+				PoolOwner:               types.PARTY(cfg.PoolOwner),
+				InstanceId:              types.TEXT(cfg.InstanceID),
 				InstrumentId:            cfg.InstrumentId,
 				Decimals:                types.INT64(cfg.Decimals),
 				RemoteChainConfigs:      remoteChainConfigs,
@@ -128,36 +166,38 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 				TransferTimeout:         transferTimeout,
 				Deps:                    cfg.Deps,
 			},
-		},
-	})
-	if err != nil {
-		return cldf.ChangesetOutput{}, err
+			OwnerParty: types.PARTY(cfg.PoolOwner),
+		})
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+		if len(out.Output.Labels.List()) == 0 {
+			return cldf.ChangesetOutput{}, fmt.Errorf("missing raw lock/release pool label in deploy output")
+		}
+		rawPoolAddr, err = contracts.RawInstanceAddressFromString(out.Output.Labels.List()[0])
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("parse raw lock/release pool label: %w", err)
+		}
+		addressRef = out.Output
 	}
 
-	rawPoolAddr := poolInstanceID.RawInstanceAddress(poolOwner)
-	addressRef := datastore.AddressRef{
-		Address:       rawPoolAddr.InstanceAddress().String(),
-		Labels:        datastore.NewLabelSet(rawPoolAddr.String()),
-		ChainSelector: config.ChainSelector,
-		Type:          datastore.ContractType(lock_release_token_pool.ContractType),
-		Version:       lock_release_token_pool.Version,
-		Qualifier:     cfg.Qualifier,
-	}
-	if err = ds.AddressRefStore.Add(addressRef); err != nil {
+	if err := ds.AddressRefStore.Add(addressRef); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save deployed LockReleaseTokenPool contract address: %w", err)
 	}
 
 	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {
-		tarInstanceID := contracts.InstanceID(hex.EncodeToString(cfg.TokenAdminRegistryInstanceAddress.Bytes()))
 		regInput := sequences.RegisterTokenPoolInput{
-			TokenAdminRegistryInstanceAddress:    cfg.TokenAdminRegistryInstanceAddress,
-			TokenAdminRegistryRawInstanceAddress: tarInstanceID.RawInstanceAddress(types.PARTY(cfg.CcipOwner)),
-			InstrumentId:                         cfg.InstrumentId,
-			CcipParty:                            cfg.CcipOwner,
-			PoolOwnerParty:                       cfg.PoolOwner,
-			PoolInstanceID:                       rawPoolAddr.InstanceID(),
+			TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
+			InstrumentId:                      cfg.InstrumentId,
+			CcipParty:                         cfg.CcipOwner,
+			PoolOwnerParty:                    cfg.PoolOwner,
+			PoolInstanceID:                    rawPoolAddr.InstanceID(),
 		}
-		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
+		if mcmsEnabled {
+			tarInstanceID := contracts.InstanceID(hex.EncodeToString(cfg.TokenAdminRegistryInstanceAddress.Bytes()))
+			regInput.TokenAdminRegistryRawInstanceAddress = tarInstanceID.RawInstanceAddress(types.PARTY(cfg.CcipOwner))
+		}
+		_, err := cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
 		}

@@ -24,16 +24,16 @@ import (
 	dsutil "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 )
 
+// SetRuntimeDataStore forwards to the shared runtime datastore used by lane configure sequences.
+func SetRuntimeDataStore(ds datastore.DataStore) {
+	dsutil.SetRuntimeDataStore(ds)
+}
+
 var _ ccipadapters.ChainFamily = (*CantonChainFamilyAdapter)(nil)
 
 type CantonChainFamilyAdapter struct{}
 
 var CantonFamilySelector = [4]byte{0xdf, 0xaf, 0xaf, 0x4b}
-
-// SetRuntimeDataStore forwards to the shared runtime datastore used by lane configure sequences.
-func SetRuntimeDataStore(ds datastore.DataStore) {
-	dsutil.SetRuntimeDataStore(ds)
-}
 
 func DefaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
@@ -158,10 +158,13 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 				out, err = ccipseq.RunAndMergeSequence(
 					b,
 					chains,
-					sequences.ConfigureLaneLegAsSource,
-					lanes.UpdateLanesInput{
-						Source: localChain,
-						Dest:   remoteChain,
+					sequences.ConfigureLaneLegAsSourceWithDataStore,
+					sequences.ConfigureLaneLegInput{
+						Lane: lanes.UpdateLanesInput{
+							Source: localChain,
+							Dest:   remoteChain,
+						},
+						DataStore: ds,
 					},
 					out,
 				)
