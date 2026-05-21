@@ -22,36 +22,36 @@ import (
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
-// --- DeployCoreChainContractsFromFactory ---
+// --- DeployCCIPChainContractsFromFactory ---
 
-type DeployCoreChainContractsFromFactoryConfig struct {
+type DeployCCIPChainContractsFromFactoryConfig struct {
 	OwnerParty     string `json:"ownerParty" yaml:"ownerParty"`
 	CCIPOwnerParty string `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
 	Params         sequences.DeployChainContractsParams
 }
 
-type DeployCoreChainContractsFromFactory struct{}
+type DeployCCIPChainContractsFromFactory struct{}
 
-var _ cldf.ChangeSetV2[CantonCSDeps[DeployCoreChainContractsFromFactoryConfig]] = DeployCoreChainContractsFromFactory{}
+var _ cldf.ChangeSetV2[CantonCSDeps[DeployCCIPChainContractsFromFactoryConfig]] = DeployCCIPChainContractsFromFactory{}
 
-func (d DeployCoreChainContractsFromFactory) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployCoreChainContractsFromFactoryConfig]) error {
+func (d DeployCCIPChainContractsFromFactory) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployCCIPChainContractsFromFactoryConfig]) error {
 	if config.Config.OwnerParty == "" && config.Config.CCIPOwnerParty == "" {
 		return fmt.Errorf("ownerParty or ccipOwnerParty is required")
 	}
-	_, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCore)
+	_, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
 	if err != nil {
-		return fmt.Errorf("core CCIPFactory must be deployed first: %w", err)
+		return fmt.Errorf("ccip CCIPFactory must be deployed first: %w", err)
 	}
 
 	return nil
 }
 
-func (d DeployCoreChainContractsFromFactory) Apply(e cldf.Environment, config CantonCSDeps[DeployCoreChainContractsFromFactoryConfig]) (cldf.ChangesetOutput, error) {
+func (d DeployCCIPChainContractsFromFactory) Apply(e cldf.Environment, config CantonCSDeps[DeployCCIPChainContractsFromFactoryConfig]) (cldf.ChangesetOutput, error) {
 	ds := datastore.NewMemoryDataStore()
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 	participant := chain.Participants[config.Participant]
 
-	factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCore)
+	factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
 	if err != nil {
 		return cldf.ChangesetOutput{}, err
 	}
@@ -70,9 +70,9 @@ func (d DeployCoreChainContractsFromFactory) Apply(e cldf.Environment, config Ca
 		}
 	}
 
-	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployCoreChainContractsFromFactory, chain, params)
+	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployCCIPChainContractsFromFactory, chain, params)
 	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("deploy core chain contracts from factory: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("deploy ccip chain contracts from factory: %w", err)
 	}
 
 	for _, addrRef := range out.Output.Addresses {

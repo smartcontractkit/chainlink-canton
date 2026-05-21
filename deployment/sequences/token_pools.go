@@ -134,7 +134,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(factoryops.ContractType)),
 		)
-		factoryRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierPools, factoryRefs)
+		factoryRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierCCIP, factoryRefs)
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, err
 		}
@@ -450,7 +450,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(factoryops.ContractType)),
 		)
-		factoryRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierPools, factoryRefs)
+		factoryRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierCCIP, factoryRefs)
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, err
 		}

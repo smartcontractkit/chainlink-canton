@@ -110,7 +110,9 @@ var deployAndConfigureMCMSSequence = operations.NewSequence(
 		roleState := emptyRoleState(initialConfig)
 		ownerParty := types.PARTY(input.OwnerParty)
 
+		qualifier := qualifierOrDefault(input.Qualifier)
 		deployReport, err := operations.ExecuteOperation(b, mcmsops.Deploy, deps, opcontract.DeployInput[mcmsbindings.MCMS]{
+			Qualifier: &qualifier,
 			Template: mcmsbindings.MCMS{
 				Owner:              ownerParty,
 				InstanceId:         types.TEXT(input.InstanceID),

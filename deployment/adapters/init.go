@@ -3,6 +3,7 @@ package adapters
 import (
 	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	ccipdeploy "github.com/smartcontractkit/chainlink-ccip/deployment/deploy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -22,6 +23,7 @@ func init() {
 	// Register the onchain adapters
 	ccipadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyCanton, &CantonDeployChainContractsAdapter{})
 	ccipadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyCanton, &CantonChainFamilyAdapter{})
+	ccipdeploy.GetTransferOwnershipRegistry().RegisterAdapter(chainsel.FamilyCanton, ccipdeploy.MCMSVersion, &CantonTransferOwnershipAdapter{})
 
 	// Register the offchain adapters
 	ccvadapters.GetRegistry().Register(chainsel.FamilyCanton, ccvadapters.ChainAdapters{

@@ -56,6 +56,10 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
+		committeeVerifierFactoryRaw, err := resolveCommitteeVerifierFactoryRaw(input, factoryRawInstanceAddress)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
 
 		rmnInstanceID, err := ensureInstanceID(input.RMNRemote.Template.InstanceId, "rmn_remote")
 		if err != nil {
@@ -173,7 +177,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 					RmnRemote: rmnRemoteRawInstanceAddress.Binding(),
 				},
 			}
-			deployCommitteeVerifierReport, err := operations.ExecuteOperation(b, factoryops.DeployCommitteeVerifier, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployCommitteeVerifier{Contract: committeeVerifierTemplate}, input.ProposalDriven))
+			deployCommitteeVerifierReport, err := operations.ExecuteOperation(b, factoryops.DeployCommitteeVerifier, deps, newChoiceInput(committeeVerifierFactoryRaw, factorybindings.DeployCommitteeVerifier{Contract: committeeVerifierTemplate}, input.ProposalDriven))
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier #%d from factory: %w", i, err)
 			}
@@ -289,16 +293,16 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 	},
 )
 
-// DeployCoreChainContractsFromFactory deploys core CCIP contracts (no CommitteeVerifiers) via the core factory.
-var DeployCoreChainContractsFromFactory = operations.NewSequence(
-	"canton/ccip/deploy_core_chain_contracts_from_factory",
+// DeployCCIPChainContractsFromFactory deploys CCIP contracts (no CommitteeVerifiers) via the ccip-qualified factory.
+var DeployCCIPChainContractsFromFactory = operations.NewSequence(
+	"canton/ccip/deploy_ccip_chain_contracts_from_factory",
 	semver.MustParse("2.0.0"),
-	"Deploys core CCIP contracts on Canton through CCIPFactory (excludes CommitteeVerifier)",
+	"Deploys CCIP contracts on Canton through CCIPFactory (excludes CommitteeVerifier)",
 	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
-		coreInput := input
-		coreInput.CommitteeVerifiers = nil
+		ccipInput := input
+		ccipInput.CommitteeVerifiers = nil
 
-		report, err := operations.ExecuteSequence(b, DeployChainContractsFromFactory, deps, coreInput)
+		report, err := operations.ExecuteSequence(b, DeployChainContractsFromFactory, deps, ccipInput)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -382,6 +386,14 @@ var DeployCCVFromFactory = operations.NewSequence(
 		return out, nil
 	},
 )
+
+func resolveCommitteeVerifierFactoryRaw(input DeployChainContractsParams, ccipFactory contracts.RawInstanceAddress) (contracts.RawInstanceAddress, error) {
+	if input.CCVFactoryAddressRef.Type == "" {
+		return ccipFactory, nil
+	}
+
+	return rawInstanceAddressFromAddressRef(input.CCVFactoryAddressRef)
+}
 
 func resolveOwnerParties(input DeployChainContractsParams) (types.PARTY, types.PARTY, error) {
 	owner := input.OwnerParty

@@ -5,17 +5,18 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
-	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 )
 
 // Qualifiers distinguish multiple CCIPFactory instances on the same chain.
 const (
-	QualifierCore  = "core"
-	QualifierPools = "pools"
+	QualifierCCIP  = "ccip"
 	QualifierCCV   = "ccv"
+	QualifierCore  = "core" // deprecated; use QualifierCCIP
+	QualifierPools = "pools"
 )
 
 // FactoryAddressRefFromRefs finds a factory ref by qualifier in the given ref list.
@@ -58,6 +59,29 @@ func FirstCommitteeVerifierRawAddress(ds datastore.DataStore, chainSelector uint
 
 	refs := ds.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
 	for _, ref := range refs {
+		if ref.Type != datastore.ContractType(committee_verifier.ContractType) {
+			continue
+		}
+		if qualifier != "" && ref.Qualifier != qualifier {
+			continue
+		}
+		raw, err := GetRawInstanceAddressFromAddressRef(ref)
+		if err != nil {
+			return "", err
+		}
+
+		return raw, nil
+	}
+
+	return "", fmt.Errorf("no CommitteeVerifier found for chain %d", chainSelector)
+}
+
+// FirstCommitteeVerifierRawAddressFromRefs finds a CommitteeVerifier in the given ref list.
+func FirstCommitteeVerifierRawAddressFromRefs(chainSelector uint64, refs []datastore.AddressRef, qualifier string) (contracts.RawInstanceAddress, error) {
+	for _, ref := range refs {
+		if ref.ChainSelector != chainSelector {
+			continue
+		}
 		if ref.Type != datastore.ContractType(committee_verifier.ContractType) {
 			continue
 		}

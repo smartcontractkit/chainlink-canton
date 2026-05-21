@@ -74,8 +74,10 @@ type DeployChainContractsParams struct {
 	GlobalConfig       GlobalConfigParams
 	RMNRemote          RMNRemoteParams
 	FeeQuoterConfig    FeeQuoterParams
-	// FactoryAddressRef is used by the factory-backed deploy sequence.
+	// FactoryAddressRef is the ccip-qualified factory for core CCIP deploys.
 	FactoryAddressRef datastore.AddressRef
+	// CCVFactoryAddressRef is the ccv-qualified factory for CommitteeVerifier deploys.
+	CCVFactoryAddressRef datastore.AddressRef
 	// ProposalDriven enables MCMS proposal generation for factory-backed deploys.
 	ProposalDriven bool
 	// CcvRegistryBinding is used for OnRamp deps when CommitteeVerifiers is empty (CCV deployed separately).

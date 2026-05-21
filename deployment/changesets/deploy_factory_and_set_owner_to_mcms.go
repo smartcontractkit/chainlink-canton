@@ -10,7 +10,6 @@ import (
 
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
-	mcmsops "github.com/smartcontractkit/chainlink-canton/deployment/operations/mcms"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -22,8 +21,9 @@ import (
 // DeployFactoryAndSetOwnerToMCMS deploys a CCIPFactory and returns an MCMS proposal to transfer ownership.
 type DeployFactoryAndSetOwnerToMCMSConfig struct {
 	OwnerParty string        `json:"ownerParty" yaml:"ownerParty"`
-	MCMSParty  string        `json:"mcmsParty" yaml:"mcmsParty"`
-	InstanceID string        `json:"instanceID,omitempty" yaml:"instanceID,omitempty"`
+	MCMSParty          string        `json:"mcmsParty" yaml:"mcmsParty"`
+	MCMSOwnerQualifier string        `json:"mcmsOwnerQualifier,omitempty" yaml:"mcmsOwnerQualifier,omitempty"`
+	InstanceID         string        `json:"instanceID,omitempty" yaml:"instanceID,omitempty"`
 	Qualifier  string        `json:"qualifier,omitempty" yaml:"qualifier,omitempty"`
 	MinDelay   time.Duration `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
 }
@@ -50,12 +50,11 @@ func (d DeployFactoryAndSetOwnerToMCMS) VerifyPreconditions(e cldf.Environment, 
 	if config.Config.Qualifier == "" {
 		return fmt.Errorf("factory qualifier is required")
 	}
-	if _, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		config.ChainSelector,
-		datastore.ContractType(mcmsops.ContractType),
-		mcmsops.Version,
-		"",
-	)); err != nil {
+	mcmsQualifier := config.Config.MCMSOwnerQualifier
+	if mcmsQualifier == "" {
+		mcmsQualifier = cantonmcms.QualifierCCIPOwner
+	}
+	if _, err := dsutils.CantonMCMSAddressRef(e.DataStore, config.ChainSelector, mcmsQualifier); err != nil {
 		return fmt.Errorf("MCMS contract not found in datastore (deploy MCMS first): %w", err)
 	}
 
@@ -101,16 +100,11 @@ func (d DeployFactoryAndSetOwnerToMCMS) Apply(e cldf.Environment, config CantonC
 		return cldf.ChangesetOutput{}, fmt.Errorf("build batch operation: %w", err)
 	}
 
-	mcmsRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		config.ChainSelector,
-		datastore.ContractType(mcmsops.ContractType),
-		mcmsops.Version,
-		"",
-	))
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("MCMS contract not found: %w", err)
+	mcmsQualifier := cfg.MCMSOwnerQualifier
+	if mcmsQualifier == "" {
+		mcmsQualifier = cantonmcms.QualifierCCIPOwner
 	}
-	mcmsRawAddr, err := dsutils.GetRawInstanceAddressFromAddressRef(mcmsRef)
+	mcmsRawAddr, err := dsutils.MCMSRawInstanceAddress(e.DataStore, config.ChainSelector, mcmsQualifier)
 	if err != nil {
 		return cldf.ChangesetOutput{}, err
 	}

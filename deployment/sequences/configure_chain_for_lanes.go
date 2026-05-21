@@ -205,17 +205,20 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			proposalOutputs = append(proposalOutputs, feeQuoterDestConfigReport.Output)
 		}
 
-		if !mcmsEnabled {
-			_, err = operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
-				InstanceAddress: feeQuoterRaw.InstanceAddress(),
-				Args: feequoter.ApplyPriceUpdatersUpdate{
-					AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
-					RemovedPriceUpdaters: nil,
-				},
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("ensuring price updater on fee quoter: %w", err)
-			}
+		priceUpdatersReport, err := operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
+			InstanceAddress:    feeQuoterRaw.InstanceAddress(),
+			RawInstanceAddress: feeQuoterRaw.String(),
+			MCMSEnabled:        mcmsEnabled,
+			Args: feequoter.ApplyPriceUpdatersUpdate{
+				AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
+				RemovedPriceUpdaters: nil,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("ensuring price updater on fee quoter: %w", err)
+		}
+		if mcmsEnabled && !priceUpdatersReport.Output.Executed() {
+			proposalOutputs = append(proposalOutputs, priceUpdatersReport.Output)
 		}
 
 		tokenPriceUpdates, err := tokenPriceUpdatesFromParams(destChain.TokenPrices)
@@ -248,15 +251,18 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			proposalOutputs = append(proposalOutputs, updatePricesReport.Output)
 		}
 
+		var cvBatchOps []mcms_types.BatchOperation
 		// CommitteeVerifier - Dest Chain Config
 		for _, verifierConfig := range input.Source.CommitteeVerifiers {
-			_, err = operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsSource, deps, ConfigureCommitteeVerifierAsSourceInput{
+			cvReport, err := operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsSource, deps, ConfigureCommitteeVerifierAsSourceInput{
 				ChainSelector:           chain.Selector,
+				MCMSEnabled:             mcmsEnabled,
 				CommitteeVerifierConfig: verifierConfig,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as source: %w", err)
 			}
+			cvBatchOps = append(cvBatchOps, cvReport.Output.BatchOps...)
 		}
 
 		if !mcmsEnabled {
@@ -266,11 +272,15 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for lane configuration: %w", err)
 		}
-		if len(batchOp.Transactions) == 0 {
+		batchOps := cvBatchOps
+		if len(batchOp.Transactions) > 0 {
+			batchOps = append(batchOps, batchOp)
+		}
+		if len(batchOps) == 0 {
 			return sequences.OnChainOutput{}, nil
 		}
 
-		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
+		return sequences.OnChainOutput{BatchOps: batchOps}, nil
 	},
 )
 
@@ -339,15 +349,18 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			proposalOutputs = append(proposalOutputs, sourceChainConfigReport.Output)
 		}
 
+		var cvBatchOps []mcms_types.BatchOperation
 		// CommitteeVerifier - Source Chain Config
 		for _, verifierConfig := range input.Dest.CommitteeVerifiers {
-			_, err = operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsDest, deps, ConfigureCommitteeVerifierAsDestInput{
+			cvReport, err := operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsDest, deps, ConfigureCommitteeVerifierAsDestInput{
 				ChainSelector:           chain.Selector,
+				MCMSEnabled:             mcmsEnabled,
 				CommitteeVerifierConfig: verifierConfig,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as dest: %w", err)
 			}
+			cvBatchOps = append(cvBatchOps, cvReport.Output.BatchOps...)
 		}
 
 		if !mcmsEnabled {
@@ -357,11 +370,15 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for lane configuration: %w", err)
 		}
-		if len(batchOp.Transactions) == 0 {
+		batchOps := cvBatchOps
+		if len(batchOp.Transactions) > 0 {
+			batchOps = append(batchOps, batchOp)
+		}
+		if len(batchOps) == 0 {
 			return sequences.OnChainOutput{}, nil
 		}
 
-		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
+		return sequences.OnChainOutput{BatchOps: batchOps}, nil
 	},
 )
 

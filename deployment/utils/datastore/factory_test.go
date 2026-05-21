@@ -7,38 +7,27 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 )
 
 func TestFactoryAddressRef(t *testing.T) {
 	t.Parallel()
 
-	const chainSelector uint64 = 123
-	raw := contracts.InstanceID("core-factory").RawInstanceAddress("owner-party")
+	const chainSelector uint64 = 8706591216959472610
 
 	ds := datastore.NewMemoryDataStore()
-	require.NoError(t, ds.AddressRefStore.Add(datastore.AddressRef{
+	require.NoError(t, ds.Addresses().Add(datastore.AddressRef{
+		Address:       "0xabc",
 		ChainSelector: chainSelector,
+		Labels:        datastore.NewLabelSet("factory-ccip@party::1220"),
+		Qualifier:     QualifierCCIP,
 		Type:          datastore.ContractType(factoryops.ContractType),
 		Version:       factoryops.Version,
-		Qualifier:     QualifierCore,
-		Address:       raw.InstanceAddress().String(),
-		Labels:        datastore.NewLabelSet(raw.String()),
-	}))
-	require.NoError(t, ds.AddressRefStore.Add(datastore.AddressRef{
-		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(factoryops.ContractType),
-		Version:       factoryops.Version,
-		Qualifier:     QualifierPools,
-		Address:       "other",
-		Labels:        datastore.NewLabelSet("pools-factory@owner-party"),
 	}))
 
-	got, err := FactoryAddressRef(ds.Seal(), chainSelector, QualifierCore)
+	got, err := FactoryAddressRef(ds.Seal(), chainSelector, QualifierCCIP)
 	require.NoError(t, err)
-	require.Equal(t, QualifierCore, got.Qualifier)
-	require.Equal(t, raw.InstanceAddress().String(), got.Address)
+	require.Equal(t, QualifierCCIP, got.Qualifier)
 
 	_, err = FactoryAddressRef(ds.Seal(), chainSelector, QualifierCCV)
 	require.Error(t, err)
@@ -47,17 +36,18 @@ func TestFactoryAddressRef(t *testing.T) {
 func TestFactoryAddressRefFromRefs(t *testing.T) {
 	t.Parallel()
 
-	const chainSelector uint64 = 99
+	const chainSelector uint64 = 8706591216959472610
+
 	refs := []datastore.AddressRef{{
+		Address:       "0xdef",
 		ChainSelector: chainSelector,
+		Labels:        datastore.NewLabelSet("factory-ccv@party::1220"),
+		Qualifier:     QualifierCCV,
 		Type:          datastore.ContractType(factoryops.ContractType),
 		Version:       factoryops.Version,
-		Qualifier:     QualifierPools,
-		Address:       "addr",
-		Labels:        datastore.NewLabelSet("pools-factory@owner"),
 	}}
 
-	got, err := FactoryAddressRefFromRefs(chainSelector, QualifierPools, refs)
+	got, err := FactoryAddressRefFromRefs(chainSelector, QualifierCCV, refs)
 	require.NoError(t, err)
-	require.Equal(t, QualifierPools, got.Qualifier)
+	require.Equal(t, QualifierCCV, got.Qualifier)
 }

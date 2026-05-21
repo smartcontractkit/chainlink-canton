@@ -23,8 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 )
 
@@ -68,25 +68,24 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		return ccipadapters.DeployChainContractsOutput{}, err
 	}
 
-	factoryAddressRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierCore, input.ExistingAddresses)
+	factoryAddressRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierCCIP, input.ExistingAddresses)
 	if err != nil {
 		return ccipadapters.DeployChainContractsOutput{}, err
 	}
 
 	proposalDriven := shouldUseMCMSProposalDeployment(input, chain)
 
-	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContractsFromFactory, chain, sequences.DeployChainContractsParams{
-		OwnerParty:         ownerParty,
-		CCIPOwnerParty:     ownerParty,
-		FactoryAddressRef:  factoryAddressRef,
-		CommitteeVerifiers: committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
+	deployParams := sequences.DeployChainContractsParams{
+		OwnerParty:        ownerParty,
+		CCIPOwnerParty:    ownerParty,
+		FactoryAddressRef: factoryAddressRef,
+		ProposalDriven:    proposalDriven,
 		GlobalConfig: sequences.GlobalConfigParams{
 			Template: common.GlobalConfig{
 				CcipOwner:     "",
 				ChainSelector: types.NUMERIC(strconv.FormatUint(input.ChainSelector, 10)),
 			},
 		},
-		ProposalDriven:     proposalDriven,
 		NativeInstrumentId: nativeInstrumentID,
 		FeeQuoterConfig: sequences.FeeQuoterParams{
 			Template: feequoter.FeeQuoter{
@@ -100,7 +99,28 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 			},
 		},
 		Executors: executorParams(ownerParty, input.ContractParams.Executors),
-	})
+	}
+	// Always deploy CommitteeVerifier via the ccv factory when present so the MCMS batch
+	// includes both factories. Fall back to an existing CV binding only when the ccv factory
+	// is not in the datastore (e.g. CV deployed in a prior step).
+	ccvFactoryRef, ccvFactoryErr := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierCCV, input.ExistingAddresses)
+	if ccvFactoryErr == nil {
+		deployParams.CCVFactoryAddressRef = ccvFactoryRef
+		deployParams.CommitteeVerifiers = committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers)
+	} else if ccvRaw, err := dsutils.FirstCommitteeVerifierRawAddressFromRefs(
+		input.ChainSelector,
+		input.ExistingAddresses,
+		devenvcommon.DefaultCommitteeVerifierQualifier,
+	); err == nil {
+		deployParams.CcvRegistryBinding = ccvRaw.Binding()
+	} else {
+		return ccipadapters.DeployChainContractsOutput{}, fmt.Errorf(
+			"ccv CCIPFactory required to deploy CommitteeVerifier (deploy ccv factory first): %w",
+			ccvFactoryErr,
+		)
+	}
+
+	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContractsFromFactory, chain, deployParams)
 	if err != nil {
 		return ccipadapters.DeployChainContractsOutput{}, fmt.Errorf("failed to deploy canton chain contracts for selector %d: %w", input.ChainSelector, err)
 	}
@@ -168,35 +188,6 @@ func lookupNativeInstrumentID(ctx context.Context, participant canton.Participan
 		Admin: types.PARTY(info.JSON200.AdminId),
 		Id:    types.TEXT("Amulet"),
 	}, nil
-}
-
-func committeeVerifierParams(ownerParty string, verifiers []ccipadapters.CommitteeVerifierDeployParams) []sequences.CommitteeVerifierParams {
-	params := make([]sequences.CommitteeVerifierParams, 0, len(verifiers))
-	for _, verifier := range verifiers {
-		storageLocations := make([]types.TEXT, len(verifier.StorageLocations))
-		for i, location := range verifier.StorageLocations {
-			storageLocations[i] = types.TEXT(location)
-		}
-		qualifier := verifier.Qualifier
-		if qualifier == "" {
-			qualifier = devenvcommon.DefaultCommitteeVerifierQualifier
-		}
-		params = append(params, sequences.CommitteeVerifierParams{
-			Qualifier: qualifier,
-			Template: ccvsbindings.CommitteeVerifier{
-				Owner:                        types.PARTY(ownerParty),
-				CcipOwner:                    types.PARTY(ownerParty),
-				VersionTag:                   types.TEXT("e9a05a20"),
-				MessageSentObservers:         nil,
-				StorageLocations:             storageLocations,
-				StorageLocationsAdmin:        types.PARTY(ownerParty),
-				PendingStorageLocationsAdmin: types.PARTY(ownerParty),
-				Deps:                         ccvsbindings.CommitteeVerifierDeps{},
-			},
-		})
-	}
-
-	return params
 }
 
 func executorParams(
@@ -274,5 +265,63 @@ func waitForFinalityRequested() common.FinalityConfig {
 
 func waitForSafeRequested() common.FinalityConfig {
 	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
+}
+
+func committeeVerifierParams(ownerParty string, committees []ccipadapters.CommitteeVerifierDeployParams) []sequences.CommitteeVerifierParams {
+	if len(committees) == 0 {
+		return []sequences.CommitteeVerifierParams{defaultCommitteeVerifierParams(ownerParty)}
+	}
+
+	out := make([]sequences.CommitteeVerifierParams, 0, len(committees))
+	for _, cv := range committees {
+		qualifier := cv.Qualifier
+		if qualifier == "" {
+			qualifier = devenvcommon.DefaultCommitteeVerifierQualifier
+		}
+		allowlistAdmin := partyPtr(ownerParty)
+		if cv.AllowlistAdmin != "" {
+			allowlistAdmin = partyPtr(cv.AllowlistAdmin)
+		}
+		storageLocations := make([]types.TEXT, 0, len(cv.StorageLocations))
+		for _, loc := range cv.StorageLocations {
+			storageLocations = append(storageLocations, types.TEXT(loc))
+		}
+		if len(storageLocations) == 0 {
+			storageLocations = []types.TEXT{"ipfs://staging"}
+		}
+
+		out = append(out, sequences.CommitteeVerifierParams{
+			Qualifier: qualifier,
+			Template: ccvsbindings.CommitteeVerifier{
+				Owner:                        types.PARTY(ownerParty),
+				AllowListAdmin:               allowlistAdmin,
+				StorageLocations:             storageLocations,
+				StorageLocationsAdmin:        types.PARTY(ownerParty),
+				PendingStorageLocationsAdmin: types.PARTY(ownerParty),
+				VersionTag:                   ccvsbindings.VersionTagV200,
+			},
+		})
+	}
+
+	return out
+}
+
+func partyPtr(p string) *types.PARTY {
+	v := types.PARTY(p)
+	return &v
+}
+
+func defaultCommitteeVerifierParams(ownerParty string) sequences.CommitteeVerifierParams {
+	return sequences.CommitteeVerifierParams{
+		Qualifier: devenvcommon.DefaultCommitteeVerifierQualifier,
+		Template: ccvsbindings.CommitteeVerifier{
+			Owner:                        types.PARTY(ownerParty),
+			AllowListAdmin:               partyPtr(ownerParty),
+			StorageLocations:             []types.TEXT{"ipfs://staging"},
+			StorageLocationsAdmin:        types.PARTY(ownerParty),
+			PendingStorageLocationsAdmin: types.PARTY(ownerParty),
+			VersionTag:                   ccvsbindings.VersionTagV200,
+		},
+	}
 }
 
