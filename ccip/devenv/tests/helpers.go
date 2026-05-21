@@ -17,6 +17,37 @@ import (
 
 // TODO: move this helper into ccv.Lib.
 func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, lib ccv.Lib) cciptestinterfaces.CCIP17 {
+	chainMap, err := lib.ChainsMap(t.Context())
+	require.NoError(t, err)
+	return GetChainFromMap(t, chainType, cfg, lib, chainMap)
+}
+
+// GetChainFromMap returns a chain from an existing ChainsMap result. lib.ChainsMap
+// constructs new impls on every call, so tests must reuse the same map they wired
+// (via WireLibIntoChains) rather than calling ChainsMap again through GetChain.
+func GetChainFromMap(
+	t *testing.T,
+	chainType string,
+	cfg *ccv.Cfg,
+	lib ccv.Lib,
+	chainMap map[uint64]cciptestinterfaces.CCIP17,
+) cciptestinterfaces.CCIP17 {
+	t.Helper()
+
+	selector := chainSelectorForType(t, chainType, cfg)
+
+	c, ok := chainMap[selector]
+	require.True(t, ok, "chain selector %d not in ChainsMap", selector)
+	if la, ok := c.(libAware); ok {
+		la.SetLib(lib)
+	}
+
+	return c
+}
+
+func chainSelectorForType(t *testing.T, chainType string, cfg *ccv.Cfg) uint64 {
+	t.Helper()
+
 	var chain *blockchain.Input
 	for _, bc := range cfg.Blockchains {
 		if bc.Type == chainType {
@@ -39,10 +70,25 @@ func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, lib ccv.Lib) cciptes
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chain.ChainID, family)
 	require.NoError(t, err)
 
-	chainMap, err := lib.ChainsMap(t.Context())
-	require.NoError(t, err)
+	return chainDetails.ChainSelector
+}
 
-	return chainMap[chainDetails.ChainSelector]
+// libAware is implemented by chain impls that need a back-reference to ccv.Lib
+// (e.g. to fetch verifier results inside ConfirmExecOnDest). EVM does not
+// implement this; Canton does.
+type libAware interface {
+	SetLib(ccv.Lib)
+}
+
+// WireLibIntoChains injects lib into every chain that implements libAware. Test
+// runners must call this once after lib.ChainsMap and before invoking
+// chain methods that depend on the lib (today: Canton's ConfirmExecOnDest).
+func WireLibIntoChains(lib ccv.Lib, chains map[uint64]cciptestinterfaces.CCIP17) {
+	for _, c := range chains {
+		if la, ok := c.(libAware); ok {
+			la.SetLib(lib)
+		}
+	}
 }
 
 func AssertSingleVerifierResult(

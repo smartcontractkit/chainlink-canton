@@ -1,7 +1,6 @@
 package load
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -9,6 +8,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	ccvload "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/load"
@@ -73,11 +73,15 @@ func TestCanton2EVM_Load(t *testing.T) {
 	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath, chainsel.FamilyEVM, chainsel.FamilyCanton)
 	require.NoError(t, err)
 
-	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, lib)
+	chainMap, err := lib.ChainsMap(ctx)
+	require.NoError(t, err)
+	devenvtests.WireLibIntoChains(lib, chainMap)
+
+	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, lib, chainMap)
 	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
 	require.True(t, ok, "Canton chain must be *cantondevenv.Chain")
 
-	destinations := discoverEVMDestinations(t, ctx, in, lib)
+	destinations := discoverEVMDestinations(t, in, chainMap)
 	require.NotEmpty(t, destinations, "need at least one EVM destination in the env file")
 	t.Logf("Canton→EVM load destinations: %d EVM chain(s)", len(destinations))
 	for _, d := range destinations {
@@ -177,12 +181,10 @@ func TestCanton2EVM_Load(t *testing.T) {
 		"Gun.Call must not overlap (Canton holdings 1-wide)")
 }
 
-// discoverEVMDestinations enumerates every Anvil blockchain in the env, resolves its CCIP17
-// implementation via lib's chain map, and captures an EOA receiver per chain.
-func discoverEVMDestinations(t *testing.T, ctx context.Context, in *ccv.Cfg, lib ccv.Lib) []EVMDestination {
+// discoverEVMDestinations enumerates every Anvil blockchain in the env using the same
+// ChainsMap instance the test runner wired (lib.ChainsMap creates new impls per call).
+func discoverEVMDestinations(t *testing.T, in *ccv.Cfg, chainMap map[uint64]cciptestinterfaces.CCIP17) []EVMDestination {
 	t.Helper()
-	chainMap, err := lib.ChainsMap(ctx)
-	require.NoError(t, err)
 
 	dests := make([]EVMDestination, 0)
 	seen := make(map[uint64]struct{})
