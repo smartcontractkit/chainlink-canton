@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -64,11 +65,28 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
 		var proposalOutputs []contract.ExerciseOutput
 
+		if sourceChain.CantonLaneConfig == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("canton lane config is required on source chain")
+		}
+
 		globalConfigRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.CantonLaneConfig.GlobalConfig)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("global config raw instance address: %w", err)
 		}
-		feeQuoterRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.CantonLaneConfig.FeeQuoterRef)
+		if len(sourceChain.FeeQuoter) == 0 {
+			return sequences.OnChainOutput{}, fmt.Errorf("fee quoter address bytes are required on source chain")
+		}
+		ds := dsutils.RuntimeDataStore()
+		if ds == nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("runtime datastore is not set")
+		}
+		feeQuoterRaw, err := dsutils.GetRawInstanceAddressFromInstanceAddressBytes(
+			ds,
+			sourceChain.Selector,
+			datastore.ContractType(feequoterop.ContractType),
+			feequoterop.Version,
+			sourceChain.FeeQuoter,
+		)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("fee quoter raw instance address: %w", err)
 		}
