@@ -69,7 +69,7 @@ func TestFindActiveContractByInstanceAddress_multiPartyVisibility(t *testing.T) 
 			fbp[poolOwnerB] != nil
 	}), mock.Anything).
 		RunAndReturn(func(context.Context, *apiv2.GetActiveContractsRequest, ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse], error) {
-			return newFakeActiveContractsStream(ctx, acsStream), nil
+			return newFakeActiveContractsStream(acsStream), nil
 		}).
 		Times(len(ledger))
 
@@ -106,29 +106,47 @@ func makeActiveContractACSResponse(instanceID, signatory, contractID string) *ap
 }
 
 type fakeActiveContractsStream struct {
-	ctx       context.Context
 	responses []*apiv2.GetActiveContractsResponse
 	idx       int
 }
 
-func newFakeActiveContractsStream(ctx context.Context, responses []*apiv2.GetActiveContractsResponse) *fakeActiveContractsStream {
-	return &fakeActiveContractsStream{ctx: ctx, responses: responses}
+func newFakeActiveContractsStream(responses []*apiv2.GetActiveContractsResponse) *fakeActiveContractsStream {
+	return &fakeActiveContractsStream{responses: responses}
 }
 
 func (s *fakeActiveContractsStream) Recv() (*apiv2.GetActiveContractsResponse, error) {
 	if s.idx < len(s.responses) {
 		resp := s.responses[s.idx]
 		s.idx++
+
 		return resp, nil
 	}
+
 	return nil, io.EOF
 }
 
-func (s *fakeActiveContractsStream) Header() (metadata.MD, error)  { return metadata.MD{}, nil }
-func (s *fakeActiveContractsStream) Trailer() metadata.MD           { return metadata.MD{} }
-func (s *fakeActiveContractsStream) CloseSend() error               { return nil }
-func (s *fakeActiveContractsStream) Context() context.Context       { return s.ctx }
-func (s *fakeActiveContractsStream) SendMsg(any) error              { return nil }
-func (s *fakeActiveContractsStream) RecvMsg(any) error              { return nil }
+func (s *fakeActiveContractsStream) Header() (metadata.MD, error) {
+	return metadata.MD{}, nil
+}
+
+func (s *fakeActiveContractsStream) Trailer() metadata.MD {
+	return metadata.MD{}
+}
+
+func (s *fakeActiveContractsStream) CloseSend() error {
+	return nil
+}
+
+func (s *fakeActiveContractsStream) Context() context.Context {
+	return context.Background()
+}
+
+func (s *fakeActiveContractsStream) SendMsg(any) error {
+	return nil
+}
+
+func (s *fakeActiveContractsStream) RecvMsg(any) error {
+	return nil
+}
 
 var _ grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse] = (*fakeActiveContractsStream)(nil)
