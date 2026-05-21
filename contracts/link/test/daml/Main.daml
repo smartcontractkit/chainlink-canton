@@ -224,6 +224,7 @@ testPendingTransferExpiresBeforeAccept = script do
       instanceId = "link-registry-expiry"
       registryMeta = MetadataV1.emptyMetadata
       transferPreapprovals = Map.empty
+  disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
 
   mintResult <- submit (actAs admin <> actAs alice) do
     exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
@@ -241,7 +242,7 @@ testPendingTransferExpiresBeforeAccept = script do
         meta = MetadataV1.emptyMetadata
 
   now <- getTime
-  transferResult <- submit alice do
+  transferResult <- submit (actAs alice <> disclose disclosedRegistry) do
     exerciseCmd (toInterfaceContractId @TransferV1.TransferFactory registryCid) TransferV1.TransferFactory_Transfer with
       expectedAdmin = admin
       transfer = TransferV1.Transfer with

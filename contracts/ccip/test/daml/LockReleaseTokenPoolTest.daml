@@ -423,9 +423,9 @@ testLockOrBurn = script do
 
     debug "testLockOrBurn: PASSED"
 
--- | Test LockOrBurn validates only newly received holdings, not existing pool holdings.
-testLockOrBurnIgnoresExistingPoolHoldingsInValidation : Script ()
-testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
+-- | Test LockOrBurn validates existing pool holdings while preserving them in the output.
+testLockOrBurnValidatesExistingPoolHoldingsAndPreservesThem : Script ()
+testLockOrBurnValidatesExistingPoolHoldingsAndPreservesThem = script do
     ccipOwner <- allocateParty "ccip-owner-existing-pool"
     rmnOwner <- allocateParty "rmn-owner-existing-pool"
     ccvOwner <- allocateParty "ccv-owner-existing-pool"
@@ -585,11 +585,13 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiter
+    disclosedExistingPoolHolding <- fromSome <$> queryDisclosure poolOwner existingPoolHolding
 
     result <- submit (actAs sender
                       <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
-                      <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter
+                      <> disclose disclosedExistingPoolHolding) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockOrBurn with
             tokenAdminRegistryCid = tokenAdminRegistry
             tokenConfigCid = tokenConfigCid
@@ -615,7 +617,7 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
     let tokenSendData = fromSome updatedSendingMessage.tokenSendData
     tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 50000000000.0)
 
-    debug "testLockOrBurnIgnoresExistingPoolHoldingsInValidation: PASSED"
+    debug "testLockOrBurnValidatesExistingPoolHoldingsAndPreservesThem: PASSED"
 
 -- | Test LockOrBurn deducts proportional feeBps from bridged token amount.
 testLockOrBurnDeductsFeeBps : Script ()
@@ -951,6 +953,211 @@ testReleaseFromTicket = script do
     poolC.owner === poolOwner
 
     debug "testReleaseFromTicket: PASSED"
+
+testReleaseFromTicketRejectsBadTransferFactoryResults : Script ()
+testReleaseFromTicketRejectsBadTransferFactoryResults = script do
+    ccipOwner <- allocateParty "ccip-owner-bad-release"
+    rmnOwner <- allocateParty "rmn-owner-bad-release"
+    poolOwner <- allocateParty "pool-owner-bad-release"
+    receiver <- allocateParty "receiver-bad-release"
+    otherReceiver <- allocateParty "other-receiver-bad-release"
+
+    let tokenAdminRegistryInstanceId = "test-tar-bad-release"
+    let tokenPoolInstanceId = "test-lock-release-pool-bad-release"
+    let sourceChainSelector : Numeric 0 = 123.0
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+    let wrongInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "WrongToken"
+
+    poolHolding <- submit (actAs poolOwner <> actAs ccipOwner) do
+        createCmd TestToken.TestHolding with
+            owner = poolOwner
+            admin = ccipOwner
+            instrumentId = testInstrumentId
+            amount = 10.0
+
+    badPoolHolding <- submit (actAs poolOwner <> actAs ccipOwner) do
+        createCmd TestToken.TestHolding with
+            owner = poolOwner
+            admin = ccipOwner
+            instrumentId = wrongInstrumentId
+            amount = 10.0
+
+    badWrongOwnerFactory <- submit ccipOwner do
+        createCmd TestToken.BadTransferFactory with
+            admin = ccipOwner
+            completedOwner = Some otherReceiver
+            completedInstrumentId = None
+            completedAmount = None
+            pendingTransfer = None
+
+    badWrongInstrumentFactory <- submit ccipOwner do
+        createCmd TestToken.BadTransferFactory with
+            admin = ccipOwner
+            completedOwner = None
+            completedInstrumentId = Some wrongInstrumentId
+            completedAmount = None
+            pendingTransfer = None
+
+    badWrongAmountFactory <- submit ccipOwner do
+        createCmd TestToken.BadTransferFactory with
+            admin = ccipOwner
+            completedOwner = None
+            completedInstrumentId = None
+            completedAmount = Some 2.0
+            pendingTransfer = None
+
+    let pendingWrongInstrumentTransfer = TransferInstructionV1.Transfer with
+            sender = poolOwner
+            receiver = receiver
+            amount = 3.0
+            instrumentId = wrongInstrumentId
+            requestedAt = time (date 2026 Jan 1) 0 0 0
+            executeBefore = time (date 2026 Jan 1) 0 1 0
+            inputHoldingCids = [toInterfaceContractId poolHolding]
+            meta = MetadataV1.emptyMetadata
+    badPendingWrongInstrumentFactory <- submit ccipOwner do
+        createCmd TestToken.BadTransferFactory with
+            admin = ccipOwner
+            completedOwner = None
+            completedInstrumentId = None
+            completedAmount = None
+            pendingTransfer = Some pendingWrongInstrumentTransfer
+
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
+        ccipOwner
+        poolOwner
+        tokenAdminRegistryInstanceId
+        testInstrumentId
+        tokenPoolInstanceId
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = "test-rmn-bad-release"
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
+        poolOwner
+        tokenPoolInstanceId
+        sourceChainSelector
+        RateLimiter.RateLimitDirection_Inbound
+        100000000000.0
+        10000000.0
+
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = finalityConfig 0
+            inboundRateLimiter = inboundRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = inboundRateLimiterAddr
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            poolOwner = poolOwner
+            ccipOwner = ccipOwner
+            instanceId = tokenPoolInstanceId
+            instrumentId = testInstrumentId
+            decimals = 10
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-bad-release" "test-feequoter-bad-release" ccipOwner rmnOwner
+
+    tokenReceiveTicket <- submit ccipOwner do
+        createCmd Tickets.TokenReceiveTicket with
+            tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+            ccipOwner = ccipOwner
+            ccvOwners = []
+            verifiedCCVs = []
+            requiredInboundPoolCCVs = []
+            poolOwner = poolOwner
+            receiver = receiver
+            tokenReceiver = receiver
+            instrumentId = testInstrumentId
+            amount = fromSome (MessageCodecV1.encodeUint256 30000000000.0)
+            sourcePoolData = ""
+            messageId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            sourceChainSelector = sourceChainSelector
+            finality = finalityConfig 0
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
+    disclosedBadPoolHolding <- fromSome <$> queryDisclosure poolOwner badPoolHolding
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
+    disclosedBadWrongOwnerFactory <- fromSome <$> queryDisclosure ccipOwner badWrongOwnerFactory
+    disclosedBadWrongInstrumentFactory <- fromSome <$> queryDisclosure ccipOwner badWrongInstrumentFactory
+    disclosedBadWrongAmountFactory <- fromSome <$> queryDisclosure ccipOwner badWrongAmountFactory
+    disclosedBadPendingWrongInstrumentFactory <- fromSome <$> queryDisclosure ccipOwner badPendingWrongInstrumentFactory
+    disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+    disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicket
+
+    submitMustFail (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedBadWrongOwnerFactory
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            rmnRemoteCid = rmnRemote
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongOwnerFactory) [toInterfaceContractId poolHolding] []
+            caller = receiver
+
+    submitMustFail (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedBadWrongInstrumentFactory
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            rmnRemoteCid = rmnRemote
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongInstrumentFactory) [toInterfaceContractId poolHolding] []
+            caller = receiver
+
+    submitMustFail (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedBadWrongAmountFactory
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            rmnRemoteCid = rmnRemote
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongAmountFactory) [toInterfaceContractId poolHolding] []
+            caller = receiver
+
+    submitMustFail (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedBadPendingWrongInstrumentFactory
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            rmnRemoteCid = rmnRemote
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badPendingWrongInstrumentFactory) [toInterfaceContractId poolHolding] []
+            caller = receiver
+
+    submitMustFail (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedBadPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedBadWrongInstrumentFactory
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            rmnRemoteCid = rmnRemote
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongInstrumentFactory) [toInterfaceContractId badPoolHolding] []
+            caller = receiver
 
 -- | Test ReleaseFromTicket remains valid after post-ticket inbound CCV config drift.
 -- The release path must use ticket.requiredInboundPoolCCVs, not current pool config.

@@ -18,7 +18,7 @@ import qualified DA.Map as Map
 import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.TextMap as TextMap
 import DA.Date (date, Month(Dec))
-import DA.Time (time, addRelTime, hours)
+import DA.Time (time)
 import DA.Foldable (forA_)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -47,7 +47,6 @@ import CCIP.BurnMintTokenPoolTypes (
 import qualified Splice.Api.Token.BurnMintV1
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
-import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Context
 import qualified CCIP.Events
@@ -117,13 +116,96 @@ calculateLocalAmount remoteAmount remoteDecimals localDecimals =
         remoteDecimals
         localDecimals
 
-sumHoldingAmounts : [ContractId Splice.Api.Token.HoldingV1.Holding] -> Update Decimal
-sumHoldingAmounts =
+assertHoldingMatches
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.HoldingV1.Holding
+    -> Update Splice.Api.Token.HoldingV1.HoldingView
+assertHoldingMatches prefix expectedOwner expectedInstrumentId cid = do
+    holding <- fetch cid
+    let hv = view holding
+    assertMsg (prefix <> ": holding owner mismatch")
+        (hv.owner == expectedOwner)
+    assertMsg (prefix <> ": holding instrumentId mismatch")
+        (hv.instrumentId == expectedInstrumentId)
+    pure hv
+
+sumCheckedHoldingAmounts
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update Decimal
+sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId =
     foldlA
         (\acc cid -> do
-            holding <- fetch cid
-            pure (acc + (view holding).amount))
+            hv <- assertHoldingMatches prefix expectedOwner expectedInstrumentId cid
+            pure (acc + hv.amount))
         0.0
+
+assertSingleHolding
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> Decimal
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update (ContractId Splice.Api.Token.HoldingV1.Holding)
+assertSingleHolding prefix expectedOwner expectedInstrumentId expectedAmount cids =
+    case cids of
+        [cid] -> do
+            hv <- assertHoldingMatches prefix expectedOwner expectedInstrumentId cid
+            assertMsg (prefix <> ": holding amount mismatch")
+                (hv.amount == expectedAmount)
+            pure cid
+        _ -> abort (prefix <> ": expected exactly one holding")
+
+validateLockOrBurnOutputs
+    : Party
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> Decimal
+    -> Decimal
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update
+        ( [ContractId Splice.Api.Token.HoldingV1.Holding]
+        , [ContractId Splice.Api.Token.HoldingV1.Holding]
+        )
+validateLockOrBurnOutputs caller poolOwner instrumentId senderChangeAmount feeHoldingAmount outputCids =
+    case (senderChangeAmount > 0.0, feeHoldingAmount > 0.0, outputCids) of
+        (False, False, []) ->
+            pure ([], [])
+        (True, False, [senderChangeCid]) -> do
+            _ <- assertSingleHolding
+                "LockOrBurn: sender change holding"
+                caller
+                instrumentId
+                senderChangeAmount
+                [senderChangeCid]
+            pure ([senderChangeCid], [])
+        (False, True, [poolFeeCid]) -> do
+            _ <- assertSingleHolding
+                "LockOrBurn: pool fee holding"
+                poolOwner
+                instrumentId
+                feeHoldingAmount
+                [poolFeeCid]
+            pure ([], [poolFeeCid])
+        (True, True, [senderChangeCid, poolFeeCid]) -> do
+            _ <- assertSingleHolding
+                "LockOrBurn: sender change holding"
+                caller
+                instrumentId
+                senderChangeAmount
+                [senderChangeCid]
+            _ <- assertSingleHolding
+                "LockOrBurn: pool fee holding"
+                poolOwner
+                instrumentId
+                feeHoldingAmount
+                [poolFeeCid]
+            pure ([senderChangeCid], [poolFeeCid])
+        _ -> abort "LockOrBurn: burn/mint output shape mismatch"
 
 assertRateLimiter
     : Text
@@ -668,8 +750,13 @@ template BurnMintTokenPool
                             meta = Splice.Api.Token.MetadataV1.Metadata with
                                 values = extraArgsMetaValues
 
-                let receiverCids = burnMintResult.outputCids
-                assertMsg "ReleaseFromTicket: mint completed with no receiver holdings" (not (null receiverCids))
+                receiverCid <- assertSingleHolding
+                    "ReleaseFromTicket: receiver holding"
+                    ticket.tokenReceiver
+                    instrumentId
+                    amountDecimal
+                    burnMintResult.outputCids
+                let receiverCids = [receiverCid]
                 let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
                         receiverHoldingCids = receiverCids
                 let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Completed with
@@ -861,7 +948,11 @@ template BurnMintTokenPool
                 let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
                         Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
                         _ -> 0.0
-                inputTotal <- sumHoldingAmounts senderInputCids
+                inputTotal <- sumCheckedHoldingAmounts
+                    "LockOrBurn: sender input holdings"
+                    caller
+                    instrumentId
+                    senderInputCids
                 assertMsg "LockOrBurn: insufficient sender input amount"
                     (inputTotal >= amount)
                 let feeAmount = calculateFeeFromBps amountNumeric0 tokenFeeBps
@@ -898,9 +989,13 @@ template BurnMintTokenPool
                             meta = Splice.Api.Token.MetadataV1.Metadata with
                                 values = extraArgsMetaValues
 
-                let senderChangeCount = if senderChangeAmount > 0.0 then 1 else 0
-                let senderChangeCids = take senderChangeCount burnMintResult.outputCids
-                let poolChangeCids = drop senderChangeCount burnMintResult.outputCids
+                (senderChangeCids, poolChangeCids) <- validateLockOrBurnOutputs
+                    caller
+                    poolOwner
+                    instrumentId
+                    senderChangeAmount
+                    feeHoldingAmount
+                    burnMintResult.outputCids
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.AddTokenSend with
