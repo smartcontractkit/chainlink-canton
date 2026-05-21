@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -717,6 +718,8 @@ func deployTokenPoolRateLimiter(
 			IsEnabled:           types.BOOL(cfg.IsEnabled),
 			Capacity:            capacity,
 			Rate:                rate,
+			Tokens:              capacity,
+			LastUpdated:         types.TIMESTAMP(time.Now()),
 		},
 	}, mcmsEnabled))
 	if err != nil {
