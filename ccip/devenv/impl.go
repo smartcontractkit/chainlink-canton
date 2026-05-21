@@ -1065,7 +1065,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 	// TODO come up with a better way of doing this
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{party}, perpartyrouter.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}

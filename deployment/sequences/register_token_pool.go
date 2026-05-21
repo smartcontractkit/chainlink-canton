@@ -130,7 +130,7 @@ func findTokenConfigCid(b operations.Bundle, deps canton.Chain, address contract
 	contractID, err := contract.FindActiveContractIDByInstanceAddress(
 		b.GetContext(),
 		participant.LedgerServices.State,
-		participant.PartyID,
+		contract.LedgerQueryParties(participant),
 		tokenadminregistry.TokenConfig{}.GetTemplateID(),
 		address,
 	)

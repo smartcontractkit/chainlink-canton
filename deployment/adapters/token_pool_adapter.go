@@ -76,6 +76,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 		return 0, fmt.Errorf("canton chain with selector %d not found", chainSelector)
 	}
 	participant := chain.Participants[0]
+	queryParties := opcontract.LedgerQueryParties(participant)
 	ctx := context.Background()
 	if e.GetContext != nil {
 		ctx = e.GetContext()
@@ -87,7 +88,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 		activePool, err := opcontract.FindActiveContractByInstanceAddress(
 			ctx,
 			participant.LedgerServices.State,
-			participant.PartyID,
+			queryParties,
 			lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
 			poolAddress,
 		)
@@ -105,7 +106,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 		activePool, err := opcontract.FindActiveContractByInstanceAddress(
 			ctx,
 			participant.LedgerServices.State,
-			participant.PartyID,
+			queryParties,
 			burnminttokenpool.BurnMintTokenPool{}.GetTemplateID(),
 			poolAddress,
 		)
