@@ -105,10 +105,11 @@ func (c *CantonCurseAdapter) getGlobalConfig(ctx context.Context, chain canton.C
 		return nil, fmt.Errorf("global config for chain %d not found in environment", chain.Selector)
 	}
 
+	participant := chain.Participants[0]
 	active, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
-		chain.Participants[0].LedgerServices.State,
-		chain.Participants[0].PartyID,
+		participant.LedgerServices.State,
+		contract.LedgerQueryParties(participant),
 		common_binding.GlobalConfig{}.GetTemplateID(),
 		globalConfig,
 	)
@@ -169,10 +170,11 @@ func (c *CantonCurseAdapter) IsSubjectCursedOnChain(e deployment.Environment, se
 		return false, fmt.Errorf("no RMNRemote instance address cached for chain %d", selector)
 	}
 
+	participant := cantonChain.Participants[0]
 	active, err := contract.FindActiveContractByInstanceAddress(
 		e.GetContext(),
-		cantonChain.Participants[0].LedgerServices.State,
-		cantonChain.Participants[0].PartyID,
+		participant.LedgerServices.State,
+		contract.LedgerQueryParties(participant),
 		rmn.RMNRemote{}.GetTemplateID(),
 		rmnRemoteInstanceAddr,
 	)
