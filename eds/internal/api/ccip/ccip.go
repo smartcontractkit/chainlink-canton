@@ -133,7 +133,7 @@ func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
 
 	resp := &oapiCCIP.CCIPPerPartyRouterFactoryResponse{
 		ContractId:         activePerPartyRouterFactoryContract.GetCreatedEvent().GetContractId(),
-		InstanceAddress:    parsedPerPartyRouterFactory.Address.InstanceID(),
+		InstanceAddress:    parsedPerPartyRouterFactory.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: parsedPerPartyRouterFactory.Address.String(),
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activePerPartyRouterFactoryContract),

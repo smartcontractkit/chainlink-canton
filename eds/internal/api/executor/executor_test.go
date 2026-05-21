@@ -1,11 +1,8 @@
 package executor
 
 import (
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -25,26 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
 )
-
-func TestMain(m *testing.M) {
-	gin.SetMode(gin.TestMode)
-	os.Exit(m.Run())
-}
-
-func makeHashedAddress(hex string) oapiCommon.RawOrHashedAddress {
-	var addr oapiCommon.RawOrHashedAddress
-	_ = addr.FromInstanceAddress(hex)
-	return addr
-}
-
-func makeRawAddress(raw string) oapiCommon.RawOrHashedAddress {
-	var addr oapiCommon.RawOrHashedAddress
-	_ = addr.FromRawInstanceAddress(raw)
-	return addr
-}
 
 const RequestSizeLimit = 100_000
 
@@ -61,10 +42,6 @@ func makeClient(t *testing.T, server *Server) oapiExecutor.ClientWithResponsesIn
 	return client
 }
 
-func makeOversizedRequest(size int) io.Reader {
-	return strings.NewReader(`{"` + strings.Repeat("a", size-2))
-}
-
 func TestServer_PostExecutorSend(t *testing.T) {
 	t.Parallel()
 
@@ -77,8 +54,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 		ccv3 := contracts.NewRawInstanceAddress("ccv3", "owner")
 		ccv4 := contracts.NewRawInstanceAddress("ccv4", "owner")
 		executor := executorBinding.Executor{
-			InstanceId:    "executor1",
-			Owner:         "owner",
+			InstanceId:    types.TEXT(executorAddress.InstanceID()),
+			Owner:         types.PARTY(executorAddress.Owner()),
 			MaxCCVsPerMsg: 2,
 			DynamicConfig: executorBinding.DynamicConfig{
 				AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: new(types.UNIT)},
@@ -97,7 +74,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			Executors: []config.Executor{
 				{
 					ContractIdentifier: config.ContractIdentifier{
-						PartyID:         "owner",
+						PartyID:         executorAddress.Owner(),
 						InstanceAddress: executorAddress.InstanceAddress(),
 					},
 				},
@@ -122,8 +99,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.InstanceAddress().Hex(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv1.InstanceAddress().Hex()),
-					makeRawAddress(ccv2.InstanceAddress().Hex()),
+					testhelpers.MakeRawAddress(ccv1.InstanceAddress().Hex()),
+					testhelpers.MakeRawAddress(ccv2.InstanceAddress().Hex()),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -132,7 +109,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeHashedAddress(executorAddress.InstanceAddress().Hex())),
+						Address: new(testhelpers.MakeHashedAddress(executorAddress.InstanceAddress().Hex())),
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -150,6 +127,10 @@ func TestServer_PostExecutorSend(t *testing.T) {
 					TemplateId: "package1:module1:entity1",
 				},
 			}, resp.JSON200.DisclosedContracts)
+			require.Equal(t, "contract1", resp.JSON200.ContractId)
+			require.Equal(t, executorAddress.InstanceAddress().Hex(), resp.JSON200.InstanceAddress)
+			require.Equal(t, executorAddress.String(), resp.JSON200.RawInstanceAddress)
+			require.NotNil(t, resp.JSON200.ContextData)
 		})
 		t.Run("With RawInstanceAddress", func(t *testing.T) {
 			// All requested addresses are RawInstanceAddresses
@@ -157,8 +138,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.String(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv2.String()),
-					makeRawAddress(ccv3.String()),
+					testhelpers.MakeRawAddress(ccv2.String()),
+					testhelpers.MakeRawAddress(ccv3.String()),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -167,7 +148,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeRawAddress(executorAddress.String())),
+						Address: new(testhelpers.MakeRawAddress(executorAddress.String())),
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -192,9 +173,9 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.String(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv1.String()),
-					makeRawAddress(ccv2.String()),
-					makeRawAddress(ccv3.String()),
+					testhelpers.MakeRawAddress(ccv1.String()),
+					testhelpers.MakeRawAddress(ccv2.String()),
+					testhelpers.MakeRawAddress(ccv3.String()),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -203,7 +184,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeRawAddress(executorAddress.String())),
+						Address: new(testhelpers.MakeRawAddress(executorAddress.String())),
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -223,8 +204,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.String(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv2.String()),
-					makeRawAddress(ccv4.String()),
+					testhelpers.MakeRawAddress(ccv2.String()),
+					testhelpers.MakeRawAddress(ccv4.String()),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -233,7 +214,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeRawAddress(executorAddress.String())),
+						Address: new(testhelpers.MakeRawAddress(executorAddress.String())),
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -253,8 +234,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.String(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv2.String()),
-					makeRawAddress("notavalidaddress"),
+					testhelpers.MakeRawAddress(ccv2.String()),
+					testhelpers.MakeRawAddress("notavalidaddress"),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -263,7 +244,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeRawAddress(executorAddress.String())),
+						Address: new(testhelpers.MakeRawAddress(executorAddress.String())),
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -283,8 +264,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.String(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv2.String()),
-					makeRawAddress("notavalidaddress"),
+					testhelpers.MakeRawAddress(ccv2.String()),
+					testhelpers.MakeRawAddress("notavalidaddress"),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -293,7 +274,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeHashedAddress("0x42")), // address that doesn't match the path parameter
+						Address: new(testhelpers.MakeHashedAddress("0x42")), // address that doesn't match the path parameter
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -313,8 +294,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.String(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv2.String()),
-					makeRawAddress("notavalidaddress"),
+					testhelpers.MakeRawAddress(ccv2.String()),
+					testhelpers.MakeRawAddress("notavalidaddress"),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -342,8 +323,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.InstanceAddress().Hex(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv1.InstanceAddress().Hex()),
-					makeRawAddress(ccv2.InstanceAddress().Hex()),
+					testhelpers.MakeRawAddress(ccv1.InstanceAddress().Hex()),
+					testhelpers.MakeRawAddress(ccv2.InstanceAddress().Hex()),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -377,8 +358,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			executorAddress := contracts.HexToInstanceAddress("0x7777")
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.Hex(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv1.InstanceAddress().Hex()),
-					makeRawAddress(ccv2.InstanceAddress().Hex()),
+					testhelpers.MakeRawAddress(ccv1.InstanceAddress().Hex()),
+					testhelpers.MakeRawAddress(ccv2.InstanceAddress().Hex()),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -387,7 +368,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeHashedAddress(executorAddress.Hex())),
+						Address: new(testhelpers.MakeHashedAddress(executorAddress.Hex())),
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -411,8 +392,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 		ccv3 := contracts.NewRawInstanceAddress("ccv3", "owner")
 		ccv4 := contracts.NewRawInstanceAddress("ccv4", "owner")
 		executor := executorBinding.Executor{
-			InstanceId:    "executor1",
-			Owner:         "owner",
+			InstanceId:    types.TEXT(executorAddress.InstanceID()),
+			Owner:         types.PARTY(executorAddress.Owner()),
 			MaxCCVsPerMsg: 3,
 			DynamicConfig: executorBinding.DynamicConfig{
 				AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: new(types.UNIT)},
@@ -456,9 +437,9 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.InstanceAddress().Hex(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv3.InstanceAddress().Hex()), // allowed CCV
-					makeRawAddress(ccv4.InstanceAddress().Hex()), // unallowed CCV - should not be checked
-					makeRawAddress("invalidaddress"),             // invalid address - should not be checked
+					testhelpers.MakeRawAddress(ccv3.InstanceAddress().Hex()), // allowed CCV
+					testhelpers.MakeRawAddress(ccv4.InstanceAddress().Hex()), // unallowed CCV - should not be checked
+					testhelpers.MakeRawAddress("invalidaddress"),             // invalid address - should not be checked
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -467,7 +448,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeHashedAddress(executorAddress.String())),
+						Address: new(testhelpers.MakeHashedAddress(executorAddress.String())),
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -492,10 +473,10 @@ func TestServer_PostExecutorSend(t *testing.T) {
 
 			resp, err := client.PostExecutorSendWithResponse(t.Context(), executorAddress.String(), oapiExecutor.ExecutorSendRequest{
 				Ccvs: []oapiCommon.RawOrHashedAddress{
-					makeRawAddress(ccv1.String()),
-					makeRawAddress(ccv2.String()),
-					makeRawAddress(ccv3.String()),
-					makeRawAddress(ccv4.String()),
+					testhelpers.MakeRawAddress(ccv1.String()),
+					testhelpers.MakeRawAddress(ccv2.String()),
+					testhelpers.MakeRawAddress(ccv3.String()),
+					testhelpers.MakeRawAddress(ccv4.String()),
 				},
 				Message: oapiCommon.Message{
 					DestinationChainSelector: "123",
@@ -504,7 +485,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 						Type    oapiCommon.MessageExecutorType `json:"type"`
 					}{
 						Type:    oapiCommon.WithAddress,
-						Address: new(makeHashedAddress(executorAddress.String())),
+						Address: new(testhelpers.MakeHashedAddress(executorAddress.String())),
 					},
 					FeeToken: oapiCommon.InstrumentId{
 						Admin: "feeAdmin",
@@ -530,7 +511,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			require.NoError(t, err)
 			client := makeClient(t, server)
 
-			resp, err := client.PostExecutorSendWithBodyWithResponse(t.Context(), "0x1", "application/json", makeOversizedRequest(RequestSizeLimit))
+			resp, err := client.PostExecutorSendWithBodyWithResponse(t.Context(), "0x1", "application/json", testhelpers.MakeOversizedRequest(RequestSizeLimit))
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
@@ -542,7 +523,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			require.NoError(t, err)
 			client := makeClient(t, server)
 
-			resp, err := client.PostExecutorSendWithBodyWithResponse(t.Context(), "0x1", "application/json", makeOversizedRequest(RequestSizeLimit+1))
+			resp, err := client.PostExecutorSendWithBodyWithResponse(t.Context(), "0x1", "application/json", testhelpers.MakeOversizedRequest(RequestSizeLimit+1))
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusRequestEntityTooLarge, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "request body too large")
