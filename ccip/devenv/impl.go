@@ -30,7 +30,6 @@ import (
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
-	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainreg"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -193,9 +192,9 @@ type Chain struct {
 	transferTokenInstrument *splice_api_token_holding_v1.InstrumentId
 	nextTransferCID         string // holding CID to be used as transfer on next message send
 
-	// lib is injected post-construction by test runners (see SetLib). Required by
-	// ConfirmExecOnDest to fetch verifier results from the aggregator/indexer.
-	lib ccv.Lib
+	// verifierObs is injected post-construction by test runners (see SetVerifierObservation).
+	// Required by ConfirmExecOnDest to fetch verifier results from aggregator/indexer.
+	verifierObs VerifierObservation
 
 	// partyMutexes serializes manual execution per receiver party so that
 	// concurrent ConfirmExecOnDest calls cannot race on PerPartyRouter CID consumption.
@@ -237,14 +236,6 @@ func NewEmptyCCIP17Canton(logger zerolog.Logger) *Chain {
 		logger:       logger,
 		partyMutexes: make(map[string]*sync.Mutex),
 	}
-}
-
-// SetLib injects the CCV library that ConfirmExecOnDest uses to fetch verifier
-// results. Test runners call this once after lib.ChainsMap so the chain can drive
-// manual execution end-to-end without requiring callers to thread the verifier
-// result through MessageEventKey. It is safe to set lib repeatedly (last write wins).
-func (c *Chain) SetLib(lib ccv.Lib) {
-	c.lib = lib
 }
 
 func (c *Chain) ChainSelector() uint64 {
@@ -873,19 +864,20 @@ func (c *Chain) ConfirmSendOnSource(ctx context.Context, to uint64, key cciptest
 //  1. Lock per receiver party (PerPartyRouter CID is consumed on every Execute).
 //  2. Idempotency: if an ExecutionStateChanged for (from, seqNo, messageID) already
 //     exists on the ledger, parse and return it without re-executing.
-//  3. Otherwise fetch the verifier result via lib.AggregatorClient + lib.IndexerMonitor,
-//     translate the verifier dest address to its hashed instance address, and call
-//     ManuallyExecuteMessage.
+//  3. Otherwise fetch the verifier result via verifier observation (aggregator +
+//     indexer), translate the verifier dest address to its hashed instance address,
+//     and call ManuallyExecuteMessage.
 //
 // Both SeqNum AND MessageID must be set on key: they key the idempotency lookup and
 // the verifier-result fetch respectively. EVM-side ConfirmExecOnDest is permissive
-// and accepts either; Canton requires both. Test runners must call SetLib first.
+// and accepts either; Canton requires both. Test runners must wire verifier
+// observation (see WireVerifierObservationFromLib) before calling this method.
 func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptestinterfaces.MessageEventKey, timeout time.Duration) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
 	if key.MessageID == (protocol.Bytes32{}) || key.SeqNum == 0 {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("MessageEventKey must have both MessageID and SeqNum")
 	}
-	if c.lib == nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("lib not wired (test runner must call SetLib)")
+	if !c.verifierObs.wired() {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("verifier observation not wired (test runner must call WireVerifierObservationFromLib)")
 	}
 	if len(c.chain.Participants) == 0 {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no participants on chain")

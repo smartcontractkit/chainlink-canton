@@ -49,10 +49,10 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 	chainMap, err := lib.ChainsMap(t.Context())
 	require.NoError(t, err)
-	devenvtests.WireLibIntoChains(lib, chainMap)
+	require.NoError(t, devenvtests.WireVerifierObservationFromLib(lib, chainMap))
 
-	srcChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, lib, chainMap)
-	dstChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, lib, chainMap)
+	srcChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
+	dstChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
 
 	t.Cleanup(func() {
 		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
@@ -127,7 +127,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
-		// Idempotency: a second call must return the same event without re-executing.
+		// testing idempotency of ConfirmExecOnDest: a second call
+		// must return the same event without re-executing.
 		idempotentEvent, err := dstChain.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, executionStateChangedEvent.State, idempotentEvent.State)

@@ -12,7 +12,6 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -36,7 +35,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 	// Create PerPartyRouter (ignore error if it exists already)
 	perPartyRouterFactoryDisclosure, err := c.GetPerPartyRouterFactoryDisclosure(ctx, partyId)
 	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("get canton per party router factory disclosure: %w", err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to get canton per party router factory disclosure: %w", err)
 	}
 	c.logger.Debug().Str("ContractId", perPartyRouterFactoryDisclosure.ContractId).Msg("Resolved per-party router factory address")
 
@@ -57,7 +56,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 		PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
 	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("find per-party router: %w", err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to find per-party router: %w", err)
 	}
 
 	return routerAddress, nil
@@ -66,7 +65,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 func (c *Chain) DeployCCIPReceiver(partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
 	finalityConfig, err := encodeReceiverFinalityConfig(receiverFinality)
 	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("encodeReceiverFinalityConfig: %w", err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to encode receiver finality config: %w", err)
 	}
 
 	// Deploy receiver contract
@@ -82,7 +81,7 @@ func (c *Chain) DeployCCIPReceiver(partyId string, receiverFinality int64) (cont
 		OwnerParty: types.PARTY(partyId),
 	})
 	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("deploy receiver contract: %w", err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to deploy receiver contract: %w", err)
 	}
 	receiverAddress := contracts.HexToInstanceAddress(out.Output.Address)
 
@@ -103,20 +102,20 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	// Deploy PerPartyRouter for the receiver party
 	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, executingParty)
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("deploy per-party router: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
 	c.logger.Debug().Str("RouterAddress", routerAddress.String()).Msg("Deployed PerPartyRouter")
 
 	// Deploy CCIPReceiver contract
 	receiverAddress, err := c.DeployCCIPReceiver(executingParty, int64(message.Finality))
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("deploy CCIPReceiver contract: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy CCIPReceiver contract: %w", err)
 	}
 	c.logger.Debug().Str("ReceiverAddress", receiverAddress.String()).Msg("Deployed CCIPReceiver")
 
 	encodedMessage, err := message.Encode()
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("encode message: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to encode message: %w", err)
 	}
 	ccvs := make([]contracts.InstanceAddress, len(verifiers))
 	for i, verifier := range verifiers {
@@ -126,7 +125,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{participant.PartyID}, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("get router contract ID: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get router contract ID: %w", err)
 	}
 	c.logger.Debug().Str("InstanceAddress", routerAddress.String()).Str("ContractId", routerCid).Msg("Resolved PerPartyRouter contract")
 
@@ -134,7 +133,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	// CCIP
 	ccipExecuteDisclosure, err := c.GetCCIPExecuteDisclosure(ctx, encodedMessageHex)
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("get CCIP execute disclosure: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCIP execute disclosure: %w", err)
 	}
 	executeArgs := ccipreceiver.Execute{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
@@ -153,7 +152,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		verifier := ccvs[i]
 		ccvExecuteDisclosure, err := c.GetCCVExecuteDisclosure(ctx, encodedMessageHex, verifier)
 		if err != nil {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("get CCV execute disclosure for verifier %s: %w", verifier.String(), err)
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCV execute disclosure for verifier %s: %w", verifier.String(), err)
 		}
 
 		executeArgs.CcvInputs[i] = ccipreceiver.CCVInput{
@@ -169,12 +168,12 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		hashedInstrumentId := contracts.BytesToEncodedInstrumentID(message.TokenTransfer.DestTokenAddress)
 		tokenPoolAddress, err := c.GetTokenPoolForToken(ctx, hashedInstrumentId)
 		if err != nil {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("get token pool for token %s: %w", hashedInstrumentId.String(), err)
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get token pool for token %s: %w", hashedInstrumentId.String(), err)
 		}
 
 		tokenPoolDisclosure, err := c.GetTokenPoolExecuteDisclosure(ctx, encodedMessageHex, tokenPoolAddress.InstanceAddress())
 		if err != nil {
-			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("get tokenPoolExecuteDisclosure: %w", err)
+			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get token pool execute disclosure: %w", err)
 		}
 
 		executeArgs.TokenTransfer = &ccipreceiver.TokenTransferInput{
@@ -198,7 +197,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),
 	})
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("execute message: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to execute message: %w", err)
 	}
 
 	// TODO: refactor to use our standard unmarshaler
@@ -228,7 +227,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		},
 	})
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("get update %q: %w", executeReport.Output.ExecInfo.UpdateID, err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get update %q: %w", executeReport.Output.ExecInfo.UpdateID, err)
 	}
 	c.logger.Debug().Str("UpdateID", update.GetTransaction().GetUpdateId()).Msg("Executed message")
 	if message.TokenTransfer != nil {
@@ -264,7 +263,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					c.logger.Debug().Int64("Offset", createdEvent.GetOffset()).Str("ContractId", createdEvent.GetContractId()).Msg("Found ExecutionStateChanged event")
 					parsedEvent, err := parseExecutionStateChangedEvent(createdEvent)
 					if err != nil {
-						return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to parseExecutionStateChangedEvent: %w", err)
+						return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to parse ExecutionStateChanged event: %w", err)
 					}
 
 					return parsedEvent, nil
@@ -281,24 +280,24 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
 	executionStateChanged, err := bindings.UnmarshalCreatedEvent[common.ExecutionStateChanged](event)
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("unmarshal ExecutionStateChanged event: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to unmarshal ExecutionStateChanged event: %w", err)
 	}
 
 	// Source chain selector
 	sourceChainSelectorFloat, ok := new(big.Float).SetString(string(executionStateChanged.Event.SourceChainSelector))
 	if !ok {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("parse source chain selector numeric, input: %s", string(executionStateChanged.Event.SourceChainSelector))
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to parse source chain selector numeric, input: %s", string(executionStateChanged.Event.SourceChainSelector))
 	}
 	sourceChainSelector, _ := sourceChainSelectorFloat.Int(nil)
 	// Message ID
 	messageId, err := hex.DecodeString(string(executionStateChanged.Event.MessageId))
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("decode message ID %q: %w", string(executionStateChanged.Event.MessageId), err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to decode message ID %q: %w", string(executionStateChanged.Event.MessageId), err)
 	}
 	// Message number
 	sequenceNumberFloat, ok := new(big.Float).SetString(string(executionStateChanged.Event.SequenceNumber))
 	if !ok {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("parse sequence number numeric, input: %s", string(executionStateChanged.Event.SequenceNumber))
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to parse sequence number numeric, input: %s", string(executionStateChanged.Event.SequenceNumber))
 	}
 	sequenceNumber, _ := sequenceNumberFloat.Int(nil)
 	// Execution state
@@ -393,34 +392,12 @@ type verifierResult struct {
 	CCVData                []byte
 }
 
-// fetchVerifierResult queries the aggregator + indexer (via lib) for the verifier
-// output for messageID, mirroring tests/helpers.AssertSingleVerifierResult but without
-// requiring a *testing.T. Returns the single verifier result this dest needs to drive
-// ManuallyExecuteMessage. Caller must have called SetLib first.
+// fetchVerifierResult queries the aggregator + indexer for the verifier output for
+// messageID. Caller must have wired [VerifierObservation] on the chain first.
 func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Bytes32) (verifierResult, error) {
-	if c.lib == nil {
-		return verifierResult{}, fmt.Errorf("lib is nil; call SetLib on the Canton chain before ConfirmExecOnDest")
+	if !c.verifierObs.wired() {
+		return verifierResult{}, fmt.Errorf("verifier observation not wired")
 	}
-
-	chainMap, err := c.lib.ChainsMap(ctx)
-	if err != nil {
-		return verifierResult{}, fmt.Errorf("chains map: %w", err)
-	}
-	aggregatorClients, err := c.lib.AllAggregators()
-	if err != nil {
-		return verifierResult{}, fmt.Errorf("all aggregators: %w", err)
-	}
-	aggregatorClient, ok := aggregatorClients[devenvcommon.DefaultCommitteeVerifierQualifier]
-	if !ok || aggregatorClient == nil {
-		return verifierResult{}, fmt.Errorf("no aggregator client for qualifier %q", devenvcommon.DefaultCommitteeVerifierQualifier)
-	}
-	indexerMonitor, err := c.lib.IndexerMonitor()
-	if err != nil {
-		return verifierResult{}, fmt.Errorf("indexerMonitor: %w", err)
-	}
-
-	testCtx, cleanupFn := tcapi.NewTestingContext(ctx, chainMap, aggregatorClient, indexerMonitor)
-	defer cleanupFn()
 
 	// Use the deadline carried on ctx if any, else fall back to a sane default.
 	timeout := 5 * time.Minute
@@ -429,7 +406,7 @@ func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Byte
 			timeout = d
 		}
 	}
-	res, err := testCtx.AssertMessage([32]byte(messageID), tcapi.AssertMessageOptions{
+	res, err := AssertMessageWithVerifierObservation(ctx, c.verifierObs, messageID, tcapi.AssertMessageOptions{
 		TickInterval:            time.Second,
 		Timeout:                 timeout,
 		ExpectedVerifierResults: 1,
@@ -462,13 +439,13 @@ func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Byte
 func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error) {
 	switch {
 	case finality < 0:
-		return common.FinalityConfig{}, fmt.Errorf("encodeReceiverFinalityConfig: invalid finality %d: must be non-negative", finality)
+		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
 	case finality == 0:
 		return common.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
 	case finality == 0x00010000:
 		return common.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
 	case finality > 0xFFFF:
-		return common.FinalityConfig{}, fmt.Errorf("encodeReceiverFinalityConfig: invalid finality %d: max supported block depth is 65535", finality)
+		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
 	default:
 		return common.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}

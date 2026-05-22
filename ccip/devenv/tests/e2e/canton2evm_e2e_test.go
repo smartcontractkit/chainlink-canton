@@ -50,10 +50,10 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	chainMap, err := lib.ChainsMap(ctx)
 	require.NoError(t, err)
-	devenvtests.WireLibIntoChains(lib, chainMap)
+	require.NoError(t, devenvtests.WireVerifierObservationFromLib(lib, chainMap))
 
-	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, lib, chainMap)
-	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, lib, chainMap)
+	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
+	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
 	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
 	require.True(t, ok, "Canton chain cantonImpl must be *devenv.Chain")
 

@@ -8,28 +8,27 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
+
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 )
 
-// TODO: move this helper into ccv.Lib.
 func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, lib ccv.Lib) cciptestinterfaces.CCIP17 {
 	chainMap, err := lib.ChainsMap(t.Context())
 	require.NoError(t, err)
-	return GetChainFromMap(t, chainType, cfg, lib, chainMap)
+	return GetChainFromMap(t, chainType, cfg, chainMap)
 }
 
 // GetChainFromMap returns a chain from an existing ChainsMap result. lib.ChainsMap
 // constructs new impls on every call, so tests must reuse the same map they wired
-// (via WireLibIntoChains) rather than calling ChainsMap again through GetChain.
+// (via WireVerifierObservationFromLib) rather than calling ChainsMap again through GetChain.
 func GetChainFromMap(
 	t *testing.T,
 	chainType string,
 	cfg *ccv.Cfg,
-	lib ccv.Lib,
 	chainMap map[uint64]cciptestinterfaces.CCIP17,
 ) cciptestinterfaces.CCIP17 {
 	t.Helper()
@@ -38,9 +37,6 @@ func GetChainFromMap(
 
 	c, ok := chainMap[selector]
 	require.True(t, ok, "chain selector %d not in ChainsMap", selector)
-	if la, ok := c.(libAware); ok {
-		la.SetLib(lib)
-	}
 
 	return c
 }
@@ -73,22 +69,27 @@ func chainSelectorForType(t *testing.T, chainType string, cfg *ccv.Cfg) uint64 {
 	return chainDetails.ChainSelector
 }
 
-// libAware is implemented by chain impls that need a back-reference to ccv.Lib
-// (e.g. to fetch verifier results inside ConfirmExecOnDest). EVM does not
-// implement this; Canton does.
-type libAware interface {
-	SetLib(ccv.Lib)
+// verifierObservationAware is implemented by chain impls that need off-chain verifier
+// clients inside ConfirmExecOnDest. EVM does not implement this; Canton does.
+type verifierObservationAware interface {
+	SetVerifierObservation(cantondevenv.VerifierObservation)
 }
 
-// WireLibIntoChains injects lib into every chain that implements libAware. Test
-// runners must call this once after lib.ChainsMap and before invoking
-// chain methods that depend on the lib (today: Canton's ConfirmExecOnDest).
-func WireLibIntoChains(lib ccv.Lib, chains map[uint64]cciptestinterfaces.CCIP17) {
+// WireVerifierObservationFromLib builds aggregator/indexer clients from lib and
+// injects them into every chain that implements verifierObservationAware. Call once
+// after lib.ChainsMap. Requires NewLibFromCCVEnv (not CLDF-only Lib).
+func WireVerifierObservationFromLib(lib ccv.Lib, chains map[uint64]cciptestinterfaces.CCIP17) error {
+	obs, err := cantondevenv.VerifierObservationFromLib(lib)
+	if err != nil {
+		return err
+	}
 	for _, c := range chains {
-		if la, ok := c.(libAware); ok {
-			la.SetLib(lib)
+		if vo, ok := c.(verifierObservationAware); ok {
+			vo.SetVerifierObservation(obs)
 		}
 	}
+
+	return nil
 }
 
 func AssertSingleVerifierResult(
@@ -99,24 +100,10 @@ func AssertSingleVerifierResult(
 ) tcapi.AssertionResult {
 	t.Helper()
 
-	chainMap, err := lib.ChainsMap(ctx)
+	obs, err := cantondevenv.VerifierObservationFromLib(lib)
 	require.NoError(t, err)
 
-	aggregatorClients, err := lib.AllAggregators()
-	require.NoError(t, err)
-	aggregatorClient := aggregatorClients[common.DefaultCommitteeVerifierQualifier]
-	indexerMonitor, err := lib.IndexerMonitor()
-	require.NoError(t, err)
-
-	testCtx, cleanupFn := tcapi.NewTestingContext(
-		ctx,
-		chainMap,
-		aggregatorClient,
-		indexerMonitor,
-	)
-	defer cleanupFn()
-
-	result, err := testCtx.AssertMessage(messageID, tcapi.AssertMessageOptions{
+	result, err := cantondevenv.AssertMessageWithVerifierObservation(ctx, obs, messageID, tcapi.AssertMessageOptions{
 		TickInterval:            time.Second,
 		Timeout:                 utilstests.WaitTimeout(t),
 		ExpectedVerifierResults: 1,
