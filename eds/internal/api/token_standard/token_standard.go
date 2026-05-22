@@ -210,7 +210,7 @@ func (s Server) GetTransferFactory(c *gin.Context) {
 	}
 
 	var choiceArguments splice_api_token_transfer_instruction_v1.TransferFactoryTransfer
-	if err := ledger.RecordToStruct(req.ChoiceArguments, &choiceArguments); err != nil {
+	if err := ledger.MapToStruct(req.ChoiceArguments, &choiceArguments); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiTransferInstruction.ErrorResponse{Error: fmt.Sprintf("invalid `choiceArguments` format: %s", err.Error())})
 		return
 	}
