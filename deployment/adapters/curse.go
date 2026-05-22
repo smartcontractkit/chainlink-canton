@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	common_binding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -22,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
 )
@@ -33,14 +35,14 @@ var (
 
 func NewCantonCurseAdapter() *CantonCurseAdapter {
 	return &CantonCurseAdapter{
-		rmnRemoteAddressCache: make(map[uint64]contracts.InstanceAddress),
-		globalConfigCache:     make(map[uint64]contracts.InstanceAddress),
+		rmnRemoteRawCache: make(map[uint64]contracts.RawInstanceAddress),
+		globalConfigCache: make(map[uint64]contracts.InstanceAddress),
 	}
 }
 
 type CantonCurseAdapter struct {
-	rmnRemoteAddressCache map[uint64]contracts.InstanceAddress
-	globalConfigCache     map[uint64]contracts.InstanceAddress
+	rmnRemoteRawCache map[uint64]contracts.RawInstanceAddress
+	globalConfigCache map[uint64]contracts.InstanceAddress
 }
 
 // Curse implements [fastcurse.CurseAdapter].
@@ -55,16 +57,22 @@ func (c *CantonCurseAdapter) Curse() *cldf_ops.Sequence[fastcurse.CurseInput, se
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
 			}
 
-			// Get the RMNRemote instance address for the provided chain selector.
-			instanceAddr, ok := c.rmnRemoteAddressCache[chain.Selector]
+			rmnRemoteRaw, ok := c.rmnRemoteRawCache[chain.Selector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMNRemote instance address cached for chain %d", chain.Selector)
 			}
 
-			// TODO: should this be a CLDF sequence instead?
+			participant := chain.Participants[0]
+			// ReadAsPartyIDs are CanReadAs rights for parties the operator cannot ActAs (e.g. ccip owner).
+			// When present, exercises must be encoded as MCMS proposals instead of submitted directly.
+			mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
+			var proposalOutputs []contract.ExerciseOutput
+
 			for _, subject := range in.Subjects {
-				_, err = cldf_ops.ExecuteOperation(b, rmn_remote.Curse, chain, contract.ChoiceInput[rmn.Curse]{
-					InstanceAddress: instanceAddr,
+				report, err := cldf_ops.ExecuteOperation(b, rmn_remote.Curse, chain, contract.ChoiceInput[rmn.Curse]{
+					InstanceAddress:    rmnRemoteRaw.InstanceAddress(),
+					RawInstanceAddress: rmnRemoteRaw.String(),
+					MCMSEnabled:        mcmsEnabled,
 					Args: rmn.Curse{
 						Subject: types.TEXT(hex.EncodeToString(subject[:])),
 					},
@@ -72,11 +80,23 @@ func (c *CantonCurseAdapter) Curse() *cldf_ops.Sequence[fastcurse.CurseInput, se
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("execute curse operation: %w", err)
 				}
+				if mcmsEnabled && !report.Output.Executed() {
+					proposalOutputs = append(proposalOutputs, report.Output)
+				}
 			}
 
-			// TODO: MCMS batch operation?
+			if !mcmsEnabled {
+				return output, nil
+			}
+			batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for curse: %w", err)
+			}
+			if len(batchOp.Transactions) == 0 {
+				return sequences.OnChainOutput{}, nil
+			}
 
-			return output, nil
+			return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 		},
 	)
 }
@@ -93,7 +113,11 @@ func (c *CantonCurseAdapter) Initialize(e deployment.Environment, selector uint6
 		return fmt.Errorf("get global config address: %w", err)
 	}
 
-	c.rmnRemoteAddressCache[selector] = contracts.HexToInstanceAddress(rmnRemoteRef.Address)
+	rmnRemoteRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(rmnRemoteRef)
+	if err != nil {
+		return fmt.Errorf("rmn remote raw instance address: %w", err)
+	}
+	c.rmnRemoteRawCache[selector] = rmnRemoteRaw
 	c.globalConfigCache[selector] = contracts.HexToInstanceAddress(globalConfigRef.Address)
 
 	return nil
@@ -150,7 +174,7 @@ func (c *CantonCurseAdapter) IsChainConnectedToTargetChain(e deployment.Environm
 
 // IsCurseEnabledForChain implements [fastcurse.CurseAdapter].
 func (c *CantonCurseAdapter) IsCurseEnabledForChain(e deployment.Environment, selector uint64) (bool, error) {
-	_, ok := c.rmnRemoteAddressCache[selector]
+	_, ok := c.rmnRemoteRawCache[selector]
 	if !ok {
 		return false, fmt.Errorf("no RMNRemote instance address cached for chain %d", selector)
 	}
@@ -165,7 +189,7 @@ func (c *CantonCurseAdapter) IsSubjectCursedOnChain(e deployment.Environment, se
 		return false, fmt.Errorf("chain with selector %d not found in environment", selector)
 	}
 
-	rmnRemoteInstanceAddr, ok := c.rmnRemoteAddressCache[selector]
+	rmnRemoteRaw, ok := c.rmnRemoteRawCache[selector]
 	if !ok {
 		return false, fmt.Errorf("no RMNRemote instance address cached for chain %d", selector)
 	}
@@ -176,14 +200,14 @@ func (c *CantonCurseAdapter) IsSubjectCursedOnChain(e deployment.Environment, se
 		participant.LedgerServices.State,
 		contract.LedgerQueryParties(participant),
 		rmn.RMNRemote{}.GetTemplateID(),
-		rmnRemoteInstanceAddr,
+		rmnRemoteRaw.InstanceAddress(),
 	)
 	if err != nil {
 		return false, fmt.Errorf("find active contract by instance address: %w", err)
 	}
 
 	if active == nil {
-		return false, fmt.Errorf("no active contract found for RMNRemote %s", rmnRemoteInstanceAddr.String())
+		return false, fmt.Errorf("no active contract found for RMNRemote %s", rmnRemoteRaw.InstanceAddress().String())
 	}
 
 	rmnRemoteCreated, err := bindings.UnmarshalCreatedEvent[rmn.RMNRemote](active.GetCreatedEvent())
@@ -245,16 +269,22 @@ func (c *CantonCurseAdapter) Uncurse() *cldf_ops.Sequence[fastcurse.CurseInput, 
 				return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found in environment", in.ChainSelector)
 			}
 
-			// Get the RMNRemote instance address for the provided chain selector.
-			instanceAddr, ok := c.rmnRemoteAddressCache[chain.Selector]
+			rmnRemoteRaw, ok := c.rmnRemoteRawCache[chain.Selector]
 			if !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("no RMNRemote instance address cached for chain %d", chain.Selector)
 			}
 
-			// TODO: should this be a CLDF sequence instead?
+			participant := chain.Participants[0]
+			// ReadAsPartyIDs are CanReadAs rights for parties the operator cannot ActAs (e.g. ccip owner).
+			// When present, exercises must be encoded as MCMS proposals instead of submitted directly.
+			mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
+			var proposalOutputs []contract.ExerciseOutput
+
 			for _, subject := range in.Subjects {
-				_, err = cldf_ops.ExecuteOperation(b, rmn_remote.Uncurse, chain, contract.ChoiceInput[rmn.Uncurse]{
-					InstanceAddress: instanceAddr,
+				report, err := cldf_ops.ExecuteOperation(b, rmn_remote.Uncurse, chain, contract.ChoiceInput[rmn.Uncurse]{
+					InstanceAddress:    rmnRemoteRaw.InstanceAddress(),
+					RawInstanceAddress: rmnRemoteRaw.String(),
+					MCMSEnabled:        mcmsEnabled,
 					Args: rmn.Uncurse{
 						Subject: types.TEXT(hex.EncodeToString(subject[:])),
 					},
@@ -262,11 +292,23 @@ func (c *CantonCurseAdapter) Uncurse() *cldf_ops.Sequence[fastcurse.CurseInput, 
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("execute uncurse operation: %w", err)
 				}
+				if mcmsEnabled && !report.Output.Executed() {
+					proposalOutputs = append(proposalOutputs, report.Output)
+				}
 			}
 
-			// TODO: MCMS batch operation?
+			if !mcmsEnabled {
+				return output, nil
+			}
+			batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for uncurse: %w", err)
+			}
+			if len(batchOp.Transactions) == 0 {
+				return sequences.OnChainOutput{}, nil
+			}
 
-			return output, nil
+			return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 		},
 	)
 }

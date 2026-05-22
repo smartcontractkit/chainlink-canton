@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -25,29 +24,16 @@ import (
 	dsutil "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 )
 
+// SetRuntimeDataStore forwards to the shared runtime datastore used by lane configure sequences.
+func SetRuntimeDataStore(ds datastore.DataStore) {
+	dsutil.SetRuntimeDataStore(ds)
+}
+
 var _ ccipadapters.ChainFamily = (*CantonChainFamilyAdapter)(nil)
 
 type CantonChainFamilyAdapter struct{}
 
 var CantonFamilySelector = [4]byte{0xdf, 0xaf, 0xaf, 0x4b}
-
-var (
-	runtimeDataStoreMu sync.RWMutex
-	runtimeDataStore   datastore.DataStore
-)
-
-func SetRuntimeDataStore(ds datastore.DataStore) {
-	runtimeDataStoreMu.Lock()
-	defer runtimeDataStoreMu.Unlock()
-	runtimeDataStore = ds
-}
-
-func getRuntimeDataStore() datastore.DataStore {
-	runtimeDataStoreMu.RLock()
-	defer runtimeDataStoreMu.RUnlock()
-
-	return runtimeDataStore
-}
 
 func DefaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
@@ -76,7 +62,7 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 		semver.MustParse("2.0.0"),
 		"Configures CCIP lanes for a Canton chain",
 		func(b cldfops.Bundle, chains cldfchain.BlockChains, input ccipadapters.ConfigureChainForLanesInput) (ccipseq.OnChainOutput, error) {
-			ds := getRuntimeDataStore()
+			ds := dsutil.RuntimeDataStore()
 			if ds == nil {
 				return ccipseq.OnChainOutput{}, fmt.Errorf("runtime datastore is not set")
 			}
@@ -155,11 +141,13 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 					DefaultOutboundCCVs:      defaultOutboundCCVs,
 					LaneMandatedOutboundCCVs: laneMandatedOutboundCCVs,
 					DefaultExecutor:          localExecutor,
-					CantonLaneConfig:         &lanes.CantonLaneConfig{GlobalConfig: localGlobalConfig},
-					OnRamp:                   input.OnRamp,
-					OffRamp:                  input.OffRamp,
-					Router:                   input.Router,
-					FeeQuoter:                input.FeeQuoter,
+					CantonLaneConfig: &lanes.CantonLaneConfig{
+						GlobalConfig: localGlobalConfig,
+					},
+					OnRamp:    input.OnRamp,
+					OffRamp:   input.OffRamp,
+					Router:    input.Router,
+					FeeQuoter: input.FeeQuoter,
 				}
 
 				remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)
