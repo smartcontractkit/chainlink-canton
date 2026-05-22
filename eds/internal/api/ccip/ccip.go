@@ -274,6 +274,10 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "unsupported destination chain selector"})
 		return
 	}
+	if !destChainConfig.IsEnabled {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "destination chain is disabled"})
+		return
+	}
 	// Lane mandated CCVs are always required
 	resolvedCCVs := make(map[contracts.InstanceAddress]oapiCommon.RawOrHashedAddress, len(destChainConfig.LaneMandatedCCVs))
 	for _, laneMandatedCCV := range destChainConfig.LaneMandatedCCVs {
@@ -371,13 +375,6 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 
 	// If the message contains a token transfer, look up the token pool on the TAR and return the TokenConfig
 	if req.Message.TokenTransfer != nil {
-		activeTokenAdminRegistryContract, ok := s.activeContractStore.Get(s.tokenAdminRegistry)
-		if !ok {
-			s.logger.Error().Stringer("address", s.tokenAdminRegistry).Msg("active tokenAdminRegistry contract not found")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-			return
-		}
-
 		parsedTokenAdminRegistry, err := ParseTokenAdminRegistry(activeTokenAdminRegistryContract.GetCreatedEvent())
 		if err != nil {
 			s.logger.Err(err).Msg("failed to parse token admin registry contract")
