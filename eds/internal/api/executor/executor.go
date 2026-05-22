@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
@@ -53,6 +55,7 @@ func NewServer(
 }
 
 func (s *Server) PostExecutorSend(c *gin.Context, address string) {
+	// Parse and validate request
 	var req oapiExecutor.ExecutorSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
@@ -63,11 +66,35 @@ func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 
 		return
 	}
+	if err := parse.ValidateMessage(req.Message); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("invalid message: %s", err.Error())})
+		return
+	}
 
 	instanceAddress, err := converters.ResolveAddress(address)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
+	}
+	// Validate that the address path parameter matches the executor address specified in the message
+	switch req.Message.Executor.Type {
+	case oapiCommon.NoExecutor:
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "executor type is no_executor, can't request executor disclosures"})
+		return
+	case oapiCommon.Empty:
+		// If the message contains an empty executor, that means the default should apply.
+		// Cannot check against this executor since we don't know if we're the default.
+	case oapiCommon.WithAddress:
+		// parse.ValidateMessage will have already verified that the address is present and valid
+		requestInstanceAddress, err := converters.ResolveRawOrHashedAddress(*req.Message.Executor.Address)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("invalid executor address in message: %s", err.Error())})
+			return
+		}
+		if instanceAddress != requestInstanceAddress {
+			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("executor in message doesn't match requested executor: %s!=%s", requestInstanceAddress, instanceAddress)})
+			return
+		}
 	}
 
 	_, ok := s.contractConfigs[instanceAddress]
@@ -92,6 +119,33 @@ func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 		return
 	}
 
+	// Validate request's CCVs against the contract settings
+	if int64(len(req.Ccvs)) > parsedExecutor.MaxCCVsPerMessage {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("too many CCVs: %d provided, but max allowed is %d", len(req.Ccvs), parsedExecutor.MaxCCVsPerMessage)})
+		return
+	}
+	// If the allowlist is enabled, validate that the provided CCVs are all allowed
+	if parsedExecutor.CCVAllowlistEnabled {
+		for i, ccv := range req.Ccvs {
+			instanceAddress, err := converters.ResolveRawOrHashedAddress(ccv)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("invalid CCV at index %d: %s", i, err.Error())})
+				return
+			}
+			allowed := false
+			for _, allowedCCV := range parsedExecutor.AllowedCCVs {
+				if instanceAddress == allowedCCV.InstanceAddress() {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("CCV at index %d is not in the allowed CCV list", i)})
+				return
+			}
+		}
+	}
+
 	contextData, err := converters.SerializeChoiceContext(splice_api_token_metadata_v1.ChoiceContext{
 		Values: map[string]splice_api_token_metadata_v1.AnyValue{
 			// Empty for now
@@ -102,9 +156,6 @@ func (s *Server) PostExecutorSend(c *gin.Context, address string) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
-
-	// TODO check the provided CCVs against CCV allow list
-	// TODO Validate that the executor specified in the message matches this executor (and the user didn't specify no-execution)
 
 	resp := oapiExecutor.ExecutorSendResponse{
 		ContractId:         activeExecutorContract.GetCreatedEvent().GetContractId(),

@@ -703,7 +703,10 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			Type:    oapiCommon.WithAddress,
 			Address: &executorRawOrHashedAddress,
 		},
-		FeeToken: oapiCommon.InstrumentId{},
+		FeeToken: oapiCommon.InstrumentId{
+			Admin: oapiCommon.PartyId(nativeInstrumentId.Admin),
+			Id:    string(nativeInstrumentId.Id),
+		},
 		Payload:  "",
 		Receiver: "",
 		TokenTransfer: &oapiCommon.TokenTransfer{
