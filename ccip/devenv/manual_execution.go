@@ -200,6 +200,8 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("execute message: %w", err)
 	}
+
+	// TODO: refactor to use our standard unmarshaler
 	c.logger.Info().Str("UpdateID", executeReport.Output.ExecInfo.UpdateID).Msg("Message executed")
 	update, err := participant.LedgerServices.Update.GetUpdateById(ctx, &apiv2.GetUpdateByIdRequest{
 		UpdateId: executeReport.Output.ExecInfo.UpdateID,
@@ -346,15 +348,12 @@ func (c *Chain) lockForParty(party string) func() {
 }
 
 // findExistingExecutionState scans active ExecutionStateChanged contracts on the receiver
-// party and returns the parsed event matching (sourceChainSelector, seqNo) if present.
-// Used by ConfirmExecOnDest for idempotency: if a message has already been executed,
-// repeated calls return the same event instead of attempting to re-execute (which would
-// fail because the underlying PerPartyRouter contract has been consumed).
-//
-// TODO(canton-executor-service): when an on-chain Canton executor exists, prefer its event
-// stream over manual execution; this lookup naturally wins that race already.
+// party and returns the parsed event matching (sourceChainSelector, seqNo, messageID) if
+// present. Used by ConfirmExecOnDest for idempotency: if a message has already been
+// executed, repeated calls return the same event instead of attempting to re-execute
+// (which would fail because the underlying PerPartyRouter contract has been consumed).
 func (c *Chain) findExistingExecutionState(
-	ctx context.Context, sourceChainSelector, seqNo uint64,
+	ctx context.Context, sourceChainSelector, seqNo uint64, messageID protocol.Bytes32,
 ) (cciptestinterfaces.ExecutionStateChangedEvent, bool, error) {
 	if len(c.chain.Participants) == 0 {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: no participants on chain")
@@ -376,7 +375,9 @@ func (c *Chain) findExistingExecutionState(
 			c.logger.Debug().Err(err).Msg("Skipping unparseable ExecutionStateChanged active contract")
 			continue
 		}
-		if uint64(ev.SourceChainSelector) == sourceChainSelector && ev.MessageNumber == seqNo {
+		if uint64(ev.SourceChainSelector) == sourceChainSelector &&
+			ev.MessageNumber == seqNo &&
+			ev.MessageID == messageID {
 			return ev, true, nil
 		}
 	}
@@ -398,24 +399,24 @@ type verifierResult struct {
 // ManuallyExecuteMessage. Caller must have called SetLib first.
 func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Bytes32) (verifierResult, error) {
 	if c.lib == nil {
-		return verifierResult{}, fmt.Errorf("fetchVerifierResult: lib is nil; call SetLib on the Canton chain before ConfirmExecOnDest")
+		return verifierResult{}, fmt.Errorf("lib is nil; call SetLib on the Canton chain before ConfirmExecOnDest")
 	}
 
 	chainMap, err := c.lib.ChainsMap(ctx)
 	if err != nil {
-		return verifierResult{}, fmt.Errorf("fetchVerifierResult: chains map: %w", err)
+		return verifierResult{}, fmt.Errorf("chains map: %w", err)
 	}
 	aggregatorClients, err := c.lib.AllAggregators()
 	if err != nil {
-		return verifierResult{}, fmt.Errorf("fetchVerifierResult: all aggregators: %w", err)
+		return verifierResult{}, fmt.Errorf("all aggregators: %w", err)
 	}
 	aggregatorClient, ok := aggregatorClients[devenvcommon.DefaultCommitteeVerifierQualifier]
 	if !ok || aggregatorClient == nil {
-		return verifierResult{}, fmt.Errorf("fetchVerifierResult: no aggregator client for qualifier %q", devenvcommon.DefaultCommitteeVerifierQualifier)
+		return verifierResult{}, fmt.Errorf("no aggregator client for qualifier %q", devenvcommon.DefaultCommitteeVerifierQualifier)
 	}
 	indexerMonitor, err := c.lib.IndexerMonitor()
 	if err != nil {
-		return verifierResult{}, fmt.Errorf("fetchVerifierResult: indexerMonitor: %w", err)
+		return verifierResult{}, fmt.Errorf("indexerMonitor: %w", err)
 	}
 
 	testCtx, cleanupFn := tcapi.NewTestingContext(ctx, chainMap, aggregatorClient, indexerMonitor)
@@ -436,13 +437,13 @@ func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Byte
 		AssertExecutorLogs:      false,
 	})
 	if err != nil {
-		return verifierResult{}, fmt.Errorf("fetchVerifierResult: assertMessage: %w", err)
+		return verifierResult{}, fmt.Errorf("assertMessage: %w", err)
 	}
 	if res.AggregatedResult == nil {
-		return verifierResult{}, fmt.Errorf("fetchVerifierResult: aggregated verifier result missing")
+		return verifierResult{}, fmt.Errorf("aggregated verifier result missing")
 	}
 	if len(res.IndexedVerifications.Results) != 1 {
-		return verifierResult{}, fmt.Errorf("fetchVerifierResult: expected 1 indexed verifier result, got %d", len(res.IndexedVerifications.Results))
+		return verifierResult{}, fmt.Errorf("expected 1 indexed verifier result, got %d", len(res.IndexedVerifications.Results))
 	}
 	vr := res.IndexedVerifications.Results[0].VerifierResult
 
@@ -463,22 +464,14 @@ func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error)
 	case finality < 0:
 		return common.FinalityConfig{}, fmt.Errorf("encodeReceiverFinalityConfig: invalid finality %d: must be non-negative", finality)
 	case finality == 0:
-		return receiverWaitForFinalityConfig(), nil
+		return common.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
 	case finality == 0x00010000:
-		return receiverWaitForSafeConfig(), nil
+		return common.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
 	case finality > 0xFFFF:
 		return common.FinalityConfig{}, fmt.Errorf("encodeReceiverFinalityConfig: invalid finality %d: max supported block depth is 65535", finality)
 	default:
 		return common.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}
-}
-
-func receiverWaitForFinalityConfig() common.FinalityConfig {
-	return common.FinalityConfig{WaitForFinality: &types.UNIT{}}
-}
-
-func receiverWaitForSafeConfig() common.FinalityConfig {
-	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
 }
 
 // hashInstanceAddress decodes a verifier result's VerifierDestAddress on Canton.

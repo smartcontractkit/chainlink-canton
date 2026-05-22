@@ -871,27 +871,24 @@ func (c *Chain) ConfirmSendOnSource(ctx context.Context, to uint64, key cciptest
 // via ManuallyExecuteMessage. To keep the gun and e2e tests direction-agnostic,
 // this method drives the full path:
 //  1. Lock per receiver party (PerPartyRouter CID is consumed on every Execute).
-//  2. Idempotency: if an ExecutionStateChanged for (from, seqNo) already exists on
-//     the ledger, parse and return it without re-executing.
+//  2. Idempotency: if an ExecutionStateChanged for (from, seqNo, messageID) already
+//     exists on the ledger, parse and return it without re-executing.
 //  3. Otherwise fetch the verifier result via lib.AggregatorClient + lib.IndexerMonitor,
 //     translate the verifier dest address to its hashed instance address, and call
 //     ManuallyExecuteMessage.
 //
-// Both SeqNum AND MessageID must be set on key: SeqNum keys the idempotency lookup,
-// MessageID keys the verifier-result fetch. EVM-side ConfirmExecOnDest is permissive
+// Both SeqNum AND MessageID must be set on key: they key the idempotency lookup and
+// the verifier-result fetch respectively. EVM-side ConfirmExecOnDest is permissive
 // and accepts either; Canton requires both. Test runners must call SetLib first.
-//
-// TODO(canton-executor-service): when an on-chain Canton executor exists, prefer its
-// event over manual execution. The idempotency lookup already wins that race.
 func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptestinterfaces.MessageEventKey, timeout time.Duration) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
 	if key.MessageID == (protocol.Bytes32{}) || key.SeqNum == 0 {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("confirmExecOnDest: MessageEventKey must have both MessageID and SeqNum")
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("MessageEventKey must have both MessageID and SeqNum")
 	}
 	if c.lib == nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("confirmExecOnDest: lib not wired (test runner must call SetLib)")
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("lib not wired (test runner must call SetLib)")
 	}
 	if len(c.chain.Participants) == 0 {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("confirmExecOnDest: no participants on chain")
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no participants on chain")
 	}
 
 	if timeout > 0 {
@@ -904,12 +901,13 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 	unlock := c.lockForParty(receiverParty)
 	defer unlock()
 
-	if ev, found, err := c.findExistingExecutionState(ctx, from, key.SeqNum); err != nil {
+	if ev, found, err := c.findExistingExecutionState(ctx, from, key.SeqNum, key.MessageID); err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("idempotency lookup: %w", err)
 	} else if found {
 		c.logger.Info().
 			Uint64("from", from).
 			Uint64("seqNo", key.SeqNum).
+			Str("messageID", hex.EncodeToString(key.MessageID[:])).
 			Str("state", ev.State.String()).
 			Msg("ConfirmExecOnDest idempotent return: ExecutionStateChanged already present")
 
