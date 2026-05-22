@@ -186,7 +186,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
-
 	t.Run("Success - without holdings", func(t *testing.T) {
 		t.Parallel()
 		mockACS, mockIHS, client := setup(t)
@@ -213,7 +212,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
-
 	t.Run("Success - RawInstanceAddress", func(t *testing.T) {
 		t.Parallel()
 		mockACS, mockIHS, client := setup(t)
@@ -241,10 +239,8 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
-
 	t.Run("Failure cases", func(t *testing.T) {
 		t.Parallel()
-
 		t.Run("Invalid request", func(t *testing.T) {
 			t.Parallel()
 			_, _, client := setup(t)
@@ -253,7 +249,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
-
 		t.Run("Oversized request", func(t *testing.T) {
 			t.Parallel()
 			_, _, client := setup(t)
@@ -263,7 +258,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.Equalf(t, http.StatusRequestEntityTooLarge, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "request body too large")
 		})
-
 		t.Run("Invalid address", func(t *testing.T) {
 			t.Parallel()
 			_, _, client := setup(t)
@@ -274,7 +268,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
-
 		t.Run("Unknown address", func(t *testing.T) {
 			t.Parallel()
 			_, _, client := setup(t)
@@ -287,7 +280,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.Equalf(t, http.StatusNotFound, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "token pool address not found")
 		})
-
 		t.Run("Token pool not found in store", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -300,7 +292,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
-
 		t.Run("Invalid destination chain selector", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -317,7 +308,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "invalid destination chain selector")
 		})
-
 		t.Run("No token transfer in message", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -334,7 +324,28 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "message does not contain a token transfer")
 		})
+		t.Run("Wrong token for pool", func(t *testing.T) {
+			t.Parallel()
+			mockACS, _, client := setup(t)
 
+			mockACS.EXPECT().Get(tokenPoolAddress.InstanceAddress()).Return(tokenPoolActiveContract, true)
+
+			unsupportedTokenMessage := validMessage
+			unsupportedTokenMessage.TokenTransfer = &oapiCommon.TokenTransfer{
+				Amount: "1",
+				Token: oapiCommon.InstrumentId{
+					Admin: "wrongAdmin",
+					Id:    "WrongID",
+				},
+			}
+
+			resp, err := client.PostTokenPoolSendWithResponse(t.Context(), tokenPoolAddress.InstanceAddress().Hex(), oapiTokenPool.TokenPoolSendRequest{
+				Message: unsupportedTokenMessage,
+			})
+			require.NoError(t, err)
+			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+			require.Contains(t, string(resp.Body), "wrong pool for Message.TokenTransfer")
+		})
 		t.Run("Unsupported destination chain selector", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -351,7 +362,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "unsupported destination chain selector")
 		})
-
 		t.Run("Outbound rate limiter not found", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -365,7 +375,6 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
-
 		t.Run("Token pool not returned from store (nil created event)", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -482,7 +491,6 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 
 		return mockACS, mockIHS, client
 	}
-
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockACS, _, client := setup(t)
@@ -512,7 +520,6 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
-
 	t.Run("Success - RawInstanceAddress", func(t *testing.T) {
 		t.Parallel()
 		mockACS, _, client := setup(t)
@@ -537,10 +544,30 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
-
 	t.Run("Failure cases", func(t *testing.T) {
 		t.Parallel()
+		t.Run("Wrong token for pool", func(t *testing.T) {
+			t.Parallel()
+			mockACS, _, client := setup(t)
 
+			mockACS.EXPECT().Get(tokenPoolAddress.InstanceAddress()).Return(tokenPoolActiveContract, true)
+
+			unsupportedTokenMessage := validMessage
+			unsupportedTokenMessage.TokenTransfer = &oapiCommon.TokenTransfer{
+				Amount: "1",
+				Token: oapiCommon.InstrumentId{
+					Admin: "wrongAdmin",
+					Id:    "WrongID",
+				},
+			}
+
+			resp, err := client.PostTokenPoolSendWithResponse(t.Context(), tokenPoolAddress.InstanceAddress().Hex(), oapiTokenPool.TokenPoolSendRequest{
+				Message: unsupportedTokenMessage,
+			})
+			require.NoError(t, err)
+			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+			require.Contains(t, string(resp.Body), "wrong pool for Message.TokenTransfer")
+		})
 		t.Run("Unsupported destination chain selector", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -557,7 +584,6 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "unsupported destination chain selector")
 		})
-
 		t.Run("Outbound rate limiter not found", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -571,7 +597,6 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
-
 		t.Run("Token pool not returned from store (nil create arguments)", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)

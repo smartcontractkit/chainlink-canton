@@ -42,6 +42,7 @@ func TestServer_PostTokenPoolExecute_LockRelease(t *testing.T) {
 		Admin: "tokenAdmin",
 		Id:    "TestToken",
 	}
+	encodedInstrumentId := contracts.EncodeInstrumentID(instrumentId)
 
 	lockReleaseTokenPool := lockreleasetokenpool.LockReleaseTokenPool{
 		InstanceId:   types.TEXT(tokenPoolAddress.InstanceID()),
@@ -120,7 +121,7 @@ func TestServer_PostTokenPoolExecute_LockRelease(t *testing.T) {
 		Finality:            protocol.FinalityWaitForFinality,
 		TokenTransfer: &protocol.TokenTransfer{
 			Amount:                 big.NewInt(100),
-			DestTokenAddress:       make([]byte, 32),
+			DestTokenAddress:       encodedInstrumentId[:],
 			DestTokenAddressLength: 32,
 		},
 	}
@@ -135,7 +136,7 @@ func TestServer_PostTokenPoolExecute_LockRelease(t *testing.T) {
 		Finality:            5, // custom block confirmations
 		TokenTransfer: &protocol.TokenTransfer{
 			Amount:                 big.NewInt(100),
-			DestTokenAddress:       make([]byte, 32),
+			DestTokenAddress:       encodedInstrumentId[:],
 			DestTokenAddressLength: 32,
 		},
 	}
@@ -366,7 +367,35 @@ func TestServer_PostTokenPoolExecute_LockRelease(t *testing.T) {
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "message does not contain a token transfer")
 		})
+		t.Run("Wrong token in message", func(t *testing.T) {
+			t.Parallel()
+			mockACS, _, client := setup(t)
 
+			mockACS.EXPECT().Get(tokenPoolAddress.InstanceAddress()).Return(tokenPoolActiveContract, true)
+
+			instrumentId := contracts.EncodeInstrumentID(splice_api_token_holding_v1.InstrumentId{
+				Admin: "wrongAdmin",
+				Id:    "WrongID",
+			})
+			unsupportedMessage := protocol.Message{
+				SourceChainSelector: protocol.ChainSelector(999),
+				DestChainSelector:   protocol.ChainSelector(456),
+				TokenTransfer: &protocol.TokenTransfer{
+					Amount:                 big.NewInt(100),
+					DestTokenAddress:       instrumentId[:],
+					DestTokenAddressLength: 32,
+				},
+			}
+			unsupportedBytes, err := unsupportedMessage.Encode()
+			require.NoError(t, err)
+
+			resp, err := client.PostTokenPoolExecuteWithResponse(t.Context(), tokenPoolAddress.InstanceAddress().Hex(), oapiTokenPool.TokenPoolExecuteRequest{
+				EncodedMessage: hex.EncodeToString(unsupportedBytes),
+			})
+			require.NoError(t, err)
+			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+			require.Contains(t, string(resp.Body), "wrong pool for Message.TokenTransfer")
+		})
 		t.Run("Unsupported source chain selector", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -379,7 +408,7 @@ func TestServer_PostTokenPoolExecute_LockRelease(t *testing.T) {
 				DestChainSelector:   protocol.ChainSelector(456),
 				TokenTransfer: &protocol.TokenTransfer{
 					Amount:                 big.NewInt(100),
-					DestTokenAddress:       make([]byte, 32),
+					DestTokenAddress:       encodedInstrumentId[:],
 					DestTokenAddressLength: 32,
 				},
 			}
@@ -468,6 +497,7 @@ func TestServer_PostTokenPoolExecute_BurnMint(t *testing.T) {
 		Admin: "tokenAdmin",
 		Id:    "TestToken",
 	}
+	encodedInstrumentId := contracts.EncodeInstrumentID(instrumentId)
 
 	burnMintPool := burnminttokenpool.BurnMintTokenPool{
 		InstanceId:   types.TEXT(tokenPoolAddress.InstanceID()),
@@ -534,7 +564,7 @@ func TestServer_PostTokenPoolExecute_BurnMint(t *testing.T) {
 		Finality:            protocol.FinalityWaitForFinality,
 		TokenTransfer: &protocol.TokenTransfer{
 			Amount:                 big.NewInt(100),
-			DestTokenAddress:       make([]byte, 32),
+			DestTokenAddress:       encodedInstrumentId[:],
 			DestTokenAddressLength: 32,
 		},
 	}
@@ -549,7 +579,7 @@ func TestServer_PostTokenPoolExecute_BurnMint(t *testing.T) {
 		Finality:            5,
 		TokenTransfer: &protocol.TokenTransfer{
 			Amount:                 big.NewInt(100),
-			DestTokenAddress:       make([]byte, 32),
+			DestTokenAddress:       encodedInstrumentId[:],
 			DestTokenAddressLength: 32,
 		},
 	}
@@ -656,6 +686,35 @@ func TestServer_PostTokenPoolExecute_BurnMint(t *testing.T) {
 	t.Run("Failure cases", func(t *testing.T) {
 		t.Parallel()
 
+		t.Run("Wrong token in message", func(t *testing.T) {
+			t.Parallel()
+			mockACS, _, client := setup(t)
+
+			mockACS.EXPECT().Get(tokenPoolAddress.InstanceAddress()).Return(tokenPoolActiveContract, true)
+
+			instrumentId := contracts.EncodeInstrumentID(splice_api_token_holding_v1.InstrumentId{
+				Admin: "wrongAdmin",
+				Id:    "WrongID",
+			})
+			unsupportedMessage := protocol.Message{
+				SourceChainSelector: protocol.ChainSelector(999),
+				DestChainSelector:   protocol.ChainSelector(456),
+				TokenTransfer: &protocol.TokenTransfer{
+					Amount:                 big.NewInt(100),
+					DestTokenAddress:       instrumentId[:],
+					DestTokenAddressLength: 32,
+				},
+			}
+			unsupportedBytes, err := unsupportedMessage.Encode()
+			require.NoError(t, err)
+
+			resp, err := client.PostTokenPoolExecuteWithResponse(t.Context(), tokenPoolAddress.InstanceAddress().Hex(), oapiTokenPool.TokenPoolExecuteRequest{
+				EncodedMessage: hex.EncodeToString(unsupportedBytes),
+			})
+			require.NoError(t, err)
+			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+			require.Contains(t, string(resp.Body), "wrong pool for Message.TokenTransfer")
+		})
 		t.Run("Unsupported source chain selector", func(t *testing.T) {
 			t.Parallel()
 			mockACS, _, client := setup(t)
@@ -667,7 +726,7 @@ func TestServer_PostTokenPoolExecute_BurnMint(t *testing.T) {
 				DestChainSelector:   protocol.ChainSelector(456),
 				TokenTransfer: &protocol.TokenTransfer{
 					Amount:                 big.NewInt(100),
-					DestTokenAddress:       make([]byte, 32),
+					DestTokenAddress:       encodedInstrumentId[:],
 					DestTokenAddressLength: 32,
 				},
 			}
