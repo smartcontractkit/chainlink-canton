@@ -11,10 +11,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
@@ -29,13 +29,14 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
 // MaxNumCCVs is a sane limit on the maximum number of CCVs requestable by a client.
-// This is a defense in depth measure to prevent abuse of the API.
+// This is a defense-in-depth measure to prevent abuse of the API.
 const MaxNumCCVs = 64
 
 type Server struct {
@@ -132,7 +133,7 @@ func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
 
 	resp := &oapiCCIP.CCIPPerPartyRouterFactoryResponse{
 		ContractId:         activePerPartyRouterFactoryContract.GetCreatedEvent().GetContractId(),
-		InstanceAddress:    parsedPerPartyRouterFactory.Address.InstanceID(),
+		InstanceAddress:    parsedPerPartyRouterFactory.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: parsedPerPartyRouterFactory.Address.String(),
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activePerPartyRouterFactoryContract),
@@ -189,6 +190,7 @@ func (s Server) GetTokenAdminRegistryToken(c *gin.Context, instrumentId oapiComm
 }
 
 func (s Server) PostCCIPSend(c *gin.Context) {
+	// Parse and validate request
 	var req oapiCCIP.CCIPSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
@@ -197,6 +199,10 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 
+		return
+	}
+	if err := parse.ValidateMessage(req.Message); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("invalid message: %s", err.Error())})
 		return
 	}
 	if req.SenderRequiredCCVs != nil && len(*req.SenderRequiredCCVs) > MaxNumCCVs {
@@ -266,6 +272,10 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 	destChainConfig, ok := parsedGlobalConfig.DestChainConfigs[destinationChainSelector]
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "unsupported destination chain selector"})
+		return
+	}
+	if !destChainConfig.IsEnabled {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "destination chain is disabled"})
 		return
 	}
 	// Lane mandated CCVs are always required
@@ -365,13 +375,6 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 
 	// If the message contains a token transfer, look up the token pool on the TAR and return the TokenConfig
 	if req.Message.TokenTransfer != nil {
-		activeTokenAdminRegistryContract, ok := s.activeContractStore.Get(s.tokenAdminRegistry)
-		if !ok {
-			s.logger.Error().Stringer("address", s.tokenAdminRegistry).Msg("active tokenAdminRegistry contract not found")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-			return
-		}
-
 		parsedTokenAdminRegistry, err := ParseTokenAdminRegistry(activeTokenAdminRegistryContract.GetCreatedEvent())
 		if err != nil {
 			s.logger.Err(err).Msg("failed to parse token admin registry contract")
