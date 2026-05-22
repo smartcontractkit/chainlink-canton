@@ -508,10 +508,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 		}
 
 		poolOwner := types.PARTY(participant.PartyID)
-		poolInstanceID, err := ensureInstanceID(types.TEXT(fmt.Sprintf("lockreleasetokenpool-%s", qualifier)), "lockreleasetokenpool")
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("ensure lock/release pool instance ID: %w", err)
-		}
+		poolInstanceID := contracts.InstanceID(fmt.Sprintf("lockreleasetokenpool-%s", qualifier))
 		deployReport, err := operations.ExecuteOperation(b, factoryops.DeployLockReleaseTokenPool, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployLockReleaseTokenPool{
 			Contract: lockreleasetokenpool.LockReleaseTokenPool{
 				InstanceId:              types.TEXT(poolInstanceID),
