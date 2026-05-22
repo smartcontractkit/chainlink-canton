@@ -144,10 +144,10 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 					CantonLaneConfig: &lanes.CantonLaneConfig{
 						GlobalConfig: localGlobalConfig,
 					},
-					OnRamp:                   input.OnRamp,
-					OffRamp:                  input.OffRamp,
-					Router:                   input.Router,
-					FeeQuoter:                input.FeeQuoter,
+					OnRamp:    input.OnRamp,
+					OffRamp:   input.OffRamp,
+					Router:    input.Router,
+					FeeQuoter: input.FeeQuoter,
 				}
 
 				remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)

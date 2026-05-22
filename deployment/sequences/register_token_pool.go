@@ -76,10 +76,10 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 		RawInstanceAddress: tarRaw,
 		MCMSEnabled:        mcmsEnabled,
 		Args: tokenadminregistry.ProposeAdministrator{
-		TokenConfigCid: tokenConfigCidArg,
-		InstrumentId:   instrumentId,
-		NewAdmin:       types.PARTY(poolOwnerParty),
-		Caller:         types.PARTY(ccipParty),
+			TokenConfigCid: tokenConfigCidArg,
+			InstrumentId:   instrumentId,
+			NewAdmin:       types.PARTY(poolOwnerParty),
+			Caller:         types.PARTY(ccipParty),
 		},
 	})
 	if err != nil {

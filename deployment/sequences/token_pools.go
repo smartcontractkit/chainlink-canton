@@ -143,7 +143,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("resolve CCIPFactory raw address: %w", err)
 		}
-		poolRaw := contracts.NewRawInstanceAddress(contracts.InstanceID(parsedPool.InstanceId), types.PARTY(parsedPool.PoolOwner))
+		poolRaw := contracts.NewRawInstanceAddress(contracts.InstanceID(parsedPool.InstanceId), parsedPool.PoolOwner)
 
 		out := ccipsequences.OnChainOutput{}
 		committeeVerifierRefs := input.ExistingDataStore.Addresses().Filter(
@@ -294,6 +294,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				}
 			}
 			out.BatchOps = batchOps
+
 			return out, nil
 		}
 
