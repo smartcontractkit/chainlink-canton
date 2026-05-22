@@ -158,13 +158,10 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 				out, err = ccipseq.RunAndMergeSequence(
 					b,
 					chains,
-					sequences.ConfigureLaneLegAsSourceWithDataStore,
-					sequences.ConfigureLaneLegInput{
-						Lane: lanes.UpdateLanesInput{
-							Source: localChain,
-							Dest:   remoteChain,
-						},
-						DataStore: ds,
+					sequences.ConfigureLaneLegAsSource,
+					lanes.UpdateLanesInput{
+						Source: localChain,
+						Dest:   remoteChain,
 					},
 					out,
 				)

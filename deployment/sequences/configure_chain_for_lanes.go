@@ -47,25 +47,18 @@ func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
 	return types.NUMERIC(s)
 }
 
-// ConfigureLaneLegInput carries the lane update plus a datastore for MCMS fee quoter resolution.
+// ConfigureLaneLegInput carries the lane update plus an optional datastore for fee quoter resolution.
 type ConfigureLaneLegInput struct {
 	Lane      lanes.UpdateLanesInput
 	DataStore datastore.DataStore
 }
-
-var ConfigureLaneLegAsSourceWithDataStore = operations.NewSequence(
-	"CantonConfigureLaneLegAsSourceWithDataStore",
-	semver.MustParse("2.0.0"),
-	"Configures a lane leg as source on CCIP 2.0.0",
-	configureLaneLegAsSource,
-)
 
 var ConfigureLaneLegAsSource = operations.NewSequence(
 	"CantonConfigureLaneLegAsSource",
 	semver.MustParse("2.0.0"),
 	"Configures a lane leg as source on CCIP 2.0.0",
 	func(b operations.Bundle, deps chain.BlockChains, input lanes.UpdateLanesInput) (output sequences.OnChainOutput, err error) {
-		return configureLaneLegAsSource(b, deps, ConfigureLaneLegInput{Lane: input})
+		return configureLaneLegAsSource(b, deps, ConfigureLaneLegInput{Lane: input, DataStore: dsutils.RuntimeDataStore()})
 	},
 )
 
@@ -91,12 +84,7 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("global config raw instance address: %w", err)
 		}
-		feeQuoterRef, err := input.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-			sourceChain.Selector,
-			datastore.ContractType(feequoterop.ContractType),
-			feequoterop.Version,
-			"",
-		))
+		feeQuoterRef, err := resolveFeeQuoterRef(input.DataStore, sourceChain.Selector)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("resolve fee quoter: %w", err)
 		}
@@ -282,6 +270,18 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		}
 
 		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
+}
+
+func resolveFeeQuoterRef(ds datastore.DataStore, chainSelector uint64) (datastore.AddressRef, error) {
+	if ds == nil {
+		return datastore.AddressRef{}, fmt.Errorf("datastore is required")
+	}
+	return ds.Addresses().Get(datastore.NewAddressRefKey(
+		chainSelector,
+		datastore.ContractType(feequoterop.ContractType),
+		feequoterop.Version,
+		"",
+	))
 }
 
 var ConfigureLaneLegAsDest = operations.NewSequence(
