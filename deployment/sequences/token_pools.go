@@ -673,7 +673,7 @@ func loadConfiguredCantonTokenPool(
 		activePool, err := contract.FindActiveContractByInstanceAddress(
 			ctx,
 			participant.LedgerServices.State,
-			participant.PartyID,
+			contract.LedgerQueryParties(participant),
 			lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
 			poolAddress,
 		)
@@ -702,7 +702,7 @@ func loadConfiguredCantonTokenPool(
 		activePool, err := contract.FindActiveContractByInstanceAddress(
 			ctx,
 			participant.LedgerServices.State,
-			participant.PartyID,
+			contract.LedgerQueryParties(participant),
 			burnminttokenpool.BurnMintTokenPool{}.GetTemplateID(),
 			poolAddress,
 		)

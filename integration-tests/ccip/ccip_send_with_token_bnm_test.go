@@ -669,7 +669,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
 
 	// Mint LINK
-	linkRegistryCid, err := contractops.FindActiveContractIDByInstanceAddress(t.Context(), ccipParticipant.LedgerServices.State, partyCCIP, contracts.TemplateIDFromBinding(link.LinkRegistry{}).String(), linkRegistryAddress.InstanceAddress())
+	linkRegistryCid, err := contractops.FindActiveContractIDByInstanceAddress(t.Context(), ccipParticipant.LedgerServices.State, []string{partyCCIP}, contracts.TemplateIDFromBinding(link.LinkRegistry{}).String(), linkRegistryAddress.InstanceAddress())
 	require.NoError(t, err)
 	t.Logf("LinkRegistry ContractId: %v", linkRegistryCid)
 	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{

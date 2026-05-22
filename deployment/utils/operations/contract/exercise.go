@@ -146,7 +146,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			// Direct execution path
 			participant := deps.Participants[0]
 
-			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, participant.PartyID, params.Template.GetTemplateID(), input.InstanceAddress)
+			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, LedgerQueryParties(participant), params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
 			}
@@ -205,9 +205,79 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 	)
 }
 
-// FindActiveContractByInstanceAddress finds an active contract by its instance address. It returns an error if there are multiple or zero active contracts matching the instance address.
-// The returned ActiveContract includes the CreatedEventBlob required for explicit disclosures.
-func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2.StateServiceClient, party, templateId string, instanceAddress contracts.InstanceAddress) (*apiv2.ActiveContract, error) {
+// LedgerQueryParties builds the party list for ledger ACS reads (GetActiveContracts, etc.).
+//
+// The operator participant may ActAs one party while holding CanReadAs for others (for example
+// CCIP owner parties under MCMS). Contract visibility is per-party: a token pool might only be
+// readable via ReadAs party B even when ActAs party A cannot see it. Callers should pass the
+// returned slice to FindActiveContractByInstanceAddress rather than picking a single party.
+//
+// Order is ActAs party first, then ReadAs parties in config order. Duplicates and empty strings
+// are omitted.
+func LedgerQueryParties(participant canton.Participant) []string {
+	parties := make([]string, 0, 1+len(participant.ReadAsPartyIDs))
+	seen := make(map[string]struct{}, 1+len(participant.ReadAsPartyIDs))
+	add := func(party string) {
+		if party == "" {
+			return
+		}
+		if _, ok := seen[party]; ok {
+			return
+		}
+		seen[party] = struct{}{}
+		parties = append(parties, party)
+	}
+	add(participant.PartyID)
+	for _, party := range participant.ReadAsPartyIDs {
+		add(party)
+	}
+
+	return parties
+}
+
+// filtersByPartyForTemplate builds a FiltersByParty map with the same template filter on each party.
+// GetActiveContracts returns the union of active contracts visible to any listed party.
+func filtersByPartyForTemplate(parties []string, packageID, moduleName, entityName string) map[string]*apiv2.Filters {
+	templateFilters := &apiv2.Filters{
+		Cumulative: []*apiv2.CumulativeFilter{
+			{
+				IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+					TemplateFilter: &apiv2.TemplateFilter{
+						TemplateId: &apiv2.Identifier{
+							PackageId:  packageID,
+							ModuleName: moduleName,
+							EntityName: entityName,
+						},
+						IncludeCreatedEventBlob: true,
+					},
+				},
+			},
+		},
+	}
+	filtersByParty := make(map[string]*apiv2.Filters, len(parties))
+	for _, party := range parties {
+		filtersByParty[party] = templateFilters
+	}
+
+	return filtersByParty
+}
+
+// FindActiveContractByInstanceAddress resolves a contract by Canton instance address (hex of instanceId bytes).
+//
+// It queries the ACS at ledger end, filtering by template and by every party in parties (typically
+// from LedgerQueryParties). A match is accepted when the created event's instanceId and sole signatory
+// produce the same InstanceAddress as the target. The first matching contract wins; duplicate
+// stream entries for the same contract ID (common when multiple parties see the same contract) are
+// ignored.
+//
+// Returns an error when parties is empty, when no contract matches, or when more than one distinct
+// contract matches the same instance address. The ActiveContract includes CreatedEventBlob when
+// the template filter requests it (required for explicit disclosures on submit).
+func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2.StateServiceClient, parties []string, templateId string, instanceAddress contracts.InstanceAddress) (*apiv2.ActiveContract, error) {
+	if len(parties) == 0 {
+		return nil, fmt.Errorf("at least one query party is required")
+	}
+
 	ledgerEndResp, err := stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ledger end: %w", err)
@@ -222,25 +292,8 @@ func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2
 	activeContractsResp, err := stateService.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
 		ActiveAtOffset: ledgerEndResp.GetOffset(),
 		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				party: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-								TemplateFilter: &apiv2.TemplateFilter{
-									TemplateId: &apiv2.Identifier{
-										PackageId:  packageID,
-										ModuleName: moduleName,
-										EntityName: entityName,
-									},
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
+			FiltersByParty: filtersByPartyForTemplate(parties, packageID, moduleName, entityName),
+			Verbose:        true,
 		},
 	})
 	if err != nil {
@@ -249,6 +302,7 @@ func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2
 	defer activeContractsResp.CloseSend()
 
 	var activeContract *apiv2.ActiveContract
+	seenContractIDs := make(map[string]struct{})
 	for {
 		activeContractResp, err := activeContractsResp.Recv()
 		if err != nil {
@@ -260,6 +314,10 @@ func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2
 		}
 
 		if c, ok := activeContractResp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+			contractID := c.ActiveContract.GetCreatedEvent().GetContractId()
+			if _, seen := seenContractIDs[contractID]; seen {
+				continue
+			}
 			createArguments := c.ActiveContract.GetCreatedEvent().GetCreateArguments()
 			if createArguments == nil {
 				continue
@@ -291,6 +349,7 @@ func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2
 			if activeContract != nil {
 				return nil, fmt.Errorf("multiple active contracts found for InstanceAddress %s", instanceAddress.String())
 			}
+			seenContractIDs[contractID] = struct{}{}
 			activeContract = c.ActiveContract
 		}
 	}
@@ -302,9 +361,10 @@ func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2
 	return activeContract, nil
 }
 
-// FindActiveContractIDByInstanceAddress finds an active contract ID by its instance address. It returns an error if there are multiple or zero active contracts matching the instance address.
-func FindActiveContractIDByInstanceAddress(ctx context.Context, stateService apiv2.StateServiceClient, party, templateId string, instanceAddress contracts.InstanceAddress) (string, error) {
-	activeContract, err := FindActiveContractByInstanceAddress(ctx, stateService, party, templateId, instanceAddress)
+// FindActiveContractIDByInstanceAddress is a convenience wrapper around
+// FindActiveContractByInstanceAddress that returns only the ledger contract ID.
+func FindActiveContractIDByInstanceAddress(ctx context.Context, stateService apiv2.StateServiceClient, parties []string, templateId string, instanceAddress contracts.InstanceAddress) (string, error) {
+	activeContract, err := FindActiveContractByInstanceAddress(ctx, stateService, parties, templateId, instanceAddress)
 	if err != nil {
 		return "", err
 	}
