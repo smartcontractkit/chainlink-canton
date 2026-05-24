@@ -86,6 +86,7 @@ func postPerPartyRouterFactoryWithRetry(
 			if lastErr != nil {
 				return nil, fmt.Errorf("failed to get per party router factory: %w", lastErr)
 			}
+
 			return lastResp, nil
 		}
 
