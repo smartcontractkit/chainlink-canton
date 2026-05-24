@@ -922,6 +922,7 @@ testReleaseFromTicket = script do
             ccvOwners = []
             verifiedCCVs = []
             requiredInboundPoolCCVs = []
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -1114,6 +1115,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
             ccvOwners = []
             verifiedCCVs = []
             requiredInboundPoolCCVs = []
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -1286,6 +1288,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
             ccvOwners = []
             verifiedCCVs = [requiredCcv]
             requiredInboundPoolCCVs = [requiredCcv]
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -1432,6 +1435,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             ccvOwners = [ccvOwner]
             verifiedCCVs = [otherCcv]
             requiredInboundPoolCCVs = [requiredCcv]
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -1439,6 +1443,24 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             amount = fromSome (MessageCodecV1.encodeUint256 30000000000.0)
             sourcePoolData = ""
             messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            sourceChainSelector = sourceChainSelector
+            finality = finalityConfig 0
+
+    wrongPoolAddressTicket <- submit (actAs ccipOwner <> actAs ccvOwner) do
+        createCmd Tickets.TokenReceiveTicket with
+            tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+            ccipOwner = ccipOwner
+            ccvOwners = [ccvOwner]
+            verifiedCCVs = [requiredCcv]
+            requiredInboundPoolCCVs = [requiredCcv]
+            poolAddress = RawInstanceAddress.make "stale-lock-release-pool-instance" poolOwner
+            poolOwner = poolOwner
+            receiver = receiver
+            tokenReceiver = receiver
+            instrumentId = testInstrumentId
+            amount = fromSome (MessageCodecV1.encodeUint256 30000000000.0)
+            sourcePoolData = ""
+            messageId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
             sourceChainSelector = sourceChainSelector
             finality = finalityConfig 0
 
@@ -1450,6 +1472,18 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+
+    submitMustFail (actAs receiver
+                    <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedFactory
+                    <> disclose disclosedPreapproval <> disclose disclosedRmn
+                    <> disclose disclosedRateLimiter) do
+        exerciseCmd tokenPool LockReleaseTokenPool.ReleaseFromTicket with
+            tokenReceiveTicketCid = wrongPoolAddressTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            rmnRemoteCid = rmnRemote
+            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            caller = receiver
 
     submitMustFail (actAs receiver
                     <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedFactory
@@ -1552,6 +1586,7 @@ testReleaseFromTicketDecimalConversion = script do
             ccvOwners = []
             verifiedCCVs = []
             requiredInboundPoolCCVs = []
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -1695,6 +1730,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
             ccvOwners = []
             verifiedCCVs = []
             requiredInboundPoolCCVs = []
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -1828,6 +1864,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
             ccvOwners = []
             verifiedCCVs = []
             requiredInboundPoolCCVs = []
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -1962,6 +1999,7 @@ testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
             ccvOwners = []
             verifiedCCVs = []
             requiredInboundPoolCCVs = []
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -2099,6 +2137,7 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
             ccvOwners = [ccvOwner]
             verifiedCCVs = [nonsignatoryVerifiedCCV]
             requiredInboundPoolCCVs = []
+            poolAddress = RawInstanceAddress.make tokenPoolInstanceId poolOwner
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -2807,7 +2846,7 @@ testVerifyInboundMessage = script do
             optionalCCVThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
-            inboundPoolCCVs = None
+            inboundPoolVerification = None
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
@@ -2833,7 +2872,9 @@ testVerifyInboundMessage = script do
     newExecMsg <- queryContractId ccipOwner newEmCid
     assertMsg "ExecutingMessageV1 should exist" (isSome newExecMsg)
     let em = fromSome newExecMsg
-    em.inboundPoolCCVs === Some [ccvAddr]
+    em.inboundPoolVerification === Some (ExecutingMessageV1.InboundPoolVerification with
+        poolAddress = RawInstanceAddress.make "test-lock-release-pool-verify" poolOwner
+        poolCCVs = [ccvAddr])
 
     debug "testVerifyInboundMessage: PASSED"
 
@@ -2925,7 +2966,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
             optionalCCVThreshold = 0
             receiverFinalityConfig = safeFinality
             sourceDefaultCCVs = []
-            inboundPoolCCVs = None
+            inboundPoolVerification = None
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig-safe" ccipOwner
@@ -2949,7 +2990,9 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
     newExecMsg <- queryContractId ccipOwner newEmCid
     assertMsg "ExecutingMessageV1 should exist" (isSome newExecMsg)
     let em = fromSome newExecMsg
-    em.inboundPoolCCVs === Some [ccvAddr]
+    em.inboundPoolVerification === Some (ExecutingMessageV1.InboundPoolVerification with
+        poolAddress = RawInstanceAddress.make "test-lock-release-pool-verify-safe" poolOwner
+        poolCCVs = [ccvAddr])
 
     debug "testVerifyInboundMessageAllowsSafeFinalityConfig: PASSED"
 
@@ -3044,7 +3087,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
             optionalCCVThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
-            inboundPoolCCVs = None
+            inboundPoolVerification = None
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
@@ -3156,7 +3199,7 @@ testVerifyInboundMessageMissingChainConfig = script do
             optionalCCVThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
-            inboundPoolCCVs = None
+            inboundPoolVerification = None
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner

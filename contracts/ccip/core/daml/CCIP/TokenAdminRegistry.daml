@@ -438,14 +438,15 @@ template TokenAdminRegistry
                 tokenConfigCid : ContractId TokenConfig
                 ticketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                poolInstanceId : Text
                 caller : Party
             controller caller
             do
                 config <- fetch tokenConfigCid
                 assertTokenConfigForInstrument instanceId owner entryCount instrumentId config
                 pool <- registeredPoolOrAbort "ConsumeReceiveTicket" config
-                assertMsg "ConsumeReceiveTicket: caller is not the registered pool owner"
-                    (pool.poolOwner == caller)
+                assertRegisteredPoolCaller "ConsumeReceiveTicket" caller poolInstanceId pool
+                let poolAddress = RawInstanceAddress.make pool.poolInstanceId pool.poolOwner
                 ticket <- fetch ticketCid
                 assertMsg "ConsumeReceiveTicket: instanceId mismatch"
                     (ticket.tokenAdminRegistryInstanceId == instanceId)
@@ -453,6 +454,8 @@ template TokenAdminRegistry
                     (ticket.ccipOwner == owner)
                 assertMsg "ConsumeReceiveTicket: ticket pool owner must match registered pool owner"
                     (ticket.poolOwner == pool.poolOwner)
+                assertMsg "ConsumeReceiveTicket: ticket pool address must match registered pool"
+                    (ticket.poolAddress == poolAddress)
                 assertMsg "ConsumeReceiveTicket: ticket instrument must match requested instrument"
                     (ticket.instrumentId == instrumentId)
                 exercise ticketCid CCIP.Tickets.ConsumeByCCIPOwner
@@ -585,7 +588,9 @@ template TokenAdminRegistry
                 assertTokenConfigForTokenAddress instanceId owner entryCount tt.destTokenAddress config
                 pool <- registeredPoolOrAbort "SetInboundPoolCCVs" config
                 assertRegisteredPoolCaller "SetInboundPoolCCVs" caller poolInstanceId pool
+                let poolAddress = RawInstanceAddress.make pool.poolInstanceId pool.poolOwner
                 exercise executingMessageCid CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
+                    poolAddress = poolAddress
                     poolCCVs
 
         -- | Resolve token-side finalization data for an inbound token transfer and
@@ -615,10 +620,16 @@ template TokenAdminRegistry
                 config <- fetch tokenConfigCid
                 assertTokenConfigForTokenAddress instanceId owner entryCount tt.destTokenAddress config
                 pool <- registeredPoolOrAbort "TAR finalize" config
+                let poolAddress = RawInstanceAddress.make pool.poolInstanceId pool.poolOwner
+                poolVerification <- case execMsg.inboundPoolVerification of
+                    None -> abort "TAR finalize: missing inbound pool verification"
+                    Some verification -> pure verification
+                assertMsg "TAR finalize: registered pool changed since inbound verification"
+                    (poolVerification.poolAddress == poolAddress)
 
                 exercise executingMessageCid CCIP.ExecutingMessageV1.FinalizeExecute with
                     tokenAdminRegistryInstanceId = instanceId
-                    maybePoolOwner = Some pool.poolOwner
+                    maybePoolAddress = Some poolAddress
                     maybeTicketReceiver = Some ticketReceiver
                     maybeTokenReceiver = Some resolvedTokenReceiver
                     maybeInstrumentId = Some config.instrumentId
