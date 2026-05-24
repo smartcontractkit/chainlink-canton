@@ -650,6 +650,11 @@ template BurnMintTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                config <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                        tokenConfigCid
+                        instrumentId = instrumentId
+                        caller = poolOwner
                 assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
                     (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
                 assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
@@ -729,6 +734,10 @@ template BurnMintTokenPool
 
                 -- Get inputs from extraContext
                 burnMintFactory <- lookupBurnMintFactory extraContext
+                CCIP.TokenAdminRegistry.assertConfiguredBurnMintFactory
+                    "ReleaseFromTicket"
+                    config
+                    burnMintFactory
                 extraArgsContextValues <- lookupBurnMintFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupBurnMintFactoryExtraArgsMetaValues extraContext
 
@@ -903,6 +912,11 @@ template BurnMintTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                config <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                        tokenConfigCid
+                        instrumentId
+                        caller = poolOwner
                 assertMsg "LockOrBurn: sending message ccipOwner mismatch"
                     (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
@@ -942,6 +956,10 @@ template BurnMintTokenPool
 
                 -- Get inputs from extraContext
                 burnMintFactory <- lookupBurnMintFactory extraContext
+                CCIP.TokenAdminRegistry.assertConfiguredBurnMintFactory
+                    "LockOrBurn"
+                    config
+                    burnMintFactory
                 extraArgsContextValues <- lookupBurnMintFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupBurnMintFactoryExtraArgsMetaValues extraContext
 

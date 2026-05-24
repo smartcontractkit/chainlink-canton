@@ -253,6 +253,17 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
 
   registryCid <- createLinkRegistry poolOwner instrumentId registryInstanceId
   (tokenAdminRegistryCid, tokenConfigCid) <- setupTokenAdminRegistry ccipOwner poolOwner tokenAdminRegistryInstanceId instrumentId tokenPoolInstanceId
+  disclosedTarForFactorySet <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+  tokenConfigCid <- submit (actAs poolOwner <> disclose disclosedTarForFactorySet) do
+    exerciseCmd tokenAdminRegistryCid TokenAdminRegistry.SetBurnMintFactory with
+      tokenConfigCid
+      instrumentId
+      burnMintFactory = Some (toInterfaceContractId registryCid)
+      caller = poolOwner
+  badBurnMintFactoryCid <- submit poolOwner do
+    createCmd TestToken.BadBurnMintFactory with
+      admin = poolOwner
+      outputs = []
 
   rmnRemoteCid <- submit rmnOwner do
     createCmd RMNRemote.RMNRemote with
@@ -300,6 +311,18 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemoteCid
   disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiterCid
   disclosedRegistry <- fromSome <$> queryDisclosure poolOwner registryCid
+  disclosedBadBurnMintFactory <- fromSome <$> queryDisclosure poolOwner badBurnMintFactoryCid
+
+  submitMustFail (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedBadBurnMintFactory) do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
+      tokenAdminRegistryCid = tokenAdminRegistryCid
+      tokenConfigCid = tokenConfigCid
+      rmnRemoteCid = rmnRemoteCid
+      extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId badBurnMintFactoryCid)
+      sendingMessageCid = sendingMessageCid
+      senderInputCids = [senderHoldingCid]
+      amount = 7.0
+      caller = sender
 
   result <- submit (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with

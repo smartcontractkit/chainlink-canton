@@ -235,7 +235,7 @@ testCCIPSendAllFeePayouts = script do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
-            entryCount = 0
+            entryCount = 1
 
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
@@ -336,6 +336,20 @@ testCCIPSendAllFeePayouts = script do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
 
+    feeTokenConfig <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenConfig with
+            instanceId = CCIP.TokenAdminRegistry.tokenConfigInstanceId testFeeTokenId
+            registryInstanceId = tokenAdminRegistryInstanceId
+            registryOwner = ccipOwner
+            index = 0
+            isCCIPManaged = False
+            instrumentId = testFeeTokenId
+            admin = Some ccipOwner
+            pendingAdmin = None
+            tokenPool = None
+            transferFactory = Some (toInterfaceContractId transferFactory)
+            burnMintFactory = None
+
     -- CCV fee = 100 USD cents; executor fee = 100 USD cents; total = $2 = 0.1 tokens.
     -- ccipOwner residual = 0 so we can assert exact balances.
     userHolding <- submit (actAs user <> actAs ccipOwner) do
@@ -413,9 +427,45 @@ testCCIPSendAllFeePayouts = script do
             messageSentObservers = []
             caller = ccvOwner
 
-    disclosedTransferFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    badTransferFactory <- submit ccipOwner do
+        createCmd TestToken.BadTransferFactory with
+            admin = ccipOwner
+            completedOwner = None
+            completedInstrumentId = None
+            completedAmount = None
+            pendingTransfer = None
 
-    _sendResult <- submit (actAs user <> actAs ccipOwner
+    disclosedTransferFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    disclosedFeeTokenConfig <- fromSome <$> queryDisclosure ccipOwner feeTokenConfig
+    disclosedBadTransferFactory <- fromSome <$> queryDisclosure ccipOwner badTransferFactory
+
+    let feeTokenExtraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList
+                    [ (show ccvOwner, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId ccvPreapproval)
+                    , (show executorOwner, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId executorPreapproval)
+                    ]
+            meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+    submitMustFail (actAs user <> actAs ccipOwner
+            <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig
+            <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote
+            <> disclose disclosedBadTransferFactory <> disclose disclosedFeeTokenConfig) do
+        exerciseCmd router CCIP.PerPartyRouter.CCIPSend with
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.GlobalConfig.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId onRamp)
+                    ]
+            sendingMessageCid = sendingMessageCid
+            feeTokenHoldingCids = [toInterfaceContractId userHolding]
+            feeTokenConfigCid = Some feeTokenConfig
+            feeTokenTransferFactory = toInterfaceContractId badTransferFactory
+            feeTokenExtraArgs
+
+    submitMustFail (actAs user <> actAs ccipOwner
             <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig
             <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote
             <> disclose disclosedTransferFactory) do
@@ -429,14 +479,27 @@ testCCIPSendAllFeePayouts = script do
                     ]
             sendingMessageCid = sendingMessageCid
             feeTokenHoldingCids = [toInterfaceContractId userHolding]
+            feeTokenConfigCid = None
             feeTokenTransferFactory = toInterfaceContractId transferFactory
-            feeTokenExtraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
-                context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                    values = TextMap.fromList
-                        [ (show ccvOwner, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId ccvPreapproval)
-                        , (show executorOwner, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId executorPreapproval)
-                        ]
-                meta = Splice.Api.Token.MetadataV1.emptyMetadata
+            feeTokenExtraArgs
+
+    _sendResult <- submit (actAs user <> actAs ccipOwner
+            <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig
+            <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote
+            <> disclose disclosedTransferFactory <> disclose disclosedFeeTokenConfig) do
+        exerciseCmd router CCIP.PerPartyRouter.CCIPSend with
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.GlobalConfig.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId onRamp)
+                    ]
+            sendingMessageCid = sendingMessageCid
+            feeTokenHoldingCids = [toInterfaceContractId userHolding]
+            feeTokenConfigCid = Some feeTokenConfig
+            feeTokenTransferFactory = toInterfaceContractId transferFactory
+            feeTokenExtraArgs
 
     -- CCV owner must have received 100 USD cents / $20 per token = 0.05 tokens.
     ccvHoldings <- query @TestToken.TestHolding ccvOwner
@@ -663,6 +726,7 @@ testCCIPSend = script do
                  (CCIP.OnRamp.onRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId onRamp)]
             sendingMessageCid = sendingMessageCid
             feeTokenHoldingCids = []
+            feeTokenConfigCid = None
             feeTokenTransferFactory = toInterfaceContractId transferFactory
             feeTokenExtraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -728,6 +792,7 @@ testCCIPSend = script do
                  (CCIP.OnRamp.onRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId onRamp)]
             sendingMessageCid = sendingMessageCid2
             feeTokenHoldingCids = []
+            feeTokenConfigCid = None
             feeTokenTransferFactory = toInterfaceContractId transferFactory
             feeTokenExtraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext

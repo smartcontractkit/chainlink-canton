@@ -407,6 +407,7 @@ template PerPartyRouter
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+                feeTokenConfigCid : Optional (ContractId CCIP.TokenAdminRegistry.TokenConfig)
                 feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
                 feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
             controller partyOwner
@@ -443,6 +444,23 @@ template PerPartyRouter
                 totalFee <- exercise sendingMessageCid
                     CCIP.SendingMessageV1.FeeTokenAmount with
                         caller = partyOwner
+
+                _ <- if totalFee > 0.0
+                    then do
+                        configCid <- case feeTokenConfigCid of
+                            None -> abort "router: missing fee token config CID"
+                            Some cid -> pure cid
+                        config <- exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                                tokenConfigCid = configCid
+                                instrumentId = sendingMsg.feeToken
+                                caller = partyOwner
+                        CCIP.TokenAdminRegistry.assertConfiguredTransferFactory
+                            "router"
+                            config
+                            feeTokenTransferFactory
+                        pure ()
+                    else pure ()
 
                 -- TODO: move to OnRamp
                 feeChangeCids <- if totalFee > 0.0

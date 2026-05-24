@@ -250,6 +250,23 @@ testLockOrBurn = script do
         createCmd TestToken.TestTransferFactory with
             admin = ccipOwner
 
+    disclosedTarForFactorySet <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTransferFactoryForSet <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    tokenConfigCid <- submit (actAs poolOwner <> disclose disclosedTarForFactorySet <> disclose disclosedTransferFactoryForSet) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.SetTransferFactory with
+            tokenConfigCid
+            instrumentId = testInstrumentId
+            transferFactory = Some (toInterfaceContractId transferFactory)
+            caller = poolOwner
+
+    badTransferFactory <- submit ccipOwner do
+        createCmd TestToken.BadTransferFactory with
+            admin = ccipOwner
+            completedOwner = None
+            completedInstrumentId = None
+            completedAmount = None
+            pendingTransfer = None
+
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
         tokenPoolInstanceId
@@ -352,6 +369,7 @@ testLockOrBurn = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    disclosedBadFactory <- fromSome <$> queryDisclosure ccipOwner badTransferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiter
@@ -384,6 +402,21 @@ testLockOrBurn = script do
             amount = -5.0
             rmnRemoteCid = rmnRemote
             extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
+            caller = sender
+
+    -- Configured TokenConfig pins the real transfer factory and rejects a mismatched context factory.
+    submitMustFail (actAs sender
+                      <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig
+                      <> disclose disclosedBadFactory <> disclose disclosedPreapproval
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
+        exerciseCmd tokenPool LockReleaseTokenPool.LockOrBurn with
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            sendingMessageCid = sendingMessageCid
+            senderInputCids = [toInterfaceContractId senderHolding]
+            amount = 5.0
+            rmnRemoteCid = rmnRemote
+            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId badTransferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     -- LockOrBurn stores token data via AddTokenSend
