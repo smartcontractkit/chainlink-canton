@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "686bdd3aa790eba32a669f697c9b3b6cd43f1bc008c79498ed7a4ec9bb7a04f1"
+	PackageID   = "1610fed101de67a149111d3aa8262fedf3e14e44528e8b05e613cfd0d1228960"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1631,6 +1631,7 @@ type ConsumeReceiveTicket struct {
 	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	TicketCid      types.CONTRACT_ID                        `json:"ticketCid"`
 	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	PoolInstanceId types.TEXT                               `json:"poolInstanceId"`
 	Caller         types.PARTY                              `json:"caller"`
 }
 
@@ -1643,6 +1644,8 @@ func (t ConsumeReceiveTicket) ToMap() map[string]any {
 	m["ticketCid"] = model.NestedToDAMLValue(t.TicketCid)
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["poolInstanceId"] = string(t.PoolInstanceId)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1677,6 +1680,7 @@ type ConsumeReceiveTicketMCMSParams struct {
 	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	TicketCid      types.CONTRACT_ID                        `json:"ticketCid"`
 	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	PoolInstanceId types.TEXT                               `json:"poolInstanceId"`
 }
 
 // MarshalHex encodes ConsumeReceiveTicketMCMSParams to hex string for MCMS operationData.
@@ -2254,23 +2258,23 @@ var _ types.ENUM = ExecutingMessageState("")
 
 // ExecutingMessageV1 is a Template type
 type ExecutingMessageV1 struct {
-	CcipOwner              types.PARTY                        `json:"ccipOwner"`
-	Message                MessageV1                          `json:"message"`
-	MessageId              types.TEXT                         `json:"messageId"`
-	Receiver               types.PARTY                        `json:"receiver"`
-	TokenReceiver          *types.PARTY                       `json:"tokenReceiver" hex:"optional"`
-	Executor               types.PARTY                        `json:"executor"`
-	ObservingParties       []types.PARTY                      `json:"observingParties"`
-	CcvVerifications       []CCVVerification                  `json:"ccvVerifications"`
-	CcvOwners              []types.PARTY                      `json:"ccvOwners"`
-	RequiredCCVs           []chainlinkapi.RawInstanceAddress  `json:"requiredCCVs"`
-	OptionalCCVs           []chainlinkapi.RawInstanceAddress  `json:"optionalCCVs"`
-	OptionalCCVThreshold   types.INT64                        `json:"optionalCCVThreshold"`
-	ReceiverFinalityConfig FinalityConfig                     `json:"receiverFinalityConfig"`
-	SourceDefaultCCVs      []chainlinkapi.RawInstanceAddress  `json:"sourceDefaultCCVs"`
-	InboundPoolCCVs        *[]chainlinkapi.RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
-	Deps                   ExecutingMessageDeps               `json:"deps"`
-	State                  ExecutingMessageState              `json:"state"`
+	CcipOwner               types.PARTY                       `json:"ccipOwner"`
+	Message                 MessageV1                         `json:"message"`
+	MessageId               types.TEXT                        `json:"messageId"`
+	Receiver                types.PARTY                       `json:"receiver"`
+	TokenReceiver           *types.PARTY                      `json:"tokenReceiver" hex:"optional"`
+	Executor                types.PARTY                       `json:"executor"`
+	ObservingParties        []types.PARTY                     `json:"observingParties"`
+	CcvVerifications        []CCVVerification                 `json:"ccvVerifications"`
+	CcvOwners               []types.PARTY                     `json:"ccvOwners"`
+	RequiredCCVs            []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs            []chainlinkapi.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalCCVThreshold    types.INT64                       `json:"optionalCCVThreshold"`
+	ReceiverFinalityConfig  FinalityConfig                    `json:"receiverFinalityConfig"`
+	SourceDefaultCCVs       []chainlinkapi.RawInstanceAddress `json:"sourceDefaultCCVs"`
+	InboundPoolVerification *InboundPoolVerification          `json:"inboundPoolVerification" hex:"optional"`
+	Deps                    ExecutingMessageDeps              `json:"deps"`
+	State                   ExecutingMessageState             `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -2374,13 +2378,13 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
-	if t.InboundPoolCCVs != nil {
-		args["inboundPoolCCVs"] = map[string]any{
+	if t.InboundPoolVerification != nil {
+		args["inboundPoolVerification"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.InboundPoolCCVs),
+			"value": model.NestedToDAMLValue(*t.InboundPoolVerification),
 		}
 	} else {
-		args["inboundPoolCCVs"] = map[string]any{
+		args["inboundPoolVerification"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}
@@ -2490,13 +2494,13 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 		return res
 	}()
 
-	if t.InboundPoolCCVs != nil {
-		args["inboundPoolCCVs"] = map[string]any{
+	if t.InboundPoolVerification != nil {
+		args["inboundPoolVerification"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.InboundPoolCCVs),
+			"value": model.NestedToDAMLValue(*t.InboundPoolVerification),
 		}
 	} else {
-		args["inboundPoolCCVs"] = map[string]any{
+		args["inboundPoolVerification"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}
@@ -3808,7 +3812,7 @@ var _ types.VARIANT = (*FinalityConfig)(nil)
 // FinalizeExecute is a Record type
 type FinalizeExecute struct {
 	TokenAdminRegistryInstanceId types.TEXT                                `json:"tokenAdminRegistryInstanceId"`
-	MaybePoolOwner               *types.PARTY                              `json:"maybePoolOwner" hex:"optional"`
+	MaybePoolAddress             *chainlinkapi.RawInstanceAddress          `json:"maybePoolAddress" hex:"optional"`
 	MaybeTicketReceiver          *types.PARTY                              `json:"maybeTicketReceiver" hex:"optional"`
 	MaybeTokenReceiver           *types.PARTY                              `json:"maybeTokenReceiver" hex:"optional"`
 	MaybeInstrumentId            *splice_api_token_holding_v1.InstrumentId `json:"maybeInstrumentId" hex:"optional"`
@@ -3822,13 +3826,13 @@ func (t FinalizeExecute) ToMap() map[string]any {
 
 	m["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
 
-	if t.MaybePoolOwner != nil {
-		m["maybePoolOwner"] = map[string]any{
+	if t.MaybePoolAddress != nil {
+		m["maybePoolAddress"] = map[string]any{
 			"_type": "optional",
-			"value": (*t.MaybePoolOwner).ToMap(),
+			"value": model.NestedToDAMLValue(*t.MaybePoolAddress),
 		}
 	} else {
-		m["maybePoolOwner"] = map[string]any{
+		m["maybePoolAddress"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}
@@ -4954,6 +4958,51 @@ func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, pac
 // Verify interface implementations for GlobalConfig
 
 var _ api.IMCMSReceiver = (*GlobalConfig)(nil)
+
+// InboundPoolVerification is a Record type
+type InboundPoolVerification struct {
+	PoolAddress chainlinkapi.RawInstanceAddress   `json:"poolAddress"`
+	PoolCCVs    []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
+}
+
+// ToMap converts InboundPoolVerification to a map for DAML arguments
+func (t InboundPoolVerification) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
+
+	m["poolCCVs"] = func() []any {
+		res := make([]any, 0, len(t.PoolCCVs))
+		for _, e := range t.PoolCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t InboundPoolVerification) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *InboundPoolVerification) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes InboundPoolVerification to hex string (Canton MCMS format)
+func (t InboundPoolVerification) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes InboundPoolVerification from hex string (Canton MCMS format)
+func (t *InboundPoolVerification) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // IsAdministrator is a Record type
 type IsAdministrator struct {
@@ -7904,12 +7953,15 @@ func (t *SetConfig) UnmarshalHex(data string) error {
 
 // SetInboundPoolCCVs is a Record type
 type SetInboundPoolCCVs struct {
-	PoolCCVs []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
+	PoolAddress chainlinkapi.RawInstanceAddress   `json:"poolAddress"`
+	PoolCCVs    []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetInboundPoolCCVs to a map for DAML arguments
 func (t SetInboundPoolCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
 
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
@@ -9134,6 +9186,7 @@ type TokenReceiveTicket struct {
 	VerifiedCCVs                 []chainlinkapi.RawInstanceAddress        `json:"verifiedCCVs"`
 	RequiredInboundPoolCCVs      []chainlinkapi.RawInstanceAddress        `json:"requiredInboundPoolCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
+	PoolAddress                  chainlinkapi.RawInstanceAddress          `json:"poolAddress"`
 	PoolOwner                    types.PARTY                              `json:"poolOwner"`
 	Receiver                     types.PARTY                              `json:"receiver"`
 	TokenReceiver                types.PARTY                              `json:"tokenReceiver"`
@@ -9191,6 +9244,9 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["poolOwner"] = t.PoolOwner.ToMap()
@@ -9262,6 +9318,9 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["poolOwner"] = t.PoolOwner.ToMap()
@@ -9507,6 +9566,7 @@ func (t TokenReceiveTicketClaimed) ArchiveWithPackageID(contractID string, packa
 type TokenReceiveTicketClaimedEvent struct {
 	VerifiedCCVs                 []chainlinkapi.RawInstanceAddress        `json:"verifiedCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
+	PoolAddress                  chainlinkapi.RawInstanceAddress          `json:"poolAddress"`
 	InstrumentId                 splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	SourceAmount                 types.TEXT                               `json:"sourceAmount"`
 	LocalAmount                  types.NUMERIC                            `json:"localAmount"`
@@ -9530,6 +9590,8 @@ func (t TokenReceiveTicketClaimedEvent) ToMap() map[string]any {
 	}()
 
 	m["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
+
+	m["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 

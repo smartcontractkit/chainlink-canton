@@ -141,6 +141,7 @@ type GetTokenPriceMCMSParams = core.GetTokenPriceMCMSParams
 type GetTokenTransferFee = core.GetTokenTransferFee
 type GetTokenTransferFeeMCMSParams = core.GetTokenTransferFeeMCMSParams
 type GlobalConfig = core.GlobalConfig
+type InboundPoolVerification = core.InboundPoolVerification
 type IsAdministrator = core.IsAdministrator
 type IsAdministratorMCMSParams = core.IsAdministratorMCMSParams
 type IsCursed = core.IsCursed
