@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -355,42 +354,6 @@ func writeBool(buf *bytes.Buffer, value types.BOOL) {
 		return
 	}
 	buf.WriteByte(0x00)
-}
-
-func writeNumeric0(buf *bytes.Buffer, value types.NUMERIC) error {
-	text := string(value)
-	if whole, fraction, ok := strings.Cut(text, "."); ok {
-		if strings.Trim(fraction, "0") != "" {
-			return fmt.Errorf("expected Numeric 0, got %q", text)
-		}
-		text = whole
-	}
-	writeLenPrefixedText(buf, types.TEXT(text))
-	return nil
-}
-
-func writeRateLimitDirection(buf *bytes.Buffer, value common.RateLimitDirection) error {
-	switch value {
-	case common.RateLimitDirectionRateLimitDirection_Outbound:
-		buf.WriteByte(0x00)
-	case common.RateLimitDirectionRateLimitDirection_Inbound:
-		buf.WriteByte(0x01)
-	default:
-		return fmt.Errorf("unsupported rate limit direction: %s", value)
-	}
-	return nil
-}
-
-func writeRateLimitMode(buf *bytes.Buffer, value common.RateLimitMode) error {
-	switch value {
-	case common.RateLimitModeRateLimitMode_DefaultFinality:
-		buf.WriteByte(0x00)
-	case common.RateLimitModeRateLimitMode_CustomFinality:
-		buf.WriteByte(0x01)
-	default:
-		return fmt.Errorf("unsupported rate limit mode: %s", value)
-	}
-	return nil
 }
 
 func writeRequestedFinality(buf *bytes.Buffer, finality common.FinalityConfig) error {
