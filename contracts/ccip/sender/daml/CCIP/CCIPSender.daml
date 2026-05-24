@@ -5,6 +5,7 @@ module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
+import DA.List (unique)
 import DA.Optional (fromSomeNote, isNone)
 
 import qualified Splice.Api.Token.HoldingV1
@@ -75,6 +76,31 @@ lookupVerifierArgs ccvExtraArgs ccvAddress =
         [] -> pure ""
         [arg] -> pure arg.ccvArgs
         _ -> abort "sender: duplicate verifier args for CCV"
+
+assertExactCCVSet
+    : [RawInstanceAddress.RawInstanceAddress]
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Update ()
+assertExactCCVSet requiredCCVs providedCCVs = do
+    assertMsg "sender: GetFee required CCVs cannot contain duplicates"
+        (unique requiredCCVs)
+    assertMsg "sender: GetFee duplicate CCV inputs"
+        (unique providedCCVs)
+    assertMsg "sender: GetFee missing required CCV"
+        (all (\requiredCCV -> requiredCCV `elem` providedCCVs) requiredCCVs)
+    assertMsg "sender: GetFee unexpected CCV input"
+        (all (\providedCCV -> providedCCV `elem` requiredCCVs) providedCCVs)
+
+validateCCVFeeQuote
+    : RawInstanceAddress.RawInstanceAddress
+    -> ICCV.CrossChainVerifierFeeQuote
+    -> Update ()
+validateCCVFeeQuote expectedCCV quote =
+    RawInstanceAddress.assertEqual
+        "sender: GetFee CCV quote address mismatch"
+        quote.ccvInstanceId
+        quote.ccvOwner
+        expectedCCV
 
 template CCIPSender
     with
@@ -152,10 +178,14 @@ template CCIPSender
                         None -> None
                         Some input -> Some input.tokenPoolCid
 
+                let providedCCVs = map (.ccvAddress) ccvSendInputs
+                assertExactCCVSet requiredCCVs providedCCVs
+
                 quotedCCVFees <- foldlA (\fees input -> do
                     q <- exercise input.ccvCid ICCV.CrossChainVerifier_GetFee with
                         destChainSelector = destinationChainSelector
                         caller = owner
+                    validateCCVFeeQuote input.ccvAddress q
                     pure (fees ++ [q])
                     ) [] ccvSendInputs
 
