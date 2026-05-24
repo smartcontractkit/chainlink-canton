@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "bf6d727558137ec84607b2d9d32a4035be76de80069d3a3ac9f20cc45dd0c3ee"
+	PackageID   = "a6587724755599dc30da9d7859514078879bb111cda2da39a3d69bb1cef838bc"
 	SDKVersion  = "3.4.11"
 )
 
@@ -147,23 +147,23 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 	}
 }
 
-// GetRequiredCCVs exercises the GetRequiredCCVs choice on this CCIPSender contract
+// GetFee exercises the GetFee choice on this CCIPSender contract
 // This method uses the package name in the template ID
-func (t CCIPSender) GetRequiredCCVs(contractID string, args GetRequiredCCVs) *model.ExerciseCommand {
+func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
-		Choice:     "GetRequiredCCVs",
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// GetRequiredCCVsWithPackageID exercises the GetRequiredCCVs choice using the provided package ID instead of package name
-func (t CCIPSender) GetRequiredCCVsWithPackageID(contractID string, packageID string, args GetRequiredCCVs) *model.ExerciseCommand {
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee2) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
-		Choice:     "GetRequiredCCVs",
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -189,23 +189,23 @@ func (t CCIPSender) ArchiveWithPackageID(contractID string, packageID string) *m
 	}
 }
 
-// GetFee exercises the GetFee choice on this CCIPSender contract
+// GetRequiredCCVs exercises the GetRequiredCCVs choice on this CCIPSender contract
 // This method uses the package name in the template ID
-func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseCommand {
+func (t CCIPSender) GetRequiredCCVs(contractID string, args GetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
-		Choice:     "GetFee",
+		Choice:     "GetRequiredCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
-func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee2) *model.ExerciseCommand {
+// GetRequiredCCVsWithPackageID exercises the GetRequiredCCVs choice using the provided package ID instead of package name
+func (t CCIPSender) GetRequiredCCVsWithPackageID(contractID string, packageID string, args GetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
-		Choice:     "GetFee",
+		Choice:     "GetRequiredCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
