@@ -402,6 +402,7 @@ testCCIPSendAllFeePayouts = script do
     sendingMessageCid <- submit (actAs ccipOwner <> actAs executorOwner <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
             CCIP.Interfaces.Executor.Executor_CalculateFee with
+                expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid
                 executorArgs = ""
                 extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -629,6 +630,7 @@ testCCIPSend = script do
             remoteChainConfigs = Map.fromList [(destChainSelector, CCIP.Executor.RemoteChainConfig with
                 feeUSDCents = cents 0.0
                 enabled = True)]
+    let executorInstanceAddress = RawInstanceAddress.make "test-executor" ccipOwner
 
     -- Deploy PerPartyRouter factory
     factory <- submit ccipOwner do
@@ -708,6 +710,7 @@ testCCIPSend = script do
     sendingMessageCid <- submit (actAs ccipOwner <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
             CCIP.Interfaces.Executor.Executor_CalculateFee with
+                expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid
                 executorArgs = ""
                 extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -777,6 +780,7 @@ testCCIPSend = script do
     sendingMessageCid2 <- submit (actAs ccipOwner <> disclose disclosedSm2) do
         exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
             CCIP.Interfaces.Executor.Executor_CalculateFee with
+                expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid2
                 executorArgs = ""
                 extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext

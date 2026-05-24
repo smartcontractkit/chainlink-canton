@@ -97,6 +97,26 @@ computeRequiredCCVsForSend destConfig message extraArgs senderRequestedCCVs =
                 senderRequestedCCVs
     in dedup (resolvedSenderRequiredCCVs ++ destConfig.laneMandatedCCVs)
 
+validateExecutorFeeQuote
+    : CCIP.Client.ExecutorExtraArg
+    -> Optional RawInstanceAddress.RawInstanceAddress
+    -> Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
+    -> Update ()
+validateExecutorFeeQuote executorArg defaultExecutor executorFeeQuote =
+    let expectedExecutor = case executorArg of
+            CCIP.Client.Executor_NoExecutor -> None
+            CCIP.Client.Executor_UseDefault _ -> defaultExecutor
+            CCIP.Client.Executor_WithAddress executorAddress _ -> Some executorAddress
+    in case (expectedExecutor, executorFeeQuote) of
+        (None, None) -> pure ()
+        (None, Some _) ->
+            abort "onramp: executor fee quote not allowed"
+        (Some _, None) ->
+            abort "onramp: executor fee quote required"
+        (Some expectedExecutor, Some quote) ->
+            RawInstanceAddress.assertEqual "onramp: executor fee quote executor mismatch"
+                quote.executorInstanceId quote.executorOwner expectedExecutor
+
 data GetFeeFromRouterResult = GetFeeFromRouterResult
     with
         -- Final amount payable in the selected fee token, including CCV fees,
@@ -528,6 +548,11 @@ template OnRamp
                     Some cfg -> do
                         assertMsg "onramp: destination chain disabled" cfg.isEnabled
                         pure cfg
+
+                validateExecutorFeeQuote
+                    extraArgs.executor
+                    destConfig.defaultExecutor
+                    executorFeeQuote
 
                 feeDestConfig <- exercise feeQuoterCid
                     CCIP.FeeQuoter.GetDestChainConfig with
