@@ -13,13 +13,13 @@ data-dependencies:
 dependencies:
   - daml-prim
   - daml-stdlib
+  - ../../link/.daml/dist/link-0.0.1.dar
   - ../../chainlink/api/.daml/dist/chainlink-api-1.0.0.dar
   - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
   - ../core/.daml/dist/ccip-core-1.0.0.dar
   - ../extension-api/.daml/dist/ccip-extension-api-1.0.0.dar
   - ../runtime/.daml/dist/ccip-runtime-1.0.0.dar
-  - ../sender/.daml/dist/ccip-sender-1.0.0.dar
-  - ../receiver/.daml/dist/ccip-receiver-1.0.0.dar
   - ../executor/.daml/dist/ccip-executor-1.0.0.dar
   - ../committee-verifier/.daml/dist/ccip-committee-verifier-1.0.0.dar
   - ../pools/lock-release-token-pool/.daml/dist/ccip-lock-release-token-pool-1.0.0.dar
+  - ../pools/burn-mint-token-pool/.daml/dist/ccip-burn-mint-token-pool-1.0.0.dar
