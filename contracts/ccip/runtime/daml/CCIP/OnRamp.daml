@@ -160,9 +160,10 @@ calculateFeeResult
     -> Numeric 0
     -> CCIP.GlobalConfig.DestChainConfig
     -> CCIP.FeeQuoter.FeeQuoterDestChainConfig
+    -> [Numeric 0]
     -> FeeCalculationInputs
     -> Update FeeCalculationResult
-calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector destConfig feeDestConfig inputs = do
+calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector destConfig feeDestConfig ccvFeeUSDCentsByVerifier inputs = do
     let executorDestGasLimit = destConfig.baseExecutionGasCost + inputs.ccipReceiveGasLimit
     let executorDestBytesOverhead = if inputs.hasTokenTransfer
             then computeExecutorDestBytesOverheadWithToken
@@ -224,8 +225,10 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
     let convertDirect feeUSDCents =
             let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
             in CCIP.Math.mulDivDown feeUsd10 CCIP.Math.premiumIdentity feeTokenPriceN
+    let ccvFeeTokenAmount =
+            sum (map convertWithPremium ccvFeeUSDCentsByVerifier)
     let totalFeeTokenAmount =
-            convertWithPremium inputs.ccvFeeUSDCents
+            ccvFeeTokenAmount
             + convertWithPremium inputs.poolFeeUSDCents
             + convertWithPremium networkFeeUSDCents
             + convertDirect inputs.executorFeeUSDCents
@@ -588,6 +591,7 @@ template OnRamp
                     destChainSelector
                     destConfig
                     feeDestConfig
+                    (map (.feeUSDCents) ccvFeeQuotes)
                     inputs
 
                 pure GetFeeFromRouterResult with
@@ -683,6 +687,7 @@ template OnRamp
                     sendingMsg.destChainSelector
                     destConfig
                     feeDestConfig
+                    (map (.feeUSDCents) sendingMsg.ccvFees)
                     inputs
 
                 finalizedCid <- exercise sendingMessageCid
