@@ -1144,6 +1144,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get CCIP Send disclosure: %w", err)
 	}
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
+	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
 	disclosedContracts = append(disclosedContracts, ccipSendDisclosure.DisclosedContracts...)
 
 	// CCVs
