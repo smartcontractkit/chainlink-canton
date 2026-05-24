@@ -7,7 +7,7 @@ module CCIP.SendingMessageV1 where
 
 import DA.Crypto.Text (BytesHex, byteCount, keccak256)
 import DA.Foldable qualified as Foldable
-import DA.List (dedup)
+import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome, fromSome, fromOptional)
 
 import qualified CCIP.Events
@@ -296,9 +296,12 @@ template SendingMessageV1
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
                 assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
+                CCIP.Internal.assertMaxCCVListLength "sendingMessage: outbound pool CCVs" poolCCVs
+                assertMsg "sendingMessage: outbound pool CCVs cannot contain duplicates" (unique poolCCVs)
                 let resolvedPoolCCVs = CCIP.Internal.resolveRequiredCCVsWithDefaults
                         destDefaultCCVs
                         poolCCVs
+                CCIP.Internal.assertMaxCCVListLength "sendingMessage: resolved outbound pool CCVs" resolvedPoolCCVs
 
                 create this with
                     outboundPoolCCVs = Some resolvedPoolCCVs
@@ -424,6 +427,7 @@ template SendingMessageV1
 
                 let (finalCCVs, finalHash, messageV1, encoded, msgId) =
                         buildMessageArtifacts this
+                CCIP.Internal.assertMaxCCVListLength "sendingMessage: final CCVs" finalCCVs
                 create this with
                     requiredCCVs = finalCCVs
                     ccvAndExecutorHash = finalHash
@@ -493,6 +497,7 @@ template SendingMessageV1
                 let updated = this with tokenSendData = Some tsd
                 let (finalCCVs, finalHash, messageV1, encoded, msgId) =
                         buildMessageArtifacts updated
+                CCIP.Internal.assertMaxCCVListLength "sendingMessage: final CCVs" finalCCVs
                 create updated with
                     requiredCCVs = finalCCVs
                     ccvAndExecutorHash = finalHash

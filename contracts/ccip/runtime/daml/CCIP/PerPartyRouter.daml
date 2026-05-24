@@ -305,6 +305,7 @@ template PerPartyRouter
                 executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller partyOwner
             do
+                CCIP.Internal.assertMaxCCVListLength "router: CCV fee quotes" ccvFeeQuotes
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
