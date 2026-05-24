@@ -72,6 +72,66 @@ buildCCVFeeAllocations ccvFees ccvAmounts =
         Map.empty
         (zip ccvFees ccvAmounts)
 
+assertHoldingMatches
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.HoldingV1.Holding
+    -> Update Splice.Api.Token.HoldingV1.HoldingView
+assertHoldingMatches prefix expectedOwner expectedInstrumentId cid = do
+    holding <- fetch cid
+    let hv = view holding
+    assertMsg (prefix <> ": holding owner mismatch")
+        (hv.owner == expectedOwner)
+    assertMsg (prefix <> ": holding instrumentId mismatch")
+        (hv.instrumentId == expectedInstrumentId)
+    pure hv
+
+sumCheckedHoldingAmounts
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update Decimal
+sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId =
+    foldlA
+        (\acc cid -> do
+            hv <- assertHoldingMatches prefix expectedOwner expectedInstrumentId cid
+            pure (acc + hv.amount))
+        0.0
+
+assertHoldingsMatchAndSum
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> Decimal
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update ()
+assertHoldingsMatchAndSum prefix expectedOwner expectedInstrumentId expectedAmount cids = do
+    actualAmount <- sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId cids
+    assertMsg (prefix <> ": holding amount mismatch")
+        (actualAmount == expectedAmount)
+
+assertTransferInstructionMatches
+    : Text
+    -> Party
+    -> Party
+    -> Decimal
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+    -> Update ()
+assertTransferInstructionMatches prefix expectedSender expectedReceiver expectedAmount expectedInstrumentId instrCid = do
+    instr <- fetch instrCid
+    let transfer = (view instr).transfer
+    assertMsg (prefix <> ": pending transfer sender mismatch")
+        (transfer.sender == expectedSender)
+    assertMsg (prefix <> ": pending transfer receiver mismatch")
+        (transfer.receiver == expectedReceiver)
+    assertMsg (prefix <> ": pending transfer amount mismatch")
+        (transfer.amount == expectedAmount)
+    assertMsg (prefix <> ": pending transfer instrumentId mismatch")
+        (transfer.instrumentId == expectedInstrumentId)
+
 lookupExecutedMessage
     : BytesHex
     -> Set BytesHex
@@ -456,7 +516,7 @@ template PerPartyRouter
                     feeTokenTransferFactory
 
                 -- TODO: move to OnRamp
-                feeChangeCids <- if totalFee > 0.0
+                (feeChangeCids, pendingFeeInstructions) <- if totalFee > 0.0
                     then do
                         -- Fees owed to verifier owners.
                         let verifierFees = buildCCVFeeAllocations
@@ -479,15 +539,19 @@ template PerPartyRouter
                             (ownerResidual >= 0.0)
                         -- Add owner residual so map now includes all fee recipients.
                         let recipientFees = addFeeForParty verifierPoolAndExecutorFees ccipOwner ownerResidual
+                        -- ccipOwner already receives its share in the first-hop collection transfer.
+                        let ccipOwnerFeeAmount = fromOptional 0.0 (Map.lookup ccipOwner recipientFees)
                         -- Convert to transfer list and skip zero-amount transfers.
-                        let payoutEntries = filter (\entry -> snd entry > 0.0) (Map.toList recipientFees)
+                        let payoutEntries = filter
+                                (\entry -> fst entry /= ccipOwner && snd entry > 0.0)
+                                (Map.toList recipientFees)
 
-                        let executeFeeTransfer inputHoldingCids recipient amount = do
+                        let executeFeeTransfer sender receiver inputHoldingCids amount = do
                                 now <- getTime
                                 let feeTransfer =
                                         Splice.Api.Token.TransferInstructionV1.Transfer with
-                                            sender = partyOwner
-                                            receiver = recipient
+                                            sender
+                                            receiver
                                             amount = amount
                                             instrumentId = sendingMsg.feeToken
                                             requestedAt = now
@@ -500,28 +564,87 @@ template PerPartyRouter
                                         expectedAdmin = sendingMsg.feeToken.admin
                                         transfer = feeTransfer
                                         extraArgs = feeTokenExtraArgs
+                                pure feeResult
+
+                        let collectFeeFromSender = do
+                                feeResult <- executeFeeTransfer partyOwner ccipOwner feeTokenHoldingCids totalFee
                                 case feeResult.output of
-                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
-                                        pure feeResult.senderChangeCids
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverHoldingCids -> do
+                                        assertHoldingsMatchAndSum
+                                            "router: collected fee"
+                                            ccipOwner
+                                            sendingMsg.feeToken
+                                            totalFee
+                                            receiverHoldingCids
+                                        pure (feeResult.senderChangeCids, receiverHoldingCids)
                                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
                                         acceptResult <- exercise transferInstructionCid
                                             Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
                                                 extraArgs = feeTokenExtraArgs
                                         case acceptResult.output of
-                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
-                                                pure feeResult.senderChangeCids
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverHoldingCids -> do
+                                                assertHoldingsMatchAndSum
+                                                    "router: collected fee"
+                                                    ccipOwner
+                                                    sendingMsg.feeToken
+                                                    totalFee
+                                                    receiverHoldingCids
+                                                pure
+                                                    ( feeResult.senderChangeCids ++ acceptResult.senderChangeCids
+                                                    , receiverHoldingCids
+                                                    )
                                             Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
-                                                abort "fee transfer instruction failed"
+                                                abort "fee collection instruction failed"
                                             Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
-                                                abort "fee transfer instruction is still pending"
-                                    _ -> abort "fee transfer did not complete"
+                                                abort "fee collection instruction is still pending"
+                                    _ -> abort "fee collection did not complete"
 
-                        foldlA
-                            (\currentHoldingCids (recipient, amount) ->
-                                executeFeeTransfer currentHoldingCids recipient amount)
-                            feeTokenHoldingCids
+                        let executeTrustedPayout currentHoldingCids recipient amount = do
+                                payoutResult <- executeFeeTransfer ccipOwner recipient currentHoldingCids amount
+                                case payoutResult.output of
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
+                                        pure (payoutResult.senderChangeCids, [])
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
+                                        assertTransferInstructionMatches
+                                            "router: pending fee payout"
+                                            ccipOwner
+                                            recipient
+                                            amount
+                                            sendingMsg.feeToken
+                                            transferInstructionCid
+                                        pure (payoutResult.senderChangeCids, [transferInstructionCid])
+                                    _ -> abort "trusted fee payout did not complete or pend"
+
+                        (userFeeChangeCids, collectedFeeHoldingCids) <- collectFeeFromSender
+                        (_, finalCcipOwnerHoldingCids, pendingInstructions) <- foldlA
+                            (\(currentAmount, currentHoldingCids, pendingCids) (recipient, amount) -> do
+                                assertHoldingsMatchAndSum
+                                    "router: ccipOwner fee payout inputs"
+                                    ccipOwner
+                                    sendingMsg.feeToken
+                                    currentAmount
+                                    currentHoldingCids
+                                let remainingAmount = currentAmount - amount
+                                assertMsg "router: fee payout exceeds collected fee"
+                                    (remainingAmount >= 0.0)
+                                (newHoldingCids, newPendingCids) <- executeTrustedPayout currentHoldingCids recipient amount
+                                assertHoldingsMatchAndSum
+                                    "router: ccipOwner fee payout change"
+                                    ccipOwner
+                                    sendingMsg.feeToken
+                                    remainingAmount
+                                    newHoldingCids
+                                pure (remainingAmount, newHoldingCids, pendingCids ++ newPendingCids))
+                            (totalFee, collectedFeeHoldingCids, [])
                             payoutEntries
-                    else pure []
+                        assertHoldingsMatchAndSum
+                            "router: ccipOwner fee residual"
+                            ccipOwner
+                            sendingMsg.feeToken
+                            ccipOwnerFeeAmount
+                            finalCcipOwnerHoldingCids
+                        pure (userFeeChangeCids, pendingInstructions)
+                    else pure ([], [])
 
                 result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with
                     routerPartyOwner = partyOwner
@@ -544,6 +667,7 @@ template PerPartyRouter
                     ccipMessageSent = result.ccipMessageSent
                     messageId = sendingMsg.messageId
                     feeChangeCids
+                    pendingFeeInstructions
 
         -- | Prepare an inbound message for execution.
         -- Performs early replay check and delegates to OffRamp.PrepareExecute.
@@ -802,6 +926,7 @@ data CCIPSendResult = CCIPSendResult
         ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
         messageId : BytesHex
         feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        pendingFeeInstructions : [ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction]
     deriving (Eq, Show)
 
 data ExecuteResult = ExecuteResult
