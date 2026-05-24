@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "3ca1aae6556060c1e1037dc2ab5c1fbdceb69fa0a7cb1fb4e0f2ddc62f7afae1"
+	PackageID   = "686bdd3aa790eba32a669f697c9b3b6cd43f1bc008c79498ed7a4ec9bb7a04f1"
 	SDKVersion  = "3.4.11"
 )
 
@@ -53,6 +53,7 @@ const (
 	FinalityConfigByteLength = types.INT64(4)
 	MaxNumeric0IntegerText   = types.TEXT("99999999999999999999999999999999999999")
 	GlobalConfigKey          = types.TEXT("global-config")
+	MaxCCVsPerMessage        = types.INT64(255)
 	RateLimiterKey           = types.TEXT("rate-limiter")
 )
 
