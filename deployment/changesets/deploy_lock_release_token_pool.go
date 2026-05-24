@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -15,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -91,12 +91,7 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 	var addressRef datastore.AddressRef
 
 	if mcmsEnabled {
-		factoryRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-			config.ChainSelector,
-			datastore.ContractType(factoryops.ContractType),
-			factoryops.Version,
-			"",
-		))
+		factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("resolve CCIPFactory: %w", err)
 		}
@@ -186,28 +181,16 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 	}
 
 	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {
-		tarRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-			config.ChainSelector,
-			datastore.ContractType(token_admin_registry.ContractType),
-			token_admin_registry.Version,
-			"",
-		))
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("resolve token admin registry: %w", err)
-		}
-		tarRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(tarRef)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("resolve token admin registry raw address: %w", err)
-		}
+		tarInstanceID := contracts.InstanceID(hex.EncodeToString(cfg.TokenAdminRegistryInstanceAddress.Bytes()))
 		regInput := sequences.RegisterTokenPoolInput{
-			TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(tarRef.Address),
-			TokenAdminRegistryRawInstanceAddress: tarRaw,
+			TokenAdminRegistryInstanceAddress:    cfg.TokenAdminRegistryInstanceAddress,
+			TokenAdminRegistryRawInstanceAddress: tarInstanceID.RawInstanceAddress(types.PARTY(cfg.CcipOwner)),
 			InstrumentId:                         cfg.InstrumentId,
 			CcipParty:                            cfg.CcipOwner,
 			PoolOwnerParty:                       cfg.PoolOwner,
 			PoolInstanceID:                       rawPoolAddr.InstanceID(),
 		}
-		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
+		_, err := cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
 		}

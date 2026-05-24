@@ -135,7 +135,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(factoryops.ContractType)),
 		)
-		factoryRef, err := resolveFactoryAddressRef(input.ChainSelector, factoryRefs)
+		factoryRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierCCIP, factoryRefs)
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, err
 		}
@@ -468,7 +468,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(factoryops.ContractType)),
 		)
-		factoryRef, err := resolveFactoryAddressRef(input.ChainSelector, factoryRefs)
+		factoryRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierCCIP, factoryRefs)
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, err
 		}
@@ -508,12 +508,17 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			return ccipsequences.OnChainOutput{}, err
 		}
 
-		poolOwner := types.PARTY(participant.PartyID)
+		ccipOwnerParty, poolOwnerParty, err := resolveTokenPoolParties(input, participant)
+		if err != nil {
+			return ccipsequences.OnChainOutput{}, err
+		}
+		ccipOwner := types.PARTY(ccipOwnerParty)
+		poolOwner := types.PARTY(poolOwnerParty)
 		poolInstanceID := contracts.InstanceID(fmt.Sprintf("lockreleasetokenpool-%s", qualifier))
 		deployReport, err := operations.ExecuteOperation(b, factoryops.DeployLockReleaseTokenPool, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployLockReleaseTokenPool{
 			Contract: lockreleasetokenpool.LockReleaseTokenPool{
 				InstanceId:              types.TEXT(poolInstanceID),
-				CcipOwner:               poolOwner,
+				CcipOwner:               ccipOwner,
 				PoolOwner:               poolOwner,
 				InstrumentId:            instrumentID,
 				Decimals:                types.INT64(10),
@@ -800,20 +805,32 @@ func parseInstrumentIDFromTokenRefLabels(tokenRef datastore.AddressRef) (splice_
 	}, instrumentAdmin, nil
 }
 
-func resolveFactoryAddressRef(chainSelector uint64, refs []datastore.AddressRef) (datastore.AddressRef, error) {
-	if len(refs) == 0 {
-		return datastore.AddressRef{}, fmt.Errorf("missing CCIPFactory address ref for chain %d", chainSelector)
+// resolveTokenPoolParties returns the CCIP owner party for both CcipOwner and PoolOwner on token pools.
+// Token pool ownership matches core contract ownership. Label: ccip-owner:<party>.
+// When ReadAsPartyIDs is empty (devenv), missing label falls back to participant PartyID.
+func resolveTokenPoolParties(input tokenadapters.DeployTokenPoolInput, participant cldfcanton.Participant) (string, string, error) {
+	owner := partyFromTokenRefLabels(input.TokenRef, "ccip-owner:")
+	if owner == "" && len(participant.ReadAsPartyIDs) == 0 {
+		owner = participant.PartyID
 	}
-	if len(refs) == 1 {
-		return refs[0], nil
+	if owner == "" {
+		return "", "", fmt.Errorf("tokenRef label %q is required when participant has ReadAs parties", "ccip-owner")
 	}
-	for _, ref := range refs {
-		if ref.Qualifier == "" {
-			return ref, nil
+
+	return owner, owner, nil
+}
+
+func partyFromTokenRefLabels(ref *datastore.AddressRef, prefix string) string {
+	if ref == nil {
+		return ""
+	}
+	for _, label := range ref.Labels.List() {
+		if party, ok := strings.CutPrefix(label, prefix); ok {
+			return strings.TrimSpace(party)
 		}
 	}
 
-	return datastore.AddressRef{}, fmt.Errorf("expected exactly one CCIPFactory address ref for chain %d, found %d", chainSelector, len(refs))
+	return ""
 }
 
 func loadConfiguredCantonTokenPool(

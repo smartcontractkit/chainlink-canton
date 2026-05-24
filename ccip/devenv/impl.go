@@ -55,6 +55,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	cantonchangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -269,20 +270,30 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 		}
 	}
 
-	out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
-		ChainSelector: selector,
-		Participant:   0,
-		Config: cantonchangesets.DeployCCIPFactoryConfig{
-			Params: cantonchangesets.DeployCCIPFactoryParams{
-				OwnerParty: participant.PartyID,
+	runningDS := datastore.NewMemoryDataStore()
+	owner := participant.PartyID
+
+	for _, qual := range []string{dsutils.QualifierCCIP, dsutils.QualifierPools, dsutils.QualifierCCV} {
+		out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
+			ChainSelector: selector,
+			Participant:   0,
+			Config: cantonchangesets.DeployCCIPFactoryConfig{
+				Params: cantonchangesets.DeployCCIPFactoryParams{
+					OwnerParty: owner,
+					Qualifier:  qual,
+					InstanceID: "ccip-factory-" + qual,
+				},
 			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("deploy CCIPFactory for chain %d: %w", selector, err)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("deploy CCIPFactory %q for chain %d: %w", qual, selector, err)
+		}
+		if err := runningDS.Merge(out.DataStore.Seal()); err != nil {
+			return nil, fmt.Errorf("merge factory %q datastore: %w", qual, err)
+		}
 	}
 
-	return out.DataStore.Seal(), nil
+	return runningDS.Seal(), nil
 }
 
 func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (ccipChangesets.DeployChainContractsPerChainCfg, error) {
