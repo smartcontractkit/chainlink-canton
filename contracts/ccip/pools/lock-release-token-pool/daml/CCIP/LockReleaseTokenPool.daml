@@ -975,6 +975,10 @@ template LockReleaseTokenPool
                 let destTokenAddr = remoteChainCfg.remoteTokenAddress
 
                 let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
+                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
+                        _ -> 0.0
+                let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
 
                 let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
                 rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
@@ -988,7 +992,7 @@ template LockReleaseTokenPool
                     expectedRateLimiter
                     rateLimiter
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
-                    requested = amountNumeric0
+                    requested = amountAfterFeeBps
 
                 -- Get inputs from extraContext
                 tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
@@ -1049,10 +1053,6 @@ template LockReleaseTokenPool
                         pure completedReceiverCids
                     _ -> abort "LockOrBurn: transfer did not complete directly"
 
-                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
-                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
-                        _ -> 0.0
-                let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
                 let amountAfterFeeBpsBytes = fromSomeNote
                         "LockOrBurn: amountAfterFeeBps does not fit uint256"
                         (CCIP.Uint256.numeric0ToUint256Bytes amountAfterFeeBps)

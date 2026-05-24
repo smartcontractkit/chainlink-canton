@@ -946,6 +946,11 @@ template BurnMintTokenPool
                 let destTokenAddr = remoteChainCfg.remoteTokenAddress
 
                 let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
+                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
+                        _ -> 0.0
+                let feeAmount = calculateFeeFromBps amountNumeric0 tokenFeeBps
+                let amountAfterFeeBps = amountNumeric0 - feeAmount
 
                 let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
                 rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
@@ -959,7 +964,7 @@ template BurnMintTokenPool
                     expectedRateLimiter
                     rateLimiter
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
-                    requested = amountNumeric0
+                    requested = amountAfterFeeBps
 
                 -- Get inputs from extraContext
                 burnMintFactory <- lookupBurnMintFactory extraContext
@@ -970,9 +975,6 @@ template BurnMintTokenPool
                 extraArgsContextValues <- lookupBurnMintFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupBurnMintFactoryExtraArgsMetaValues extraContext
 
-                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
-                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
-                        _ -> 0.0
                 inputTotal <- sumCheckedHoldingAmounts
                     "LockOrBurn: sender input holdings"
                     caller
@@ -980,8 +982,6 @@ template BurnMintTokenPool
                     senderInputCids
                 assertMsg "LockOrBurn: insufficient sender input amount"
                     (inputTotal >= amount)
-                let feeAmount = calculateFeeFromBps amountNumeric0 tokenFeeBps
-                let amountAfterFeeBps = amountNumeric0 - feeAmount
                 let amountAfterFeeBpsBytes = fromSomeNote
                         "LockOrBurn: amountAfterFeeBps does not fit uint256"
                         (CCIP.Uint256.numeric0ToUint256Bytes amountAfterFeeBps)

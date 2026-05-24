@@ -349,6 +349,9 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   tokenSendData <- pure (fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData)
   tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 66500000000.0)
   tokenSendData.instrumentId === instrumentId
+  rateLimiters <- query @RateLimiter.RateLimiter poolOwner
+  let [(_, updatedOutboundRateLimiter)] = rateLimiters
+  updatedOutboundRateLimiter.tokens === 33500000000.0
 
 testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs : Script ()
 testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
