@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "427155a2a7a0befc1fad98ead39cc26262dec0a9adcbe6c4f35f2b00a93674c0"
+	PackageID   = "8d3b1ad07cf5f322651f59cf2e41b191a1d673368a722ed34e61f040f7659b4b"
 	SDKVersion  = "3.4.11"
 )
 
@@ -289,6 +289,7 @@ type CCIPSend struct {
 	Context                 splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	SendingMessageCid       types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	FeeTokenHoldingCids     []types.CONTRACT_ID                        `json:"feeTokenHoldingCids"`
+	FeeTokenConfigCid       types.CONTRACT_ID                          `json:"feeTokenConfigCid"`
 	FeeTokenTransferFactory types.CONTRACT_ID                          `json:"feeTokenTransferFactory"`
 	FeeTokenExtraArgs       splice_api_token_metadata_v1.ExtraArgs     `json:"feeTokenExtraArgs"`
 }
@@ -308,6 +309,8 @@ func (t CCIPSend) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["feeTokenConfigCid"] = model.NestedToDAMLValue(t.FeeTokenConfigCid)
 
 	m["feeTokenTransferFactory"] = model.NestedToDAMLValue(t.FeeTokenTransferFactory)
 
@@ -470,10 +473,11 @@ func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
 
 // CCIPSendResult is a Record type
 type CCIPSendResult struct {
-	Router          types.CONTRACT_ID   `json:"router"`
-	CcipMessageSent types.CONTRACT_ID   `json:"ccipMessageSent"`
-	MessageId       types.TEXT          `json:"messageId"`
-	FeeChangeCids   []types.CONTRACT_ID `json:"feeChangeCids"`
+	Router                 types.CONTRACT_ID   `json:"router"`
+	CcipMessageSent        types.CONTRACT_ID   `json:"ccipMessageSent"`
+	MessageId              types.TEXT          `json:"messageId"`
+	FeeChangeCids          []types.CONTRACT_ID `json:"feeChangeCids"`
+	PendingFeeInstructions []types.CONTRACT_ID `json:"pendingFeeInstructions"`
 }
 
 // ToMap converts CCIPSendResult to a map for DAML arguments
@@ -489,6 +493,14 @@ func (t CCIPSendResult) ToMap() map[string]any {
 	m["feeChangeCids"] = func() []any {
 		res := make([]any, 0, len(t.FeeChangeCids))
 		for _, e := range t.FeeChangeCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["pendingFeeInstructions"] = func() []any {
+		res := make([]any, 0, len(t.PendingFeeInstructions))
+		for _, e := range t.PendingFeeInstructions {
 			res = append(res, e)
 		}
 		return res

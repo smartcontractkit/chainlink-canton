@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "534b67ad168c5711b2a258d52fe1410fa72ecb750cd126d4daee808ddf16c3c1"
+	PackageID   = "006481233c9244e338f090c3eadaeae9a37057fe2af26c8a403c21417019327b"
 	SDKVersion  = "3.4.11"
 )
 
@@ -294,6 +294,7 @@ func (t *ExecutorInput) UnmarshalHex(data string) error {
 // FeeTokenInput is a Record type
 type FeeTokenInput struct {
 	SenderInputCids         []types.CONTRACT_ID                    `json:"senderInputCids"`
+	FeeTokenConfigCid       types.CONTRACT_ID                      `json:"feeTokenConfigCid"`
 	FeeTokenTransferFactory types.CONTRACT_ID                      `json:"feeTokenTransferFactory"`
 	FeeTokenExtraArgs       splice_api_token_metadata_v1.ExtraArgs `json:"feeTokenExtraArgs"`
 }
@@ -309,6 +310,8 @@ func (t FeeTokenInput) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["feeTokenConfigCid"] = model.NestedToDAMLValue(t.FeeTokenConfigCid)
 
 	m["feeTokenTransferFactory"] = model.NestedToDAMLValue(t.FeeTokenTransferFactory)
 

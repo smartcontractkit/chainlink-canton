@@ -128,6 +128,7 @@ type CCIPSendDisclosure struct {
 	DisclosedContracts []*apiv2.DisclosedContract
 	CCVs               []string
 	Executor           *string
+	FeeTokenConfigCid  string
 }
 
 func GetCCIPSendDisclosure(
@@ -188,5 +189,6 @@ func GetCCIPSendDisclosure(
 		DisclosedContracts: disclosedContracts,
 		CCVs:               ccvs,
 		Executor:           executor,
+		FeeTokenConfigCid:  resp.JSON200.FeeTokenConfigCid,
 	}, nil
 }

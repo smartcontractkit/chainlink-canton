@@ -5,7 +5,10 @@ import DA.Assert ((===))
 import DA.Optional (fromSome)
 
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.BurnMintV1
+import qualified Splice.Api.Token.TransferInstructionV1
 import CCIP.TokenAdminRegistry
+import qualified TestToken
 
 createRegistryWithAdmin
     : Party
@@ -30,6 +33,8 @@ createRegistryWithAdmin owner instanceId instrumentId = do
       admin = Some owner
       pendingAdmin = None
       tokenPool = None
+      transferFactory = None
+      burnMintFactory = None
 
   pure (tarCid, configCid)
 
@@ -88,5 +93,99 @@ testTransferAdminRoleRejectsSameAdmin = script do
   Some config <- queryContractId owner configCid
   config.admin === Some owner
   config.pendingAdmin === None
+
+  pure ()
+
+testSetTransferFactoryStoresAndClearsFactory : Script ()
+testSetTransferFactoryStoresAndClearsFactory = script do
+  owner <- allocateParty "ccip_owner"
+
+  let instanceId = "tar-set-transfer-factory-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+
+  (tarCid, configCid0) <- createRegistryWithAdmin owner instanceId instrumentId
+  factoryCid <- submit owner do
+    createCmd TestToken.TestTransferFactory with
+      admin = owner
+
+  configCid1 <- submit owner do
+    exerciseCmd tarCid SetTransferFactory with
+      tokenConfigCid = configCid0
+      instrumentId
+      transferFactory = Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
+      caller = owner
+
+  Some config1 <- queryContractId owner configCid1
+  config1.transferFactory === Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
+
+  configCid2 <- submit owner do
+    exerciseCmd tarCid SetTransferFactory with
+      tokenConfigCid = configCid1
+      instrumentId
+      transferFactory = None
+      caller = owner
+
+  Some config2 <- queryContractId owner configCid2
+  config2.transferFactory === None
+
+  pure ()
+
+testSetTransferFactoryRejectsNonAdmin : Script ()
+testSetTransferFactoryRejectsNonAdmin = script do
+  owner <- allocateParty "ccip_owner"
+  other <- allocateParty "not_admin"
+
+  let instanceId = "tar-set-transfer-factory-non-admin-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+
+  (tarCid, configCid) <- createRegistryWithAdmin owner instanceId instrumentId
+  factoryCid <- submit owner do
+    createCmd TestToken.TestTransferFactory with
+      admin = owner
+
+  disclosedTar <- fromSome <$> queryDisclosure owner tarCid
+  disclosedConfig <- fromSome <$> queryDisclosure owner configCid
+  disclosedFactory <- fromSome <$> queryDisclosure owner factoryCid
+  submitMustFail (actAs other <> disclose disclosedTar <> disclose disclosedConfig <> disclose disclosedFactory) do
+    exerciseCmd tarCid SetTransferFactory with
+      tokenConfigCid = configCid
+      instrumentId
+      transferFactory = Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
+      caller = other
+
+  pure ()
+
+testSetBurnMintFactoryStoresAndClearsFactory : Script ()
+testSetBurnMintFactoryStoresAndClearsFactory = script do
+  owner <- allocateParty "ccip_owner"
+
+  let instanceId = "tar-set-burn-mint-factory-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+
+  (tarCid, configCid0) <- createRegistryWithAdmin owner instanceId instrumentId
+  factoryCid <- submit owner do
+    createCmd TestToken.BadBurnMintFactory with
+      admin = owner
+      outputs = []
+
+  configCid1 <- submit owner do
+    exerciseCmd tarCid SetBurnMintFactory with
+      tokenConfigCid = configCid0
+      instrumentId
+      burnMintFactory = Some (toInterfaceContractId @Splice.Api.Token.BurnMintV1.BurnMintFactory factoryCid)
+      caller = owner
+
+  Some config1 <- queryContractId owner configCid1
+  config1.burnMintFactory === Some (toInterfaceContractId @Splice.Api.Token.BurnMintV1.BurnMintFactory factoryCid)
+
+  configCid2 <- submit owner do
+    exerciseCmd tarCid SetBurnMintFactory with
+      tokenConfigCid = configCid1
+      instrumentId
+      burnMintFactory = None
+      caller = owner
+
+  Some config2 <- queryContractId owner configCid2
+  config2.burnMintFactory === None
 
   pure ()

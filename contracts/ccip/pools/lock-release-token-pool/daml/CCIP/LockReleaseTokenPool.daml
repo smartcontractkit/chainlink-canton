@@ -122,13 +122,66 @@ calculateLocalAmount remoteAmount remoteDecimals localDecimals =
         remoteDecimals
         localDecimals
 
-sumHoldingAmounts : [ContractId Splice.Api.Token.HoldingV1.Holding] -> Update Decimal
-sumHoldingAmounts =
+assertHoldingMatches
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.HoldingV1.Holding
+    -> Update Splice.Api.Token.HoldingV1.HoldingView
+assertHoldingMatches prefix expectedOwner expectedInstrumentId cid = do
+    holding <- fetch cid
+    let hv = view holding
+    assertMsg (prefix <> ": holding owner mismatch")
+        (hv.owner == expectedOwner)
+    assertMsg (prefix <> ": holding instrumentId mismatch")
+        (hv.instrumentId == expectedInstrumentId)
+    pure hv
+
+sumCheckedHoldingAmounts
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update Decimal
+sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId =
     foldlA
         (\acc cid -> do
-            holding <- fetch cid
-            pure (acc + (view holding).amount))
+            hv <- assertHoldingMatches prefix expectedOwner expectedInstrumentId cid
+            pure (acc + hv.amount))
         0.0
+
+assertHoldingsMatchAndSum
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> Decimal
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update ()
+assertHoldingsMatchAndSum prefix expectedOwner expectedInstrumentId expectedAmount cids = do
+    actualAmount <- sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId cids
+    assertMsg (prefix <> ": holding amount mismatch")
+        (actualAmount == expectedAmount)
+
+assertTransferInstructionMatches
+    : Text
+    -> Party
+    -> Party
+    -> Decimal
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+    -> Update ()
+assertTransferInstructionMatches prefix expectedSender expectedReceiver expectedAmount expectedInstrumentId instrCid = do
+    instr <- fetch instrCid
+    let instrView = view instr
+    let transfer = instrView.transfer
+    assertMsg (prefix <> ": pending transfer sender mismatch")
+        (transfer.sender == expectedSender)
+    assertMsg (prefix <> ": pending transfer receiver mismatch")
+        (transfer.receiver == expectedReceiver)
+    assertMsg (prefix <> ": pending transfer amount mismatch")
+        (transfer.amount == expectedAmount)
+    assertMsg (prefix <> ": pending transfer instrumentId mismatch")
+        (transfer.instrumentId == expectedInstrumentId)
 
 assertRateLimiter
     : Text
@@ -572,6 +625,11 @@ template LockReleaseTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                config <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                        tokenConfigCid
+                        instrumentId = instrumentId
+                        caller = poolOwner
                 assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
                     (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
                 assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
@@ -651,7 +709,16 @@ template LockReleaseTokenPool
 
                 -- Get inputs from extraContext
                 tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                _ <- sumCheckedHoldingAmounts
+                    "ReleaseFromTicket: tokenPoolHoldings"
+                    poolOwner
+                    instrumentId
+                    tokenPoolHoldings
                 transferFactory <- lookupTransferFactory extraContext
+                CCIP.TokenAdminRegistry.assertConfiguredTransferFactory
+                    "ReleaseFromTicket"
+                    config
+                    transferFactory
                 extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
 
@@ -686,6 +753,12 @@ template LockReleaseTokenPool
                 case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids -> do
                         assertMsg "ReleaseFromTicket: transfer completed with no receiver holdings" (not (null receiverCids))
+                        assertHoldingsMatchAndSum
+                            "ReleaseFromTicket: receiver holdings"
+                            ticket.tokenReceiver
+                            instrumentId
+                            amountDecimal
+                            receiverCids
                         let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
                                 receiverHoldingCids = receiverCids
                         let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Completed with
@@ -713,6 +786,13 @@ template LockReleaseTokenPool
                             poolChangeCids = transferResult.senderChangeCids
                             claimedEventCid
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
+                        assertTransferInstructionMatches
+                            "ReleaseFromTicket"
+                            poolOwner
+                            ticket.tokenReceiver
+                            amountDecimal
+                            instrumentId
+                            instrCid
                         let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
                                 transferInstructionCid = instrCid
                         let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Pending with
@@ -860,6 +940,11 @@ template LockReleaseTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                config <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                        tokenConfigCid
+                        instrumentId
+                        caller = poolOwner
                 assertMsg "LockOrBurn: sending message ccipOwner mismatch"
                     (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
@@ -899,7 +984,21 @@ template LockReleaseTokenPool
 
                 -- Get inputs from extraContext
                 tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                _ <- sumCheckedHoldingAmounts
+                    "LockOrBurn: existing tokenPoolHoldings"
+                    poolOwner
+                    instrumentId
+                    tokenPoolHoldings
+                _ <- sumCheckedHoldingAmounts
+                    "LockOrBurn: sender input holdings"
+                    caller
+                    instrumentId
+                    senderInputCids
                 transferFactory <- lookupTransferFactory extraContext
+                CCIP.TokenAdminRegistry.assertConfiguredTransferFactory
+                    "LockOrBurn"
+                    config
+                    transferFactory
                 extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
 
@@ -933,9 +1032,12 @@ template LockReleaseTokenPool
                 receiverCids <- case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
                             completedReceiverCids -> do
-                        receivedAmount <- sumHoldingAmounts completedReceiverCids
-                        assertMsg "LockOrBurn: receiver holdings amount mismatch"
-                            (receivedAmount == amount)
+                        assertHoldingsMatchAndSum
+                            "LockOrBurn: receiver holdings"
+                            poolOwner
+                            instrumentId
+                            amount
+                            completedReceiverCids
                         pure completedReceiverCids
                     _ -> abort "LockOrBurn: transfer did not complete directly"
 

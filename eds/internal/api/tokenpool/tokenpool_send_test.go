@@ -174,8 +174,12 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 		require.Equal(t, tokenPoolAddress.String(), resp.JSON200.RawInstanceAddress)
 		require.NotNil(t, resp.JSON200.ContextData)
 		require.Len(t, resp.JSON200.RequiredCCVs, 2)
-		// Disclosed contracts: token pool + rate limiter
+		// Disclosed contracts: existing pool holdings + token pool + rate limiter.
 		require.ElementsMatch(t, []oapiCommon.DisclosedContract{
+			{
+				ContractId: "holdingContractId",
+				TemplateId: "package3:Splice.Token:Holding",
+			},
 			{
 				ContractId: "lockReleaseContractId",
 				TemplateId: "package1:CCIP.LockReleaseTokenPool:LockReleaseTokenPool",
