@@ -39,7 +39,7 @@ data CCVSendInput = CCVSendInput
 data FeeTokenInput = FeeTokenInput
     with
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-        feeTokenConfigCid : Optional (ContractId CCIP.TokenAdminRegistry.TokenConfig)
+        feeTokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
         feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
         feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
     deriving (Eq, Show)
