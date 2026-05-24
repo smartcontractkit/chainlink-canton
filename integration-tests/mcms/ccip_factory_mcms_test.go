@@ -123,7 +123,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 		InstanceId:   types.TEXT(linkInstanceID),
 		InstrumentId: linkInstrumentID,
 	}
-	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsPkgID, factoryPkgID, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLinkTokenParams", linkParams)
+	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsEncoder, ccipOwner, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLinkTokenParams", linkParams)
 	t.Logf("LinkToken deployed: %s", linkInstanceID)
 
 	// 5. Deploy FeeQuoter
