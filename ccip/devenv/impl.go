@@ -415,7 +415,6 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 		FeeQuoter:            contracts.HexToInstanceAddress(feeQuoter.Address).Bytes(),
 		CantonLaneConfig: &lanes.CantonLaneConfig{
 			GlobalConfig: globalConfig,
-			FeeQuoterRef: feeQuoter,
 		},
 	}
 	cvConfig := lanes.CommitteeVerifierRemoteChainInput{

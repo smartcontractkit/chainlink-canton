@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -267,7 +266,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Resolve contracts
 	globalConfigRef, globalConfigAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_config.ContractType, global_config.Version, "")
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	feeQuoterRef, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
+	_, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
 	require.NoError(t, err, "failed to get FeeQuoter address")
 	_, onRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), onramp.ContractType, onramp.Version, "")
 	require.NoError(t, err, "failed to get OnRamp address")
@@ -285,8 +284,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err, "failed to get Executor address")
 
 	// Deploy and configure lane for outbound sends
-	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
-	require.Truef(t, ok, "failed to get Canton Lane adapter")
 
 	// 8 cents outgoing CCV verification fee
 	ccvFeeUSDCents := 7
@@ -309,8 +306,10 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		},
 	}
 
-	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
-		Source: &lanes.ChainDefinition{
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, sequences.ConfigureLaneLegAsSourceWithInput, cldfEnv.BlockChains, sequences.ConfigureLaneLegInput{
+		DataStore: cldfEnv.DataStore,
+		Lane: lanes.UpdateLanesInput{
+			Source: &lanes.ChainDefinition{
 			Selector: env.Chain.ChainSelector(),
 			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 				{
@@ -335,7 +334,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			DefaultOutboundCCVs:      nil,
 			CantonLaneConfig: &lanes.CantonLaneConfig{
 				GlobalConfig: globalConfigRef,
-				FeeQuoterRef: feeQuoterRef,
 			},
 			DefaultExecutor: executorRef,
 			FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
@@ -357,6 +355,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		IsDisabled:   false,
 		TestRouter:   false,
 		ExtraConfigs: lanes.ExtraConfigs{},
+		},
 	})
 	require.NoErrorf(t, err, "Failed to configure chain for lanes")
 	runningDs := datastore.NewMemoryDataStore()

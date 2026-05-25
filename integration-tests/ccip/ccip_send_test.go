@@ -244,7 +244,7 @@ func TestCCIPSend(t *testing.T) {
 	// Resolve contracts
 	globalConfigRef, globalConfigAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_config.ContractType, global_config.Version, "")
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	feeQuoterRef, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
+	_, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
 	require.NoError(t, err, "failed to get FeeQuoter address")
 	_, onRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), onramp.ContractType, onramp.Version, "")
 	require.NoError(t, err, "failed to get OnRamp address")
@@ -262,18 +262,18 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to get Executor address")
 
 	// Deploy and configure lane for outbound sends
-	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
-	require.Truef(t, ok, "failed to get Canton Lane adapter")
 	evmAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0"))
 	require.Truef(t, ok, "failed to get EVM adapter")
 	feeQuoterDestChainConfig := evmAdapter.GetFeeQuoterDestChainConfig()
 	feeQuoterDestChainConfig.IsEnabled = true
 	feeQuoterDestChainConfig.V2Params.USDPerUnitGas = big.NewInt(38)
 
-	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
-		Source: &lanes.ChainDefinition{
-			Selector: env.Chain.ChainSelector(),
-			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, sequences.ConfigureLaneLegAsSourceWithInput, cldfEnv.BlockChains, sequences.ConfigureLaneLegInput{
+		DataStore: cldfEnv.DataStore,
+		Lane: lanes.UpdateLanesInput{
+			Source: &lanes.ChainDefinition{
+				Selector: env.Chain.ChainSelector(),
+				CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
 				{
 					CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
 					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
@@ -296,7 +296,6 @@ func TestCCIPSend(t *testing.T) {
 			DefaultOutboundCCVs:      nil,
 			CantonLaneConfig: &lanes.CantonLaneConfig{
 				GlobalConfig: globalConfigRef,
-				FeeQuoterRef: feeQuoterRef,
 			},
 			DefaultExecutor: executorRef,
 			FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
@@ -318,6 +317,7 @@ func TestCCIPSend(t *testing.T) {
 		IsDisabled:   false,
 		TestRouter:   false,
 		ExtraConfigs: lanes.ExtraConfigs{},
+		},
 	})
 	require.NoErrorf(t, err, "Failed to configure chain for lanes")
 	runningDs := datastore.NewMemoryDataStore()

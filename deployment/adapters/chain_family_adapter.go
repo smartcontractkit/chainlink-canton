@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -26,6 +27,10 @@ import (
 )
 
 var _ ccipadapters.ChainFamily = (*CantonChainFamilyAdapter)(nil)
+
+// ConfigureLanesDataStoreFamilyExtraKey passes e.DataStore into Canton lane configure when the
+// pinned chainlink-ccip ConfigureChainForLanesInput type does not yet expose DataStore.
+const ConfigureLanesDataStoreFamilyExtraKey = "canton.dataStore"
 
 type CantonChainFamilyAdapter struct{}
 
@@ -97,9 +102,9 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 	chains cldfchain.BlockChains,
 	input ccipadapters.ConfigureChainForLanesInput,
 ) (ccipseq.OnChainOutput, error) {
-	ds := input.DataStore
-	if ds == nil {
-		return ccipseq.OnChainOutput{}, fmt.Errorf("datastore is required")
+	ds, err := dataStoreFromConfigureChainForLanesInput(input)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, err
 	}
 
 	localGlobalConfig, err := findContractRef(
@@ -111,17 +116,6 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 	)
 	if err != nil {
 		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve global config: %w", err)
-	}
-
-	localFeeQuoter, err := findContractRef(
-		ds,
-		input.ChainSelector,
-		datastore.ContractType(fee_quoter.ContractType),
-		fee_quoter.Version,
-		"",
-	)
-	if err != nil {
-		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve fee quoter: %w", err)
 	}
 
 	router, onRamp, feeQuoter, offRamp, err := a.resolveLocalContractsForConfigureLanes(ds, input)
@@ -194,7 +188,6 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 			DefaultExecutor:          localExecutor,
 			CantonLaneConfig: &lanes.CantonLaneConfig{
 				GlobalConfig: localGlobalConfig,
-				FeeQuoterRef: localFeeQuoter,
 			},
 			OnRamp:    onRamp,
 			OffRamp:   offRamp,
@@ -210,10 +203,13 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		out, err = ccipseq.RunAndMergeSequence(
 			b,
 			chains,
-			sequences.ConfigureLaneLegAsSource,
-			lanes.UpdateLanesInput{
-				Source: localChain,
-				Dest:   remoteChain,
+			sequences.ConfigureLaneLegAsSourceWithInput,
+			sequences.ConfigureLaneLegInput{
+				Lane: lanes.UpdateLanesInput{
+					Source: localChain,
+					Dest:   remoteChain,
+				},
+				DataStore: ds,
 			},
 			out,
 		)
@@ -507,4 +503,21 @@ func remoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteC
 			},
 		},
 	}, nil
+}
+
+func dataStoreFromConfigureChainForLanesInput(input ccipadapters.ConfigureChainForLanesInput) (datastore.DataStore, error) {
+	if input.FamilyExtras != nil {
+		if ds, ok := input.FamilyExtras[ConfigureLanesDataStoreFamilyExtraKey].(datastore.DataStore); ok && ds != nil {
+			return ds, nil
+		}
+	}
+
+	v := reflect.ValueOf(input)
+	if f := v.FieldByName("DataStore"); f.IsValid() && !f.IsZero() {
+		if ds, ok := f.Interface().(datastore.DataStore); ok && ds != nil {
+			return ds, nil
+		}
+	}
+
+	return nil, fmt.Errorf("datastore is required (set FamilyExtras[%q] or upgrade chainlink-ccip/deployment)", ConfigureLanesDataStoreFamilyExtraKey)
 }

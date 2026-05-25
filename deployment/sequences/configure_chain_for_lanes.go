@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
@@ -46,20 +47,38 @@ func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
 	return types.NUMERIC(s)
 }
 
+// ConfigureLaneLegInput carries the lane update plus a datastore for fee quoter resolution.
+type ConfigureLaneLegInput struct {
+	Lane      lanes.UpdateLanesInput
+	DataStore datastore.DataStore
+}
+
+var ConfigureLaneLegAsSourceWithInput = operations.NewSequence(
+	"CantonConfigureLaneLegAsSourceWithInput",
+	semver.MustParse("2.0.0"),
+	"Configures a lane leg as source on CCIP 2.0.0",
+	configureLaneLegAsSource,
+)
+
 var ConfigureLaneLegAsSource = operations.NewSequence(
 	"CantonConfigureLaneLegAsSource",
 	semver.MustParse("2.0.0"),
 	"Configures a lane leg as source on CCIP 2.0.0",
 	func(b operations.Bundle, deps chain.BlockChains, input lanes.UpdateLanesInput) (output sequences.OnChainOutput, err error) {
-		b.Logger.Infof("Canton Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
+		return configureLaneLegAsSource(b, deps, ConfigureLaneLegInput{Lane: input})
+	},
+)
 
-		chain, ok := deps.CantonChains()[input.Source.Selector]
-		if !ok {
-			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.Source.Selector)
-		}
+func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input ConfigureLaneLegInput) (output sequences.OnChainOutput, err error) {
+	b.Logger.Infof("Canton Configuring lane leg as source. src: %+v, dest: %+v", input.Lane.Source, input.Lane.Dest)
 
-		sourceChain := input.Source
-		destChain := input.Dest
+	chain, ok := deps.CantonChains()[input.Lane.Source.Selector]
+	if !ok {
+		return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.Lane.Source.Selector)
+	}
+
+	sourceChain := input.Lane.Source
+	destChain := input.Lane.Dest
 		participant := chain.Participants[0]
 		mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
 		var proposalOutputs []contract.ExerciseOutput
@@ -72,7 +91,11 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("global config raw instance address: %w", err)
 		}
-		feeQuoterRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.CantonLaneConfig.FeeQuoterRef)
+		feeQuoterRef, err := resolveFeeQuoterRef(input, sourceChain.Selector)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("resolve fee quoter: %w", err)
+		}
+		feeQuoterRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(feeQuoterRef)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("fee quoter raw instance address: %w", err)
 		}
@@ -237,7 +260,7 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 		var cvBatchOps []mcms_types.BatchOperation
 		// CommitteeVerifier configure is emitted in a separate mcms-ccv proposal (Run 2).
 		if !mcmsEnabled {
-			for _, verifierConfig := range input.Source.CommitteeVerifiers {
+			for _, verifierConfig := range input.Lane.Source.CommitteeVerifiers {
 				cvReport, err := operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsSource, deps, ConfigureCommitteeVerifierAsSourceInput{
 					ChainSelector:           chain.Selector,
 					MCMSEnabled:             mcmsEnabled,
@@ -265,9 +288,21 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			return sequences.OnChainOutput{}, nil
 		}
 
-		return sequences.OnChainOutput{BatchOps: batchOps}, nil
-	},
-)
+	return sequences.OnChainOutput{BatchOps: batchOps}, nil
+}
+
+func resolveFeeQuoterRef(input ConfigureLaneLegInput, chainSelector uint64) (datastore.AddressRef, error) {
+	if input.DataStore == nil {
+		return datastore.AddressRef{}, fmt.Errorf("datastore is required on ConfigureLaneLegInput")
+	}
+
+	return input.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		chainSelector,
+		datastore.ContractType(feequoterop.ContractType),
+		feequoterop.Version,
+		"",
+	))
+}
 
 var ConfigureLaneLegAsDest = operations.NewSequence(
 	"CantonConfigureLaneLegAsDest",
