@@ -18,11 +18,31 @@ func requireCCIPOwnerMCMSRef(e cldf.Environment, sel uint64) error {
 	return nil
 }
 
-func requireDualMCMSRefs(e cldf.Environment, sel uint64) error {
+func requireRMNOwnerMCMSRef(e cldf.Environment, sel uint64) error {
+	if _, err := dsutils.ProposerMCMSAddressRef(e.DataStore, sel, cantonmcms.QualifierRMNOwner); err != nil {
+		return fmt.Errorf("rmnOwner MCMS must be deployed first (mcms-rmn): %w", err)
+	}
+
+	return nil
+}
+
+func requireCCVOwnerMCMSRef(e cldf.Environment, sel uint64) error {
+	if _, err := dsutils.ProposerMCMSAddressRef(e.DataStore, sel, cantonmcms.QualifierCCVOwner); err != nil {
+		return fmt.Errorf("ccvOwner MCMS must be deployed first (mcms-ccv): %w", err)
+	}
+
+	return nil
+}
+
+// requireTripleMCMSRefs ensures mcms-ccip, mcms-rmn, and mcms-ccv are in the datastore.
+func requireTripleMCMSRefs(e cldf.Environment, sel uint64) error {
 	if err := requireCCIPOwnerMCMSRef(e, sel); err != nil {
 		return fmt.Errorf("ccipOwner MCMS must be deployed first (canton_devnet_deploy_mcms_ccip.yaml): %w", err)
 	}
-	if _, err := dsutils.ProposerMCMSAddressRef(e.DataStore, sel, cantonmcms.QualifierCCVOwner); err != nil {
+	if err := requireRMNOwnerMCMSRef(e, sel); err != nil {
+		return fmt.Errorf("rmnOwner MCMS must be deployed first (canton_devnet_deploy_mcms_rmn.yaml): %w", err)
+	}
+	if err := requireCCVOwnerMCMSRef(e, sel); err != nil {
 		return fmt.Errorf("ccvOwner MCMS must be deployed first (canton_devnet_deploy_mcms_ccv.yaml): %w", err)
 	}
 

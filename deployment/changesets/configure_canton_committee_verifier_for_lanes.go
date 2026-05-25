@@ -50,7 +50,7 @@ func ConfigureCantonCommitteeVerifierForLanesFromTopology(
 			if family != chainsel.FamilyCanton {
 				continue
 			}
-			if err := requireDualMCMSRefs(e, chainCfg.ChainSelector); err != nil {
+			if err := requireTripleMCMSRefs(e, chainCfg.ChainSelector); err != nil {
 				return err
 			}
 			if len(chainCfg.CommitteeVerifiers) == 0 {
