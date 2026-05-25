@@ -3,14 +3,15 @@ package mcms
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/smartcontractkit/mcms"
 	ccipmcms "github.com/smartcontractkit/chainlink-ccip/deployment/utils/mcms"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/mcms"
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
@@ -21,6 +22,8 @@ const (
 	ccvFactoryInstanceSubstring = "ccip-factory-ccv@"
 	rmnFactoryInstanceSubstring = "ccip-factory-rmn@"
 )
+
+var errNoBatchOps = errors.New("no batch operations for timelock proposal")
 
 // ccvOwnerFunctionNames lists MCMS entrypoint function names from CommitteeVerifier.daml.
 // Keep in sync with contracts/ccip/committee-verifier/daml/CCIP/CommitteeVerifier.daml.
@@ -150,7 +153,7 @@ func BuildDualTimelockProposalsFromBatchOps(
 		ctx, e, chain, chainSelector, QualifierCCIPOwner, ccipBatch, input,
 		proposalDescription(description, QualifierCCIPOwner),
 	)
-	if err != nil {
+	if err != nil && !errors.Is(err, errNoBatchOps) {
 		return nil, fmt.Errorf("build ccipOwner proposal for chain %d: %w", chainSelector, err)
 	}
 	if ccipProposal != nil {
@@ -161,7 +164,7 @@ func BuildDualTimelockProposalsFromBatchOps(
 		ctx, e, chain, chainSelector, QualifierCCVOwner, ccvBatch, input,
 		proposalDescription(description, QualifierCCVOwner),
 	)
-	if err != nil {
+	if err != nil && !errors.Is(err, errNoBatchOps) {
 		return nil, fmt.Errorf("build ccvOwner proposal for chain %d: %w", chainSelector, err)
 	}
 	if ccvProposal != nil {
@@ -172,7 +175,7 @@ func BuildDualTimelockProposalsFromBatchOps(
 		ctx, e, chain, chainSelector, QualifierRMNOwner, rmnBatch, input,
 		proposalDescription(description, QualifierRMNOwner),
 	)
-	if err != nil {
+	if err != nil && !errors.Is(err, errNoBatchOps) {
 		return nil, fmt.Errorf("build rmnOwner proposal for chain %d: %w", chainSelector, err)
 	}
 	if rmnProposal != nil {
@@ -223,7 +226,7 @@ func BuildTimelockProposalForOwner(
 	description string,
 ) (*mcms.TimelockProposal, error) {
 	if len(batchOps) == 0 {
-		return nil, nil
+		return nil, errNoBatchOps
 	}
 	if len(chain.Participants) == 0 {
 		return nil, fmt.Errorf("canton chain %d has no participants", chainSelector)
@@ -274,6 +277,8 @@ func cantonsdkRoleForAction(action mcms_types.TimelockAction) cantonsdk.Timelock
 		return cantonsdk.TimelockRoleBypasser
 	case mcms_types.TimelockActionCancel:
 		return cantonsdk.TimelockRoleCanceller
+	case mcms_types.TimelockActionSchedule:
+		return cantonsdk.TimelockRoleProposer
 	default:
 		return cantonsdk.TimelockRoleProposer
 	}

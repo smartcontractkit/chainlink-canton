@@ -34,6 +34,7 @@ func (a *CantonTransferOwnershipAdapter) SequenceTransferOwnershipViaMCMS() *cld
 			if _, ok := chains.CantonChains()[in.ChainSelector]; !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("canton chain with selector %d not found in environment", in.ChainSelector)
 			}
+
 			return sequences.OnChainOutput{}, nil
 		},
 	)
@@ -48,6 +49,7 @@ func (a *CantonTransferOwnershipAdapter) SequenceAcceptOwnership() *cldf_ops.Seq
 			if _, ok := chains.CantonChains()[in.ChainSelector]; !ok {
 				return sequences.OnChainOutput{}, fmt.Errorf("canton chain with selector %d not found in environment", in.ChainSelector)
 			}
+
 			return sequences.OnChainOutput{}, nil
 		},
 	)

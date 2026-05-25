@@ -3,8 +3,8 @@ package changesets
 import (
 	"fmt"
 
-	ccipchangesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	cciptokens "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	ccipchangesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"

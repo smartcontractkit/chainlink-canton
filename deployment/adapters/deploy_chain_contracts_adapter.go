@@ -23,8 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 )
 
@@ -85,9 +85,9 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		CCVOwnerParty:        ownerParty,
 		RMNOwnerParty:        ownerParty,
 		DevenvBundledDeploy:  true,
-		FactoryAddressRef:   factoryAddressRef,
+		FactoryAddressRef:    factoryAddressRef,
 		RMNFactoryAddressRef: rmnFactoryAddressRef,
-		CommitteeVerifiers: committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
+		CommitteeVerifiers:   committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
 		GlobalConfig: sequences.GlobalConfigParams{
 			Template: common.GlobalConfig{
 				CcipOwner:     "",
@@ -281,4 +281,3 @@ func waitForFinalityRequested() common.FinalityConfig {
 func waitForSafeRequested() common.FinalityConfig {
 	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
 }
-

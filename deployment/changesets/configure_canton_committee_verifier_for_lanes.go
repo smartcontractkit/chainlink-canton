@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	ccipchangesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	ccipseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
-	ccipchangesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	v2cs "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	cldfchain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -123,6 +123,7 @@ func chainFamilyRegistryForCommitteeVerifierOnly(
 				ChainFamily: adapter,
 				cv:          cantonCV,
 			})
+
 			continue
 		}
 		reg.RegisterChainFamily(family, adapter)

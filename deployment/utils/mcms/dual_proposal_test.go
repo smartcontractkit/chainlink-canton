@@ -102,7 +102,6 @@ func TestSplitBatchOpsByOwner_committeeVerifierMCMSEntrypoints(t *testing.T) {
 	}
 
 	for _, fn := range ccvFunctions {
-		fn := fn
 		t.Run(fn, func(t *testing.T) {
 			t.Parallel()
 
