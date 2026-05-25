@@ -10,6 +10,7 @@ replace github.com/smartcontractkit/chainlink-canton/party-ceremony => ../party-
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 replace (
+	github.com/smartcontractkit/chainlink-ccip => github.com/smartcontractkit/chainlink-ccip v0.0.0-20260416055149-75c017f534ca
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.41.2-0.20260423204345-3cd8c2672428
@@ -26,8 +27,8 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.100
 	github.com/smartcontractkit/chainlink-canton v0.0.0-20260423182618-78ffd32b7eb5
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0
-	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260519201156-791d8279a3ad
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260519201156-791d8279a3ad
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260518162021-f8d199608321
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260518162021-f8d199608321
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260518191934-8eaeb5f036e1
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.106.0
