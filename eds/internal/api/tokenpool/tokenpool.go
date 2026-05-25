@@ -289,10 +289,13 @@ func (s Server) lockReleaseTokenPoolSend(
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
 		ContextData:        contextData,
-		DisclosedContracts: append(
+		DisclosedContracts: slices.Concat(
+			disclosedHoldings,
 			factoryDisclosures,
-			converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
-			converters.ActiveContractToDisclosedContract(rateLimiter),
+			[]oapiCommon.DisclosedContract{
+				converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
+				converters.ActiveContractToDisclosedContract(rateLimiter),
+			},
 		),
 	}
 

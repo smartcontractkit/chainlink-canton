@@ -93,6 +93,9 @@ template LinkTransferInstruction
         meta = MetadataV1.emptyMetadata
 
       transferInstruction_acceptImpl _self _arg = do
+        now <- getTime
+        assertMsg "LinkTransferInstruction.TransferInstruction_Accept: transfer instruction expired"
+          (instructionTransfer.executeBefore > now)
         lockedHolding <- fetch instructionLockedHoldingCid
         archive instructionLockedHoldingCid
 

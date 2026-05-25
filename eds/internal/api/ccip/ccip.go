@@ -372,17 +372,36 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		converters.ActiveContractToDisclosedContract(activeRMNRemoteContract),
 		converters.ActiveContractToDisclosedContract(activeFeeQuoterContract),
 	}
+	var feeTokenConfigCid string
+
+	parsedTokenAdminRegistry, err := ParseTokenAdminRegistry(activeTokenAdminRegistryContract.GetCreatedEvent())
+	if err != nil {
+		s.logger.Err(err).Msg("failed to parse token admin registry contract")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	if req.Message.FeeToken.Admin == "" || req.Message.FeeToken.Id == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "invalid fee token"})
+		return
+	}
+	encodedFeeInstrumentId := contracts.EncodeInstrumentID(splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(req.Message.FeeToken.Admin),
+		Id:    types.TEXT(req.Message.FeeToken.Id),
+	})
+	feeTokenConfigInstanceAddress := contracts.InstanceID(hex.EncodeToString(encodedFeeInstrumentId.Bytes())).
+		RawInstanceAddress(types.PARTY(parsedTokenAdminRegistry.Address.Owner())).
+		InstanceAddress()
+	activeFeeTokenConfigContract, ok := s.activeContractStore.Get(feeTokenConfigInstanceAddress)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token config registered for fee token: %s", encodedFeeInstrumentId.Hex())})
+		return
+	}
+	feeTokenConfigCid = activeFeeTokenConfigContract.GetCreatedEvent().GetContractId()
+	disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeFeeTokenConfigContract))
 
 	// If the message contains a token transfer, look up the token pool on the TAR and return the TokenConfig
 	if req.Message.TokenTransfer != nil {
-		parsedTokenAdminRegistry, err := ParseTokenAdminRegistry(activeTokenAdminRegistryContract.GetCreatedEvent())
-		if err != nil {
-			s.logger.Err(err).Msg("failed to parse token admin registry contract")
-			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-
-			return
-		}
-
 		// Calculate the InstanceID of the TokenConfig
 		encodedInstrumentId := contracts.EncodeInstrumentID(splice_api_token_holding_v1.InstrumentId{
 			Admin: types.PARTY(req.Message.TokenTransfer.Token.Admin),
@@ -423,6 +442,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		ContextData:        contextData,
 		Executor:           executor,
 		DisclosedContracts: disclosedContracts,
+		FeeTokenConfigCid:  feeTokenConfigCid,
 	}
 	c.JSON(http.StatusOK, resp)
 }

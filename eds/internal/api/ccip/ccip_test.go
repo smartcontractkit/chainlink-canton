@@ -380,6 +380,12 @@ func TestServer_PostCCIPSend(t *testing.T) {
 	}
 	encodedTokenInstrumentId := contracts.EncodeInstrumentID(tokenInstrumentId)
 	tokenConfigAddress := contracts.NewRawInstanceAddress(contracts.InstanceID(hex.EncodeToString(encodedTokenInstrumentId.Bytes())), "owner")
+	feeInstrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: "feeAdmin",
+		Id:    "LINK",
+	}
+	encodedFeeInstrumentId := contracts.EncodeInstrumentID(feeInstrumentId)
+	feeTokenConfigAddress := contracts.NewRawInstanceAddress(contracts.InstanceID(hex.EncodeToString(encodedFeeInstrumentId.Bytes())), "owner")
 
 	setup := func(t *testing.T) (*mocks.MockActiveContractStore, oapiCCIP.ClientWithResponsesInterface) {
 		t.Helper()
@@ -390,6 +396,29 @@ func TestServer_PostCCIPSend(t *testing.T) {
 		client := makeClient(t, server)
 
 		return mockActiveContractStore, client
+	}
+	tokenConfigContract := func(contractId string, instrumentId splice_api_token_holding_v1.InstrumentId, tokenPool *core.PoolRegistration) *apiv2.ActiveContract {
+		encodedInstrumentId := contracts.EncodeInstrumentID(instrumentId)
+		return &apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+			ContractId: contractId,
+			TemplateId: &apiv2.Identifier{
+				PackageId:  "package",
+				ModuleName: "module",
+				EntityName: "TokenConfig",
+			},
+			CreateArguments: bindings.MarshalTemplateToRecord(core.TokenConfig{
+				InstanceId:         types.TEXT(hex.EncodeToString(encodedInstrumentId.Bytes())),
+				RegistryInstanceId: types.TEXT(tokenAdminRegistryAddress.InstanceID()),
+				RegistryOwner:      types.PARTY(tokenAdminRegistryAddress.Owner()),
+				Index:              0,
+				InstrumentId:       instrumentId,
+				TokenPool:          tokenPool,
+			}),
+		}}
+	}
+	tokenPoolRegistration := &core.PoolRegistration{
+		PoolOwner:      types.PARTY(tokenPoolAddress.Owner()),
+		PoolInstanceId: types.TEXT(tokenPoolAddress.InstanceID()),
 	}
 
 	t.Run("Success", func(t *testing.T) {
@@ -447,25 +476,8 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				EntryCount: 1,
 			}),
 		}}, true)
-		mockActiveContractStore.EXPECT().Get(tokenConfigAddress.InstanceAddress()).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
-			ContractId: "tokenConfigContractId",
-			TemplateId: &apiv2.Identifier{
-				PackageId:  "package",
-				ModuleName: "module",
-				EntityName: "TokenConfig",
-			},
-			CreateArguments: bindings.MarshalTemplateToRecord(core.TokenConfig{
-				InstanceId:         types.TEXT(hex.EncodeToString(encodedTokenInstrumentId.Bytes())),
-				RegistryInstanceId: types.TEXT(tokenAdminRegistryAddress.InstanceID()),
-				RegistryOwner:      types.PARTY(tokenAdminRegistryAddress.Owner()),
-				Index:              0,
-				InstrumentId:       tokenInstrumentId,
-				TokenPool: &core.PoolRegistration{
-					PoolOwner:      types.PARTY(tokenPoolAddress.Owner()),
-					PoolInstanceId: types.TEXT(tokenPoolAddress.InstanceID()),
-				},
-			}),
-		}}, true)
+		mockActiveContractStore.EXPECT().Get(feeTokenConfigAddress.InstanceAddress()).Return(tokenConfigContract("feeTokenConfigContractId", feeInstrumentId, nil), true)
+		mockActiveContractStore.EXPECT().Get(tokenConfigAddress.InstanceAddress()).Return(tokenConfigContract("tokenConfigContractId", tokenInstrumentId, tokenPoolRegistration), true)
 		mockActiveContractStore.EXPECT().Get(cfg.RMNRemote.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 			ContractId: "rmnRemoteContractId",
 			TemplateId: &apiv2.Identifier{
@@ -534,9 +546,13 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				}, {
 					ContractId: "feeQuoterContractId",
 					TemplateId: "package:module:FeeQuoter",
+				}, {
+					ContractId: "feeTokenConfigContractId",
+					TemplateId: "package:module:TokenConfig",
 				},
 			}, resp.JSON200.DisclosedContracts)
 			require.Equal(t, new(converters.RawInstanceAddressAsRawOrHashedAddress(defaultExecutor)), resp.JSON200.Executor)
+			require.Equal(t, "feeTokenConfigContractId", resp.JSON200.FeeTokenConfigCid)
 		})
 		t.Run("Token Transfer", func(t *testing.T) {
 			t.Parallel()
@@ -598,11 +614,15 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					ContractId: "feeQuoterContractId",
 					TemplateId: "package:module:FeeQuoter",
 				}, {
+					ContractId: "feeTokenConfigContractId",
+					TemplateId: "package:module:TokenConfig",
+				}, {
 					ContractId: "tokenConfigContractId",
 					TemplateId: "package:module:TokenConfig",
 				},
 			}, resp.JSON200.DisclosedContracts)
 			require.Equal(t, new(converters.RawInstanceAddressAsRawOrHashedAddress(defaultExecutor)), resp.JSON200.Executor)
+			require.Equal(t, "feeTokenConfigContractId", resp.JSON200.FeeTokenConfigCid)
 		})
 		t.Run("Token Transfer - with executor + default CCVs", func(t *testing.T) {
 			t.Parallel()
@@ -1030,6 +1050,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			}}, true)
 			mockActiveContractStore.EXPECT().Get(cfg.RMNRemote.InstanceAddress).Return(nil, true)
 			mockActiveContractStore.EXPECT().Get(cfg.FeeQuoter.InstanceAddress).Return(nil, true)
+			mockActiveContractStore.EXPECT().Get(feeTokenConfigAddress.InstanceAddress()).Return(tokenConfigContract("feeTokenConfigContractId", feeInstrumentId, nil), true)
 			mockActiveContractStore.EXPECT().Get(tokenConfigAddress.InstanceAddress()).Return(nil, false)
 
 			resp, err := client.PostCCIPSendWithResponse(t.Context(), oapiCCIP.CCIPSendRequest{
@@ -1067,6 +1088,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			}}, true)
 			mockActiveContractStore.EXPECT().Get(cfg.RMNRemote.InstanceAddress).Return(nil, true)
 			mockActiveContractStore.EXPECT().Get(cfg.FeeQuoter.InstanceAddress).Return(nil, true)
+			mockActiveContractStore.EXPECT().Get(feeTokenConfigAddress.InstanceAddress()).Return(tokenConfigContract("feeTokenConfigContractId", feeInstrumentId, nil), true)
 			mockActiveContractStore.EXPECT().Get(tokenConfigAddress.InstanceAddress()).Return(nil, true)
 
 			resp, err := client.PostCCIPSendWithResponse(t.Context(), oapiCCIP.CCIPSendRequest{
@@ -1103,6 +1125,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			}}, true)
 			mockActiveContractStore.EXPECT().Get(cfg.RMNRemote.InstanceAddress).Return(nil, true)
 			mockActiveContractStore.EXPECT().Get(cfg.FeeQuoter.InstanceAddress).Return(nil, true)
+			mockActiveContractStore.EXPECT().Get(feeTokenConfigAddress.InstanceAddress()).Return(tokenConfigContract("feeTokenConfigContractId", feeInstrumentId, nil), true)
 			mockActiveContractStore.EXPECT().Get(tokenConfigAddress.InstanceAddress()).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenConfig{
 					InstanceId:         types.TEXT(hex.EncodeToString(encodedTokenInstrumentId.Bytes())),
