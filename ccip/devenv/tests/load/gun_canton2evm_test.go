@@ -4,41 +4,22 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	ccvload "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/load"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
-	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 )
 
 const (
 	// cantonToEVMFeeAmount matches the message-only path in canton2evm_e2e_test.go.
 	cantonToEVMFeeAmount int64 = 2_000
-
-	// Schedule env vars (consumed in TestCanton2EVM_Load):
-	//   CANTON_LOAD_MESSAGE_RATE: "<int>/<duration>" (e.g. "1/1s", "1/20s", "10/5m")
-	//     Maps to wasp.Plain rate + wasp.Config.RateLimitUnitDuration.
-	//   CANTON_LOAD_DURATION: total wall-clock runtime (Go time.Duration, e.g. "90s", "10m")
-	//     Maps to the duration argument of wasp.Plain.
-	envMessageRate      = "CANTON_LOAD_MESSAGE_RATE"
-	envLoadDuration     = "CANTON_LOAD_DURATION"
-	defaultMessageRate  = "1/1s"
-	defaultLoadDuration = 90 * time.Second
 
 	// mintBuffer is a safety multiplier on top of estimated message count so a slow fee
 	// burn does not starve the run mid-flight (1.5x).
@@ -52,7 +33,7 @@ const (
 // Requires a running devenv and ../../env-canton-evm-out.toml (same as the basic e2e test).
 //
 // Devenv-specific: this test pre-mints fee holdings and calls SetupSend once before WASP
-// starts. The Canton2EVMGun itself is environment-agnostic so the same gun can be reused by
+// starts. The CCIPLoadGun itself is environment-agnostic so the same gun can be reused by
 // a future staging/prod runner that assumes pre-funded accounts.
 //
 //nolint:paralleltest // Canton holdings must stay 1-wide; shares env with e2e.
@@ -93,47 +74,11 @@ func TestCanton2EVM_Load(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	ds, err := lib.DataStore()
-	require.NoError(t, err)
-	ccvAddr, err := tcapi.GetContractAddress(
-		ds,
-		cantonChain.ChainSelector(),
-		datastore.ContractType(canton_committee_verifier.ContractType),
-		canton_committee_verifier.Version.String(),
-		common.DefaultCommitteeVerifierQualifier,
-		"canton committee verifier",
-	)
-	require.NoError(t, err)
-	executorAddr, err := tcapi.GetContractAddress(
-		ds,
-		cantonChain.ChainSelector(),
-		datastore.ContractType(executor.ContractType),
-		executor.Version.String(),
-		common.DefaultExecutorQualifier,
-		"source executor",
-	)
-	require.NoError(t, err)
+	ccvAddr, executorAddr := resolveCantonSourceAddrs(t, lib, cantonChain.ChainSelector())
 
-	// Resolve the load schedule from env vars (or defaults). Same "N/T" shape as CCV.
-	messageRate := os.Getenv(envMessageRate)
-	if messageRate == "" {
-		messageRate = defaultMessageRate
-	}
-	rate, rateUnit := ccvload.ParseMessageRate(messageRate)
-	require.NotZero(t, rate, "%s=%q invalid (expected e.g. '1/20s')", envMessageRate, messageRate)
-	require.Positive(t, rateUnit, "%s=%q invalid (expected e.g. '1/20s')", envMessageRate, messageRate)
+	sched := loadSchedule(t)
 
-	duration := defaultLoadDuration
-	if d := os.Getenv(envLoadDuration); d != "" {
-		parsed, err := time.ParseDuration(d)
-		require.NoError(t, err, "%s=%q invalid", envLoadDuration, d)
-		duration = parsed
-	}
-	t.Logf("Load schedule: rate=%d unit=%s totalDuration=%s", rate, rateUnit, duration)
-
-	// Devenv-only pre-funding: mint enough fee holdings for the whole profile, then SetupSend
-	// once. The gun does not mint during Call (staging/prod rely on pre-funded accounts).
-	estimatedMessages := uint64(rate) * uint64(duration/rateUnit)
+	estimatedMessages := uint64(sched.rate) * uint64(sched.duration/sched.rateUnit)
 	if estimatedMessages == 0 {
 		estimatedMessages = 1
 	}
@@ -143,8 +88,7 @@ func TestCanton2EVM_Load(t *testing.T) {
 	require.NoError(t, cantonImpl.MintTokens(ctx, mintAmount))
 	require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), 0))
 
-	gun, err := NewCanton2EVMGun(
-		lib,
+	gun, err := NewCCIPLoadGun(
 		cantonChain,
 		destinations,
 		ccvAddr,
@@ -153,59 +97,5 @@ func TestCanton2EVM_Load(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	p := wasp.NewProfile().Add(wasp.NewGenerator(&wasp.Config{
-		T:        t,
-		LoadType: wasp.RPS,
-		GenName:  "canton-load-canton2evm",
-		Schedule: wasp.Combine(
-			wasp.Plain(rate, duration),
-		),
-		RateLimitUnitDuration: rateUnit,
-		Gun:                   gun,
-		Labels: map[string]string{
-			"go_test_name":  "canton-load-canton2evm",
-			"branch":        "test",
-			"commit":        "test",
-			"message_rate":  messageRate,
-			"load_duration": duration.String(),
-		},
-		LokiConfig: nil,
-	}))
-
-	_, err = p.Run(true)
-	require.NoError(t, err)
-	p.Wait()
-
-	require.Positive(t, gun.CallCount(), "gun should have completed at least one message")
-	require.LessOrEqual(t, gun.MaxConcurrentObserved(), int32(1),
-		"Gun.Call must not overlap (Canton holdings 1-wide)")
-}
-
-// discoverEVMDestinations enumerates every Anvil blockchain in the env using the same
-// ChainsMap instance the test runner wired (lib.ChainsMap creates new impls per call).
-func discoverEVMDestinations(t *testing.T, in *ccv.Cfg, chainMap map[uint64]cciptestinterfaces.CCIP17) []EVMDestination {
-	t.Helper()
-
-	dests := make([]EVMDestination, 0)
-	seen := make(map[uint64]struct{})
-	for _, bc := range in.Blockchains {
-		if bc.Type != blockchain.TypeAnvil {
-			continue
-		}
-		details, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, chainsel.FamilyEVM)
-		require.NoError(t, err, "resolve chain selector for chainID=%s", bc.ChainID)
-		if _, dup := seen[details.ChainSelector]; dup {
-			continue
-		}
-		chain, ok := chainMap[details.ChainSelector]
-		require.True(t, ok, "EVM chain %d not in harness chain map", details.ChainSelector)
-
-		receiver, err := chain.GetEOAReceiverAddress()
-		require.NoError(t, err)
-
-		dests = append(dests, EVMDestination{Chain: chain, Receiver: receiver})
-		seen[details.ChainSelector] = struct{}{}
-	}
-
-	return dests
+	runWASP(t, gun, "canton-load-canton2evm", sched)
 }

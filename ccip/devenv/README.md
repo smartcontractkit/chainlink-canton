@@ -64,16 +64,38 @@ cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestCanton2
 
 If the out file is missing the test skips with a hint.
 
+### EVM → Canton load (requires devenv)
+
+Sequential EVM→Canton messages against the Canton destination in the env file. Uses the same schedule env vars as Canton→EVM (`CANTON_LOAD_MESSAGE_RATE`, `CANTON_LOAD_DURATION`). EVM accounts are pre-funded by devenv; no Canton pre-mint.
+
+Example — 1 message every 20 seconds for 10 minutes:
+
+```bash
+CANTON_LOAD_MESSAGE_RATE=1/20s CANTON_LOAD_DURATION=10m make run-evm2canton-load
+```
+
+```bash
+# From repo root
+make run-evm2canton-load
+```
+
+Equivalent:
+
+```bash
+cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Canton_Load$'
+```
+
 ### CI (on demand)
 
 The **CCIP Canton Load Tests** workflow (`ccip-load-tests.yml`) can be triggered manually from GitHub Actions
-(`workflow_dispatch`). It reuses the same devenv setup as the CCIP E2E workflow. Inputs:
+(`workflow_dispatch`). It reuses the same devenv setup as the CCIP E2E workflow and runs both
+`TestCanton2EVM_Load` and `TestEVM2Canton_Load`. Inputs:
 
 | Input | Default | Maps to |
 |---|---|---|
 | `message_rate` | `1/1s` | `CANTON_LOAD_MESSAGE_RATE` |
 | `load_duration` | `90s` | `CANTON_LOAD_DURATION` |
-| `test_timeout` | `20m` | `go test -timeout` |
+| `test_timeout` | `40m` | `go test -timeout` |
 | `canton_ref` | workflow ref | chainlink-canton checkout |
 
 chainlink-ccv is pinned in `.github/actions/setup-ccip-devenv` (same as CCIP E2E).

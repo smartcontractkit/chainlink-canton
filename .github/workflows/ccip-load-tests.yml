@@ -16,7 +16,7 @@ on:
       test_timeout:
         description: 'go test -timeout value (must exceed load duration + teardown)'
         required: false
-        default: '20m'
+        default: '40m'
         type: string
       canton_ref:
         description: 'chainlink-canton git ref (empty = workflow ref)'
@@ -33,7 +33,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    name: Canton→EVM load (devenv)
+    name: CCIP load tests (devenv)
     runs-on: ubuntu-latest-8cores-32GB
     timeout-minutes: 120
     steps:
@@ -48,13 +48,13 @@ jobs:
           jd-registry: ${{ secrets.JD_REGISTRY }}
           jd-image: ${{ secrets.JD_IMAGE }}
 
-      - name: Run TestCanton2EVM_Load
+      - name: Run load tests
         working-directory: chainlink-canton/ccip/devenv/tests/load
         env:
           CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
           CANTON_LOAD_DURATION: ${{ inputs.load_duration }}
         run: |
-          go test -timeout ${{ inputs.test_timeout }} -v -count 1 -run '^TestCanton2EVM_Load$'
+          go test -timeout ${{ inputs.test_timeout }} -v -count 1 -run '^(TestCanton2EVM_Load|TestEVM2Canton_Load)$'
 
       - name: Upload devenv logs
         if: always()

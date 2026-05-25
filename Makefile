@@ -94,6 +94,10 @@ run-e2e-tests:
 run-canton2evm-load: ## Canton→EVM WASP load (requires running devenv + env-canton-evm-out.toml).
 	cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestCanton2EVM_Load$$'
 
+.PHONY: run-evm2canton-load
+run-evm2canton-load: ## EVM→Canton WASP load (requires running devenv + env-canton-evm-out.toml).
+	cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Canton_Load$$'
+
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests
 

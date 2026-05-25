@@ -906,7 +906,7 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 		return ev, nil
 	}
 
-	vr, err := c.fetchVerifierResult(ctx, key.MessageID)
+	vr, err := c.fetchVerifierResult(ctx, key.MessageID, timeout)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("fetch verifier result: %w", err)
 	}
