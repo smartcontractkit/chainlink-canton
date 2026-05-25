@@ -280,6 +280,7 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 			Config: cantonchangesets.DeployCCIPFactoryConfig{
 				Params: cantonchangesets.DeployCCIPFactoryParams{
 					OwnerParty: owner,
+					MCMSParty:  owner,
 					Qualifier:  qual,
 					InstanceID: "ccip-factory-" + qual,
 				},

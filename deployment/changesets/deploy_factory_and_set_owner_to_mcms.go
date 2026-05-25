@@ -10,7 +10,6 @@ import (
 
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
-	mcmsops "github.com/smartcontractkit/chainlink-canton/deployment/operations/mcms"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -50,12 +49,11 @@ func (d DeployFactoryAndSetOwnerToMCMS) VerifyPreconditions(e cldf.Environment, 
 	if config.Config.Qualifier == "" {
 		return fmt.Errorf("factory qualifier is required")
 	}
-	if _, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		config.ChainSelector,
-		datastore.ContractType(mcmsops.ContractType),
-		mcmsops.Version,
-		"",
-	)); err != nil {
+	mcmsOwnerQualifier, err := mcmsOwnerQualifierForFactory(config.Config.Qualifier)
+	if err != nil {
+		return err
+	}
+	if _, err := dsutils.MCMSRawInstanceAddress(e.DataStore, config.ChainSelector, mcmsOwnerQualifier); err != nil {
 		return fmt.Errorf("MCMS contract not found in datastore (deploy MCMS first): %w", err)
 	}
 
@@ -85,7 +83,7 @@ func (d DeployFactoryAndSetOwnerToMCMS) Apply(e cldf.Environment, config CantonC
 		return cldf.ChangesetOutput{}, fmt.Errorf("factory raw instance address: %w", err)
 	}
 
-	// Note: default MCMS
+	// Encode SetOwnerToMCMS for MCMS proposal submission.
 	exerciseOut, err := operations.ExecuteOperation(e.OperationsBundle, factoryops.SetOwnerToMCMS, chain, opcontract.ChoiceInput[factorybindings.SetOwnerToMCMS]{
 		InstanceAddress:    factoryRawAddr.InstanceAddress(),
 		RawInstanceAddress: factoryRawAddr.String(),
@@ -101,18 +99,13 @@ func (d DeployFactoryAndSetOwnerToMCMS) Apply(e cldf.Environment, config CantonC
 		return cldf.ChangesetOutput{}, fmt.Errorf("build batch operation: %w", err)
 	}
 
-	mcmsRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-		config.ChainSelector,
-		datastore.ContractType(mcmsops.ContractType),
-		mcmsops.Version,
-		"",
-	))
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("MCMS contract not found: %w", err)
-	}
-	mcmsRawAddr, err := dsutils.GetRawInstanceAddressFromAddressRef(mcmsRef)
+	mcmsOwnerQualifier, err := mcmsOwnerQualifierForFactory(cfg.Qualifier)
 	if err != nil {
 		return cldf.ChangesetOutput{}, err
+	}
+	mcmsRawAddr, err := dsutils.MCMSRawInstanceAddress(e.DataStore, config.ChainSelector, mcmsOwnerQualifier)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("MCMS contract not found: %w", err)
 	}
 
 	participant := chain.Participants[config.Participant]

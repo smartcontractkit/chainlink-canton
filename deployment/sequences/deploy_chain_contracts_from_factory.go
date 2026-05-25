@@ -48,7 +48,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		var addresses []datastore.AddressRef
 		var proposalOutputs []contract.ExerciseOutput
 
-		ownerParty, ccipOwnerParty, ccvOwnerParty, err := resolveOwnerParties(input)
+		ownerParty, ccipOwnerParty, err := requireOwnerParties(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -57,24 +57,16 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, err
 		}
 
-		rmnInstanceID, err := ensureInstanceID(input.RMNRemote.Template.InstanceId, "rmn_remote")
+		rmnRemoteRawInstanceAddress, rmnAddressRef, rmnProposalOutputs, err := resolveOrDeployRMNRemote(
+			b, deps, input, factoryRawInstanceAddress, ccipOwnerParty,
+		)
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure RMNRemote instance ID: %w", err)
+			return sequences.OnChainOutput{}, err
 		}
-		rmnTemplate := rmn.RMNRemote{
-			InstanceId:      types.TEXT(rmnInstanceID),
-			RmnOwner:        ccipOwnerParty,
-			CcipOwner:       ccipOwnerParty,
-			CustomObservers: input.RMNRemote.Template.CustomObservers,
-			CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
+		if rmnAddressRef != nil {
+			addresses = append(addresses, *rmnAddressRef)
 		}
-		deployRMNRemoteReport, err := operations.ExecuteOperation(b, factoryops.DeployRMNRemote, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployRMNRemote{Contract: rmnTemplate}, input.ProposalDriven))
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote from factory: %w", err)
-		}
-		proposalOutputs = appendExerciseOutput(proposalOutputs, deployRMNRemoteReport.Output, input.ProposalDriven)
-		rmnRemoteRawInstanceAddress := rmnInstanceID.RawInstanceAddress(ccipOwnerParty)
-		addresses = append(addresses, newAddressRef(deps.ChainSelector(), rmnRemoteRawInstanceAddress, rmn_remote.ContractType, rmn_remote.Version, ""))
+		proposalOutputs = append(proposalOutputs, rmnProposalOutputs...)
 
 		globalConfigInstanceID, err := ensureInstanceID(input.GlobalConfig.Template.InstanceId, "globalconfig")
 		if err != nil {
@@ -145,14 +137,21 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 
 		var firstCommitteeVerifierBinding mcms.RawInstanceAddress
 		if len(input.CommitteeVerifiers) == 0 {
+			if input.CcvRegistryBinding.Unpack == "" {
+				return sequences.OnChainOutput{}, fmt.Errorf("CcvRegistryBinding is required when CommitteeVerifiers is empty")
+			}
 			firstCommitteeVerifierBinding = input.CcvRegistryBinding
+		}
+		var ccvOwnerParty types.PARTY
+		if len(input.CommitteeVerifiers) > 0 {
+			ccvOwnerParty, err = requireCCVOwnerParty(input)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
 		}
 		for i, committeeVerifierParams := range input.CommitteeVerifiers {
 			qualifier := committeeVerifierParams.Qualifier
 			committeeVerifierOwner := ccvOwnerParty
-			if committeeVerifierParams.Template.Owner != "" {
-				committeeVerifierOwner = committeeVerifierParams.Template.Owner
-			}
 			committeeVerifierInstanceID, err := ensureInstanceID(committeeVerifierParams.Template.InstanceId, "committeeverifier")
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure CommitteeVerifier #%d instance ID: %w", i, err)
@@ -289,12 +288,54 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 	},
 )
 
-// DeployCCIPChainContractsFromFactory deploys CCIP contracts (no CommitteeVerifiers) via the ccip-qualified factory.
+// DeployRMNFromFactory deploys RMNRemote via the ccip-qualified CCIPFactory.
+var DeployRMNFromFactory = operations.NewSequence(
+	"canton/ccip/deploy_rmn_from_factory",
+	semver.MustParse("0.1.0"),
+	"Deploys RMNRemote on Canton through the ccip CCIPFactory",
+	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
+		_, ccipOwnerParty, err := requireOwnerParties(input)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		factoryRawInstanceAddress, err := rawInstanceAddressFromAddressRef(input.FactoryAddressRef)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		_, rmnAddressRef, proposalOutputs, err := deployRMNRemoteFromFactory(
+			b, deps, input, factoryRawInstanceAddress, ccipOwnerParty,
+		)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
+		out := sequences.OnChainOutput{Addresses: []datastore.AddressRef{*rmnAddressRef}}
+		if input.ProposalDriven {
+			batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to build RMN proposal batch: %w", err)
+			}
+			if len(batchOp.Transactions) > 0 {
+				out.BatchOps = []mcms_types.BatchOperation{batchOp}
+			}
+		}
+
+		return out, nil
+	},
+)
+
+// DeployCCIPChainContractsFromFactory deploys CCIP contracts (no RMNRemote, no CommitteeVerifiers) via the ccip-qualified factory.
 var DeployCCIPChainContractsFromFactory = operations.NewSequence(
 	"canton/ccip/deploy_ccip_chain_contracts_from_factory",
 	semver.MustParse("2.0.0"),
-	"Deploys core CCIP contracts on Canton through CCIPFactory (excludes CommitteeVerifier)",
+	"Deploys core CCIP contracts on Canton through CCIPFactory (excludes RMNRemote and CommitteeVerifier)",
 	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
+		if input.RmnRemoteRawInstanceAddress == "" {
+			return sequences.OnChainOutput{}, fmt.Errorf("RmnRemoteRawInstanceAddress is required for core CCIP factory deploy")
+		}
+
 		coreInput := input
 		coreInput.CommitteeVerifiers = nil
 
@@ -320,7 +361,11 @@ var DeployCCVFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("RmnRemoteRawInstanceAddress is required for CCV factory deploy")
 		}
 
-		_, ccipOwnerParty, ccvOwnerParty, err := resolveOwnerParties(input)
+		_, ccipOwnerParty, err := requireOwnerParties(input)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+		ccvOwnerParty, err := requireCCVOwnerParty(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -336,9 +381,6 @@ var DeployCCVFromFactory = operations.NewSequence(
 		for i, committeeVerifierParams := range input.CommitteeVerifiers {
 			qualifier := committeeVerifierParams.Qualifier
 			committeeVerifierOwner := ccvOwnerParty
-			if committeeVerifierParams.Template.Owner != "" {
-				committeeVerifierOwner = committeeVerifierParams.Template.Owner
-			}
 			committeeVerifierInstanceID, err := ensureInstanceID(committeeVerifierParams.Template.InstanceId, "committeeverifier")
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure CommitteeVerifier #%d instance ID: %w", i, err)
@@ -383,26 +425,74 @@ var DeployCCVFromFactory = operations.NewSequence(
 	},
 )
 
-func resolveOwnerParties(input DeployChainContractsParams) (types.PARTY, types.PARTY, types.PARTY, error) {
-	owner := input.OwnerParty
-	if owner == "" {
-		owner = input.CCIPOwnerParty
+func requireOwnerParties(input DeployChainContractsParams) (types.PARTY, types.PARTY, error) {
+	if input.OwnerParty == "" {
+		return "", "", fmt.Errorf("OwnerParty is required")
 	}
-	if owner == "" {
-		return "", "", "", fmt.Errorf("owner party or CCIPOwnerParty is required")
-	}
-
-	ccipOwner := input.CCIPOwnerParty
-	if ccipOwner == "" {
-		ccipOwner = owner
+	if input.CCIPOwnerParty == "" {
+		return "", "", fmt.Errorf("CCIPOwnerParty is required")
 	}
 
-	ccvOwner := input.CCVOwnerParty
-	if ccvOwner == "" {
-		ccvOwner = owner
+	return types.PARTY(input.OwnerParty), types.PARTY(input.CCIPOwnerParty), nil
+}
+
+func requireCCVOwnerParty(input DeployChainContractsParams) (types.PARTY, error) {
+	if input.CCVOwnerParty == "" {
+		return "", fmt.Errorf("CCVOwnerParty is required")
 	}
 
-	return types.PARTY(owner), types.PARTY(ccipOwner), types.PARTY(ccvOwner), nil
+	return types.PARTY(input.CCVOwnerParty), nil
+}
+
+func resolveOrDeployRMNRemote(
+	b operations.Bundle,
+	deps canton.Chain,
+	input DeployChainContractsParams,
+	factoryRawInstanceAddress contracts.RawInstanceAddress,
+	ccipOwnerParty types.PARTY,
+) (contracts.RawInstanceAddress, *datastore.AddressRef, []contract.ExerciseOutput, error) {
+	if input.RmnRemoteRawInstanceAddress != "" {
+		return input.RmnRemoteRawInstanceAddress, nil, nil, nil
+	}
+	if !input.DeployRMNInline {
+		return "", nil, nil, fmt.Errorf("RmnRemoteRawInstanceAddress is required (set DeployRMNInline=true to deploy RMN in this sequence)")
+	}
+
+	return deployRMNRemoteFromFactory(b, deps, input, factoryRawInstanceAddress, ccipOwnerParty)
+}
+
+func deployRMNRemoteFromFactory(
+	b operations.Bundle,
+	deps canton.Chain,
+	input DeployChainContractsParams,
+	factoryRawInstanceAddress contracts.RawInstanceAddress,
+	ccipOwnerParty types.PARTY,
+) (contracts.RawInstanceAddress, *datastore.AddressRef, []contract.ExerciseOutput, error) {
+	rmnInstanceID, err := ensureInstanceID(input.RMNRemote.Template.InstanceId, "rmn_remote")
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to ensure RMNRemote instance ID: %w", err)
+	}
+	rmnTemplate := rmn.RMNRemote{
+		InstanceId:      types.TEXT(rmnInstanceID),
+		RmnOwner:        ccipOwnerParty,
+		CcipOwner:       ccipOwnerParty,
+		CustomObservers: input.RMNRemote.Template.CustomObservers,
+		CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
+	}
+	deployRMNRemoteReport, err := operations.ExecuteOperation(b, factoryops.DeployRMNRemote, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployRMNRemote{Contract: rmnTemplate}, input.ProposalDriven))
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to deploy RMNRemote from factory: %w", err)
+	}
+
+	rmnRemoteRawInstanceAddress := rmnInstanceID.RawInstanceAddress(ccipOwnerParty)
+	addressRef := newAddressRef(deps.ChainSelector(), rmnRemoteRawInstanceAddress, rmn_remote.ContractType, rmn_remote.Version, "")
+
+	var proposalOutputs []contract.ExerciseOutput
+	if input.ProposalDriven {
+		proposalOutputs = append(proposalOutputs, deployRMNRemoteReport.Output)
+	}
+
+	return rmnRemoteRawInstanceAddress, &addressRef, proposalOutputs, nil
 }
 
 func appendExerciseOutput(outputs []contract.ExerciseOutput, output contract.ExerciseOutput, proposalDriven bool) []contract.ExerciseOutput {

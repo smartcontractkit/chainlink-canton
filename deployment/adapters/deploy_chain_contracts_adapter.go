@@ -78,6 +78,8 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContractsFromFactory, chain, sequences.DeployChainContractsParams{
 		OwnerParty:         ownerParty,
 		CCIPOwnerParty:     ownerParty,
+		CCVOwnerParty:        ownerParty,
+		DeployRMNInline:    true,
 		FactoryAddressRef:  factoryAddressRef,
 		CommitteeVerifiers: committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
 		GlobalConfig: sequences.GlobalConfigParams{

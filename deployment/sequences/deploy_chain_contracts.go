@@ -80,10 +80,12 @@ type DeployChainContractsParams struct {
 	FactoryAddressRef datastore.AddressRef
 	// ProposalDriven enables MCMS proposal generation for factory-backed deploys.
 	ProposalDriven bool
-	// CcvRegistryBinding is used for OnRamp deps when CommitteeVerifiers is empty (CCV deployed separately).
+	// CcvRegistryBinding is required for OnRamp deps when CommitteeVerifiers is empty (CCV deployed separately).
 	CcvRegistryBinding mcms.RawInstanceAddress
-	// RmnRemoteRawInstanceAddress is required when deploying CommitteeVerifiers (CCV factory path).
+	// RmnRemoteRawInstanceAddress is required unless DeployRMNInline is true (devenv bundled factory deploy).
 	RmnRemoteRawInstanceAddress contracts.RawInstanceAddress
+	// DeployRMNInline deploys RMNRemote inside DeployChainContractsFromFactory when RmnRemoteRawInstanceAddress is unset.
+	DeployRMNInline bool
 	// The InstrumentId of the native token
 	NativeInstrumentId splice_api_token_holding_v1.InstrumentId
 }
