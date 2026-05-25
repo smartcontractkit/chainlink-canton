@@ -543,6 +543,6 @@ require (
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 
 replace (
-	github.com/smartcontractkit/chainlink-ccip/chains/evm => github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260518162021-f8d199608321
-	github.com/smartcontractkit/chainlink-ccip/deployment => github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260518162021-f8d199608321
+	github.com/smartcontractkit/chainlink-ccip/chains/evm => github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260519201156-791d8279a3ad
+	github.com/smartcontractkit/chainlink-ccip/deployment => github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260519201156-791d8279a3ad
 )
