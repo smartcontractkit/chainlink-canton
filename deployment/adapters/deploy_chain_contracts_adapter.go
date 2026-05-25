@@ -72,15 +72,20 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 	if err != nil {
 		return ccipadapters.DeployChainContractsOutput{}, err
 	}
+	rmnFactoryAddressRef, err := dsutils.FactoryAddressRefFromRefs(input.ChainSelector, dsutils.QualifierRMN, input.ExistingAddresses)
+	if err != nil {
+		return ccipadapters.DeployChainContractsOutput{}, err
+	}
 
 	proposalDriven := shouldUseMCMSProposalDeployment(input, chain)
 
 	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContractsFromFactory, chain, sequences.DeployChainContractsParams{
-		OwnerParty:         ownerParty,
-		CCIPOwnerParty:     ownerParty,
-		CCVOwnerParty:        ownerParty,
-		DeployRMNInline:    true,
-		FactoryAddressRef:  factoryAddressRef,
+		OwnerParty:          ownerParty,
+		CCIPOwnerParty:      ownerParty,
+		CCVOwnerParty:       ownerParty,
+		DeployRMNInline:     true,
+		FactoryAddressRef:   factoryAddressRef,
+		RMNFactoryAddressRef: rmnFactoryAddressRef,
 		CommitteeVerifiers: committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
 		GlobalConfig: sequences.GlobalConfigParams{
 			Template: common.GlobalConfig{

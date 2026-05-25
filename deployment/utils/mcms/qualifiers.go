@@ -6,4 +6,7 @@ package mcms
 const (
 	QualifierCCIPOwner = "ccipOwner"
 	QualifierCCVOwner  = "ccvOwner"
+	// QualifierRMNOwner is the MCMS instance for RMNRemote deploy and curse operations.
+	// The MCMS owner party is the same ccipOwner decentralized party; only the instance and config differ.
+	QualifierRMNOwner = "rmnOwner"
 )

@@ -1,0 +1,45 @@
+# Run 2 — Canton CommitteeVerifier lane configure only (mcms-ccv).
+# Pipeline: canton-configure-committee-verifier-for-lanes-from-topology
+# Changeset: ConfigureCantonCommitteeVerifierForLanesFromTopology
+#
+# Register Run 2 pipeline in staging_testnet/pipelines.go before running.
+#
+# Copy to deployments repo, e.g.:
+#   domains/ccv/staging_testnet/durable_pipelines/inputs/configure_lanes_run2_canton_cv.yaml
+#
+# Run:
+#   go run . durable-pipeline run -e staging_testnet \
+#     -i staging_testnet/durable_pipelines/inputs/configure_lanes_run2_canton_cv.yaml
+#
+# Before run: set mcms.validUntil to unix timestamp > now + 10m.
+
+environment: staging_testnet
+domain: ccv
+changesets:
+  - canton-configure-committee-verifier-for-lanes-from-topology:
+      chainOverrides:
+        - 10109143320554840099 # Canton testnet
+      payload:
+        chains:
+          - chainselector: 10109143320554840099 # Canton testnet (local)
+            committeeverifiers:
+              - committeequalifier: default
+                remotechains:
+                  16015286601757825753: {} # Sepolia (remote)
+            remotechains:
+              16015286601757825753:
+                defaultinboundccvs:
+                  - qualifier: default
+                    type: CommitteeVerifier
+                    version: "0.1.0"
+                defaultoutboundccvs:
+                  - qualifier: default
+                    type: CommitteeVerifier
+                    version: "0.1.0"
+        mcms:
+          description: "Run 2 — Configure Canton CommitteeVerifier lane settings (mcms-ccv)"
+          qualifier: ccvOwner
+          overridePreviousRoot: true
+          validUntil: 1893456000
+          timelockDelay: 1s
+          timelockAction: schedule

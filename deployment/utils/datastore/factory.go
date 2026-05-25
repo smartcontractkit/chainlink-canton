@@ -15,6 +15,7 @@ import (
 const (
 	QualifierCCIP = "ccip"
 	QualifierCCV  = "ccv"
+	QualifierRMN  = "rmn"
 )
 
 // FactoryAddressRefFromRefs finds a factory ref by qualifier in the given ref list.

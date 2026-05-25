@@ -49,7 +49,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -245,7 +244,7 @@ func TestCCIPSend(t *testing.T) {
 	// Resolve contracts
 	globalConfigRef, globalConfigAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_config.ContractType, global_config.Version, "")
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	_, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
+	feeQuoterRef, feeQuoterAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), fee_quoter.ContractType, fee_quoter.Version, "")
 	require.NoError(t, err, "failed to get FeeQuoter address")
 	_, onRampAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), onramp.ContractType, onramp.Version, "")
 	require.NoError(t, err, "failed to get OnRamp address")
@@ -271,7 +270,6 @@ func TestCCIPSend(t *testing.T) {
 	feeQuoterDestChainConfig.IsEnabled = true
 	feeQuoterDestChainConfig.V2Params.USDPerUnitGas = big.NewInt(38)
 
-	cantonadapters.SetRuntimeDataStore(cldfEnv.DataStore)
 	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
 		Source: &lanes.ChainDefinition{
 			Selector: env.Chain.ChainSelector(),
@@ -298,6 +296,7 @@ func TestCCIPSend(t *testing.T) {
 			DefaultOutboundCCVs:      nil,
 			CantonLaneConfig: &lanes.CantonLaneConfig{
 				GlobalConfig: globalConfigRef,
+				FeeQuoterRef: feeQuoterRef,
 			},
 			DefaultExecutor: executorRef,
 			FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),

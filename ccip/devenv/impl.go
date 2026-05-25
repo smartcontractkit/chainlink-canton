@@ -273,7 +273,7 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 	runningDS := datastore.NewMemoryDataStore()
 	owner := participant.PartyID
 
-	for _, qual := range []string{dsutils.QualifierCCIP, dsutils.QualifierCCV} {
+	for _, qual := range []string{dsutils.QualifierCCIP, dsutils.QualifierCCV, dsutils.QualifierRMN} {
 		out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
 			ChainSelector: selector,
 			Participant:   0,
@@ -415,6 +415,7 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 		FeeQuoter:            contracts.HexToInstanceAddress(feeQuoter.Address).Bytes(),
 		CantonLaneConfig: &lanes.CantonLaneConfig{
 			GlobalConfig: globalConfig,
+			FeeQuoterRef: feeQuoter,
 		},
 	}
 	cvConfig := lanes.CommitteeVerifierRemoteChainInput{
@@ -425,12 +426,6 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 }
 
 func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64) (cciptestinterfaces.ChainLaneProfile, error) {
-	if env != nil && env.DataStore != nil {
-		cantonadapters.SetRuntimeDataStore(env.DataStore)
-	} else if c.e != nil && c.e.DataStore != nil {
-		cantonadapters.SetRuntimeDataStore(c.e.DataStore)
-	}
-
 	defaultFeeQuoterCfg := cantonadapters.DefaultCantonFeeQuoterDestChainConfig()
 
 	baseExecutionGasCost := uint32(1)

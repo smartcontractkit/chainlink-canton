@@ -58,7 +58,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		}
 
 		rmnRemoteRawInstanceAddress, rmnAddressRef, rmnProposalOutputs, err := resolveOrDeployRMNRemote(
-			b, deps, input, factoryRawInstanceAddress, ccipOwnerParty,
+			b, deps, input, ccipOwnerParty,
 		)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -448,7 +448,6 @@ func resolveOrDeployRMNRemote(
 	b operations.Bundle,
 	deps canton.Chain,
 	input DeployChainContractsParams,
-	factoryRawInstanceAddress contracts.RawInstanceAddress,
 	ccipOwnerParty types.PARTY,
 ) (contracts.RawInstanceAddress, *datastore.AddressRef, []contract.ExerciseOutput, error) {
 	if input.RmnRemoteRawInstanceAddress != "" {
@@ -457,8 +456,12 @@ func resolveOrDeployRMNRemote(
 	if !input.DeployRMNInline {
 		return "", nil, nil, fmt.Errorf("RmnRemoteRawInstanceAddress is required (set DeployRMNInline=true to deploy RMN in this sequence)")
 	}
+	rmnFactoryRaw, err := rawInstanceAddressFromAddressRef(input.RMNFactoryAddressRef)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("RMNFactoryAddressRef is required when DeployRMNInline is true: %w", err)
+	}
 
-	return deployRMNRemoteFromFactory(b, deps, input, factoryRawInstanceAddress, ccipOwnerParty)
+	return deployRMNRemoteFromFactory(b, deps, input, rmnFactoryRaw, ccipOwnerParty)
 }
 
 func deployRMNRemoteFromFactory(

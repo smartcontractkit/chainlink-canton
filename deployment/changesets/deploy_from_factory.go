@@ -39,9 +39,9 @@ func (d DeployRMNFromFactory) VerifyPreconditions(e cldf.Environment, config Can
 	if err := requireFactoryDeployOwnerParties(config.Config.OwnerParty, config.Config.CCIPOwnerParty); err != nil {
 		return err
 	}
-	_, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
+	_, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierRMN)
 	if err != nil {
-		return fmt.Errorf("ccip CCIPFactory must be deployed first: %w", err)
+		return fmt.Errorf("rmn CCIPFactory must be deployed first: %w", err)
 	}
 	_, err = dsutils.RmnRemoteRawAddress(e.DataStore, config.ChainSelector)
 	if err == nil {
@@ -56,7 +56,7 @@ func (d DeployRMNFromFactory) Apply(e cldf.Environment, config CantonCSDeps[Depl
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 	participant := chain.Participants[config.Participant]
 
-	factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
+	factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierRMN)
 	if err != nil {
 		return cldf.ChangesetOutput{}, err
 	}
@@ -80,7 +80,7 @@ func (d DeployRMNFromFactory) Apply(e cldf.Environment, config CantonCSDeps[Depl
 
 	return buildFactoryDeployChangesetOutput(
 		e, chain, config.ChainSelector, config.Participant, params.ProposalDriven,
-		cantonmcms.QualifierCCIPOwner, config.Config.MinDelay, config.Config.Description, ds, out.Output.BatchOps,
+		cantonmcms.QualifierRMNOwner, config.Config.MinDelay, config.Config.Description, ds, out.Output.BatchOps,
 	)
 }
 
@@ -480,7 +480,9 @@ func mcmsOwnerQualifierForFactory(factoryQualifier string) (string, error) {
 		return cantonmcms.QualifierCCIPOwner, nil
 	case dsutils.QualifierCCV:
 		return cantonmcms.QualifierCCVOwner, nil
+	case dsutils.QualifierRMN:
+		return cantonmcms.QualifierRMNOwner, nil
 	default:
-		return "", fmt.Errorf("unsupported factory qualifier %q for MCMS owner lookup (expected %q or %q)", factoryQualifier, dsutils.QualifierCCIP, dsutils.QualifierCCV)
+		return "", fmt.Errorf("unsupported factory qualifier %q for MCMS owner lookup (expected %q, %q, or %q)", factoryQualifier, dsutils.QualifierCCIP, dsutils.QualifierCCV, dsutils.QualifierRMN)
 	}
 }
