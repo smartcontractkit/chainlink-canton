@@ -22,7 +22,7 @@ var tokenPoolVersions = []string{
 func init() {
 	// Register the onchain adapters
 	ccipadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyCanton, &CantonDeployChainContractsAdapter{})
-	ccipadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyCanton, &CantonChainFamilyAdapter{})
+	ccipadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyCanton, &cantonChainFamilyWithDataStoreCache{})
 	ccipdeploy.GetTransferOwnershipRegistry().RegisterAdapter(chainsel.FamilyCanton, ccipdeploy.MCMSVersion, &CantonTransferOwnershipAdapter{})
 
 	// Register the offchain adapters
