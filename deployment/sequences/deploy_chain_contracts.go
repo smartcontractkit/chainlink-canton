@@ -78,16 +78,16 @@ type DeployChainContractsParams struct {
 	FeeQuoterConfig    FeeQuoterParams
 	// FactoryAddressRef is the ccip-qualified factory for core CCIP deploys.
 	FactoryAddressRef datastore.AddressRef
-	// RMNFactoryAddressRef is the rmn-qualified factory; required when DeployRMNInline is true.
+	// RMNFactoryAddressRef is the rmn-qualified factory; required when DevenvBundledDeploy is true.
 	RMNFactoryAddressRef datastore.AddressRef
 	// ProposalDriven enables MCMS proposal generation for factory-backed deploys.
 	ProposalDriven bool
 	// CcvRegistryBinding is required for OnRamp deps when CommitteeVerifiers is empty (CCV deployed separately).
 	CcvRegistryBinding mcms.RawInstanceAddress
-	// RmnRemoteRawInstanceAddress is required unless DeployRMNInline is true (devenv bundled factory deploy).
+	// RmnRemoteRawInstanceAddress is required for production split deploy paths.
 	RmnRemoteRawInstanceAddress contracts.RawInstanceAddress
-	// DeployRMNInline deploys RMNRemote inside DeployChainContractsFromFactory when RmnRemoteRawInstanceAddress is unset.
-	DeployRMNInline bool
+	// DevenvBundledDeploy runs RMN+CV+core in one sequence (devenv adapter only). Mutually exclusive with RmnRemoteRawInstanceAddress.
+	DevenvBundledDeploy bool
 	// The InstrumentId of the native token
 	NativeInstrumentId splice_api_token_holding_v1.InstrumentId
 }

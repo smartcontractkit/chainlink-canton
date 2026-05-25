@@ -288,7 +288,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 	},
 )
 
-// DeployRMNFromFactory deploys RMNRemote via the ccip-qualified CCIPFactory.
+// DeployRMNFromFactory deploys RMNRemote via the rmn-qualified CCIPFactory.
 var DeployRMNFromFactory = operations.NewSequence(
 	"canton/ccip/deploy_rmn_from_factory",
 	semver.MustParse("0.1.0"),
@@ -450,18 +450,22 @@ func resolveOrDeployRMNRemote(
 	input DeployChainContractsParams,
 	ccipOwnerParty types.PARTY,
 ) (contracts.RawInstanceAddress, *datastore.AddressRef, []contract.ExerciseOutput, error) {
-	if input.RmnRemoteRawInstanceAddress != "" {
-		return input.RmnRemoteRawInstanceAddress, nil, nil, nil
+	if input.DevenvBundledDeploy {
+		if input.RmnRemoteRawInstanceAddress != "" {
+			return "", nil, nil, fmt.Errorf("RmnRemoteRawInstanceAddress must not be set when DevenvBundledDeploy is true")
+		}
+		rmnFactoryRaw, err := rawInstanceAddressFromAddressRef(input.RMNFactoryAddressRef)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("RMNFactoryAddressRef is required for DevenvBundledDeploy: %w", err)
+		}
+
+		return deployRMNRemoteFromFactory(b, deps, input, rmnFactoryRaw, ccipOwnerParty)
 	}
-	if !input.DeployRMNInline {
-		return "", nil, nil, fmt.Errorf("RmnRemoteRawInstanceAddress is required (set DeployRMNInline=true to deploy RMN in this sequence)")
-	}
-	rmnFactoryRaw, err := rawInstanceAddressFromAddressRef(input.RMNFactoryAddressRef)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("RMNFactoryAddressRef is required when DeployRMNInline is true: %w", err)
+	if input.RmnRemoteRawInstanceAddress == "" {
+		return "", nil, nil, fmt.Errorf("RmnRemoteRawInstanceAddress is required")
 	}
 
-	return deployRMNRemoteFromFactory(b, deps, input, rmnFactoryRaw, ccipOwnerParty)
+	return input.RmnRemoteRawInstanceAddress, nil, nil, nil
 }
 
 func deployRMNRemoteFromFactory(

@@ -12,7 +12,7 @@ import (
 // DeployCantonTokenExpansion deploys Canton token pools (and optionally resolves token refs) and
 // emits one MCMS timelock proposal against mcms-ccip (ccipOwner).
 //
-// Run after DeployCantonChainContracts and ConfigureCantonChainsForLanesFromTopology. Omit
+// Run after DeployCCIPChainContractsFromFactory and Run 1 lane configure. Omit
 // TokenTransferConfig from per-chain input for deploy-only; use ConfigureCantonTokensForTransfers
 // to wire remote lanes, rate limiters, and TAR registration for transfers.
 func DeployCantonTokenExpansion() cldf.ChangeSetV2[cciptokens.TokenExpansionInput] {

@@ -83,7 +83,7 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		OwnerParty:          ownerParty,
 		CCIPOwnerParty:      ownerParty,
 		CCVOwnerParty:       ownerParty,
-		DeployRMNInline:     true,
+		DevenvBundledDeploy:  true,
 		FactoryAddressRef:   factoryAddressRef,
 		RMNFactoryAddressRef: rmnFactoryAddressRef,
 		CommitteeVerifiers: committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),

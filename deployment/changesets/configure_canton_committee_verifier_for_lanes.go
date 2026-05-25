@@ -78,6 +78,20 @@ func ConfigureCantonCommitteeVerifierForLanesFromTopology(
 	return cldf.CreateChangeSet(apply, validate)
 }
 
+func hasCantonChainsInConfig(cfg v2cs.ConfigureChainsForLanesFromTopologyConfig) bool {
+	for _, chainCfg := range cfg.Chains {
+		family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
+		if err != nil {
+			continue
+		}
+		if family == chainsel.FamilyCanton {
+			return true
+		}
+	}
+
+	return false
+}
+
 func cantonOnlyConfigureLanesConfig(cfg v2cs.ConfigureChainsForLanesFromTopologyConfig) v2cs.ConfigureChainsForLanesFromTopologyConfig {
 	cfgCopy := cfg
 	cfgCopy.Chains = nil

@@ -182,16 +182,6 @@ func BuildDualTimelockProposalsFromBatchOps(
 	return proposals, nil
 }
 
-// BatchOpsFromTimelockProposals flattens MCMS timelock proposal operations into batch ops.
-func BatchOpsFromTimelockProposals(proposals []mcms.TimelockProposal) []mcms_types.BatchOperation {
-	var ops []mcms_types.BatchOperation
-	for _, prop := range proposals {
-		ops = append(ops, prop.Operations...)
-	}
-
-	return ConsolidateBatchOpsPerChain(ops)
-}
-
 // ConsolidateBatchOpsPerChain merges multiple batch operations for the same chain into one.
 func ConsolidateBatchOpsPerChain(ops []mcms_types.BatchOperation) []mcms_types.BatchOperation {
 	txsByChain := make(map[mcms_types.ChainSelector][]mcms_types.Transaction)

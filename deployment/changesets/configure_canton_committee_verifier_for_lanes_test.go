@@ -46,3 +46,19 @@ func TestFamiliesInConfigureLanesConfig(t *testing.T) {
 	assert.Contains(t, families, chainsel.FamilyCanton)
 	assert.Contains(t, families, chainsel.FamilyEVM)
 }
+
+func TestHasCantonChainsInConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := v2cs.ConfigureChainsForLanesFromTopologyConfig{
+		Chains: []v2cs.PartialChainConfig{
+			{ChainSelector: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector},
+		},
+	}
+	assert.False(t, hasCantonChainsInConfig(cfg))
+
+	cfg.Chains = append(cfg.Chains, v2cs.PartialChainConfig{
+		ChainSelector: chainsel.CANTON_TESTNET.Selector,
+	})
+	assert.True(t, hasCantonChainsInConfig(cfg))
+}
