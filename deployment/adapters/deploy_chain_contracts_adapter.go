@@ -80,9 +80,10 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 	proposalDriven := shouldUseMCMSProposalDeployment(input, chain)
 
 	out, err := cldf_ops.ExecuteSequence(bundle, sequences.DeployChainContractsFromFactory, chain, sequences.DeployChainContractsParams{
-		OwnerParty:          ownerParty,
-		CCIPOwnerParty:      ownerParty,
-		CCVOwnerParty:       ownerParty,
+		OwnerParty:           ownerParty,
+		CCIPOwnerParty:       ownerParty,
+		CCVOwnerParty:        ownerParty,
+		RMNOwnerParty:        ownerParty,
 		DevenvBundledDeploy:  true,
 		FactoryAddressRef:   factoryAddressRef,
 		RMNFactoryAddressRef: rmnFactoryAddressRef,

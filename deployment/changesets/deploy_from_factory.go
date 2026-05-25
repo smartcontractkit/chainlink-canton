@@ -26,6 +26,7 @@ import (
 type DeployRMNFromFactoryConfig struct {
 	OwnerParty     string        `json:"ownerParty" yaml:"ownerParty"`
 	CCIPOwnerParty string        `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
+	RMNOwnerParty  string        `json:"rmnOwnerParty" yaml:"rmnOwnerParty"`
 	MinDelay       time.Duration `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
 	Description    string        `json:"description,omitempty" yaml:"description,omitempty"`
 	Params         sequences.DeployChainContractsParams
@@ -38,6 +39,9 @@ var _ cldf.ChangeSetV2[CantonCSDeps[DeployRMNFromFactoryConfig]] = DeployRMNFrom
 func (d DeployRMNFromFactory) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployRMNFromFactoryConfig]) error {
 	if err := requireFactoryDeployOwnerParties(config.Config.OwnerParty, config.Config.CCIPOwnerParty); err != nil {
 		return err
+	}
+	if config.Config.RMNOwnerParty == "" {
+		return fmt.Errorf("rmnOwnerParty is required")
 	}
 	_, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierRMN)
 	if err != nil {
@@ -64,6 +68,7 @@ func (d DeployRMNFromFactory) Apply(e cldf.Environment, config CantonCSDeps[Depl
 	params := config.Config.Params
 	params.OwnerParty = config.Config.OwnerParty
 	params.CCIPOwnerParty = config.Config.CCIPOwnerParty
+	params.RMNOwnerParty = config.Config.RMNOwnerParty
 	params.FactoryAddressRef = factoryRef
 	params.ProposalDriven = len(participant.ReadAsPartyIDs) > 0
 

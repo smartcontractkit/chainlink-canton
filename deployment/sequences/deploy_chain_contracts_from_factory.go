@@ -58,7 +58,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		}
 
 		rmnRemoteRawInstanceAddress, rmnAddressRef, rmnProposalOutputs, err := resolveOrDeployRMNRemote(
-			b, deps, input, ccipOwnerParty,
+			b, deps, input,
 		)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -294,7 +294,7 @@ var DeployRMNFromFactory = operations.NewSequence(
 	semver.MustParse("0.1.0"),
 	"Deploys RMNRemote on Canton through the ccip CCIPFactory",
 	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
-		_, ccipOwnerParty, err := requireOwnerParties(input)
+		ccipOwnerParty, err := requireCCIPOwnerParty(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -436,6 +436,14 @@ func requireOwnerParties(input DeployChainContractsParams) (types.PARTY, types.P
 	return types.PARTY(input.OwnerParty), types.PARTY(input.CCIPOwnerParty), nil
 }
 
+func requireCCIPOwnerParty(input DeployChainContractsParams) (types.PARTY, error) {
+	if input.CCIPOwnerParty == "" {
+		return "", fmt.Errorf("CCIPOwnerParty is required")
+	}
+
+	return types.PARTY(input.CCIPOwnerParty), nil
+}
+
 func requireCCVOwnerParty(input DeployChainContractsParams) (types.PARTY, error) {
 	if input.CCVOwnerParty == "" {
 		return "", fmt.Errorf("CCVOwnerParty is required")
@@ -444,15 +452,26 @@ func requireCCVOwnerParty(input DeployChainContractsParams) (types.PARTY, error)
 	return types.PARTY(input.CCVOwnerParty), nil
 }
 
+func requireRMNOwnerParty(input DeployChainContractsParams) (types.PARTY, error) {
+	if input.RMNOwnerParty == "" {
+		return "", fmt.Errorf("RMNOwnerParty is required")
+	}
+
+	return types.PARTY(input.RMNOwnerParty), nil
+}
+
 func resolveOrDeployRMNRemote(
 	b operations.Bundle,
 	deps canton.Chain,
 	input DeployChainContractsParams,
-	ccipOwnerParty types.PARTY,
 ) (contracts.RawInstanceAddress, *datastore.AddressRef, []contract.ExerciseOutput, error) {
 	if input.DevenvBundledDeploy {
 		if input.RmnRemoteRawInstanceAddress != "" {
 			return "", nil, nil, fmt.Errorf("RmnRemoteRawInstanceAddress must not be set when DevenvBundledDeploy is true")
+		}
+		ccipOwnerParty, err := requireCCIPOwnerParty(input)
+		if err != nil {
+			return "", nil, nil, err
 		}
 		rmnFactoryRaw, err := rawInstanceAddressFromAddressRef(input.RMNFactoryAddressRef)
 		if err != nil {
@@ -475,13 +494,18 @@ func deployRMNRemoteFromFactory(
 	factoryRawInstanceAddress contracts.RawInstanceAddress,
 	ccipOwnerParty types.PARTY,
 ) (contracts.RawInstanceAddress, *datastore.AddressRef, []contract.ExerciseOutput, error) {
+	rmnOwnerParty, err := requireRMNOwnerParty(input)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
 	rmnInstanceID, err := ensureInstanceID(input.RMNRemote.Template.InstanceId, "rmn_remote")
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to ensure RMNRemote instance ID: %w", err)
 	}
 	rmnTemplate := rmn.RMNRemote{
 		InstanceId:      types.TEXT(rmnInstanceID),
-		RmnOwner:        ccipOwnerParty,
+		RmnOwner:        rmnOwnerParty,
 		CcipOwner:       ccipOwnerParty,
 		CustomObservers: input.RMNRemote.Template.CustomObservers,
 		CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
@@ -491,7 +515,7 @@ func deployRMNRemoteFromFactory(
 		return "", nil, nil, fmt.Errorf("failed to deploy RMNRemote from factory: %w", err)
 	}
 
-	rmnRemoteRawInstanceAddress := rmnInstanceID.RawInstanceAddress(ccipOwnerParty)
+	rmnRemoteRawInstanceAddress := rmnInstanceID.RawInstanceAddress(rmnOwnerParty)
 	addressRef := newAddressRef(deps.ChainSelector(), rmnRemoteRawInstanceAddress, rmn_remote.ContractType, rmn_remote.Version, "")
 
 	var proposalOutputs []contract.ExerciseOutput

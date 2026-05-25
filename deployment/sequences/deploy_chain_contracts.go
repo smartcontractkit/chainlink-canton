@@ -71,6 +71,8 @@ type DeployChainContractsParams struct {
 	CCIPOwnerParty string
 	// CCVOwnerParty is the CommitteeVerifier signatory owner (ccvOwner); distinct from CCIPOwnerParty in dual-MCMS deploys.
 	CCVOwnerParty string
+	// RMNOwnerParty is the RMNRemote signatory owner (rmnOwner); distinct from CCIPOwnerParty in triple-MCMS deploys.
+	RMNOwnerParty string
 	CommitteeVerifiers []CommitteeVerifierParams
 	Executors          []ExecutorParams
 	GlobalConfig       GlobalConfigParams
@@ -99,14 +101,20 @@ var DeployChainContracts = operations.NewSequence(
 	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
 		var addresses []datastore.AddressRef
 
+		rmnOwnerParty, err := requireRMNOwnerParty(input)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
 		// Deploy RMNRemote
 		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[rmn.RMNRemote]{
 			Template: rmn.RMNRemote{
-				RmnOwner:       input.RMNRemote.Template.RmnOwner,
-				CcipOwner:      types.PARTY(input.CCIPOwnerParty),
-				CursedSubjects: input.RMNRemote.Template.CursedSubjects,
+				RmnOwner:        rmnOwnerParty,
+				CcipOwner:       types.PARTY(input.CCIPOwnerParty),
+				CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
+				CustomObservers: input.RMNRemote.Template.CustomObservers,
 			},
-			OwnerParty: types.PARTY(input.CCIPOwnerParty),
+			OwnerParty: rmnOwnerParty,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote: %w", err)
