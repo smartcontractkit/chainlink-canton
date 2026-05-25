@@ -13,10 +13,8 @@ import (
 
 // Qualifiers distinguish multiple CCIPFactory instances on the same chain.
 const (
-	QualifierCCIP  = "ccip"
-	QualifierCCV   = "ccv"
-	QualifierCore  = "core" // deprecated; use QualifierCCIP
-	QualifierPools = "pools"
+	QualifierCCIP = "ccip"
+	QualifierCCV  = "ccv"
 )
 
 // FactoryAddressRefFromRefs finds a factory ref by qualifier in the given ref list.

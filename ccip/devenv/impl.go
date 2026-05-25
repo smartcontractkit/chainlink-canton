@@ -273,7 +273,7 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 	runningDS := datastore.NewMemoryDataStore()
 	owner := participant.PartyID
 
-	for _, qual := range []string{dsutils.QualifierCCIP, dsutils.QualifierPools, dsutils.QualifierCCV} {
+	for _, qual := range []string{dsutils.QualifierCCIP, dsutils.QualifierCCV} {
 		out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
 			ChainSelector: selector,
 			Participant:   0,

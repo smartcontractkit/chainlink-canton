@@ -48,7 +48,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		var addresses []datastore.AddressRef
 		var proposalOutputs []contract.ExerciseOutput
 
-		ownerParty, ccipOwnerParty, err := resolveOwnerParties(input)
+		ownerParty, ccipOwnerParty, ccvOwnerParty, err := resolveOwnerParties(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -63,7 +63,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		}
 		rmnTemplate := rmn.RMNRemote{
 			InstanceId:      types.TEXT(rmnInstanceID),
-			RmnOwner:        input.RMNRemote.Template.RmnOwner,
+			RmnOwner:        ccipOwnerParty,
 			CcipOwner:       ccipOwnerParty,
 			CustomObservers: input.RMNRemote.Template.CustomObservers,
 			CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
@@ -73,7 +73,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote from factory: %w", err)
 		}
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployRMNRemoteReport.Output, input.ProposalDriven)
-		rmnRemoteRawInstanceAddress := rmnInstanceID.RawInstanceAddress(ownerParty)
+		rmnRemoteRawInstanceAddress := rmnInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), rmnRemoteRawInstanceAddress, rmn_remote.ContractType, rmn_remote.Version, ""))
 
 		globalConfigInstanceID, err := ensureInstanceID(input.GlobalConfig.Template.InstanceId, "globalconfig")
@@ -149,9 +149,9 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		}
 		for i, committeeVerifierParams := range input.CommitteeVerifiers {
 			qualifier := committeeVerifierParams.Qualifier
-			committeeVerifierOwner := committeeVerifierParams.Template.Owner
-			if committeeVerifierOwner == "" {
-				committeeVerifierOwner = ownerParty
+			committeeVerifierOwner := ccvOwnerParty
+			if committeeVerifierParams.Template.Owner != "" {
+				committeeVerifierOwner = committeeVerifierParams.Template.Owner
 			}
 			committeeVerifierInstanceID, err := ensureInstanceID(committeeVerifierParams.Template.InstanceId, "committeeverifier")
 			if err != nil {
@@ -320,7 +320,7 @@ var DeployCCVFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("RmnRemoteRawInstanceAddress is required for CCV factory deploy")
 		}
 
-		ownerParty, ccipOwnerParty, err := resolveOwnerParties(input)
+		_, ccipOwnerParty, ccvOwnerParty, err := resolveOwnerParties(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -335,9 +335,9 @@ var DeployCCVFromFactory = operations.NewSequence(
 
 		for i, committeeVerifierParams := range input.CommitteeVerifiers {
 			qualifier := committeeVerifierParams.Qualifier
-			committeeVerifierOwner := committeeVerifierParams.Template.Owner
-			if committeeVerifierOwner == "" {
-				committeeVerifierOwner = ownerParty
+			committeeVerifierOwner := ccvOwnerParty
+			if committeeVerifierParams.Template.Owner != "" {
+				committeeVerifierOwner = committeeVerifierParams.Template.Owner
 			}
 			committeeVerifierInstanceID, err := ensureInstanceID(committeeVerifierParams.Template.InstanceId, "committeeverifier")
 			if err != nil {
@@ -383,13 +383,13 @@ var DeployCCVFromFactory = operations.NewSequence(
 	},
 )
 
-func resolveOwnerParties(input DeployChainContractsParams) (types.PARTY, types.PARTY, error) {
+func resolveOwnerParties(input DeployChainContractsParams) (types.PARTY, types.PARTY, types.PARTY, error) {
 	owner := input.OwnerParty
 	if owner == "" {
 		owner = input.CCIPOwnerParty
 	}
 	if owner == "" {
-		return "", "", fmt.Errorf("owner party or CCIPOwnerParty is required")
+		return "", "", "", fmt.Errorf("owner party or CCIPOwnerParty is required")
 	}
 
 	ccipOwner := input.CCIPOwnerParty
@@ -397,7 +397,12 @@ func resolveOwnerParties(input DeployChainContractsParams) (types.PARTY, types.P
 		ccipOwner = owner
 	}
 
-	return types.PARTY(owner), types.PARTY(ccipOwner), nil
+	ccvOwner := input.CCVOwnerParty
+	if ccvOwner == "" {
+		ccvOwner = owner
+	}
+
+	return types.PARTY(owner), types.PARTY(ccipOwner), types.PARTY(ccvOwner), nil
 }
 
 func appendExerciseOutput(outputs []contract.ExerciseOutput, output contract.ExerciseOutput, proposalDriven bool) []contract.ExerciseOutput {

@@ -30,9 +30,9 @@ func TestFactoryAddressRef(t *testing.T) {
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(factoryops.ContractType),
 		Version:       factoryops.Version,
-		Qualifier:     QualifierPools,
+		Qualifier:     QualifierCCV,
 		Address:       "other",
-		Labels:        datastore.NewLabelSet("pools-factory@owner-party"),
+		Labels:        datastore.NewLabelSet("ccv-factory@owner-party"),
 	}))
 
 	got, err := FactoryAddressRef(ds.Seal(), chainSelector, QualifierCCIP)
@@ -40,7 +40,11 @@ func TestFactoryAddressRef(t *testing.T) {
 	require.Equal(t, QualifierCCIP, got.Qualifier)
 	require.Equal(t, raw.InstanceAddress().String(), got.Address)
 
-	_, err = FactoryAddressRef(ds.Seal(), chainSelector, QualifierCCV)
+	got, err = FactoryAddressRef(ds.Seal(), chainSelector, QualifierCCV)
+	require.NoError(t, err)
+	require.Equal(t, QualifierCCV, got.Qualifier)
+
+	_, err = FactoryAddressRef(ds.Seal(), chainSelector, "missing")
 	require.Error(t, err)
 }
 
@@ -52,12 +56,12 @@ func TestFactoryAddressRefFromRefs(t *testing.T) {
 		ChainSelector: chainSelector,
 		Type:          datastore.ContractType(factoryops.ContractType),
 		Version:       factoryops.Version,
-		Qualifier:     QualifierPools,
+		Qualifier:     QualifierCCV,
 		Address:       "addr",
-		Labels:        datastore.NewLabelSet("pools-factory@owner"),
+		Labels:        datastore.NewLabelSet("ccv-factory@owner"),
 	}}
 
-	got, err := FactoryAddressRefFromRefs(chainSelector, QualifierPools, refs)
+	got, err := FactoryAddressRefFromRefs(chainSelector, QualifierCCV, refs)
 	require.NoError(t, err)
-	require.Equal(t, QualifierPools, got.Qualifier)
+	require.Equal(t, QualifierCCV, got.Qualifier)
 }

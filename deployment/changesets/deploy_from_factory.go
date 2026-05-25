@@ -89,6 +89,7 @@ func (d DeployCCIPChainContractsFromFactory) Apply(e cldf.Environment, config Ca
 type DeployCCVFromFactoryConfig struct {
 	OwnerParty     string `json:"ownerParty" yaml:"ownerParty"`
 	CCIPOwnerParty string `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
+	CCVOwnerParty  string `json:"ccvOwnerParty" yaml:"ccvOwnerParty"`
 	Params         sequences.DeployChainContractsParams
 }
 
@@ -132,6 +133,10 @@ func (d DeployCCVFromFactory) Apply(e cldf.Environment, config CantonCSDeps[Depl
 	params := config.Config.Params
 	params.OwnerParty = config.Config.OwnerParty
 	params.CCIPOwnerParty = config.Config.CCIPOwnerParty
+	params.CCVOwnerParty = config.Config.CCVOwnerParty
+	if params.CCVOwnerParty == "" {
+		params.CCVOwnerParty = config.Config.OwnerParty
+	}
 	params.FactoryAddressRef = factoryRef
 	params.RmnRemoteRawInstanceAddress = rmnRaw
 	params.ProposalDriven = len(participant.ReadAsPartyIDs) > 0

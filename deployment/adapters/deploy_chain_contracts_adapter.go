@@ -95,7 +95,6 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		},
 		RMNRemote: sequences.RMNRemoteParams{
 			Template: rmn.RMNRemote{
-				RmnOwner:       types.PARTY(ownerParty),
 				CursedSubjects: nil,
 			},
 		},
@@ -184,7 +183,6 @@ func committeeVerifierParams(ownerParty string, verifiers []ccipadapters.Committ
 		params = append(params, sequences.CommitteeVerifierParams{
 			Qualifier: qualifier,
 			Template: ccvsbindings.CommitteeVerifier{
-				Owner:                        types.PARTY(ownerParty),
 				CcipOwner:                    types.PARTY(ownerParty),
 				VersionTag:                   types.TEXT("e9a05a20"),
 				MessageSentObservers:         nil,

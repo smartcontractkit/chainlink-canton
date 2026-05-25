@@ -68,7 +68,9 @@ type DeployChainContractsParams struct {
 	// OwnerParty is the Canton instance owner (decentralized party); used for instanceId@owner addresses.
 	OwnerParty string
 	// CCIPOwnerParty is the operational ccipOwner on product templates (lanes, admin roles, etc.).
-	CCIPOwnerParty     string
+	CCIPOwnerParty string
+	// CCVOwnerParty is the CommitteeVerifier signatory owner (ccvOwner); distinct from CCIPOwnerParty in dual-MCMS deploys.
+	CCVOwnerParty string
 	CommitteeVerifiers []CommitteeVerifierParams
 	Executors          []ExecutorParams
 	GlobalConfig       GlobalConfigParams
