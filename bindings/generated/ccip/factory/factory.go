@@ -6,14 +6,14 @@ import (
 	"math/big"
 	"strings"
 
+	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
 	ccipruntime "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipruntime"
 	committeeverifier "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/committeeverifier"
 	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
 	executor "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
-	receiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/receiver"
-	sender "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/sender"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
+	link "github.com/smartcontractkit/chainlink-canton/bindings/generated/link"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/api"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
@@ -34,8 +34,8 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "57f38378efbee7194f371aa03f3d249787a9ad57d9b4a87bf6eec74b1ca9d9f2"
-	SDKVersion  = "3.4.10"
+	PackageID   = "ca64c82ac9be0b2e9c1e9174b47639f5b67c31c51ec0941977e33be5725577dd"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -224,6 +224,27 @@ func (t CCIPFactory) DeployFeeQuoterWithPackageID(contractID string, packageID s
 	}
 }
 
+// DeployLinkToken exercises the DeployLinkToken choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployLinkToken(contractID string, args DeployLinkToken) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployLinkToken",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployLinkTokenWithPackageID exercises the DeployLinkToken choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployLinkTokenWithPackageID(contractID string, packageID string, args DeployLinkToken) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployLinkToken",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // DeployTokenAdminRegistry exercises the DeployTokenAdminRegistry choice on this CCIPFactory contract
 // This method uses the package name in the template ID
 func (t CCIPFactory) DeployTokenAdminRegistry(contractID string, args DeployTokenAdminRegistry) *model.ExerciseCommand {
@@ -392,6 +413,27 @@ func (t CCIPFactory) DeployLockReleaseTokenPoolWithPackageID(contractID string, 
 	}
 }
 
+// DeployBurnMintTokenPool exercises the DeployBurnMintTokenPool choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployBurnMintTokenPool(contractID string, args DeployBurnMintTokenPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployBurnMintTokenPool",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployBurnMintTokenPoolWithPackageID exercises the DeployBurnMintTokenPool choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployBurnMintTokenPoolWithPackageID(contractID string, packageID string, args DeployBurnMintTokenPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployBurnMintTokenPool",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // DeployRateLimiter exercises the DeployRateLimiter choice on this CCIPFactory contract
 // This method uses the package name in the template ID
 func (t CCIPFactory) DeployRateLimiter(contractID string, args DeployRateLimiter) *model.ExerciseCommand {
@@ -409,48 +451,6 @@ func (t CCIPFactory) DeployRateLimiterWithPackageID(contractID string, packageID
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "DeployRateLimiter",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCCIPSender exercises the DeployCCIPSender choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployCCIPSender(contractID string, args DeployCCIPSender) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCCIPSender",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCCIPSenderWithPackageID exercises the DeployCCIPSender choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployCCIPSenderWithPackageID(contractID string, packageID string, args DeployCCIPSender) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCCIPSender",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCCIPReceiver exercises the DeployCCIPReceiver choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployCCIPReceiver(contractID string, args DeployCCIPReceiver) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCCIPReceiver",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployCCIPReceiverWithPackageID exercises the DeployCCIPReceiver choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployCCIPReceiverWithPackageID(contractID string, packageID string, args DeployCCIPReceiver) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployCCIPReceiver",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -543,13 +543,13 @@ func (t CCIPFactory) MCMSReceiverEntrypointWithPackageID(contractID string, pack
 
 var _ api.IMCMSReceiver = (*CCIPFactory)(nil)
 
-// DeployCCIPReceiver is a Record type
-type DeployCCIPReceiver struct {
-	Contract receiver.CCIPReceiver `json:"contract"`
+// DeployBurnMintTokenPool is a Record type
+type DeployBurnMintTokenPool struct {
+	Contract burnminttokenpool.BurnMintTokenPool `json:"contract"`
 }
 
-// ToMap converts DeployCCIPReceiver to a map for DAML arguments
-func (t DeployCCIPReceiver) ToMap() map[string]any {
+// ToMap converts DeployBurnMintTokenPool to a map for DAML arguments
+func (t DeployBurnMintTokenPool) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["contract"] = model.NestedToDAMLValue(t.Contract)
@@ -557,162 +557,100 @@ func (t DeployCCIPReceiver) ToMap() map[string]any {
 	return m
 }
 
-func (t DeployCCIPReceiver) MarshalJSON() ([]byte, error) {
+func (t DeployBurnMintTokenPool) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *DeployCCIPReceiver) UnmarshalJSON(data []byte) error {
+func (t *DeployBurnMintTokenPool) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes DeployCCIPReceiver to hex string (Canton MCMS format)
-func (t DeployCCIPReceiver) MarshalHex() (string, error) {
+// MarshalHex encodes DeployBurnMintTokenPool to hex string (Canton MCMS format)
+func (t DeployBurnMintTokenPool) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes DeployCCIPReceiver from hex string (Canton MCMS format)
-func (t *DeployCCIPReceiver) UnmarshalHex(data string) error {
+// UnmarshalHex decodes DeployBurnMintTokenPool from hex string (Canton MCMS format)
+func (t *DeployBurnMintTokenPool) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// DeployCCIPReceiverParams is a Record type
-type DeployCCIPReceiverParams struct {
-	InstanceId             types.TEXT                        `json:"instanceId"`
-	Owner                  types.PARTY                       `json:"owner"`
-	RequiredCCVs           []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs           []chainlinkapi.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold      types.INT64                       `json:"optionalThreshold"`
-	ReceiverFinalityConfig core.FinalityConfig               `json:"receiverFinalityConfig"`
+// DeployBurnMintTokenPoolParams is a Record type
+type DeployBurnMintTokenPoolParams struct {
+	InstanceId         types.TEXT                                 `json:"instanceId"`
+	PoolOwner          types.PARTY                                `json:"poolOwner"`
+	CcipOwner          types.PARTY                                `json:"ccipOwner"`
+	InstrumentId       splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Decimals           types.INT64                                `json:"decimals"`
+	RateLimitAdmin     *types.PARTY                               `json:"rateLimitAdmin" hex:"optional"`
+	TokenAdminRegistry chainlinkapi.RawInstanceAddress            `json:"tokenAdminRegistry"`
+	FeeQuoter          chainlinkapi.RawInstanceAddress            `json:"feeQuoter"`
+	RmnRemote          chainlinkapi.RawInstanceAddress            `json:"rmnRemote"`
+	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
+	TransferTimeout    burnminttokenpool.TransferTimeout          `json:"transferTimeout"`
 }
 
-// ToMap converts DeployCCIPReceiverParams to a map for DAML arguments
-func (t DeployCCIPReceiverParams) ToMap() map[string]any {
+// ToMap converts DeployBurnMintTokenPoolParams to a map for DAML arguments
+func (t DeployBurnMintTokenPoolParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["instanceId"] = string(t.InstanceId)
 
-	m["owner"] = t.Owner.ToMap()
+	m["poolOwner"] = t.PoolOwner.ToMap()
 
-	m["requiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.RequiredCCVs))
-		for _, e := range t.RequiredCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+	m["ccipOwner"] = t.CcipOwner.ToMap()
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["decimals"] = int64(t.Decimals)
+
+	if t.RateLimitAdmin != nil {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.RateLimitAdmin).ToMap(),
 		}
-		return res
-	}()
-
-	m["optionalCCVs"] = func() []any {
-		res := make([]any, 0, len(t.OptionalCCVs))
-		for _, e := range t.OptionalCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
+	} else {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
 		}
-		return res
-	}()
+	}
 
-	m["optionalThreshold"] = int64(t.OptionalThreshold)
+	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
 
-	m["receiverFinalityConfig"] = model.NestedToDAMLValue(t.ReceiverFinalityConfig)
+	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
 
-	return m
-}
+	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
 
-func (t DeployCCIPReceiverParams) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
+	m["poolReceiveContext"] = model.NestedToDAMLValue(t.PoolReceiveContext)
 
-func (t *DeployCCIPReceiverParams) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DeployCCIPReceiverParams to hex string (Canton MCMS format)
-func (t DeployCCIPReceiverParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DeployCCIPReceiverParams from hex string (Canton MCMS format)
-func (t *DeployCCIPReceiverParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// DeployCCIPSender is a Record type
-type DeployCCIPSender struct {
-	Contract sender.CCIPSender `json:"contract"`
-}
-
-// ToMap converts DeployCCIPSender to a map for DAML arguments
-func (t DeployCCIPSender) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
+	m["transferTimeout"] = model.NestedToDAMLValue(t.TransferTimeout)
 
 	return m
 }
 
-func (t DeployCCIPSender) MarshalJSON() ([]byte, error) {
+func (t DeployBurnMintTokenPoolParams) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *DeployCCIPSender) UnmarshalJSON(data []byte) error {
+func (t *DeployBurnMintTokenPoolParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes DeployCCIPSender to hex string (Canton MCMS format)
-func (t DeployCCIPSender) MarshalHex() (string, error) {
+// MarshalHex encodes DeployBurnMintTokenPoolParams to hex string (Canton MCMS format)
+func (t DeployBurnMintTokenPoolParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes DeployCCIPSender from hex string (Canton MCMS format)
-func (t *DeployCCIPSender) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// DeployCCIPSenderParams is a Record type
-type DeployCCIPSenderParams struct {
-	InstanceId types.TEXT  `json:"instanceId"`
-	Owner      types.PARTY `json:"owner"`
-}
-
-// ToMap converts DeployCCIPSenderParams to a map for DAML arguments
-func (t DeployCCIPSenderParams) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["instanceId"] = string(t.InstanceId)
-
-	m["owner"] = t.Owner.ToMap()
-
-	return m
-}
-
-func (t DeployCCIPSenderParams) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *DeployCCIPSenderParams) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DeployCCIPSenderParams to hex string (Canton MCMS format)
-func (t DeployCCIPSenderParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DeployCCIPSenderParams from hex string (Canton MCMS format)
-func (t *DeployCCIPSenderParams) UnmarshalHex(data string) error {
+// UnmarshalHex decodes DeployBurnMintTokenPoolParams from hex string (Canton MCMS format)
+func (t *DeployBurnMintTokenPoolParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1068,6 +1006,81 @@ func (t DeployGlobalConfigParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes DeployGlobalConfigParams from hex string (Canton MCMS format)
 func (t *DeployGlobalConfigParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployLinkToken is a Record type
+type DeployLinkToken struct {
+	Contract link.LinkRegistry `json:"contract"`
+}
+
+// ToMap converts DeployLinkToken to a map for DAML arguments
+func (t DeployLinkToken) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contract"] = model.NestedToDAMLValue(t.Contract)
+
+	return m
+}
+
+func (t DeployLinkToken) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployLinkToken) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployLinkToken to hex string (Canton MCMS format)
+func (t DeployLinkToken) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployLinkToken from hex string (Canton MCMS format)
+func (t *DeployLinkToken) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployLinkTokenParams is a Record type
+type DeployLinkTokenParams struct {
+	InstanceId   types.TEXT                               `json:"instanceId"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+}
+
+// ToMap converts DeployLinkTokenParams to a map for DAML arguments
+func (t DeployLinkTokenParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	return m
+}
+
+func (t DeployLinkTokenParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployLinkTokenParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployLinkTokenParams to hex string (Canton MCMS format)
+func (t DeployLinkTokenParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployLinkTokenParams from hex string (Canton MCMS format)
+func (t *DeployLinkTokenParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1897,10 +1910,8 @@ func (t *SetOwnerToMCMS) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	DeployCCIPReceiver(args DeployCCIPReceiver) (*bind.EncodedChoice, error)
-	DeployCCIPReceiverParams(args DeployCCIPReceiverParams) (*bind.EncodedChoice, error)
-	DeployCCIPSender(args DeployCCIPSender) (*bind.EncodedChoice, error)
-	DeployCCIPSenderParams(args DeployCCIPSenderParams) (*bind.EncodedChoice, error)
+	DeployBurnMintTokenPool(args DeployBurnMintTokenPool) (*bind.EncodedChoice, error)
+	DeployBurnMintTokenPoolParams(args DeployBurnMintTokenPoolParams) (*bind.EncodedChoice, error)
 	DeployCommitteeVerifier(args DeployCommitteeVerifier) (*bind.EncodedChoice, error)
 	DeployCommitteeVerifierParams(args DeployCommitteeVerifierParams) (*bind.EncodedChoice, error)
 	DeployExecutor(args DeployExecutor) (*bind.EncodedChoice, error)
@@ -1909,6 +1920,8 @@ type MCMSEncoder interface {
 	DeployFeeQuoterParams(args DeployFeeQuoterParams) (*bind.EncodedChoice, error)
 	DeployGlobalConfig(args DeployGlobalConfig) (*bind.EncodedChoice, error)
 	DeployGlobalConfigParams(args DeployGlobalConfigParams) (*bind.EncodedChoice, error)
+	DeployLinkToken(args DeployLinkToken) (*bind.EncodedChoice, error)
+	DeployLinkTokenParams(args DeployLinkTokenParams) (*bind.EncodedChoice, error)
 	DeployLockReleaseTokenPool(args DeployLockReleaseTokenPool) (*bind.EncodedChoice, error)
 	DeployLockReleaseTokenPoolParams(args DeployLockReleaseTokenPoolParams) (*bind.EncodedChoice, error)
 	DeployOffRamp(args DeployOffRamp) (*bind.EncodedChoice, error)
@@ -1955,24 +1968,14 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// DeployCCIPReceiver encodes parameters for the DeployCCIPReceiver choice.
-func (e *encoder) DeployCCIPReceiver(args DeployCCIPReceiver) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployCCIPReceiver", args)
+// DeployBurnMintTokenPool encodes parameters for the DeployBurnMintTokenPool choice.
+func (e *encoder) DeployBurnMintTokenPool(args DeployBurnMintTokenPool) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployBurnMintTokenPool", args)
 }
 
-// DeployCCIPReceiverParams encodes parameters for the DeployCCIPReceiver choice.
-func (e *encoder) DeployCCIPReceiverParams(args DeployCCIPReceiverParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployCCIPReceiver", args)
-}
-
-// DeployCCIPSender encodes parameters for the DeployCCIPSender choice.
-func (e *encoder) DeployCCIPSender(args DeployCCIPSender) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployCCIPSender", args)
-}
-
-// DeployCCIPSenderParams encodes parameters for the DeployCCIPSender choice.
-func (e *encoder) DeployCCIPSenderParams(args DeployCCIPSenderParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployCCIPSender", args)
+// DeployBurnMintTokenPoolParams encodes parameters for the DeployBurnMintTokenPool choice.
+func (e *encoder) DeployBurnMintTokenPoolParams(args DeployBurnMintTokenPoolParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployBurnMintTokenPool", args)
 }
 
 // DeployCommitteeVerifier encodes parameters for the DeployCommitteeVerifier choice.
@@ -2013,6 +2016,16 @@ func (e *encoder) DeployGlobalConfig(args DeployGlobalConfig) (*bind.EncodedChoi
 // DeployGlobalConfigParams encodes parameters for the DeployGlobalConfig choice.
 func (e *encoder) DeployGlobalConfigParams(args DeployGlobalConfigParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("DeployGlobalConfig", args)
+}
+
+// DeployLinkToken encodes parameters for the DeployLinkToken choice.
+func (e *encoder) DeployLinkToken(args DeployLinkToken) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployLinkToken", args)
+}
+
+// DeployLinkTokenParams encodes parameters for the DeployLinkToken choice.
+func (e *encoder) DeployLinkTokenParams(args DeployLinkTokenParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployLinkToken", args)
 }
 
 // DeployLockReleaseTokenPool encodes parameters for the DeployLockReleaseTokenPool choice.
