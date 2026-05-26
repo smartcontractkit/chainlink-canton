@@ -19,7 +19,6 @@ const IssuerTypeIssuerType_CCV = core.IssuerTypeIssuerType_CCV
 const IssuerTypeIssuerType_Executor = core.IssuerTypeIssuerType_Executor
 const IssuerTypeIssuerType_Network = core.IssuerTypeIssuerType_Network
 const IssuerTypeIssuerType_Pool = core.IssuerTypeIssuerType_Pool
-const JuelsPerLocalLink = core.JuelsPerLocalLink
 const MaxCCVsPerMessage = core.MaxCCVsPerMessage
 const MaxNumeric0DecimalText = core.MaxNumeric0DecimalText
 const MaxNumeric0IntegerText = core.MaxNumeric0IntegerText
