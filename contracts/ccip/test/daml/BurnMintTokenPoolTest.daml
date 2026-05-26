@@ -1486,7 +1486,7 @@ testBurnMintTokenPool_ApplyTokenTransferFeeConfigUpdates_RejectsNegativeFeeUSDCe
             poolOwner = poolOwner
             ccipOwner = ccipOwner
             instrumentId = HoldingV1.InstrumentId with
-                admin = ccipOwner
+                admin = poolOwner
                 id = "LINK"
             decimals = 10
             rateLimitAdmin = None
