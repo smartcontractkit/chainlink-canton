@@ -82,6 +82,16 @@ var DeployFeeQuoter = contract.NewExercise(contract.ExerciseParams[factorybindin
 	EncodeMethod: encodeDeployFeeQuoter,
 })
 
+var DeployLinkToken = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployLinkToken]{
+	Name:         "canton/ccip/factory/deploy_link_token",
+	Version:      Version,
+	Description:  "Deploys a LinkRegistry token through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployLinkToken,
+	EncodeMethod: encodeDeployLinkToken,
+})
+
 var DeployCommitteeVerifier = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployCommitteeVerifier]{
 	Name:         "canton/ccip/factory/deploy_committee_verifier",
 	Version:      Version,
@@ -142,6 +152,36 @@ var DeployExecutor = contract.NewExercise(contract.ExerciseParams[factorybinding
 	EncodeMethod: encodeDeployExecutor,
 })
 
+var DeployLockReleaseTokenPool = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployLockReleaseTokenPool]{
+	Name:         "canton/ccip/factory/deploy_lock_release_token_pool",
+	Version:      Version,
+	Description:  "Deploys a LockReleaseTokenPool through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployLockReleaseTokenPool,
+	EncodeMethod: encodeDeployLockReleaseTokenPool,
+})
+
+var DeployBurnMintTokenPool = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployBurnMintTokenPool]{
+	Name:         "canton/ccip/factory/deploy_burn_mint_token_pool",
+	Version:      Version,
+	Description:  "Deploys a BurnMintTokenPool through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployBurnMintTokenPool,
+	EncodeMethod: encodeDeployBurnMintTokenPool,
+})
+
+var DeployRateLimiter = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployRateLimiter]{
+	Name:         "canton/ccip/factory/deploy_rate_limiter",
+	Version:      Version,
+	Description:  "Deploys a token pool rate limiter through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployRateLimiter,
+	EncodeMethod: encodeDeployRateLimiter,
+})
+
 func encodeDeployRMNRemote(args factorybindings.DeployRMNRemote) (*bind.EncodedChoice, error) {
 	return factoryEncoder.DeployRMNRemoteParams(factorybindings.DeployRMNRemoteParams{
 		InstanceId:      args.Contract.InstanceId,
@@ -169,6 +209,13 @@ func encodeDeployFeeQuoter(args factorybindings.DeployFeeQuoter) (*bind.EncodedC
 	return factoryEncoder.DeployFeeQuoterParams(factorybindings.DeployFeeQuoterParams{
 		InstanceId:            args.Contract.InstanceId,
 		LinkTokenInstrumentId: args.Contract.LinkTokenInstrumentId,
+	})
+}
+
+func encodeDeployLinkToken(args factorybindings.DeployLinkToken) (*bind.EncodedChoice, error) {
+	return factoryEncoder.DeployLinkTokenParams(factorybindings.DeployLinkTokenParams{
+		InstanceId:   args.Contract.InstanceId,
+		InstrumentId: args.Contract.RegistryInstrumentId,
 	})
 }
 
@@ -217,6 +264,55 @@ func encodeDeployPerPartyRouterFactory(args factorybindings.DeployPerPartyRouter
 		TokenAdminRegistry: args.Contract.Deps.TokenAdminRegistry,
 		FeeQuoter:          args.Contract.Deps.FeeQuoter,
 		RmnRemote:          args.Contract.Deps.RmnRemote,
+	})
+}
+
+func encodeDeployLockReleaseTokenPool(args factorybindings.DeployLockReleaseTokenPool) (*bind.EncodedChoice, error) {
+	c := args.Contract
+	return factoryEncoder.DeployLockReleaseTokenPoolParams(factorybindings.DeployLockReleaseTokenPoolParams{
+		InstanceId:         c.InstanceId,
+		PoolOwner:          c.PoolOwner,
+		CcipOwner:          c.CcipOwner,
+		InstrumentId:       c.InstrumentId,
+		Decimals:           c.Decimals,
+		RateLimitAdmin:     c.RateLimitAdmin,
+		TokenAdminRegistry: c.Deps.TokenAdminRegistry,
+		FeeQuoter:          c.Deps.FeeQuoter,
+		RmnRemote:          c.Deps.RmnRemote,
+		PoolReceiveContext: c.PoolReceiveContext,
+		TransferTimeout:    c.TransferTimeout,
+	})
+}
+
+func encodeDeployBurnMintTokenPool(args factorybindings.DeployBurnMintTokenPool) (*bind.EncodedChoice, error) {
+	c := args.Contract
+	return factoryEncoder.DeployBurnMintTokenPoolParams(factorybindings.DeployBurnMintTokenPoolParams{
+		InstanceId:         c.InstanceId,
+		PoolOwner:          c.PoolOwner,
+		CcipOwner:          c.CcipOwner,
+		InstrumentId:       c.InstrumentId,
+		Decimals:           c.Decimals,
+		RateLimitAdmin:     c.RateLimitAdmin,
+		TokenAdminRegistry: c.Deps.TokenAdminRegistry,
+		FeeQuoter:          c.Deps.FeeQuoter,
+		RmnRemote:          c.Deps.RmnRemote,
+		PoolReceiveContext: c.PoolReceiveContext,
+		TransferTimeout:    c.TransferTimeout,
+	})
+}
+
+func encodeDeployRateLimiter(args factorybindings.DeployRateLimiter) (*bind.EncodedChoice, error) {
+	c := args.Contract
+	return factoryEncoder.DeployRateLimiterParams(factorybindings.DeployRateLimiterParams{
+		InstanceId:          c.InstanceId,
+		PoolInstanceId:      c.PoolInstanceId,
+		PoolOwner:           c.PoolOwner,
+		RemoteChainSelector: c.RemoteChainSelector,
+		Direction:           c.Direction,
+		Mode:                c.Mode,
+		IsEnabled:           c.IsEnabled,
+		Capacity:            c.Capacity,
+		Rate:                c.Rate,
 	})
 }
 

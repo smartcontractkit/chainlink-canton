@@ -4,7 +4,7 @@ on:
     types: [ auto-fix-command ] # ChatOps dispatch
 
 env:
-  GOLANGCI_LINT_VERSION: v2.8.0
+  GOLANGCI_LINT_VERSION: v2.11.4
 
 permissions: {}
 jobs:
@@ -15,7 +15,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-4cores-16GB
     steps:
       - name: Setup GitHub Token
         id: setup-github-token
@@ -68,6 +68,15 @@ jobs:
           git fetch origin "$branch"
           expected_remote_head="$(git rev-parse "origin/${branch}")"
           echo "expected_remote_head=${expected_remote_head}" >> "$GITHUB_OUTPUT"
+      - name: merge target branch
+        run: |
+          echo 'bindings/generated/** merge=ours' >> .git/info/attributes
+          echo 'contracts/dars/** merge=ours' >> .git/info/attributes
+          git config --global user.name "Login will be determined by the Github API based on the creator of the token"
+          git config --global user.email ""
+          git config --local merge.ours.driver true
+          git fetch origin ${{ github.event.client_payload.pull_request.base.ref }}
+          git merge --no-edit "origin/${{ github.event.client_payload.pull_request.base.ref }}"
       - name: Install Go
         uses: actions/setup-go@v6
         with:
@@ -85,12 +94,10 @@ jobs:
       - name: Create commit
         id: commit
         run: |
-          if git diff --quiet; then
+          if git diff --quiet && git diff --cached --quiet; then
             echo "No changes to commit"
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else
-            git config --global user.name "Login will be determined by the Github API based on the creator of the token"
-            git config --global user.email ""
             git add -A
             git commit -m "[autofix] apply fix-all to PR"
             echo "has_changes=true" >> $GITHUB_OUTPUT

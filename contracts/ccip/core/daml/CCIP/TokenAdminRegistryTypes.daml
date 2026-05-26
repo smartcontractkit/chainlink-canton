@@ -3,12 +3,15 @@
 module CCIP.TokenAdminRegistryTypes
   ( PoolRegistration(..)
   , SetPoolParams(..)
+  , SetTransferFactoryParams(..)
+  , SetBurnMintFactoryParams(..)
   , ProposeAdminParams(..)
   , TransferAdminParams(..)
   , AcceptAdminParams(..)
   ) where
 
 import qualified Splice.Api.Token.HoldingV1
+import Chainlink.InstanceAddress (RawInstanceAddress)
 
 -- | Registered pool identity for a token instrument.
 data PoolRegistration = PoolRegistration
@@ -26,6 +29,28 @@ data SetPoolParams = SetPoolParams
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         tokenPool : Optional PoolRegistration
+    deriving (Eq, Show)
+
+-- | Params for SetTransferFactory choice.
+--
+-- MCMS operation data cannot carry arbitrary ContractIds because Daml cannot
+-- decode a ContractId from bytes. The address is resolved through the
+-- MCMS-provided contractIds map.
+data SetTransferFactoryParams = SetTransferFactoryParams
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        transferFactoryAddress : Optional RawInstanceAddress
+    deriving (Eq, Show)
+
+-- | Params for SetBurnMintFactory choice.
+--
+-- MCMS operation data cannot carry arbitrary ContractIds because Daml cannot
+-- decode a ContractId from bytes. The address is resolved through the
+-- MCMS-provided contractIds map.
+data SetBurnMintFactoryParams = SetBurnMintFactoryParams
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        burnMintFactoryAddress : Optional RawInstanceAddress
     deriving (Eq, Show)
 
 -- | Params for ProposeAdmin choice
