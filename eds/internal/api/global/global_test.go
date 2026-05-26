@@ -3,7 +3,6 @@ package global
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -15,26 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 )
-
-func TestMain(m *testing.M) {
-	gin.SetMode(gin.TestMode)
-	os.Exit(m.Run())
-}
-
-func makeHashedAddress(hex string) oapiCommon.RawOrHashedAddress {
-	var addr oapiCommon.RawOrHashedAddress
-	_ = addr.FromInstanceAddress(hex)
-	return addr
-}
-
-func makeRawAddress(raw string) oapiCommon.RawOrHashedAddress {
-	var addr oapiCommon.RawOrHashedAddress
-	_ = addr.FromRawInstanceAddress(raw)
-	return addr
-}
 
 func makeClient(t *testing.T, server *Server) oapiGlobal.ClientWithResponsesInterface {
 	t.Helper()
@@ -102,10 +85,10 @@ func TestServer(t *testing.T) {
 
 		resp, err := client.PostGetExplicitDisclosureBatchWithResponse(t.Context(), oapiGlobal.GetExplicitDisclosureBatchRequest{
 			Addresses: []oapiCommon.RawOrHashedAddress{
-				makeHashedAddress(address1.Hex()),
-				makeRawAddress(address2.String()),
+				testhelpers.MakeHashedAddress(address1.Hex()),
+				testhelpers.MakeRawAddress(address2.String()),
 				// Duplicate address, shouldn't fail
-				makeHashedAddress(address1.Hex()),
+				testhelpers.MakeHashedAddress(address1.Hex()),
 			},
 		})
 		require.NoError(t, err)
@@ -168,9 +151,9 @@ func TestServer(t *testing.T) {
 
 		resp, err := client.PostGetExplicitDisclosureBatchWithResponse(t.Context(), oapiGlobal.GetExplicitDisclosureBatchRequest{
 			Addresses: []oapiCommon.RawOrHashedAddress{
-				makeHashedAddress(address1.Hex()),
-				makeRawAddress(address2.String()),
-				makeHashedAddress(address3.Hex()),
+				testhelpers.MakeHashedAddress(address1.Hex()),
+				testhelpers.MakeRawAddress(address2.String()),
+				testhelpers.MakeHashedAddress(address3.Hex()),
 			},
 		})
 		require.NoError(t, err)
@@ -192,8 +175,8 @@ func TestServer(t *testing.T) {
 
 		resp, err := client.PostGetExplicitDisclosureBatchWithResponse(t.Context(), oapiGlobal.GetExplicitDisclosureBatchRequest{
 			Addresses: []oapiCommon.RawOrHashedAddress{
-				makeHashedAddress(address1.Hex()),
-				makeRawAddress(address2.String()),
+				testhelpers.MakeHashedAddress(address1.Hex()),
+				testhelpers.MakeRawAddress(address2.String()),
 			},
 		})
 		require.NoError(t, err)
@@ -226,8 +209,8 @@ func TestServer(t *testing.T) {
 
 		resp, err := client.PostGetExplicitDisclosureBatchWithResponse(t.Context(), oapiGlobal.GetExplicitDisclosureBatchRequest{
 			Addresses: []oapiCommon.RawOrHashedAddress{
-				makeHashedAddress(address1.Hex()),
-				makeRawAddress(address2.String()),
+				testhelpers.MakeHashedAddress(address1.Hex()),
+				testhelpers.MakeRawAddress(address2.String()),
 			},
 		})
 		require.NoError(t, err)
@@ -257,8 +240,8 @@ func TestServer(t *testing.T) {
 
 		resp, err := client.PostGetExplicitDisclosureBatchWithResponse(t.Context(), oapiGlobal.GetExplicitDisclosureBatchRequest{
 			Addresses: []oapiCommon.RawOrHashedAddress{
-				makeHashedAddress(address1.Hex()),
-				makeHashedAddress(address2.Hex()),
+				testhelpers.MakeHashedAddress(address1.Hex()),
+				testhelpers.MakeHashedAddress(address2.Hex()),
 			},
 		})
 		require.NoError(t, err)

@@ -85,6 +85,7 @@ func TestDeployChainContracts(t *testing.T) {
 		Config: DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: ccipOwnerParty,
+				RMNOwnerParty:  ccipOwnerParty,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Template: ccvs.CommitteeVerifier{
@@ -106,8 +107,6 @@ func TestDeployChainContracts(t *testing.T) {
 				},
 				RMNRemote: sequences.RMNRemoteParams{
 					Template: rmn.RMNRemote{
-						CcipOwner:      "", // Populated by the sequence
-						RmnOwner:       types.PARTY(ccipOwnerParty),
 						CursedSubjects: nil,
 					},
 				},

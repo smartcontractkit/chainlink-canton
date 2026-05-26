@@ -3,6 +3,7 @@ package tokenpool
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -125,7 +126,12 @@ func NewServer(
 func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiCommon.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 	instanceAddress, err := converters.ResolveAddress(address)
@@ -150,13 +156,10 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "invalid destination chain selector"})
 		return
 	}
-	tokenTransfer := req.Message.TokenTransfer
-	if tokenTransfer == nil {
+	if req.Message.TokenTransfer == nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "message does not contain a token transfer"})
 		return
 	}
-
-	// TODO check that the token transfer is for this pool
 
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
@@ -178,12 +181,18 @@ func (s Server) lockReleaseTokenPoolSend(
 	instanceAddress contracts.InstanceAddress,
 	activeTokenPoolContract *apiv2.ActiveContract,
 	destinationChainSelector uint64,
-	_ oapiCommon.Message,
+	message oapiCommon.Message,
 ) {
 	lockReleaseTokenPool, err := ParseLockReleaseTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
 		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse lock release token pool contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	// Validate that the message's token is for this pool
+	if message.TokenTransfer.Token.Id != string(lockReleaseTokenPool.InstrumentId.Id) || message.TokenTransfer.Token.Admin != string(lockReleaseTokenPool.InstrumentId.Admin) {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "wrong pool for Message.TokenTransfer"})
 		return
 	}
 
@@ -280,10 +289,13 @@ func (s Server) lockReleaseTokenPoolSend(
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
 		ContextData:        contextData,
-		DisclosedContracts: append(
+		DisclosedContracts: slices.Concat(
+			disclosedHoldings,
 			factoryDisclosures,
-			converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
-			converters.ActiveContractToDisclosedContract(rateLimiter),
+			[]oapiCommon.DisclosedContract{
+				converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
+				converters.ActiveContractToDisclosedContract(rateLimiter),
+			},
 		),
 	}
 
@@ -296,12 +308,18 @@ func (s Server) burnMintTokenPoolSend(
 	instanceAddress contracts.InstanceAddress,
 	activeTokenPoolContract *apiv2.ActiveContract,
 	destinationChainSelector uint64,
-	_ oapiCommon.Message,
+	message oapiCommon.Message,
 ) {
 	burnMintTokenPool, err := ParseBurnMintTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
 		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse lock release token pool contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	// Validate that the message's token is for this pool
+	if message.TokenTransfer.Token.Id != string(burnMintTokenPool.InstrumentId.Id) || message.TokenTransfer.Token.Admin != string(burnMintTokenPool.InstrumentId.Admin) {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "wrong pool for Message.TokenTransfer: " + message.TokenTransfer.Token.Id + " " + message.TokenTransfer.Token.Admin + " " + string(burnMintTokenPool.InstrumentId.Id) + " " + string(burnMintTokenPool.InstrumentId.Admin)})
 		return
 	}
 
@@ -396,7 +414,12 @@ func (s Server) burnMintTokenPoolSend(
 func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolExecuteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiCommon.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 	instanceAddress, err := converters.ResolveAddress(address)
@@ -428,13 +451,10 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 		return
 	}
 	sourceChainSelector := uint64(message.SourceChainSelector)
-	tokenTransfer := message.TokenTransfer
-	if tokenTransfer == nil {
+	if message.TokenTransfer == nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "message does not contain a token transfer"})
 		return
 	}
-
-	// TODO check that the Token Transfer is for this pool
 
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
@@ -462,6 +482,14 @@ func (s Server) lockReleaseTokenPoolExecute(
 	if err != nil {
 		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse lock release token pool contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	// Validate that the message's token is for this pool
+	messageInstrumentId := contracts.BytesToEncodedInstrumentID(message.TokenTransfer.DestTokenAddress)
+	poolInstrumentId := contracts.EncodeInstrumentID(lockReleaseTokenPool.InstrumentId)
+	if messageInstrumentId != poolInstrumentId {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "wrong pool for Message.TokenTransfer"})
 		return
 	}
 
@@ -577,6 +605,14 @@ func (s Server) burnMintTokenPoolExecute(
 	if err != nil {
 		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse lock release token pool contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	// Validate that the message's token is for this pool
+	messageInstrumentId := contracts.BytesToEncodedInstrumentID(message.TokenTransfer.DestTokenAddress)
+	poolInstrumentId := contracts.EncodeInstrumentID(burnMintTokenPool.InstrumentId)
+	if messageInstrumentId != poolInstrumentId {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "wrong pool for Message.TokenTransfer"})
 		return
 	}
 

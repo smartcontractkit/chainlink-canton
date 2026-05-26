@@ -8,10 +8,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -44,26 +44,14 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 
-	ctx := ccv.Plog.WithContext(t.Context())
-	harness, err := tcapi.NewTestHarness(
-		ctx,
-		configPath,
-		in,
-		chainsel.FamilyEVM,
-		chainsel.FamilyCanton,
-	)
+	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath)
 	require.NoError(t, err)
+	ctx := ccv.Plog.WithContext(t.Context())
 
-	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, harness)
-	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
+	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, lib)
+	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, lib)
 	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
 	require.True(t, ok, "Canton chain cantonImpl must be *devenv.Chain")
-
-	for _, client := range harness.AggregatorClients {
-		t.Cleanup(func() {
-			client.Close()
-		})
-	}
 
 	t.Cleanup(func() {
 		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
@@ -77,10 +65,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(cantonToEVMFeeAmount)))
 		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), 0))
 
+		ds, err := lib.DataStore()
+		require.NoError(t, err)
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
 		ccvAddr, err := tcapi.GetContractAddress(
-			in,
+			ds,
 			cantonChain.ChainSelector(),
 			datastore.ContractType(canton_committee_verifier.ContractType),
 			canton_committee_verifier.Version.String(),
@@ -89,7 +79,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		)
 		require.NoError(t, err)
 		executorAddr, err := tcapi.GetContractAddress(
-			in,
+			ds,
 			cantonChain.ChainSelector(),
 			datastore.ContractType(executor.ContractType),
 			executor.Version.String(),
@@ -145,7 +135,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		t.Logf("CCIPMessageSent event: %+v", sentEvent)
 
 		t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID[:])
-		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
+		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, lib, sentEvent.MessageID)
 		t.Logf(
 			"Message assertion succeeded: aggregated=true indexerResults=%+v",
 			result.IndexedVerifications.Results,
@@ -166,10 +156,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMTokenTransferAmount))) // Holdings for token transfer
 		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), uint64(cantonToEVMTokenTransferAmount)))    // Setup with fee and token transfer amounts
 
+		ds, err := lib.DataStore()
+		require.NoError(t, err)
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
 		ccvAddr, err := tcapi.GetContractAddress(
-			in,
+			ds,
 			cantonChain.ChainSelector(),
 			datastore.ContractType(canton_committee_verifier.ContractType),
 			canton_committee_verifier.Version.String(),
@@ -178,7 +170,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		)
 		require.NoError(t, err)
 		executorAddr, err := tcapi.GetContractAddress(
-			in,
+			ds,
 			cantonChain.ChainSelector(),
 			datastore.ContractType(executor.ContractType),
 			executor.Version.String(),
@@ -186,7 +178,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			"source executor",
 		)
 		require.NoError(t, err)
-		destTokenRef, err := in.CLDF.DataStore.Addresses().Get(
+		destTokenRef, err := ds.Addresses().Get(
 			datastore.NewAddressRefKey(
 				evmChain.ChainSelector(),
 				datastore.ContractType("BurnMintERC20WithDripToken"),

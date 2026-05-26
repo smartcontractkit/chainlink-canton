@@ -17,9 +17,11 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		ChainSelector: "",
-		Server:        ServerConfig{},
-		Node:          NodeConfig{},
-		Monitoring:    MonitoringConfig{},
+		Server: ServerConfig{
+			MaxRequestSizeBytes: 1024 * 1024 * 10, // 10MiB
+		},
+		Node:       NodeConfig{},
+		Monitoring: MonitoringConfig{},
 		GlobalAPIConfig: GlobalAPIConfig{
 			MaxBatchSize: 1024,
 		},
@@ -46,8 +48,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host string `toml:"host" validate:"required"`
-	Port uint16 `toml:"port" validate:"required,port"`
+	Host                string `toml:"host" validate:"required"`
+	Port                uint16 `toml:"port" validate:"required,port"`
+	MaxRequestSizeBytes int64  `toml:"max_request_size_bytes" validate:"required"`
 }
 
 type NodeConfig struct {
