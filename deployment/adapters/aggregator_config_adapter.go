@@ -68,7 +68,7 @@ func (a *CantonCommitteeVerifierOnchain) ScanCommitteeStates(ctx context.Context
 		active, err := contract.FindActiveContractByInstanceAddress(
 			ctx,
 			participant.LedgerServices.State,
-			participant.PartyID,
+			contract.LedgerQueryParties(participant),
 			ccvs.CommitteeVerifier{}.GetTemplateID(),
 			instanceAddr,
 		)

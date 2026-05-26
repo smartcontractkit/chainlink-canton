@@ -25,7 +25,7 @@ import (
 const defaultHost = "localhost"
 const defaultPort = 5001
 
-// Dial opens a gRPC connection to a Canton admin API endpoint using the
+// Dial opens a gRPC connection to a Canton Admin gRPC endpoint using the
 // host, port, and optional JWT bearer token from cfg.
 func Dial(cfg ClientConfig) (*grpc.ClientConn, error) {
 	host := cfg.AdminHost
@@ -107,11 +107,19 @@ var authorizedStore = &topoadminv30.StoreId{
 }
 
 func synchronizerStore(syncID string) *topoadminv30.StoreId {
+	sync := &topoadminv30.Synchronizer{}
+	// Physical IDs include a sequencer suffix, e.g. global-domain::1220...::34-0.
+	// Canton Admin API expects Synchronizer_PhysicalId for those values; using
+	// Synchronizer_Id causes PROTO_DESERIALIZATION_FAILURE on Authorize.
+	if strings.Count(syncID, "::") >= 2 {
+		sync.Kind = &topoadminv30.Synchronizer_PhysicalId{PhysicalId: syncID}
+	} else {
+		sync.Kind = &topoadminv30.Synchronizer_Id{Id: syncID}
+	}
+
 	return &topoadminv30.StoreId{
 		Store: &topoadminv30.StoreId_Synchronizer{
-			Synchronizer: &topoadminv30.Synchronizer{
-				Kind: &topoadminv30.Synchronizer_Id{Id: syncID},
-			},
+			Synchronizer: sync,
 		},
 	}
 }

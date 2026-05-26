@@ -61,6 +61,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
@@ -269,20 +270,31 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 		}
 	}
 
-	out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
-		ChainSelector: selector,
-		Participant:   0,
-		Config: cantonchangesets.DeployCCIPFactoryConfig{
-			Params: cantonchangesets.DeployCCIPFactoryParams{
-				OwnerParty: participant.PartyID,
+	runningDS := datastore.NewMemoryDataStore()
+	owner := participant.PartyID
+
+	for _, qual := range []string{dsutils.QualifierCCIP, dsutils.QualifierCCV, dsutils.QualifierRMN} {
+		out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
+			ChainSelector: selector,
+			Participant:   0,
+			Config: cantonchangesets.DeployCCIPFactoryConfig{
+				Params: cantonchangesets.DeployCCIPFactoryParams{
+					OwnerParty: owner,
+					MCMSParty:  owner,
+					Qualifier:  qual,
+					InstanceID: "ccip-factory-" + qual,
+				},
 			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("deploy CCIPFactory for chain %d: %w", selector, err)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("deploy CCIPFactory %q for chain %d: %w", qual, selector, err)
+		}
+		if err := runningDS.Merge(out.DataStore.Seal()); err != nil {
+			return nil, fmt.Errorf("merge factory %q datastore: %w", qual, err)
+		}
 	}
 
-	return out.DataStore.Seal(), nil
+	return runningDS.Seal(), nil
 }
 
 func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (ccipChangesets.DeployChainContractsPerChainCfg, error) {
@@ -357,6 +369,10 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	if err != nil {
 		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("failed to get GlobalConfig address for chain %d: %w", selector, err)
 	}
+	feeQuoter, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(selector, datastore.ContractType(feequoterop.ContractType), feequoterop.Version, ""))
+	if err != nil {
+		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("failed to get FeeQuoter address for chain %d: %w", selector, err)
+	}
 	c.logger.Debug().Str("GlobalConfig", globalConfig.Address).Msg("Resolved GlobalConfig")
 
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), c.chain.Participants[0])
@@ -396,6 +412,7 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 			},
 		},
 		BaseExecutionGasCost: 1,
+		FeeQuoter:            contracts.HexToInstanceAddress(feeQuoter.Address).Bytes(),
 		CantonLaneConfig: &lanes.CantonLaneConfig{
 			GlobalConfig: globalConfig,
 		},
@@ -408,12 +425,6 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 }
 
 func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64) (cciptestinterfaces.ChainLaneProfile, error) {
-	if env != nil && env.DataStore != nil {
-		cantonadapters.SetRuntimeDataStore(env.DataStore)
-	} else if c.e != nil && c.e.DataStore != nil {
-		cantonadapters.SetRuntimeDataStore(c.e.DataStore)
-	}
-
 	defaultFeeQuoterCfg := cantonadapters.DefaultCantonFeeQuoterDestChainConfig()
 
 	baseExecutionGasCost := uint32(1)
@@ -1065,7 +1076,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 	// TODO come up with a better way of doing this
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, perpartyrouter.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{party}, perpartyrouter.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}
@@ -1139,6 +1150,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get CCIP Send disclosure: %w", err)
 	}
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
+	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
 	disclosedContracts = append(disclosedContracts, ccipSendDisclosure.DisclosedContracts...)
 
 	// CCVs

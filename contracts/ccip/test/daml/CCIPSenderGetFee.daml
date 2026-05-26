@@ -1,0 +1,177 @@
+module CCIPSenderGetFee where
+
+import Daml.Script
+
+import DA.Optional (fromSome)
+import qualified DA.TextMap as TextMap
+
+import qualified CCIP.Client
+import qualified CCIP.CCIPSender
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import qualified CommitteeVerifier.DummyCommitteeVerifier
+import qualified CCVMaxBounds
+import qualified Splice.Api.Token.MetadataV1 as MetadataV1
+
+data SenderGetFeeFixture = SenderGetFeeFixture
+    with
+        outbound : CCVMaxBounds.OutboundFixture
+        sender : ContractId CCIP.CCIPSender.CCIPSender
+        requiredVerifier : ContractId CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier
+        extraVerifier : ContractId CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier
+        requiredVerifierAddress : RawInstanceAddress.RawInstanceAddress
+        extraVerifierAddress : RawInstanceAddress.RawInstanceAddress
+
+emptyContext : MetadataV1.ChoiceContext
+emptyContext = MetadataV1.ChoiceContext with
+    values = TextMap.fromList []
+
+mkCCVSendInput
+    : RawInstanceAddress.RawInstanceAddress
+    -> ContractId CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier
+    -> CCIP.CCIPSender.CCVSendInput
+mkCCVSendInput ccvAddress verifierCid =
+    CCIP.CCIPSender.CCVSendInput with
+        ccvAddress = ccvAddress
+        ccvCid = coerceContractId verifierCid
+        ccvExtraContext = emptyContext
+
+messageRequiringRequiredVerifier
+    : SenderGetFeeFixture
+    -> CCIP.Client.Canton2AnyMessage
+messageRequiringRequiredVerifier f =
+    CCVMaxBounds.messageOnly f.outbound
+        [ CCIP.Client.CCVExtraArg with
+            ccvAddress = f.requiredVerifierAddress
+            ccvArgs = ""
+        ]
+
+setupSenderGetFeeFixture : Text -> Script SenderGetFeeFixture
+setupSenderGetFeeFixture suffix = do
+    outbound <- CCVMaxBounds.setupOutboundFixture ("sender-getfee-" <> suffix)
+    sender <- submit outbound.user do
+        createCmd CCIP.CCIPSender.CCIPSender with
+            instanceId = "sender-getfee-" <> suffix
+            owner = outbound.user
+
+    let requiredVerifierAddress =
+            RawInstanceAddress.make ("required-ccv-getfee-" <> suffix) outbound.user
+    requiredVerifier <- submit outbound.user do
+        createCmd CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier with
+            instanceId = "required-ccv-getfee-" <> suffix
+            owner = outbound.user
+            ccipOwner = outbound.ccipOwner
+            versionTag = CommitteeVerifier.DummyCommitteeVerifier.dummyVersionTag
+            feeUSDCents = 7.0
+            destGasLimit = 11
+            destBytesOverhead = 13
+
+    let extraVerifierAddress =
+            RawInstanceAddress.make ("extra-ccv-getfee-" <> suffix) outbound.user
+    extraVerifier <- submit outbound.user do
+        createCmd CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier with
+            instanceId = "extra-ccv-getfee-" <> suffix
+            owner = outbound.user
+            ccipOwner = outbound.ccipOwner
+            versionTag = CommitteeVerifier.DummyCommitteeVerifier.dummyVersionTag
+            feeUSDCents = 17.0
+            destGasLimit = 19
+            destBytesOverhead = 23
+
+    pure SenderGetFeeFixture with
+        outbound = outbound
+        sender = sender
+        requiredVerifier = requiredVerifier
+        extraVerifier = extraVerifier
+        requiredVerifierAddress = requiredVerifierAddress
+        extraVerifierAddress = extraVerifierAddress
+
+submitGetFee
+    : SenderGetFeeFixture
+    -> CCIP.Client.Canton2AnyMessage
+    -> [CCIP.CCIPSender.CCVSendInput]
+    -> Script CCIP.CCIPSender.GetFeeResult
+submitGetFee f message ccvSendInputs = do
+    disclosedOnRamp <- fromSome <$> queryDisclosure f.outbound.ccipOwner f.outbound.onRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure f.outbound.ccipOwner f.outbound.globalConfig
+    disclosedFeeQuoter <- fromSome <$> queryDisclosure f.outbound.ccipOwner f.outbound.feeQuoter
+    submit
+        ( actAs f.outbound.user
+        <> actAs f.outbound.ccipOwner
+        <> disclose disclosedOnRamp
+        <> disclose disclosedGlobalConfig
+        <> disclose disclosedFeeQuoter
+        )
+        do
+            exerciseCmd f.sender CCIP.CCIPSender.GetFee with
+                destinationChainSelector = f.outbound.destChainSelector
+                message = message
+                context = CCVMaxBounds.outboundContext f.outbound
+                routerCid = f.outbound.router
+                ccvSendInputs = ccvSendInputs
+                tokenTransferInput = None
+                executorInput = None
+
+submitGetFeeMustFail
+    : SenderGetFeeFixture
+    -> CCIP.Client.Canton2AnyMessage
+    -> [CCIP.CCIPSender.CCVSendInput]
+    -> Script ()
+submitGetFeeMustFail f message ccvSendInputs = do
+    disclosedOnRamp <- fromSome <$> queryDisclosure f.outbound.ccipOwner f.outbound.onRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure f.outbound.ccipOwner f.outbound.globalConfig
+    disclosedFeeQuoter <- fromSome <$> queryDisclosure f.outbound.ccipOwner f.outbound.feeQuoter
+    submitMustFail
+        ( actAs f.outbound.user
+        <> actAs f.outbound.ccipOwner
+        <> disclose disclosedOnRamp
+        <> disclose disclosedGlobalConfig
+        <> disclose disclosedFeeQuoter
+        )
+        do
+            exerciseCmd f.sender CCIP.CCIPSender.GetFee with
+                destinationChainSelector = f.outbound.destChainSelector
+                message = message
+                context = CCVMaxBounds.outboundContext f.outbound
+                routerCid = f.outbound.router
+                ccvSendInputs = ccvSendInputs
+                tokenTransferInput = None
+                executorInput = None
+
+testSenderGetFeeAcceptsExactRequiredCCVs : Script ()
+testSenderGetFeeAcceptsExactRequiredCCVs = script do
+    f <- setupSenderGetFeeFixture "exact"
+    let message = messageRequiringRequiredVerifier f
+    _ <- submitGetFee f message
+        [mkCCVSendInput f.requiredVerifierAddress f.requiredVerifier]
+    pure ()
+
+testSenderGetFeeRejectsOmittedRequiredCCV : Script ()
+testSenderGetFeeRejectsOmittedRequiredCCV = script do
+    f <- setupSenderGetFeeFixture "omitted"
+    let message = messageRequiringRequiredVerifier f
+    submitGetFeeMustFail f message []
+
+testSenderGetFeeRejectsExtraCCV : Script ()
+testSenderGetFeeRejectsExtraCCV = script do
+    f <- setupSenderGetFeeFixture "extra"
+    let message = messageRequiringRequiredVerifier f
+    submitGetFeeMustFail f message
+        [ mkCCVSendInput f.requiredVerifierAddress f.requiredVerifier
+        , mkCCVSendInput f.extraVerifierAddress f.extraVerifier
+        ]
+
+testSenderGetFeeRejectsDuplicateCCVInputs : Script ()
+testSenderGetFeeRejectsDuplicateCCVInputs = script do
+    f <- setupSenderGetFeeFixture "duplicate"
+    let message = messageRequiringRequiredVerifier f
+    submitGetFeeMustFail f message
+        [ mkCCVSendInput f.requiredVerifierAddress f.requiredVerifier
+        , mkCCVSendInput f.requiredVerifierAddress f.requiredVerifier
+        ]
+
+testSenderGetFeeRejectsCCVAddressCidMismatch : Script ()
+testSenderGetFeeRejectsCCVAddressCidMismatch = script do
+    f <- setupSenderGetFeeFixture "mismatch"
+    let message = messageRequiringRequiredVerifier f
+    submitGetFeeMustFail f message
+        [mkCCVSendInput f.requiredVerifierAddress f.extraVerifier]

@@ -86,6 +86,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	t.Log("Deploying CCIP chain contracts...")
 	deployOut, err := cld_ops.ExecuteSequence(bundle, sequences.DeployChainContracts, *cantonChain, sequences.DeployChainContractsParams{
 		CCIPOwnerParty: party,
+		RMNOwnerParty:  party,
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{{
 			Template: ccvs.CommitteeVerifier{
 				Owner:                        types.PARTY(party),
@@ -289,7 +290,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 
 	// Re-resolve the GlobalConfig (it may have a new contract ID after the update)
 	updatedGC, err := opcontract.FindActiveContractByInstanceAddress(
-		t.Context(), participant.LedgerServices.State, party,
+		t.Context(), participant.LedgerServices.State, []string{party},
 		common.GlobalConfig{}.GetTemplateID(), gcRaw.InstanceAddress(),
 	)
 	require.NoError(t, err, "find updated GlobalConfig")

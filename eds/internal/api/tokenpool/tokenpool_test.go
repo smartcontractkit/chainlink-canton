@@ -58,8 +58,6 @@ func TestServer_FilterContracts(t *testing.T) {
 		TransferTimeout:         lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT)},
 		Deps:                    lockreleasetokenpool.LockReleaseTokenPoolDeps{},
 	}
-	_ = tokenPool1
-	_ = tokenPool2
 
 	cfg := config.TokenPoolAPIConfig{
 		TokenPools: map[string]config.TokenPool{

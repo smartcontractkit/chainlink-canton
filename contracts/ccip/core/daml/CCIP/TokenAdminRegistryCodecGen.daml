@@ -4,7 +4,7 @@ module CCIP.TokenAdminRegistryCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), SetTransferFactoryParams(..), SetBurnMintFactoryParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
 
 import MCMS.Codec (
     decodeOptional,
@@ -15,7 +15,7 @@ import MCMS.Codec (
     encodeText
     )
 
-import CCIP.Codec (decodeInstrumentId, encodeInstrumentId)
+import CCIP.Codec (decodeInstrumentId, decodeRawInstanceAddressAt, encodeInstrumentId, encodeRawInstanceAddress)
 
 
 -- ===============================================
@@ -48,6 +48,38 @@ decodeSetPoolParamsAt encoded offset = do
     (instrumentId, offset) <- decodeInstrumentId encoded offset
     (tokenPool, offset) <- decodeOptional encoded offset decodePoolRegistrationAt
     Some (SetPoolParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetTransferFactoryParams
+-- ===============================================
+
+encodeSetTransferFactoryParams : SetTransferFactoryParams -> BytesHex
+encodeSetTransferFactoryParams params =
+    encodeInstrumentId params.instrumentId
+    <> encodeOptional params.transferFactoryAddress encodeRawInstanceAddress
+
+decodeSetTransferFactoryParamsAt : BytesHex -> Int -> Optional (SetTransferFactoryParams, Int)
+decodeSetTransferFactoryParamsAt encoded offset = do
+    (instrumentId, offset) <- decodeInstrumentId encoded offset
+    (transferFactoryAddress, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
+    Some (SetTransferFactoryParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetBurnMintFactoryParams
+-- ===============================================
+
+encodeSetBurnMintFactoryParams : SetBurnMintFactoryParams -> BytesHex
+encodeSetBurnMintFactoryParams params =
+    encodeInstrumentId params.instrumentId
+    <> encodeOptional params.burnMintFactoryAddress encodeRawInstanceAddress
+
+decodeSetBurnMintFactoryParamsAt : BytesHex -> Int -> Optional (SetBurnMintFactoryParams, Int)
+decodeSetBurnMintFactoryParamsAt encoded offset = do
+    (instrumentId, offset) <- decodeInstrumentId encoded offset
+    (burnMintFactoryAddress, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
+    Some (SetBurnMintFactoryParams{..}, offset)
 
 
 -- ===============================================

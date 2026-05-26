@@ -18,6 +18,7 @@ runAll : Script ()
 runAll = script do
   testTransferUsesKeyedPreapproval
   testTransferFallsBackToPending
+  testPendingTransferExpiresBeforeAccept
   testBurnMintRequiresActors
 
 testTransferUsesKeyedPreapproval : Script ()
@@ -204,6 +205,77 @@ testTransferFallsBackToPending = script do
           receiverHolding.holdingAmount === 3.0
           receiverHolding.meta === transferMetadata
         _ -> abort "expected completed accept result"
+    _ -> abort "expected pending transfer result"
+
+testPendingTransferExpiresBeforeAccept : Script ()
+testPendingTransferExpiresBeforeAccept = script do
+  admin <- allocateParty "link-admin-expiry"
+  alice <- allocateParty "alice-expiry"
+  bob <- allocateParty "bob-expiry"
+
+  let instrumentId = HoldingV1.InstrumentId with
+        admin
+        id = "LINK"
+
+  registryCid <- submit admin do
+    createCmd LinkRegistry with
+      registryAdmin = admin
+      registryInstrumentId = instrumentId
+      instanceId = "link-registry-expiry"
+      registryMeta = MetadataV1.emptyMetadata
+      transferPreapprovals = Map.empty
+  disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
+
+  mintResult <- submit (actAs admin <> actAs alice) do
+    exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
+      expectedAdmin = admin
+      instrumentId
+      inputHoldingCids = []
+      outputs =
+        [BurnMintV1.BurnMintOutput with
+          owner = alice
+          amount = 8.0
+          context = MetadataV1.emptyChoiceContext]
+      extraActors = [alice]
+      extraArgs = MetadataV1.ExtraArgs with
+        context = MetadataV1.emptyChoiceContext
+        meta = MetadataV1.emptyMetadata
+
+  now <- getTime
+  transferResult <- submit (actAs alice <> disclose disclosedRegistry) do
+    exerciseCmd (toInterfaceContractId @TransferV1.TransferFactory registryCid) TransferV1.TransferFactory_Transfer with
+      expectedAdmin = admin
+      transfer = TransferV1.Transfer with
+        sender = alice
+        receiver = bob
+        amount = 3.0
+        instrumentId
+        requestedAt = now
+        executeBefore = addRelTime now (seconds 10)
+        inputHoldingCids = mintResult.outputCids
+        meta = MetadataV1.emptyMetadata
+      extraArgs = MetadataV1.ExtraArgs with
+        context = MetadataV1.emptyChoiceContext
+        meta = MetadataV1.emptyMetadata
+
+  passTime (seconds 11)
+
+  case transferResult.output of
+    TransferV1.TransferInstructionResult_Pending transferInstructionCid -> do
+      submitMustFail bob do
+        exerciseCmd transferInstructionCid TransferV1.TransferInstruction_Accept with
+          extraArgs = MetadataV1.ExtraArgs with
+            context = MetadataV1.emptyChoiceContext
+            meta = MetadataV1.emptyMetadata
+
+      withdrawResult <- submit alice do
+        exerciseCmd transferInstructionCid TransferV1.TransferInstruction_Withdraw with
+          extraArgs = MetadataV1.ExtraArgs with
+            context = MetadataV1.emptyChoiceContext
+            meta = MetadataV1.emptyMetadata
+      case withdrawResult.output of
+        TransferV1.TransferInstructionResult_Failed -> pure ()
+        _ -> abort "expected failed result on withdraw after expiry"
     _ -> abort "expected pending transfer result"
 
 testBurnMintRequiresActors : Script ()

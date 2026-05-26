@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
@@ -23,6 +24,8 @@ import (
 type RegisterTokenPoolInput struct {
 	// TokenAdminRegistryInstanceAddress is the instance address of the TokenAdminRegistry contract.
 	TokenAdminRegistryInstanceAddress contracts.InstanceAddress
+	// TokenAdminRegistryRawInstanceAddress is the raw instance address label for MCMS proposals.
+	TokenAdminRegistryRawInstanceAddress contracts.RawInstanceAddress
 	// InstrumentId identifies the token (admin party + token id).
 	InstrumentId splice_api_token_holding_v1.InstrumentId
 	// PoolInstanceID is the instance ID of the token pool.
@@ -41,24 +44,37 @@ var RegisterTokenPool = operations.NewSequence(
 )
 
 func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTokenPoolInput) (sequences.OnChainOutput, error) {
+	participant := deps.Participants[0]
+	// ReadAsPartyIDs are CanReadAs rights for parties the operator cannot ActAs (e.g. ccip owner).
+	// When present, exercises must be encoded as MCMS proposals instead of submitted directly.
+	mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
+
 	instrumentId := input.InstrumentId
 	ccipParty := input.CcipParty
 	poolOwnerParty := input.PoolOwnerParty
 	tokenConfigAddress := contracts.InstanceID(hex.EncodeToString(contracts.EncodeInstrumentID(instrumentId).Bytes())).RawInstanceAddress(types.PARTY(ccipParty)).InstanceAddress()
 
+	var proposalOutputs []contract.ExerciseOutput
+
 	existingTokenConfigCid, tokenConfigFound, err := findTokenConfigCid(b, deps, tokenConfigAddress)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config: %w", err)
 	}
+	var tokenConfigCid types.CONTRACT_ID
 	var tokenConfigCidArg *types.CONTRACT_ID
 	if tokenConfigFound {
-		tokenConfigCidArg = new(existingTokenConfigCid)
+		tokenConfigCid = existingTokenConfigCid
+		tokenConfigCidArg = &existingTokenConfigCid
 	}
+
+	tarRaw := input.TokenAdminRegistryRawInstanceAddress.String()
 
 	// Step 1: ProposeAdministrator (CCIP acts)
 	skipAcceptAdminRole := false
-	_, err = operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.ProposeAdministrator]{
-		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
+	proposeReport, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.ProposeAdministrator]{
+		InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
+		RawInstanceAddress: tarRaw,
+		MCMSEnabled:        mcmsEnabled,
 		Args: tokenadminregistry.ProposeAdministrator{
 			TokenConfigCid: tokenConfigCidArg,
 			InstrumentId:   instrumentId,
@@ -73,19 +89,26 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to propose administrator: %w", err)
 		}
 	}
-
-	tokenConfigCid, tokenConfigFound, err := findTokenConfigCid(b, deps, tokenConfigAddress)
-	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config after propose: %w", err)
+	if err == nil && mcmsEnabled && !proposeReport.Output.Executed() {
+		proposalOutputs = append(proposalOutputs, proposeReport.Output)
 	}
-	if !tokenConfigFound {
-		return sequences.OnChainOutput{}, fmt.Errorf("token config not found after propose")
+
+	if !mcmsEnabled && err == nil {
+		tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, tokenConfigAddress)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config after propose: %w", err)
+		}
+		if !tokenConfigFound {
+			return sequences.OnChainOutput{}, fmt.Errorf("token config not found after propose")
+		}
 	}
 
 	// Step 2: AcceptAdminRole (pool owner acts). Exercise resolves current TAR contract by InstanceAddress.
 	if !skipAcceptAdminRole {
-		_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.AcceptAdminRole]{
-			InstanceAddress: input.TokenAdminRegistryInstanceAddress,
+		acceptReport, err := operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.AcceptAdminRole]{
+			InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
+			RawInstanceAddress: tarRaw,
+			MCMSEnabled:        mcmsEnabled,
 			Args: tokenadminregistry.AcceptAdminRole{
 				TokenConfigCid: tokenConfigCid,
 				InstrumentId:   instrumentId,
@@ -95,19 +118,26 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to accept admin role: %w", err)
 		}
-		tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, tokenConfigAddress)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config after accept admin role: %w", err)
+		if mcmsEnabled && !acceptReport.Output.Executed() {
+			proposalOutputs = append(proposalOutputs, acceptReport.Output)
 		}
-		if !tokenConfigFound {
-			return sequences.OnChainOutput{}, fmt.Errorf("token config not found after accept admin role")
+		if !mcmsEnabled {
+			tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, tokenConfigAddress)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config after accept admin role: %w", err)
+			}
+			if !tokenConfigFound {
+				return sequences.OnChainOutput{}, fmt.Errorf("token config not found after accept admin role")
+			}
 		}
 	}
 
 	// Step 3: SetPool (pool owner acts)
 	poolOwnerPartyTyped := types.PARTY(poolOwnerParty)
-	_, err = operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[tokenadminregistry.SetPool]{
-		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
+	setPoolReport, err := operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[tokenadminregistry.SetPool]{
+		InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
+		RawInstanceAddress: tarRaw,
+		MCMSEnabled:        mcmsEnabled,
 		Args: tokenadminregistry.SetPool{
 			TokenConfigCid: tokenConfigCid,
 			InstrumentId:   instrumentId,
@@ -121,8 +151,22 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to set pool: %w", err)
 	}
+	if mcmsEnabled && !setPoolReport.Output.Executed() {
+		proposalOutputs = append(proposalOutputs, setPoolReport.Output)
+	}
 
-	return sequences.OnChainOutput{}, nil
+	if !mcmsEnabled {
+		return sequences.OnChainOutput{}, nil
+	}
+	batchOp, err := contract.NewBatchOperationFromExercises(proposalOutputs)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for token pool registration: %w", err)
+	}
+	if len(batchOp.Transactions) == 0 {
+		return sequences.OnChainOutput{}, nil
+	}
+
+	return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
 }
 
 func findTokenConfigCid(b operations.Bundle, deps canton.Chain, address contracts.InstanceAddress) (types.CONTRACT_ID, bool, error) {
@@ -130,7 +174,7 @@ func findTokenConfigCid(b operations.Bundle, deps canton.Chain, address contract
 	contractID, err := contract.FindActiveContractIDByInstanceAddress(
 		b.GetContext(),
 		participant.LedgerServices.State,
-		participant.PartyID,
+		contract.LedgerQueryParties(participant),
 		tokenadminregistry.TokenConfig{}.GetTemplateID(),
 		address,
 	)

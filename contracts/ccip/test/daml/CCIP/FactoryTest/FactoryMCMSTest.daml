@@ -12,10 +12,12 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.Factory
 import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified Splice.Api.Token.HoldingV1
+import qualified Link.Token
 
 import CCIP.FactoryTest.FactoryCodecTest
   ( encodeDeployGlobalConfigParams
   , encodeDeployFeeQuoterParams
+  , encodeDeployLinkTokenParams
   , encodeDeployTokenAdminRegistryParams
   , encodeDeployOnRampParams
   , encodeDeployOffRampParams
@@ -24,13 +26,13 @@ import CCIP.FactoryTest.FactoryCodecTest
   , encodeDeployCommitteeVerifierParams
   , encodeDeployExecutorParams
   , encodeDeployLockReleaseTokenPoolParams
+  , encodeDeployBurnMintTokenPoolParams
   , encodeDeployRateLimiterParams
-  , encodeDeployCCIPSenderParams
-  , encodeDeployCCIPReceiverParams
   )
 
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
+import qualified CCIP.BurnMintTokenPoolTypes
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
@@ -343,6 +345,79 @@ testDeployFeeQuoter_MCMS = script do
 
   pure ()
 
+-- | Test DeployLinkToken via MCMS entrypoint
+-- LinkRegistry has registryAdmin as signatory, so the factory owner is used as registryAdmin.
+testDeployLinkToken_MCMS : Script ()
+testDeployLinkToken_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+
+  let factoryInstanceId = "factory-link"
+      linkInstanceId = "link-token-1"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "LINK"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = DeployLinkTokenParams with
+        instanceId = linkInstanceId
+        instrumentId
+      encoded = encodeDeployLinkTokenParams params
+
+  submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployLinkToken"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  registries <- query @Link.Token.LinkRegistry mcmsParty
+  case filter (\(_, registry) -> registry.instanceId == linkInstanceId) registries of
+    [(_, registry)] -> do
+      registry.registryAdmin === mcmsParty
+      registry.registryInstrumentId === instrumentId
+    _ -> abort "Expected exactly one deployed LinkRegistry"
+
+  pure ()
+
+-- | LinkRegistry's instrument admin must match the factory owner / registry admin.
+testDeployLinkToken_AdminMismatch_Rejected : Script ()
+testDeployLinkToken_AdminMismatch_Rejected = script do
+  mcmsParty <- allocateParty "mcms_party"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let factoryInstanceId = "factory-link-admin-mismatch"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = DeployLinkTokenParams with
+        instanceId = "link-token-bad-admin"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      encoded = encodeDeployLinkTokenParams params
+
+  submitMustFail mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployLinkToken"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
 -- | Test DeployTokenAdminRegistry via MCMS entrypoint
 testDeployTokenAdminRegistry_MCMS : Script ()
 testDeployTokenAdminRegistry_MCMS = script do
@@ -602,6 +677,48 @@ testDeployLockReleaseTokenPool_MCMS = script do
 
   pure ()
 
+-- | Test DeployBurnMintTokenPool via MCMS entrypoint
+-- BurnMintTokenPool has poolOwner as signatory and requires instrumentId.admin == poolOwner.
+testDeployBurnMintTokenPool_MCMS : Script ()
+testDeployBurnMintTokenPool_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+  rateLimitAdmin <- allocateParty "rate_limit_admin"
+
+  let factoryInstanceId = "factory-bmtp"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = DeployBurnMintTokenPoolParams with
+        instanceId = "bmtp-1"
+        poolOwner = mcmsParty
+        ccipOwner = mcmsParty
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "USDC"
+        decimals = 6
+        rateLimitAdmin = Some rateLimitAdmin
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" mcmsParty
+        feeQuoter = RawInstanceAddress.make "fq-1" mcmsParty
+        rmnRemote = RawInstanceAddress.make "rmn-1" mcmsParty
+        poolReceiveContext = MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.BurnMintTokenPoolTypes.RelativeHours 24
+      encoded = encodeDeployBurnMintTokenPoolParams params
+
+  submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployBurnMintTokenPool"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
 -- | Test DeployExecutor via MCMS entrypoint
 testDeployExecutor_MCMS : Script ()
 testDeployExecutor_MCMS = script do
@@ -671,76 +788,6 @@ testDeployRateLimiter_MCMS = script do
   submit mcmsParty do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "DeployRateLimiter"
-      operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
-
-  pure ()
-
--- | Test DeployCCIPSender via MCMS entrypoint
--- CCIPSender has owner as signatory, so mcmsParty is used as owner
-testDeployCCIPSender_MCMS : Script ()
-testDeployCCIPSender_MCMS = script do
-  mcmsParty <- allocateParty "mcms_party"
-
-  let factoryInstanceId = "factory-sender"
-
-  factoryCid <- submit mcmsParty do
-    createCmd CCIPFactory with
-      instanceId = factoryInstanceId
-      owner = mcmsParty
-      mcmsParty
-      usedInstanceIds = Map.empty
-      deployedContracts = Map.empty
-      perPartyRouterFactoryDeployed = False
-
-  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
-  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
-  -- Use mcmsParty as owner so authorization works within single party
-  let params = DeployCCIPSenderParams with
-        instanceId = "sender-1"
-        owner = mcmsParty
-      encoded = encodeDeployCCIPSenderParams params
-
-  submit mcmsParty do
-    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "DeployCCIPSender"
-      operationData = encoded
-      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
-
-  pure ()
-
--- | Test DeployCCIPReceiver via MCMS entrypoint
--- CCIPReceiver has owner as signatory, so mcmsParty is used as owner
-testDeployCCIPReceiver_MCMS : Script ()
-testDeployCCIPReceiver_MCMS = script do
-  mcmsParty <- allocateParty "mcms_party"
-
-  let factoryInstanceId = "factory-receiver"
-
-  factoryCid <- submit mcmsParty do
-    createCmd CCIPFactory with
-      instanceId = factoryInstanceId
-      owner = mcmsParty
-      mcmsParty
-      usedInstanceIds = Map.empty
-      deployedContracts = Map.empty
-      perPartyRouterFactoryDeployed = False
-
-  let instAddr = RawInstanceAddress.makeText factoryInstanceId mcmsParty
-  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
-  -- Use mcmsParty as owner so authorization works within single party
-  let params = DeployCCIPReceiverParams with
-        instanceId = "receiver-1"
-        owner = mcmsParty
-        requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
-        optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
-        optionalThreshold = 20
-        receiverFinalityConfig = finalityConfig 7
-      encoded = encodeDeployCCIPReceiverParams params
-
-  submit mcmsParty do
-    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "DeployCCIPReceiver"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 
