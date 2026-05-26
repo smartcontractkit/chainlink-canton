@@ -88,11 +88,12 @@ cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Can
 ### CI (on demand)
 
 The **CCIP Canton Load Tests** workflow (`ccip-load-tests.yml`) can be triggered manually from GitHub Actions
-(`workflow_dispatch`). It reuses the same devenv setup as the CCIP E2E workflow and runs both
-`TestCanton2EVM_Load` and `TestEVM2Canton_Load`. Inputs:
+(`workflow_dispatch`). It reuses the same devenv setup as the CCIP E2E workflow and runs either
+`TestCanton2EVM_Load` or `TestEVM2Canton_Load` depending on the `direction` input. Inputs:
 
 | Input | Default | Maps to |
 |---|---|---|
+| `direction` | `canton2evm` | `canton2evm` → `TestCanton2EVM_Load`; `evm2canton` → `TestEVM2Canton_Load` |
 | `message_rate` | `1/1s` | `CANTON_LOAD_MESSAGE_RATE` |
 | `load_duration` | `90s` | `CANTON_LOAD_DURATION` |
 | `test_timeout` | `40m` | `go test -timeout` |
