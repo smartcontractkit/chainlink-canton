@@ -86,6 +86,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	t.Log("Deploying CCIP chain contracts...")
 	deployOut, err := cld_ops.ExecuteSequence(bundle, sequences.DeployChainContracts, *cantonChain, sequences.DeployChainContractsParams{
 		CCIPOwnerParty: party,
+		RMNOwnerParty:  party,
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{{
 			Template: ccvs.CommitteeVerifier{
 				Owner:                        types.PARTY(party),

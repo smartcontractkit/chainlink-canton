@@ -50,6 +50,7 @@ func TestConfigureGlobalConfig_DirectExecution(t *testing.T) {
 	chainSelector := types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10))
 	deployOut, err := cld_ops.ExecuteSequence(bundle, sequences.DeployChainContracts, *cantonChain, sequences.DeployChainContractsParams{
 		CCIPOwnerParty: party,
+		RMNOwnerParty:  party,
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{{
 			Template: ccvs.CommitteeVerifier{
 				Owner:                        types.PARTY(party),
@@ -66,9 +67,7 @@ func TestConfigureGlobalConfig_DirectExecution(t *testing.T) {
 			},
 		},
 		RMNRemote: sequences.RMNRemoteParams{
-			Template: rmn.RMNRemote{
-				RmnOwner: types.PARTY(party),
-			},
+			Template: rmn.RMNRemote{},
 		},
 		NativeInstrumentId: splice_api_token_holding_v1.InstrumentId{
 			Admin: types.PARTY(party),

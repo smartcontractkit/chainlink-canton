@@ -91,12 +91,7 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 	var addressRef datastore.AddressRef
 
 	if mcmsEnabled {
-		factoryRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-			config.ChainSelector,
-			datastore.ContractType(factoryops.ContractType),
-			factoryops.Version,
-			"",
-		))
+		factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("resolve CCIPFactory: %w", err)
 		}

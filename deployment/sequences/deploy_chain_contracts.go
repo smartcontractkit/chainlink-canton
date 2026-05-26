@@ -66,16 +66,31 @@ type FeeQuoterParams struct {
 }
 
 type DeployChainContractsParams struct {
-	CCIPOwnerParty     string
+	// OwnerParty is the Canton instance owner (decentralized party); used for instanceId@owner addresses.
+	OwnerParty string
+	// CCIPOwnerParty is the operational ccipOwner on product templates (lanes, admin roles, etc.).
+	CCIPOwnerParty string
+	// CCVOwnerParty is the CommitteeVerifier signatory owner (ccvOwner); distinct from CCIPOwnerParty in dual-MCMS deploys.
+	CCVOwnerParty string
+	// RMNOwnerParty is the RMNRemote signatory owner (rmnOwner); distinct from CCIPOwnerParty in triple-MCMS deploys.
+	RMNOwnerParty      string
 	CommitteeVerifiers []CommitteeVerifierParams
 	Executors          []ExecutorParams
 	GlobalConfig       GlobalConfigParams
 	RMNRemote          RMNRemoteParams
 	FeeQuoterConfig    FeeQuoterParams
-	// FactoryAddressRef is used by the factory-backed deploy sequence.
+	// FactoryAddressRef is the ccip-qualified factory for core CCIP deploys.
 	FactoryAddressRef datastore.AddressRef
+	// RMNFactoryAddressRef is the rmn-qualified factory; required when DevenvBundledDeploy is true.
+	RMNFactoryAddressRef datastore.AddressRef
 	// ProposalDriven enables MCMS proposal generation for factory-backed deploys.
 	ProposalDriven bool
+	// CcvRegistryBinding is required for OnRamp deps when CommitteeVerifiers is empty (CCV deployed separately).
+	CcvRegistryBinding mcms.RawInstanceAddress
+	// RmnRemoteRawInstanceAddress is required for production split deploy paths.
+	RmnRemoteRawInstanceAddress contracts.RawInstanceAddress
+	// DevenvBundledDeploy runs RMN+CV+core in one sequence (devenv adapter only). Mutually exclusive with RmnRemoteRawInstanceAddress.
+	DevenvBundledDeploy bool
 	// The InstrumentId of the native token
 	NativeInstrumentId splice_api_token_holding_v1.InstrumentId
 }
@@ -87,14 +102,20 @@ var DeployChainContracts = operations.NewSequence(
 	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
 		var addresses []datastore.AddressRef
 
+		rmnOwnerParty, err := requireRMNOwnerParty(input)
+		if err != nil {
+			return sequences.OnChainOutput{}, err
+		}
+
 		// Deploy RMNRemote
 		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[rmn.RMNRemote]{
 			Template: rmn.RMNRemote{
-				RmnOwner:       input.RMNRemote.Template.RmnOwner,
-				CcipOwner:      types.PARTY(input.CCIPOwnerParty),
-				CursedSubjects: input.RMNRemote.Template.CursedSubjects,
+				RmnOwner:        rmnOwnerParty,
+				CcipOwner:       types.PARTY(input.CCIPOwnerParty),
+				CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
+				CustomObservers: input.RMNRemote.Template.CustomObservers,
 			},
-			OwnerParty: types.PARTY(input.CCIPOwnerParty),
+			OwnerParty: rmnOwnerParty,
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote: %w", err)

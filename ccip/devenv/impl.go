@@ -62,6 +62,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
@@ -281,20 +282,31 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 		}
 	}
 
-	out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
-		ChainSelector: selector,
-		Participant:   0,
-		Config: cantonchangesets.DeployCCIPFactoryConfig{
-			Params: cantonchangesets.DeployCCIPFactoryParams{
-				OwnerParty: participant.PartyID,
+	runningDS := datastore.NewMemoryDataStore()
+	owner := participant.PartyID
+
+	for _, qual := range []string{dsutils.QualifierCCIP, dsutils.QualifierCCV, dsutils.QualifierRMN} {
+		out, err := cantonchangesets.DeployCCIPFactory{}.Apply(*env, cantonchangesets.CantonCSDeps[cantonchangesets.DeployCCIPFactoryConfig]{
+			ChainSelector: selector,
+			Participant:   0,
+			Config: cantonchangesets.DeployCCIPFactoryConfig{
+				Params: cantonchangesets.DeployCCIPFactoryParams{
+					OwnerParty: owner,
+					MCMSParty:  owner,
+					Qualifier:  qual,
+					InstanceID: "ccip-factory-" + qual,
+				},
 			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("deploy CCIPFactory for chain %d: %w", selector, err)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("deploy CCIPFactory %q for chain %d: %w", qual, selector, err)
+		}
+		if err := runningDS.Merge(out.DataStore.Seal()); err != nil {
+			return nil, fmt.Errorf("merge factory %q datastore: %w", qual, err)
+		}
 	}
 
-	return out.DataStore.Seal(), nil
+	return runningDS.Seal(), nil
 }
 
 func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (ccipChangesets.DeployChainContractsPerChainCfg, error) {
@@ -425,12 +437,6 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 }
 
 func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64) (cciptestinterfaces.ChainLaneProfile, error) {
-	if env != nil && env.DataStore != nil {
-		cantonadapters.SetRuntimeDataStore(env.DataStore)
-	} else if c.e != nil && c.e.DataStore != nil {
-		cantonadapters.SetRuntimeDataStore(c.e.DataStore)
-	}
-
 	defaultFeeQuoterCfg := cantonadapters.DefaultCantonFeeQuoterDestChainConfig()
 
 	baseExecutionGasCost := uint32(1)
