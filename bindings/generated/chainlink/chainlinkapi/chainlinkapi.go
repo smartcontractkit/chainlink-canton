@@ -23,8 +23,8 @@ var (
 
 const (
 	PackageName = "chainlink-api"
-	PackageID   = "b43d515ea9d4668a4ef8642b9aea0e5921c7bba78da7c794328724d712e27505"
-	SDKVersion  = "3.4.10"
+	PackageID   = "5a47b7339178469ed26257863f6756d96ce2b003ed49e0369e0430250cfbbf79"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {

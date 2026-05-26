@@ -204,6 +204,7 @@ template CommitteeVerifier
                 -- Validate
                 forA_ remoteChainConfigArgs $ \args -> do
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
+                    assertMsg ("ApplyRemoteChainConfigUpdates: invalid fee: " <> show args.feeUSDCents) (args.feeUSDCents >= 0.0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid gas for verification: " <> show args.gasForVerification) (args.gasForVerification > 0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid payload size bytes: " <> show args.payloadSizeBytes) (args.payloadSizeBytes >= 0)
                 -- Update
@@ -298,6 +299,14 @@ template CommitteeVerifier
             controller caller
             do
                 execMsg <- fetch executingMessageCid
+
+                -- Domain separation: the verifier and the executing message must share a ccipOwner.
+                -- Without this, a verification produced under a different ccipOwner domain could still
+                -- satisfy the executing message's required verifier set because AddCCVVerification
+                -- records identity as (ccvInstanceId, ccvOwner) only.
+                assertMsg "verifier: executing message ccipOwner mismatch"
+                    (execMsg.ccipOwner == ccipOwner)
+
                 let message = execMsg.message
 
                 -- Get source chain signature config

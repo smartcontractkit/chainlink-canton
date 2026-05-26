@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/keys"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/topology"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -159,97 +160,113 @@ var OnboardingSequence = operations.NewSequence(
 
 		deps.Logger.Infow("All namespace delegations confirmed", "count", len(members))
 
-		// ── Step 3: DNS proposal creation ────────────────────────────────────
-		out.State.Phase = PhaseDNSProposal
-		proposalReport, err := operations.ExecuteOperation(b, topology.CreateDNSProposalOp, deps, topology.CreateDNSProposalInput{
-			NamespaceName:  in.NamespaceName,
-			Members:        members,
-			SynchronizerID: in.SynchronizerID,
-			Threshold:      in.Threshold,
-		})
-		if err != nil {
-			return out, fmt.Errorf("create-dns-proposal: %w", err)
+		ownerFingerprints := make([]string, len(members))
+		for i, m := range members {
+			ownerFingerprints[i] = m.NamespaceFingerprint
 		}
-		proposal := proposalReport.Output
-		out.State.ProposalHash = proposal.ProposalHashSHA256
-		out.State.RequiredSigners = proposal.RequiredSigners
-		out.State.Threshold = proposal.Threshold
+		decentralizedNS := helpers.ComputeDecentralizedNamespace(ownerFingerprints)
 
-		// ── Step 4: DNS signature collection ─────────────────────────────────
-		out.State.Phase = PhaseDNSSigning
-		var allSignedTxsB64 []string
-		for _, signerID := range proposal.RequiredSigners {
-			sigReport, sigErr := operations.ExecuteOperation(b, topology.SignDNSProposalOp, deps, topology.SignDNSProposalInput{
-				ParticipantID:      signerID,
-				ProposalHashSHA256: proposal.ProposalHashSHA256,
-				DNSTxB64:           proposal.DNSTxB64,
-				SynchronizerID:     in.SynchronizerID,
+		dnsAlreadyActive, dnsCheckErr := deps.Client.DNSExists(b.GetContext(), decentralizedNS, in.SynchronizerID)
+		if dnsCheckErr != nil {
+			return out, fmt.Errorf("checking existing decentralized namespace: %w", dnsCheckErr)
+		}
+
+		if !dnsAlreadyActive {
+			// ── Step 3: DNS proposal creation ────────────────────────────────────
+			out.State.Phase = PhaseDNSProposal
+			proposalReport, err := operations.ExecuteOperation(b, topology.CreateDNSProposalOp, deps, topology.CreateDNSProposalInput{
+				NamespaceName:  in.NamespaceName,
+				Members:        members,
+				SynchronizerID: in.SynchronizerID,
+				Threshold:      in.Threshold,
 			})
-			if sigErr != nil {
-				deps.Logger.Infow("Signature pending", "signer", signerID, "err", sigErr)
-				out.State.PendingSigners = append(out.State.PendingSigners, signerID)
-
-				continue
+			if err != nil {
+				return out, fmt.Errorf("create-dns-proposal: %w", err)
 			}
-			allSignedTxsB64 = append(allSignedTxsB64, sigReport.Output.SignedDNSTxB64)
-			out.State.CollectedSigners = append(out.State.CollectedSigners, signerID)
-		}
+			proposal := proposalReport.Output
+			out.State.ProposalHash = proposal.ProposalHashSHA256
+			out.State.RequiredSigners = proposal.RequiredSigners
+			out.State.Threshold = proposal.Threshold
 
-		deps.Logger.Infow("Collected DNS signatures",
-			"count", len(out.State.CollectedSigners), "required", proposal.Threshold)
+			// ── Step 4: DNS signature collection ─────────────────────────────────
+			out.State.Phase = PhaseDNSSigning
+			var allSignedTxsB64 []string
+			for _, signerID := range proposal.RequiredSigners {
+				sigReport, sigErr := operations.ExecuteOperation(b, topology.SignDNSProposalOp, deps, topology.SignDNSProposalInput{
+					ParticipantID:      signerID,
+					ProposalHashSHA256: proposal.ProposalHashSHA256,
+					DNSTxB64:           proposal.DNSTxB64,
+					SynchronizerID:     in.SynchronizerID,
+				})
+				if sigErr != nil {
+					deps.Logger.Infow("Signature pending", "signer", signerID, "err", sigErr)
+					out.State.PendingSigners = append(out.State.PendingSigners, signerID)
 
-		// Gate: require threshold signatures for initial DNS creation.
-		if len(out.State.CollectedSigners) < proposal.Threshold {
-			deps.Logger.Warnw("Threshold not met",
-				"collected", len(out.State.CollectedSigners), "required", proposal.Threshold)
-
-			return out, fmt.Errorf("%w: %d/%d",
-				ErrThresholdNotMet, len(out.State.CollectedSigners), proposal.Threshold)
-		}
-
-		// ── Step 5: Submit DNS ───────────────────────────────────────────────
-		out.State.Phase = PhaseDNSSubmit
-		_, err = operations.ExecuteOperation(
-			b, topology.SubmitDNSOp, deps,
-			topology.SubmitDNSInput{
-				SignedDNSTxsB64: allSignedTxsB64,
-				SynchronizerID:  in.SynchronizerID,
-				FilterNamespace: proposal.DecentralizedNS,
-			},
-			operations.WithRetry[topology.SubmitDNSInput, ceremony.CantonDeps](),
-		)
-		if err != nil {
-			return out, fmt.Errorf("submit-dns: %w", err)
-		}
-
-		// Check that the DNS is confirmed in the topology state.
-		ctx := b.GetContext()
-		err = retry.Do(
-			func() error {
-				deps.Logger.Infow("Checking DNS confirmation", "namespace", proposal.DecentralizedNS)
-				exists, err := deps.Client.DNSExists(ctx, proposal.DecentralizedNS, in.SynchronizerID)
-				if err != nil {
-					return fmt.Errorf("checking DNS confirmation: %w", err)
+					continue
 				}
-				if !exists {
-					return fmt.Errorf("DNS not yet confirmed for namespace %s", proposal.DecentralizedNS)
-				}
+				allSignedTxsB64 = append(allSignedTxsB64, sigReport.Output.SignedDNSTxB64)
+				out.State.CollectedSigners = append(out.State.CollectedSigners, signerID)
+			}
 
-				deps.Logger.Infow("DNS submitted and confirmed", "namespace", proposal.DecentralizedNS)
+			deps.Logger.Infow("Collected DNS signatures",
+				"count", len(out.State.CollectedSigners), "required", proposal.Threshold)
 
-				return nil
-			},
-			retry.Context(b.GetContext()),
-			retry.Attempts(5),
-			retry.Delay(5*time.Second),
-		)
-		if err != nil {
-			return out, fmt.Errorf("waiting for DNS confirmation: %w", err)
+			// Gate: require threshold signatures for initial DNS creation.
+			if len(out.State.CollectedSigners) < proposal.Threshold {
+				deps.Logger.Warnw("Threshold not met",
+					"collected", len(out.State.CollectedSigners), "required", proposal.Threshold)
+
+				return out, fmt.Errorf("%w: %d/%d",
+					ErrThresholdNotMet, len(out.State.CollectedSigners), proposal.Threshold)
+			}
+
+			// ── Step 5: Submit DNS ───────────────────────────────────────────────
+			out.State.Phase = PhaseDNSSubmit
+			_, err = operations.ExecuteOperation(
+				b, topology.SubmitDNSOp, deps,
+				topology.SubmitDNSInput{
+					SignedDNSTxsB64: allSignedTxsB64,
+					SynchronizerID:  in.SynchronizerID,
+					FilterNamespace: proposal.DecentralizedNS,
+				},
+				operations.WithRetry[topology.SubmitDNSInput, ceremony.CantonDeps](),
+			)
+			if err != nil {
+				return out, fmt.Errorf("submit-dns: %w", err)
+			}
+
+			// Check that the DNS is confirmed in the topology state.
+			ctx := b.GetContext()
+			err = retry.Do(
+				func() error {
+					deps.Logger.Infow("Checking DNS confirmation", "namespace", proposal.DecentralizedNS)
+					exists, err := deps.Client.DNSExists(ctx, proposal.DecentralizedNS, in.SynchronizerID)
+					if err != nil {
+						return fmt.Errorf("checking DNS confirmation: %w", err)
+					}
+					if !exists {
+						return fmt.Errorf("DNS not yet confirmed for namespace %s", proposal.DecentralizedNS)
+					}
+
+					deps.Logger.Infow("DNS submitted and confirmed", "namespace", proposal.DecentralizedNS)
+
+					return nil
+				},
+				retry.Context(b.GetContext()),
+				retry.Attempts(5),
+				retry.Delay(5*time.Second),
+			)
+			if err != nil {
+				return out, fmt.Errorf("waiting for DNS confirmation: %w", err)
+			}
+		} else {
+			deps.Logger.Infow("Decentralized namespace already active, skipping DNS ceremony steps",
+				"namespace", decentralizedNS)
 		}
 
 		// ── Step 6: PartyToParticipant mapping ───────────────────────────────
 		out.State.Phase = PhaseP2P
-		partyID := fmt.Sprintf("%s::%s", in.PartyPrefix, proposal.DecentralizedNS)
+		partyID := fmt.Sprintf("%s::%s", in.PartyPrefix, decentralizedNS)
 		out.State.P2PRequired = in.Threshold
 
 		for _, m := range members {

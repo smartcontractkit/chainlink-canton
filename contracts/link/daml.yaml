@@ -1,4 +1,4 @@
-sdk-version: 3.4.10
+sdk-version: 3.4.11
 name: link
 source: daml
 init-script: Main:runAll

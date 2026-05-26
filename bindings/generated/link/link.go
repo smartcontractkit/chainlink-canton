@@ -27,8 +27,8 @@ var (
 
 const (
 	PackageName = "link"
-	PackageID   = "8bad79df0f39af8e524f9c613c51192d09fab6890c38a1a8e71904a92853908e"
-	SDKVersion  = "3.4.10"
+	PackageID   = "9f9c7c90a3f67209d2e27d1ba78b663a9b225fb9a856fc745fbdb85b9886dfdb"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {

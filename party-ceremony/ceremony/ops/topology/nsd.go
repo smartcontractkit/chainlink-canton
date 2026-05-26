@@ -8,6 +8,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 
 	cryptov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/v30"
 	protov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"
@@ -69,11 +70,16 @@ var ProposeNamespaceDelegationOp = operations.NewOperation(
 
 		_, err = deps.Client.Authorize(ctx, 1, mapping, in.SynchronizerID, true)
 		if err != nil {
-			return ProposeNSDOutput{}, fmt.Errorf("proposing namespace delegation: %w", err)
+			if client.IsTopologyMappingAlreadyExists(err) {
+				deps.Logger.Infow("Namespace delegation already exists",
+					"participant", in.ParticipantID, "namespace", in.Namespace)
+			} else {
+				return ProposeNSDOutput{}, fmt.Errorf("proposing namespace delegation: %w", err)
+			}
+		} else {
+			deps.Logger.Infow("Namespace delegation proposed",
+				"participant", in.ParticipantID, "namespace", in.Namespace)
 		}
-
-		deps.Logger.Infow("Namespace delegation proposed",
-			"participant", in.ParticipantID, "namespace", in.Namespace)
 
 		return ProposeNSDOutput{
 			ParticipantID:      in.ParticipantID,
