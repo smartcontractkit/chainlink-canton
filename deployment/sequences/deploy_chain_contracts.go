@@ -73,7 +73,7 @@ type DeployChainContractsParams struct {
 	// CCVOwnerParty is the CommitteeVerifier signatory owner (ccvOwner); distinct from CCIPOwnerParty in dual-MCMS deploys.
 	CCVOwnerParty string
 	// RMNOwnerParty is the RMNRemote signatory owner (rmnOwner); distinct from CCIPOwnerParty in triple-MCMS deploys.
-	RMNOwnerParty string
+	RMNOwnerParty      string
 	CommitteeVerifiers []CommitteeVerifierParams
 	Executors          []ExecutorParams
 	GlobalConfig       GlobalConfigParams
