@@ -114,16 +114,17 @@ template FeeQuoter
                 removedPriceUpdaters : [Party]
             controller owner
             do
-                let newPriceUpdaters = dedup ((priceUpdaters \\ removedPriceUpdaters) ++ addedPriceUpdaters)
+                let newPriceUpdaters =
+                        filter (/= owner) (dedup ((priceUpdaters \\ removedPriceUpdaters) ++ addedPriceUpdaters))
                 create this with priceUpdaters = newPriceUpdaters
 
         -- Update the price for given tokens and gas prices for given chains.
         --
         -- Params:
         -- priceUpdates: The price updates to apply.
-        -- caller: The party calling this function, must be in the priceUpdaters list.
+        -- caller: Listed price updater, or the contract owner (owner need not appear in priceUpdaters).
         --
-        -- Only callable by parties in the priceUpdaters list.
+        -- Callable when caller is in priceUpdaters or caller is owner.
         choice UpdatePrices : ContractId FeeQuoter
             with
                 priceUpdates : PriceUpdates

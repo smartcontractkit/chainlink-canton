@@ -4,7 +4,7 @@ module CCIP.BurnMintTokenPoolCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.BurnMintTokenPoolTypes (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), TransferTimeout(..))
+import CCIP.BurnMintTokenPoolTypes (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), TransferTimeout(..))
 
 import MCMS.Codec (
     decodeBoolAt,
@@ -15,6 +15,7 @@ import MCMS.Codec (
     decodeNumeric0At,
     decodeOptional,
     decodePartyAt,
+    decodeTextAt,
     encodeBool,
     encodeBytesHex,
     encodeBytesHexList,
@@ -23,6 +24,7 @@ import MCMS.Codec (
     encodeNumeric0,
     encodeOptional,
     encodeParty,
+    encodeText,
     encodeUint8,
     extractBytes
     )
@@ -228,6 +230,52 @@ decodeSetTransferTimeoutParamsAt : BytesHex -> Int -> Optional (SetTransferTimeo
 decodeSetTransferTimeoutParamsAt encoded offset = do
     (transferTimeout, offset) <- decodeTransferTimeoutAt encoded offset
     Some (SetTransferTimeoutParams{..}, offset)
+
+
+-- ===============================================
+-- |              AddPoolReceiveContextNonContractValueParams
+-- ===============================================
+
+encodeAddPoolReceiveContextNonContractValueParams : AddPoolReceiveContextNonContractValueParams -> BytesHex
+encodeAddPoolReceiveContextNonContractValueParams params =
+    encodeText params.contextKey
+    <> encodeBytesHex params.valuePayload
+
+decodeAddPoolReceiveContextNonContractValueParamsAt : BytesHex -> Int -> Optional (AddPoolReceiveContextNonContractValueParams, Int)
+decodeAddPoolReceiveContextNonContractValueParamsAt encoded offset = do
+    (contextKey, offset) <- decodeTextAt encoded offset
+    (valuePayload, offset) <- decodeBytesHexAt encoded offset
+    Some (AddPoolReceiveContextNonContractValueParams{..}, offset)
+
+
+-- ===============================================
+-- |              AddPoolReceiveContextContractValueParams
+-- ===============================================
+
+encodeAddPoolReceiveContextContractValueParams : AddPoolReceiveContextContractValueParams -> BytesHex
+encodeAddPoolReceiveContextContractValueParams params =
+    encodeText params.contextKey
+    <> encodeRawInstanceAddress params.referentInstanceAddress
+
+decodeAddPoolReceiveContextContractValueParamsAt : BytesHex -> Int -> Optional (AddPoolReceiveContextContractValueParams, Int)
+decodeAddPoolReceiveContextContractValueParamsAt encoded offset = do
+    (contextKey, offset) <- decodeTextAt encoded offset
+    (referentInstanceAddress, offset) <- decodeRawInstanceAddressAt encoded offset
+    Some (AddPoolReceiveContextContractValueParams{..}, offset)
+
+
+-- ===============================================
+-- |              RemovePoolReceiveContextValueParams
+-- ===============================================
+
+encodeRemovePoolReceiveContextValueParams : RemovePoolReceiveContextValueParams -> BytesHex
+encodeRemovePoolReceiveContextValueParams params =
+    encodeText params.contextKey
+
+decodeRemovePoolReceiveContextValueParamsAt : BytesHex -> Int -> Optional (RemovePoolReceiveContextValueParams, Int)
+decodeRemovePoolReceiveContextValueParamsAt encoded offset = do
+    (contextKey, offset) <- decodeTextAt encoded offset
+    Some (RemovePoolReceiveContextValueParams{..}, offset)
 
 
 

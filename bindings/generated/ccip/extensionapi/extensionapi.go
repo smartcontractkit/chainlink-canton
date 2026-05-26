@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-extension-api"
-	PackageID   = "54af54186b0f9a8cc4f9e8b36415259aa669814447606c6ecd310825b7cfb62d"
+	PackageID   = "d3fd418a7d8170bc85f7e8f6f4b36520de4dd208ec8b4d995180c65a72d81f34"
 	SDKVersion  = "3.4.11"
 )
 
@@ -474,6 +474,7 @@ func (t *ExecutorView) UnmarshalHex(data string) error {
 
 // ExecutorCalculateFee is a Record type
 type ExecutorCalculateFee struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
 	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
@@ -483,6 +484,8 @@ type ExecutorCalculateFee struct {
 // ToMap converts ExecutorCalculateFee to a map for DAML arguments
 func (t ExecutorCalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expectedExecutor"] = model.NestedToDAMLValue(t.ExpectedExecutor)
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
@@ -519,6 +522,7 @@ func (t *ExecutorCalculateFee) UnmarshalHex(data string) error {
 
 // ExecutorGetFee is a Record type
 type ExecutorGetFee struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
 	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
 	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
 	Caller            types.PARTY                       `json:"caller"`
@@ -527,6 +531,8 @@ type ExecutorGetFee struct {
 // ToMap converts ExecutorGetFee to a map for DAML arguments
 func (t ExecutorGetFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expectedExecutor"] = model.NestedToDAMLValue(t.ExpectedExecutor)
 
 	m["destChainSelector"] = t.DestChainSelector
 

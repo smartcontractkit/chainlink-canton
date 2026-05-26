@@ -13,7 +13,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
+	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
@@ -116,12 +118,26 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 	}
 
 	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {
+		tarRef, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+			config.ChainSelector,
+			datastore.ContractType(token_admin_registry.ContractType),
+			token_admin_registry.Version,
+			"",
+		))
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve token admin registry: %w", err)
+		}
+		tarRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(tarRef)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve token admin registry raw address: %w", err)
+		}
 		regInput := sequences.RegisterTokenPoolInput{
-			TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
-			InstrumentId:                      cfg.InstrumentId,
-			CcipParty:                         cfg.CcipOwner,
-			PoolOwnerParty:                    cfg.PoolOwner,
-			PoolInstanceID:                    rawPoolAddr.InstanceID(),
+			TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(tarRef.Address),
+			TokenAdminRegistryRawInstanceAddress: tarRaw,
+			InstrumentId:                         cfg.InstrumentId,
+			CcipParty:                            cfg.CcipOwner,
+			PoolOwnerParty:                       cfg.PoolOwner,
+			PoolInstanceID:                       rawPoolAddr.InstanceID(),
 		}
 		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {

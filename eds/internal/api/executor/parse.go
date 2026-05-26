@@ -8,10 +8,14 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 )
 
 type Executor struct {
-	Address contracts.RawInstanceAddress
+	Address             contracts.RawInstanceAddress
+	MaxCCVsPerMessage   int64
+	CCVAllowlistEnabled bool
+	AllowedCCVs         []contracts.RawInstanceAddress
 }
 
 func ParseExecutor(createdEvent *apiv2.CreatedEvent) (*Executor, error) {
@@ -22,7 +26,15 @@ func ParseExecutor(createdEvent *apiv2.CreatedEvent) (*Executor, error) {
 
 	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.Owner)
 
+	allowedCCVs, err := parse.RawInstanceAddressList(boundContract.AllowedCCVs)
+	if err != nil {
+		return nil, fmt.Errorf("invalid allowed CCVs: %w", err)
+	}
+
 	return &Executor{
-		Address: address,
+		Address:             address,
+		MaxCCVsPerMessage:   int64(boundContract.MaxCCVsPerMsg),
+		CCVAllowlistEnabled: bool(boundContract.DynamicConfig.CcvAllowlistEnabled),
+		AllowedCCVs:         allowedCCVs,
 	}, nil
 }

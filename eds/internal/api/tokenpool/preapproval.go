@@ -14,7 +14,7 @@ import (
 
 type preapprovalFactory func(ctx context.Context) (string, *apiv2.ActiveContract, error)
 
-func getPreapprovalFactory(acs *store.ActiveContractStore, contextKey string, party types.PARTY, cfg config.TransferPreapproval) (preapprovalFactory, error) {
+func getPreapprovalFactory(acs store.ActiveContractStoreInterface, contextKey string, party types.PARTY, cfg config.TransferPreapproval) (preapprovalFactory, error) {
 	templateId, err := contracts.TemplateIDFromString(cfg.TemplateId)
 	if err != nil {
 		return nil, fmt.Errorf("invalid TemplateId for TransferPreapproval: %w", err)

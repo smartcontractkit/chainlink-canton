@@ -56,14 +56,22 @@ signature_length : Int = 64
 signature_component_length : Int
 signature_component_length : Int = 32
 
+-- | Maximum number of 64-byte (r,s) signatures that can appear in `verifierResults`
+-- for `VerifyMessage`. The wire format uses `MessageCodecV1.decodeUint16` for the
+-- signature payload byte length (at most 65535 bytes), so at most 65535 / 64
+-- full signatures fit. Reject `SignatureConfig.threshold` above this in
+-- `isValidSignatureConfig` so configs cannot require more signatures than any proof
+-- can encode.
+maxCommitteeSignaturesPerProof : Int
+maxCommitteeSignaturesPerProof = 65535 / signature_length
+
 template CommitteeVerifier
     with
         instanceId : Text
         owner : Party
 
         ccipOwner : Party
-        -- | Must equal `versionTagV2_0_0` (bytes4(keccak256("CommitteeVerifier 2.0.0")))).
-        versionTag : BytesHex
+        versionTag : BytesHex -- Version tag for this CCV (e.g., "e9a05a20")
         
         -- | Dynamic config
         -- Party capable of adding or removing allowed senders
@@ -89,11 +97,10 @@ template CommitteeVerifier
         signatory owner
         observer storageLocationsAdmin :: pendingStorageLocationsAdmin :: optional [] pure allowListAdmin
 
-        -- Valid instance id; canonical CCV version tag; signer configs with
-        -- positive threshold, enough signers, and unique signer keys.
+        -- Ensure signer configs have a positive threshold within the verifierResults
+        -- proof limit, enough signers, and no duplicate signer keys.
         ensure assertValidInstanceId instanceId
-          && versionTag == versionTagV2_0_0
-          && all isValidSignatureConfig (Map.values signerConfigs)
+          && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
@@ -206,6 +213,7 @@ template CommitteeVerifier
                 -- Validate
                 forA_ remoteChainConfigArgs $ \args -> do
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
+                    assertMsg ("ApplyRemoteChainConfigUpdates: invalid fee: " <> show args.feeUSDCents) (args.feeUSDCents >= 0.0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid gas for verification: " <> show args.gasForVerification) (args.gasForVerification > 0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid payload size bytes: " <> show args.payloadSizeBytes) (args.payloadSizeBytes >= 0)
                 -- Update
@@ -300,6 +308,14 @@ template CommitteeVerifier
             controller caller
             do
                 execMsg <- fetch executingMessageCid
+
+                -- Domain separation: the verifier and the executing message must share a ccipOwner.
+                -- Without this, a verification produced under a different ccipOwner domain could still
+                -- satisfy the executing message's required verifier set because AddCCVVerification
+                -- records identity as (ccvInstanceId, ccvOwner) only.
+                assertMsg "verifier: executing message ccipOwner mismatch"
+                    (execMsg.ccipOwner == ccipOwner)
+
                 let message = execMsg.message
 
                 -- Get source chain signature config
@@ -549,5 +565,6 @@ countValidSigners validSignersMap =
 isValidSignatureConfig : SignatureConfig -> Bool
 isValidSignatureConfig config =
     config.threshold > 0
+        && config.threshold <= maxCommitteeSignaturesPerProof
         && length config.signerKeys >= config.threshold
         && length config.signerKeys == length (dedup config.signerKeys)

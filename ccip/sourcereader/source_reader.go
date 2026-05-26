@@ -457,7 +457,7 @@ func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Byt
 	activeContract, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
 		c.stateServiceClient,
-		c.config.NodeOperatorParty,
+		[]string{c.config.NodeOperatorParty},
 		c.config.RMNRemoteTemplateID.String(),
 		c.rmnRemoteInstanceAddress,
 	)
