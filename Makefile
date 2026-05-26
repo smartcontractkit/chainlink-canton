@@ -90,9 +90,19 @@ start-devenv: build-ccv-images build-committeeverifier build-eds
 run-e2e-tests:
 	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run TestCanton2EVM_Basic
 
+.PHONY: run-canton2evm-load
+run-canton2evm-load: ## Canton→EVM WASP load (requires running devenv + env-canton-evm-out.toml).
+	cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestCanton2EVM_Load$$'
+
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests
 
 .PHONY: mocks
 mocks:
 	go run github.com/vektra/mockery/v3@v3.7.0
+
+.PHONY: git-generated-merge-config
+git-generated-merge-config:
+	echo 'bindings/generated/** merge=ours' >> .git/info/attributes
+	echo 'contracts/dars/** merge=ours' >> .git/info/attributes
+	git config --local merge.ours.driver true

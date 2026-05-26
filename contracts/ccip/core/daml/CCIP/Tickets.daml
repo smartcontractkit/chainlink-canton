@@ -46,6 +46,8 @@ template TokenReceiveTicket
         --   * useDefaultCCVs sentinel expands to source defaults
         requiredInboundPoolCCVs : [RawInstanceAddress]
         tokenAdminRegistryInstanceId : Text  -- Identifies the issuing TAR
+        -- Exact registered pool instance that performed inbound pool verification.
+        poolAddress : RawInstanceAddress
         poolOwner : Party           -- Observer - pool that should release
         receiver : Party            -- Message receiver (observer)
         tokenReceiver : Party       -- Who gets the tokens (may differ from receiver)

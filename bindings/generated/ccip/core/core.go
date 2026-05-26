@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "6364957686f1554d6746b16132fae44d2a96b9fd8b79f1ff4da8bfc642314ec9"
+	PackageID   = "6ced4bdcb92aa6e8629926cc36b0eea3e2e6d81e7d4e024bef5ce12e209c2438"
 	SDKVersion  = "3.4.11"
 )
 
@@ -53,6 +53,7 @@ const (
 	FinalityConfigByteLength = types.INT64(4)
 	MaxNumeric0IntegerText   = types.TEXT("99999999999999999999999999999999999999")
 	GlobalConfigKey          = types.TEXT("global-config")
+	MaxCCVsPerMessage        = types.INT64(255)
 	RateLimiterKey           = types.TEXT("rate-limiter")
 )
 
@@ -1630,6 +1631,7 @@ type ConsumeReceiveTicket struct {
 	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	TicketCid      types.CONTRACT_ID                        `json:"ticketCid"`
 	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	PoolInstanceId types.TEXT                               `json:"poolInstanceId"`
 	Caller         types.PARTY                              `json:"caller"`
 }
 
@@ -1642,6 +1644,8 @@ func (t ConsumeReceiveTicket) ToMap() map[string]any {
 	m["ticketCid"] = model.NestedToDAMLValue(t.TicketCid)
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["poolInstanceId"] = string(t.PoolInstanceId)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1676,6 +1680,7 @@ type ConsumeReceiveTicketMCMSParams struct {
 	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	TicketCid      types.CONTRACT_ID                        `json:"ticketCid"`
 	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	PoolInstanceId types.TEXT                               `json:"poolInstanceId"`
 }
 
 // MarshalHex encodes ConsumeReceiveTicketMCMSParams to hex string for MCMS operationData.
@@ -2253,23 +2258,23 @@ var _ types.ENUM = ExecutingMessageState("")
 
 // ExecutingMessageV1 is a Template type
 type ExecutingMessageV1 struct {
-	CcipOwner              types.PARTY                        `json:"ccipOwner"`
-	Message                MessageV1                          `json:"message"`
-	MessageId              types.TEXT                         `json:"messageId"`
-	Receiver               types.PARTY                        `json:"receiver"`
-	TokenReceiver          *types.PARTY                       `json:"tokenReceiver" hex:"optional"`
-	Executor               types.PARTY                        `json:"executor"`
-	ObservingParties       []types.PARTY                      `json:"observingParties"`
-	CcvVerifications       []CCVVerification                  `json:"ccvVerifications"`
-	CcvOwners              []types.PARTY                      `json:"ccvOwners"`
-	RequiredCCVs           []chainlinkapi.RawInstanceAddress  `json:"requiredCCVs"`
-	OptionalCCVs           []chainlinkapi.RawInstanceAddress  `json:"optionalCCVs"`
-	OptionalCCVThreshold   types.INT64                        `json:"optionalCCVThreshold"`
-	ReceiverFinalityConfig FinalityConfig                     `json:"receiverFinalityConfig"`
-	SourceDefaultCCVs      []chainlinkapi.RawInstanceAddress  `json:"sourceDefaultCCVs"`
-	InboundPoolCCVs        *[]chainlinkapi.RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
-	Deps                   ExecutingMessageDeps               `json:"deps"`
-	State                  ExecutingMessageState              `json:"state"`
+	CcipOwner               types.PARTY                       `json:"ccipOwner"`
+	Message                 MessageV1                         `json:"message"`
+	MessageId               types.TEXT                        `json:"messageId"`
+	Receiver                types.PARTY                       `json:"receiver"`
+	TokenReceiver           *types.PARTY                      `json:"tokenReceiver" hex:"optional"`
+	Executor                types.PARTY                       `json:"executor"`
+	ObservingParties        []types.PARTY                     `json:"observingParties"`
+	CcvVerifications        []CCVVerification                 `json:"ccvVerifications"`
+	CcvOwners               []types.PARTY                     `json:"ccvOwners"`
+	RequiredCCVs            []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs            []chainlinkapi.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalCCVThreshold    types.INT64                       `json:"optionalCCVThreshold"`
+	ReceiverFinalityConfig  FinalityConfig                    `json:"receiverFinalityConfig"`
+	SourceDefaultCCVs       []chainlinkapi.RawInstanceAddress `json:"sourceDefaultCCVs"`
+	InboundPoolVerification *InboundPoolVerification          `json:"inboundPoolVerification" hex:"optional"`
+	Deps                    ExecutingMessageDeps              `json:"deps"`
+	State                   ExecutingMessageState             `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -2373,13 +2378,13 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
-	if t.InboundPoolCCVs != nil {
-		args["inboundPoolCCVs"] = map[string]any{
+	if t.InboundPoolVerification != nil {
+		args["inboundPoolVerification"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.InboundPoolCCVs),
+			"value": model.NestedToDAMLValue(*t.InboundPoolVerification),
 		}
 	} else {
-		args["inboundPoolCCVs"] = map[string]any{
+		args["inboundPoolVerification"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}
@@ -2489,13 +2494,13 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 		return res
 	}()
 
-	if t.InboundPoolCCVs != nil {
-		args["inboundPoolCCVs"] = map[string]any{
+	if t.InboundPoolVerification != nil {
+		args["inboundPoolVerification"] = map[string]any{
 			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.InboundPoolCCVs),
+			"value": model.NestedToDAMLValue(*t.InboundPoolVerification),
 		}
 	} else {
-		args["inboundPoolCCVs"] = map[string]any{
+		args["inboundPoolVerification"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}
@@ -3807,7 +3812,7 @@ var _ types.VARIANT = (*FinalityConfig)(nil)
 // FinalizeExecute is a Record type
 type FinalizeExecute struct {
 	TokenAdminRegistryInstanceId types.TEXT                                `json:"tokenAdminRegistryInstanceId"`
-	MaybePoolOwner               *types.PARTY                              `json:"maybePoolOwner" hex:"optional"`
+	MaybePoolAddress             *chainlinkapi.RawInstanceAddress          `json:"maybePoolAddress" hex:"optional"`
 	MaybeTicketReceiver          *types.PARTY                              `json:"maybeTicketReceiver" hex:"optional"`
 	MaybeTokenReceiver           *types.PARTY                              `json:"maybeTokenReceiver" hex:"optional"`
 	MaybeInstrumentId            *splice_api_token_holding_v1.InstrumentId `json:"maybeInstrumentId" hex:"optional"`
@@ -3821,13 +3826,13 @@ func (t FinalizeExecute) ToMap() map[string]any {
 
 	m["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
 
-	if t.MaybePoolOwner != nil {
-		m["maybePoolOwner"] = map[string]any{
+	if t.MaybePoolAddress != nil {
+		m["maybePoolAddress"] = map[string]any{
 			"_type": "optional",
-			"value": (*t.MaybePoolOwner).ToMap(),
+			"value": model.NestedToDAMLValue(*t.MaybePoolAddress),
 		}
 	} else {
-		m["maybePoolOwner"] = map[string]any{
+		m["maybePoolAddress"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}
@@ -4953,6 +4958,51 @@ func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, pac
 // Verify interface implementations for GlobalConfig
 
 var _ api.IMCMSReceiver = (*GlobalConfig)(nil)
+
+// InboundPoolVerification is a Record type
+type InboundPoolVerification struct {
+	PoolAddress chainlinkapi.RawInstanceAddress   `json:"poolAddress"`
+	PoolCCVs    []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
+}
+
+// ToMap converts InboundPoolVerification to a map for DAML arguments
+func (t InboundPoolVerification) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
+
+	m["poolCCVs"] = func() []any {
+		res := make([]any, 0, len(t.PoolCCVs))
+		for _, e := range t.PoolCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t InboundPoolVerification) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *InboundPoolVerification) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes InboundPoolVerification to hex string (Canton MCMS format)
+func (t InboundPoolVerification) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes InboundPoolVerification from hex string (Canton MCMS format)
+func (t *InboundPoolVerification) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // IsAdministrator is a Record type
 type IsAdministrator struct {
@@ -7735,6 +7785,130 @@ func (t SendingMessageV1) ArchiveWithPackageID(contractID string, packageID stri
 	}
 }
 
+// SetBurnMintFactory is a Record type
+type SetBurnMintFactory struct {
+	TokenConfigCid  types.CONTRACT_ID                        `json:"tokenConfigCid"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	BurnMintFactory *types.CONTRACT_ID                       `json:"burnMintFactory" hex:"optional"`
+	Caller          types.PARTY                              `json:"caller"`
+}
+
+// ToMap converts SetBurnMintFactory to a map for DAML arguments
+func (t SetBurnMintFactory) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.BurnMintFactory != nil {
+		m["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.BurnMintFactory),
+		}
+	} else {
+		m["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t SetBurnMintFactory) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetBurnMintFactory) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetBurnMintFactory to hex string (Canton MCMS format)
+func (t SetBurnMintFactory) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetBurnMintFactory from hex string (Canton MCMS format)
+func (t *SetBurnMintFactory) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetBurnMintFactoryMCMSParams is SetBurnMintFactory without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type SetBurnMintFactoryMCMSParams struct {
+	TokenConfigCid  types.CONTRACT_ID                        `json:"tokenConfigCid"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	BurnMintFactory *types.CONTRACT_ID                       `json:"burnMintFactory" hex:"optional"`
+}
+
+// MarshalHex encodes SetBurnMintFactoryMCMSParams to hex string for MCMS operationData.
+func (t SetBurnMintFactoryMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetBurnMintFactoryMCMSParams from hex string.
+func (t *SetBurnMintFactoryMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetBurnMintFactoryParams is a Record type
+type SetBurnMintFactoryParams struct {
+	InstrumentId           splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	BurnMintFactoryAddress *chainlinkapi.RawInstanceAddress         `json:"burnMintFactoryAddress" hex:"optional"`
+}
+
+// ToMap converts SetBurnMintFactoryParams to a map for DAML arguments
+func (t SetBurnMintFactoryParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.BurnMintFactoryAddress != nil {
+		m["burnMintFactoryAddress"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.BurnMintFactoryAddress),
+		}
+	} else {
+		m["burnMintFactoryAddress"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	return m
+}
+
+func (t SetBurnMintFactoryParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetBurnMintFactoryParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetBurnMintFactoryParams to hex string (Canton MCMS format)
+func (t SetBurnMintFactoryParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetBurnMintFactoryParams from hex string (Canton MCMS format)
+func (t *SetBurnMintFactoryParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetConfig is a Record type
 type SetConfig struct {
 	NewIsEnabled types.BOOL    `json:"newIsEnabled"`
@@ -7779,12 +7953,15 @@ func (t *SetConfig) UnmarshalHex(data string) error {
 
 // SetInboundPoolCCVs is a Record type
 type SetInboundPoolCCVs struct {
-	PoolCCVs []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
+	PoolAddress chainlinkapi.RawInstanceAddress   `json:"poolAddress"`
+	PoolCCVs    []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetInboundPoolCCVs to a map for DAML arguments
 func (t SetInboundPoolCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
 
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
@@ -7981,6 +8158,130 @@ func (t SetPoolParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetPoolParams from hex string (Canton MCMS format)
 func (t *SetPoolParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetTransferFactory is a Record type
+type SetTransferFactory struct {
+	TokenConfigCid  types.CONTRACT_ID                        `json:"tokenConfigCid"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	TransferFactory *types.CONTRACT_ID                       `json:"transferFactory" hex:"optional"`
+	Caller          types.PARTY                              `json:"caller"`
+}
+
+// ToMap converts SetTransferFactory to a map for DAML arguments
+func (t SetTransferFactory) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.TransferFactory != nil {
+		m["transferFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TransferFactory),
+		}
+	} else {
+		m["transferFactory"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t SetTransferFactory) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetTransferFactory) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetTransferFactory to hex string (Canton MCMS format)
+func (t SetTransferFactory) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetTransferFactory from hex string (Canton MCMS format)
+func (t *SetTransferFactory) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetTransferFactoryMCMSParams is SetTransferFactory without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type SetTransferFactoryMCMSParams struct {
+	TokenConfigCid  types.CONTRACT_ID                        `json:"tokenConfigCid"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	TransferFactory *types.CONTRACT_ID                       `json:"transferFactory" hex:"optional"`
+}
+
+// MarshalHex encodes SetTransferFactoryMCMSParams to hex string for MCMS operationData.
+func (t SetTransferFactoryMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetTransferFactoryMCMSParams from hex string.
+func (t *SetTransferFactoryMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetTransferFactoryParams is a Record type
+type SetTransferFactoryParams struct {
+	InstrumentId           splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	TransferFactoryAddress *chainlinkapi.RawInstanceAddress         `json:"transferFactoryAddress" hex:"optional"`
+}
+
+// ToMap converts SetTransferFactoryParams to a map for DAML arguments
+func (t SetTransferFactoryParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.TransferFactoryAddress != nil {
+		m["transferFactoryAddress"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TransferFactoryAddress),
+		}
+	} else {
+		m["transferFactoryAddress"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	return m
+}
+
+func (t SetTransferFactoryParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetTransferFactoryParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetTransferFactoryParams to hex string (Canton MCMS format)
+func (t SetTransferFactoryParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetTransferFactoryParams from hex string (Canton MCMS format)
+func (t *SetTransferFactoryParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -8442,6 +8743,48 @@ func (t TokenAdminRegistry) AcceptAdminRoleWithPackageID(contractID string, pack
 	}
 }
 
+// SetBurnMintFactory exercises the SetBurnMintFactory choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) SetBurnMintFactory(contractID string, args SetBurnMintFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "SetBurnMintFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetBurnMintFactoryWithPackageID exercises the SetBurnMintFactory choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) SetBurnMintFactoryWithPackageID(contractID string, packageID string, args SetBurnMintFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "SetBurnMintFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetTransferFactory exercises the SetTransferFactory choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) SetTransferFactory(contractID string, args SetTransferFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "SetTransferFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetTransferFactoryWithPackageID exercises the SetTransferFactory choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) SetTransferFactoryWithPackageID(contractID string, packageID string, args SetTransferFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "SetTransferFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // SetPool exercises the SetPool choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) SetPool(contractID string, args SetPool) *model.ExerciseCommand {
@@ -8562,6 +8905,8 @@ type TokenConfig struct {
 	Admin              *types.PARTY                             `json:"admin" hex:"optional"`
 	PendingAdmin       *types.PARTY                             `json:"pendingAdmin" hex:"optional"`
 	TokenPool          *PoolRegistration                        `json:"tokenPool" hex:"optional"`
+	TransferFactory    *types.CONTRACT_ID                       `json:"transferFactory" hex:"optional"`
+	BurnMintFactory    *types.CONTRACT_ID                       `json:"burnMintFactory" hex:"optional"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -8632,6 +8977,30 @@ func (t TokenConfig) CreateCommand() *model.CreateCommand {
 		}
 	}
 
+	if t.TransferFactory != nil {
+		args["transferFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TransferFactory),
+		}
+	} else {
+		args["transferFactory"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	if t.BurnMintFactory != nil {
+		args["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.BurnMintFactory),
+		}
+	} else {
+		args["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -8691,6 +9060,30 @@ func (t TokenConfig) CreateCommandWithPackageID(packageID string) *model.CreateC
 		}
 	} else {
 		args["tokenPool"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	if t.TransferFactory != nil {
+		args["transferFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TransferFactory),
+		}
+	} else {
+		args["transferFactory"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	if t.BurnMintFactory != nil {
+		args["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.BurnMintFactory),
+		}
+	} else {
+		args["burnMintFactory"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}
@@ -8793,6 +9186,7 @@ type TokenReceiveTicket struct {
 	VerifiedCCVs                 []chainlinkapi.RawInstanceAddress        `json:"verifiedCCVs"`
 	RequiredInboundPoolCCVs      []chainlinkapi.RawInstanceAddress        `json:"requiredInboundPoolCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
+	PoolAddress                  chainlinkapi.RawInstanceAddress          `json:"poolAddress"`
 	PoolOwner                    types.PARTY                              `json:"poolOwner"`
 	Receiver                     types.PARTY                              `json:"receiver"`
 	TokenReceiver                types.PARTY                              `json:"tokenReceiver"`
@@ -8850,6 +9244,9 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["poolOwner"] = t.PoolOwner.ToMap()
@@ -8921,6 +9318,9 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["poolOwner"] = t.PoolOwner.ToMap()
@@ -9166,6 +9566,7 @@ func (t TokenReceiveTicketClaimed) ArchiveWithPackageID(contractID string, packa
 type TokenReceiveTicketClaimedEvent struct {
 	VerifiedCCVs                 []chainlinkapi.RawInstanceAddress        `json:"verifiedCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
+	PoolAddress                  chainlinkapi.RawInstanceAddress          `json:"poolAddress"`
 	InstrumentId                 splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	SourceAmount                 types.TEXT                               `json:"sourceAmount"`
 	LocalAmount                  types.NUMERIC                            `json:"localAmount"`
@@ -9189,6 +9590,8 @@ func (t TokenReceiveTicketClaimedEvent) ToMap() map[string]any {
 	}()
 
 	m["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
+
+	m["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
@@ -10232,12 +10635,18 @@ type MCMSEncoder interface {
 	RemoveFeeTokens(args RemoveFeeTokens) (*bind.EncodedChoice, error)
 	RemoveFeeTokensParams(args RemoveFeeTokensParams) (*bind.EncodedChoice, error)
 	RemovePriceUpdaters(args RemovePriceUpdaters) (*bind.EncodedChoice, error)
+	SetBurnMintFactory(args SetBurnMintFactory) (*bind.EncodedChoice, error)
+	SetBurnMintFactoryMCMSParams(args SetBurnMintFactoryMCMSParams) (*bind.EncodedChoice, error)
+	SetBurnMintFactoryParams(args SetBurnMintFactoryParams) (*bind.EncodedChoice, error)
 	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
 	SetInboundPoolCCVs(args SetInboundPoolCCVs) (*bind.EncodedChoice, error)
 	SetOutboundPoolCCVs(args SetOutboundPoolCCVs) (*bind.EncodedChoice, error)
 	SetPool(args SetPool) (*bind.EncodedChoice, error)
 	SetPoolMCMSParams(args SetPoolMCMSParams) (*bind.EncodedChoice, error)
 	SetPoolParams(args SetPoolParams) (*bind.EncodedChoice, error)
+	SetTransferFactory(args SetTransferFactory) (*bind.EncodedChoice, error)
+	SetTransferFactoryMCMSParams(args SetTransferFactoryMCMSParams) (*bind.EncodedChoice, error)
+	SetTransferFactoryParams(args SetTransferFactoryParams) (*bind.EncodedChoice, error)
 	TransferAdminRole(args TransferAdminRole) (*bind.EncodedChoice, error)
 	TransferAdminRoleMCMSParams(args TransferAdminRoleMCMSParams) (*bind.EncodedChoice, error)
 	Uncurse(args Uncurse) (*bind.EncodedChoice, error)
@@ -10660,6 +11069,21 @@ func (e *encoder) RemovePriceUpdaters(args RemovePriceUpdaters) (*bind.EncodedCh
 	return e.EncodeChoiceArgs("RemovePriceUpdaters", args)
 }
 
+// SetBurnMintFactory encodes parameters for the SetBurnMintFactory choice.
+func (e *encoder) SetBurnMintFactory(args SetBurnMintFactory) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetBurnMintFactory", args)
+}
+
+// SetBurnMintFactoryMCMSParams encodes MCMS parameters (without Caller) for the SetBurnMintFactory choice.
+func (e *encoder) SetBurnMintFactoryMCMSParams(args SetBurnMintFactoryMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetBurnMintFactory", args)
+}
+
+// SetBurnMintFactoryParams encodes parameters for the SetBurnMintFactory choice.
+func (e *encoder) SetBurnMintFactoryParams(args SetBurnMintFactoryParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetBurnMintFactory", args)
+}
+
 // SetConfig encodes parameters for the SetConfig choice.
 func (e *encoder) SetConfig(args SetConfig) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetConfig", args)
@@ -10688,6 +11112,21 @@ func (e *encoder) SetPoolMCMSParams(args SetPoolMCMSParams) (*bind.EncodedChoice
 // SetPoolParams encodes parameters for the SetPool choice.
 func (e *encoder) SetPoolParams(args SetPoolParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetPool", args)
+}
+
+// SetTransferFactory encodes parameters for the SetTransferFactory choice.
+func (e *encoder) SetTransferFactory(args SetTransferFactory) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetTransferFactory", args)
+}
+
+// SetTransferFactoryMCMSParams encodes MCMS parameters (without Caller) for the SetTransferFactory choice.
+func (e *encoder) SetTransferFactoryMCMSParams(args SetTransferFactoryMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetTransferFactory", args)
+}
+
+// SetTransferFactoryParams encodes parameters for the SetTransferFactory choice.
+func (e *encoder) SetTransferFactoryParams(args SetTransferFactoryParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetTransferFactory", args)
 }
 
 // TransferAdminRole encodes parameters for the TransferAdminRole choice.

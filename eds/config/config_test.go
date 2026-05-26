@@ -123,8 +123,9 @@ chain_selector = "8706591216959472610"
 			want: &Config{
 				ChainSelector: "8706591216959472610",
 				Server: ServerConfig{
-					Host: "0.0.0.0",
-					Port: 8088,
+					Host:                "0.0.0.0",
+					Port:                8088,
+					MaxRequestSizeBytes: (1 << 20) * 10, // Default
 				},
 				GlobalAPIConfig: GlobalAPIConfig{
 					MaxBatchSize: 1024, // Default
