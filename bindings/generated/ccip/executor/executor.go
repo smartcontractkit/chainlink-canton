@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "9e767d601da6109ce1f59dac705963f11e8dc4a2d5eca2d44839c5d0c8ac0ea6"
+	PackageID   = "1736bd792865ac814ebc0b2c2f08489d6de7c059fb18d38f765defda2c598392"
 	SDKVersion  = "3.4.11"
 )
 
@@ -268,6 +268,7 @@ func (t *ApplyDestChainUpdatesParams) UnmarshalHex(data string) error {
 
 // CalculateFee is a Record type
 type CalculateFee struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
 	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
@@ -277,6 +278,8 @@ type CalculateFee struct {
 // ToMap converts CalculateFee to a map for DAML arguments
 func (t CalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expectedExecutor"] = model.NestedToDAMLValue(t.ExpectedExecutor)
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
@@ -314,6 +317,7 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CalculateFeeMCMSParams struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
 	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
@@ -1019,6 +1023,7 @@ func (t *GetDynamicConfigMCMSParams) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
 	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
 	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
 	Caller            types.PARTY                       `json:"caller"`
@@ -1027,6 +1032,8 @@ type GetFee struct {
 // ToMap converts GetFee to a map for DAML arguments
 func (t GetFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expectedExecutor"] = model.NestedToDAMLValue(t.ExpectedExecutor)
 
 	m["destChainSelector"] = t.DestChainSelector
 
@@ -1068,6 +1075,7 @@ func (t *GetFee) UnmarshalHex(data string) error {
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type GetFeeMCMSParams struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
 	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
 	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
 }
