@@ -134,7 +134,7 @@ func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.Unkno
 		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
 			return cciptestinterfaces.MessageFields{
 					Receiver: receiver,
-					Data:     []byte(fmt.Sprintf("canton2evm load n=%d dest=%d", callNum, destSelector)),
+					Data:     fmt.Appendf(nil, "canton2evm load n=%d dest=%d", callNum, destSelector),
 				}, cciptestinterfaces.MessageOptions{
 					ExecutionGasLimit: 200_000,
 					FinalityConfig:    1,
@@ -165,7 +165,7 @@ func cantonLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.Un
 		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
 			return cciptestinterfaces.MessageFields{
 					Receiver: receiver,
-					Data:     []byte(fmt.Sprintf("evm2canton load n=%d dest=%d", callNum, destSelector)),
+					Data:     fmt.Appendf(nil, "evm2canton load n=%d dest=%d", callNum, destSelector),
 				}, cciptestinterfaces.MessageOptions{
 					ExecutionGasLimit: 200_000,
 					FinalityConfig:    0,

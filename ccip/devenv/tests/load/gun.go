@@ -37,6 +37,7 @@ func (d Destination) BuildMessage(
 		return cciptestinterfaces.MessageFields{}, cciptestinterfaces.MessageOptions{},
 			fmt.Errorf("destination %d: buildMessage not configured", d.Chain.ChainSelector())
 	}
+
 	return d.buildMessage(source, callNum, ccvAddr, executorAddr)
 }
 
