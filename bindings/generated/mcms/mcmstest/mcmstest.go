@@ -24,8 +24,8 @@ var (
 
 const (
 	PackageName = "mcms-test"
-	PackageID   = "633009c96676a8d3d5bc70cd60add4add04453bc4caf632800f1d00448abe5c2"
-	SDKVersion  = "3.4.10"
+	PackageID   = "d81c8e0b390e03c69c7fa85a47d370e312fd6e489a0373470b9d200c8d2e3617"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {

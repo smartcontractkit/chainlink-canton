@@ -4,7 +4,10 @@
 module TestToken where
 
 import DA.Action (foldlA)
+import DA.Optional (fromOptional)
+import DA.TextMap qualified as TextMap
 
+import Splice.Api.Token.BurnMintV1 qualified as BurnMintV1
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
@@ -21,6 +24,27 @@ template TestHolding
     signatory owner, admin
 
     interface instance HoldingV1.Holding for TestHolding where
+      view = HoldingV1.HoldingView with
+        owner
+        instrumentId
+        amount
+        lock = None
+        meta = MetadataV1.emptyMetadata
+
+-- | Holding fixture for malicious backend tests. The viewed owner does not need
+-- to be a signatory, which lets tests model a bad token backend returning
+-- inconsistent generic Holding views.
+template BadHolding
+  with
+    admin : Party
+    owner : Party
+    instrumentId : HoldingV1.InstrumentId
+    amount : Decimal
+  where
+    signatory admin
+    observer owner
+
+    interface instance HoldingV1.Holding for BadHolding where
       view = HoldingV1.HoldingView with
         owner
         instrumentId
@@ -138,12 +162,12 @@ template TestTransferInstruction
       transferInstruction_updateImpl _self _arg =
         abort "TestTransferInstruction: update not supported"
 
--- | TransferFactory (like ExternalPartyAmuletRules).
--- Checks for preapproval; if exists -> direct, else -> pending.
+-- Looks up the preapproval CID from extraArgs.context keyed by show(receiver).
+-- Callers pass preapprovals via feeTokenExtraArgs.context (CCIPSend) or via the
+-- transfer-factory-extra-args-context-values entry in the pool extraContext (LockOrBurn).
 template TestTransferFactory
   with
     admin : Party
-    preapprovalCid : Optional (ContractId TestTransferPreapproval)
   where
     signatory admin
 
@@ -156,12 +180,15 @@ template TestTransferFactory
 
         -- Check if this is a self-transfer or has preapproval
         let isSelfTransfer = transfer.sender == transfer.receiver
+        let preapprovalOpt = case TextMap.lookup (show transfer.receiver) arg.extraArgs.context.values of
+              Some (MetadataV1.AV_ContractId cid) -> Some (coerceContractId cid : ContractId TestTransferPreapproval)
+              _ -> None
 
-        case (isSelfTransfer, preapprovalCid) of
+        case (isSelfTransfer, preapprovalOpt) of
           -- Self-transfer: direct (like Canton Coin)
           (True, _) -> executeDirect admin transfer
 
-          -- Has preapproval: use it for direct transfer
+          -- Has preapproval in context: use it for direct transfer
           (False, Some paCid) -> do
             exercise paCid Send with
               sender = transfer.sender
@@ -175,12 +202,108 @@ template TestTransferFactory
       transferFactory_publicFetchImpl _self _arg =
         pure (view (toInterface @TransferV1.TransferFactory this))
 
-    -- Update preapproval reference
-    choice SetPreapproval : ContractId TestTransferFactory
-      with
-        newPreapprovalCid : Optional (ContractId TestTransferPreapproval)
-      controller admin
-      do create this with preapprovalCid = newPreapprovalCid
+template BadTransferInstruction
+  with
+    admin : Party
+    transfer : TransferV1.Transfer
+  where
+    signatory admin
+    observer transfer.sender, transfer.receiver
+
+    interface instance TransferV1.TransferInstruction for BadTransferInstruction where
+      view = TransferV1.TransferInstructionView with
+        originalInstructionCid = None
+        transfer
+        status = TransferV1.TransferPendingReceiverAcceptance
+        meta = MetadataV1.emptyMetadata
+
+      transferInstruction_acceptImpl _self _arg =
+        abort "BadTransferInstruction: accept not supported"
+
+      transferInstruction_rejectImpl _self _arg =
+        abort "BadTransferInstruction: reject not supported"
+
+      transferInstruction_withdrawImpl _self _arg =
+        abort "BadTransferInstruction: withdraw not supported"
+
+      transferInstruction_updateImpl _self _arg =
+        abort "BadTransferInstruction: update not supported"
+
+template BadTransferFactory
+  with
+    admin : Party
+    completedOwner : Optional Party
+    completedInstrumentId : Optional HoldingV1.InstrumentId
+    completedAmount : Optional Decimal
+    pendingTransfer : Optional TransferV1.Transfer
+  where
+    signatory admin
+
+    interface instance TransferV1.TransferFactory for BadTransferFactory where
+      view = TransferV1.TransferFactoryView with admin, meta = MetadataV1.emptyMetadata
+
+      transferFactory_transferImpl _self arg = do
+        assertMsg "BadTransferFactory: expectedAdmin mismatch" (arg.expectedAdmin == admin)
+        let transfer = arg.transfer
+        case pendingTransfer of
+          Some pending -> do
+            instrCid <- create BadTransferInstruction with
+              admin
+              transfer = pending
+            pure TransferV1.TransferInstructionResult with
+              senderChangeCids = []
+              output = TransferV1.TransferInstructionResult_Pending with
+                transferInstructionCid = toInterfaceContractId instrCid
+              meta = MetadataV1.emptyMetadata
+          None -> do
+            receiverCid <- create BadHolding with
+              admin
+              owner = fromOptional transfer.receiver completedOwner
+              instrumentId = fromOptional transfer.instrumentId completedInstrumentId
+              amount = fromOptional transfer.amount completedAmount
+            pure TransferV1.TransferInstructionResult with
+              senderChangeCids = []
+              output = TransferV1.TransferInstructionResult_Completed with
+                receiverHoldingCids = [toInterfaceContractId receiverCid]
+              meta = MetadataV1.emptyMetadata
+
+      transferFactory_publicFetchImpl _self _arg =
+        pure (view (toInterface @TransferV1.TransferFactory this))
+
+data BadBurnMintOutput = BadBurnMintOutput
+  with
+    owner : Party
+    instrumentId : HoldingV1.InstrumentId
+    amount : Decimal
+  deriving (Eq, Show)
+
+template BadBurnMintFactory
+  with
+    admin : Party
+    outputs : [BadBurnMintOutput]
+  where
+    signatory admin
+
+    interface instance BurnMintV1.BurnMintFactory for BadBurnMintFactory where
+      view = BurnMintV1.BurnMintFactoryView with admin, meta = MetadataV1.emptyMetadata
+
+      burnMintFactory_burnMintImpl _self arg = do
+        assertMsg "BadBurnMintFactory: expectedAdmin mismatch" (arg.expectedAdmin == admin)
+        outputCids <- foldlA
+          (\acc output -> do
+            cid <- create BadHolding with
+              admin
+              owner = output.owner
+              instrumentId = output.instrumentId
+              amount = output.amount
+            pure (acc ++ [toInterfaceContractId cid]))
+          []
+          outputs
+        pure BurnMintV1.BurnMintFactory_BurnMintResult with
+          outputCids
+
+      burnMintFactory_publicFetchImpl _self _arg =
+        pure (view (toInterface @BurnMintV1.BurnMintFactory this))
 
 -- Helper: Sum inputs, validate ownership/instrument, and archive them.
 sumAndArchiveInputs : Party -> Party -> HoldingV1.InstrumentId -> [ContractId HoldingV1.Holding] -> Update Decimal

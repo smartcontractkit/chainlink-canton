@@ -16,7 +16,7 @@ import (
 )
 
 // TODO: move this helper into ccv.Lib.
-func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, harness tcapi.TestHarness) cciptestinterfaces.CCIP17 {
+func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, lib ccv.Lib) cciptestinterfaces.CCIP17 {
 	var chain *blockchain.Input
 	for _, bc := range cfg.Blockchains {
 		if bc.Type == chainType {
@@ -39,7 +39,7 @@ func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, harness tcapi.TestHa
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chain.ChainID, family)
 	require.NoError(t, err)
 
-	chainMap, err := harness.Lib.ChainsMap(t.Context())
+	chainMap, err := lib.ChainsMap(t.Context())
 	require.NoError(t, err)
 
 	return chainMap[chainDetails.ChainSelector]
@@ -48,19 +48,25 @@ func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, harness tcapi.TestHa
 func AssertSingleVerifierResult(
 	t *testing.T,
 	ctx context.Context,
-	harness *tcapi.TestHarness,
+	lib ccv.Lib,
 	messageID [32]byte,
 ) tcapi.AssertionResult {
 	t.Helper()
 
-	chainMap, err := harness.Lib.ChainsMap(ctx)
+	chainMap, err := lib.ChainsMap(ctx)
+	require.NoError(t, err)
+
+	aggregatorClients, err := lib.AllAggregators()
+	require.NoError(t, err)
+	aggregatorClient := aggregatorClients[common.DefaultCommitteeVerifierQualifier]
+	indexerMonitor, err := lib.IndexerMonitor()
 	require.NoError(t, err)
 
 	testCtx, cleanupFn := tcapi.NewTestingContext(
 		ctx,
 		chainMap,
-		harness.AggregatorClients[common.DefaultCommitteeVerifierQualifier],
-		harness.IndexerMonitor,
+		aggregatorClient,
+		indexerMonitor,
 	)
 	defer cleanupFn()
 

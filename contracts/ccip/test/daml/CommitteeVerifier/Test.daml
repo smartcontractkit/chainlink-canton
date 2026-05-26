@@ -55,7 +55,7 @@ createExecMsg owner rmnOwner = submit owner do
         optionalCCVThreshold = 0
         receiverFinalityConfig = finalityConfig 0
         sourceDefaultCCVs = []
-        inboundPoolCCVs = None
+        inboundPoolVerification = None
         deps = CCIP.ExecutingMessageV1.ExecutingMessageDeps with
             offRamp = RawInstanceAddress.make "test-offramp" owner
             globalConfig = RawInstanceAddress.make "test-globalconfig" owner
@@ -758,3 +758,59 @@ testCommitteeVerifier_SetDynamicConfig = script do
     assertMsg "Message sent observers not updated correctly" (gotCCV.messageSentObservers == [owner, admin])
 
     pure ()
+
+-- VerifyMessage must reject an ExecutingMessageV1 whose ccipOwner differs
+-- from the verifier's, otherwise a verification produced under one ccipOwner domain could
+-- satisfy another domain's required verifier set because AddCCVVerification only records
+-- (ccvInstanceId, ccvOwner) without the ccipOwner.
+testVerifyMessage_RejectsCrossDomainExecutingMessage : Script ()
+testVerifyMessage_RejectsCrossDomainExecutingMessage = script do
+    owner <- allocateParty "owner"
+    otherCcipOwner <- allocateParty "other-ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
+
+    let rmnInstanceId = "test-rmn"
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = owner
+            customObservers = []
+            cursedSubjects = []
+
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    -- ExecutingMessageV1 is under `owner`'s ccipOwner domain.
+    executingMessageCid <- createExecMsg owner rmnOwner
+
+    let indices = [0]
+    let pubKeys = PayloadBuilder.getPubkeysForIndices indices
+    let verifierResults = PayloadBuilder.getVerifierResultsForIndices indices
+
+    -- Verifier is under a DIFFERENT ccipOwner domain.
+    ccvCid <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv-cross-domain"
+            owner = owner
+            ccipOwner = otherCcipOwner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys)]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
+        exerciseCmd ccvCid CommitteeVerifier.VerifyMessage with
+            rmnRemoteCid = rmnRemote
+            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            executingMessageCid = executingMessageCid
+            verifierResults = verifierResults
+            caller = owner
+
+    debug "testVerifyMessage_RejectsCrossDomainExecutingMessage: PASSED"
