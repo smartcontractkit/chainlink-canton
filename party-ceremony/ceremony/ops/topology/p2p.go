@@ -9,6 +9,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 
 	cryptov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/v30"
 	protov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"
@@ -119,11 +120,16 @@ var ProposeP2POp = operations.NewOperation(
 		// signatures from other participants as they also propose.
 		_, err = deps.Client.Authorize(ctx, 1, mapping, in.SynchronizerID, false)
 		if err != nil {
-			return ProposeP2POutput{}, fmt.Errorf("authorizing P2P mapping: %w", err)
+			if client.IsTopologyMappingAlreadyExists(err) {
+				deps.Logger.Infow("P2P mapping already exists",
+					"participant", in.ParticipantID, "party", in.PartyID)
+			} else {
+				return ProposeP2POutput{}, fmt.Errorf("authorizing P2P mapping: %w", err)
+			}
+		} else {
+			deps.Logger.Infow("P2P proposal submitted",
+				"participant", in.ParticipantID, "party", in.PartyID)
 		}
-
-		deps.Logger.Infow("P2P proposal submitted",
-			"participant", in.ParticipantID, "party", in.PartyID)
 
 		return ProposeP2POutput{
 			ParticipantID: in.ParticipantID,
