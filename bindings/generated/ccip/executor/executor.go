@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "1736bd792865ac814ebc0b2c2f08489d6de7c059fb18d38f765defda2c598392"
+	PackageID   = "80d9025c0c93f844d0cb8fc9cd3988b17d648823b036f12bf6caea1a3eec9e89"
 	SDKVersion  = "3.4.11"
 )
 
@@ -509,6 +509,27 @@ func (t *Executor) UnmarshalHex(data string) error {
 
 // Choice methods for Executor
 
+// ApplyDestChainUpdates exercises the ApplyDestChainUpdates choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) ApplyDestChainUpdates(contractID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "ApplyDestChainUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyDestChainUpdatesWithPackageID exercises the ApplyDestChainUpdates choice using the provided package ID instead of package name
+func (t Executor) ApplyDestChainUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "ApplyDestChainUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // CalculateFee exercises the CalculateFee choice on this Executor contract
 // This method uses the package name in the template ID
 func (t Executor) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
@@ -673,27 +694,6 @@ func (t Executor) GetAllowedFinalityConfigWithPackageID(contractID string, packa
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
 		Choice:     "GetAllowedFinalityConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyDestChainUpdates exercises the ApplyDestChainUpdates choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) ApplyDestChainUpdates(contractID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "ApplyDestChainUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyDestChainUpdatesWithPackageID exercises the ApplyDestChainUpdates choice using the provided package ID instead of package name
-func (t Executor) ApplyDestChainUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "ApplyDestChainUpdates",
 		Arguments:  argsToMap(args),
 	}
 }

@@ -432,6 +432,7 @@ template LockReleaseTokenPool
                     -- Reject configs with isEnabled: false - use disableTokenTransferFeeConfigs parameter instead.
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: must be enabled" (arg.isEnabled)
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: feeBps must be non-negative" (arg.feeBps >= 0.0)
+                    assertMsg ("ApplyTokenTransferFeeConfigUpdates: feeUSDCents must be non-negative: " <> show arg.feeUSDCents) (arg.feeUSDCents >= 0.0)
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: feeBps must be less than 10000" (arg.feeBps < bpsDenominator)
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: destBytesOverhead must be at least 32" (arg.destBytesOverhead >= 32)
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: destGasOverhead must be non-zero" (arg.destGasOverhead > 0)
