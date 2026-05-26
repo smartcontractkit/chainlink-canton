@@ -4552,6 +4552,19 @@ testLockReleaseTokenPool_ApplyTokenTransferFeeConfigUpdates = script do
                     destBytesOverhead = 32
                 ]
             disableTokenTransferFeeConfigArgs = []
+    -- Test invalid feeBps (at max bps denominator)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyTokenTransferFeeConfigUpdates with
+            tokenTransferFeeConfigArgs = [
+                LockReleaseTokenPool.TokenTransferFeeConfigArgs with
+                    destChainSelector = 123.0
+                    isEnabled = True
+                    feeUSDCents = cents 1.0
+                    feeBps = 10000.0 -- invalid, must be less than 10000
+                    destGasOverhead = 21000
+                    destBytesOverhead = 32
+                ]
+            disableTokenTransferFeeConfigArgs = []
     -- Test invalid feeBps (too high)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyTokenTransferFeeConfigUpdates with
