@@ -392,23 +392,25 @@ type verifierResult struct {
 	CCVData                []byte
 }
 
+// verifierAssertTimeout maps ConfirmExecOnDest's timeout to the verifier poll window.
+func verifierAssertTimeout(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return 5 * time.Minute
+	}
+
+	return timeout
+}
+
 // fetchVerifierResult queries the aggregator + indexer for the verifier output for
 // messageID. Caller must have wired [VerifierObservation] on the chain first.
-func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Bytes32) (verifierResult, error) {
+func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Bytes32, timeout time.Duration) (verifierResult, error) {
 	if !c.verifierObs.wired() {
 		return verifierResult{}, fmt.Errorf("verifier observation not wired")
 	}
 
-	// Use the deadline carried on ctx if any, else fall back to a sane default.
-	timeout := 5 * time.Minute
-	if dl, ok := ctx.Deadline(); ok {
-		if d := time.Until(dl); d > 0 && d < timeout {
-			timeout = d
-		}
-	}
 	res, err := AssertMessageWithVerifierObservation(ctx, c.verifierObs, messageID, tcapi.AssertMessageOptions{
 		TickInterval:            time.Second,
-		Timeout:                 timeout,
+		Timeout:                 verifierAssertTimeout(timeout),
 		ExpectedVerifierResults: 1,
 		AssertVerifierLogs:      false,
 		AssertExecutorLogs:      false,
