@@ -10,7 +10,7 @@ concurrency:
 jobs:
   test-deploy-chain-contracts:
     name: TestDeployChainContracts
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -25,7 +25,7 @@ jobs:
           go test -v -count 1 -timeout 20m -run TestDeployChainContracts ./...
   test-deploy-coin:
     name: TestDeployCoin
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -40,7 +40,7 @@ jobs:
           go test -v -count 1 -timeout 20m -run TestDeployCoin ./...
   test-deploy-tps:
     name: TestDeployTokenPool
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
