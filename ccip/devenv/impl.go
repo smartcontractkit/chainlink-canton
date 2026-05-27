@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -191,6 +192,15 @@ type Chain struct {
 	nextFeeCID              string // holding CID to be used as fee on next message send
 	transferTokenInstrument *splice_api_token_holding_v1.InstrumentId
 	nextTransferCID         string // holding CID to be used as transfer on next message send
+
+	// verifierObs is injected post-construction by test runners (see SetVerifierObservation).
+	// Required by ConfirmExecOnDest to fetch verifier results from aggregator/indexer.
+	verifierObs VerifierObservation
+
+	// partyMutexes serializes manual execution per receiver party so that
+	// concurrent ConfirmExecOnDest calls cannot race on PerPartyRouter CID consumption.
+	partyMutexes   map[string]*sync.Mutex
+	partyMutexesMu sync.Mutex
 }
 
 type validatorAPIClients struct {
@@ -218,12 +228,14 @@ func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, 
 		chain:        chain,
 		chainDetails: chainDetails,
 		logger:       logger,
+		partyMutexes: make(map[string]*sync.Mutex),
 	}, nil
 }
 
 func NewEmptyCCIP17Canton(logger zerolog.Logger) *Chain {
 	return &Chain{
-		logger: logger,
+		logger:       logger,
+		partyMutexes: make(map[string]*sync.Mutex),
 	}
 }
 
@@ -851,13 +863,65 @@ func (c *Chain) ConfirmSendOnSource(ctx context.Context, to uint64, key cciptest
 }
 
 // ConfirmExecOnDest implements cciptestinterfaces.CCIP17.
+//
+// Canton has no executor service today, so finalization on Canton dest happens
+// via ManuallyExecuteMessage. To keep the gun and e2e tests direction-agnostic,
+// this method drives the full path:
+//  1. Lock per receiver party (PerPartyRouter CID is consumed on every Execute).
+//  2. Idempotency: if an ExecutionStateChanged for (from, seqNo, messageID) already
+//     exists on the ledger, parse and return it without re-executing.
+//  3. Otherwise fetch the verifier result via verifier observation (aggregator +
+//     indexer), translate the verifier dest address to its hashed instance address,
+//     and call ManuallyExecuteMessage.
+//
+// Both SeqNum AND MessageID must be set on key: they key the idempotency lookup and
+// the verifier-result fetch respectively. EVM-side ConfirmExecOnDest is permissive
+// and accepts either; Canton requires both. Test runners must wire verifier
+// observation (see WireVerifierObservationFromLib) before calling this method.
 func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptestinterfaces.MessageEventKey, timeout time.Duration) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	if key.MessageID == (protocol.Bytes32{}) && key.SeqNum == 0 {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("MessageEventKey must have MessageID or SeqNum set")
+	if key.MessageID == (protocol.Bytes32{}) || key.SeqNum == 0 {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("MessageEventKey must have both MessageID and SeqNum")
 	}
-	// Canton destination execution is driven by ManuallyExecuteMessage in current tests; on-chain
-	// ExecutionStateChanged polling is not wired yet.
-	return cciptestinterfaces.ExecutionStateChangedEvent{}, nil // TODO: implement on-chain confirmation
+	if !c.verifierObs.wired() {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("verifier observation not wired (test runner must call WireVerifierObservationFromLib)")
+	}
+	if len(c.chain.Participants) == 0 {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no participants on chain")
+	}
+
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	receiverParty := c.chain.Participants[0].PartyID
+	unlock := c.lockForParty(receiverParty)
+	defer unlock()
+
+	if ev, found, err := c.findExistingExecutionState(ctx, from, key.SeqNum, key.MessageID); err != nil {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("idempotency lookup: %w", err)
+	} else if found {
+		c.logger.Info().
+			Uint64("from", from).
+			Uint64("seqNo", key.SeqNum).
+			Str("messageID", hex.EncodeToString(key.MessageID[:])).
+			Str("state", ev.State.String()).
+			Msg("ConfirmExecOnDest idempotent return: ExecutionStateChanged already present")
+
+		return ev, nil
+	}
+
+	vr, err := c.fetchVerifierResult(ctx, key.MessageID)
+	if err != nil {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("fetch verifier result: %w", err)
+	}
+
+	return c.ManuallyExecuteMessage(
+		ctx, vr.Message, 0,
+		[]protocol.UnknownAddress{vr.HashedVerifierDestAddr},
+		[][]byte{vr.CCVData},
+	)
 }
 
 // SetupSend sets up Canton sender specific prerequisites for sending a message.

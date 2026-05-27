@@ -167,7 +167,7 @@ func (g *Canton2EVMGun) Call(gen *wasp.Generator) *wasp.Response {
 	ev, err := dest.Chain.ConfirmExecOnDest(
 		subtestCtx,
 		g.cantonChain.ChainSelector(),
-		cciptestinterfaces.MessageEventKey{SeqNum: seqNo},
+		cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID},
 		g.confirmExecTimeout,
 	)
 	if err != nil {
