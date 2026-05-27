@@ -238,7 +238,7 @@ func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64,
 	b.Reset()
 
 	var lastErr error
-	for attempt := 0; ; attempt++ {
+	for attempt := 1; ; attempt++ {
 		stream, err := s.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
 			BeginExclusive: offset,
 			EndInclusive:   nil, // not set, stream will not terminate
@@ -253,8 +253,9 @@ func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64,
 			},
 		})
 		if err != nil {
-			if streamConfig.MaxRetries > 0 && attempt > streamConfig.MaxRetries {
-				return nil, fmt.Errorf("max retries reached: %w", lastErr)
+			// If MaxRetries is enabled/non-zero and the maximum number of retries has been reached, return an error.
+			if streamConfig.MaxRetries > 0 && attempt >= streamConfig.MaxRetries {
+				return nil, fmt.Errorf("max retries (%v) reached: %w", streamConfig.MaxRetries, lastErr)
 			}
 
 			wait := b.Duration()
