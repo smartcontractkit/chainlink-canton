@@ -246,7 +246,9 @@ template CommitteeVerifier
                 -- number of signer keys >= threshold, and signer keys are unique.
                 assertMsg "invalid signature config: threshold must be > 0, signerKeys must be >= threshold, and signerKeys must be unique"
                     (all isValidSignatureConfig signatureConfigs)
-                let newSignerConfigs = foldr (\config acc -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
+                -- @dev Last signers update wins. If a source chain selector is repeated in `signatureConfigs` then the last one will be the state set.
+                let newSignerConfigs =
+                        foldl (\acc config -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
                 create this with signerConfigs = newSignerConfigs
 
         -- | Update dependencies selectively (None = keep existing)
