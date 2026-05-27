@@ -8,13 +8,13 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -23,8 +23,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton ImplFactory
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -39,32 +40,15 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		t.Skip("skipping EVM2Canton_Basic test in short mode")
 	}
 
-	// Register the Canton impl factory so the shared CCV harness can resolve the
-	// Canton family to this repo's devenv/test implementation.
-	ccv.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
-
 	configPath := "../../env-canton-evm-out.toml"
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 
-	ctx := ccv.Plog.WithContext(t.Context())
-	harness, err := tcapi.NewTestHarness(
-		ctx,
-		configPath,
-		in,
-		chainsel.FamilyEVM,
-		chainsel.FamilyCanton,
-	)
+	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath)
 	require.NoError(t, err)
 
-	srcChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, harness)
-	dstChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
-
-	for _, client := range harness.AggregatorClients {
-		t.Cleanup(func() {
-			client.Close()
-		})
-	}
+	srcChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, lib)
+	dstChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, lib)
 
 	t.Cleanup(func() {
 		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
@@ -84,8 +68,10 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	receiver, err := dstChain.GetEOAReceiverAddress()
 	require.NoError(t, err)
 
+	ds, err := lib.DataStore()
+	require.NoError(t, err)
 	ccvAddr, err := tcapi.GetContractAddress(
-		in,
+		ds,
 		srcSelector,
 		datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
 		versioned_verifier_resolver.Version.String(),
@@ -95,7 +81,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	require.NoError(t, err)
 
 	executorAddress, err := tcapi.GetContractAddress(
-		in,
+		ds,
 		srcSelector,
 		datastore.ContractType(sequences.ExecutorProxyType),
 		proxy.Deploy.Version(),
@@ -132,10 +118,12 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NotNil(t, sentEvent.Message)
 		require.Nil(t, sentEvent.Message.TokenTransfer)
 
-		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
+		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, lib, sentEvent.MessageID)
 		vr := result.IndexedVerifications.Results[0].VerifierResult
-		message, verifierDestAddress, ccvData := vr.Message, vr.VerifierDestAddress, vr.CCVData
+
+		message, verifierDestAddress, ccvData := vr.Message, getHashedInstanceAddress(t, vr.VerifierDestAddress), vr.CCVData
 		require.Nil(t, message.TokenTransfer)
+
 		executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(subtestCtx, message, 0, []protocol.UnknownAddress{verifierDestAddress}, [][]byte{ccvData})
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
@@ -144,7 +132,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	t.Run("token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		tokenRef, err := in.CLDF.DataStore.Addresses().Get(
+		tokenRef, err := ds.Addresses().Get(
 			datastore.NewAddressRefKey(
 				srcSelector,
 				datastore.ContractType("BurnMintERC20WithDripToken"),
@@ -186,9 +174,11 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NotNil(t, sentEvent.Message)
 		require.NotNil(t, sentEvent.Message.TokenTransfer)
 
-		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, &harness, sentEvent.MessageID)
+		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, lib, sentEvent.MessageID)
 		vr := result.IndexedVerifications.Results[0].VerifierResult
-		message, verifierDestAddress, ccvData := vr.Message, vr.VerifierDestAddress, vr.CCVData
+
+		message, verifierDestAddress, ccvData := vr.Message, getHashedInstanceAddress(t, vr.VerifierDestAddress), vr.CCVData
+
 		require.NotNil(t, message.TokenTransfer)
 		require.NotNil(t, message.TokenTransfer.Amount)
 		t.Logf("Canton token transfer amount from verifier result: %s", message.TokenTransfer.Amount.String())
@@ -210,4 +200,19 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NotNil(t, dstBalanceAfter)
 		t.Logf("Token balances after execute: evm_sender=%s canton_receiver=%s", srcBalanceAfter.String(), dstBalanceAfter.String())
 	})
+}
+
+// VerifierDestAddress is the raw instance address of the committee verifier on Canton,
+// after being hex-encoded.
+// Therefore, to get the hashed instance address and get the disclosure from EDS, we need to do
+// the following:
+// 1. Convert the raw instance address bytes to a string.
+// 2. Convert the string to a raw instance address.
+// 3. Get the instance address from the raw instance address.
+func getHashedInstanceAddress(t *testing.T, rawInstanceAddressBytes protocol.UnknownAddress) protocol.UnknownAddress {
+	rawInstanceAddressStr := string(rawInstanceAddressBytes.Bytes())
+	rawInstanceAddress, err := contracts.RawInstanceAddressFromString(rawInstanceAddressStr)
+	require.NoError(t, err)
+
+	return protocol.UnknownAddress(rawInstanceAddress.InstanceAddress().Bytes())
 }

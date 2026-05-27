@@ -28,8 +28,11 @@ import CCIP.LockReleaseTokenPoolCodecGen (
     decodeApplyTokenTransferFeeConfigUpdatesParamsAt,
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
+    decodeAddPoolReceiveContextNonContractValueParamsAt,
+    decodeAddPoolReceiveContextContractValueParamsAt,
+    decodeRemovePoolReceiveContextValueParamsAt,
     )
-import CCIP.ContextCodec (decodeChoiceContextAt)
+import CCIP.ContextCodec (decodeAnyValueAt)
 import CCIP.LockReleaseTokenPoolTypes (
     TokenTransferFeeConfig(..),
     RemoteChainConfig(..),
@@ -42,6 +45,9 @@ import CCIP.LockReleaseTokenPoolTypes (
     ApplyTokenTransferFeeConfigUpdatesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
+    AddPoolReceiveContextNonContractValueParams(..),
+    AddPoolReceiveContextContractValueParams(..),
+    RemovePoolReceiveContextValueParams(..),
     )
 
 import qualified Splice.Api.Token.HoldingV1
@@ -122,13 +128,66 @@ calculateLocalAmount remoteAmount remoteDecimals localDecimals =
         remoteDecimals
         localDecimals
 
-sumHoldingAmounts : [ContractId Splice.Api.Token.HoldingV1.Holding] -> Update Decimal
-sumHoldingAmounts =
+assertHoldingMatches
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.HoldingV1.Holding
+    -> Update Splice.Api.Token.HoldingV1.HoldingView
+assertHoldingMatches prefix expectedOwner expectedInstrumentId cid = do
+    holding <- fetch cid
+    let hv = view holding
+    assertMsg (prefix <> ": holding owner mismatch")
+        (hv.owner == expectedOwner)
+    assertMsg (prefix <> ": holding instrumentId mismatch")
+        (hv.instrumentId == expectedInstrumentId)
+    pure hv
+
+sumCheckedHoldingAmounts
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update Decimal
+sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId =
     foldlA
         (\acc cid -> do
-            holding <- fetch cid
-            pure (acc + (view holding).amount))
+            hv <- assertHoldingMatches prefix expectedOwner expectedInstrumentId cid
+            pure (acc + hv.amount))
         0.0
+
+assertHoldingsMatchAndSum
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> Decimal
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update ()
+assertHoldingsMatchAndSum prefix expectedOwner expectedInstrumentId expectedAmount cids = do
+    actualAmount <- sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId cids
+    assertMsg (prefix <> ": holding amount mismatch")
+        (actualAmount == expectedAmount)
+
+assertTransferInstructionMatches
+    : Text
+    -> Party
+    -> Party
+    -> Decimal
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+    -> Update ()
+assertTransferInstructionMatches prefix expectedSender expectedReceiver expectedAmount expectedInstrumentId instrCid = do
+    instr <- fetch instrCid
+    let instrView = view instr
+    let transfer = instrView.transfer
+    assertMsg (prefix <> ": pending transfer sender mismatch")
+        (transfer.sender == expectedSender)
+    assertMsg (prefix <> ": pending transfer receiver mismatch")
+        (transfer.receiver == expectedReceiver)
+    assertMsg (prefix <> ": pending transfer amount mismatch")
+        (transfer.amount == expectedAmount)
+    assertMsg (prefix <> ": pending transfer instrumentId mismatch")
+        (transfer.instrumentId == expectedInstrumentId)
 
 assertRateLimiter
     : Text
@@ -378,7 +437,8 @@ template LockReleaseTokenPool
                     -- Reject configs with isEnabled: false - use disableTokenTransferFeeConfigs parameter instead.
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: must be enabled" (arg.isEnabled)
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: feeBps must be non-negative" (arg.feeBps >= 0.0)
-                    assertMsg "ApplyTokenTransferFeeConfigUpdates: feeBps must be less than 10000" (arg.feeBps <= bpsDenominator)
+                    assertMsg ("ApplyTokenTransferFeeConfigUpdates: feeUSDCents must be non-negative: " <> show arg.feeUSDCents) (arg.feeUSDCents >= 0.0)
+                    assertMsg "ApplyTokenTransferFeeConfigUpdates: feeBps must be less than 10000" (arg.feeBps < bpsDenominator)
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: destBytesOverhead must be at least 32" (arg.destBytesOverhead >= 32)
                     assertMsg "ApplyTokenTransferFeeConfigUpdates: destGasOverhead must be non-zero" (arg.destGasOverhead > 0)
                 
@@ -440,15 +500,44 @@ template LockReleaseTokenPool
                 create this with
                     remoteChainConfigs = remoteChainConfigsUpdated
 
-        -- Set the pool receive context (for preapproval CIDs in Splice token patterns).
+        -- Add or replace one receive-context entry with a non-contract AnyValue (for preapproval CIDs in Splice token patterns).
         -- The context is merged into extraArgs for inbound transfers.
-        --
-        -- Callable by poolOwner
-        choice SetPoolReceiveContext : ContractId LockReleaseTokenPool
+        choice AddPoolReceiveContextNonContractValue : ContractId LockReleaseTokenPool
             with
-                newPoolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                contextKey : Text
+                value : Splice.Api.Token.MetadataV1.AnyValue
             controller poolOwner
-            do create this with poolReceiveContext = newPoolReceiveContext
+            do
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.insert contextKey value poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        -- Add or replace one receive-context entry with AV_ContractId from an already-resolved ContractId ().
+        -- (for preapproval CIDs in Splice token patterns).
+        -- The context is merged into extraArgs for inbound transfers.
+        choice AddPoolReceiveContextContractValue : ContractId LockReleaseTokenPool
+            with
+                contextKey : Text
+                referredContract : ContractId ()
+            controller poolOwner
+            do
+                let av = Splice.Api.Token.MetadataV1.AV_ContractId (coerceContractId referredContract)
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.insert contextKey av poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        choice RemovePoolReceiveContextValue : ContractId LockReleaseTokenPool
+            with
+                contextKey : Text
+            controller poolOwner
+            do
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.delete contextKey poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        choice ClearPoolReceiveContext : ContractId LockReleaseTokenPool
+            controller poolOwner
+            do create this with poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         -- Set the transfer timeout for pending TransferInstructions.
         -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
@@ -577,6 +666,11 @@ template LockReleaseTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                config <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                        tokenConfigCid
+                        instrumentId = instrumentId
+                        caller = poolOwner
                 assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
                     (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
                 assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
@@ -586,6 +680,11 @@ template LockReleaseTokenPool
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "ReleaseFromTicket: ticket instrument must match pool instrument"
                     (ticket.instrumentId == instrumentId)
+                let poolAddress = RawInstanceAddress.make instanceId poolOwner
+                assertMsg "ReleaseFromTicket: ticket pool owner mismatch"
+                    (ticket.poolOwner == poolOwner)
+                assertMsg "ReleaseFromTicket: ticket pool address mismatch"
+                    (ticket.poolAddress == poolAddress)
 
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = poolOwner
@@ -652,11 +751,21 @@ template LockReleaseTokenPool
                         tokenConfigCid
                         ticketCid = tokenReceiveTicketCid
                         instrumentId = instrumentId
+                        poolInstanceId = instanceId
                         caller = poolOwner
 
                 -- Get inputs from extraContext
                 tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                _ <- sumCheckedHoldingAmounts
+                    "ReleaseFromTicket: tokenPoolHoldings"
+                    poolOwner
+                    instrumentId
+                    tokenPoolHoldings
                 transferFactory <- lookupTransferFactory extraContext
+                CCIP.TokenAdminRegistry.assertConfiguredTransferFactory
+                    "ReleaseFromTicket"
+                    config
+                    transferFactory
                 extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
 
@@ -691,6 +800,12 @@ template LockReleaseTokenPool
                 case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids -> do
                         assertMsg "ReleaseFromTicket: transfer completed with no receiver holdings" (not (null receiverCids))
+                        assertHoldingsMatchAndSum
+                            "ReleaseFromTicket: receiver holdings"
+                            ticket.tokenReceiver
+                            instrumentId
+                            amountDecimal
+                            receiverCids
                         let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
                                 receiverHoldingCids = receiverCids
                         let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Completed with
@@ -705,6 +820,7 @@ template LockReleaseTokenPool
                             event = CCIP.Events.TokenReceiveTicketClaimedEvent with
                                 verifiedCCVs = ticket.verifiedCCVs
                                 tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                poolAddress = ticket.poolAddress
                                 instrumentId = ticket.instrumentId
                                 sourceAmount = ticket.amount
                                 localAmount = localAmount
@@ -718,6 +834,13 @@ template LockReleaseTokenPool
                             poolChangeCids = transferResult.senderChangeCids
                             claimedEventCid
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
+                        assertTransferInstructionMatches
+                            "ReleaseFromTicket"
+                            poolOwner
+                            ticket.tokenReceiver
+                            amountDecimal
+                            instrumentId
+                            instrCid
                         let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
                                 transferInstructionCid = instrCid
                         let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Pending with
@@ -732,6 +855,7 @@ template LockReleaseTokenPool
                             event = CCIP.Events.TokenReceiveTicketClaimedEvent with
                                 verifiedCCVs = ticket.verifiedCCVs
                                 tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                poolAddress = ticket.poolAddress
                                 instrumentId = ticket.instrumentId
                                 sourceAmount = ticket.amount
                                 localAmount = localAmount
@@ -865,6 +989,11 @@ template LockReleaseTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                config <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                        tokenConfigCid
+                        instrumentId
+                        caller = poolOwner
                 assertMsg "LockOrBurn: sending message ccipOwner mismatch"
                     (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
@@ -887,6 +1016,10 @@ template LockReleaseTokenPool
                 let destTokenAddr = remoteChainCfg.remoteTokenAddress
 
                 let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
+                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
+                        _ -> 0.0
+                let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
 
                 let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
                 rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
@@ -900,11 +1033,25 @@ template LockReleaseTokenPool
                     expectedRateLimiter
                     rateLimiter
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
-                    requested = amountNumeric0
+                    requested = amountAfterFeeBps
 
                 -- Get inputs from extraContext
                 tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                _ <- sumCheckedHoldingAmounts
+                    "LockOrBurn: existing tokenPoolHoldings"
+                    poolOwner
+                    instrumentId
+                    tokenPoolHoldings
+                _ <- sumCheckedHoldingAmounts
+                    "LockOrBurn: sender input holdings"
+                    caller
+                    instrumentId
+                    senderInputCids
                 transferFactory <- lookupTransferFactory extraContext
+                CCIP.TokenAdminRegistry.assertConfiguredTransferFactory
+                    "LockOrBurn"
+                    config
+                    transferFactory
                 extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
 
@@ -938,16 +1085,15 @@ template LockReleaseTokenPool
                 receiverCids <- case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
                             completedReceiverCids -> do
-                        receivedAmount <- sumHoldingAmounts completedReceiverCids
-                        assertMsg "LockOrBurn: receiver holdings amount mismatch"
-                            (receivedAmount == amount)
+                        assertHoldingsMatchAndSum
+                            "LockOrBurn: receiver holdings"
+                            poolOwner
+                            instrumentId
+                            amount
+                            completedReceiverCids
                         pure completedReceiverCids
                     _ -> abort "LockOrBurn: transfer did not complete directly"
 
-                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
-                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
-                        _ -> 0.0
-                let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
                 let amountAfterFeeBpsBytes = fromSomeNote
                         "LockOrBurn: amountAfterFeeBps does not fit uint256"
                         (CCIP.Uint256.numeric0ToUint256Bytes amountAfterFeeBps)
@@ -1015,14 +1161,39 @@ template LockReleaseTokenPool
                             rateLimitConfigArgs
                             caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-                "SetPoolReceiveContext" -> do
-                    case decodeChoiceContextAt operationData 0 of
-                        None -> abort "E_INVALID_PARAMS: SetPoolReceiveContext"
-                        Some (newPoolReceiveContext, finalOffset) -> do
-                            assertMsg "E_TRAILING_BYTES: SetPoolReceiveContext" (finalOffset == byteCount operationData)
-                            newCid <- exercise selfCid SetPoolReceiveContext with
-                                newPoolReceiveContext
+                "AddPoolReceiveContextNonContractValue" -> do
+                    case decodeAddPoolReceiveContextNonContractValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue"
+                        Some (AddPoolReceiveContextNonContractValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue" (finalOffset == byteCount operationData)
+                            (value, innerOff) <- case decodeAnyValueAt valuePayload 0 of
+                                None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue:valuePayload"
+                                Some p -> pure p
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue:valuePayload" (innerOff == byteCount valuePayload)
+                            newCid <- exercise selfCid AddPoolReceiveContextNonContractValue with contextKey, value
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "AddPoolReceiveContextContractValue" -> do
+                    case decodeAddPoolReceiveContextContractValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextContractValue"
+                        Some (AddPoolReceiveContextContractValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextContractValue" (finalOffset == byteCount operationData)
+                            let refAddr = RawInstanceAddress.toText referentInstanceAddress
+                            referred <- case Map.lookup refAddr contractIds of
+                                None -> abort ("E_REFERENT_CONTRACT_NOT_IN_MAP: " <> refAddr)
+                                Some c -> pure c
+                            newCid <- exercise selfCid AddPoolReceiveContextContractValue with contextKey, referredContract = referred
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "RemovePoolReceiveContextValue" -> do
+                    case decodeRemovePoolReceiveContextValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: RemovePoolReceiveContextValue"
+                        Some (RemovePoolReceiveContextValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: RemovePoolReceiveContextValue" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid RemovePoolReceiveContextValue with contextKey
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "ClearPoolReceiveContext" -> do
+                    assertMsg "E_TRAILING_BYTES: ClearPoolReceiveContext" (byteCount operationData == 0)
+                    newCid <- exercise selfCid ClearPoolReceiveContext
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "SetTransferTimeout" -> do
                     case decodeSetTransferTimeoutParamsAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: SetTransferTimeout"
