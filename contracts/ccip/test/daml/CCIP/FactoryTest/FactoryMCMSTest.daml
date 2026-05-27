@@ -10,6 +10,7 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.Factory
+import qualified CCIP.CommitteeVerifier
 import CCIP.FinalityConfig qualified as FinalityCodec
 import qualified Splice.Api.Token.HoldingV1
 import qualified Link.Token
@@ -617,7 +618,7 @@ testDeployCommitteeVerifier_MCMS = script do
         instanceId = "ccv-1"
         owner = mcmsParty
         ccipOwner = mcmsParty
-        versionTag = "01020304"
+        versionTag = CCIP.CommitteeVerifier.versionTagV2_0_0
         allowListAdmin = None
         messageSentObservers = [mcmsParty]
         rmnRemote = RawInstanceAddress "rmn@owner"
