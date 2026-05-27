@@ -282,6 +282,10 @@ func ReceiveFromStream[T any](ctx context.Context, stream grpc.ServerStreamingCl
 	go func() {
 		defer close(respChan)
 		defer close(errChan)
+		defer func(stream grpc.ServerStreamingClient[T]) {
+			// CloseSend always returns a nil error.
+			_ = stream.CloseSend()
+		}(stream)
 
 		for {
 			resp, err := stream.Recv()
