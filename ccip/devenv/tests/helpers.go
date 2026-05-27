@@ -2,11 +2,9 @@ package tests
 
 import (
 	"context"
-	"math/big"
 	"testing"
 	"time"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
@@ -18,7 +16,7 @@ import (
 )
 
 // TODO: move this helper into ccv.Lib.
-func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, harness tcapi.TestHarness) cciptestinterfaces.CCIP17 {
+func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, lib ccv.Lib) cciptestinterfaces.CCIP17 {
 	var chain *blockchain.Input
 	for _, bc := range cfg.Blockchains {
 		if bc.Type == chainType {
@@ -41,7 +39,7 @@ func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, harness tcapi.TestHa
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chain.ChainID, family)
 	require.NoError(t, err)
 
-	chainMap, err := harness.Lib.ChainsMap(t.Context())
+	chainMap, err := lib.ChainsMap(t.Context())
 	require.NoError(t, err)
 
 	return chainMap[chainDetails.ChainSelector]
@@ -50,19 +48,25 @@ func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, harness tcapi.TestHa
 func AssertSingleVerifierResult(
 	t *testing.T,
 	ctx context.Context,
-	harness *tcapi.TestHarness,
+	lib ccv.Lib,
 	messageID [32]byte,
 ) tcapi.AssertionResult {
 	t.Helper()
 
-	chainMap, err := harness.Lib.ChainsMap(ctx)
+	chainMap, err := lib.ChainsMap(ctx)
+	require.NoError(t, err)
+
+	aggregatorClients, err := lib.AllAggregators()
+	require.NoError(t, err)
+	aggregatorClient := aggregatorClients[common.DefaultCommitteeVerifierQualifier]
+	indexerMonitor, err := lib.IndexerMonitor()
 	require.NoError(t, err)
 
 	testCtx, cleanupFn := tcapi.NewTestingContext(
 		ctx,
 		chainMap,
-		harness.AggregatorClients[common.DefaultCommitteeVerifierQualifier],
-		harness.IndexerMonitor,
+		aggregatorClient,
+		indexerMonitor,
 	)
 	defer cleanupFn()
 
@@ -78,31 +82,4 @@ func AssertSingleVerifierResult(
 	require.Len(t, result.IndexedVerifications.Results, 1)
 
 	return result
-}
-
-func HoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
-	var total float64
-
-	for _, h := range holdings {
-		views := h.GetCreatedEvent().GetInterfaceViews()
-		if len(views) == 0 || views[0].GetViewValue() == nil {
-			continue
-		}
-
-		fields := views[0].GetViewValue().GetFields()
-		if len(fields) < 3 {
-			continue
-		}
-
-		balanceStr := fields[2].GetValue().GetNumeric()
-		balance, ok := new(big.Float).SetString(balanceStr)
-		if !ok {
-			continue
-		}
-
-		v, _ := balance.Float64()
-		total += v
-	}
-
-	return total
 }

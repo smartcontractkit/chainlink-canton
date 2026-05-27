@@ -21,21 +21,23 @@ import qualified CCIP.PerPartyRouter
 import qualified CCIP.PerPartyRouterTypes
 import qualified CCIP.RMNRemote
 import qualified CCIP.TokenAdminRegistry
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 mkContext
     : ContractId CCIP.RMNRemote.RMNRemote
     -> ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
     -> ContractId CCIP.GlobalConfig.GlobalConfig
     -> ContractId CCIP.OffRamp.OffRamp
-    -> CCIP.Context.CCIPContext
+    -> MetadataV1.ChoiceContext
 mkContext rmnRemoteCid tokenAdminRegistryCid globalConfigCid offRampCid =
-    CCIP.Context.CCIPContext with
+    MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId (coerceContractId rmnRemoteCid))
-            , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId (coerceContractId tokenAdminRegistryCid))
-            , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId (coerceContractId globalConfigCid))
-            , (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId (coerceContractId offRampCid))
+            [ (CCIP.Context.rmnRemoteKey, MetadataV1.AV_ContractId (coerceContractId rmnRemoteCid))
+            , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId (coerceContractId tokenAdminRegistryCid))
+            , (CCIP.GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId (coerceContractId globalConfigCid))
+            , (CCIP.OffRamp.offRampKey, MetadataV1.AV_ContractId (coerceContractId offRampCid))
             ]
 
 testReceiverGetRequiredCCVsMatchesPrepareExecute : Script ()

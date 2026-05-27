@@ -6,10 +6,12 @@ import (
 	"math/big"
 	"strings"
 
-	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
+	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/extensionapi"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
+	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/api"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,9 +28,9 @@ var (
 )
 
 const (
-	PackageName = "ccip-burnminttokenpool"
-	PackageID   = "b1a59fbacabeece99080e2ba7e2a94b251764982d530e459107d1a908583e8d5"
-	SDKVersion  = "3.4.10"
+	PackageName = "ccip-burn-mint-token-pool"
+	PackageID   = "b8c3b814172fe5f5d19d0d4aa731a5b7cd0567bf2580ab2f43fe759e3f8e4135"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -37,7 +39,10 @@ type Template interface {
 }
 
 const (
-	BpsDenominator = types.NUMERIC("10000.")
+	BurnMintFactoryExtraArgsMetaValuesContextKey    = types.TEXT("burn-mint-factory-extra-args-meta-values")
+	BurnMintFactoryExtraArgsContextValuesContextKey = types.TEXT("burn-mint-factory-extra-args-values")
+	BurnMintFactoryContextKey                       = types.TEXT("burn-mint-factory")
+	BpsDenominator                                  = types.NUMERIC("10000.")
 )
 
 func argsToMap(args any) map[string]any {
@@ -57,6 +62,162 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AddPoolReceiveContextContractValue is a Record type
+type AddPoolReceiveContextContractValue struct {
+	ContextKey       types.TEXT        `json:"contextKey"`
+	ReferredContract types.CONTRACT_ID `json:"referredContract"`
+}
+
+// ToMap converts AddPoolReceiveContextContractValue to a map for DAML arguments
+func (t AddPoolReceiveContextContractValue) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	m["referredContract"] = model.NestedToDAMLValue(t.ReferredContract)
+
+	return m
+}
+
+func (t AddPoolReceiveContextContractValue) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPoolReceiveContextContractValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPoolReceiveContextContractValue to hex string (Canton MCMS format)
+func (t AddPoolReceiveContextContractValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPoolReceiveContextContractValue from hex string (Canton MCMS format)
+func (t *AddPoolReceiveContextContractValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddPoolReceiveContextContractValueParams is a Record type
+type AddPoolReceiveContextContractValueParams struct {
+	ContextKey              types.TEXT                      `json:"contextKey"`
+	ReferentInstanceAddress chainlinkapi.RawInstanceAddress `json:"referentInstanceAddress"`
+}
+
+// ToMap converts AddPoolReceiveContextContractValueParams to a map for DAML arguments
+func (t AddPoolReceiveContextContractValueParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	m["referentInstanceAddress"] = model.NestedToDAMLValue(t.ReferentInstanceAddress)
+
+	return m
+}
+
+func (t AddPoolReceiveContextContractValueParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPoolReceiveContextContractValueParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPoolReceiveContextContractValueParams to hex string (Canton MCMS format)
+func (t AddPoolReceiveContextContractValueParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPoolReceiveContextContractValueParams from hex string (Canton MCMS format)
+func (t *AddPoolReceiveContextContractValueParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddPoolReceiveContextNonContractValue is a Record type
+type AddPoolReceiveContextNonContractValue struct {
+	ContextKey types.TEXT                            `json:"contextKey"`
+	Value      splice_api_token_metadata_v1.AnyValue `json:"value"`
+}
+
+// ToMap converts AddPoolReceiveContextNonContractValue to a map for DAML arguments
+func (t AddPoolReceiveContextNonContractValue) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	m["value"] = model.NestedToDAMLValue(t.Value)
+
+	return m
+}
+
+func (t AddPoolReceiveContextNonContractValue) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPoolReceiveContextNonContractValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPoolReceiveContextNonContractValue to hex string (Canton MCMS format)
+func (t AddPoolReceiveContextNonContractValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPoolReceiveContextNonContractValue from hex string (Canton MCMS format)
+func (t *AddPoolReceiveContextNonContractValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddPoolReceiveContextNonContractValueParams is a Record type
+type AddPoolReceiveContextNonContractValueParams struct {
+	ContextKey   types.TEXT `json:"contextKey"`
+	ValuePayload types.TEXT `json:"valuePayload"`
+}
+
+// ToMap converts AddPoolReceiveContextNonContractValueParams to a map for DAML arguments
+func (t AddPoolReceiveContextNonContractValueParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	m["valuePayload"] = string(t.ValuePayload)
+
+	return m
+}
+
+func (t AddPoolReceiveContextNonContractValueParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPoolReceiveContextNonContractValueParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPoolReceiveContextNonContractValueParams to hex string (Canton MCMS format)
+func (t AddPoolReceiveContextNonContractValueParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPoolReceiveContextNonContractValueParams from hex string (Canton MCMS format)
+func (t *AddPoolReceiveContextNonContractValueParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ApplyChainUpdates is a Record type
@@ -265,17 +426,17 @@ func (t *ApplyTokenTransferFeeConfigUpdatesParams) UnmarshalHex(data string) err
 
 // BurnMintTokenPool is a Template type
 type BurnMintTokenPool struct {
-	InstanceId              types.TEXT                               `json:"instanceId"`
-	PoolOwner               types.PARTY                              `json:"poolOwner"`
-	CcipOwner               types.PARTY                              `json:"ccipOwner"`
-	InstrumentId            splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals                types.INT64                              `json:"decimals"`
-	RateLimitAdmin          *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
-	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig      `json:"remoteChainConfigs"`
-	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig `json:"tokenTransferFeeConfigs"`
-	PoolReceiveContext      common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout         TransferTimeout                          `json:"transferTimeout"`
-	Deps                    BurnMintTokenPoolDeps                    `json:"deps"`
+	InstanceId              types.TEXT                                 `json:"instanceId"`
+	PoolOwner               types.PARTY                                `json:"poolOwner"`
+	CcipOwner               types.PARTY                                `json:"ccipOwner"`
+	InstrumentId            splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Decimals                types.INT64                                `json:"decimals"`
+	RateLimitAdmin          *types.PARTY                               `json:"rateLimitAdmin" hex:"optional"`
+	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig        `json:"remoteChainConfigs"`
+	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig   `json:"tokenTransferFeeConfigs"`
+	PoolReceiveContext      splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
+	TransferTimeout         TransferTimeout                            `json:"transferTimeout"`
+	Deps                    BurnMintTokenPoolDeps                      `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -688,23 +849,86 @@ func (t BurnMintTokenPool) SetDynamicConfigWithPackageID(contractID string, pack
 	}
 }
 
-// SetPoolReceiveContext exercises the SetPoolReceiveContext choice on this BurnMintTokenPool contract
+// AddPoolReceiveContextNonContractValue exercises the AddPoolReceiveContextNonContractValue choice on this BurnMintTokenPool contract
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) SetPoolReceiveContext(contractID string, args SetPoolReceiveContext) *model.ExerciseCommand {
+func (t BurnMintTokenPool) AddPoolReceiveContextNonContractValue(contractID string, args AddPoolReceiveContextNonContractValue) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
 		ContractID: contractID,
-		Choice:     "SetPoolReceiveContext",
+		Choice:     "AddPoolReceiveContextNonContractValue",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// SetPoolReceiveContextWithPackageID exercises the SetPoolReceiveContext choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) SetPoolReceiveContextWithPackageID(contractID string, packageID string, args SetPoolReceiveContext) *model.ExerciseCommand {
+// AddPoolReceiveContextNonContractValueWithPackageID exercises the AddPoolReceiveContextNonContractValue choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) AddPoolReceiveContextNonContractValueWithPackageID(contractID string, packageID string, args AddPoolReceiveContextNonContractValue) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
 		ContractID: contractID,
-		Choice:     "SetPoolReceiveContext",
+		Choice:     "AddPoolReceiveContextNonContractValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddPoolReceiveContextContractValue exercises the AddPoolReceiveContextContractValue choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) AddPoolReceiveContextContractValue(contractID string, args AddPoolReceiveContextContractValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "AddPoolReceiveContextContractValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddPoolReceiveContextContractValueWithPackageID exercises the AddPoolReceiveContextContractValue choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) AddPoolReceiveContextContractValueWithPackageID(contractID string, packageID string, args AddPoolReceiveContextContractValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "AddPoolReceiveContextContractValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemovePoolReceiveContextValue exercises the RemovePoolReceiveContextValue choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) RemovePoolReceiveContextValue(contractID string, args RemovePoolReceiveContextValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "RemovePoolReceiveContextValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemovePoolReceiveContextValueWithPackageID exercises the RemovePoolReceiveContextValue choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) RemovePoolReceiveContextValueWithPackageID(contractID string, packageID string, args RemovePoolReceiveContextValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "RemovePoolReceiveContextValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ClearPoolReceiveContext exercises the ClearPoolReceiveContext choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) ClearPoolReceiveContext(contractID string, args ClearPoolReceiveContext) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "ClearPoolReceiveContext",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ClearPoolReceiveContextWithPackageID exercises the ClearPoolReceiveContext choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) ClearPoolReceiveContextWithPackageID(contractID string, packageID string, args ClearPoolReceiveContext) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "ClearPoolReceiveContext",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -732,7 +956,7 @@ func (t BurnMintTokenPool) SetTransferTimeoutWithPackageID(contractID string, pa
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this BurnMintTokenPool contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t BurnMintTokenPool) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "MCMSReceiver"),
 		ContractID: contractID,
@@ -742,7 +966,7 @@ func (t BurnMintTokenPool) MCMSReceiverEntrypoint(contractID string, args mcms.M
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t BurnMintTokenPool) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "MCMSReceiver"),
 		ContractID: contractID,
@@ -753,7 +977,7 @@ func (t BurnMintTokenPool) MCMSReceiverEntrypointWithPackageID(contractID string
 
 // TokenPoolGetRequiredCCVs exercises the TokenPool_GetRequiredCCVs choice on this BurnMintTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) TokenPoolGetRequiredCCVs(contractID string, args interfaces.TokenPoolGetRequiredCCVs) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolGetRequiredCCVs(contractID string, args extensionapi.TokenPoolGetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -763,7 +987,7 @@ func (t BurnMintTokenPool) TokenPoolGetRequiredCCVs(contractID string, args inte
 }
 
 // TokenPoolGetRequiredCCVsWithPackageID exercises the TokenPool_GetRequiredCCVs choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) TokenPoolGetRequiredCCVsWithPackageID(contractID string, packageID string, args interfaces.TokenPoolGetRequiredCCVs) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolGetRequiredCCVsWithPackageID(contractID string, packageID string, args extensionapi.TokenPoolGetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -774,7 +998,7 @@ func (t BurnMintTokenPool) TokenPoolGetRequiredCCVsWithPackageID(contractID stri
 
 // TokenPoolVerifyInboundMessage exercises the TokenPool_VerifyInboundMessage choice on this BurnMintTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) TokenPoolVerifyInboundMessage(contractID string, args interfaces.TokenPoolVerifyInboundMessage) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolVerifyInboundMessage(contractID string, args extensionapi.TokenPoolVerifyInboundMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -784,7 +1008,7 @@ func (t BurnMintTokenPool) TokenPoolVerifyInboundMessage(contractID string, args
 }
 
 // TokenPoolVerifyInboundMessageWithPackageID exercises the TokenPool_VerifyInboundMessage choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) TokenPoolVerifyInboundMessageWithPackageID(contractID string, packageID string, args interfaces.TokenPoolVerifyInboundMessage) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolVerifyInboundMessageWithPackageID(contractID string, packageID string, args extensionapi.TokenPoolVerifyInboundMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -795,7 +1019,7 @@ func (t BurnMintTokenPool) TokenPoolVerifyInboundMessageWithPackageID(contractID
 
 // TokenPoolVerifyOutboundCCVs exercises the TokenPool_VerifyOutboundCCVs choice on this BurnMintTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) TokenPoolVerifyOutboundCCVs(contractID string, args interfaces.TokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolVerifyOutboundCCVs(contractID string, args extensionapi.TokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -805,7 +1029,7 @@ func (t BurnMintTokenPool) TokenPoolVerifyOutboundCCVs(contractID string, args i
 }
 
 // TokenPoolVerifyOutboundCCVsWithPackageID exercises the TokenPool_VerifyOutboundCCVs choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) TokenPoolVerifyOutboundCCVsWithPackageID(contractID string, packageID string, args interfaces.TokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolVerifyOutboundCCVsWithPackageID(contractID string, packageID string, args extensionapi.TokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -816,7 +1040,7 @@ func (t BurnMintTokenPool) TokenPoolVerifyOutboundCCVsWithPackageID(contractID s
 
 // TokenPoolReleaseFromTicket exercises the TokenPool_ReleaseFromTicket choice on this BurnMintTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) TokenPoolReleaseFromTicket(contractID string, args interfaces.TokenPoolReleaseFromTicket) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolReleaseFromTicket(contractID string, args extensionapi.TokenPoolReleaseFromTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -826,7 +1050,7 @@ func (t BurnMintTokenPool) TokenPoolReleaseFromTicket(contractID string, args in
 }
 
 // TokenPoolReleaseFromTicketWithPackageID exercises the TokenPool_ReleaseFromTicket choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) TokenPoolReleaseFromTicketWithPackageID(contractID string, packageID string, args interfaces.TokenPoolReleaseFromTicket) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolReleaseFromTicketWithPackageID(contractID string, packageID string, args extensionapi.TokenPoolReleaseFromTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -837,7 +1061,7 @@ func (t BurnMintTokenPool) TokenPoolReleaseFromTicketWithPackageID(contractID st
 
 // TokenPoolLockOrBurn exercises the TokenPool_LockOrBurn choice on this BurnMintTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) TokenPoolLockOrBurn(contractID string, args interfaces.TokenPoolLockOrBurn) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolLockOrBurn(contractID string, args extensionapi.TokenPoolLockOrBurn) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -847,7 +1071,7 @@ func (t BurnMintTokenPool) TokenPoolLockOrBurn(contractID string, args interface
 }
 
 // TokenPoolLockOrBurnWithPackageID exercises the TokenPool_LockOrBurn choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) TokenPoolLockOrBurnWithPackageID(contractID string, packageID string, args interfaces.TokenPoolLockOrBurn) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolLockOrBurnWithPackageID(contractID string, packageID string, args extensionapi.TokenPoolLockOrBurn) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -858,7 +1082,7 @@ func (t BurnMintTokenPool) TokenPoolLockOrBurnWithPackageID(contractID string, p
 
 // TokenPoolCalculateFee exercises the TokenPool_CalculateFee choice on this BurnMintTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) TokenPoolCalculateFee(contractID string, args interfaces.TokenPoolCalculateFee) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolCalculateFee(contractID string, args extensionapi.TokenPoolCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -868,7 +1092,7 @@ func (t BurnMintTokenPool) TokenPoolCalculateFee(contractID string, args interfa
 }
 
 // TokenPoolCalculateFeeWithPackageID exercises the TokenPool_CalculateFee choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) TokenPoolCalculateFeeWithPackageID(contractID string, packageID string, args interfaces.TokenPoolCalculateFee) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolCalculateFeeWithPackageID(contractID string, packageID string, args extensionapi.TokenPoolCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -879,7 +1103,7 @@ func (t BurnMintTokenPool) TokenPoolCalculateFeeWithPackageID(contractID string,
 
 // TokenPoolGetFee exercises the TokenPool_GetFee choice on this BurnMintTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) TokenPoolGetFee(contractID string, args interfaces.TokenPoolGetFee) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolGetFee(contractID string, args extensionapi.TokenPoolGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -889,7 +1113,7 @@ func (t BurnMintTokenPool) TokenPoolGetFee(contractID string, args interfaces.To
 }
 
 // TokenPoolGetFeeWithPackageID exercises the TokenPool_GetFee choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) TokenPoolGetFeeWithPackageID(contractID string, packageID string, args interfaces.TokenPoolGetFee) *model.ExerciseCommand {
+func (t BurnMintTokenPool) TokenPoolGetFeeWithPackageID(contractID string, packageID string, args extensionapi.TokenPoolGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "ITokenPool"),
 		ContractID: contractID,
@@ -900,15 +1124,15 @@ func (t BurnMintTokenPool) TokenPoolGetFeeWithPackageID(contractID string, packa
 
 // Verify interface implementations for BurnMintTokenPool
 
-var _ mcms.IMCMSReceiver = (*BurnMintTokenPool)(nil)
+var _ api.IMCMSReceiver = (*BurnMintTokenPool)(nil)
 
-var _ interfaces.IITokenPool = (*BurnMintTokenPool)(nil)
+var _ extensionapi.IITokenPool = (*BurnMintTokenPool)(nil)
 
 // BurnMintTokenPoolDeps is a Record type
 type BurnMintTokenPoolDeps struct {
-	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
-	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
-	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	TokenAdminRegistry chainlinkapi.RawInstanceAddress `json:"tokenAdminRegistry"`
+	RmnRemote          chainlinkapi.RawInstanceAddress `json:"rmnRemote"`
+	FeeQuoter          chainlinkapi.RawInstanceAddress `json:"feeQuoter"`
 }
 
 // ToMap converts BurnMintTokenPoolDeps to a map for DAML arguments
@@ -948,13 +1172,13 @@ func (t *BurnMintTokenPoolDeps) UnmarshalHex(data string) error {
 
 // CalculateFee is a Record type
 type CalculateFee struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext                       `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller                types.PARTY                              `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                          `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CalculateFee to a map for DAML arguments
@@ -1003,12 +1227,12 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CalculateFeeMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext                       `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                          `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -1025,15 +1249,15 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 
 // ChainUpdate is a Record type
 type ChainUpdate struct {
-	RemoteChainSelector                        types.NUMERIC             `json:"remoteChainSelector"`
-	RemotePools                                []types.TEXT              `json:"remotePools"`
-	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
-	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
-	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
-	FinalityConfig                             common.FinalityConfig     `json:"finalityConfig"`
-	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
-	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
-	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
+	RemoteChainSelector                        types.NUMERIC                     `json:"remoteChainSelector"`
+	RemotePools                                []types.TEXT                      `json:"remotePools"`
+	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress"`
+	InboundCCVs                                []chainlinkapi.RawInstanceAddress `json:"inboundCCVs"`
+	OutboundCCVs                               []chainlinkapi.RawInstanceAddress `json:"outboundCCVs"`
+	FinalityConfig                             core.FinalityConfig               `json:"finalityConfig"`
+	InboundRateLimiter                         chainlinkapi.RawInstanceAddress   `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter chainlinkapi.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        chainlinkapi.RawInstanceAddress   `json:"outboundRateLimiter"`
 }
 
 // ToMap converts ChainUpdate to a map for DAML arguments
@@ -1097,6 +1321,38 @@ func (t ChainUpdate) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ChainUpdate from hex string (Canton MCMS format)
 func (t *ChainUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ClearPoolReceiveContext is a Record type
+type ClearPoolReceiveContext struct {
+}
+
+// ToMap converts ClearPoolReceiveContext to a map for DAML arguments
+func (t ClearPoolReceiveContext) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t ClearPoolReceiveContext) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ClearPoolReceiveContext) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ClearPoolReceiveContext to hex string (Canton MCMS format)
+func (t ClearPoolReceiveContext) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ClearPoolReceiveContext from hex string (Canton MCMS format)
+func (t *ClearPoolReceiveContext) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1168,12 +1424,12 @@ func (t *GetFeeMCMSParams) UnmarshalHex(data string) error {
 
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
-	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
-	Amount              types.NUMERIC                `json:"amount"`
-	Finality            common.FinalityConfig        `json:"finality"`
-	ExtraData           types.TEXT                   `json:"extraData"`
-	Direction           interfaces.TransferDirection `json:"direction"`
-	Caller              types.PARTY                  `json:"caller"`
+	RemoteChainSelector types.NUMERIC                  `json:"remoteChainSelector"`
+	SourceAmount        types.TEXT                     `json:"sourceAmount"`
+	Finality            core.FinalityConfig            `json:"finality"`
+	ExtraData           types.TEXT                     `json:"extraData"`
+	Direction           extensionapi.TransferDirection `json:"direction"`
+	Caller              types.PARTY                    `json:"caller"`
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
@@ -1182,7 +1438,7 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 
 	m["remoteChainSelector"] = t.RemoteChainSelector
 
-	m["amount"] = t.Amount
+	m["sourceAmount"] = string(t.SourceAmount)
 
 	m["finality"] = model.NestedToDAMLValue(t.Finality)
 
@@ -1220,11 +1476,11 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 // GetRequiredCCVsMCMSParams is GetRequiredCCVs without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type GetRequiredCCVsMCMSParams struct {
-	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
-	Amount              types.NUMERIC                `json:"amount"`
-	Finality            common.FinalityConfig        `json:"finality"`
-	ExtraData           types.TEXT                   `json:"extraData"`
-	Direction           interfaces.TransferDirection `json:"direction"`
+	RemoteChainSelector types.NUMERIC                  `json:"remoteChainSelector"`
+	SourceAmount        types.TEXT                     `json:"sourceAmount"`
+	Finality            core.FinalityConfig            `json:"finality"`
+	ExtraData           types.TEXT                     `json:"extraData"`
+	Direction           extensionapi.TransferDirection `json:"direction"`
 }
 
 // MarshalHex encodes GetRequiredCCVsMCMSParams to hex string for MCMS operationData.
@@ -1241,15 +1497,14 @@ func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
 
 // LockOrBurn is a Record type
 type LockOrBurn struct {
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID     `json:"tokenConfigCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext    `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
-	SenderInputCids       []types.CONTRACT_ID   `json:"senderInputCids"`
-	Amount                types.NUMERIC         `json:"amount"`
-	Caller                types.PARTY           `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
+	Amount                types.NUMERIC                              `json:"amount"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts LockOrBurn to a map for DAML arguments
@@ -1265,8 +1520,6 @@ func (t LockOrBurn) ToMap() map[string]any {
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
-
-	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	m["senderInputCids"] = func() []any {
 		res := make([]any, 0, len(t.SenderInputCids))
@@ -1308,14 +1561,13 @@ func (t *LockOrBurn) UnmarshalHex(data string) error {
 // LockOrBurnMCMSParams is LockOrBurn without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockOrBurnMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID     `json:"tokenConfigCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext    `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
-	SenderInputCids       []types.CONTRACT_ID   `json:"senderInputCids"`
-	Amount                types.NUMERIC         `json:"amount"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
+	Amount                types.NUMERIC                              `json:"amount"`
 }
 
 // MarshalHex encodes LockOrBurnMCMSParams to hex string for MCMS operationData.
@@ -1332,10 +1584,10 @@ func (t *LockOrBurnMCMSParams) UnmarshalHex(data string) error {
 
 // RateLimitConfigArgs is a Record type
 type RateLimitConfigArgs struct {
-	RemoteChainSelector                        types.NUMERIC           `json:"remoteChainSelector"`
-	InboundRateLimiter                         mcms.RawInstanceAddress `json:"inboundRateLimiter"`
-	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress `json:"inboundCustomBlockConfirmationsRateLimiter"`
-	OutboundRateLimiter                        mcms.RawInstanceAddress `json:"outboundRateLimiter"`
+	RemoteChainSelector                        types.NUMERIC                   `json:"remoteChainSelector"`
+	InboundRateLimiter                         chainlinkapi.RawInstanceAddress `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter chainlinkapi.RawInstanceAddress `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        chainlinkapi.RawInstanceAddress `json:"outboundRateLimiter"`
 }
 
 // ToMap converts RateLimitConfigArgs to a map for DAML arguments
@@ -1377,13 +1629,12 @@ func (t *RateLimitConfigArgs) UnmarshalHex(data string) error {
 
 // ReleaseFromTicket is a Record type
 type ReleaseFromTicket struct {
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID     `json:"tokenConfigCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext    `json:"extraContext"`
-	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
-	Caller                types.PARTY           `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts ReleaseFromTicket to a map for DAML arguments
@@ -1399,8 +1650,6 @@ func (t ReleaseFromTicket) ToMap() map[string]any {
 	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
 
 	m["tokenReceiveTicketCid"] = model.NestedToDAMLValue(t.TokenReceiveTicketCid)
-
-	m["tokenInput"] = model.NestedToDAMLValue(t.TokenInput)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1432,12 +1681,11 @@ func (t *ReleaseFromTicket) UnmarshalHex(data string) error {
 // ReleaseFromTicketMCMSParams is ReleaseFromTicket without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type ReleaseFromTicketMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID     `json:"tokenConfigCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext          common.CCIPContext    `json:"extraContext"`
-	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
 }
 
 // MarshalHex encodes ReleaseFromTicketMCMSParams to hex string for MCMS operationData.
@@ -1454,14 +1702,14 @@ func (t *ReleaseFromTicketMCMSParams) UnmarshalHex(data string) error {
 
 // RemoteChainConfig is a Record type
 type RemoteChainConfig struct {
-	RemotePools                                []types.TEXT              `json:"remotePools"`
-	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
-	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
-	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
-	FinalityConfig                             common.FinalityConfig     `json:"finalityConfig"`
-	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
-	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
-	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
+	RemotePools                                []types.TEXT                      `json:"remotePools"`
+	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress"`
+	InboundCCVs                                []chainlinkapi.RawInstanceAddress `json:"inboundCCVs"`
+	OutboundCCVs                               []chainlinkapi.RawInstanceAddress `json:"outboundCCVs"`
+	FinalityConfig                             core.FinalityConfig               `json:"finalityConfig"`
+	InboundRateLimiter                         chainlinkapi.RawInstanceAddress   `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter chainlinkapi.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        chainlinkapi.RawInstanceAddress   `json:"outboundRateLimiter"`
 }
 
 // ToMap converts RemoteChainConfig to a map for DAML arguments
@@ -1523,6 +1771,78 @@ func (t RemoteChainConfig) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes RemoteChainConfig from hex string (Canton MCMS format)
 func (t *RemoteChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RemovePoolReceiveContextValue is a Record type
+type RemovePoolReceiveContextValue struct {
+	ContextKey types.TEXT `json:"contextKey"`
+}
+
+// ToMap converts RemovePoolReceiveContextValue to a map for DAML arguments
+func (t RemovePoolReceiveContextValue) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	return m
+}
+
+func (t RemovePoolReceiveContextValue) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemovePoolReceiveContextValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemovePoolReceiveContextValue to hex string (Canton MCMS format)
+func (t RemovePoolReceiveContextValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemovePoolReceiveContextValue from hex string (Canton MCMS format)
+func (t *RemovePoolReceiveContextValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RemovePoolReceiveContextValueParams is a Record type
+type RemovePoolReceiveContextValueParams struct {
+	ContextKey types.TEXT `json:"contextKey"`
+}
+
+// ToMap converts RemovePoolReceiveContextValueParams to a map for DAML arguments
+func (t RemovePoolReceiveContextValueParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contextKey"] = string(t.ContextKey)
+
+	return m
+}
+
+func (t RemovePoolReceiveContextValueParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemovePoolReceiveContextValueParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemovePoolReceiveContextValueParams to hex string (Canton MCMS format)
+func (t RemovePoolReceiveContextValueParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemovePoolReceiveContextValueParams from hex string (Canton MCMS format)
+func (t *RemovePoolReceiveContextValueParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1615,42 +1935,6 @@ func (t SetDynamicConfigParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetDynamicConfigParams from hex string (Canton MCMS format)
 func (t *SetDynamicConfigParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// SetPoolReceiveContext is a Record type
-type SetPoolReceiveContext struct {
-	NewPoolReceiveContext common.CCIPContext `json:"newPoolReceiveContext"`
-}
-
-// ToMap converts SetPoolReceiveContext to a map for DAML arguments
-func (t SetPoolReceiveContext) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["newPoolReceiveContext"] = model.NestedToDAMLValue(t.NewPoolReceiveContext)
-
-	return m
-}
-
-func (t SetPoolReceiveContext) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *SetPoolReceiveContext) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes SetPoolReceiveContext to hex string (Canton MCMS format)
-func (t SetPoolReceiveContext) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes SetPoolReceiveContext from hex string (Canton MCMS format)
-func (t *SetPoolReceiveContext) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2012,11 +2296,11 @@ var _ types.VariantWithTagByte = (*TransferTimeout)(nil)
 
 // VerifyInboundMessage is a Record type
 type VerifyInboundMessage struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
-	Caller                types.PARTY        `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	ExecutingMessageCid   types.CONTRACT_ID                          `json:"executingMessageCid"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts VerifyInboundMessage to a map for DAML arguments
@@ -2061,10 +2345,10 @@ func (t *VerifyInboundMessage) UnmarshalHex(data string) error {
 // VerifyInboundMessageMCMSParams is VerifyInboundMessage without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type VerifyInboundMessageMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	ExecutingMessageCid   types.CONTRACT_ID                          `json:"executingMessageCid"`
 }
 
 // MarshalHex encodes VerifyInboundMessageMCMSParams to hex string for MCMS operationData.
@@ -2081,12 +2365,12 @@ func (t *VerifyInboundMessageMCMSParams) UnmarshalHex(data string) error {
 
 // VerifyOutboundCCVs is a Record type
 type VerifyOutboundCCVs struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
-	Amount                types.NUMERIC      `json:"amount"`
-	Caller                types.PARTY        `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Amount                types.NUMERIC                              `json:"amount"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts VerifyOutboundCCVs to a map for DAML arguments
@@ -2133,11 +2417,11 @@ func (t *VerifyOutboundCCVs) UnmarshalHex(data string) error {
 // VerifyOutboundCCVsMCMSParams is VerifyOutboundCCVs without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type VerifyOutboundCCVsMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID  `json:"tokenConfigCid"`
-	ExtraContext          common.CCIPContext `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
-	Amount                types.NUMERIC      `json:"amount"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Amount                types.NUMERIC                              `json:"amount"`
 }
 
 // MarshalHex encodes VerifyOutboundCCVsMCMSParams to hex string for MCMS operationData.
@@ -2155,12 +2439,17 @@ func (t *VerifyOutboundCCVsMCMSParams) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AddPoolReceiveContextContractValue(args AddPoolReceiveContextContractValue) (*bind.EncodedChoice, error)
+	AddPoolReceiveContextContractValueParams(args AddPoolReceiveContextContractValueParams) (*bind.EncodedChoice, error)
+	AddPoolReceiveContextNonContractValue(args AddPoolReceiveContextNonContractValue) (*bind.EncodedChoice, error)
+	AddPoolReceiveContextNonContractValueParams(args AddPoolReceiveContextNonContractValueParams) (*bind.EncodedChoice, error)
 	ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice, error)
 	ApplyChainUpdatesParams(args ApplyChainUpdatesParams) (*bind.EncodedChoice, error)
 	ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error)
 	ApplyTokenTransferFeeConfigUpdatesParams(args ApplyTokenTransferFeeConfigUpdatesParams) (*bind.EncodedChoice, error)
 	CalculateFee(args CalculateFee) (*bind.EncodedChoice, error)
 	CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error)
+	ClearPoolReceiveContext(args ClearPoolReceiveContext) (*bind.EncodedChoice, error)
 	GetFee(args GetFee) (*bind.EncodedChoice, error)
 	GetFeeMCMSParams(args GetFeeMCMSParams) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
@@ -2169,9 +2458,10 @@ type MCMSEncoder interface {
 	LockOrBurnMCMSParams(args LockOrBurnMCMSParams) (*bind.EncodedChoice, error)
 	ReleaseFromTicket(args ReleaseFromTicket) (*bind.EncodedChoice, error)
 	ReleaseFromTicketMCMSParams(args ReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error)
+	RemovePoolReceiveContextValue(args RemovePoolReceiveContextValue) (*bind.EncodedChoice, error)
+	RemovePoolReceiveContextValueParams(args RemovePoolReceiveContextValueParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
 	SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error)
-	SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
@@ -2210,6 +2500,26 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
+// AddPoolReceiveContextContractValue encodes parameters for the AddPoolReceiveContextContractValue choice.
+func (e *encoder) AddPoolReceiveContextContractValue(args AddPoolReceiveContextContractValue) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPoolReceiveContextContractValue", args)
+}
+
+// AddPoolReceiveContextContractValueParams encodes parameters for the AddPoolReceiveContextContractValue choice.
+func (e *encoder) AddPoolReceiveContextContractValueParams(args AddPoolReceiveContextContractValueParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPoolReceiveContextContractValue", args)
+}
+
+// AddPoolReceiveContextNonContractValue encodes parameters for the AddPoolReceiveContextNonContractValue choice.
+func (e *encoder) AddPoolReceiveContextNonContractValue(args AddPoolReceiveContextNonContractValue) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPoolReceiveContextNonContractValue", args)
+}
+
+// AddPoolReceiveContextNonContractValueParams encodes parameters for the AddPoolReceiveContextNonContractValue choice.
+func (e *encoder) AddPoolReceiveContextNonContractValueParams(args AddPoolReceiveContextNonContractValueParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPoolReceiveContextNonContractValue", args)
+}
+
 // ApplyChainUpdates encodes parameters for the ApplyChainUpdates choice.
 func (e *encoder) ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyChainUpdates", args)
@@ -2238,6 +2548,11 @@ func (e *encoder) CalculateFee(args CalculateFee) (*bind.EncodedChoice, error) {
 // CalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the CalculateFee choice.
 func (e *encoder) CalculateFeeMCMSParams(args CalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CalculateFee", args)
+}
+
+// ClearPoolReceiveContext encodes parameters for the ClearPoolReceiveContext choice.
+func (e *encoder) ClearPoolReceiveContext(args ClearPoolReceiveContext) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ClearPoolReceiveContext", args)
 }
 
 // GetFee encodes parameters for the GetFee choice.
@@ -2280,6 +2595,16 @@ func (e *encoder) ReleaseFromTicketMCMSParams(args ReleaseFromTicketMCMSParams) 
 	return e.EncodeChoiceArgs("ReleaseFromTicket", args)
 }
 
+// RemovePoolReceiveContextValue encodes parameters for the RemovePoolReceiveContextValue choice.
+func (e *encoder) RemovePoolReceiveContextValue(args RemovePoolReceiveContextValue) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemovePoolReceiveContextValue", args)
+}
+
+// RemovePoolReceiveContextValueParams encodes parameters for the RemovePoolReceiveContextValue choice.
+func (e *encoder) RemovePoolReceiveContextValueParams(args RemovePoolReceiveContextValueParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemovePoolReceiveContextValue", args)
+}
+
 // SetDynamicConfig encodes parameters for the SetDynamicConfig choice.
 func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
@@ -2288,11 +2613,6 @@ func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, 
 // SetDynamicConfigParams encodes parameters for the SetDynamicConfig choice.
 func (e *encoder) SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
-}
-
-// SetPoolReceiveContext encodes parameters for the SetPoolReceiveContext choice.
-func (e *encoder) SetPoolReceiveContext(args SetPoolReceiveContext) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetPoolReceiveContext", args)
 }
 
 // SetRateLimitConfig encodes parameters for the SetRateLimitConfig choice.

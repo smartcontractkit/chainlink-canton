@@ -7,7 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	"github.com/ethereum/go-ethereum/crypto"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -42,32 +41,15 @@ func TestDeployChainContracts(t *testing.T) {
 	ccipOwnerParty := participant.PartyID
 
 	// Upload Dars
-	dars := []struct {
-		contract contracts.Package
-		name     string
-	}{
-		{contracts.CCIPCommon, "common"},
-		{contracts.CCIPOffRamp, "offramp"},
-		{contracts.CCIPOnRamp, "onramp"},
-		{contracts.CCIPTokenAdminRegistry, "token admin registry"},
-		{contracts.CCIPCommitteeVerifier, "committee verifier"},
-		{contracts.CCIPLockReleaseTokenPool, "token pool"},
-		{contracts.CCIPPerPartyRouter, "per-party router"},
-	}
-
-	darData := make([]*participantv30.UploadDarRequest_UploadDarData, 0, len(dars))
-	for _, dar := range dars {
-		darBytes, err := contracts.GetDar(dar.contract, contracts.CurrentVersion)
-		require.NoError(t, err, "failed to get %s dar file", dar.name)
-		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{Bytes: darBytes})
-	}
-
-	_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
-		Dars:               darData,
-		VetAllPackages:     true,
-		SynchronizeVetting: true,
-	})
-	require.NoError(t, err, "failed to upload DAR files")
+	uploadDARs(t, participant,
+		contracts.CCIPCommon,
+		contracts.CCIPOffRamp,
+		contracts.CCIPOnRamp,
+		contracts.CCIPTokenAdminRegistry,
+		contracts.CCIPCommitteeVerifier,
+		contracts.CCIPLockReleaseTokenPool,
+		contracts.CCIPPerPartyRouter,
+	)
 
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
@@ -103,6 +85,7 @@ func TestDeployChainContracts(t *testing.T) {
 		Config: DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: ccipOwnerParty,
+				RMNOwnerParty:  ccipOwnerParty,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Template: ccvs.CommitteeVerifier{
@@ -124,8 +107,6 @@ func TestDeployChainContracts(t *testing.T) {
 				},
 				RMNRemote: sequences.RMNRemoteParams{
 					Template: rmn.RMNRemote{
-						CcipOwner:      "", // Populated by the sequence
-						RmnOwner:       types.PARTY(ccipOwnerParty),
 						CursedSubjects: nil,
 					},
 				},

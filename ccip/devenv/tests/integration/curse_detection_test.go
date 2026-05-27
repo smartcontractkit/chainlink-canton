@@ -1,13 +1,14 @@
 package integration
 
 import (
-	"encoding/binary"
 	"strconv"
 	"testing"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
+	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -17,10 +18,11 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register the canton impl factory
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters" // register the curse adapters
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 )
 
@@ -61,27 +63,25 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 		t.Skip("skipping TestIntegration_SourceReader_CurseDetection test in short mode")
 	}
 
-	ccv.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
-
 	configPath := "../../env-canton-evm-out.toml"
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 
 	ctx := ccv.Plog.WithContext(t.Context())
-	harness, err := tcapi.NewTestHarness(
-		ctx,
-		configPath,
-		in,
-		chainsel.FamilyEVM,
-		chainsel.FamilyCanton,
-	)
+	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath)
 	require.NoError(t, err)
 
-	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
-	chainMap, err := harness.Lib.ChainsMap(ctx)
+	cldfEnv, err := lib.CLDFEnvironment()
+	require.NoError(t, err)
+
+	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, lib)
+	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, lib)
+	chainMap, err := lib.ChainsMap(ctx)
 	require.NoError(t, err)
 	cantonImpl := chainMap[cantonChain.ChainSelector()]
 	require.NotNil(t, cantonImpl)
+	evmImpl := chainMap[evmChain.ChainSelector()]
+	require.NotNil(t, evmImpl)
 
 	lggr := logger.Test(t)
 
@@ -112,18 +112,36 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, subjects)
 
-	// TODO: this should be a helper function in protocol.
-	var subject protocol.Bytes16
-	binary.BigEndian.PutUint64(subject[8:], cantonChain.ChainSelector())
+	subject := fastcurse.GenericSelectorToSubject(evmChain.ChainSelector())
 
-	require.NoError(t, cantonChain.Curse(ctx, [][16]byte{subject}))
+	curseCS := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
+	_, err = curseCS.Apply(*cldfEnv, fastcurse.RMNCurseConfig{
+		CurseActions: []fastcurse.CurseActionInput{
+			{
+				ChainSelector:        cantonChain.ChainSelector(),
+				SubjectChainSelector: evmChain.ChainSelector(),
+				Version:              rmn_remote.Version,
+			},
+		},
+	})
+	require.NoError(t, err)
 
 	subjects, err = sourceReader.GetRMNCursedSubjects(ctx)
 	require.NoError(t, err)
 	require.Equal(t, []protocol.Bytes16{subject}, subjects)
 
 	// Uncurse the subject and verify that it is no longer cursed
-	require.NoError(t, cantonChain.Uncurse(ctx, [][16]byte{subject}))
+	uncurseCS := fastcurse.UncurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
+	_, err = uncurseCS.Apply(*cldfEnv, fastcurse.RMNCurseConfig{
+		CurseActions: []fastcurse.CurseActionInput{
+			{
+				ChainSelector:        cantonChain.ChainSelector(),
+				SubjectChainSelector: evmChain.ChainSelector(),
+				Version:              rmn_remote.Version,
+			},
+		},
+	})
+	require.NoError(t, err)
 
 	// should return no cursed subjects
 	subjects, err = sourceReader.GetRMNCursedSubjects(ctx)

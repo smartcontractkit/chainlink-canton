@@ -316,7 +316,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Native is Amulet
 	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
+		Id:    types.TEXT("Amulet"), // TODO: hardcoded
 	}
 
 	reporter := cld_ops.NewMemoryReporter()
@@ -340,6 +340,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		Config: changesets.DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: partyCCIP,
+				RMNOwnerParty:  partyCCIP,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
@@ -554,10 +555,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
@@ -617,7 +618,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Deploy CCIPReceiver for receiver
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
@@ -645,7 +646,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress())
 	require.NoError(t, err)
 
-	executeArgs := ccipreceiver.Execute2{
+	executeArgs := ccipreceiver.Execute{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
@@ -663,7 +664,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// receiver-authored transaction with disclosures for off-ramp dependencies.
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},

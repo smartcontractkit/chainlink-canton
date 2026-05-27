@@ -21,6 +21,7 @@ template LinkHolding
     holdingAdmin : Party
     holdingInstrumentId : HoldingV1.InstrumentId
     holdingAmount : Decimal
+    meta : MetadataV1.Metadata
   where
     signatory holdingOwner, holdingAdmin
 
@@ -30,7 +31,7 @@ template LinkHolding
         instrumentId = holdingInstrumentId
         amount = holdingAmount
         lock = None
-        meta = MetadataV1.emptyMetadata
+        meta = meta
 
 template LinkTransferPreapproval
   with
@@ -45,6 +46,7 @@ template LinkTransferPreapproval
         amount : Decimal
         instrumentId : HoldingV1.InstrumentId
         inputHoldingCids : [ContractId HoldingV1.Holding]
+        meta : MetadataV1.Metadata
       controller sender
       do
         inputTotal <- sumAndArchiveInputs sender instrumentId inputHoldingCids
@@ -56,6 +58,7 @@ template LinkTransferPreapproval
           holdingAdmin = preapprovalAdmin
           holdingInstrumentId = instrumentId
           holdingAmount = amount
+          meta = meta
 
         senderChangeCids <- createChangeIfNeeded preapprovalAdmin sender instrumentId (inputTotal - amount)
 
@@ -90,6 +93,9 @@ template LinkTransferInstruction
         meta = MetadataV1.emptyMetadata
 
       transferInstruction_acceptImpl _self _arg = do
+        now <- getTime
+        assertMsg "LinkTransferInstruction.TransferInstruction_Accept: transfer instruction expired"
+          (instructionTransfer.executeBefore > now)
         lockedHolding <- fetch instructionLockedHoldingCid
         archive instructionLockedHoldingCid
 
@@ -98,6 +104,7 @@ template LinkTransferInstruction
           holdingAdmin = instructionAdmin
           holdingInstrumentId = instructionTransfer.instrumentId
           holdingAmount = lockedHolding.lockedAmount
+          meta = lockedHolding.meta
 
         pure TransferV1.TransferInstructionResult with
           senderChangeCids = []
@@ -121,6 +128,7 @@ template LockedLinkHolding
     lockedReceiver : Party
     lockedInstrumentId : HoldingV1.InstrumentId
     lockedAmount : Decimal
+    meta : MetadataV1.Metadata
   where
     signatory lockedAdmin, lockedSender
     observer lockedReceiver
@@ -160,6 +168,7 @@ template LinkRegistry
               amount = transfer.amount
               instrumentId = transfer.instrumentId
               inputHoldingCids = transfer.inputHoldingCids
+              meta = transfer.meta
           (False, None) -> createPendingTransfer registryAdmin transfer
 
       transferFactory_publicFetchImpl _self arg = do
@@ -197,6 +206,7 @@ template LinkRegistry
             holdingAdmin = registryAdmin
             holdingInstrumentId = registryInstrumentId
             holdingAmount = output.amount
+            meta = arg.extraArgs.meta
 
         pure BurnMintV1.BurnMintFactory_BurnMintResult with
           outputCids
@@ -260,6 +270,7 @@ createChangeIfNeeded admin owner instrumentId change =
         holdingAdmin = admin
         holdingInstrumentId = instrumentId
         holdingAmount = change
+        meta = MetadataV1.emptyMetadata
       pure [toInterfaceContractId changeCid]
     else pure []
 
@@ -277,6 +288,7 @@ returnLockedFunds admin transfer lockedHoldingCid = do
     holdingAdmin = admin
     holdingInstrumentId = transfer.instrumentId
     holdingAmount = lockedHolding.lockedAmount
+    meta = lockedHolding.meta
 
   pure TransferV1.TransferInstructionResult with
     senderChangeCids = [toInterfaceContractId senderCid]
@@ -294,6 +306,7 @@ executeDirectTransfer admin transfer = do
     holdingAdmin = admin
     holdingInstrumentId = transfer.instrumentId
     holdingAmount = transfer.amount
+    meta = transfer.meta
 
   senderChangeCids <- createChangeIfNeeded admin transfer.sender transfer.instrumentId (inputTotal - transfer.amount)
 
@@ -315,6 +328,7 @@ createPendingTransfer admin transfer = do
     lockedReceiver = transfer.receiver
     lockedInstrumentId = transfer.instrumentId
     lockedAmount = transfer.amount
+    meta = transfer.meta
 
   senderChangeCids <- createChangeIfNeeded admin transfer.sender transfer.instrumentId (inputTotal - transfer.amount)
   instructionCid <- create LinkTransferInstruction with

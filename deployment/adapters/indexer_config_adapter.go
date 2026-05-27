@@ -3,7 +3,7 @@ package adapters
 import (
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	ccvadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -11,16 +11,16 @@ import (
 
 type CantonIndexerConfigAdapter struct{}
 
-var _ adapters.IndexerConfigAdapter = (*CantonIndexerConfigAdapter)(nil)
+var _ ccvadapters.IndexerConfigAdapter = (*CantonIndexerConfigAdapter)(nil)
 
 func (a *CantonIndexerConfigAdapter) ResolveVerifierAddresses(
-	ds datastore.DataStore, chainSelector uint64, qualifier string, kind adapters.VerifierKind,
+	ds datastore.DataStore, chainSelector uint64, qualifier string, kind ccvadapters.VerifierKind,
 ) ([]string, error) {
 	switch kind {
-	case adapters.CommitteeVerifierKind:
+	case ccvadapters.CommitteeVerifierKind:
 		return a.resolveCommitteeVerifierAddresses(ds, chainSelector, qualifier)
-	case adapters.CCTPVerifierKind, adapters.LombardVerifierKind:
-		return nil, &adapters.MissingIndexerVerifierAddressesError{
+	case ccvadapters.CCTPVerifierKind, ccvadapters.LombardVerifierKind:
+		return nil, &ccvadapters.MissingIndexerVerifierAddressesError{
 			Kind:          kind,
 			ChainSelector: chainSelector,
 			Qualifier:     qualifier,
@@ -41,8 +41,8 @@ func (a *CantonIndexerConfigAdapter) resolveCommitteeVerifierAddresses(
 	)
 
 	if len(refs) == 0 {
-		return nil, &adapters.MissingIndexerVerifierAddressesError{
-			Kind:          adapters.CommitteeVerifierKind,
+		return nil, &ccvadapters.MissingIndexerVerifierAddressesError{
+			Kind:          ccvadapters.CommitteeVerifierKind,
 			ChainSelector: chainSelector,
 			Qualifier:     qualifier,
 		}

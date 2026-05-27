@@ -9,12 +9,39 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 
 	cryptov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/v30"
 	protov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"google.golang.org/protobuf/proto"
 )
+
+func signingKeysWithThreshold(keysB64 []string, threshold uint32) (*cryptov30.SigningKeysWithThreshold, error) {
+	if len(keysB64) == 0 {
+		return &cryptov30.SigningKeysWithThreshold{
+			Threshold: threshold,
+		}, nil
+	}
+
+	keys := make([]*cryptov30.SigningPublicKey, 0, len(keysB64))
+	for i, keyB64 := range keysB64 {
+		keyBytes, decErr := base64.StdEncoding.DecodeString(keyB64)
+		if decErr != nil {
+			return nil, fmt.Errorf("decoding party signing key %d: %w", i, decErr)
+		}
+		var key cryptov30.SigningPublicKey
+		if unmErr := proto.Unmarshal(keyBytes, &key); unmErr != nil {
+			return nil, fmt.Errorf("unmarshalling party signing key %d: %w", i, unmErr)
+		}
+		keys = append(keys, &key)
+	}
+
+	return &cryptov30.SigningKeysWithThreshold{
+		Keys:      keys,
+		Threshold: threshold,
+	}, nil
+}
 
 // ProposeP2POp authorizes the PartyToParticipant mapping for a single
 // participant during initial onboarding. Each participant runs this independently.
@@ -93,11 +120,16 @@ var ProposeP2POp = operations.NewOperation(
 		// signatures from other participants as they also propose.
 		_, err = deps.Client.Authorize(ctx, 1, mapping, in.SynchronizerID, false)
 		if err != nil {
-			return ProposeP2POutput{}, fmt.Errorf("authorizing P2P mapping: %w", err)
+			if client.IsTopologyMappingAlreadyExists(err) {
+				deps.Logger.Infow("P2P mapping already exists",
+					"participant", in.ParticipantID, "party", in.PartyID)
+			} else {
+				return ProposeP2POutput{}, fmt.Errorf("authorizing P2P mapping: %w", err)
+			}
+		} else {
+			deps.Logger.Infow("P2P proposal submitted",
+				"participant", in.ParticipantID, "party", in.PartyID)
 		}
-
-		deps.Logger.Infow("P2P proposal submitted",
-			"participant", in.ParticipantID, "party", in.PartyID)
 
 		return ProposeP2POutput{
 			ParticipantID: in.ParticipantID,
@@ -140,12 +172,18 @@ var ProposeKickP2POp = operations.NewOperation(
 			}
 		}
 
+		partySigningKeys, err := signingKeysWithThreshold(in.PartySigningKeysB64, uint32(in.NewP2PThreshold))
+		if err != nil {
+			return ProposeKickP2POutput{}, fmt.Errorf("building kick party signing keys: %w", err)
+		}
+
 		mapping := &protov30.TopologyMapping{
 			Mapping: &protov30.TopologyMapping_PartyToParticipant{
 				PartyToParticipant: &protov30.PartyToParticipant{
-					Party:        in.PartyID,
-					Threshold:    uint32(in.NewP2PThreshold),
-					Participants: hostingParticipants,
+					Party:            in.PartyID,
+					Threshold:        uint32(in.NewP2PThreshold),
+					Participants:     hostingParticipants,
+					PartySigningKeys: partySigningKeys,
 				},
 			},
 		}
@@ -202,12 +240,18 @@ var ProposeAddP2POp = operations.NewOperation(
 			}
 		}
 
+		partySigningKeys, err := signingKeysWithThreshold(in.PartySigningKeysB64, uint32(in.NewP2PThreshold))
+		if err != nil {
+			return ProposeAddP2POutput{}, fmt.Errorf("building add party signing keys: %w", err)
+		}
+
 		mapping := &protov30.TopologyMapping{
 			Mapping: &protov30.TopologyMapping_PartyToParticipant{
 				PartyToParticipant: &protov30.PartyToParticipant{
-					Party:        in.PartyID,
-					Threshold:    uint32(in.NewP2PThreshold),
-					Participants: hostingParticipants,
+					Party:            in.PartyID,
+					Threshold:        uint32(in.NewP2PThreshold),
+					Participants:     hostingParticipants,
+					PartySigningKeys: partySigningKeys,
 				},
 			},
 		}
@@ -301,6 +345,10 @@ var ProposeRotationP2POp = operations.NewOperation(
 		if threshold <= 0 {
 			threshold = len(in.AllParticipantUIDs)/2 + 1
 		}
+		signingKeysThreshold := in.PartySigningKeysThreshold
+		if signingKeysThreshold == 0 {
+			signingKeysThreshold = uint32(threshold)
+		}
 
 		mapping := &protov30.TopologyMapping{
 			Mapping: &protov30.TopologyMapping_PartyToParticipant{
@@ -310,7 +358,7 @@ var ProposeRotationP2POp = operations.NewOperation(
 					Participants: hostingParticipants,
 					PartySigningKeys: &cryptov30.SigningKeysWithThreshold{
 						Keys:      updatedKeys,
-						Threshold: in.SigningKeysThreshold,
+						Threshold: signingKeysThreshold,
 					},
 				},
 			},

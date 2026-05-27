@@ -12,18 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/go-daml/pkg/types"
-	mcmscore "github.com/smartcontractkit/mcms"
-	"github.com/smartcontractkit/mcms/sdk"
-	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcmscore "github.com/smartcontractkit/mcms"
+	"github.com/smartcontractkit/mcms/sdk"
+	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -49,9 +48,9 @@ import (
 //  5. Sign and execute the proposal on-chain via ScheduleBatch → ExecuteScheduledBatch
 //  6. Verify the GlobalConfig dest chain config was applied
 func TestMCMS_ChangesetProposalE2E(t *testing.T) {
-	//if os.Getenv("INTEGRATION_TEST") == "" {
+	// if os.Getenv("INTEGRATION_TEST") == "" {
 	//	t.Skip("Skipping integration test. Set INTEGRATION_TEST=1 to run.")
-	//}
+	// }
 
 	t.Parallel()
 
@@ -62,7 +61,6 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	sharedEnv := GetSharedCCIPMCMSEnvironment(t)
 	participant := sharedEnv.Participant
 	party := sharedEnv.CcipOwner
-	mcmsPkgID := sharedEnv.McmsPkgID
 	config := sharedEnv.Config
 	sortedSigners := sharedEnv.SortedSigners
 
@@ -88,6 +86,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	t.Log("Deploying CCIP chain contracts...")
 	deployOut, err := cld_ops.ExecuteSequence(bundle, sequences.DeployChainContracts, *cantonChain, sequences.DeployChainContractsParams{
 		CCIPOwnerParty: party,
+		RMNOwnerParty:  party,
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{{
 			Template: ccvs.CommitteeVerifier{
 				Owner:                        types.PARTY(party),
@@ -139,7 +138,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Deploying MCMS contract with 2-of-3 config...")
-	mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, party, chainID, baseMcmsID, config, 0, nil)
+	mcmsCid := createMCMSMultiRole(t, participant, party, chainID, baseMcmsID, config, 0, nil)
 	t.Logf("MCMS contract created: %s", mcmsCid)
 
 	// ========================================================================
@@ -291,7 +290,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 
 	// Re-resolve the GlobalConfig (it may have a new contract ID after the update)
 	updatedGC, err := opcontract.FindActiveContractByInstanceAddress(
-		t.Context(), participant.LedgerServices.State, party,
+		t.Context(), participant.LedgerServices.State, []string{party},
 		common.GlobalConfig{}.GetTemplateID(), gcRaw.InstanceAddress(),
 	)
 	require.NoError(t, err, "find updated GlobalConfig")

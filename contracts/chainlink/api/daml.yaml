@@ -1,0 +1,10 @@
+sdk-version: 3.4.11
+name: chainlink-api
+version: 1.0.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+build-options:
+  - -Wno-crypto-text-is-alpha
+  - -Werror=unused-dependency

@@ -4,9 +4,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"sync"
+	"reflect"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	ccipseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -14,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -23,31 +23,18 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutil "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
+	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
 )
 
 var _ ccipadapters.ChainFamily = (*CantonChainFamilyAdapter)(nil)
 
+// ConfigureLanesDataStoreFamilyExtraKey passes e.DataStore into Canton lane configure when the
+// pinned chainlink-ccip ConfigureChainForLanesInput type does not yet expose DataStore.
+const ConfigureLanesDataStoreFamilyExtraKey = "canton.dataStore"
+
 type CantonChainFamilyAdapter struct{}
 
 var CantonFamilySelector = [4]byte{0xdf, 0xaf, 0xaf, 0x4b}
-
-var (
-	runtimeDataStoreMu sync.RWMutex
-	runtimeDataStore   datastore.DataStore
-)
-
-func SetRuntimeDataStore(ds datastore.DataStore) {
-	runtimeDataStoreMu.Lock()
-	defer runtimeDataStoreMu.Unlock()
-	runtimeDataStore = ds
-}
-
-func getRuntimeDataStore() datastore.DataStore {
-	runtimeDataStoreMu.RLock()
-	defer runtimeDataStoreMu.RUnlock()
-
-	return runtimeDataStore
-}
 
 func DefaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
@@ -76,129 +63,244 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 		semver.MustParse("2.0.0"),
 		"Configures CCIP lanes for a Canton chain",
 		func(b cldfops.Bundle, chains cldfchain.BlockChains, input ccipadapters.ConfigureChainForLanesInput) (ccipseq.OnChainOutput, error) {
-			ds := getRuntimeDataStore()
-			if ds == nil {
-				return ccipseq.OnChainOutput{}, fmt.Errorf("runtime datastore is not set")
-			}
-
-			localGlobalConfig, err := findContractRef(
-				ds,
-				input.ChainSelector,
-				datastore.ContractType(global_config.ContractType),
-				global_config.Version,
-				"",
-			)
+			out, err := a.configureChainForLanes(b, chains, input)
 			if err != nil {
-				return ccipseq.OnChainOutput{}, fmt.Errorf("resolve global config: %w", err)
+				return ccipseq.OnChainOutput{}, err
 			}
-
-			localCommitteeVerifiers := convertCommitteeVerifierConfigs(input.CommitteeVerifiers)
-			var out ccipseq.OnChainOutput
-
-			for remoteSelector, remoteCfg := range input.RemoteChains {
-				localExecutor, err := resolveContractRefByAddress(
-					ds,
-					input.ChainSelector,
-					datastore.ContractType(executorop.ContractType),
-					executorop.Version,
-					remoteCfg.DefaultExecutor,
-				)
-				if err != nil {
-					return out, fmt.Errorf("resolve executor for remote chain %d: %w", remoteSelector, err)
-				}
-				defaultInboundCCVs, err := resolveContractRefsByAddresses(
-					ds,
-					input.ChainSelector,
-					datastore.ContractType(committeeverifierop.ContractType),
-					committeeverifierop.Version,
-					remoteCfg.DefaultInboundCCVs,
-				)
-				if err != nil {
-					return out, fmt.Errorf("resolve default inbound ccvs for remote chain %d: %w", remoteSelector, err)
-				}
-				laneMandatedInboundCCVs, err := resolveContractRefsByAddresses(
-					ds,
-					input.ChainSelector,
-					datastore.ContractType(committeeverifierop.ContractType),
-					committeeverifierop.Version,
-					remoteCfg.LaneMandatedInboundCCVs,
-				)
-				if err != nil {
-					return out, fmt.Errorf("resolve lane mandated inbound ccvs for remote chain %d: %w", remoteSelector, err)
-				}
-				defaultOutboundCCVs, err := resolveContractRefsByAddresses(
-					ds,
-					input.ChainSelector,
-					datastore.ContractType(committeeverifierop.ContractType),
-					committeeverifierop.Version,
-					remoteCfg.DefaultOutboundCCVs,
-				)
-				if err != nil {
-					return out, fmt.Errorf("resolve default outbound ccvs for remote chain %d: %w", remoteSelector, err)
-				}
-				laneMandatedOutboundCCVs, err := resolveContractRefsByAddresses(
-					ds,
-					input.ChainSelector,
-					datastore.ContractType(committeeverifierop.ContractType),
-					committeeverifierop.Version,
-					remoteCfg.LaneMandatedOutboundCCVs,
-				)
-				if err != nil {
-					return out, fmt.Errorf("resolve lane mandated outbound ccvs for remote chain %d: %w", remoteSelector, err)
-				}
-
-				localChain := &lanes.ChainDefinition{
-					Selector:                 input.ChainSelector,
-					CommitteeVerifiers:       localCommitteeVerifiers,
-					DefaultInboundCCVs:       defaultInboundCCVs,
-					LaneMandatedInboundCCVs:  laneMandatedInboundCCVs,
-					DefaultOutboundCCVs:      defaultOutboundCCVs,
-					LaneMandatedOutboundCCVs: laneMandatedOutboundCCVs,
-					DefaultExecutor:          localExecutor,
-					CantonLaneConfig:         &lanes.CantonLaneConfig{GlobalConfig: localGlobalConfig},
-					OnRamp:                   contracts.HexToInstanceAddress(input.OnRamp).Bytes(),
-					OffRamp:                  contracts.HexToInstanceAddress(input.OffRamp).Bytes(),
-					Router:                   contracts.HexToInstanceAddress(input.Router).Bytes(),
-					FeeQuoter:                contracts.HexToInstanceAddress(input.FeeQuoter).Bytes(),
-				}
-
-				remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)
-				if err != nil {
-					return out, err
-				}
-
-				out, err = ccipseq.RunAndMergeSequence(
-					b,
-					chains,
-					sequences.ConfigureLaneLegAsSource,
-					lanes.UpdateLanesInput{
-						Source: localChain,
-						Dest:   remoteChain,
-					},
-					out,
-				)
-				if err != nil {
-					return out, err
-				}
-
-				out, err = ccipseq.RunAndMergeSequence(
-					b,
-					chains,
-					sequences.ConfigureLaneLegAsDest,
-					lanes.UpdateLanesInput{
-						Source: remoteChain,
-						Dest:   localChain,
-					},
-					out,
-				)
-				if err != nil {
-					return out, err
-				}
-			}
+			out.BatchOps = cantonmcms.ConsolidateBatchOpsPerChain(out.BatchOps)
 
 			return out, nil
 		},
 	)
+}
+
+// ConfigureCommitteeVerifierForLanes configures CommitteeVerifier lane settings only.
+// Used by ConfigureCantonCommitteeVerifierForLanesFromTopology (Run 2).
+func (a *CantonChainFamilyAdapter) ConfigureCommitteeVerifierForLanes() *cldfops.Sequence[ccipadapters.ConfigureChainForLanesInput, ccipseq.OnChainOutput, cldfchain.BlockChains] {
+	return cldfops.NewSequence(
+		"canton/configure-committee-verifier-for-lanes",
+		semver.MustParse("2.0.0"),
+		"Configures CommitteeVerifier lane settings for a Canton chain",
+		func(b cldfops.Bundle, chains cldfchain.BlockChains, input ccipadapters.ConfigureChainForLanesInput) (ccipseq.OnChainOutput, error) {
+			out, err := a.configureCommitteeVerifierForLanes(b, chains, input)
+			if err != nil {
+				return ccipseq.OnChainOutput{}, err
+			}
+			out.BatchOps = cantonmcms.ConsolidateBatchOpsPerChain(out.BatchOps)
+
+			return out, nil
+		},
+	)
+}
+
+// configureChainForLanes resolves deployed contract refs from the input datastore and runs
+// lane configure sequences (GlobalConfig, FeeQuoter, Executor, CommitteeVerifier, …).
+// MCMS transactions are returned in OnChainOutput.BatchOps for the changeset layer to split
+// into ccipOwner and ccvOwner proposals.
+func (a *CantonChainFamilyAdapter) configureChainForLanes(
+	b cldfops.Bundle,
+	chains cldfchain.BlockChains,
+	input ccipadapters.ConfigureChainForLanesInput,
+) (ccipseq.OnChainOutput, error) {
+	ds, err := dataStoreFromConfigureChainForLanesInput(input)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, err
+	}
+
+	localGlobalConfig, err := findContractRef(
+		ds,
+		input.ChainSelector,
+		datastore.ContractType(global_config.ContractType),
+		global_config.Version,
+		"",
+	)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve global config: %w", err)
+	}
+
+	router, onRamp, feeQuoter, offRamp, err := a.resolveLocalContractsForConfigureLanes(ds, input)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, err
+	}
+
+	localCommitteeVerifiers := convertCommitteeVerifierConfigs(input.CommitteeVerifiers)
+	var out ccipseq.OnChainOutput
+
+	for remoteSelector, remoteCfg := range input.RemoteChains {
+		localExecutor, err := resolveContractRefByAddress(
+			ds,
+			input.ChainSelector,
+			datastore.ContractType(executorop.ContractType),
+			executorop.Version,
+			remoteCfg.DefaultExecutor,
+		)
+		if err != nil {
+			return out, fmt.Errorf("resolve executor for remote chain %d: %w", remoteSelector, err)
+		}
+		defaultInboundCCVs, err := resolveContractRefsByAddresses(
+			ds,
+			input.ChainSelector,
+			datastore.ContractType(committeeverifierop.ContractType),
+			committeeverifierop.Version,
+			remoteCfg.DefaultInboundCCVs,
+		)
+		if err != nil {
+			return out, fmt.Errorf("resolve default inbound ccvs for remote chain %d: %w", remoteSelector, err)
+		}
+		laneMandatedInboundCCVs, err := resolveContractRefsByAddresses(
+			ds,
+			input.ChainSelector,
+			datastore.ContractType(committeeverifierop.ContractType),
+			committeeverifierop.Version,
+			remoteCfg.LaneMandatedInboundCCVs,
+		)
+		if err != nil {
+			return out, fmt.Errorf("resolve lane mandated inbound ccvs for remote chain %d: %w", remoteSelector, err)
+		}
+		defaultOutboundCCVs, err := resolveContractRefsByAddresses(
+			ds,
+			input.ChainSelector,
+			datastore.ContractType(committeeverifierop.ContractType),
+			committeeverifierop.Version,
+			remoteCfg.DefaultOutboundCCVs,
+		)
+		if err != nil {
+			return out, fmt.Errorf("resolve default outbound ccvs for remote chain %d: %w", remoteSelector, err)
+		}
+		laneMandatedOutboundCCVs, err := resolveContractRefsByAddresses(
+			ds,
+			input.ChainSelector,
+			datastore.ContractType(committeeverifierop.ContractType),
+			committeeverifierop.Version,
+			remoteCfg.LaneMandatedOutboundCCVs,
+		)
+		if err != nil {
+			return out, fmt.Errorf("resolve lane mandated outbound ccvs for remote chain %d: %w", remoteSelector, err)
+		}
+
+		localChain := &lanes.ChainDefinition{
+			Selector:                 input.ChainSelector,
+			CommitteeVerifiers:       localCommitteeVerifiers,
+			DefaultInboundCCVs:       defaultInboundCCVs,
+			LaneMandatedInboundCCVs:  laneMandatedInboundCCVs,
+			DefaultOutboundCCVs:      defaultOutboundCCVs,
+			LaneMandatedOutboundCCVs: laneMandatedOutboundCCVs,
+			DefaultExecutor:          localExecutor,
+			CantonLaneConfig: &lanes.CantonLaneConfig{
+				GlobalConfig: localGlobalConfig,
+			},
+			OnRamp:    onRamp,
+			OffRamp:   offRamp,
+			Router:    router,
+			FeeQuoter: feeQuoter,
+		}
+
+		remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)
+		if err != nil {
+			return out, err
+		}
+
+		out, err = ccipseq.RunAndMergeSequence(
+			b,
+			chains,
+			sequences.ConfigureLaneLegAsSourceWithInput,
+			sequences.ConfigureLaneLegInput{
+				Lane: lanes.UpdateLanesInput{
+					Source: localChain,
+					Dest:   remoteChain,
+				},
+				DataStore: ds,
+			},
+			out,
+		)
+		if err != nil {
+			return out, err
+		}
+
+		out, err = ccipseq.RunAndMergeSequence(
+			b,
+			chains,
+			sequences.ConfigureLaneLegAsDest,
+			lanes.UpdateLanesInput{
+				Source: remoteChain,
+				Dest:   localChain,
+			},
+			out,
+		)
+		if err != nil {
+			return out, err
+		}
+	}
+
+	return out, nil
+}
+
+func (a *CantonChainFamilyAdapter) configureCommitteeVerifierForLanes(
+	b cldfops.Bundle,
+	chains cldfchain.BlockChains,
+	input ccipadapters.ConfigureChainForLanesInput,
+) (ccipseq.OnChainOutput, error) {
+	chain, ok := chains.CantonChains()[input.ChainSelector]
+	if !ok {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("canton chain %d not found", input.ChainSelector)
+	}
+
+	mcmsEnabled := len(chain.Participants[0].ReadAsPartyIDs) > 0
+	localCommitteeVerifiers := convertCommitteeVerifierConfigs(input.CommitteeVerifiers)
+	var out ccipseq.OnChainOutput
+
+	for _, verifierConfig := range localCommitteeVerifiers {
+		cvReport, err := cldfops.ExecuteSequence(b, sequences.ConfigureCommitteeVerifierAsSource, chains, sequences.ConfigureCommitteeVerifierAsSourceInput{
+			ChainSelector:           input.ChainSelector,
+			MCMSEnabled:             mcmsEnabled,
+			CommitteeVerifierConfig: verifierConfig,
+		})
+		if err != nil {
+			return out, fmt.Errorf("configuring committee verifier as source: %w", err)
+		}
+		out.BatchOps = append(out.BatchOps, cvReport.Output.BatchOps...)
+
+		cvDestReport, err := cldfops.ExecuteSequence(b, sequences.ConfigureCommitteeVerifierAsDest, chains, sequences.ConfigureCommitteeVerifierAsDestInput{
+			ChainSelector:           input.ChainSelector,
+			MCMSEnabled:             mcmsEnabled,
+			CommitteeVerifierConfig: verifierConfig,
+		})
+		if err != nil {
+			return out, fmt.Errorf("configuring committee verifier as dest: %w", err)
+		}
+		out.BatchOps = append(out.BatchOps, cvDestReport.Output.BatchOps...)
+	}
+
+	return out, nil
+}
+
+func (a *CantonChainFamilyAdapter) resolveLocalContractsForConfigureLanes(
+	ds datastore.DataStore,
+	input ccipadapters.ConfigureChainForLanesInput,
+) (router, onRamp, feeQuoter, offRamp []byte, err error) {
+	if input.AllowOnrampOverride {
+		router, err = a.GetTestRouter(ds, input.ChainSelector)
+	} else {
+		router, err = a.GetRouterAddress(ds, input.ChainSelector)
+	}
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("resolve router: %w", err)
+	}
+
+	onRamp, err = a.GetOnRampAddress(ds, input.ChainSelector)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("resolve onRamp: %w", err)
+	}
+	feeQuoter, err = a.GetFQAddress(ds, input.ChainSelector)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("resolve feeQuoter: %w", err)
+	}
+	offRamp, err = a.GetOffRampAddress(ds, input.ChainSelector)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("resolve offRamp: %w", err)
+	}
+
+	return router, onRamp, feeQuoter, offRamp, nil
 }
 
 func (a *CantonChainFamilyAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
@@ -232,6 +334,67 @@ func (a *CantonChainFamilyAdapter) ResolveExecutor(ds datastore.DataStore, chain
 	}
 
 	return ref.Address, nil
+}
+
+// GetAddressBytesLength implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetAddressBytesLength() uint8 {
+	return 32
+}
+
+// GetChainFamilySelector implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetChainFamilySelector() [4]byte {
+	return CantonFamilySelector
+}
+
+// GetDefaultCommitteeVerifierRemoteChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig() ccipadapters.CommitteeVerifierRemoteChainDefaults {
+	return ccipadapters.CommitteeVerifierRemoteChainDefaults{
+		AllowlistEnabled:   false,
+		FeeUSDCents:        0,
+		GasForVerification: 100_000,
+		PayloadSizeBytes:   1_000,
+	}
+}
+
+// GetDefaultFeeQuoterDestChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccipadapters.FeeQuoterDestChainConfig {
+	return ccipadapters.FeeQuoterDestChainConfig{
+		OverrideExistingConfig:      false,
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         CantonFamilySelector,
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		LinkFeeMultiplierPercent:    0,
+		USDPerUnitGas:               big.NewInt(0),
+	}
+}
+
+// GetDefaultFinalityConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
+	return finality.Config{
+		WaitForFinality: true,
+	}
+}
+
+// GetDefaultRemoteChainConfig implements [adapters.ChainFamily].
+func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig() ccipadapters.RemoteChainDefaults {
+	return ccipadapters.RemoteChainDefaults{
+		AllowTrafficFrom: true, // TODO: check what this does?
+		ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
+			USDCentsFee: 0,
+			Enabled:     true,
+		},
+		BaseExecutionGasCost:      50_000,
+		TokenReceiverAllowed:      false, // TODO: check what this does?
+		MessageNetworkFeeUSDCents: 0,
+		TokenNetworkFeeUSDCents:   0,
+	}
 }
 
 func findContractRef(ds datastore.DataStore, chainSelector uint64, contractType datastore.ContractType, version *semver.Version, qualifier string) (datastore.AddressRef, error) {
@@ -340,4 +503,25 @@ func remoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteC
 			},
 		},
 	}, nil
+}
+
+func dataStoreFromConfigureChainForLanesInput(input ccipadapters.ConfigureChainForLanesInput) (datastore.DataStore, error) {
+	if input.FamilyExtras != nil {
+		if ds, ok := input.FamilyExtras[ConfigureLanesDataStoreFamilyExtraKey].(datastore.DataStore); ok && ds != nil {
+			return ds, nil
+		}
+	}
+
+	if ds, ok := cachedConfigureLanesDataStore(input.ChainSelector); ok {
+		return ds, nil
+	}
+
+	v := reflect.ValueOf(input)
+	if f := v.FieldByName("DataStore"); f.IsValid() && !f.IsZero() {
+		if ds, ok := f.Interface().(datastore.DataStore); ok && ds != nil {
+			return ds, nil
+		}
+	}
+
+	return nil, fmt.Errorf("datastore is required (set FamilyExtras[%q] or upgrade chainlink-ccip/deployment)", ConfigureLanesDataStoreFamilyExtraKey)
 }

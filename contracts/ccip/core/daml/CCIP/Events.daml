@@ -1,0 +1,86 @@
+module CCIP.Events where
+
+import DA.Crypto.Text (BytesHex)
+import DA.List (dedup)
+
+import qualified CCIP.FinalityConfig
+import qualified CCIP.Internal
+import qualified CCIP.Tickets
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.TransferInstructionV1
+import qualified Chainlink.InstanceAddress
+
+template CCIPMessageSent
+    with
+        ccipOwner : Party
+        ccvOwners : [Party]
+        sender : Party
+        observers : [Party]
+        event : CCIPMessageSentEvent
+    where
+        signatory dedup (ccipOwner :: ccvOwners)
+        observer sender, observers
+
+data CCIPMessageSentEvent = CCIPMessageSentEvent
+    with
+        destChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        encodedMessage : BytesHex
+        verifierBlobs : [BytesHex]
+        receipts : [CCIP.Tickets.Receipt]
+    deriving (Eq, Show)
+
+template ExecutionStateChanged
+    with
+        ccipOwner : Party
+        ccvOwners : [Party]
+        receiver : Party
+        event : ExecutionStateChangedEvent
+    where
+        signatory dedup (ccipOwner :: ccvOwners)
+        observer receiver
+
+data ExecutionStateChangedEvent = ExecutionStateChangedEvent
+    with
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        state : CCIP.Internal.MessageExecutionState
+        returnData : BytesHex
+    deriving (Eq, Show)
+
+template TokenReceiveTicketClaimed
+    with
+        ccipOwner : Party
+        ccvOwners : [Party]
+        poolOwner : Party
+        receiver : Party
+        tokenReceiver : Party
+        tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
+        event : TokenReceiveTicketClaimedEvent
+    where
+        signatory poolOwner
+        observer dedup (ccipOwner :: receiver :: tokenReceiver :: ccvOwners)
+
+data TokenReceiveTicketClaimedEvent = TokenReceiveTicketClaimedEvent
+    with
+        verifiedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        tokenAdminRegistryInstanceId : Text
+        poolAddress : Chainlink.InstanceAddress.RawInstanceAddress
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        sourceAmount : BytesHex
+        localAmount : Numeric 0
+        sourcePoolData : BytesHex
+        messageId : BytesHex
+        sourceChainSelector : Numeric 0
+        finality : CCIP.FinalityConfig.FinalityConfig
+        output : TokenReceiveTicketClaimed_Output
+    deriving (Eq, Show)
+
+data TokenReceiveTicketClaimed_Output
+    = TokenReceiveTicketClaimed_Pending
+        with transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+    | TokenReceiveTicketClaimed_Completed
+        with receiverHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)

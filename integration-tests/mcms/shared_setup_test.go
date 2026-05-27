@@ -21,8 +21,6 @@ import (
 // Contract instances (MCMS, Counter, etc.) are NOT shared as each test needs its own isolated state.
 type SharedCantonEnvironment struct {
 	Participant   canton.Participant
-	McmsPkgID     string
-	McmsTestPkgID string
 	McmsEncoder   mcms.MCMSEncoder
 	CcipOwner     string
 	Signers       []*MCMSSigner
@@ -30,28 +28,17 @@ type SharedCantonEnvironment struct {
 	Config        MCMSConfig
 }
 
-// SharedTwoParticipantEnvironment extends SharedCantonEnvironment with a second participant.
-// Used for tests that require a random user on a separate participant.
-type SharedTwoParticipantEnvironment struct {
-	SharedCantonEnvironment
-	UserParticipant canton.Participant
-	RandomUser      string
-}
-
 // SharedTAREnvironment extends SharedCantonEnvironment with TokenAdminRegistry package.
 // Used for tests that interact with TokenAdminRegistry contracts.
 type SharedTAREnvironment struct {
 	SharedCantonEnvironment
-	TarPkgID string
 }
 
 // SharedCCIPMCMSEnvironment extends SharedCantonEnvironment with all CCIP + Factory packages.
 // Used for tests that validate MCMS-driven CCIP deployment and configuration.
 type SharedCCIPMCMSEnvironment struct {
 	SharedCantonEnvironment
-	CCIPCommonPkgID string
-	FactoryPkgID    string
-	FactoryEncoder  factory.MCMSEncoder
+	FactoryEncoder factory.MCMSEncoder
 }
 
 // SharedCCIPMCMSTwoParticipantEnvironment extends SharedCCIPMCMSEnvironment with a second party.
@@ -67,10 +54,6 @@ var (
 	sharedEnv     *SharedCantonEnvironment
 	sharedEnvOnce sync.Once
 	errSharedEnv  error
-
-	sharedTwoPartEnv     *SharedTwoParticipantEnvironment
-	sharedTwoPartEnvOnce sync.Once
-	errSharedTwoPartEnv  error
 
 	sharedTAREnv     *SharedTAREnvironment
 	sharedTAREnvOnce sync.Once
@@ -120,16 +103,12 @@ func GetSharedEnvironment(t *testing.T) *SharedCantonEnvironment {
 			return
 		}
 
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedEnv = &SharedCantonEnvironment{
 			Participant:   participant,
-			McmsPkgID:     mcmsPkgID,
-			McmsTestPkgID: mcmsTestPkgID,
-			McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+			McmsEncoder:   NewMCMSEncoder(),
 			CcipOwner:     participant.PartyID,
 			Signers:       signers,
 			SortedSigners: sortedSigners,
@@ -141,68 +120,6 @@ func GetSharedEnvironment(t *testing.T) *SharedCantonEnvironment {
 	require.NotNil(t, sharedEnv, "shared environment is nil")
 
 	return sharedEnv
-}
-
-// GetSharedTwoParticipantEnvironment initializes a shared environment with two participants.
-// Used by tests that need a separate user participant (e.g., testing contract disclosure).
-func GetSharedTwoParticipantEnvironment(t *testing.T) *SharedTwoParticipantEnvironment {
-	t.Helper()
-
-	sharedTwoPartEnvOnce.Do(func() {
-		env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
-		participant := env.Chain.Participants[0]
-		userParticipant := env.Chain.Participants[1]
-
-		// Upload MCMS DAR to both participants
-		mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
-		if err != nil {
-			errSharedTwoPartEnv = err
-			return
-		}
-
-		// Upload MCMS Test DAR (contains Counter) to both participants
-		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
-		if err != nil {
-			errSharedTwoPartEnv = err
-			return
-		}
-
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, mcmsTestDar}, participant, userParticipant)
-		if err != nil {
-			errSharedTwoPartEnv = err
-			return
-		}
-
-		if len(packageIDs) < 2 {
-			errSharedTwoPartEnv = err
-			return
-		}
-
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
-		signers := createSigners(t)
-		sortedSigners := SortSignersByAddress(signers)
-
-		sharedTwoPartEnv = &SharedTwoParticipantEnvironment{
-			SharedCantonEnvironment: SharedCantonEnvironment{
-				Participant:   participant,
-				McmsPkgID:     mcmsPkgID,
-				McmsTestPkgID: mcmsTestPkgID,
-				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
-				CcipOwner:     participant.PartyID,
-				Signers:       signers,
-				SortedSigners: sortedSigners,
-				Config:        New2of3Config(signers),
-			},
-			UserParticipant: userParticipant,
-			RandomUser:      userParticipant.PartyID,
-		}
-	})
-
-	require.NoError(t, errSharedTwoPartEnv, "failed to initialize two-participant environment")
-	require.NotNil(t, sharedTwoPartEnv, "two-participant environment is nil")
-
-	return sharedTwoPartEnv
 }
 
 // GetSharedTAREnvironment initializes a shared environment with TokenAdminRegistry support.
@@ -255,24 +172,18 @@ func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
 			return
 		}
 
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
-		tarPkgID := packageIDs[len(packageIDs)-1]
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedTAREnv = &SharedTAREnvironment{
 			SharedCantonEnvironment: SharedCantonEnvironment{
 				Participant:   participant,
-				McmsPkgID:     mcmsPkgID,
-				McmsTestPkgID: mcmsTestPkgID,
-				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+				McmsEncoder:   NewMCMSEncoder(),
 				CcipOwner:     participant.PartyID,
 				Signers:       signers,
 				SortedSigners: sortedSigners,
 				Config:        New2of3Config(signers),
 			},
-			TarPkgID: tarPkgID,
 		}
 	})
 
@@ -320,41 +231,27 @@ func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
 			darBytes = append(darBytes, dar)
 		}
 
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
+		_, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
 		if err != nil {
 			errSharedCCIPMCMSEnv = err
 			return
 		}
 
-		if len(packageIDs) < len(darPackages) {
-			errSharedCCIPMCMSEnv = fmt.Errorf("expected %d package IDs, got %d", len(darPackages), len(packageIDs))
-			return
-		}
-
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
-		ccipCommonPkgID := packageIDs[2]
-		factoryPkgID := packageIDs[len(packageIDs)-1]
-
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
-		factoryEncoder := factory.NewContract(factoryPkgID, "CCIP.Factory", "CCIPFactory").Encoder()
+		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.Factory", "CCIPFactory").Encoder()
 
 		sharedCCIPMCMSEnv = &SharedCCIPMCMSEnvironment{
 			SharedCantonEnvironment: SharedCantonEnvironment{
 				Participant:   participant,
-				McmsPkgID:     mcmsPkgID,
-				McmsTestPkgID: mcmsTestPkgID,
-				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+				McmsEncoder:   NewMCMSEncoder(),
 				CcipOwner:     participant.PartyID,
 				Signers:       signers,
 				SortedSigners: sortedSigners,
 				Config:        New2of3Config(signers),
 			},
-			CCIPCommonPkgID: ccipCommonPkgID,
-			FactoryPkgID:    factoryPkgID,
-			FactoryEncoder:  factoryEncoder,
+			FactoryEncoder: factoryEncoder,
 		}
 	})
 
@@ -375,13 +272,10 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 		env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
 		participant := env.Chain.Participants[0]
 
-		// Ensure user has explicit CanActAs rights for the primary party
-		// This is needed for multi-party submissions where both parties must be authorized
-		testhelpers.GrantCanActAs(t, participant, participant.PartyID)
-
 		// Allocate a second party on the same participant for bootstrapping
 		// Use unique hint to avoid conflicts across test runs
-		bootstrapParty := testhelpers.AllocateParty(t, participant, fmt.Sprintf("bootstrap-%s", uuid.New().String()[:8]))
+		bootstrapParty := testhelpers.AllocateParty(t, participant, fmt.Sprintf("bootstrap-%s", uuid.NewString()[:8]))
+		testhelpers.GrantCanActAs(t, participant, bootstrapParty)
 
 		darPackages := []contracts.Package{
 			contracts.MCMS,
@@ -411,42 +305,28 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 		}
 
 		// Upload DARs to the participant
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
+		_, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
 		if err != nil {
 			errSharedCCIPMCMSTwoPartEnv = err
 			return
 		}
 
-		if len(packageIDs) < len(darPackages) {
-			errSharedCCIPMCMSTwoPartEnv = fmt.Errorf("expected %d package IDs, got %d", len(darPackages), len(packageIDs))
-			return
-		}
-
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
-		ccipCommonPkgID := packageIDs[2]
-		factoryPkgID := packageIDs[len(packageIDs)-1]
-
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
-		factoryEncoder := factory.NewContract(factoryPkgID, "CCIP.Factory", "CCIPFactory").Encoder()
+		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.Factory", "CCIPFactory").Encoder()
 
 		sharedCCIPMCMSTwoPartEnv = &SharedCCIPMCMSTwoParticipantEnvironment{
 			SharedCCIPMCMSEnvironment: SharedCCIPMCMSEnvironment{
 				SharedCantonEnvironment: SharedCantonEnvironment{
 					Participant:   participant,
-					McmsPkgID:     mcmsPkgID,
-					McmsTestPkgID: mcmsTestPkgID,
-					McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+					McmsEncoder:   NewMCMSEncoder(),
 					CcipOwner:     participant.PartyID,
 					Signers:       signers,
 					SortedSigners: sortedSigners,
 					Config:        New2of3Config(signers),
 				},
-				CCIPCommonPkgID: ccipCommonPkgID,
-				FactoryPkgID:    factoryPkgID,
-				FactoryEncoder:  factoryEncoder,
+				FactoryEncoder: factoryEncoder,
 			},
 			BootstrapParty: bootstrapParty,
 		}

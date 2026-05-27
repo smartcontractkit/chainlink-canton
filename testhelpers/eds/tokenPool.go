@@ -5,10 +5,7 @@ import (
 	"fmt"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
@@ -19,9 +16,8 @@ type TokenPoolExecuteDisclosure struct {
 	ContractId         string
 	Address            contracts.RawInstanceAddress
 	DisclosedContracts []*apiv2.DisclosedContract
-	ChoiceContext      common.CCIPContext
+	ChoiceContext      splice_api_token_metadata_v1.ChoiceContext
 	RequiredCCVs       []string
-	TokenInput         interfaces.TokenInput
 }
 
 func GetTokenPoolExecuteDisclosure(
@@ -54,7 +50,7 @@ func GetTokenPoolExecuteDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := contracts.CCIPContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := contracts.ChoiceContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
@@ -64,40 +60,12 @@ func GetTokenPoolExecuteDisclosure(
 		requiredCCVs[i], _ = ccv.AsRawInstanceAddress()
 	}
 
-	tokenInputContext, err := contracts.CCIPContextFromData(resp.JSON200.TokenInput.ExtraArgs.Context)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert token input choice context: %w", err)
-	}
-
-	tokenPoolHoldings := make([]types.CONTRACT_ID, len(resp.JSON200.TokenInput.TokenPoolHoldings))
-	for i, id := range resp.JSON200.TokenInput.TokenPoolHoldings {
-		tokenPoolHoldings[i] = types.CONTRACT_ID(id)
-	}
-	tokenMetadataContext, err := contracts.CCIPContextToChoiceContext(tokenInputContext)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert token metadata choice context: %w", err)
-	}
-
-	tokenInput := interfaces.TokenInput{
-		TransferFactory: types.CONTRACT_ID(resp.JSON200.TokenInput.TransferFactory),
-		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: tokenMetadataContext,
-			Meta:    splice_api_token_metadata_v1.Metadata{},
-		},
-		TokenPoolHoldings: tokenPoolHoldings,
-	}
-	if resp.JSON200.TokenInput.BurnMintFactory != nil {
-		burnMintFactory := types.CONTRACT_ID(*resp.JSON200.TokenInput.BurnMintFactory)
-		tokenInput.BurnMintFactory = &burnMintFactory
-	}
-
 	return &TokenPoolExecuteDisclosure{
 		ContractId:         resp.JSON200.ContractId,
 		Address:            address,
 		DisclosedContracts: disclosedContracts,
 		ChoiceContext:      choiceContext,
 		RequiredCCVs:       requiredCCVs,
-		TokenInput:         tokenInput,
 	}, nil
 }
 
@@ -105,9 +73,8 @@ type TokenPoolSendDisclosure struct {
 	ContractId         string
 	Address            contracts.RawInstanceAddress
 	DisclosedContracts []*apiv2.DisclosedContract
-	ChoiceContext      common.CCIPContext
+	ChoiceContext      splice_api_token_metadata_v1.ChoiceContext
 	RequiredCCVs       []string
-	TokenInput         interfaces.TokenInput
 }
 
 func GetTokenPoolSendDisclosure(
@@ -140,7 +107,7 @@ func GetTokenPoolSendDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := contracts.CCIPContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := contracts.ChoiceContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
@@ -150,32 +117,11 @@ func GetTokenPoolSendDisclosure(
 		requiredCCVs[i], _ = ccv.AsRawInstanceAddress()
 	}
 
-	tokenInputContext, err := contracts.CCIPContextFromData(resp.JSON200.TokenInput.ExtraArgs.Context)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert token input choice context: %w", err)
-	}
-	tokenMetadataContext, err := contracts.CCIPContextToChoiceContext(tokenInputContext)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert token metadata choice context: %w", err)
-	}
-
-	tokenInput := interfaces.TokenInput{
-		TransferFactory: types.CONTRACT_ID(resp.JSON200.TokenInput.TransferFactory),
-		ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-			Context: tokenMetadataContext,
-			Meta:    splice_api_token_metadata_v1.Metadata{},
-		},
-	}
-	if resp.JSON200.TokenInput.BurnMintFactory != nil {
-		tokenInput.BurnMintFactory = new(types.CONTRACT_ID(*resp.JSON200.TokenInput.BurnMintFactory))
-	}
-
 	return &TokenPoolSendDisclosure{
 		ContractId:         resp.JSON200.ContractId,
 		Address:            address,
 		DisclosedContracts: disclosedContracts,
 		ChoiceContext:      choiceContext,
 		RequiredCCVs:       requiredCCVs,
-		TokenInput:         tokenInput,
 	}, nil
 }

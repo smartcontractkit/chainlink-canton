@@ -6,8 +6,10 @@ import DA.Assert
 
 import CCIP.ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
+import CCIP.Internal qualified as Internal
 import qualified CCIP.MessageCodecV1
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 
 finalityConfig n =
     if n == 0
@@ -74,7 +76,7 @@ testAddCCVVerification = do
             optionalCCVThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
-            inboundPoolCCVs = None
+            inboundPoolVerification = None
             deps = ExecutingMessageDeps with
                 offRamp = RawInstanceAddress.make "test-offramp" ccipOwner
                 globalConfig = RawInstanceAddress.make "test-globalConfig" ccipOwner
@@ -134,6 +136,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
     ccvOwner <- allocateParty "CCV Owner Token"
     receiver <- allocateParty "Receiver Token"
     executor <- allocateParty "Executor Token"
+    poolOwner <- allocateParty "Pool Owner Token"
 
     let message = CCIP.MessageCodecV1.MessageV1 with
             sourceChainSelector = 123.0
@@ -153,7 +156,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
                 sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000005"
                 destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
                 tokenReceiver = CCIP.MessageCodecV1.encodePartyAddress receiver
-                amount = 1.0
+                amount = fromSome (CCIP.MessageCodecV1.encodeUint256 1.0)
                 extraData = "")
             messageData = ""
 
@@ -173,7 +176,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
             optionalCCVThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
-            inboundPoolCCVs = None
+            inboundPoolVerification = None
             deps = ExecutingMessageDeps with
                 offRamp = RawInstanceAddress.make "test-offramp" ccipOwner
                 globalConfig = RawInstanceAddress.make "test-globalConfig" ccipOwner
@@ -189,6 +192,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
 
     executingMessageCid <- submit ccipOwner do
         exerciseCmd executingMessageCid SetInboundPoolCCVs with
+            poolAddress = RawInstanceAddress.make "test-pool" poolOwner
             poolCCVs = []
 
     executingMessageCid <- submit [ccipOwner, ccvOwner] do
@@ -199,3 +203,161 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
 
     finalMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
     length finalMessage.ccvVerifications === 1
+
+testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs : Script ()
+testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
+    ccipOwner <- allocateParty "CCIP Owner Finalize Snapshot"
+    defaultCCVOwner <- allocateParty "Default CCV Owner Finalize Snapshot"
+    explicitCCVOwner <- allocateParty "Explicit CCV Owner Finalize Snapshot"
+    poolOwner <- allocateParty "Pool Owner Finalize Snapshot"
+    receiver <- allocateParty "Receiver Finalize Snapshot"
+    executor <- allocateParty "Executor Finalize Snapshot"
+
+    let defaultCCV = RawInstanceAddress.make "default-ccv" defaultCCVOwner
+    let explicitCCV = RawInstanceAddress.make "explicit-ccv" explicitCCVOwner
+    let sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000004"
+    let sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000005"
+    let destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = 123.0
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            finality = messageFinality 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = Some (CCIP.MessageCodecV1.TokenTransferV1 with
+                sourcePoolAddress = sourcePoolAddress
+                sourceTokenAddress = sourceTokenAddress
+                destTokenAddress = destTokenAddress
+                tokenReceiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+                amount = fromSome (CCIP.MessageCodecV1.encodeUint256 10.0)
+                extraData = "")
+            messageData = ""
+
+    executingMessageCid <- submit ccipOwner do
+        createCmd ExecutingMessageV1 with
+            ccipOwner = ccipOwner
+            message = message
+            messageId = "0x9abc"
+            receiver = receiver
+            tokenReceiver = Some receiver
+            executor = executor
+            observingParties = []
+            ccvVerifications = []
+            ccvOwners = []
+            requiredCCVs = [defaultCCV]
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverFinalityConfig = finalityConfig 2000
+            sourceDefaultCCVs = [defaultCCV]
+            inboundPoolVerification = Some (InboundPoolVerification with
+                poolAddress = RawInstanceAddress.make "snapshot-pool" poolOwner
+                poolCCVs = [Internal.useDefaultCCVs, explicitCCV])
+            deps = ExecutingMessageDeps with
+                offRamp = RawInstanceAddress.make "test-offramp-snapshot" ccipOwner
+                globalConfig = RawInstanceAddress.make "test-globalConfig-snapshot" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmnRemote-snapshot" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make "test-tokenAdminRegistry-snapshot" ccipOwner
+            state = ExecutingMessageState_Prepared
+
+    submitMustFail [ccipOwner] do
+        exerciseCmd executingMessageCid FinalizeExecute with
+            tokenAdminRegistryInstanceId = "test-tokenAdminRegistry-snapshot"
+            maybePoolAddress = Some (RawInstanceAddress.make "wrong-snapshot-pool" poolOwner)
+            maybeTicketReceiver = Some receiver
+            maybeTokenReceiver = Some receiver
+            maybeInstrumentId = Some (HoldingV1.InstrumentId with admin = ccipOwner, id = "TEST")
+            maybeAmount = Some (fromSome (CCIP.MessageCodecV1.encodeUint256 10.0))
+            returnData = ""
+
+    finalizeResult <- submit ccipOwner do
+        exerciseCmd executingMessageCid FinalizeExecute with
+            tokenAdminRegistryInstanceId = "test-tokenAdminRegistry-snapshot"
+            maybePoolAddress = Some (RawInstanceAddress.make "snapshot-pool" poolOwner)
+            maybeTicketReceiver = Some receiver
+            maybeTokenReceiver = Some receiver
+            maybeInstrumentId = Some (HoldingV1.InstrumentId with admin = ccipOwner, id = "TEST")
+            maybeAmount = Some (fromSome (CCIP.MessageCodecV1.encodeUint256 10.0))
+            returnData = ""
+
+    ticketCid <- case finalizeResult.tokenReceiveTicket of
+        Some cid -> pure cid
+        None -> abort "expected token receive ticket"
+    ticket <- fromSome <$> queryContractId ccipOwner ticketCid
+    ticket.requiredInboundPoolCCVs === [defaultCCV, explicitCCV]
+    ticket.poolAddress === RawInstanceAddress.make "snapshot-pool" poolOwner
+
+testFinalizeExecuteFailsWithoutInboundPoolCCVsForTokenTicket : Script ()
+testFinalizeExecuteFailsWithoutInboundPoolCCVsForTokenTicket = do
+    ccipOwner <- allocateParty "CCIP Owner Finalize Missing Inbound"
+    poolOwner <- allocateParty "Pool Owner Finalize Missing Inbound"
+    receiver <- allocateParty "Receiver Finalize Missing Inbound"
+    executor <- allocateParty "Executor Finalize Missing Inbound"
+
+    let sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000004"
+    let sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000005"
+    let destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
+    let instrumentId = HoldingV1.InstrumentId with admin = ccipOwner, id = "TEST"
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = 123.0
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            finality = messageFinality 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = Some (CCIP.MessageCodecV1.TokenTransferV1 with
+                sourcePoolAddress = sourcePoolAddress
+                sourceTokenAddress = sourceTokenAddress
+                destTokenAddress = destTokenAddress
+                tokenReceiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+                amount = fromSome (CCIP.MessageCodecV1.encodeUint256 10.0)
+                extraData = "")
+            messageData = ""
+
+    executingMessageCid <- submit ccipOwner do
+        createCmd ExecutingMessageV1 with
+            ccipOwner = ccipOwner
+            message = message
+            messageId = "0xdef0"
+            receiver = receiver
+            tokenReceiver = Some receiver
+            executor = executor
+            observingParties = []
+            ccvVerifications = []
+            ccvOwners = []
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverFinalityConfig = finalityConfig 2000
+            sourceDefaultCCVs = []
+            inboundPoolVerification = None
+            deps = ExecutingMessageDeps with
+                offRamp = RawInstanceAddress.make "test-offramp-missing-inbound" ccipOwner
+                globalConfig = RawInstanceAddress.make "test-globalConfig-missing-inbound" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmnRemote-missing-inbound" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make "test-tokenAdminRegistry-missing-inbound" ccipOwner
+            state = ExecutingMessageState_Prepared
+
+    submitMustFail [ccipOwner] do
+        exerciseCmd executingMessageCid FinalizeExecute with
+            tokenAdminRegistryInstanceId = "test-tokenAdminRegistry-missing-inbound"
+            maybePoolAddress = Some (RawInstanceAddress.make "missing-inbound-pool" poolOwner)
+            maybeTicketReceiver = Some receiver
+            maybeTokenReceiver = Some receiver
+            maybeInstrumentId = Some instrumentId
+            maybeAmount = Some (fromSome (CCIP.MessageCodecV1.encodeUint256 10.0))
+            returnData = ""

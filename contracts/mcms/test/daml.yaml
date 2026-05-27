@@ -1,12 +1,14 @@
-sdk-version: 3.4.10
+sdk-version: 3.4.11
 name: mcms-test
-version: 0.0.1
+version: 1.0.0
 source: daml
 dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
-  - ../.daml/dist/mcms-0.0.1.dar
+  - ../../chainlink/api/.daml/dist/chainlink-api-1.0.0.dar
+  - ../api/.daml/dist/mcms-api-1.0.0.dar
+  - ../core/.daml/dist/mcms-core-1.0.0.dar
 build-options:
   - -Wno-upgrade-interfaces
   - -Wno-crypto-text-is-alpha

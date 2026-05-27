@@ -1,0 +1,61 @@
+module CCIP.Interfaces.Executor where
+
+import DA.Crypto.Text (BytesHex)
+
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
+import qualified CCIP.SendingMessageV1
+import Chainlink.InstanceAddress (RawInstanceAddress)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+interface IExecutor where
+    viewtype ExecutorView
+
+    executor_calculateFeeImpl :
+        ContractId IExecutor ->
+        Executor_CalculateFee ->
+        Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
+    executor_getFeeImpl :
+        ContractId IExecutor ->
+        Executor_GetFee ->
+        Update ExecutorFeeQuote
+
+    nonconsuming choice Executor_CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        with
+            expectedExecutor : RawInstanceAddress
+            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            executorArgs : BytesHex
+            extraContext : ChoiceContext
+            caller : Party
+        controller caller
+        do
+            let executorView = view this
+            RawInstanceAddress.assertEqual "executor: expected executor mismatch"
+                executorView.instanceId executorView.owner expectedExecutor
+            executor_calculateFeeImpl this self arg
+
+    nonconsuming choice Executor_GetFee : ExecutorFeeQuote
+        with
+            expectedExecutor : RawInstanceAddress
+            destChainSelector : Numeric 0
+            requiredCCVs : [RawInstanceAddress]
+            caller : Party
+        controller caller
+        do
+            let executorView = view this
+            RawInstanceAddress.assertEqual "executor: expected executor mismatch"
+                executorView.instanceId executorView.owner expectedExecutor
+            executor_getFeeImpl this self arg
+
+data ExecutorView = ExecutorView
+    with
+        instanceId : Text
+        owner : Party
+    deriving (Eq, Show)
+
+data ExecutorFeeQuote = ExecutorFeeQuote
+    with
+        executorInstanceId : Text
+        executorOwner : Party
+        feeUSDCents : Numeric 0
+    deriving (Eq, Show)

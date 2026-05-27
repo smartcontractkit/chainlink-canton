@@ -56,14 +56,6 @@ insecure_connection = true
 nop_aliases = ["evm-default-verifier-1", "evm-default-verifier-2"]
 threshold = 2
 
-[environment_topology.nop_topology.committees.default.chain_configs.12922642891491394802]
-nop_aliases = ["evm-default-verifier-1", "evm-default-verifier-2"]
-threshold = 2
-
-[environment_topology.nop_topology.committees.default.chain_configs.4793464827907405086]
-nop_aliases = ["evm-default-verifier-1", "evm-default-verifier-2"]
-threshold = 2
-
 [environment_topology.nop_topology.committees.default.chain_configs.8706591216959472610]
 nop_aliases = ["canton-default-verifier-1", "canton-default-verifier-2"]
 threshold = 2
@@ -81,14 +73,6 @@ worker_count = 100
 ntp_server = "time.google.com"
 
 [environment_topology.executor_pools.default.chain_configs."3379446385462418246"]
-nop_aliases = ["default-executor-1"]
-execution_interval = 15_000_000_000
-
-[environment_topology.executor_pools.default.chain_configs."12922642891491394802"]
-nop_aliases = ["default-executor-1"]
-execution_interval = 15_000_000_000
-
-[environment_topology.executor_pools.default.chain_configs."4793464827907405086"]
 nop_aliases = ["default-executor-1"]
 execution_interval = 15_000_000_000
 
@@ -111,27 +95,11 @@ execution_interval = 15_000_000_000
   type = "anvil"
 
 [[blockchains]]
-  container_name = "blockchain-dst"
-  chain_id = "2337"
-  docker_cmd_params = ["-b", "1", "--mixed-mining", "--slots-in-an-epoch", "1"]
-  image = "ghcr.io/foundry-rs/foundry:latest"
-  port = "8555"
-  type = "anvil"
-
-[[blockchains]]
-  container_name = "blockchain-3rd"
-  chain_id = "3337"
-  docker_cmd_params = ["-b", "1", "--mixed-mining", "--slots-in-an-epoch", "1"]
-  image = "ghcr.io/foundry-rs/foundry:latest"
-  port = "8565"
-  type = "anvil"
-
-[[blockchains]]
   container_name = "blockchain-canton"
   chain_id = "LocalNet"
   port = "8575"
   type = "canton"
-  image = "0.5.17"
+  image = "0.6.3"
   number_of_canton_validators = 1
 
 [fake]
@@ -192,11 +160,11 @@ execution_interval = 15_000_000_000
     [verifier.opaque_configs.canton.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
       [verifier.opaque_configs.canton.reader_configs.8706591216959472610.ccip_message_sent_template_id]
-        package_id = "#ccip-common"
+        package_id = "#ccip-core"
         module_name = "CCIP.Events"
         entity_name = "CCIPMessageSent"
       [verifier.opaque_configs.canton.reader_configs.8706591216959472610.rmn_remote_template_id]
-        package_id = "#ccip-rmn"
+        package_id = "#ccip-core"
         module_name = "CCIP.RMNRemote"
         entity_name = "RMNRemote"
     [verifier.opaque_configs.canton.blockchain_infos.8706591216959472610]
@@ -226,11 +194,11 @@ execution_interval = 15_000_000_000
     [verifier.opaque_configs.canton.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
       [verifier.opaque_configs.canton.reader_configs.8706591216959472610.ccip_message_sent_template_id]
-        package_id = "#ccip-common"
+        package_id = "#ccip-core"
         module_name = "CCIP.Events"
         entity_name = "CCIPMessageSent"
       [verifier.opaque_configs.canton.reader_configs.8706591216959472610.rmn_remote_template_id]
-        package_id = "#ccip-rmn"
+        package_id = "#ccip-core"
         module_name = "CCIP.RMNRemote"
         entity_name = "RMNRemote"
     [verifier.opaque_configs.canton.blockchain_infos.8706591216959472610]
@@ -267,10 +235,12 @@ execution_interval = 15_000_000_000
 
 [[executor]]
   image = "executor:dev"
-  port = 8101
   container_name = "default-executor-1"
   nop_alias = "default-executor-1"
   executor_qualifier = "default"
+  [executor.db]
+    image = "postgres:16-alpine"
+    name = "default-executor-1-db"
 
 [[indexer]]
   image = "indexer:dev"

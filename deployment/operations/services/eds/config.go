@@ -139,9 +139,9 @@ var BuildConfig = operations.NewOperation(
 		}
 
 		refs = env.DataStore.Addresses().Filter(datastore.AddressRefByChainSelector(input.ChainSelector))
-		tokenPools := make([]edsConfig.TokenPool, 0, len(refs))
+		tokenPools := make(map[string]edsConfig.TokenPool)
 		for _, ref := range refs {
-			if strings.Count(ref.Qualifier, "[default]") != 2 {
+			if strings.Count(ref.Qualifier, "[default]") != 3 { // TODO: this logic is really fragile and needs to be improved.
 				continue
 			}
 
@@ -162,19 +162,23 @@ var BuildConfig = operations.NewOperation(
 				continue
 			}
 
-			tokenPools = append(tokenPools, edsConfig.TokenPool{
+			instanceAddress := contracts.HexToInstanceAddress(ref.Address)
+			pool := edsConfig.TokenPool{
 				ContractIdentifier: edsConfig.ContractIdentifier{
 					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
+					InstanceAddress: instanceAddress,
 				},
 				Type:      tokenPoolType,
 				PoolOwner: participant.PartyID,
-				TransferFactory: &edsConfig.TransferFactory{
+			}
+			if tokenPoolType == edsConfig.TokenPoolTypeLockRelease {
+				pool.TransferFactory = &edsConfig.TransferFactory{
 					Type:                    edsConfig.FactoryTypeURL,
 					TokenStandardURL:        tokenStandardURL,
 					TokenStandardAuthConfig: tokenStandardAuthConfig,
-				},
-			})
+				}
+			}
+			tokenPools[instanceAddress.Hex()] = pool
 		}
 
 		return GenerateEDSConfigOutput{

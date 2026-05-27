@@ -22,19 +22,20 @@ import MCMS.Codec
 import CCIP.Codec
   ( encodeInstrumentId
   , encodeRawInstanceAddress
-  , encodeRawInstanceAddressList
   )
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.Factory
-import MCMS.RawInstanceAddress (RawInstanceAddress(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
-import CCIP.ContextCodec (encodeCCIPContext)
+import CCIP.ContextCodec (encodeChoiceContext)
 import CCIP.LockReleaseTokenPoolCodecGen (encodeTransferTimeout)
+import qualified CCIP.BurnMintTokenPoolCodecGen
+import qualified CCIP.BurnMintTokenPoolTypes
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
-import CCIP.Context (emptyCCIPContext)
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 finalityConfig n =
   if n == 0
@@ -62,6 +63,11 @@ encodeDeployFeeQuoterParams : DeployFeeQuoterParams -> BytesHex
 encodeDeployFeeQuoterParams params =
   encodeText params.instanceId
   <> encodeInstrumentId params.linkTokenInstrumentId
+
+encodeDeployLinkTokenParams : DeployLinkTokenParams -> BytesHex
+encodeDeployLinkTokenParams params =
+  encodeText params.instanceId
+  <> encodeInstrumentId params.instrumentId
 
 encodeDeployTokenAdminRegistryParams : DeployTokenAdminRegistryParams -> BytesHex
 encodeDeployTokenAdminRegistryParams params =
@@ -134,8 +140,22 @@ encodeDeployLockReleaseTokenPoolParams params =
   <> encodeRawInstanceAddress params.tokenAdminRegistry
   <> encodeRawInstanceAddress params.feeQuoter
   <> encodeRawInstanceAddress params.rmnRemote
-  <> encodeCCIPContext params.poolReceiveContext
+  <> encodeChoiceContext params.poolReceiveContext
   <> encodeTransferTimeout params.transferTimeout
+
+encodeDeployBurnMintTokenPoolParams : DeployBurnMintTokenPoolParams -> BytesHex
+encodeDeployBurnMintTokenPoolParams params =
+  encodeText params.instanceId
+  <> encodeParty params.poolOwner
+  <> encodeParty params.ccipOwner
+  <> encodeInstrumentId params.instrumentId
+  <> fromSome (encodeInt64 params.decimals)
+  <> encodeOptional params.rateLimitAdmin encodeParty
+  <> encodeRawInstanceAddress params.tokenAdminRegistry
+  <> encodeRawInstanceAddress params.feeQuoter
+  <> encodeRawInstanceAddress params.rmnRemote
+  <> encodeChoiceContext params.poolReceiveContext
+  <> CCIP.BurnMintTokenPoolCodecGen.encodeTransferTimeout params.transferTimeout
 
 encodeRateLimitDirection : RateLimitDirection -> BytesHex
 encodeRateLimitDirection RateLimitDirection_Outbound = fromSome (encodeUint8 0)
@@ -156,20 +176,6 @@ encodeDeployRateLimiterParams params =
   <> encodeBool params.isEnabled
   <> encodeNumeric0 params.capacity
   <> encodeNumeric0 params.rate
-
-encodeDeployCCIPSenderParams : DeployCCIPSenderParams -> BytesHex
-encodeDeployCCIPSenderParams params =
-  encodeText params.instanceId
-  <> encodeParty params.owner
-
-encodeDeployCCIPReceiverParams : DeployCCIPReceiverParams -> BytesHex
-encodeDeployCCIPReceiverParams params =
-  encodeText params.instanceId
-  <> encodeParty params.owner
-  <> encodeRawInstanceAddressList params.requiredCCVs
-  <> encodeRawInstanceAddressList params.optionalCCVs
-  <> fromSome (encodeInt64 params.optionalThreshold)
-  <> encodeRequestedFinality params.receiverFinalityConfig
 
 -- ===========================================================================
 -- ROUND-TRIP TESTS
@@ -219,6 +225,23 @@ testDecodeDeployFeeQuoterParams = script do
     Some decoded -> do
       decoded.instanceId === params.instanceId
       decoded.linkTokenInstrumentId === params.linkTokenInstrumentId
+
+  pure ()
+
+testDecodeDeployLinkTokenParams : Script ()
+testDecodeDeployLinkTokenParams = script do
+  tokenAdmin <- allocateParty "LinkTokenAdmin"
+
+  let params = DeployLinkTokenParams with
+        instanceId = "link-token-1"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      encoded = encodeDeployLinkTokenParams params
+
+  case decodeDeployLinkTokenParams encoded of
+    None -> abort "Failed to decode DeployLinkTokenParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.instrumentId === params.instrumentId
 
   pure ()
 
@@ -459,7 +482,7 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
         tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
         feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
         rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
-        poolReceiveContext = emptyCCIPContext
+        poolReceiveContext = MetadataV1.emptyChoiceContext
         transferTimeout = RelativeHours 24
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
@@ -498,7 +521,7 @@ testDecodeDeployLockReleaseTokenPoolParams_Indefinite = script do
         tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
         feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
         rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
-        poolReceiveContext = emptyCCIPContext
+        poolReceiveContext = MetadataV1.emptyChoiceContext
         transferTimeout = Indefinite
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
@@ -506,7 +529,78 @@ testDecodeDeployLockReleaseTokenPoolParams_Indefinite = script do
     None -> abort "Failed to decode DeployLockReleaseTokenPoolParams with Indefinite"
     Some decoded -> do
       decoded.transferTimeout === Indefinite
-      decoded.poolReceiveContext === emptyCCIPContext
+      decoded.poolReceiveContext === MetadataV1.emptyChoiceContext
+      decoded.rateLimitAdmin === None
+
+  pure ()
+
+testDecodeDeployBurnMintTokenPoolParams : Script ()
+testDecodeDeployBurnMintTokenPoolParams = script do
+  poolOwner <- allocateParty "pool_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "token_admin"
+  rateLimitAdmin <- allocateParty "rate_limit_admin"
+  feeOwner <- allocateParty "fee_owner"
+  rmnOwner <- allocateParty "rmn_owner"
+
+  let params = DeployBurnMintTokenPoolParams with
+        instanceId = "bmtp-1"
+        poolOwner
+        ccipOwner
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+        decimals = 6
+        rateLimitAdmin = Some rateLimitAdmin
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.BurnMintTokenPoolTypes.RelativeHours 24
+      encoded = encodeDeployBurnMintTokenPoolParams params
+
+  case decodeDeployBurnMintTokenPoolParams encoded of
+    None -> abort "Failed to decode DeployBurnMintTokenPoolParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.poolOwner === params.poolOwner
+      decoded.ccipOwner === params.ccipOwner
+      decoded.instrumentId === params.instrumentId
+      decoded.decimals === params.decimals
+      decoded.rateLimitAdmin === params.rateLimitAdmin
+      decoded.tokenAdminRegistry === params.tokenAdminRegistry
+      decoded.feeQuoter === params.feeQuoter
+      decoded.rmnRemote === params.rmnRemote
+      decoded.poolReceiveContext === params.poolReceiveContext
+      decoded.transferTimeout === params.transferTimeout
+
+  pure ()
+
+testDecodeDeployBurnMintTokenPoolParams_Indefinite : Script ()
+testDecodeDeployBurnMintTokenPoolParams_Indefinite = script do
+  poolOwner <- allocateParty "pool_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "token_admin"
+  feeOwner <- allocateParty "fee_owner"
+  rmnOwner <- allocateParty "rmn_owner"
+
+  let params = DeployBurnMintTokenPoolParams with
+        instanceId = "bmtp-indefinite"
+        poolOwner
+        ccipOwner
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+        decimals = 18
+        rateLimitAdmin = None
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.BurnMintTokenPoolTypes.Indefinite
+      encoded = encodeDeployBurnMintTokenPoolParams params
+
+  case decodeDeployBurnMintTokenPoolParams encoded of
+    None -> abort "Failed to decode DeployBurnMintTokenPoolParams with Indefinite"
+    Some decoded -> do
+      decoded.transferTimeout === CCIP.BurnMintTokenPoolTypes.Indefinite
+      decoded.poolReceiveContext === MetadataV1.emptyChoiceContext
       decoded.rateLimitAdmin === None
 
   pure ()
@@ -564,71 +658,6 @@ testDecodeDeployRateLimiterParams_Inbound = script do
       decoded.direction === RateLimitDirection_Inbound
       decoded.mode === RateLimitMode_CustomFinality
       decoded.isEnabled === False
-
-  pure ()
-
-testDecodeDeployCCIPSenderParams : Script ()
-testDecodeDeployCCIPSenderParams = script do
-  owner <- allocateParty "owner"
-
-  let params = DeployCCIPSenderParams with
-        instanceId = "sender-1"
-        owner
-      encoded = encodeDeployCCIPSenderParams params
-
-  case decodeDeployCCIPSenderParams encoded of
-    None -> abort "Failed to decode DeployCCIPSenderParams"
-    Some decoded -> do
-      decoded.instanceId === params.instanceId
-      decoded.owner === params.owner
-
-  pure ()
-
-testDecodeDeployCCIPReceiverParams : Script ()
-testDecodeDeployCCIPReceiverParams = script do
-  owner <- allocateParty "owner"
-
-  let params = DeployCCIPReceiverParams with
-        instanceId = "receiver-1"
-        owner
-        requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
-        optionalCCVs = [RawInstanceAddress "ccv3@owner", RawInstanceAddress "ccv4@owner"]
-        optionalThreshold = 20
-        receiverFinalityConfig = finalityConfig 42
-      encoded = encodeDeployCCIPReceiverParams params
-
-  case decodeDeployCCIPReceiverParams encoded of
-    None -> abort "Failed to decode DeployCCIPReceiverParams"
-    Some decoded -> do
-      decoded.instanceId === params.instanceId
-      decoded.owner === params.owner
-      decoded.requiredCCVs === params.requiredCCVs
-      decoded.optionalCCVs === params.optionalCCVs
-      decoded.optionalThreshold === params.optionalThreshold
-      decoded.receiverFinalityConfig === params.receiverFinalityConfig
-
-  pure ()
-
-testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs : Script ()
-testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
-  owner <- allocateParty "owner"
-
-  let params = DeployCCIPReceiverParams with
-        instanceId = "receiver-empty"
-        owner
-        requiredCCVs = []
-        optionalCCVs = []
-        optionalThreshold = 0
-        receiverFinalityConfig = finalityConfig 0
-      encoded = encodeDeployCCIPReceiverParams params
-
-  case decodeDeployCCIPReceiverParams encoded of
-    None -> abort "Failed to decode with empty requiredCCVs"
-    Some decoded -> do
-      decoded.requiredCCVs === []
-      decoded.optionalCCVs === []
-      decoded.optionalThreshold === 0
-      decoded.receiverFinalityConfig === finalityConfig 0
 
   pure ()
 

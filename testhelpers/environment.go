@@ -23,7 +23,7 @@ import (
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
 
 // SpliceVersion overrides the default version specified by CTF
-const SpliceVersion = "0.5.17"
+const SpliceVersion = "0.6.3"
 
 type TestEnvironment struct {
 	Logger zerolog.Logger
@@ -173,8 +173,8 @@ func NewTestEnvironment(t *testing.T, options ...TestOption) TestEnvironment {
 	return env
 }
 
-// AllocateParty allocates a new party on the given participant and grants the
-// participant's user CanActAs rights for the new party.
+// AllocateParty allocates a new party on the given participant, given the partyHint.
+// It will fail if the party already exists.
 // Returns the new party ID.
 func AllocateParty(t *testing.T, participant canton.Participant, partyHint string) string {
 	t.Helper()
@@ -186,24 +186,10 @@ func AllocateParty(t *testing.T, participant canton.Participant, partyHint strin
 
 	partyID := resp.GetPartyDetails().GetParty()
 
-	// Grant CanActAs rights to the participant's user for the new party
-	_, err = participant.LedgerServices.Admin.UserManagement.GrantUserRights(t.Context(), &adminv2.GrantUserRightsRequest{
-		UserId: participant.UserID,
-		Rights: []*adminv2.Right{{
-			Kind: &adminv2.Right_CanActAs_{
-				CanActAs: &adminv2.Right_CanActAs{
-					Party: partyID,
-				},
-			},
-		}},
-	})
-	require.NoError(t, err, "Failed to grant CanActAs rights for party %s to user %s", partyID, participant.UserID)
-
 	return partyID
 }
 
-// GrantCanActAs grants CanActAs rights for the given party to the participant's user.
-// This is useful for multi-party submissions where the user needs to act as multiple parties.
+// GrantCanActAs grants the participant's user actAs rights for the given partyID
 func GrantCanActAs(t *testing.T, participant canton.Participant, partyID string) {
 	t.Helper()
 
@@ -218,4 +204,21 @@ func GrantCanActAs(t *testing.T, participant canton.Participant, partyID string)
 		}},
 	})
 	require.NoError(t, err, "Failed to grant CanActAs rights for party %s to user %s", partyID, participant.UserID)
+}
+
+// GrantCanReadAs grants the participant's user readAs rights for the given partyID.
+func GrantCanReadAs(t *testing.T, participant canton.Participant, partyID string) {
+	t.Helper()
+
+	_, err := participant.LedgerServices.Admin.UserManagement.GrantUserRights(t.Context(), &adminv2.GrantUserRightsRequest{
+		UserId: participant.UserID,
+		Rights: []*adminv2.Right{{
+			Kind: &adminv2.Right_CanReadAs_{
+				CanReadAs: &adminv2.Right_CanReadAs{
+					Party: partyID,
+				},
+			},
+		}},
+	})
+	require.NoError(t, err, "Failed to grant CanReadAs rights for party %s to user %s", partyID, participant.UserID)
 }

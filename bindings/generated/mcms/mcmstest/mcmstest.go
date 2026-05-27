@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/api"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,8 +24,8 @@ var (
 
 const (
 	PackageName = "mcms-test"
-	PackageID   = "b2c0fa23bdfb65d59e8f577a66da87c2d79bf4b48d68c5b7141a0f8c90076300"
-	SDKVersion  = "3.4.10"
+	PackageID   = "d03c146239dbead3ab1209f2103c862509664747a21937beaa611009c3c54857"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -296,7 +296,7 @@ func (t Counter) ResetWithPackageID(contractID string, packageID string, args Re
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this Counter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t Counter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t Counter) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Mock.Counter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -306,7 +306,7 @@ func (t Counter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceive
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t Counter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t Counter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Mock.Counter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -317,7 +317,7 @@ func (t Counter) MCMSReceiverEntrypointWithPackageID(contractID string, packageI
 
 // Verify interface implementations for Counter
 
-var _ mcms.IMCMSReceiver = (*Counter)(nil)
+var _ api.IMCMSReceiver = (*Counter)(nil)
 
 // ForgedReceiver is a Template type
 type ForgedReceiver struct {
@@ -421,7 +421,7 @@ func (t ForgedReceiver) ArchiveWithPackageID(contractID string, packageID string
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this ForgedReceiver contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t ForgedReceiver) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t ForgedReceiver) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Mock.ForgedReceiver", "MCMSReceiver"),
 		ContractID: contractID,
@@ -431,7 +431,7 @@ func (t ForgedReceiver) MCMSReceiverEntrypoint(contractID string, args mcms.MCMS
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t ForgedReceiver) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t ForgedReceiver) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Mock.ForgedReceiver", "MCMSReceiver"),
 		ContractID: contractID,
@@ -442,7 +442,7 @@ func (t ForgedReceiver) MCMSReceiverEntrypointWithPackageID(contractID string, p
 
 // Verify interface implementations for ForgedReceiver
 
-var _ mcms.IMCMSReceiver = (*ForgedReceiver)(nil)
+var _ api.IMCMSReceiver = (*ForgedReceiver)(nil)
 
 // GetInstanceAddressChoice is a Record type
 type GetInstanceAddressChoice struct {

@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
@@ -24,11 +25,9 @@ func GetPerPartyRouterFactoryDisclosure(
 	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,
 	partyId string,
 ) (*PerPartyRouterFactoryDisclosure, error) {
-	resp, err := ccipAPIClient.PostPerPartyRouterFactoryWithResponse(ctx, oapiCCIP.CCIPPerPartyRouterFactoryRequest{
-		PartyID: partyId, // Unused for now
-	})
+	resp, err := postPerPartyRouterFactoryWithRetry(ctx, ccipAPIClient, partyId)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get per party router factory: %w", err)
+		return nil, err
 	}
 	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
@@ -55,6 +54,52 @@ func GetPerPartyRouterFactoryDisclosure(
 	}, nil
 }
 
+func postPerPartyRouterFactoryWithRetry(
+	ctx context.Context,
+	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,
+	partyId string,
+) (*oapiCCIP.PostPerPartyRouterFactoryResponse, error) {
+	const (
+		retryDelay   = 200 * time.Millisecond
+		retryTimeout = 10 * time.Second
+	)
+
+	request := oapiCCIP.CCIPPerPartyRouterFactoryRequest{
+		PartyID: partyId, // Unused for now
+	}
+	deadline := time.Now().Add(retryTimeout)
+	var lastResp *oapiCCIP.PostPerPartyRouterFactoryResponse
+	var lastErr error
+
+	for {
+		resp, err := ccipAPIClient.PostPerPartyRouterFactoryWithResponse(ctx, request)
+		if err == nil && resp.StatusCode() == http.StatusOK {
+			return resp, nil
+		}
+		if err == nil && resp.StatusCode() < http.StatusInternalServerError {
+			return resp, nil
+		}
+		lastResp = resp
+		lastErr = err
+
+		if time.Now().After(deadline) {
+			if lastErr != nil {
+				return nil, fmt.Errorf("failed to get per party router factory: %w", lastErr)
+			}
+
+			return lastResp, nil
+		}
+
+		timer := time.NewTimer(retryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, fmt.Errorf("failed to get per party router factory: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+}
+
 func GetTokenPoolForToken(ctx context.Context, ccipAPIClient oapiCCIP.ClientWithResponsesInterface, token contracts.EncodedInstrumentID) (contracts.RawInstanceAddress, error) {
 	resp, err := ccipAPIClient.GetTokenAdminRegistryTokenWithResponse(ctx, token.String())
 	if err != nil {
@@ -73,7 +118,7 @@ func GetTokenPoolForToken(ctx context.Context, ccipAPIClient oapiCCIP.ClientWith
 }
 
 type CCIPExecuteDisclosure struct {
-	ChoiceContext      common.CCIPContext
+	ChoiceContext      splice_api_token_metadata_v1.ChoiceContext
 	DisclosedContracts []*apiv2.DisclosedContract
 	TokenPool          *contracts.RawInstanceAddress
 }
@@ -89,7 +134,7 @@ func GetCCIPExecuteDisclosure(
 	if err != nil {
 		return nil, fmt.Errorf("error calling CCIPExecute: %w", err)
 	}
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 	}
 
@@ -102,7 +147,7 @@ func GetCCIPExecuteDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := contracts.CCIPContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := contracts.ChoiceContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
@@ -124,10 +169,11 @@ func GetCCIPExecuteDisclosure(
 }
 
 type CCIPSendDisclosure struct {
-	ChoiceContext      common.CCIPContext
+	ChoiceContext      splice_api_token_metadata_v1.ChoiceContext
 	DisclosedContracts []*apiv2.DisclosedContract
 	CCVs               []string
 	Executor           *string
+	FeeTokenConfigCid  string
 }
 
 func GetCCIPSendDisclosure(
@@ -154,7 +200,7 @@ func GetCCIPSendDisclosure(
 	if err != nil {
 		return nil, fmt.Errorf("error calling CCIPSend: %w", err)
 	}
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
 	}
 
@@ -167,7 +213,7 @@ func GetCCIPSendDisclosure(
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
 
-	choiceContext, err := contracts.CCIPContextFromData(resp.JSON200.ContextData)
+	choiceContext, err := contracts.ChoiceContextFromData(resp.JSON200.ContextData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
@@ -188,5 +234,6 @@ func GetCCIPSendDisclosure(
 		DisclosedContracts: disclosedContracts,
 		CCVs:               ccvs,
 		Executor:           executor,
+		FeeTokenConfigCid:  resp.JSON200.FeeTokenConfigCid,
 	}, nil
 }

@@ -3,6 +3,7 @@ package tokenpool
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -20,9 +21,11 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
@@ -38,8 +41,8 @@ type ContractConfig struct {
 
 type Server struct {
 	logger                 zerolog.Logger
-	activeContractStore    *store.ActiveContractStore
-	instrumentHoldingStore *store.InstrumentHoldingStore
+	activeContractStore    store.ActiveContractStoreInterface
+	instrumentHoldingStore store.InstrumentHoldingStoreInterface
 
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
@@ -49,8 +52,8 @@ var _ oapiTokenPool.ServerInterface = &Server{}
 func NewServer(
 	ctx context.Context,
 	logger zerolog.Logger,
-	activeContractStore *store.ActiveContractStore,
-	instrumentHoldingStore *store.InstrumentHoldingStore,
+	activeContractStore store.ActiveContractStoreInterface,
+	instrumentHoldingStore store.InstrumentHoldingStoreInterface,
 	cfg config.TokenPoolAPIConfig,
 ) (*Server, error) {
 	s := &Server{
@@ -123,7 +126,12 @@ func NewServer(
 func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiCommon.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 	instanceAddress, err := converters.ResolveAddress(address)
@@ -148,13 +156,10 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "invalid destination chain selector"})
 		return
 	}
-	tokenTransfer := req.Message.TokenTransfer
-	if tokenTransfer == nil {
+	if req.Message.TokenTransfer == nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "message does not contain a token transfer"})
 		return
 	}
-
-	// TODO check that the token transfer is for this pool
 
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
@@ -176,12 +181,18 @@ func (s Server) lockReleaseTokenPoolSend(
 	instanceAddress contracts.InstanceAddress,
 	activeTokenPoolContract *apiv2.ActiveContract,
 	destinationChainSelector uint64,
-	_ oapiCommon.Message,
+	message oapiCommon.Message,
 ) {
 	lockReleaseTokenPool, err := ParseLockReleaseTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
 		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse lock release token pool contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	// Validate that the message's token is for this pool
+	if message.TokenTransfer.Token.Id != string(lockReleaseTokenPool.InstrumentId.Id) || message.TokenTransfer.Token.Admin != string(lockReleaseTokenPool.InstrumentId.Admin) {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "wrong pool for Message.TokenTransfer"})
 		return
 	}
 
@@ -203,19 +214,44 @@ func (s Server) lockReleaseTokenPoolSend(
 		requiredCCVs[i] = converters.RawInstanceAddressAsRawOrHashedAddress(v)
 	}
 
+	// Add Token Pool holdings to choiceContext - not currently used by the Token Pool, but may be required in the future
+	holdings, ok := s.instrumentHoldingStore.GetHolding(cfg.Owner, lockReleaseTokenPool.InstrumentId)
+	if !ok {
+		// If the LnR Token Pool hasn't been seeded with liquidity it might not have any holdings during the first send.
+		// Logging as a warning but otherwise continuing - this should not happen during normal operation.
+		s.logger.Warn().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Msg("no holdings found for lock release token pool during send")
+	}
+	tokenPoolHoldings := make([]splice_api_token_metadata_v1.AnyValue, len(holdings))
+	disclosedHoldings := make([]oapiCommon.DisclosedContract, len(holdings))
+	for i, holding := range holdings {
+		tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId()))}
+		disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
+	}
+
+	// The ChoiceContext that will be passed to the Token Pool
+	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
+		string(common.RateLimiterKey):                            {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(lockreleasetokenpool.TokenPoolHoldingsContextKey): {AVList: new(tokenPoolHoldings)},
+	}}
+
+	// The ChoiceContext that will be passed to the TransferFactory by the Token Pool
+	transferFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
+		Values: make(map[string]splice_api_token_metadata_v1.AnyValue),
+	}
+	var factoryDisclosures []oapiCommon.DisclosedContract
 	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
-	var (
-		transferFactory           string
-		transferContext           common.CCIPContext
-		disclosedFactoryContracts = make([]oapiCommon.DisclosedContract, 0, 2)
-	)
 	if cfg.transferFactory != nil {
-		transferFactory, transferContext, disclosedFactoryContracts, err = cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
+		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
+		choiceContext.Values[string(lockreleasetokenpool.TransferFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(transferFactory)),
+		}
+		transferFactoryContext.Values = transferContext.Values
+		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
 	}
 
 	// Get TransferPreapproval (if enabled)
@@ -227,27 +263,22 @@ func (s Server) lockReleaseTokenPoolSend(
 			return
 		}
 
-		transferContext.Values[contextKey] = common.AnyValue{
+		transferFactoryContext.Values[contextKey] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTransferPreapproval.GetCreatedEvent().GetContractId())),
 		}
-		disclosedFactoryContracts = append(disclosedFactoryContracts, converters.ActiveContractToDisclosedContract(activeTransferPreapproval))
+		factoryDisclosures = append(factoryDisclosures, converters.ActiveContractToDisclosedContract(activeTransferPreapproval))
 	}
 
-	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: map[string]common.AnyValue{
-			string(common.RateLimiterKey): {
-				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
-			},
-		},
-	})
+	// If the TransferFactory context contains any values, set it as part of the choiceContext
+	if len(transferFactoryContext.Values) > 0 {
+		choiceContext.Values[string(lockreleasetokenpool.TransferFactoryExtraArgsContextValuesContextKey)] = splice_api_token_metadata_v1.AnyValue{
+			AVMap: new(transferFactoryContext.Values),
+		}
+	}
+
+	contextData, err := converters.SerializeChoiceContext(choiceContext)
 	if err != nil {
 		s.logger.Err(err).Msg("failed to serialize CCIP context")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	choiceContext, err := converters.SerializeCCIPContext(transferContext)
-	if err != nil {
-		s.logger.Err(err).Msg("failed to serialize transfer context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -257,22 +288,14 @@ func (s Server) lockReleaseTokenPoolSend(
 		InstanceAddress:    lockReleaseTokenPool.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
-		ContextData:        ccipContext,
-		TokenInput: oapiTokenPool.TokenInput{
-			ExtraArgs: struct {
-				Context  map[string]any `json:"context"`
-				Metadata map[string]any `json:"metadata"`
-			}{
-				Context:  choiceContext,
-				Metadata: map[string]any{},
+		ContextData:        contextData,
+		DisclosedContracts: slices.Concat(
+			disclosedHoldings,
+			factoryDisclosures,
+			[]oapiCommon.DisclosedContract{
+				converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
+				converters.ActiveContractToDisclosedContract(rateLimiter),
 			},
-			TokenPoolHoldings: nil,
-			TransferFactory:   transferFactory,
-		},
-		DisclosedContracts: append(
-			disclosedFactoryContracts,
-			converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
-			converters.ActiveContractToDisclosedContract(rateLimiter),
 		),
 	}
 
@@ -285,12 +308,18 @@ func (s Server) burnMintTokenPoolSend(
 	instanceAddress contracts.InstanceAddress,
 	activeTokenPoolContract *apiv2.ActiveContract,
 	destinationChainSelector uint64,
-	_ oapiCommon.Message,
+	message oapiCommon.Message,
 ) {
 	burnMintTokenPool, err := ParseBurnMintTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
 		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse lock release token pool contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	// Validate that the message's token is for this pool
+	if message.TokenTransfer.Token.Id != string(burnMintTokenPool.InstrumentId.Id) || message.TokenTransfer.Token.Admin != string(burnMintTokenPool.InstrumentId.Admin) {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "wrong pool for Message.TokenTransfer: " + message.TokenTransfer.Token.Id + " " + message.TokenTransfer.Token.Admin + " " + string(burnMintTokenPool.InstrumentId.Id) + " " + string(burnMintTokenPool.InstrumentId.Admin)})
 		return
 	}
 
@@ -312,19 +341,29 @@ func (s Server) burnMintTokenPoolSend(
 		requiredCCVs[i] = converters.RawInstanceAddressAsRawOrHashedAddress(v)
 	}
 
+	// The ChoiceContext that will be passed to the Token Pool
+	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
+		string(common.RateLimiterKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+	}}
+
+	// The ChoiceContext that will be passed to the BurnMintFactory by the Token Pool
+	transferFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
+		Values: make(map[string]splice_api_token_metadata_v1.AnyValue),
+	}
+
 	// Get BurnMintFactory (if enabled)
-	var (
-		burnMintFactory           string
-		transferContext           common.CCIPContext
-		disclosedFactoryContracts = make([]oapiCommon.DisclosedContract, 0, 2)
-	)
-	if cfg.transferFactory != nil {
-		burnMintFactory, disclosedFactoryContracts, err = cfg.burnMintFactory(c)
+	var factoryDisclosures []oapiCommon.DisclosedContract
+	if cfg.burnMintFactory != nil {
+		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
+		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(burnMintFactory)),
+		}
+		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
 	}
 
 	// Get TransferPreapproval (if enabled)
@@ -336,27 +375,22 @@ func (s Server) burnMintTokenPoolSend(
 			return
 		}
 
-		transferContext.Values[contextKey] = common.AnyValue{
+		transferFactoryContext.Values[contextKey] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTransferPreapproval.GetCreatedEvent().GetContractId())),
 		}
-		disclosedFactoryContracts = append(disclosedFactoryContracts, converters.ActiveContractToDisclosedContract(activeTransferPreapproval))
+		factoryDisclosures = append(factoryDisclosures, converters.ActiveContractToDisclosedContract(activeTransferPreapproval))
 	}
 
-	ccipContext, err := converters.SerializeCCIPContext(common.CCIPContext{
-		Values: map[string]common.AnyValue{
-			string(common.RateLimiterKey): {
-				AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
-			},
-		},
-	})
+	// If the TransferFactory context contains any values, set it as part of the choiceContext
+	if len(transferFactoryContext.Values) > 0 {
+		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryExtraArgsContextValuesContextKey)] = splice_api_token_metadata_v1.AnyValue{
+			AVMap: new(transferFactoryContext.Values),
+		}
+	}
+
+	contextData, err := converters.SerializeChoiceContext(choiceContext)
 	if err != nil {
 		s.logger.Err(err).Msg("failed to serialize CCIP context")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	choiceContext, err := converters.SerializeCCIPContext(transferContext)
-	if err != nil {
-		s.logger.Err(err).Msg("failed to serialize transfer context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -366,21 +400,9 @@ func (s Server) burnMintTokenPoolSend(
 		InstanceAddress:    burnMintTokenPool.Address.InstanceAddress().Hex(),
 		RawInstanceAddress: burnMintTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
-		ContextData:        ccipContext,
-		TokenInput: oapiTokenPool.TokenInput{
-			ExtraArgs: struct {
-				Context  map[string]any `json:"context"`
-				Metadata map[string]any `json:"metadata"`
-			}{
-				Context:  choiceContext,
-				Metadata: map[string]any{},
-			},
-			TokenPoolHoldings: nil,
-			TransferFactory:   "",
-			BurnMintFactory:   new(burnMintFactory),
-		},
+		ContextData:        contextData,
 		DisclosedContracts: append(
-			disclosedFactoryContracts,
+			factoryDisclosures,
 			converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
 			converters.ActiveContractToDisclosedContract(rateLimiter),
 		),
@@ -392,7 +414,12 @@ func (s Server) burnMintTokenPoolSend(
 func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolExecuteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, oapiCommon.ErrorResponse{Error: "request body too large"})
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
+
 		return
 	}
 	instanceAddress, err := converters.ResolveAddress(address)
@@ -424,13 +451,10 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 		return
 	}
 	sourceChainSelector := uint64(message.SourceChainSelector)
-	tokenTransfer := message.TokenTransfer
-	if tokenTransfer == nil {
+	if message.TokenTransfer == nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "message does not contain a token transfer"})
 		return
 	}
-
-	// TODO check that the Token Transfer is for this pool
 
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
@@ -461,15 +485,20 @@ func (s Server) lockReleaseTokenPoolExecute(
 		return
 	}
 
+	// Validate that the message's token is for this pool
+	messageInstrumentId := contracts.BytesToEncodedInstrumentID(message.TokenTransfer.DestTokenAddress)
+	poolInstrumentId := contracts.EncodeInstrumentID(lockReleaseTokenPool.InstrumentId)
+	if messageInstrumentId != poolInstrumentId {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "wrong pool for Message.TokenTransfer"})
+		return
+	}
+
 	remoteChainConfig, ok := lockReleaseTokenPool.RemoteChainConfigs[sourceChainSelector]
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("unsupported source chain selector: %v", sourceChainSelector)})
 		return
 	}
 
-	ccipContext := common.CCIPContext{
-		Values: map[string]common.AnyValue{},
-	}
 	var rateLimiter *apiv2.ActiveContract
 	if message.Finality == protocol.FinalityWaitForFinality {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
@@ -478,18 +507,12 @@ func (s Server) lockReleaseTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values[string(common.RateLimiterKey)] = common.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
-		}
 	} else {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
 		if !ok {
 			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("custom inbound active rate limiter not found")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
-		}
-		ccipContext.Values[string(common.RateLimiterKey)] = common.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	}
 
@@ -504,37 +527,49 @@ func (s Server) lockReleaseTokenPoolExecute(
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
-	tokenPoolHoldings := make([]oapiCommon.ContractId, len(holdings))
+	tokenPoolHoldings := make([]splice_api_token_metadata_v1.AnyValue, len(holdings))
 	disclosedHoldings := make([]oapiCommon.DisclosedContract, len(holdings))
 	for i, holding := range holdings {
-		tokenPoolHoldings[i] = holding.GetCreatedEvent().GetContractId()
+		tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId()))}
 		disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
 	}
 
+	// The ChoiceContext that will be passed to the Token Pool
+	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
+		string(common.RateLimiterKey):                            {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(lockreleasetokenpool.TokenPoolHoldingsContextKey): {AVList: new(tokenPoolHoldings)},
+	}}
+
+	// The ChoiceContext that will be passed to the TransferFactory by the Token Pool
+	transferFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
+		Values: make(map[string]splice_api_token_metadata_v1.AnyValue),
+	}
+	var factoryDisclosures []oapiCommon.DisclosedContract
 	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
-	var (
-		transferFactory           string
-		transferContext           common.CCIPContext
-		disclosedFactoryContracts []oapiCommon.DisclosedContract
-	)
 	if cfg.transferFactory != nil {
-		transferFactory, transferContext, disclosedFactoryContracts, err = cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
+		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
+		choiceContext.Values[string(lockreleasetokenpool.TransferFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(transferFactory)),
+		}
+		transferFactoryContext.Values = transferContext.Values
+		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
 	}
 
-	contextData, err := converters.SerializeCCIPContext(ccipContext)
+	// If the TransferFactory context contains any values, set it as part of the choiceContext
+	if len(transferFactoryContext.Values) > 0 {
+		choiceContext.Values[string(lockreleasetokenpool.TransferFactoryExtraArgsContextValuesContextKey)] = splice_api_token_metadata_v1.AnyValue{
+			AVMap: new(transferFactoryContext.Values),
+		}
+	}
+
+	contextData, err := converters.SerializeChoiceContext(choiceContext)
 	if err != nil {
 		s.logger.Err(err).Msg("failed to serialize CCIP context")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	choiceContext, err := converters.SerializeCCIPContext(transferContext)
-	if err != nil {
-		s.logger.Err(err).Msg("failed to serialize transfer context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -545,20 +580,9 @@ func (s Server) lockReleaseTokenPoolExecute(
 		RawInstanceAddress: lockReleaseTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
 		ContextData:        contextData,
-		TokenInput: oapiTokenPool.TokenInput{
-			TokenPoolHoldings: tokenPoolHoldings,
-			ExtraArgs: struct {
-				Context  map[string]any `json:"context"`
-				Metadata map[string]any `json:"metadata"`
-			}{
-				Context:  choiceContext,
-				Metadata: map[string]any{},
-			},
-			TransferFactory: transferFactory,
-		},
 		DisclosedContracts: slices.Concat(
 			disclosedHoldings,
-			disclosedFactoryContracts,
+			factoryDisclosures,
 			[]oapiCommon.DisclosedContract{
 				converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
 				converters.ActiveContractToDisclosedContract(rateLimiter),
@@ -584,15 +608,20 @@ func (s Server) burnMintTokenPoolExecute(
 		return
 	}
 
+	// Validate that the message's token is for this pool
+	messageInstrumentId := contracts.BytesToEncodedInstrumentID(message.TokenTransfer.DestTokenAddress)
+	poolInstrumentId := contracts.EncodeInstrumentID(burnMintTokenPool.InstrumentId)
+	if messageInstrumentId != poolInstrumentId {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "wrong pool for Message.TokenTransfer"})
+		return
+	}
+
 	remoteChainConfig, ok := burnMintTokenPool.RemoteChainConfigs[sourceChainSelector]
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("unsupported source chain selector: %v", sourceChainSelector)})
 		return
 	}
 
-	ccipContext := common.CCIPContext{
-		Values: map[string]common.AnyValue{},
-	}
 	var rateLimiter *apiv2.ActiveContract
 	if message.Finality == protocol.FinalityWaitForFinality {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
@@ -601,18 +630,12 @@ func (s Server) burnMintTokenPoolExecute(
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
-		ccipContext.Values[string(common.RateLimiterKey)] = common.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
-		}
 	} else {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
 		if !ok {
 			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("custom inbound active rate limiter not found")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
-		}
-		ccipContext.Values[string(common.RateLimiterKey)] = common.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId())),
 		}
 	}
 
@@ -621,30 +644,41 @@ func (s Server) burnMintTokenPoolExecute(
 		requiredCCVs[i] = converters.RawInstanceAddressAsRawOrHashedAddress(v)
 	}
 
+	// The ChoiceContext that will be passed to the Token Pool
+	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
+		string(common.RateLimiterKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+	}}
+
+	// The ChoiceContext that will be passed to the BurnMintFactory by the Token Pool
+	transferFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
+		Values: make(map[string]splice_api_token_metadata_v1.AnyValue),
+	}
+
 	// Get BurnMintFactory (if enabled)
-	var (
-		burnMintFactory           string
-		transferContext           common.CCIPContext
-		disclosedFactoryContracts = make([]oapiCommon.DisclosedContract, 0, 2)
-	)
+	var factoryDisclosures []oapiCommon.DisclosedContract
 	if cfg.burnMintFactory != nil {
-		burnMintFactory, disclosedFactoryContracts, err = cfg.burnMintFactory(c)
+		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
+		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
+			AVContractId: new(types.CONTRACT_ID(burnMintFactory)),
+		}
+		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
 	}
 
-	contextData, err := converters.SerializeCCIPContext(ccipContext)
+	// If the TransferFactory context contains any values, set it as part of the choiceContext
+	if len(transferFactoryContext.Values) > 0 {
+		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryExtraArgsContextValuesContextKey)] = splice_api_token_metadata_v1.AnyValue{
+			AVMap: new(transferFactoryContext.Values),
+		}
+	}
+
+	contextData, err := converters.SerializeChoiceContext(choiceContext)
 	if err != nil {
 		s.logger.Err(err).Msg("failed to serialize CCIP context")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	choiceContext, err := converters.SerializeCCIPContext(transferContext)
-	if err != nil {
-		s.logger.Err(err).Msg("failed to serialize transfer context")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -655,20 +689,8 @@ func (s Server) burnMintTokenPoolExecute(
 		RawInstanceAddress: burnMintTokenPool.Address.String(),
 		RequiredCCVs:       requiredCCVs,
 		ContextData:        contextData,
-		TokenInput: oapiTokenPool.TokenInput{
-			TokenPoolHoldings: nil,
-			ExtraArgs: struct {
-				Context  map[string]any `json:"context"`
-				Metadata map[string]any `json:"metadata"`
-			}{
-				Context:  choiceContext,
-				Metadata: map[string]any{},
-			},
-			TransferFactory: burnMintFactory, // TODO make this optional
-			BurnMintFactory: new(burnMintFactory),
-		},
 		DisclosedContracts: slices.Concat(
-			disclosedFactoryContracts,
+			factoryDisclosures,
 			[]oapiCommon.DisclosedContract{
 				converters.ActiveContractToDisclosedContract(activeTokenPoolContract),
 				converters.ActiveContractToDisclosedContract(rateLimiter),
@@ -677,4 +699,61 @@ func (s Server) burnMintTokenPoolExecute(
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+var _ global.InstanceAddressFilter = &Server{}
+
+// FilterContracts returns the sub-set of addresses that are tracked by the Token Pool API Server.
+// This includes token pools themselves, and their rate limiters.
+func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+	if len(addresses) == 0 {
+		return nil
+	}
+
+	// Reconstruct all contracts + rate limiters
+	var allContracts = make(map[contracts.InstanceAddress]bool, len(s.contractConfigs)*2)
+	for poolAddress, contractConfig := range s.contractConfigs {
+		allContracts[poolAddress] = true
+		activeContract, ok := s.activeContractStore.Get(poolAddress)
+		if !ok {
+			s.logger.Error().Stringer("address", poolAddress).Msg("active token pool contract not found while filtering contracts")
+			continue
+		}
+		switch contractConfig.Type {
+		case config.TokenPoolTypeLockRelease:
+			lockReleaseTokenPool, err := ParseLockReleaseTokenPool(activeContract.CreatedEvent)
+			if err != nil {
+				s.logger.Err(err).Stringer("address", poolAddress).Msg("failed to parse lock release token pool contract while filtering contracts")
+				continue
+			}
+			for _, remoteChainConfig := range lockReleaseTokenPool.RemoteChainConfigs {
+				allContracts[remoteChainConfig.OutboundRateLimiter] = true
+				allContracts[remoteChainConfig.InboundRateLimiter] = true
+				allContracts[remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter] = true
+			}
+		case config.TokenPoolTypeBurnMint:
+			burnMintTokenPool, err := ParseBurnMintTokenPool(activeContract.CreatedEvent)
+			if err != nil {
+				s.logger.Err(err).Stringer("address", poolAddress).Msg("failed to parse burn mint token pool contract while filtering contracts")
+				continue
+			}
+			for _, remoteChainConfig := range burnMintTokenPool.RemoteChainConfigs {
+				allContracts[remoteChainConfig.OutboundRateLimiter] = true
+				allContracts[remoteChainConfig.InboundRateLimiter] = true
+				allContracts[remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter] = true
+			}
+		default:
+			continue
+		}
+	}
+
+	// Filter requested contracts
+	var out []contracts.InstanceAddress
+	for _, address := range addresses {
+		if allContracts[address] {
+			out = append(out, address)
+		}
+	}
+
+	return out
 }

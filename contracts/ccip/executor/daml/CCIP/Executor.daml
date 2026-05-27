@@ -1,15 +1,20 @@
 module CCIP.Executor where
 
 import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Foldable (forA_)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.Map as Map
 
+import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
-import qualified CCIP.Context
+import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
 import qualified CCIP.FinalityConfig
+import qualified CCIP.Internal
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.SendingMessageV1
 import CCIP.ExecutorTypes (RemoteChainConfig(..), RemoteChainConfigArgs(..), DynamicConfig(..), ApplyDestChainUpdatesParams(..), SetDynamicConfigParams(..), ApplyAllowedCCVUpdatesParams(..))
@@ -27,6 +32,7 @@ template Executor
         signatory owner
         ensure assertValidInstanceId instanceId
             && maxCCVsPerMsg > 0
+            && maxCCVsPerMsg <= CCIP.Internal.maxCCVsPerMessage
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where
             view = CCIP.Interfaces.Executor.ExecutorView with
@@ -35,6 +41,7 @@ template Executor
 
             executor_calculateFeeImpl self arg = do
                 exercise (fromInterfaceContractId @Executor self) CalculateFee with
+                    expectedExecutor = arg.expectedExecutor
                     sendingMessageCid = arg.sendingMessageCid
                     executorArgs = arg.executorArgs
                     extraContext = arg.extraContext
@@ -42,6 +49,7 @@ template Executor
 
             executor_getFeeImpl self arg = do
                 exercise (fromInterfaceContractId @Executor self) GetFee with
+                    expectedExecutor = arg.expectedExecutor
                     destChainSelector = arg.destChainSelector
                     requiredCCVs = arg.requiredCCVs
                     caller = arg.caller
@@ -52,6 +60,9 @@ template Executor
                 destChainSelectorsToAdd : [RemoteChainConfigArgs]
             controller owner
             do
+                forA_ destChainSelectorsToAdd $ \cfg ->
+                    assertMsg ("ApplyDestChainUpdates: invalid fee: " <> show cfg.config.feeUSDCents)
+                        (cfg.config.feeUSDCents >= 0.0)
                 let pruned = foldr Map.delete remoteChainConfigs destChainSelectorsToRemove
                 let addConfig acc cfg = Map.insert cfg.destChainSelector cfg.config acc
                 let merged = foldl addConfig pruned destChainSelectorsToAdd
@@ -119,12 +130,16 @@ template Executor
         -- Calculates the executor flat fee and validates the message.
         nonconsuming choice CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
+                expectedExecutor : RawInstanceAddress
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 executorArgs : BytesHex
-                extraContext : CCIP.Context.CCIPContext
+                extraContext : ChoiceContext
                 caller : Party
             controller caller
             do
+                RawInstanceAddress.assertEqual "executor: expected executor mismatch"
+                    instanceId owner expectedExecutor
+
                 sm <- fetch sendingMessageCid
 
                 let remoteCfg = fromSomeNote "executor: unsupported destination chain"
@@ -151,11 +166,15 @@ template Executor
         -- Quote-only fee path for executor.
         nonconsuming choice GetFee : CCIP.Interfaces.Executor.ExecutorFeeQuote
             with
+                expectedExecutor : RawInstanceAddress
                 destChainSelector : Numeric 0
                 requiredCCVs : [RawInstanceAddress]
                 caller : Party
             controller caller
             do
+                RawInstanceAddress.assertEqual "executor: expected executor mismatch"
+                    instanceId owner expectedExecutor
+
                 let remoteCfg = fromSomeNote "executor: unsupported destination chain"
                         (Map.lookup destChainSelector remoteChainConfigs)
                 assertMsg "executor: destination chain disabled" remoteCfg.enabled

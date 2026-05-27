@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"io"
+	"maps"
 	"reflect"
 
 	"dario.cat/mergo"
@@ -16,9 +17,11 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		ChainSelector: "",
-		Server:        ServerConfig{},
-		Node:          NodeConfig{},
-		Monitoring:    MonitoringConfig{},
+		Server: ServerConfig{
+			MaxRequestSizeBytes: 1024 * 1024 * 10, // 10MiB
+		},
+		Node:       NodeConfig{},
+		Monitoring: MonitoringConfig{},
 		GlobalAPIConfig: GlobalAPIConfig{
 			MaxBatchSize: 1024,
 		},
@@ -45,8 +48,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host string `toml:"host" validate:"required"`
-	Port uint16 `toml:"port" validate:"required,port"`
+	Host                string `toml:"host" validate:"required"`
+	Port                uint16 `toml:"port" validate:"required,port"`
+	MaxRequestSizeBytes int64  `toml:"max_request_size_bytes" validate:"required"`
 }
 
 type NodeConfig struct {
@@ -118,9 +122,9 @@ const (
 type TransferFactory struct {
 	Type FactoryType `toml:"type" validate:"oneof=address url"`
 
-	TemplateId *string                    `toml:"template_id" validate:"required_if=Type address"`
-	Party      *string                    `toml:"party" validate:"required_if=Type address"`
-	Address    *contracts.InstanceAddress `toml:"address" validate:"required_if=Type address"`
+	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
+	Party           *string                    `toml:"party" validate:"required_if=Type address"`
+	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
 
 	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"required_if=Type url,url"`
 	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url"`
@@ -129,9 +133,9 @@ type TransferFactory struct {
 type BurnMintFactory struct {
 	Type FactoryType `toml:"type" validate:"oneof=address"`
 
-	TemplateId *string                    `toml:"template_id" validate:"required_if=Type address"`
-	Party      *string                    `toml:"party" validate:"required_if=Type address"`
-	Address    *contracts.InstanceAddress `toml:"address" validate:"required_if=Type address"`
+	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
+	Party           *string                    `toml:"party" validate:"required_if=Type address"`
+	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
 }
 
 type TokenPool struct {
@@ -152,8 +156,9 @@ type TransferPreapproval struct {
 }
 
 type TokenPoolAPIConfig struct {
-	Enabled    bool        `toml:"enabled"`
-	TokenPools []TokenPool `toml:"token_pools" validate:"required_if=Enabled true,dive"`
+	Enabled bool `toml:"enabled"`
+	// TokenPools is keyed by instance_address (contracts.InstanceAddress.Hex()) so layered configs merge per pool.
+	TokenPools map[string]TokenPool `toml:"token_pools" validate:"required_if=Enabled true,dive"`
 }
 
 // Token Standard API
@@ -190,6 +195,20 @@ func (cfg *Config) Validate() error {
 	if err := validate.Struct(cfg); err != nil {
 		return fmt.Errorf("failed to validate config: %w", err)
 	}
+	if err := cfg.validateTokenPoolMapKeys(); err != nil {
+		return fmt.Errorf("failed to validate config: %w", err)
+	}
+
+	return nil
+}
+
+func (cfg *Config) validateTokenPoolMapKeys() error {
+	for key, pool := range cfg.TokenPoolAPIConfig.TokenPools {
+		want := pool.InstanceAddress.Hex()
+		if key != want {
+			return fmt.Errorf("token_pool_api.token_pools: map key %q must equal instance_address %q", key, want)
+		}
+	}
 
 	return nil
 }
@@ -201,7 +220,7 @@ func (t configTransformer) Transformer(typ reflect.Type) func(dst, src reflect.V
 	// Merge doesn't handle arrays gracefully, manually check if an InstanceAddress should override the dest
 	case reflect.TypeFor[contracts.InstanceAddress]():
 		return func(dst, src reflect.Value) error {
-			if !src.IsZero() {
+			if !src.IsZero() && dst.CanSet() {
 				dst.Set(src)
 			}
 
@@ -215,6 +234,9 @@ func (t configTransformer) Transformer(typ reflect.Type) func(dst, src reflect.V
 // Merge merges the in config into cfg and returns cfg.
 // Any unexported/unset/zero-value field will be ignored.
 // If in is nil, no merge will be performed and cfg will be returned as-is.
+//
+// Token pool entries are merged separately by contract-address key: mergo cannot merge struct values
+// inside maps correctly, so token_pool_api.token_pools uses a manual per-key merge.
 func (cfg *Config) Merge(in *Config) (*Config, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is nil")
@@ -223,11 +245,45 @@ func (cfg *Config) Merge(in *Config) (*Config, error) {
 		return cfg, nil
 	}
 
-	if err := mergo.Merge(cfg, in, mergo.WithOverride, mergo.WithTransformers(configTransformer{})); err != nil {
+	basePools := maps.Clone(cfg.TokenPoolAPIConfig.TokenPools)
+	overlayPools := maps.Clone(in.TokenPoolAPIConfig.TokenPools)
+	cfg.TokenPoolAPIConfig.TokenPools = nil
+
+	inMerged := *in
+	inMerged.TokenPoolAPIConfig.TokenPools = nil
+
+	if err := mergo.Merge(cfg, &inMerged, mergo.WithOverride, mergo.WithTransformers(configTransformer{})); err != nil {
 		return nil, fmt.Errorf("failed to merge config: %w", err)
 	}
 
+	mergedPools, err := mergeTokenPoolMaps(basePools, overlayPools)
+	if err != nil {
+		return nil, err
+	}
+	if len(mergedPools) == 0 {
+		mergedPools = nil
+	}
+	cfg.TokenPoolAPIConfig.TokenPools = mergedPools
+
 	return cfg, nil
+}
+
+func mergeTokenPoolMaps(base, overlay map[string]TokenPool) (map[string]TokenPool, error) {
+	out := make(map[string]TokenPool)
+	maps.Copy(out, base)
+	for k, sv := range overlay {
+		if dv, ok := out[k]; ok {
+			merged := dv
+			if err := mergo.Merge(&merged, &sv, mergo.WithOverride, mergo.WithTransformers(configTransformer{})); err != nil {
+				return nil, fmt.Errorf("merge token pool %s: %w", k, err)
+			}
+			out[k] = merged
+		} else {
+			out[k] = sv
+		}
+	}
+
+	return out, nil
 }
 
 func Read(configData io.Reader) (*Config, error) {

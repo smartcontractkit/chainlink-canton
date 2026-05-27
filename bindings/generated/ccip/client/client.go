@@ -1,474 +1,223 @@
 package client
 
-import (
-	"errors"
-	"fmt"
-	"math/big"
-	"strings"
-
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/go-daml/pkg/bind"
-	"github.com/smartcontractkit/go-daml/pkg/codec"
-	"github.com/smartcontractkit/go-daml/pkg/model"
-	"github.com/smartcontractkit/go-daml/pkg/types"
-)
-
-var (
-	_ = fmt.Sprintf
-	_ = errors.New
-	_ = big.NewInt
-	_ = strings.NewReader
-	_ = model.Command{}
-	_ bind.BoundTemplate
-)
-
-const (
-	PackageName = "ccip-client"
-	PackageID   = "4dba5948bf5b07121f01229243edeb3ed68ecdf76ec8a5abb5c201994c93991e"
-	SDKVersion  = "3.4.10"
-)
-
-type Template interface {
-	CreateCommand() *model.CreateCommand
-	GetTemplateID() string
-}
-
-func argsToMap(args any) map[string]any {
-	if args == nil {
-		return map[string]any{}
-	}
-
-	if m, ok := args.(map[string]any); ok {
-		return m
-	}
-
-	type mapper interface {
-		ToMap() map[string]any
-	}
-	if mapper, ok := args.(mapper); ok {
-		return mapper.ToMap()
-	}
-
-	return map[string]any{"args": args}
-}
-
-// CCVExtraArg is a Record type
-type CCVExtraArg struct {
-	CcvAddress mcms.RawInstanceAddress `json:"ccvAddress"`
-	CcvArgs    types.TEXT              `json:"ccvArgs"`
-}
-
-// ToMap converts CCVExtraArg to a map for DAML arguments
-func (t CCVExtraArg) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["ccvAddress"] = model.NestedToDAMLValue(t.CcvAddress)
-
-	m["ccvArgs"] = string(t.CcvArgs)
-
-	return m
-}
-
-func (t CCVExtraArg) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CCVExtraArg) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CCVExtraArg to hex string (Canton MCMS format)
-func (t CCVExtraArg) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CCVExtraArg from hex string (Canton MCMS format)
-func (t *CCVExtraArg) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// Canton2AnyMessage is a Record type
-type Canton2AnyMessage struct {
-	Receiver      types.TEXT                               `json:"receiver"`
-	Payload       types.TEXT                               `json:"payload"`
-	TokenTransfer *TokenTransfer                           `json:"tokenTransfer" hex:"optional"`
-	FeeToken      splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
-	ExtraArgs     ExtraArgs                                `json:"extraArgs"`
-}
-
-// ToMap converts Canton2AnyMessage to a map for DAML arguments
-func (t Canton2AnyMessage) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["receiver"] = string(t.Receiver)
-
-	m["payload"] = string(t.Payload)
-
-	if t.TokenTransfer != nil {
-		m["tokenTransfer"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenTransfer),
-		}
-	} else {
-		m["tokenTransfer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
-	m["feeToken"] = model.NestedToDAMLValue(t.FeeToken)
-
-	m["extraArgs"] = model.NestedToDAMLValue(t.ExtraArgs)
-
-	return m
-}
-
-func (t Canton2AnyMessage) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *Canton2AnyMessage) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes Canton2AnyMessage to hex string (Canton MCMS format)
-func (t Canton2AnyMessage) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes Canton2AnyMessage from hex string (Canton MCMS format)
-func (t *Canton2AnyMessage) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ExecutorExtraArg is a variant/union type
-type ExecutorExtraArg struct {
-	ExecutorNoExecutor  *types.UNIT          `json:"Executor_NoExecutor,omitempty"`
-	ExecutorUseDefault  *ExecutorUseDefault  `json:"Executor_UseDefault,omitempty"`
-	ExecutorWithAddress *ExecutorWithAddress `json:"Executor_WithAddress,omitempty"`
-}
-
-// MarshalJSON implements custom JSON marshaling for ExecutorExtraArg
-func (v ExecutorExtraArg) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(v)
-}
-
-// UnmarshalJSON implements custom JSON unmarshalling for ExecutorExtraArg
-func (v *ExecutorExtraArg) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, v)
-}
-
-// MarshalHex encodes ExecutorExtraArg to hex string (Canton MCMS format)
-func (v ExecutorExtraArg) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(v)
-}
-
-// UnmarshalHex decodes ExecutorExtraArg from hex string (Canton MCMS format)
-func (v *ExecutorExtraArg) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, v)
-}
-
-// GetVariantTag implements types.VARIANT interface
-func (v ExecutorExtraArg) GetVariantTag() string {
-
-	if v.ExecutorNoExecutor != nil {
-		return "Executor_NoExecutor"
-	}
-
-	if v.ExecutorUseDefault != nil {
-		return "Executor_UseDefault"
-	}
-
-	if v.ExecutorWithAddress != nil {
-		return "Executor_WithAddress"
-	}
-
-	return ""
-}
-
-// GetVariantValue implements types.VARIANT interface
-func (v ExecutorExtraArg) GetVariantValue() any {
-
-	if v.ExecutorNoExecutor != nil {
-		return v.ExecutorNoExecutor
-	}
-
-	if v.ExecutorUseDefault != nil {
-		return v.ExecutorUseDefault
-	}
-
-	if v.ExecutorWithAddress != nil {
-		return v.ExecutorWithAddress
-	}
-
-	return nil
-}
-
-var _ types.VARIANT = (*ExecutorExtraArg)(nil)
-
-// ExecutorUseDefault is a Record type
-type ExecutorUseDefault struct {
-	ExecutorArgs types.TEXT `json:"executorArgs"`
-}
-
-// ToMap converts ExecutorUseDefault to a map for DAML arguments
-func (t ExecutorUseDefault) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["executorArgs"] = string(t.ExecutorArgs)
-
-	return m
-}
-
-func (t ExecutorUseDefault) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ExecutorUseDefault) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ExecutorUseDefault to hex string (Canton MCMS format)
-func (t ExecutorUseDefault) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ExecutorUseDefault from hex string (Canton MCMS format)
-func (t *ExecutorUseDefault) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ExecutorWithAddress is a Record type
-type ExecutorWithAddress struct {
-	ExecutorAddress mcms.RawInstanceAddress `json:"executorAddress"`
-	ExecutorArgs    types.TEXT              `json:"executorArgs"`
-}
-
-// ToMap converts ExecutorWithAddress to a map for DAML arguments
-func (t ExecutorWithAddress) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["executorAddress"] = model.NestedToDAMLValue(t.ExecutorAddress)
-
-	m["executorArgs"] = string(t.ExecutorArgs)
-
-	return m
-}
-
-func (t ExecutorWithAddress) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ExecutorWithAddress) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ExecutorWithAddress to hex string (Canton MCMS format)
-func (t ExecutorWithAddress) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ExecutorWithAddress from hex string (Canton MCMS format)
-func (t *ExecutorWithAddress) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ExtraArgs is a variant/union type
-type ExtraArgs struct {
-	V3 *GenericExtraArgsV3 `json:"V3,omitempty"`
-}
-
-// MarshalJSON implements custom JSON marshaling for ExtraArgs
-func (v ExtraArgs) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(v)
-}
-
-// UnmarshalJSON implements custom JSON unmarshalling for ExtraArgs
-func (v *ExtraArgs) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, v)
-}
-
-// MarshalHex encodes ExtraArgs to hex string (Canton MCMS format)
-func (v ExtraArgs) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(v)
-}
-
-// UnmarshalHex decodes ExtraArgs from hex string (Canton MCMS format)
-func (v *ExtraArgs) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, v)
-}
-
-// GetVariantTag implements types.VARIANT interface
-func (v ExtraArgs) GetVariantTag() string {
-
-	if v.V3 != nil {
-		return "V3"
-	}
-
-	return ""
-}
-
-// GetVariantValue implements types.VARIANT interface
-func (v ExtraArgs) GetVariantValue() any {
-
-	if v.V3 != nil {
-		return v.V3
-	}
-
-	return nil
-}
-
-var _ types.VARIANT = (*ExtraArgs)(nil)
-
-// GenericExtraArgsV3 is a Record type
-type GenericExtraArgsV3 struct {
-	GasLimit      types.INT64      `json:"gasLimit"`
-	Ccvs          []CCVExtraArg    `json:"ccvs"`
-	Executor      ExecutorExtraArg `json:"executor"`
-	TokenReceiver types.TEXT       `json:"tokenReceiver"`
-	TokenArgs     types.TEXT       `json:"tokenArgs"`
-}
-
-// ToMap converts GenericExtraArgsV3 to a map for DAML arguments
-func (t GenericExtraArgsV3) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["gasLimit"] = int64(t.GasLimit)
-
-	m["ccvs"] = func() []any {
-		res := make([]any, 0, len(t.Ccvs))
-		for _, e := range t.Ccvs {
-			res = append(res, model.NestedToDAMLValue(e))
-		}
-		return res
-	}()
-
-	m["executor"] = model.NestedToDAMLValue(t.Executor)
-
-	m["tokenReceiver"] = string(t.TokenReceiver)
-
-	m["tokenArgs"] = string(t.TokenArgs)
-
-	return m
-}
-
-func (t GenericExtraArgsV3) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *GenericExtraArgsV3) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes GenericExtraArgsV3 to hex string (Canton MCMS format)
-func (t GenericExtraArgsV3) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GenericExtraArgsV3 from hex string (Canton MCMS format)
-func (t *GenericExtraArgsV3) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// TokenTransfer is a Record type
-type TokenTransfer struct {
-	Token  splice_api_token_holding_v1.InstrumentId `json:"token"`
-	Amount types.NUMERIC                            `json:"amount"`
-}
-
-// ToMap converts TokenTransfer to a map for DAML arguments
-func (t TokenTransfer) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["token"] = model.NestedToDAMLValue(t.Token)
-
-	m["amount"] = t.Amount
-
-	return m
-}
-
-func (t TokenTransfer) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *TokenTransfer) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes TokenTransfer to hex string (Canton MCMS format)
-func (t TokenTransfer) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes TokenTransfer from hex string (Canton MCMS format)
-func (t *TokenTransfer) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// MCMSEncoder interface for typed encoding methods.
-// Implemented by Encoder for method-based encoding.
-type MCMSEncoder interface {
-}
-
-// encoder provides typed encoding methods for choice parameters (unexported).
-// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
-type encoder struct {
-	*bind.BoundTemplate
-}
-
-// Contract wraps template operations with Sui-style API access.
-// Use NewContract to create instances, then call Encoder() for encoding methods.
-type Contract struct {
-	enc *encoder
-}
-
-// NewContract creates a Contract with encoder for the given template.
-// This provides Sui-style API: contract.Encoder().Method(args)
-func NewContract(packageID, moduleName, templateName string) *Contract {
-	return &Contract{
-		enc: &encoder{
-			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
-		},
-	}
-}
-
-// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
-func (c *Contract) Encoder() MCMSEncoder {
-	return c.enc
-}
-
-// Verify MCMSEncoder interface implementation
-var _ MCMSEncoder = (*encoder)(nil)
+// Code generated by contracts/cmd/bindings. DO NOT EDIT.
+
+import core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
+
+const BaseInt = core.BaseInt
+const BaseNumeric = core.BaseNumeric
+const E10PerPercent = core.E10PerPercent
+const ExecutingMessageStateExecutingMessageState_Prepared = core.ExecutingMessageStateExecutingMessageState_Prepared
+const ExecutingMessageStateExecutingMessageState_RequirePoolCCVs = core.ExecutingMessageStateExecutingMessageState_RequirePoolCCVs
+const ExecutionModeExecutionMode_Executor = core.ExecutionModeExecutionMode_Executor
+const ExecutionModeExecutionMode_NoExecutor = core.ExecutionModeExecutionMode_NoExecutor
+const FeeQuoterKey = core.FeeQuoterKey
+const FinalityConfigByteLength = core.FinalityConfigByteLength
+const GlobalConfigKey = core.GlobalConfigKey
+const GlobalCurseSubject = core.GlobalCurseSubject
+const IssuerTypeIssuerType_CCV = core.IssuerTypeIssuerType_CCV
+const IssuerTypeIssuerType_Executor = core.IssuerTypeIssuerType_Executor
+const IssuerTypeIssuerType_Network = core.IssuerTypeIssuerType_Network
+const IssuerTypeIssuerType_Pool = core.IssuerTypeIssuerType_Pool
+const MaxCCVsPerMessage = core.MaxCCVsPerMessage
+const MaxNumeric0DecimalText = core.MaxNumeric0DecimalText
+const MaxNumeric0IntegerText = core.MaxNumeric0IntegerText
+const MaxUint256DecimalText = core.MaxUint256DecimalText
+const MessageExecutionStateFAILURE = core.MessageExecutionStateFAILURE
+const MessageExecutionStateIN_PROGRESS = core.MessageExecutionStateIN_PROGRESS
+const MessageExecutionStateSUCCESS = core.MessageExecutionStateSUCCESS
+const MessageExecutionStateUNTOUCHED = core.MessageExecutionStateUNTOUCHED
+const PackageID = core.PackageID
+const PackageName = core.PackageName
+const PremiumIdentity = core.PremiumIdentity
+const RateLimitDirectionRateLimitDirection_Inbound = core.RateLimitDirectionRateLimitDirection_Inbound
+const RateLimitDirectionRateLimitDirection_Outbound = core.RateLimitDirectionRateLimitDirection_Outbound
+const RateLimitModeRateLimitMode_CustomFinality = core.RateLimitModeRateLimitMode_CustomFinality
+const RateLimitModeRateLimitMode_DefaultFinality = core.RateLimitModeRateLimitMode_DefaultFinality
+const RateLimiterKey = core.RateLimiterKey
+const RmnRemoteKey = core.RmnRemoteKey
+const SDKVersion = core.SDKVersion
+const SendingMessageStateSendingMessageState_ExecutorFinalized = core.SendingMessageStateSendingMessageState_ExecutorFinalized
+const SendingMessageStateSendingMessageState_FeeFinalized = core.SendingMessageStateSendingMessageState_FeeFinalized
+const SendingMessageStateSendingMessageState_Prepared = core.SendingMessageStateSendingMessageState_Prepared
+const SendingMessageStateSendingMessageState_RequirePoolCCVs = core.SendingMessageStateSendingMessageState_RequirePoolCCVs
+const SendingMessageStateSendingMessageState_TokenLocked = core.SendingMessageStateSendingMessageState_TokenLocked
+const TokenAdminRegistryKey = core.TokenAdminRegistryKey
+const TokenConfigKey = core.TokenConfigKey
+const UsdPerUsdCent = core.UsdPerUsdCent
+const WaitForFinalityFlag = core.WaitForFinalityFlag
+
+type AcceptAdminParams = core.AcceptAdminParams
+type AcceptAdminRole = core.AcceptAdminRole
+type AcceptAdminRoleMCMSParams = core.AcceptAdminRoleMCMSParams
+type AddCCVFee = core.AddCCVFee
+type AddCCVFeeMCMSParams = core.AddCCVFeeMCMSParams
+type AddCCVVerification = core.AddCCVVerification
+type AddCCVVerificationMCMSParams = core.AddCCVVerificationMCMSParams
+type AddCustomObservers = core.AddCustomObservers
+type AddCustomObserversParams = core.AddCustomObserversParams
+type AddExecutorFee = core.AddExecutorFee
+type AddExecutorFeeMCMSParams = core.AddExecutorFeeMCMSParams
+type AddPriceUpdaters = core.AddPriceUpdaters
+type AddTokenSend = core.AddTokenSend
+type AddTokenSendFee = core.AddTokenSendFee
+type AddVerifierData = core.AddVerifierData
+type AddVerifierDataMCMSParams = core.AddVerifierDataMCMSParams
+type ApplyDestChainConfigUpdates = core.ApplyDestChainConfigUpdates
+type ApplyDestChainConfigUpdatesParams = core.ApplyDestChainConfigUpdatesParams
+type ApplyFeeQuoterDestChainConfigUpdates = core.ApplyFeeQuoterDestChainConfigUpdates
+type ApplyFeeQuoterDestChainConfigUpdatesParams = core.ApplyFeeQuoterDestChainConfigUpdatesParams
+type ApplyPriceUpdatersUpdate = core.ApplyPriceUpdatersUpdate
+type ApplyPriceUpdatersUpdateParams = core.ApplyPriceUpdatersUpdateParams
+type ApplySourceChainConfigUpdates = core.ApplySourceChainConfigUpdates
+type ApplySourceChainConfigUpdatesParams = core.ApplySourceChainConfigUpdatesParams
+type BuildMessage = core.BuildMessage
+type BuildMessageMCMSParams = core.BuildMessageMCMSParams
+type CCIPMessageSent = core.CCIPMessageSent
+type CCIPMessageSentEvent = core.CCIPMessageSentEvent
+type CCVExtraArg = core.CCVExtraArg
+type CCVFee = core.CCVFee
+type CCVVerification = core.CCVVerification
+type CancelExecute = core.CancelExecute
+type CancelExecuteMCMSParams = core.CancelExecuteMCMSParams
+type Canton2AnyMessage = core.Canton2AnyMessage
+type ConsumeByCCIPOwner = core.ConsumeByCCIPOwner
+type ConsumeCapacity = core.ConsumeCapacity
+type ConsumeCapacityResult = core.ConsumeCapacityResult
+type ConsumeReceiveTicket = core.ConsumeReceiveTicket
+type ConsumeReceiveTicketMCMSParams = core.ConsumeReceiveTicketMCMSParams
+type Contract = core.Contract
+type Curse = core.Curse
+type CurseChain = core.CurseChain
+type CurseChainParams = core.CurseChainParams
+type CurseGlobal = core.CurseGlobal
+type CurseMultiple = core.CurseMultiple
+type CurseMultipleParams = core.CurseMultipleParams
+type CurseParams = core.CurseParams
+type DecodedFinality = core.DecodedFinality
+type DestChainConfig = core.DestChainConfig
+type DestChainConfigArgs = core.DestChainConfigArgs
+type ExecutingMessageDeps = core.ExecutingMessageDeps
+type ExecutingMessageState = core.ExecutingMessageState
+type ExecutingMessageV1 = core.ExecutingMessageV1
+type ExecutionMode = core.ExecutionMode
+type ExecutionStateChanged = core.ExecutionStateChanged
+type ExecutionStateChangedEvent = core.ExecutionStateChangedEvent
+type ExecutorExtraArg = core.ExecutorExtraArg
+type ExecutorFee = core.ExecutorFee
+type ExecutorUseDefault = core.ExecutorUseDefault
+type ExecutorWithAddress = core.ExecutorWithAddress
+type ExtraArgs = core.ExtraArgs
+type FeeQuoter = core.FeeQuoter
+type FeeQuoterDestChainConfig = core.FeeQuoterDestChainConfig
+type FeeQuoterDestChainConfigArgs = core.FeeQuoterDestChainConfigArgs
+type FeeTokenAmount = core.FeeTokenAmount
+type FeeTokenAmountMCMSParams = core.FeeTokenAmountMCMSParams
+type FinalityConfig = core.FinalityConfig
+type FinalizeExecute = core.FinalizeExecute
+type FinalizeExecuteResult = core.FinalizeExecuteResult
+type FinalizeFee = core.FinalizeFee
+type FinalizeSend = core.FinalizeSend
+type FinalizeSendResult = core.FinalizeSendResult
+type GasPriceUpdate = core.GasPriceUpdate
+type GenericExtraArgsV3 = core.GenericExtraArgsV3
+type Get = core.Get
+type GetCursedSubjects = core.GetCursedSubjects
+type GetCursedSubjectsMCMSParams = core.GetCursedSubjectsMCMSParams
+type GetDestChainConfig = core.GetDestChainConfig
+type GetDestChainConfigMCMSParams = core.GetDestChainConfigMCMSParams
+type GetDestinationChainGasPrice = core.GetDestinationChainGasPrice
+type GetDestinationChainGasPriceMCMSParams = core.GetDestinationChainGasPriceMCMSParams
+type GetFeeTokens = core.GetFeeTokens
+type GetFeeTokensMCMSParams = core.GetFeeTokensMCMSParams
+type GetMCMSParams = core.GetMCMSParams
+type GetSourceChainConfig = core.GetSourceChainConfig
+type GetSourceChainConfigMCMSParams = core.GetSourceChainConfigMCMSParams
+type GetTokenConfigByCid = core.GetTokenConfigByCid
+type GetTokenConfigByCidMCMSParams = core.GetTokenConfigByCidMCMSParams
+type GetTokenPrice = core.GetTokenPrice
+type GetTokenPriceMCMSParams = core.GetTokenPriceMCMSParams
+type GetTokenTransferFee = core.GetTokenTransferFee
+type GetTokenTransferFeeMCMSParams = core.GetTokenTransferFeeMCMSParams
+type GlobalConfig = core.GlobalConfig
+type InboundPoolVerification = core.InboundPoolVerification
+type IsAdministrator = core.IsAdministrator
+type IsAdministratorMCMSParams = core.IsAdministratorMCMSParams
+type IsCursed = core.IsCursed
+type IsCursedForChain = core.IsCursedForChain
+type IsCursedForChainMCMSParams = core.IsCursedForChainMCMSParams
+type IsCursedMCMSParams = core.IsCursedMCMSParams
+type IssuerType = core.IssuerType
+type LocalAmountConversionResult = core.LocalAmountConversionResult
+type MCMSEncoder = core.MCMSEncoder
+type MessageExecutionState = core.MessageExecutionState
+type MessageV1 = core.MessageV1
+type PoolRegistration = core.PoolRegistration
+type PriceUpdates = core.PriceUpdates
+type ProposeAdminParams = core.ProposeAdminParams
+type ProposeAdministrator = core.ProposeAdministrator
+type ProposeAdministratorMCMSParams = core.ProposeAdministratorMCMSParams
+type ProposeAdministratorResult = core.ProposeAdministratorResult
+type QuoteGasForExec = core.QuoteGasForExec
+type QuoteGasForExecMCMSParams = core.QuoteGasForExecMCMSParams
+type QuoteGasForExecResult = core.QuoteGasForExecResult
+type RMNRemote = core.RMNRemote
+type RateLimitDirection = core.RateLimitDirection
+type RateLimitMode = core.RateLimitMode
+type RateLimiter = core.RateLimiter
+type Receipt = core.Receipt
+type RemoveCustomObservers = core.RemoveCustomObservers
+type RemoveCustomObserversParams = core.RemoveCustomObserversParams
+type RemoveFeeTokens = core.RemoveFeeTokens
+type RemoveFeeTokensParams = core.RemoveFeeTokensParams
+type RemovePriceUpdaters = core.RemovePriceUpdaters
+type SendingMessageDeps = core.SendingMessageDeps
+type SendingMessageState = core.SendingMessageState
+type SendingMessageV1 = core.SendingMessageV1
+type SetBurnMintFactory = core.SetBurnMintFactory
+type SetBurnMintFactoryMCMSParams = core.SetBurnMintFactoryMCMSParams
+type SetBurnMintFactoryParams = core.SetBurnMintFactoryParams
+type SetConfig = core.SetConfig
+type SetInboundPoolCCVs = core.SetInboundPoolCCVs
+type SetOutboundPoolCCVs = core.SetOutboundPoolCCVs
+type SetPool = core.SetPool
+type SetPoolMCMSParams = core.SetPoolMCMSParams
+type SetPoolParams = core.SetPoolParams
+type SetTransferFactory = core.SetTransferFactory
+type SetTransferFactoryMCMSParams = core.SetTransferFactoryMCMSParams
+type SetTransferFactoryParams = core.SetTransferFactoryParams
+type SourceChainConfig = core.SourceChainConfig
+type SourceChainConfigArgs = core.SourceChainConfigArgs
+type Template = core.Template
+type TimestampedPrice = core.TimestampedPrice
+type TokenAdminRegistry = core.TokenAdminRegistry
+type TokenConfig = core.TokenConfig
+type TokenPriceUpdate = core.TokenPriceUpdate
+type TokenReceiveTicket = core.TokenReceiveTicket
+type TokenReceiveTicketClaimed = core.TokenReceiveTicketClaimed
+type TokenReceiveTicketClaimedCompleted = core.TokenReceiveTicketClaimedCompleted
+type TokenReceiveTicketClaimedEvent = core.TokenReceiveTicketClaimedEvent
+type TokenReceiveTicketClaimedOutput = core.TokenReceiveTicketClaimedOutput
+type TokenReceiveTicketClaimedPending = core.TokenReceiveTicketClaimedPending
+type TokenSendData = core.TokenSendData
+type TokenSendFee = core.TokenSendFee
+type TokenTransfer = core.TokenTransfer
+type TokenTransferFeeConfig = core.TokenTransferFeeConfig
+type TokenTransferV1 = core.TokenTransferV1
+type TransferAdminParams = core.TransferAdminParams
+type TransferAdminRole = core.TransferAdminRole
+type TransferAdminRoleMCMSParams = core.TransferAdminRoleMCMSParams
+type Uncurse = core.Uncurse
+type UncurseChain = core.UncurseChain
+type UncurseChainParams = core.UncurseChainParams
+type UncurseGlobal = core.UncurseGlobal
+type UncurseMultiple = core.UncurseMultiple
+type UncurseMultipleParams = core.UncurseMultipleParams
+type UncurseParams = core.UncurseParams
+type UpdateCCIPOwner = core.UpdateCCIPOwner
+type UpdatePrices = core.UpdatePrices
+type UpdatePricesMCMSParams = core.UpdatePricesMCMSParams
+type UpdatePricesParams = core.UpdatePricesParams
+type VerifierData = core.VerifierData
+
+var NewContract = core.NewContract

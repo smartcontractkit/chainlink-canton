@@ -27,8 +27,8 @@ var (
 
 const (
 	PackageName = "link"
-	PackageID   = "fa46d964d09d31eca1ebc0b971d080a65a384ba6e061af4eb4dcb9bd01e33f2e"
-	SDKVersion  = "3.4.10"
+	PackageID   = "9f9c7c90a3f67209d2e27d1ba78b663a9b225fb9a856fc745fbdb85b9886dfdb"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -101,6 +101,7 @@ type LinkHolding struct {
 	HoldingAdmin        types.PARTY                              `json:"holdingAdmin"`
 	HoldingInstrumentId splice_api_token_holding_v1.InstrumentId `json:"holdingInstrumentId"`
 	HoldingAmount       types.NUMERIC                            `json:"holdingAmount"`
+	Meta                splice_api_token_metadata_v1.Metadata    `json:"meta"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -130,6 +131,9 @@ func (t LinkHolding) CreateCommand() *model.CreateCommand {
 		args["holdingAmount"] = t.HoldingAmount
 	}
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["meta"] = model.NestedToDAMLValue(t.Meta)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -152,6 +156,9 @@ func (t LinkHolding) CreateCommandWithPackageID(packageID string) *model.CreateC
 	if t.HoldingAmount != "" {
 		args["holdingAmount"] = t.HoldingAmount
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["meta"] = model.NestedToDAMLValue(t.Meta)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -773,6 +780,7 @@ type LockedLinkHolding struct {
 	LockedReceiver     types.PARTY                              `json:"lockedReceiver"`
 	LockedInstrumentId splice_api_token_holding_v1.InstrumentId `json:"lockedInstrumentId"`
 	LockedAmount       types.NUMERIC                            `json:"lockedAmount"`
+	Meta               splice_api_token_metadata_v1.Metadata    `json:"meta"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -805,6 +813,9 @@ func (t LockedLinkHolding) CreateCommand() *model.CreateCommand {
 		args["lockedAmount"] = t.LockedAmount
 	}
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["meta"] = model.NestedToDAMLValue(t.Meta)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -830,6 +841,9 @@ func (t LockedLinkHolding) CreateCommandWithPackageID(packageID string) *model.C
 	if t.LockedAmount != "" {
 		args["lockedAmount"] = t.LockedAmount
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["meta"] = model.NestedToDAMLValue(t.Meta)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -888,6 +902,7 @@ type Send struct {
 	Amount           types.NUMERIC                            `json:"amount"`
 	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	InputHoldingCids []types.CONTRACT_ID                      `json:"inputHoldingCids"`
+	Meta             splice_api_token_metadata_v1.Metadata    `json:"meta"`
 }
 
 // ToMap converts Send to a map for DAML arguments
@@ -907,6 +922,8 @@ func (t Send) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["meta"] = model.NestedToDAMLValue(t.Meta)
 
 	return m
 }

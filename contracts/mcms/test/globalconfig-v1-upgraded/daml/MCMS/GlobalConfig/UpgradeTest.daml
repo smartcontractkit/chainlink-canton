@@ -9,7 +9,7 @@ module MCMS.GlobalConfig.UpgradeTest where
 import DA.Map qualified as Map
 import Daml.Script
 import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSReceiver_Entrypoint(..))
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import MCMS.GlobalConfig.Types
 import MCMS.GlobalConfig.V1
 import MCMS.GlobalConfig.V2

@@ -15,6 +15,7 @@ import (
 	protov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"
 	topoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/topology/admin/v30"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
@@ -24,9 +25,8 @@ import (
 const defaultHost = "localhost"
 const defaultPort = 5001
 
-// Dial opens a gRPC connection to a Canton admin API endpoint using the
+// Dial opens a gRPC connection to a Canton Admin gRPC endpoint using the
 // host, port, and optional JWT bearer token from cfg.
-// TLS is not yet supported — connections are plaintext.
 func Dial(cfg ClientConfig) (*grpc.ClientConn, error) {
 	host := cfg.AdminHost
 	if host == "" {
@@ -38,7 +38,8 @@ func Dial(cfg ClientConfig) (*grpc.ClientConn, error) {
 	}
 	target := fmt.Sprintf("%s:%d", host, port)
 
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	creds := transportCredentials(host, port)
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(creds)}
 	if cfg.AdminJWT != "" {
 		opts = append(opts, grpc.WithUnaryInterceptor(jwtUnaryInterceptor(cfg.AdminJWT)))
 		opts = append(opts, grpc.WithStreamInterceptor(jwtStreamInterceptor(cfg.AdminJWT)))
@@ -50,6 +51,17 @@ func Dial(cfg ClientConfig) (*grpc.ClientConn, error) {
 	}
 
 	return conn, nil
+}
+
+// transportCredentials returns TLS credentials when dialing port 443
+// (DevNet exposes public Admin/Ledger gRPC through TLS on 443),
+// and plaintext/insecure credentials otherwise.
+func transportCredentials(host string, port int) credentials.TransportCredentials {
+	if port == 443 {
+		return credentials.NewClientTLSFromCert(nil, host)
+	}
+
+	return insecure.NewCredentials()
 }
 
 func jwtUnaryInterceptor(token string) grpc.UnaryClientInterceptor {
@@ -95,11 +107,19 @@ var authorizedStore = &topoadminv30.StoreId{
 }
 
 func synchronizerStore(syncID string) *topoadminv30.StoreId {
+	sync := &topoadminv30.Synchronizer{}
+	// Physical IDs include a sequencer suffix, e.g. global-domain::1220...::34-0.
+	// Canton Admin API expects Synchronizer_PhysicalId for those values; using
+	// Synchronizer_Id causes PROTO_DESERIALIZATION_FAILURE on Authorize.
+	if strings.Count(syncID, "::") >= 2 {
+		sync.Kind = &topoadminv30.Synchronizer_PhysicalId{PhysicalId: syncID}
+	} else {
+		sync.Kind = &topoadminv30.Synchronizer_Id{Id: syncID}
+	}
+
 	return &topoadminv30.StoreId{
 		Store: &topoadminv30.StoreId_Synchronizer{
-			Synchronizer: &topoadminv30.Synchronizer{
-				Kind: &topoadminv30.Synchronizer_Id{Id: syncID},
-			},
+			Synchronizer: sync,
 		},
 	}
 }
@@ -158,6 +178,24 @@ func (c *GRPCCantonClient) GenerateSigningKey(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("GenerateSigningKey: %w", err)
+	}
+
+	return resp.GetPublicKey(), nil
+}
+
+func (c *GRPCCantonClient) RegisterKmsSigningKey(
+	ctx context.Context,
+	kmsKeyID string,
+	name string,
+	usage []cryptov30.SigningKeyUsage,
+) (*cryptov30.SigningPublicKey, error) {
+	resp, err := c.vault.RegisterKmsSigningKey(ctx, &cryptoadminv30.RegisterKmsSigningKeyRequest{
+		KmsKeyId: kmsKeyID,
+		Name:     name,
+		Usage:    usage,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("RegisterKmsSigningKey: %w", err)
 	}
 
 	return resp.GetPublicKey(), nil

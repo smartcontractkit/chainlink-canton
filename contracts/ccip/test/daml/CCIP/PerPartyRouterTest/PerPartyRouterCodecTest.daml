@@ -6,7 +6,7 @@ import DA.Assert ((===))
 
 import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..))
 import CCIP.PerPartyRouterCodecGen (encodeSetDepsParams, decodeSetDepsParamsAt, encodePerPartyRouterDeps, decodePerPartyRouterDepsAt)
-import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
 -- SETDEPSPARAMS ENCODING/DECODING TESTS (Optional fields)

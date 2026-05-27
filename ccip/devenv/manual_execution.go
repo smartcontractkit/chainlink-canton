@@ -73,7 +73,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 
 	// Try to get the PerPartyRouter, to ensure that is actually exists
 	_, err = testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
+		PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to find per-party router: %w", err)
@@ -143,7 +143,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
 
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{participant.PartyID}, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get router contract ID: %w", err)
 	}
@@ -155,7 +155,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCIP execute disclosure: %w", err)
 	}
-	executeArgs := ccipreceiver.Execute2{
+	executeArgs := ccipreceiver.Execute{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
@@ -195,7 +195,6 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		executeArgs.TokenTransfer = &ccipreceiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(executingParty),
-			TokenInput:         tokenPoolDisclosure.TokenInput,
 			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
 		}
 		disclosedContracts = append(disclosedContracts, tokenPoolDisclosure.DisclosedContracts...)
@@ -208,7 +207,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		Str("Receiver", hex.EncodeToString(message.Receiver)).
 		Msg("Executing message...")
 
-	executeReport, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Execute, c.chain, contract.ChoiceInput[ccipreceiver.Execute2]{
+	executeReport, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Execute, c.chain, contract.ChoiceInput[ccipreceiver.Execute]{
 		InstanceAddress:    receiverAddress,
 		Args:               executeArgs,
 		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),

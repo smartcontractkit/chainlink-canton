@@ -16,13 +16,18 @@ import CCIP.LockReleaseTokenPoolTypes (
     ApplyTokenTransferFeeConfigUpdatesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
+    AddPoolReceiveContextNonContractValueParams(..),
+    AddPoolReceiveContextContractValueParams(..),
+    RemovePoolReceiveContextValueParams(..),
     )
-import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.Context qualified as Context
-import CCIP.ContextCodec (encodeCCIPContext, decodeCCIPContextAt)
+import CCIP.ContextCodec (encodeChoiceContext, decodeChoiceContextAt, encodeAnyValue)
 import DA.TextMap qualified as TextMap
 
 import CCIP.FinalityConfig qualified as FinalityCodec
+
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 mkFinalityConfig n =
     if n == 0
@@ -174,30 +179,55 @@ testTransferTimeoutRoundtrip = do
     fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedRelHoursLarge 0)) === relHoursLarge
 
 -- ===============================================
--- |           SetPoolReceiveContext             |
+-- |   Pool receive context MCMS param codecs    |
 -- ===============================================
 
-testSetPoolReceiveContextRoundtrip : Script ()
-testSetPoolReceiveContextRoundtrip = do
+testAddPoolReceiveContextNonContractValueParamsRoundtrip : Script ()
+testAddPoolReceiveContextNonContractValueParamsRoundtrip = do
+    let inner = encodeAnyValue (MetadataV1.AV_Text "hello")
+        args = AddPoolReceiveContextNonContractValueParams with contextKey = "myKey", valuePayload = inner
+        encoded = LockReleaseTokenPoolCodec.encodeAddPoolReceiveContextNonContractValueParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeAddPoolReceiveContextNonContractValueParamsAt encoded 0)) === args
+
+testAddPoolReceiveContextContractValueParamsRoundtrip : Script ()
+testAddPoolReceiveContextContractValueParamsRoundtrip = script do
+    p <- allocateParty "p"
+    let ria = RawInstanceAddress.make "other-inst" p
+        args = AddPoolReceiveContextContractValueParams with contextKey = "refKey", referentInstanceAddress = ria
+        encoded = LockReleaseTokenPoolCodec.encodeAddPoolReceiveContextContractValueParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeAddPoolReceiveContextContractValueParamsAt encoded 0)) === args
+
+testRemovePoolReceiveContextValueParamsRoundtrip : Script ()
+testRemovePoolReceiveContextValueParamsRoundtrip = do
+    let args = RemovePoolReceiveContextValueParams with contextKey = "toRemove"
+        encoded = LockReleaseTokenPoolCodec.encodeRemovePoolReceiveContextValueParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeRemovePoolReceiveContextValueParamsAt encoded 0)) === args
+
+-- ===============================================
+-- |           ChoiceContext (ContextCodec)      |
+-- ===============================================
+
+testChoiceContextCodecRoundtrip : Script ()
+testChoiceContextCodecRoundtrip = do
     -- Test empty context
-    let emptyCtx = Context.emptyCCIPContext
-        encodedEmpty = encodeCCIPContext emptyCtx
-    fst (fromSome (decodeCCIPContextAt encodedEmpty 0)) === emptyCtx
+    let emptyCtx = MetadataV1.emptyChoiceContext
+        encodedEmpty = encodeChoiceContext emptyCtx
+    fst (fromSome (decodeChoiceContextAt encodedEmpty 0)) === emptyCtx
 
     -- Test context with simple text values
-    let ctxWithText = Context.CCIPContext (TextMap.fromList [("key1", Context.AV_Text "value1"), ("key2", Context.AV_Text "value2")])
-        encodedWithText = encodeCCIPContext ctxWithText
-    fst (fromSome (decodeCCIPContextAt encodedWithText 0)) === ctxWithText
+    let ctxWithText = MetadataV1.ChoiceContext (TextMap.fromList [("key1", MetadataV1.AV_Text "value1"), ("key2", MetadataV1.AV_Text "value2")])
+        encodedWithText = encodeChoiceContext ctxWithText
+    fst (fromSome (decodeChoiceContextAt encodedWithText 0)) === ctxWithText
 
     -- Test context with int values
-    let ctxWithInt = Context.CCIPContext (TextMap.fromList [("count", Context.AV_Int 42)])
-        encodedWithInt = encodeCCIPContext ctxWithInt
-    fst (fromSome (decodeCCIPContextAt encodedWithInt 0)) === ctxWithInt
+    let ctxWithInt = MetadataV1.ChoiceContext (TextMap.fromList [("count", MetadataV1.AV_Int 42)])
+        encodedWithInt = encodeChoiceContext ctxWithInt
+    fst (fromSome (decodeChoiceContextAt encodedWithInt 0)) === ctxWithInt
 
     -- Test context with bool values
-    let ctxWithBool = Context.CCIPContext (TextMap.fromList [("enabled", Context.AV_Bool True), ("disabled", Context.AV_Bool False)])
-        encodedWithBool = encodeCCIPContext ctxWithBool
-    fst (fromSome (decodeCCIPContextAt encodedWithBool 0)) === ctxWithBool
+    let ctxWithBool = MetadataV1.ChoiceContext (TextMap.fromList [("enabled", MetadataV1.AV_Bool True), ("disabled", MetadataV1.AV_Bool False)])
+        encodedWithBool = encodeChoiceContext ctxWithBool
+    fst (fromSome (decodeChoiceContextAt encodedWithBool 0)) === ctxWithBool
 
 -- ===============================================
 -- |             SetTransferTimeout              |

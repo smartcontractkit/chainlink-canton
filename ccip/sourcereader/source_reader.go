@@ -352,7 +352,7 @@ func ccipMessageSentEventToProtocol(evt *common.CCIPMessageSentEvent) (*protocol
 // receiptsBindingToProtocol converts binding []common.Receipt to []protocol.ReceiptWithBlob.
 func receiptsBindingToProtocol(receipts []common.Receipt) ([]protocol.ReceiptWithBlob, error) {
 	protoReceipts := make([]protocol.ReceiptWithBlob, 0, len(receipts))
-	for _, r := range receipts {
+	for i, r := range receipts {
 		decoded, err := protocol.NewUnknownAddressFromHex(string(r.IssuerAddress))
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode issuerAddress: %w, input: %s", err, r.IssuerAddress)
@@ -366,10 +366,23 @@ func receiptsBindingToProtocol(receipts []common.Receipt) ([]protocol.ReceiptWit
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode extra args: %w, input: %s", err, r.ExtraArgs)
 		}
+
+		gas := int64(r.DestGasLimit)
+		if gas < 0 {
+			return nil, fmt.Errorf("receipts[%d]: dest gas limit must be non-negative: %d", i, gas)
+		}
+		overhead := int64(r.DestBytesOverhead)
+		if overhead < 0 {
+			return nil, fmt.Errorf("receipts[%d]: dest bytes overhead must be non-negative: %d", i, overhead)
+		}
+		if overhead > math.MaxUint32 {
+			return nil, fmt.Errorf("receipts[%d]: dest bytes overhead overflows uint32: %d", i, overhead)
+		}
+
 		protoReceipts = append(protoReceipts, protocol.ReceiptWithBlob{
 			Issuer:            decoded,
-			DestGasLimit:      uint64(r.DestGasLimit),      //nolint:gosec // int64 is always non-negative
-			DestBytesOverhead: uint32(r.DestBytesOverhead), //nolint:gosec // int64 is always non-negative
+			DestGasLimit:      uint64(gas),
+			DestBytesOverhead: uint32(overhead),
 			FeeTokenAmount:    feeTokenAmount,
 			ExtraArgs:         protocol.ByteSlice(extraArgs),
 		})
@@ -403,16 +416,26 @@ func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big
 	}
 
 	headers := make(map[uint64]protocol.BlockHeader)
-	for _, blockNum := range blockNumbers {
-		if blockNum.Uint64() > latest.Number {
-			return nil, fmt.Errorf("block number is greater than latest offset: %d > %d", blockNum.Uint64(), latest.Number)
+	for i, blockNum := range blockNumbers {
+		if blockNum == nil {
+			return nil, fmt.Errorf("blockNumbers[%d]: block number is nil", i)
+		}
+		if blockNum.Sign() < 0 {
+			return nil, fmt.Errorf("blockNumbers[%d]: block offset must be non-negative: %s", i, blockNum.String())
+		}
+		if !blockNum.IsUint64() {
+			return nil, fmt.Errorf("blockNumbers[%d]: block offset overflows uint64: %s", i, blockNum.String())
+		}
+		u := blockNum.Uint64()
+		if u > latest.Number {
+			return nil, fmt.Errorf("blockNumbers[%d]: block number is greater than latest offset: %d > %d", i, u, latest.Number)
 		}
 
-		h := intToBytes32(blockNum.Uint64())
-		headers[blockNum.Uint64()] = protocol.BlockHeader{
-			Number:     blockNum.Uint64(),
+		h := intToBytes32(u)
+		headers[u] = protocol.BlockHeader{
+			Number:     u,
 			Hash:       h,
-			ParentHash: parentHash(blockNum.Uint64()),
+			ParentHash: parentHash(u),
 			// TODO: determine if we can get an offset's timestamp.
 			// Timestamp: time.Time{},
 		}
@@ -434,7 +457,7 @@ func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Byt
 	activeContract, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
 		c.stateServiceClient,
-		c.config.NodeOperatorParty,
+		[]string{c.config.NodeOperatorParty},
 		c.config.RMNRemoteTemplateID.String(),
 		c.rmnRemoteInstanceAddress,
 	)

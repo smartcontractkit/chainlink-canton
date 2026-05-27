@@ -22,6 +22,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -41,6 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
@@ -236,6 +239,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 		Config: changesets.DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: partyCCIP,
+				RMNOwnerParty:  partyCCIP,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
@@ -441,7 +445,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 			InstrumentId:       nativeInstrumentId,
 			Decimals:           10,
 			InstanceID:         poolInstanceId,
-			PoolReceiveContext: common.CCIPContext{Values: map[string]common.AnyValue{}},
+			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 			TransferTimeout: lockreleasetokenpool.TransferTimeout{
 				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
 			},
@@ -541,8 +545,8 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 			},
 			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
 				Enabled: true,
-				TokenPools: []config.TokenPool{
-					{
+				TokenPools: map[string]config.TokenPool{
+					tokenPoolAddress.InstanceAddress().Hex(): {
 						Type: config.TokenPoolTypeLockRelease,
 						ContractIdentifier: config.ContractIdentifier{
 							PartyID:         partyCCIP,
@@ -589,10 +593,10 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -655,7 +659,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// Deploy CCIPReceiver for receiver
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
@@ -676,12 +680,10 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	ccipReceiverCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
-	// Capture receiver's balance before execute
-	receiverHoldingsBefore, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
+	// Capture receiver's balance before execute (Amulet for this receiver).
+	receiverBalanceRatBefore, err := testhelpers.GetHoldingsBalance(t.Context(), receiverParticipant, &nativeInstrumentId, testhelpers.WithHoldingOwner(partyReceiver))
 	require.NoError(t, err)
-	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
+	receiverBalanceBefore, _ := new(big.Float).SetRat(receiverBalanceRatBefore).Float64()
 
 	tokenPoolAddressEDS, err := edsTesthelpers.GetTokenPoolForToken(t.Context(), ccipAPIClient, hashedInstrumentId)
 	require.NoError(t, err)
@@ -692,14 +694,13 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	tokenPoolDisclosure, err := edsTesthelpers.GetTokenPoolExecuteDisclosure(t.Context(), tokenPoolAPIClient, encodedMessageHex, tokenPoolAddressEDS.InstanceAddress())
 	require.NoError(t, err)
 
-	executeArgs := ccipreceiver.Execute2{
+	executeArgs := ccipreceiver.Execute{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
 		TokenTransfer: &ccipreceiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(partyReceiver),
-			TokenInput:         tokenPoolDisclosure.TokenInput,
 			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
 		},
 		CcvInputs: []ccipreceiver.CCVInput{
@@ -715,7 +716,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	// in one receiver-authored transaction with disclosed shared dependencies.
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
@@ -758,11 +759,9 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	}
 
 	// Verify receiver's balance increased by the expected transfer amount
-	receiverHoldingsAfter, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
+	receiverBalanceRatAfter, err := testhelpers.GetHoldingsBalance(t.Context(), receiverParticipant, &nativeInstrumentId, testhelpers.WithHoldingOwner(partyReceiver))
 	require.NoError(t, err)
-	receiverBalanceAfter := getHoldingsBalance(receiverHoldingsAfter)
+	receiverBalanceAfter, _ := new(big.Float).SetRat(receiverBalanceRatAfter).Float64()
 
 	actualTransferAmount := receiverBalanceAfter - receiverBalanceBefore
 	require.InDelta(t, tc.expectedTransferAmount, actualTransferAmount, 0.01, "Receiver balance should increase by transfer amount")
@@ -780,19 +779,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	}
 
 	t.Logf("✅ Success")
-}
-
-// getHoldingsBalance returns total balance across all holdings
-func getHoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
-	var total float64
-	for _, h := range holdings {
-		balanceStr := h.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()[2].GetValue().GetSum().(*apiv2.Value_Numeric).Numeric
-		balance, _ := new(big.Float).SetString(balanceStr)
-		balanceFloat, _ := balance.Float64()
-		total += balanceFloat
-	}
-
-	return total
 }
 
 // extractCreatedContractId returns the first created contract ID from a transaction response
@@ -835,15 +821,15 @@ func encodeUint256Bytes(value uint64) []byte {
 
 func findActiveRateLimiterByInstanceID(ctx context.Context, participant canton.Participant, instanceID string) (*apiv2.ActiveContract, error) {
 	rateLimiters, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter",
+		PackageId: "#" + common.PackageName, ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter",
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	for i := len(rateLimiters) - 1; i >= 0; i-- {
-		if getRateLimiterInstanceID(rateLimiters[i]) == instanceID {
-			return rateLimiters[i], nil
+	for _, v := range slices.Backward(rateLimiters) {
+		if getRateLimiterInstanceID(v) == instanceID {
+			return v, nil
 		}
 	}
 

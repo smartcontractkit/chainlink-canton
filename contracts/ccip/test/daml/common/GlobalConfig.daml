@@ -8,7 +8,7 @@ import DA.Optional (fromSome)
 
 import qualified CCIP.GlobalConfig
 import qualified CCIP.GlobalConfigTypes
-import MCMS.RawInstanceAddress(RawInstanceAddress(..))
+import Chainlink.InstanceAddress(RawInstanceAddress(..))
 
 testGlobalConfig_ApplySourceChainConfigUpdates : Script ()
 testGlobalConfig_ApplySourceChainConfigUpdates = do
@@ -527,7 +527,23 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     submitMustFail owner do
         exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
             destChainConfigUpdates = invalidDestChainConfigUpdates
-    
+
+    -- negative message network fees are rejected.
+    let invalidDestChainConfigUpdates = [
+            (head destChainConfigUpdates1) with messageNetworkFeeUSDCents = -1.0
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
+            destChainConfigUpdates = invalidDestChainConfigUpdates
+
+    -- negative token network fees are rejected.
+    let invalidDestChainConfigUpdates = [
+            (head destChainConfigUpdates1) with tokenNetworkFeeUSDCents = -1.0
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
+            destChainConfigUpdates = invalidDestChainConfigUpdates
+
     pure()
 
 -- Assertion helpers

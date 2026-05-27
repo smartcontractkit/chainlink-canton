@@ -50,6 +50,7 @@ func TestConfigureGlobalConfig_DirectExecution(t *testing.T) {
 	chainSelector := types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10))
 	deployOut, err := cld_ops.ExecuteSequence(bundle, sequences.DeployChainContracts, *cantonChain, sequences.DeployChainContractsParams{
 		CCIPOwnerParty: party,
+		RMNOwnerParty:  party,
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{{
 			Template: ccvs.CommitteeVerifier{
 				Owner:                        types.PARTY(party),
@@ -66,9 +67,7 @@ func TestConfigureGlobalConfig_DirectExecution(t *testing.T) {
 			},
 		},
 		RMNRemote: sequences.RMNRemoteParams{
-			Template: rmn.RMNRemote{
-				RmnOwner: types.PARTY(party),
-			},
+			Template: rmn.RMNRemote{},
 		},
 		NativeInstrumentId: splice_api_token_holding_v1.InstrumentId{
 			Admin: types.PARTY(party),
@@ -196,19 +195,21 @@ func setupCantonEnv(t *testing.T) (*canton.Chain, cld_ops.Bundle, *cldf.Environm
 func uploadDARs(t *testing.T, participant canton.Participant, packages ...contracts.Package) {
 	t.Helper()
 
-	darData := make([]*participantv30.UploadDarRequest_UploadDarData, 0, len(packages))
+	// Upload one DAR per request: after DAR consolidation, the combined request can exceed
+	// Canton admin API's default 10 MiB gRPC message limit even though each DAR is valid.
 	for _, pkg := range packages {
 		dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
 		require.NoError(t, err, "failed to get DAR for %s", pkg)
-		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{Bytes: dar})
-	}
 
-	_, err := participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
-		Dars:               darData,
-		VetAllPackages:     true,
-		SynchronizeVetting: true,
-	})
-	require.NoError(t, err, "failed to upload DAR files")
+		_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+			Dars: []*participantv30.UploadDarRequest_UploadDarData{
+				{Bytes: dar},
+			},
+			VetAllPackages:     true,
+			SynchronizeVetting: true,
+		})
+		require.NoError(t, err, "failed to upload DAR for %s", pkg)
+	}
 }
 
 // uploadChainContractDARs uploads all CCIP chain contract DARs needed by DeployChainContracts.

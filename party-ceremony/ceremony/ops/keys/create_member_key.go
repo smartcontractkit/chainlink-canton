@@ -15,8 +15,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// CreateMemberKeyOp generates a namespace signing key and a DAML (protocol)
-// signing key for a single participant, and fetches the participant's UID.
+// CreateMemberKeyOp generates (or registers locally configured KMS) namespace
+// and DAML (protocol) signing keys for a single participant, then fetches the
+// participant's UID.
 //
 // Canton equivalent:
 //
@@ -25,7 +26,7 @@ import (
 var CreateMemberKeyOp = operations.NewOperation(
 	"canton-ceremony/keys/create-member-key",
 	semver.MustParse("1.0.0"),
-	"Generate namespace and DAML signing keys for a ceremony participant",
+	"Generate or register namespace and DAML signing keys for a ceremony participant",
 	func(b operations.Bundle, deps ceremony.CantonDeps, in CreateMemberKeyInput) (CreateMemberKeyOutput, error) {
 		if in.ParticipantID == "" || in.NamespaceName == "" {
 			return CreateMemberKeyOutput{}, operations.NewUnrecoverableError(
@@ -43,19 +44,27 @@ var CreateMemberKeyOp = operations.NewOperation(
 			return CreateMemberKeyOutput{}, fmt.Errorf("participant ID mismatch: expected %s, got %s", pid, in.ParticipantID)
 		}
 
-		key, err := deps.Client.GenerateSigningKey(ctx, in.NamespaceName, []cryptov30.SigningKeyUsage{
+		useKms := deps.KMS.NamespaceKeyID != "" || deps.KMS.ProtocolKeyID != ""
+		if useKms && (deps.KMS.NamespaceKeyID == "" || deps.KMS.ProtocolKeyID == "") {
+			return CreateMemberKeyOutput{}, operations.NewUnrecoverableError(
+				errors.New("create-member-key: kms_namespace_key_id and kms_protocol_key_id must both be set when using KMS"),
+			)
+		}
+
+		// Obtain the NAMESPACE signing key.
+		key, err := obtainSigningKey(ctx, deps.Client, deps.KMS.NamespaceKeyID, in.NamespaceName, []cryptov30.SigningKeyUsage{
 			cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_NAMESPACE,
 		})
 		if err != nil {
-			return CreateMemberKeyOutput{}, fmt.Errorf("generating namespace key: %w", err)
+			return CreateMemberKeyOutput{}, fmt.Errorf("obtaining namespace key: %w", err)
 		}
 
-		// Also generate a PROTOCOL (DAML) signing key for the participant.
-		damlKey, err := deps.Client.GenerateSigningKey(ctx, in.NamespaceName+"-protocol", []cryptov30.SigningKeyUsage{
+		// Obtain the PROTOCOL (DAML) signing key.
+		damlKey, err := obtainSigningKey(ctx, deps.Client, deps.KMS.ProtocolKeyID, in.NamespaceName+"-protocol", []cryptov30.SigningKeyUsage{
 			cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_PROTOCOL,
 		})
 		if err != nil {
-			return CreateMemberKeyOutput{}, fmt.Errorf("generating protocol (DAML) signing key: %w", err)
+			return CreateMemberKeyOutput{}, fmt.Errorf("obtaining protocol (DAML) signing key: %w", err)
 		}
 
 		uid, err := deps.Client.GetParticipantUID(ctx)

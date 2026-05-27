@@ -1,7 +1,7 @@
 module CCIP.ExecutorTypes where
 
 import qualified CCIP.FinalityConfig
-import MCMS.RawInstanceAddress (RawInstanceAddress)
+import Chainlink.InstanceAddress (RawInstanceAddress)
 
 data RemoteChainConfig = RemoteChainConfig
     with

@@ -1,0 +1,1200 @@
+-- | Lock/release token pool for CCIP token transfers.
+--
+-- Supports Splice token standard patterns where TransferFactory implementations
+-- may look up preapproval from extraArgs.context (e.g., Amulet's ExternalPartyAmuletRules
+-- uses "transfer-preapproval" key). The pool stores a poolReceiveContext that gets
+-- merged into extraArgs for inbound transfers, enabling direct transfers without
+-- pending state when the pool has preapproval.
+module CCIP.LockReleaseTokenPool (
+    module CCIP.LockReleaseTokenPool
+    , module CCIP.LockReleaseTokenPoolTypes
+  ) where
+
+import DA.Action (foldlA, when)
+import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Foldable qualified as Foldable
+import DA.List (dedup)
+import qualified DA.Map as Map
+import DA.Optional (fromOptional, fromSomeNote)
+import qualified DA.TextMap as TextMap
+import DA.Date (date, Month(Dec))
+import DA.Time (time, addRelTime, hours)
+import DA.Foldable (forA_)
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import CCIP.LockReleaseTokenPoolCodecGen (
+    decodeSetDynamicConfigParamsAt,
+    decodeApplyChainUpdatesParamsAt,
+    decodeApplyTokenTransferFeeConfigUpdatesParamsAt,
+    decodeSetRateLimitConfigParamsAt,
+    decodeSetTransferTimeoutParamsAt,
+    decodeAddPoolReceiveContextNonContractValueParamsAt,
+    decodeAddPoolReceiveContextContractValueParamsAt,
+    decodeRemovePoolReceiveContextValueParamsAt,
+    )
+import CCIP.ContextCodec (decodeAnyValueAt)
+import CCIP.LockReleaseTokenPoolTypes (
+    TokenTransferFeeConfig(..),
+    RemoteChainConfig(..),
+    ChainUpdate(..),
+    TokenTransferFeeConfigArgs(..),
+    RateLimitConfigArgs(..),
+    TransferTimeout(..),
+    SetDynamicConfigParams(..),
+    ApplyChainUpdatesParams(..),
+    ApplyTokenTransferFeeConfigUpdatesParams(..),
+    SetRateLimitConfigParams(..),
+    SetTransferTimeoutParams(..),
+    AddPoolReceiveContextNonContractValueParams(..),
+    AddPoolReceiveContextContractValueParams(..),
+    RemovePoolReceiveContextValueParams(..),
+    )
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified CCIP.Context
+import qualified CCIP.Events
+import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FinalityConfig
+import qualified CCIP.FeeQuoter
+import qualified CCIP.Interfaces.TokenPool
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.Math
+import qualified CCIP.Uint256
+import qualified CCIP.RateLimiter
+import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import qualified CCIP.RMNRemote
+import qualified CCIP.SendingMessageV1
+import qualified CCIP.Tickets
+import qualified CCIP.TokenAdminRegistry
+
+-- | Far-future time used as "never expires" for pending transfers.
+-- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
+maxTime : Time
+maxTime = time (date 9999 Dec 31) 23 59 59
+
+transferFactoryContextKey : Text
+transferFactoryContextKey = "transfer-factory"
+
+lookupTransferFactory : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory)
+lookupTransferFactory ctx = CCIP.Context.getFromContextU ctx transferFactoryContextKey
+
+transferFactoryExtraArgsContextValuesContextKey : Text
+transferFactoryExtraArgsContextValuesContextKey = "transfer-factory-extra-args-context-values"
+
+lookupTransferFactoryExtraArgsContextValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Splice.Api.Token.MetadataV1.AnyValue)
+lookupTransferFactoryExtraArgsContextValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx transferFactoryExtraArgsContextValuesContextKey
+
+transferFactoryExtraArgsMetaValuesContextKey : Text
+transferFactoryExtraArgsMetaValuesContextKey = "transfer-factory-extra-args-meta-values"
+
+lookupTransferFactoryExtraArgsMetaValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Text)
+lookupTransferFactoryExtraArgsMetaValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx transferFactoryExtraArgsMetaValuesContextKey
+
+tokenPoolHoldingsContextKey : Text
+tokenPoolHoldingsContextKey = "token-pool-holdings"
+
+lookupTokenPoolHoldings : Splice.Api.Token.MetadataV1.ChoiceContext -> Update [ContractId Splice.Api.Token.HoldingV1.Holding]
+lookupTokenPoolHoldings ctx = CCIP.Context.getFromContextU ctx tokenPoolHoldingsContextKey
+
+data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
+    with
+        tokenAdminRegistry : RawInstanceAddress
+        rmnRemote : RawInstanceAddress
+        feeQuoter : RawInstanceAddress
+    deriving (Eq, Show)
+
+parseSourcePoolDecimals : Int -> BytesHex -> Int
+parseSourcePoolDecimals localDecimals sourcePoolData =
+    if sourcePoolData == ""
+    then localDecimals
+    else
+        let decoded = fromSomeNote
+                "ReleaseFromTicket: invalid source pool decimals"
+                (CCIP.MessageCodecV1.decodeUint256 sourcePoolData)
+        in
+            if decoded < 0.0 || decoded > 255.0
+            then error "ReleaseFromTicket: invalid source pool decimals"
+            else truncate decoded
+
+calculateLocalAmount : Numeric 0 -> Int -> Int -> Numeric 0
+calculateLocalAmount remoteAmount remoteDecimals localDecimals =
+    CCIP.Math.calculateLocalAmountChecked
+        "LockReleaseTokenPool.calculateLocalAmount"
+        remoteAmount
+        remoteDecimals
+        localDecimals
+
+assertHoldingMatches
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.HoldingV1.Holding
+    -> Update Splice.Api.Token.HoldingV1.HoldingView
+assertHoldingMatches prefix expectedOwner expectedInstrumentId cid = do
+    holding <- fetch cid
+    let hv = view holding
+    assertMsg (prefix <> ": holding owner mismatch")
+        (hv.owner == expectedOwner)
+    assertMsg (prefix <> ": holding instrumentId mismatch")
+        (hv.instrumentId == expectedInstrumentId)
+    pure hv
+
+sumCheckedHoldingAmounts
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update Decimal
+sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId =
+    foldlA
+        (\acc cid -> do
+            hv <- assertHoldingMatches prefix expectedOwner expectedInstrumentId cid
+            pure (acc + hv.amount))
+        0.0
+
+assertHoldingsMatchAndSum
+    : Text
+    -> Party
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> Decimal
+    -> [ContractId Splice.Api.Token.HoldingV1.Holding]
+    -> Update ()
+assertHoldingsMatchAndSum prefix expectedOwner expectedInstrumentId expectedAmount cids = do
+    actualAmount <- sumCheckedHoldingAmounts prefix expectedOwner expectedInstrumentId cids
+    assertMsg (prefix <> ": holding amount mismatch")
+        (actualAmount == expectedAmount)
+
+assertTransferInstructionMatches
+    : Text
+    -> Party
+    -> Party
+    -> Decimal
+    -> Splice.Api.Token.HoldingV1.InstrumentId
+    -> ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+    -> Update ()
+assertTransferInstructionMatches prefix expectedSender expectedReceiver expectedAmount expectedInstrumentId instrCid = do
+    instr <- fetch instrCid
+    let instrView = view instr
+    let transfer = instrView.transfer
+    assertMsg (prefix <> ": pending transfer sender mismatch")
+        (transfer.sender == expectedSender)
+    assertMsg (prefix <> ": pending transfer receiver mismatch")
+        (transfer.receiver == expectedReceiver)
+    assertMsg (prefix <> ": pending transfer amount mismatch")
+        (transfer.amount == expectedAmount)
+    assertMsg (prefix <> ": pending transfer instrumentId mismatch")
+        (transfer.instrumentId == expectedInstrumentId)
+
+assertRateLimiter
+    : Text
+    -> Text
+    -> Numeric 0
+    -> CCIP.RateLimiter.RateLimitDirection
+    -> CCIP.RateLimiter.RateLimitMode
+    -> RawInstanceAddress.RawInstanceAddress
+    -> CCIP.RateLimiter.RateLimiter
+    -> Update ()
+assertRateLimiter prefix poolInstanceId remoteChainSelector direction mode expected limiter = do
+    RawInstanceAddress.assertEqual (prefix <> ": instance address mismatch")
+        limiter.instanceId
+        limiter.poolOwner
+        expected
+    assertMsg (prefix <> ": pool instance mismatch")
+        (limiter.poolInstanceId == poolInstanceId)
+    assertMsg (prefix <> ": remote chain mismatch")
+        (limiter.remoteChainSelector == remoteChainSelector)
+    assertMsg (prefix <> ": direction mismatch")
+        (limiter.direction == direction)
+    assertMsg (prefix <> ": rate limit mode mismatch")
+        (limiter.mode == mode)
+
+bpsDenominator : Numeric 0
+bpsDenominator = 10000.0
+
+calculateFeeFromBps : Numeric 0 -> Numeric 0 -> Numeric 0
+calculateFeeFromBps amount feeBps = CCIP.Math.mulDivDown amount feeBps bpsDenominator
+
+customFinalityRateLimiterRequired : CCIP.FinalityConfig.FinalityConfig -> Bool
+customFinalityRateLimiterRequired finalityConfig =
+    CCIP.FinalityConfig.customFinalityRateLimiterRequired finalityConfig
+
+-- | Lock/release token pool with dynamic CCV requirements per chain.
+template LockReleaseTokenPool
+    with
+        instanceId : Text  -- Unique identifier for this pool instance
+        poolOwner : Party
+
+        ccipOwner : Party
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        decimals : Int
+
+        -- | Dynamic config
+        -- Party capable of updating rate limits for this pool.
+        rateLimitAdmin : Optional Party
+
+        -- Remote chain config: remote token address, CCV requirements, and rate limiter requirements for each remote chain.
+        -- Keyed by remote chain selector.
+        remoteChainConfigs : Map.Map (Numeric 0) RemoteChainConfig
+        -- Optional token-transfer fee overrides keyed by destination chain selector.
+        tokenTransferFeeConfigs : Map.Map (Numeric 0) TokenTransferFeeConfig
+
+        -- Context merged into extraArgs for transfers TO the pool (LockOrBurn).
+        -- For tokens following Splice patterns (e.g., Amulet), this should contain
+        -- the pool's preapproval CID under the key the TransferFactory expects
+        -- (e.g., "transfer-preapproval"). Converted to Splice ChoiceContext at the
+        -- TransferFactory boundary.
+        poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        -- Timeout for pending TransferInstructions created by this pool.
+        transferTimeout : TransferTimeout
+        deps : LockReleaseTokenPoolDeps
+    where
+        signatory poolOwner
+        observer optional [] pure rateLimitAdmin
+
+        ensure assertValidInstanceId instanceId
+            && all
+                (\cfg ->
+                    cfg.feeBps >= 0.0
+                        && cfg.feeBps < bpsDenominator
+                        && cfg.destBytesOverhead >= 32
+                )
+                (Map.values tokenTransferFeeConfigs)
+
+        interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
+            view = CCIP.Interfaces.TokenPool.TokenPoolView with
+                owner = poolOwner
+                ccipOwner = ccipOwner
+                instrumentId = instrumentId
+
+            tokenPool_getRequiredCCVsImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) GetRequiredCCVs
+                    with
+                        remoteChainSelector = arg.remoteChainSelector
+                        sourceAmount = arg.sourceAmount
+                        finality = arg.finality
+                        extraData = arg.extraData
+                        direction = arg.direction
+                        caller = arg.caller
+
+            tokenPool_verifyInboundMessageImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) VerifyInboundMessage
+                    with
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
+                        extraContext = arg.extraContext
+                        executingMessageCid = arg.executingMessageCid
+                        caller = arg.caller
+
+            tokenPool_verifyOutboundCCVsImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) VerifyOutboundCCVs
+                    with
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
+                        extraContext = arg.extraContext
+                        sendingMessageCid = arg.sendingMessageCid
+                        amount = arg.amount
+                        caller = arg.caller
+
+            tokenPool_releaseFromTicketImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) ReleaseFromTicket
+                    with
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
+                        rmnRemoteCid = arg.rmnRemoteCid
+                        extraContext = arg.extraContext
+                        tokenReceiveTicketCid = arg.tokenReceiveTicketCid
+                        caller = arg.caller
+
+            tokenPool_lockOrBurnImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockOrBurn
+                    with
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
+                        rmnRemoteCid = arg.rmnRemoteCid
+                        extraContext = arg.extraContext
+                        sendingMessageCid = arg.sendingMessageCid
+                        senderInputCids = arg.senderInputCids
+                        amount = arg.amount
+                        caller = arg.caller
+
+            tokenPool_calculateFeeImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) CalculateFee
+                    with
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
+                        extraContext = arg.extraContext
+                        sendingMessageCid = arg.sendingMessageCid
+                        feeQuoterCid = arg.feeQuoterCid
+                        tokenInstrumentId = arg.tokenInstrumentId
+                        caller = arg.caller
+
+            tokenPool_getFeeImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) GetFee
+                    with
+                        feeQuoterCid = arg.feeQuoterCid
+                        destChainSelector = arg.destChainSelector
+                        tokenInstrumentId = arg.tokenInstrumentId
+                        caller = arg.caller
+
+        -- Sets the dynamic configuration for the pool.
+        -- 
+        -- Params:
+        -- rateLimitAdmin: Optional party that can manage rate limits
+        -- 
+        -- Callable by poolOwner
+        choice SetDynamicConfig : ContractId LockReleaseTokenPool
+            with
+                rateLimitAdmin : Optional Party
+            controller poolOwner
+            do
+                create this with
+                    rateLimitAdmin = rateLimitAdmin
+
+        -- Sets the remote chain configurations for the pool.
+        -- 
+        -- Params:
+        -- remoteChainSelectorsToRemove: list of remote chain selectors to remove from the pool config
+        -- chainsToAdd: list of remote chain configs to add to the pool config. 
+        --              If a remote chain selector already exists in the pool config, it must be removed first
+        --              before it can be added with updated config values.
+        -- 
+        -- Callable by poolOwner
+        choice ApplyChainUpdates : ContractId LockReleaseTokenPool
+            with
+                remoteChainSelectorsToRemove : [Numeric 0]
+                chainsToAdd : [ChainUpdate]
+            controller poolOwner
+            do
+                -- Validate
+                forA_ remoteChainSelectorsToRemove $ \remoteChainSelectorToRemove -> do
+                    assertMsg "ApplyChainUpdates: cannot remove non-existent chain config" (Map.member remoteChainSelectorToRemove remoteChainConfigs)
+                -- Remove specified chain configs
+                let remoteChainConfigsRemoved = foldl
+                        (\configs remoteChainSelectorToRemove -> Map.delete remoteChainSelectorToRemove configs)
+                        remoteChainConfigs
+                        remoteChainSelectorsToRemove
+
+                -- Validate
+                forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, finalityConfig, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
+                    assertMsg "ApplyChainUpdates: invalid chain selector" (remoteChainSelector > 0.0)
+                    assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
+                    -- If the chain already exists, the update should first remove it.
+                    assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
+                    -- Validate rate limiters
+                    assertMsg "ApplyChainUpdates: inbound/outbound rate limiters cannot be empty" (inboundRateLimiter /= RawInstanceAddress.empty && outboundRateLimiter /= RawInstanceAddress.empty)
+                    when (customFinalityRateLimiterRequired finalityConfig) $
+                        assertMsg "ApplyChainUpdates: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
+                            (inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
+                    assertMsg "ApplyChainUpdates: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
+                    -- Validate remote pools
+                    assertMsg "ApplyChainUpdates: remotePools cannot contain empty address" ("" `notElem` remotePools)
+                    assertMsg "ApplyChainUpdates: remotePools cannot contain duplicates" (length remotePools == length (dedup remotePools))
+                    assertMsg "ApplyChainUpdates: inbound and outbound CCV lists cannot contain duplicates" (length inboundCCVs == length (dedup inboundCCVs) && length outboundCCVs == length (dedup outboundCCVs))
+                -- Add new chain configs
+                let remoteChainConfigsAdded = foldl
+                        (\configs chainToAdd ->
+                            Map.insert chainToAdd.remoteChainSelector RemoteChainConfig with 
+                                    remotePools = chainToAdd.remotePools
+                                    remoteTokenAddress = chainToAdd.remoteTokenAddress
+                                    inboundCCVs = chainToAdd.inboundCCVs
+                                    outboundCCVs = chainToAdd.outboundCCVs
+                                    finalityConfig = chainToAdd.finalityConfig
+                                    inboundRateLimiter = chainToAdd.inboundRateLimiter
+                                    inboundCustomBlockConfirmationsRateLimiter = chainToAdd.inboundCustomBlockConfirmationsRateLimiter
+                                    outboundRateLimiter = chainToAdd.outboundRateLimiter
+                                configs)
+                        remoteChainConfigsRemoved
+                        chainsToAdd
+                create this with
+                    remoteChainConfigs = remoteChainConfigsAdded
+
+        -- Updates the token transfer fee configurations for specified destination chains.
+        -- 
+        -- Params:
+        -- tokenTransferFeeConfigArgs: Array of structs containing destination chain selectors and their fee configs.
+        -- disableTokenTransferFeeConfigArgs: Array of destination chain selectors to disable custom fee configs for.
+        -- 
+        -- Callable by poolOwner
+        choice ApplyTokenTransferFeeConfigUpdates : ContractId LockReleaseTokenPool
+            with
+                tokenTransferFeeConfigArgs : [TokenTransferFeeConfigArgs]
+                disableTokenTransferFeeConfigArgs : [Numeric 0]
+            controller poolOwner
+            do
+                -- Validate
+                forA_ tokenTransferFeeConfigArgs $ \arg -> do
+                    assertMsg "ApplyTokenTransferFeeConfigUpdates: invalid chain selector" (arg.destChainSelector > 0.0)
+                    assertMsg ("ApplyTokenTransferFeeConfigUpdates: unsupported chain selector: " <> show arg.destChainSelector) (Map.member arg.destChainSelector remoteChainConfigs)
+                    -- Reject configs with isEnabled: false - use disableTokenTransferFeeConfigs parameter instead.
+                    assertMsg "ApplyTokenTransferFeeConfigUpdates: must be enabled" (arg.isEnabled)
+                    assertMsg "ApplyTokenTransferFeeConfigUpdates: feeBps must be non-negative" (arg.feeBps >= 0.0)
+                    assertMsg ("ApplyTokenTransferFeeConfigUpdates: feeUSDCents must be non-negative: " <> show arg.feeUSDCents) (arg.feeUSDCents >= 0.0)
+                    assertMsg "ApplyTokenTransferFeeConfigUpdates: feeBps must be less than 10000" (arg.feeBps < bpsDenominator)
+                    assertMsg "ApplyTokenTransferFeeConfigUpdates: destBytesOverhead must be at least 32" (arg.destBytesOverhead >= 32)
+                    assertMsg "ApplyTokenTransferFeeConfigUpdates: destGasOverhead must be non-zero" (arg.destGasOverhead > 0)
+                
+                -- Update
+                let tokenTransferFeeConfigsUpdated = foldl
+                        (\configs arg ->
+                            Map.insert arg.destChainSelector TokenTransferFeeConfig with
+                                isEnabled = arg.isEnabled
+                                destGasOverhead = arg.destGasOverhead
+                                destBytesOverhead = arg.destBytesOverhead
+                                feeUSDCents = arg.feeUSDCents
+                                feeBps = arg.feeBps
+                            configs)
+                        tokenTransferFeeConfigs
+                        tokenTransferFeeConfigArgs
+                let tokenTransferFeeConfigsRemoved = foldr Map.delete tokenTransferFeeConfigsUpdated disableTokenTransferFeeConfigArgs
+                create this with
+                    tokenTransferFeeConfigs = tokenTransferFeeConfigsRemoved
+
+        -- Sets the rate limit configurations for specified remote chains.
+        -- 
+        -- Params:
+        -- rateLimitConfigArgs: Array of structs containing remote chain selectors and their rate limiter configs.
+        -- caller: The party initiating the rate limit configuration update.
+        -- 
+        -- Callable by poolOwner or rateLimitAdmin if set.
+        choice SetRateLimitConfig : ContractId LockReleaseTokenPool
+            with
+                rateLimitConfigArgs : [RateLimitConfigArgs]
+                caller : Party
+            controller caller
+            do
+                -- Callable by poolOwner or rateLimitAdmin if set
+                assertMsg "SetRateLimitConfig: only callable by owner or rateLimitAdmin" (caller == poolOwner || (rateLimitAdmin == Some caller))
+
+                -- Validate
+                forA_ rateLimitConfigArgs $ \arg -> do
+                    assertMsg "SetRateLimitConfig: invalid chain selector" (arg.remoteChainSelector > 0.0)
+                    assertMsg "SetRateLimitConfig: inbound/outbound rate limiters cannot be empty" (arg.inboundRateLimiter /= RawInstanceAddress.empty && arg.outboundRateLimiter /= RawInstanceAddress.empty)
+                    assertMsg "SetRateLimitConfig: rate limiters cannot be the same for inbound and outbound" (arg.inboundRateLimiter /= arg.outboundRateLimiter)
+                    cfg <- case Map.lookup arg.remoteChainSelector remoteChainConfigs of
+                        None -> abort ("SetRateLimitConfig: unsupported chain selector: " <> show arg.remoteChainSelector)
+                        Some cfg -> pure cfg
+                    when (customFinalityRateLimiterRequired cfg.finalityConfig) $
+                        assertMsg "SetRateLimitConfig: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
+                            (arg.inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
+
+                -- Update
+                let remoteChainConfigsUpdated = foldl
+                        (\configs RateLimitConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} ->
+                            case Map.lookup remoteChainSelector configs of
+                                None -> configs
+                                Some cfg ->
+                                    let updatedCfg = cfg with inboundRateLimiter = inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter = inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter = outboundRateLimiter
+                                    in Map.insert remoteChainSelector updatedCfg configs
+                        )
+                        remoteChainConfigs
+                        rateLimitConfigArgs
+                create this with
+                    remoteChainConfigs = remoteChainConfigsUpdated
+
+        -- Add or replace one receive-context entry with a non-contract AnyValue (for preapproval CIDs in Splice token patterns).
+        -- The context is merged into extraArgs for inbound transfers.
+        choice AddPoolReceiveContextNonContractValue : ContractId LockReleaseTokenPool
+            with
+                contextKey : Text
+                value : Splice.Api.Token.MetadataV1.AnyValue
+            controller poolOwner
+            do
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.insert contextKey value poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        -- Add or replace one receive-context entry with AV_ContractId from an already-resolved ContractId ().
+        -- (for preapproval CIDs in Splice token patterns).
+        -- The context is merged into extraArgs for inbound transfers.
+        choice AddPoolReceiveContextContractValue : ContractId LockReleaseTokenPool
+            with
+                contextKey : Text
+                referredContract : ContractId ()
+            controller poolOwner
+            do
+                let av = Splice.Api.Token.MetadataV1.AV_ContractId (coerceContractId referredContract)
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.insert contextKey av poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        choice RemovePoolReceiveContextValue : ContractId LockReleaseTokenPool
+            with
+                contextKey : Text
+            controller poolOwner
+            do
+                let newPoolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.delete contextKey poolReceiveContext.values
+                create this with poolReceiveContext = newPoolReceiveContext
+
+        choice ClearPoolReceiveContext : ContractId LockReleaseTokenPool
+            controller poolOwner
+            do create this with poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+        -- Set the transfer timeout for pending TransferInstructions.
+        -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
+        --
+        -- Callable by poolOwner
+        choice SetTransferTimeout : ContractId LockReleaseTokenPool
+            with
+                newTransferTimeout : TransferTimeout
+            controller poolOwner
+            do create this with transferTimeout = newTransferTimeout
+
+        -- Get required CCV raw instance addresses based on chain and direction.
+        nonconsuming choice GetRequiredCCVs : [RawInstanceAddress]
+            with
+                remoteChainSelector : Numeric 0
+                sourceAmount : BytesHex
+                finality : CCIP.FinalityConfig.FinalityConfig
+                extraData : BytesHex
+                direction : CCIP.Interfaces.TokenPool.TransferDirection
+                caller : Party
+            controller caller
+            do
+                case Map.lookup remoteChainSelector remoteChainConfigs of
+                    None -> abort "pool: unsupported remote chain selector"
+                    Some config -> case direction of
+                        CCIP.Interfaces.TokenPool.Inbound -> pure config.inboundCCVs
+                        CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
+
+        -- Validate inbound token transfer message and record pool CCV requirements.
+        -- Validates that the message has a token transfer targeting this pool's instrument,
+        -- validates the source pool address against the allowed remote pools for the source chain,
+        -- looks up per-chain CCV requirements, and records them on the executing message.
+        -- OffRamp performs the actual CCV coverage check.
+        nonconsuming choice VerifyInboundMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+            with
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+                caller : Party
+            controller caller
+            do
+                execMsg <- fetch executingMessageCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "pool: executing message tokenAdminRegistry mismatch"
+                    (execMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                let message = execMsg.message
+
+                tt <- case message.tokenTransfer of
+                    None -> abort "pool: no token transfer in message"
+                    Some t -> pure t
+
+                let expectedAddr = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+                assertMsg "pool: destTokenAddress does not match pool instrumentId"
+                    (tt.destTokenAddress == expectedAddr)
+
+                remoteChainCfg <- case Map.lookup message.sourceChainSelector remoteChainConfigs of
+                    None -> abort "pool: unsupported source chain"
+                    Some cfg -> pure cfg
+                assertMsg "pool: message finality not allowed by pool finality config"
+                    (CCIP.FinalityConfig.requestedFinalityAllowed message.finality.requested remoteChainCfg.finalityConfig)
+
+                assertMsg "pool: invalid sourcePoolAddress"
+                    (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)
+
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.SetInboundPoolCCVs with
+                        tokenConfigCid
+                        executingMessageCid
+                        poolInstanceId = instanceId
+                        poolCCVs = remoteChainCfg.inboundCCVs
+                        caller = poolOwner
+
+        -- Declare outbound CCV requirements on SendingMessageV1 via TAR.
+        -- Looks up per-chain CCV requirements and records them on the sending message.
+        nonconsuming choice VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                amount : Decimal
+                caller : Party
+            controller caller
+            do
+                assertMsg "pool: amount must be positive" (amount > 0.0)
+
+                sm <- fetch sendingMessageCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "pool: sending message ccipOwner mismatch"
+                    (sm.ccipOwner == tokenAdminRegistry.owner)
+                assertMsg "pool: sending message tokenAdminRegistry mismatch"
+                    (sm.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+
+                poolCCVs <- case Map.lookup sm.destChainSelector remoteChainConfigs of
+                        None -> abort "pool: unsupported dest chain"
+                        Some cfg -> pure cfg.outboundCCVs
+
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.SetOutboundPoolCCVs with
+                        tokenConfigCid
+                        sendingMessageCid = sendingMessageCid
+                        poolInstanceId = instanceId
+                        poolCCVs = poolCCVs
+                        caller = poolOwner
+
+        -- Release tokens by consuming a TokenReceiveTicket via TokenAdminRegistry.
+        -- The TAR validates the ticket was issued by the correct registry instance,
+        -- the pool is the registered pool for the instrument, and archives the ticket
+        -- atomically. If any check fails, the entire transaction rolls back.
+        nonconsuming choice ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
+            with
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
+                caller : Party
+            controller caller
+            do
+                ticket <- fetch tokenReceiveTicketCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                config <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                        tokenConfigCid
+                        instrumentId = instrumentId
+                        caller = poolOwner
+                assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
+                    (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
+                assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
+                    (ticket.ccipOwner == tokenAdminRegistry.owner)
+                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
+                RawInstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                assertMsg "ReleaseFromTicket: ticket instrument must match pool instrument"
+                    (ticket.instrumentId == instrumentId)
+                let poolAddress = RawInstanceAddress.make instanceId poolOwner
+                assertMsg "ReleaseFromTicket: ticket pool owner mismatch"
+                    (ticket.poolOwner == poolOwner)
+                assertMsg "ReleaseFromTicket: ticket pool address mismatch"
+                    (ticket.poolAddress == poolAddress)
+
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = poolOwner
+                    chainSelector = ticket.sourceChainSelector
+                assertMsg "ReleaseFromTicket: source chain is cursed" (not isCursed)
+
+                assertMsg "ReleaseFromTicket: caller must be tokenReceiver"
+                    (caller == ticket.tokenReceiver)
+
+                -- Defensive consistency check: every verified CCV instance must be
+                -- owned by a ticket signatory party.
+                let ticketSignatories = signatory ticket
+                Foldable.forA_ ticket.verifiedCCVs $ \verifiedCCV ->
+                    assertMsg ("ReleaseFromTicket: verified CCV owner is not a ticket signatory " <> show verifiedCCV)
+                        (RawInstanceAddress.ownerParty verifiedCCV `elem` ticketSignatories)
+
+                -- Validate the exact pool-required CCV instances are present on the ticket.
+                -- This preserves the configured instance-level trust model even when
+                -- multiple CCV instances share the same owner party.
+                remoteChainCfg <- case Map.lookup ticket.sourceChainSelector remoteChainConfigs of
+                    None -> abort "ReleaseFromTicket: unsupported source chain"
+                    Some cfg -> pure cfg
+                let requiredPoolCCVs = dedup ticket.requiredInboundPoolCCVs
+                Foldable.forA_ requiredPoolCCVs $ \requiredCCV ->
+                    assertMsg ("ReleaseFromTicket: missing required pool CCV " <> show requiredCCV)
+                        (requiredCCV `elem` ticket.verifiedCCVs)
+
+                let useCustomFinalityRateLimiter =
+                        ticket.finality /= CCIP.FinalityConfig.WaitForFinality
+                        && CCIP.FinalityConfig.customFinalityRateLimiterRequired remoteChainCfg.finalityConfig
+                let expectedRateLimitMode = if useCustomFinalityRateLimiter
+                        then CCIP.RateLimiter.RateLimitMode_CustomFinality
+                        else CCIP.RateLimiter.RateLimitMode_DefaultFinality
+                let expectedRateLimiter = if useCustomFinalityRateLimiter
+                        then remoteChainCfg.inboundCustomBlockConfirmationsRateLimiter
+                        else remoteChainCfg.inboundRateLimiter
+                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiter <- fetch rateLimiterCid
+                assertRateLimiter
+                    "ReleaseFromTicket: rateLimiter"
+                    instanceId
+                    ticket.sourceChainSelector
+                    CCIP.RateLimiter.RateLimitDirection_Inbound
+                    expectedRateLimitMode
+                    expectedRateLimiter
+                    rateLimiter
+                let sourceDecimals = parseSourcePoolDecimals decimals ticket.sourcePoolData
+                conversion <- case CCIP.Uint256.calculateLocalAmountFromUint256Checked
+                        "ReleaseFromTicket"
+                        ticket.amount
+                        sourceDecimals
+                        decimals of
+                    None -> abort "ReleaseFromTicket: source amount cannot be represented as local amount"
+                    Some result -> pure result
+                assertMsg "ReleaseFromTicket: local amount rounds down to zero"
+                    (conversion.localAmount > 0.0)
+                let localAmount = conversion.localAmount
+                _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
+                    requested = localAmount
+
+                -- Consume ticket via TAR after validating the disclosed TAR identity.
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.ConsumeReceiveTicket with
+                        tokenConfigCid
+                        ticketCid = tokenReceiveTicketCid
+                        instrumentId = instrumentId
+                        poolInstanceId = instanceId
+                        caller = poolOwner
+
+                -- Get inputs from extraContext
+                tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                _ <- sumCheckedHoldingAmounts
+                    "ReleaseFromTicket: tokenPoolHoldings"
+                    poolOwner
+                    instrumentId
+                    tokenPoolHoldings
+                transferFactory <- lookupTransferFactory extraContext
+                CCIP.TokenAdminRegistry.assertConfiguredTransferFactory
+                    "ReleaseFromTicket"
+                    config
+                    transferFactory
+                extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
+                extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
+
+                -- Transfer tokens from pool to receiver via TransferFactory.
+                -- If receiver has preapproval, completes immediately. Otherwise creates pending
+                -- TransferInstruction that receiver must accept.
+                now <- getTime
+                let executeBefore = case transferTimeout of
+                        Indefinite -> maxTime
+                        RelativeHours h -> addRelTime now (hours h)
+                let amountDecimal = CCIP.Math.numeric0ToDecimal localAmount
+                let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
+                        sender = poolOwner
+                        receiver = ticket.tokenReceiver
+                        amount = amountDecimal
+                        instrumentId = instrumentId
+                        requestedAt = now
+                        executeBefore
+                        inputHoldingCids = tokenPoolHoldings
+                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+                transferResult <- exercise transferFactory
+                    Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+                        expectedAdmin = instrumentId.admin
+                        transfer
+                        extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+                            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                                values = extraArgsContextValues
+                            meta = Splice.Api.Token.MetadataV1.Metadata with
+                                values = extraArgsMetaValues
+
+                case transferResult.output of
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids -> do
+                        assertMsg "ReleaseFromTicket: transfer completed with no receiver holdings" (not (null receiverCids))
+                        assertHoldingsMatchAndSum
+                            "ReleaseFromTicket: receiver holdings"
+                            ticket.tokenReceiver
+                            instrumentId
+                            amountDecimal
+                            receiverCids
+                        let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
+                                receiverHoldingCids = receiverCids
+                        let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Completed with
+                                receiverHoldingCids = receiverCids
+                        claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                            ccipOwner = ticket.ccipOwner
+                            ccvOwners = ticket.ccvOwners
+                            poolOwner = ticket.poolOwner
+                            receiver = ticket.receiver
+                            tokenReceiver = ticket.tokenReceiver
+                            tokenReceiveTicketCid
+                            event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                                verifiedCCVs = ticket.verifiedCCVs
+                                tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                poolAddress = ticket.poolAddress
+                                instrumentId = ticket.instrumentId
+                                sourceAmount = ticket.amount
+                                localAmount = localAmount
+                                sourcePoolData = ticket.sourcePoolData
+                                messageId = ticket.messageId
+                                sourceChainSelector = ticket.sourceChainSelector
+                                finality = ticket.finality
+                                output = claimedOutput
+                        pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
+                            output
+                            poolChangeCids = transferResult.senderChangeCids
+                            claimedEventCid
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
+                        assertTransferInstructionMatches
+                            "ReleaseFromTicket"
+                            poolOwner
+                            ticket.tokenReceiver
+                            amountDecimal
+                            instrumentId
+                            instrCid
+                        let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
+                                transferInstructionCid = instrCid
+                        let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Pending with
+                                transferInstructionCid = instrCid
+                        claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                            ccipOwner = ticket.ccipOwner
+                            ccvOwners = ticket.ccvOwners
+                            poolOwner = ticket.poolOwner
+                            receiver = ticket.receiver
+                            tokenReceiver = ticket.tokenReceiver
+                            tokenReceiveTicketCid
+                            event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                                verifiedCCVs = ticket.verifiedCCVs
+                                tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                poolAddress = ticket.poolAddress
+                                instrumentId = ticket.instrumentId
+                                sourceAmount = ticket.amount
+                                localAmount = localAmount
+                                sourcePoolData = ticket.sourcePoolData
+                                messageId = ticket.messageId
+                                sourceChainSelector = ticket.sourceChainSelector
+                                finality = ticket.finality
+                                output = claimedOutput
+                        pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
+                            output
+                            poolChangeCids = transferResult.senderChangeCids
+                            claimedEventCid
+                    _ -> abort "ReleaseFromTicket: unexpected failed transfer"
+
+        -- Calculate fee for outbound token transfer (USD cents only).
+        -- Reads destChainSelector from SendingMessageV1, looks up per-chain
+        -- fee config, appends fee directly to SendingMessageV1.
+        nonconsuming choice CalculateFee
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                sendingMsg <- fetch sendingMessageCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "pool: sending message ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
+                assertMsg "pool: sending message tokenAdminRegistry mismatch"
+                    (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                assertMsg "pool: tokenInstrumentId mismatch"
+                    (tokenInstrumentId == instrumentId)
+                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                assertMsg "pool: sending message feeQuoter mismatch"
+                    (sendingMsg.deps.feeQuoter == deps.feeQuoter)
+                -- Check if fee config is enabled for the destination chain.
+                -- If no config is set/it's disabled, use the FeeQuoter defaults. If enabled, use the specified fee parameters.
+                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                    Some feeConfig | feeConfig.isEnabled ->
+                        pure
+                            ( feeConfig.feeUSDCents
+                            , feeConfig.destGasOverhead
+                            , feeConfig.destBytesOverhead
+                            )
+                    _ ->
+                        exercise feeQuoterCid CCIP.FeeQuoter.GetTokenTransferFee with
+                            destChainSelector = sendingMsg.destChainSelector
+                            token = tokenInstrumentId
+                            caller = poolOwner
+
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.AddTokenSendFee with
+                        tokenConfigCid
+                        sendingMessageCid = sendingMessageCid
+                        poolInstanceId = instanceId
+                        feeUSDCents = feeUSDCents
+                        destGasOverhead = destGasOverhead
+                        destBytesOverhead = destBytesOverhead
+                        caller = poolOwner
+
+        -- Quote fee for outbound token transfer (USD cents only).
+        nonconsuming choice GetFee
+                : CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
+            with
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                destChainSelector : Numeric 0
+                tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                assertMsg "pool: tokenInstrumentId mismatch"
+                    (tokenInstrumentId == instrumentId)
+
+                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+
+                case Map.lookup destChainSelector tokenTransferFeeConfigs of
+                    Some feeConfig | feeConfig.isEnabled ->
+                        pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
+                            poolInstanceId = instanceId
+                            poolOwner = poolOwner
+                            feeUSDCents = feeConfig.feeUSDCents
+                            destGasOverhead = feeConfig.destGasOverhead
+                            destBytesOverhead = feeConfig.destBytesOverhead
+                            tokenFeeBps = feeConfig.feeBps
+                            isEnabled = True
+                    _ -> do
+                        (feeUSDCents, destGasOverhead, destBytesOverhead) <- exercise feeQuoterCid
+                            CCIP.FeeQuoter.GetTokenTransferFee with
+                                destChainSelector = destChainSelector
+                                token = tokenInstrumentId
+                                caller = poolOwner
+                        pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
+                            poolInstanceId = instanceId
+                            poolOwner = poolOwner
+                            feeUSDCents = feeUSDCents
+                            destGasOverhead = destGasOverhead
+                            destBytesOverhead = destBytesOverhead
+                            tokenFeeBps = 0.0
+                            isEnabled = False
+
+        -- Lock tokens for outbound transfer and append token send data.
+        -- Reads from SendingMessageV1 instead of taking separate params.
+        -- Requires ccvAndExecutorHash to be finalized by the executor step before this runs.
+        nonconsuming choice LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
+            with
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+                amount : Decimal
+                caller : Party
+            controller caller
+            do
+                assertMsg "pool: amount must be positive" (amount > 0.0)
+                let amountNumeric0 = CCIP.Math.decimalToNumeric0 amount
+
+                sendingMsg <- fetch sendingMessageCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                config <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                        tokenConfigCid
+                        instrumentId
+                        caller = poolOwner
+                assertMsg "LockOrBurn: sending message ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
+                assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
+                    (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
+                RawInstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                assertMsg "LockOrBurn: sending message rmn mismatch"
+                    (sendingMsg.deps.rmnRemote == deps.rmnRemote)
+
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = poolOwner
+                    chainSelector = sendingMsg.destChainSelector
+                assertMsg "LockOrBurn: dest chain is cursed" (not isCursed)
+
+                remoteChainCfg <- case Map.lookup sendingMsg.destChainSelector remoteChainConfigs of
+                    None -> abort "pool: unsupported dest chain"
+                    Some cfg -> pure cfg
+
+                let destTokenAddr = remoteChainCfg.remoteTokenAddress
+
+                let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
+                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
+                        _ -> 0.0
+                let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
+
+                let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
+                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiter <- fetch rateLimiterCid
+                assertRateLimiter
+                    "LockOrBurn: rateLimiter"
+                    instanceId
+                    sendingMsg.destChainSelector
+                    CCIP.RateLimiter.RateLimitDirection_Outbound
+                    CCIP.RateLimiter.RateLimitMode_DefaultFinality
+                    expectedRateLimiter
+                    rateLimiter
+                _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
+                    requested = amountAfterFeeBps
+
+                -- Get inputs from extraContext
+                tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                _ <- sumCheckedHoldingAmounts
+                    "LockOrBurn: existing tokenPoolHoldings"
+                    poolOwner
+                    instrumentId
+                    tokenPoolHoldings
+                _ <- sumCheckedHoldingAmounts
+                    "LockOrBurn: sender input holdings"
+                    caller
+                    instrumentId
+                    senderInputCids
+                transferFactory <- lookupTransferFactory extraContext
+                CCIP.TokenAdminRegistry.assertConfiguredTransferFactory
+                    "LockOrBurn"
+                    config
+                    transferFactory
+                extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
+                extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
+
+                -- Merge the pool's receive context with the extra args context values
+                let mergedContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.union poolReceiveContext.values extraArgsContextValues
+                let mergedExtraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+                        context = mergedContext
+                        meta = Splice.Api.Token.MetadataV1.Metadata with
+                            values = extraArgsMetaValues
+                now <- getTime
+                let executeBefore = case transferTimeout of
+                        Indefinite -> maxTime
+                        RelativeHours h -> addRelTime now (hours h)
+                let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
+                        sender = caller
+                        receiver = poolOwner
+                        amount = amount
+                        instrumentId = instrumentId
+                        requestedAt = now
+                        executeBefore
+                        inputHoldingCids = senderInputCids
+                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+                transferResult <- exercise transferFactory
+                    Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+                        expectedAdmin = instrumentId.admin
+                        transfer
+                        extraArgs = mergedExtraArgs
+
+                receiverCids <- case transferResult.output of
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
+                            completedReceiverCids -> do
+                        assertHoldingsMatchAndSum
+                            "LockOrBurn: receiver holdings"
+                            poolOwner
+                            instrumentId
+                            amount
+                            completedReceiverCids
+                        pure completedReceiverCids
+                    _ -> abort "LockOrBurn: transfer did not complete directly"
+
+                let amountAfterFeeBpsBytes = fromSomeNote
+                        "LockOrBurn: amountAfterFeeBps does not fit uint256"
+                        (CCIP.Uint256.numeric0ToUint256Bytes amountAfterFeeBps)
+                let extraData = fromOptional "" destPoolData
+                newSendingMessageCid <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.AddTokenSend with
+                        tokenConfigCid
+                        sendingMessageCid = sendingMessageCid
+                        poolInstanceId = instanceId
+                        instrumentId = instrumentId
+                        amount = amountAfterFeeBpsBytes
+                        destTokenAddress = destTokenAddr
+                        extraData = extraData
+                        caller = poolOwner
+
+                pure CCIP.Interfaces.TokenPool.LockOrBurnResult with
+                    poolChangeCids = receiverCids ++ tokenPoolHoldings
+                    senderChangeCids = transferResult.senderChangeCids
+                    sendingMessageCid = newSendingMessageCid
+
+        interface instance MCMSReceiver for LockReleaseTokenPool where
+          view = MCMSReceiverView with
+            mcmsController = poolOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText poolOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId LockReleaseTokenPool)
+
+            case functionName of
+                "SetDynamicConfig" -> do
+                    case decodeSetDynamicConfigParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: SetDynamicConfig"
+                        Some (SetDynamicConfigParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetDynamicConfig" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetDynamicConfig with
+                                rateLimitAdmin
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "ApplyChainUpdates" -> do
+                    case decodeApplyChainUpdatesParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: ApplyChainUpdates"
+                        Some (ApplyChainUpdatesParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: ApplyChainUpdates" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid ApplyChainUpdates with
+                                remoteChainSelectorsToRemove
+                                chainsToAdd
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "ApplyTokenTransferFeeConfigUpdates" -> do
+                    case decodeApplyTokenTransferFeeConfigUpdatesParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: ApplyTokenTransferFeeConfigUpdates"
+                        Some (ApplyTokenTransferFeeConfigUpdatesParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: ApplyTokenTransferFeeConfigUpdates" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid ApplyTokenTransferFeeConfigUpdates with
+                                tokenTransferFeeConfigArgs
+                                disableTokenTransferFeeConfigArgs
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetRateLimitConfig" -> do
+                  case decodeSetRateLimitConfigParamsAt operationData 0 of
+                    None -> abort "E_INVALID_PARAMS: SetRateLimitConfig"
+                    Some (SetRateLimitConfigParams{..}, finalOffset) -> do
+                        assertMsg "E_TRAILING_BYTES: SetRateLimitConfig" (finalOffset == byteCount operationData)
+                        newCid <- exercise selfCid SetRateLimitConfig with
+                            rateLimitConfigArgs
+                            caller
+                        pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "AddPoolReceiveContextNonContractValue" -> do
+                    case decodeAddPoolReceiveContextNonContractValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue"
+                        Some (AddPoolReceiveContextNonContractValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue" (finalOffset == byteCount operationData)
+                            (value, innerOff) <- case decodeAnyValueAt valuePayload 0 of
+                                None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue:valuePayload"
+                                Some p -> pure p
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue:valuePayload" (innerOff == byteCount valuePayload)
+                            newCid <- exercise selfCid AddPoolReceiveContextNonContractValue with contextKey, value
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "AddPoolReceiveContextContractValue" -> do
+                    case decodeAddPoolReceiveContextContractValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextContractValue"
+                        Some (AddPoolReceiveContextContractValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextContractValue" (finalOffset == byteCount operationData)
+                            let refAddr = RawInstanceAddress.toText referentInstanceAddress
+                            referred <- case Map.lookup refAddr contractIds of
+                                None -> abort ("E_REFERENT_CONTRACT_NOT_IN_MAP: " <> refAddr)
+                                Some c -> pure c
+                            newCid <- exercise selfCid AddPoolReceiveContextContractValue with contextKey, referredContract = referred
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "RemovePoolReceiveContextValue" -> do
+                    case decodeRemovePoolReceiveContextValueParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: RemovePoolReceiveContextValue"
+                        Some (RemovePoolReceiveContextValueParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: RemovePoolReceiveContextValue" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid RemovePoolReceiveContextValue with contextKey
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "ClearPoolReceiveContext" -> do
+                    assertMsg "E_TRAILING_BYTES: ClearPoolReceiveContext" (byteCount operationData == 0)
+                    newCid <- exercise selfCid ClearPoolReceiveContext
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetTransferTimeout" -> do
+                    case decodeSetTransferTimeoutParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: SetTransferTimeout"
+                        Some (SetTransferTimeoutParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetTransferTimeout" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetTransferTimeout with
+                                newTransferTimeout = transferTimeout
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

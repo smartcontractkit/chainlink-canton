@@ -3,10 +3,12 @@ package accessors
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 
 	"google.golang.org/grpc"
 
+	"github.com/BurntSushi/toml"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
@@ -16,6 +18,43 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
+
+const CantonConfigPathEnv = "CANTON_CONFIG_PATH"
+
+func init() {
+	chainaccess.Register(chainsel.FamilyCanton, CreateCantonAccessorFactory)
+}
+
+func loadConfig(path string) (*ccip.Config, error) {
+	var cfg ccip.Config
+	if md, err := toml.DecodeFile(path, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config file %s: %w", path, err)
+	} else if len(md.Undecoded()) > 0 {
+		return nil, fmt.Errorf("unknown fields in config: %v", md.Undecoded())
+	}
+
+	return &cfg, nil
+}
+
+func CreateCantonAccessorFactory(lggr logger.Logger, genericConfig chainaccess.GenericConfig) (chainaccess.AccessorFactory, error) {
+	configPath, ok := os.LookupEnv(CantonConfigPathEnv)
+	if !ok {
+		configPath = ccip.DefaultCantonConfigPath
+	}
+
+	cantonConfig, err := loadConfig(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Don't log full config to avoid leaking sensitive fields.
+	lggr.Infow("loaded canton config",
+		"numChains", len(cantonConfig.BlockchainInfos),
+		"numReaderConfigs", len(cantonConfig.ReaderConfigs),
+	)
+
+	return NewFactory(lggr, cantonConfig.BlockchainInfos, cantonConfig.ReaderConfigs, genericConfig.RMNRemoteAddresses), nil
+}
 
 type factory struct {
 	lggr               logger.Logger
@@ -102,6 +141,20 @@ func newAccessor(sourceReader chainaccess.SourceReader) chainaccess.Accessor {
 	}
 }
 
-func (a *accessor) SourceReader() chainaccess.SourceReader {
-	return a.sourceReader
+// Close implements [chainaccess.Accessor].
+func (a *accessor) Close() error {
+	// Nothing to close.
+	return nil
+}
+
+func (a *accessor) SourceReader() (chainaccess.SourceReader, error) {
+	return a.sourceReader, nil
+}
+
+func (a *accessor) DestinationReader() (chainaccess.DestinationReader, error) {
+	return nil, fmt.Errorf("not supported")
+}
+
+func (a *accessor) ContractTransmitter() (chainaccess.ContractTransmitter, error) {
+	return nil, fmt.Errorf("not supported")
 }

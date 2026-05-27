@@ -2,7 +2,6 @@ package global_config
 
 import (
 	"errors"
-	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
 )
 
 var ContractType = deployment.ContractType("CantonGlobalConfig")
@@ -28,7 +28,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
 			return errors.New("ccip owner cannot be empty")
 		}
 
-		chainSelector, err := strconv.ParseUint(string(template.ChainSelector), 10, 64)
+		chainSelector, err := internalparse.Uint64Checked(string(template.ChainSelector))
 		if err != nil {
 			return err
 		}
