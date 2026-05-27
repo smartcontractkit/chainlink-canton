@@ -47,18 +47,25 @@ func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
 	return types.NUMERIC(s)
 }
 
-// ConfigureLaneLegInput carries the lane update plus an optional datastore for fee quoter resolution.
+// ConfigureLaneLegInput carries the lane update plus a datastore for fee quoter resolution.
 type ConfigureLaneLegInput struct {
 	Lane      lanes.UpdateLanesInput
 	DataStore datastore.DataStore
 }
+
+var ConfigureLaneLegAsSourceWithInput = operations.NewSequence(
+	"CantonConfigureLaneLegAsSourceWithInput",
+	semver.MustParse("2.0.0"),
+	"Configures a lane leg as source on CCIP 2.0.0",
+	configureLaneLegAsSource,
+)
 
 var ConfigureLaneLegAsSource = operations.NewSequence(
 	"CantonConfigureLaneLegAsSource",
 	semver.MustParse("2.0.0"),
 	"Configures a lane leg as source on CCIP 2.0.0",
 	func(b operations.Bundle, deps chain.BlockChains, input lanes.UpdateLanesInput) (output sequences.OnChainOutput, err error) {
-		return configureLaneLegAsSource(b, deps, ConfigureLaneLegInput{Lane: input, DataStore: dsutils.RuntimeDataStore()})
+		return configureLaneLegAsSource(b, deps, ConfigureLaneLegInput{Lane: input})
 	},
 )
 
@@ -84,7 +91,7 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("global config raw instance address: %w", err)
 	}
-	feeQuoterRef, err := resolveFeeQuoterRef(input.DataStore, sourceChain.Selector)
+	feeQuoterRef, err := resolveFeeQuoterRef(input, sourceChain.Selector)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("resolve fee quoter: %w", err)
 	}
@@ -204,17 +211,20 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		proposalOutputs = append(proposalOutputs, feeQuoterDestConfigReport.Output)
 	}
 
-	if !mcmsEnabled {
-		_, err = operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
-			InstanceAddress: feeQuoterRaw.InstanceAddress(),
-			Args: feequoter.ApplyPriceUpdatersUpdate{
-				AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
-				RemovedPriceUpdaters: nil,
-			},
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("ensuring price updater on fee quoter: %w", err)
-		}
+	priceUpdatersReport, err := operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
+		InstanceAddress:    feeQuoterRaw.InstanceAddress(),
+		RawInstanceAddress: feeQuoterRaw.String(),
+		MCMSEnabled:        mcmsEnabled,
+		Args: feequoter.ApplyPriceUpdatersUpdate{
+			AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
+			RemovedPriceUpdaters: nil,
+		},
+	})
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("ensuring price updater on fee quoter: %w", err)
+	}
+	if mcmsEnabled && !priceUpdatersReport.Output.Executed() {
+		proposalOutputs = append(proposalOutputs, priceUpdatersReport.Output)
 	}
 
 	tokenPriceUpdates, err := tokenPriceUpdatesFromParams(destChain.TokenPrices)
@@ -247,14 +257,19 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		proposalOutputs = append(proposalOutputs, updatePricesReport.Output)
 	}
 
-	// CommitteeVerifier - Dest Chain Config
-	for _, verifierConfig := range input.Lane.Source.CommitteeVerifiers {
-		_, err = operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsSource, deps, ConfigureCommitteeVerifierAsSourceInput{
-			ChainSelector:           chain.Selector,
-			CommitteeVerifierConfig: verifierConfig,
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as source: %w", err)
+	var cvBatchOps []mcms_types.BatchOperation
+	// CommitteeVerifier configure is emitted in a separate mcms-ccv proposal (Run 2).
+	if !mcmsEnabled {
+		for _, verifierConfig := range input.Lane.Source.CommitteeVerifiers {
+			cvReport, err := operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsSource, deps, ConfigureCommitteeVerifierAsSourceInput{
+				ChainSelector:           chain.Selector,
+				MCMSEnabled:             mcmsEnabled,
+				CommitteeVerifierConfig: verifierConfig,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as source: %w", err)
+			}
+			cvBatchOps = append(cvBatchOps, cvReport.Output.BatchOps...)
 		}
 	}
 
@@ -265,19 +280,23 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for lane configuration: %w", err)
 	}
-	if len(batchOp.Transactions) == 0 {
+	batchOps := cvBatchOps
+	if len(batchOp.Transactions) > 0 {
+		batchOps = append(batchOps, batchOp)
+	}
+	if len(batchOps) == 0 {
 		return sequences.OnChainOutput{}, nil
 	}
 
-	return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
+	return sequences.OnChainOutput{BatchOps: batchOps}, nil
 }
 
-func resolveFeeQuoterRef(ds datastore.DataStore, chainSelector uint64) (datastore.AddressRef, error) {
-	if ds == nil {
-		return datastore.AddressRef{}, fmt.Errorf("datastore is required")
+func resolveFeeQuoterRef(input ConfigureLaneLegInput, chainSelector uint64) (datastore.AddressRef, error) {
+	if input.DataStore == nil {
+		return datastore.AddressRef{}, fmt.Errorf("datastore is required on ConfigureLaneLegInput")
 	}
 
-	return ds.Addresses().Get(datastore.NewAddressRefKey(
+	return input.DataStore.Addresses().Get(datastore.NewAddressRefKey(
 		chainSelector,
 		datastore.ContractType(feequoterop.ContractType),
 		feequoterop.Version,
@@ -350,14 +369,19 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			proposalOutputs = append(proposalOutputs, sourceChainConfigReport.Output)
 		}
 
-		// CommitteeVerifier - Source Chain Config
-		for _, verifierConfig := range input.Dest.CommitteeVerifiers {
-			_, err = operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsDest, deps, ConfigureCommitteeVerifierAsDestInput{
-				ChainSelector:           chain.Selector,
-				CommitteeVerifierConfig: verifierConfig,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as dest: %w", err)
+		var cvBatchOps []mcms_types.BatchOperation
+		// CommitteeVerifier configure is emitted in a separate mcms-ccv proposal (Run 2).
+		if !mcmsEnabled {
+			for _, verifierConfig := range input.Dest.CommitteeVerifiers {
+				cvReport, err := operations.ExecuteSequence(b, ConfigureCommitteeVerifierAsDest, deps, ConfigureCommitteeVerifierAsDestInput{
+					ChainSelector:           chain.Selector,
+					MCMSEnabled:             mcmsEnabled,
+					CommitteeVerifierConfig: verifierConfig,
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("configuring committee verifier as dest: %w", err)
+				}
+				cvBatchOps = append(cvBatchOps, cvReport.Output.BatchOps...)
 			}
 		}
 
@@ -368,11 +392,15 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("build MCMS batch for lane configuration: %w", err)
 		}
-		if len(batchOp.Transactions) == 0 {
+		batchOps := cvBatchOps
+		if len(batchOp.Transactions) > 0 {
+			batchOps = append(batchOps, batchOp)
+		}
+		if len(batchOps) == 0 {
 			return sequences.OnChainOutput{}, nil
 		}
 
-		return sequences.OnChainOutput{BatchOps: []mcms_types.BatchOperation{batchOp}}, nil
+		return sequences.OnChainOutput{BatchOps: batchOps}, nil
 	},
 )
 

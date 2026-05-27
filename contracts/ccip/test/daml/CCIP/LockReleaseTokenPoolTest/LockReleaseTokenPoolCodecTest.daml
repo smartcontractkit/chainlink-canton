@@ -16,10 +16,13 @@ import CCIP.LockReleaseTokenPoolTypes (
     ApplyTokenTransferFeeConfigUpdatesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
+    AddPoolReceiveContextNonContractValueParams(..),
+    AddPoolReceiveContextContractValueParams(..),
+    RemovePoolReceiveContextValueParams(..),
     )
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.Context qualified as Context
-import CCIP.ContextCodec (encodeChoiceContext, decodeChoiceContextAt)
+import CCIP.ContextCodec (encodeChoiceContext, decodeChoiceContextAt, encodeAnyValue)
 import DA.TextMap qualified as TextMap
 
 import CCIP.FinalityConfig qualified as FinalityCodec
@@ -176,11 +179,36 @@ testTransferTimeoutRoundtrip = do
     fst (fromSome (LockReleaseTokenPoolCodec.decodeTransferTimeoutAt encodedRelHoursLarge 0)) === relHoursLarge
 
 -- ===============================================
--- |           SetPoolReceiveContext             |
+-- |   Pool receive context MCMS param codecs    |
 -- ===============================================
 
-testSetPoolReceiveContextRoundtrip : Script ()
-testSetPoolReceiveContextRoundtrip = do
+testAddPoolReceiveContextNonContractValueParamsRoundtrip : Script ()
+testAddPoolReceiveContextNonContractValueParamsRoundtrip = do
+    let inner = encodeAnyValue (MetadataV1.AV_Text "hello")
+        args = AddPoolReceiveContextNonContractValueParams with contextKey = "myKey", valuePayload = inner
+        encoded = LockReleaseTokenPoolCodec.encodeAddPoolReceiveContextNonContractValueParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeAddPoolReceiveContextNonContractValueParamsAt encoded 0)) === args
+
+testAddPoolReceiveContextContractValueParamsRoundtrip : Script ()
+testAddPoolReceiveContextContractValueParamsRoundtrip = script do
+    p <- allocateParty "p"
+    let ria = RawInstanceAddress.make "other-inst" p
+        args = AddPoolReceiveContextContractValueParams with contextKey = "refKey", referentInstanceAddress = ria
+        encoded = LockReleaseTokenPoolCodec.encodeAddPoolReceiveContextContractValueParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeAddPoolReceiveContextContractValueParamsAt encoded 0)) === args
+
+testRemovePoolReceiveContextValueParamsRoundtrip : Script ()
+testRemovePoolReceiveContextValueParamsRoundtrip = do
+    let args = RemovePoolReceiveContextValueParams with contextKey = "toRemove"
+        encoded = LockReleaseTokenPoolCodec.encodeRemovePoolReceiveContextValueParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeRemovePoolReceiveContextValueParamsAt encoded 0)) === args
+
+-- ===============================================
+-- |           ChoiceContext (ContextCodec)      |
+-- ===============================================
+
+testChoiceContextCodecRoundtrip : Script ()
+testChoiceContextCodecRoundtrip = do
     -- Test empty context
     let emptyCtx = MetadataV1.emptyChoiceContext
         encodedEmpty = encodeChoiceContext emptyCtx

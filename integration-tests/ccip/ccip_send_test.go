@@ -49,7 +49,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -177,6 +176,7 @@ func TestCCIPSend(t *testing.T) {
 		Config: changesets.DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: partyCCIP,
+				RMNOwnerParty:  partyCCIP,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
@@ -263,62 +263,62 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to get Executor address")
 
 	// Deploy and configure lane for outbound sends
-	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
-	require.Truef(t, ok, "failed to get Canton Lane adapter")
 	evmAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0"))
 	require.Truef(t, ok, "failed to get EVM adapter")
 	feeQuoterDestChainConfig := evmAdapter.GetFeeQuoterDestChainConfig()
 	feeQuoterDestChainConfig.IsEnabled = true
 	feeQuoterDestChainConfig.V2Params.USDPerUnitGas = big.NewInt(38)
 
-	cantonadapters.SetRuntimeDataStore(cldfEnv.DataStore)
-	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
-		Source: &lanes.ChainDefinition{
-			Selector: env.Chain.ChainSelector(),
-			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-				{
-					CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
-					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						remoteSelector: {
-							AllowlistEnabled:          false,
-							AddedAllowlistedSenders:   nil,
-							RemovedAllowlistedSenders: nil,
-							FeeUSDCents:               50,
-							GasForVerification:        50_000,
-							PayloadSizeBytes:          6*64 + 2*32,
-							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
-								Signers:   ccvSignerPubKeys,
-								Threshold: 2,
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, sequences.ConfigureLaneLegAsSourceWithInput, cldfEnv.BlockChains, sequences.ConfigureLaneLegInput{
+		DataStore: cldfEnv.DataStore,
+		Lane: lanes.UpdateLanesInput{
+			Source: &lanes.ChainDefinition{
+				Selector: env.Chain.ChainSelector(),
+				CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					{
+						CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {
+								AllowlistEnabled:          false,
+								AddedAllowlistedSenders:   nil,
+								RemovedAllowlistedSenders: nil,
+								FeeUSDCents:               50,
+								GasForVerification:        50_000,
+								PayloadSizeBytes:          6*64 + 2*32,
+								SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   ccvSignerPubKeys,
+									Threshold: 2,
+								},
 							},
 						},
 					},
 				},
+				LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifierRef},
+				DefaultOutboundCCVs:      nil,
+				CantonLaneConfig: &lanes.CantonLaneConfig{
+					GlobalConfig: globalConfigRef,
+				},
+				DefaultExecutor: executorRef,
+				FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
+				OnRamp:          onRampAddress.InstanceAddress().Bytes(),
+				OffRamp:         offRampAddress.InstanceAddress().Bytes(),
 			},
-			LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifierRef},
-			DefaultOutboundCCVs:      nil,
-			CantonLaneConfig: &lanes.CantonLaneConfig{
-				GlobalConfig: globalConfigRef,
+			Dest: &lanes.ChainDefinition{
+				Selector:                 remoteSelector,
+				AddressBytesLength:       20,
+				FeeQuoterDestChainConfig: feeQuoterDestChainConfig,
+				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+					USDCentsFee: 50,
+					Enabled:     true,
+				},
+				OnRamp:  hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+				OffRamp: hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+				Router:  hexutil.MustDecode("0xe3ddcb2fde5d27a33c450fddc54a3f9bb2ecaa9f"),
 			},
-			DefaultExecutor: executorRef,
-			FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
-			OnRamp:          onRampAddress.InstanceAddress().Bytes(),
-			OffRamp:         offRampAddress.InstanceAddress().Bytes(),
+			IsDisabled:   false,
+			TestRouter:   false,
+			ExtraConfigs: lanes.ExtraConfigs{},
 		},
-		Dest: &lanes.ChainDefinition{
-			Selector:                 remoteSelector,
-			AddressBytesLength:       20,
-			FeeQuoterDestChainConfig: feeQuoterDestChainConfig,
-			ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
-				USDCentsFee: 50,
-				Enabled:     true,
-			},
-			OnRamp:  hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
-			OffRamp: hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
-			Router:  hexutil.MustDecode("0xe3ddcb2fde5d27a33c450fddc54a3f9bb2ecaa9f"),
-		},
-		IsDisabled:   false,
-		TestRouter:   false,
-		ExtraConfigs: lanes.ExtraConfigs{},
 	})
 	require.NoErrorf(t, err, "Failed to configure chain for lanes")
 	runningDs := datastore.NewMemoryDataStore()
