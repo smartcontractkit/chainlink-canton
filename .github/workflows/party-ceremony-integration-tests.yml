@@ -10,7 +10,7 @@ concurrency:
 jobs:
   test-ceremonies:
     name: Test Ceremonies
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6

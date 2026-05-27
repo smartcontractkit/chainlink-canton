@@ -10,7 +10,7 @@ concurrency:
 jobs:
   test-ccip-execute:
     name: TestCCIPExecuteE2E
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -25,7 +25,7 @@ jobs:
           go test -v -count 1 -timeout 20m -run TestCCIPExecuteE2E ./...
   test-ccip-execute-lnr:
     name: TestLnRTokenPool_FullReceiveFlow
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -40,7 +40,7 @@ jobs:
           go test -v -count 1 -timeout 20m -run '^TestLnRTokenPool_FullReceiveFlow$' ./...
   test-ccip-execute-bnm-decimal:
     name: TestLnRTokenPool_FullReceiveFlow_DecimalConversion
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -55,7 +55,7 @@ jobs:
           go test -v -count 1 -timeout 20m -run '^TestLnRTokenPool_FullReceiveFlow_DecimalConversion$' ./...
   test-ccip-execute-bnm:
     name: TestBnMTokenPool_FullReceiveFlow
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -71,7 +71,7 @@ jobs:
 
   test-ccip-send:
     name: TestCCIPSend
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -86,7 +86,7 @@ jobs:
           go test -v -count 1 -timeout 20m -run '^TestCCIPSend$' ./...
   test-ccip-send-lnr:
     name: TestLnRTokenPool_FullSendFlow
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -101,7 +101,7 @@ jobs:
           go test -v -count 1 -timeout 20m -run '^TestLnRTokenPool_FullSendFlow' ./...
   test-ccip-send-bnm:
     name: TestBnMTokenPool_FullSendFlow
-    runs-on: ubuntu-latest-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v6
