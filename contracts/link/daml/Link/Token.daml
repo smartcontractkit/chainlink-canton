@@ -1,7 +1,7 @@
 module Link.Token where
 
-import DA.Action (forA, foldlA)
-import DA.Assert
+import DA.Action (foldlA)
+import DA.Foldable (forA_)
 import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Text qualified as T
@@ -189,7 +189,7 @@ template LinkRegistry
         assertMsg "LinkRegistry.BurnMintFactory_BurnMint: instrumentId mismatch"
           (arg.instrumentId == registryInstrumentId)
 
-        forA arg.inputHoldingCids \holdingCid -> do
+        forA_ arg.inputHoldingCids \holdingCid -> do
           let linkHoldingCid = coerceContractId holdingCid : ContractId LinkHolding
           holding <- fetch linkHoldingCid
           assertMsg "LinkRegistry.BurnMintFactory_BurnMint: input instrumentId mismatch"
