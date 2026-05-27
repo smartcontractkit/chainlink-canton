@@ -1,6 +1,7 @@
 module CCIP.Executor where
 
 import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Foldable (forA_)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Optional (fromOptional, fromSomeNote)
@@ -59,6 +60,9 @@ template Executor
                 destChainSelectorsToAdd : [RemoteChainConfigArgs]
             controller owner
             do
+                forA_ destChainSelectorsToAdd $ \cfg ->
+                    assertMsg ("ApplyDestChainUpdates: invalid fee: " <> show cfg.config.feeUSDCents)
+                        (cfg.config.feeUSDCents >= 0.0)
                 let pruned = foldr Map.delete remoteChainConfigs destChainSelectorsToRemove
                 let addConfig acc cfg = Map.insert cfg.destChainSelector cfg.config acc
                 let merged = foldl addConfig pruned destChainSelectorsToAdd

@@ -103,3 +103,24 @@ data SetTransferTimeoutParams = SetTransferTimeoutParams
     with
         transferTimeout : TransferTimeout
     deriving (Eq, Show)
+
+-- | MCMS params: set one ChoiceContext entry from a serialized AnyValue payload.
+-- | valuePayload must be exactly encodeAnyValue output (see CCIP.ContextCodec); AV_ContractId is not round-trippable in bytes—use AddPoolReceiveContextContractValueParams instead.
+data AddPoolReceiveContextNonContractValueParams = AddPoolReceiveContextNonContractValueParams
+    with
+        contextKey : Text
+        valuePayload : BytesHex
+    deriving (Eq, Show)
+
+-- | MCMS params: set one ChoiceContext entry to AV_ContractId by resolving referentInstanceAddress in the MCMS contractIds map.
+data AddPoolReceiveContextContractValueParams = AddPoolReceiveContextContractValueParams
+    with
+        contextKey : Text
+        referentInstanceAddress : RawInstanceAddress
+    deriving (Eq, Show)
+
+-- | MCMS params: remove one ChoiceContext entry by key.
+data RemovePoolReceiveContextValueParams = RemovePoolReceiveContextValueParams
+    with
+        contextKey : Text
+    deriving (Eq, Show)

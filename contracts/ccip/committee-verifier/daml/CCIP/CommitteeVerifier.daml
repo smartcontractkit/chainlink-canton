@@ -56,6 +56,15 @@ signature_length : Int = 64
 signature_component_length : Int
 signature_component_length : Int = 32
 
+-- | Maximum number of 64-byte (r,s) signatures that can appear in `verifierResults`
+-- for `VerifyMessage`. The wire format uses `MessageCodecV1.decodeUint16` for the
+-- signature payload byte length (at most 65535 bytes), so at most 65535 / 64
+-- full signatures fit. Reject `SignatureConfig.threshold` above this in
+-- `isValidSignatureConfig` so configs cannot require more signatures than any proof
+-- can encode.
+maxCommitteeSignaturesPerProof : Int
+maxCommitteeSignaturesPerProof = 65535 / signature_length
+
 template CommitteeVerifier
     with
         instanceId : Text
@@ -88,8 +97,8 @@ template CommitteeVerifier
         signatory owner
         observer storageLocationsAdmin :: pendingStorageLocationsAdmin :: optional [] pure allowListAdmin
 
-        -- Ensure signer configs have a positive threshold, enough signers,
-        -- and no duplicate signer keys.
+        -- Ensure signer configs have a positive threshold within the verifierResults
+        -- proof limit, enough signers, and no duplicate signer keys.
         ensure assertValidInstanceId instanceId
           && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
 
@@ -204,6 +213,7 @@ template CommitteeVerifier
                 -- Validate
                 forA_ remoteChainConfigArgs $ \args -> do
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
+                    assertMsg ("ApplyRemoteChainConfigUpdates: invalid fee: " <> show args.feeUSDCents) (args.feeUSDCents >= 0.0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid gas for verification: " <> show args.gasForVerification) (args.gasForVerification > 0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid payload size bytes: " <> show args.payloadSizeBytes) (args.payloadSizeBytes >= 0)
                 -- Update
@@ -236,7 +246,9 @@ template CommitteeVerifier
                 -- number of signer keys >= threshold, and signer keys are unique.
                 assertMsg "invalid signature config: threshold must be > 0, signerKeys must be >= threshold, and signerKeys must be unique"
                     (all isValidSignatureConfig signatureConfigs)
-                let newSignerConfigs = foldr (\config acc -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
+                -- @dev Last signers update wins. If a source chain selector is repeated in `signatureConfigs` then the last one will be the state set.
+                let newSignerConfigs =
+                        foldl (\acc config -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
                 create this with signerConfigs = newSignerConfigs
 
         -- | Update dependencies selectively (None = keep existing)
@@ -555,5 +567,6 @@ countValidSigners validSignersMap =
 isValidSignatureConfig : SignatureConfig -> Bool
 isValidSignatureConfig config =
     config.threshold > 0
+        && config.threshold <= maxCommitteeSignaturesPerProof
         && length config.signerKeys >= config.threshold
         && length config.signerKeys == length (dedup config.signerKeys)

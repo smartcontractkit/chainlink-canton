@@ -1461,3 +1461,52 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
       senderInputCids = [senderHoldingCid]
       amount = 2.0
       caller = sender
+
+testBurnMintTokenPool_ApplyTokenTransferFeeConfigUpdates_RejectsNegativeFeeUSDCents : Script ()
+testBurnMintTokenPool_ApplyTokenTransferFeeConfigUpdates_RejectsNegativeFeeUSDCents = script do
+    ccipOwner <- allocateParty "ccip-owner-bm-fee"
+    poolOwner <- allocateParty "pool-owner-bm-fee"
+
+    let destChainSelector = 456.0
+    let tokenPoolInstanceId = "bm-pool-fee"
+    (_, outboundRateLimiterAddr) <- createRateLimiter
+        poolOwner
+        "rl-bm-fee-out"
+        tokenPoolInstanceId
+        destChainSelector
+        RateLimiter.RateLimitDirection_Outbound
+        RateLimiter.RateLimitMode_DefaultFinality
+        100000000000.0
+        10000000.0
+
+    let remoteChainConfig = mkRemoteChainConfig [] [] outboundRateLimiterAddr outboundRateLimiterAddr outboundRateLimiterAddr
+    tokenPoolCid <- submit poolOwner do
+        createCmd BurnMintTokenPool.BurnMintTokenPool with
+            instanceId = tokenPoolInstanceId
+            poolOwner = poolOwner
+            ccipOwner = ccipOwner
+            instrumentId = HoldingV1.InstrumentId with
+                admin = poolOwner
+                id = "LINK"
+            decimals = 10
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(destChainSelector, remoteChainConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = BurnMintTokenPool.Indefinite
+            deps = mkPoolDeps "tar-bm-fee" "rmn-bm-fee" "fq-bm-fee" ccipOwner ccipOwner
+
+    submitMustFail poolOwner do
+        exerciseCmd tokenPoolCid BurnMintTokenPool.ApplyTokenTransferFeeConfigUpdates with
+            tokenTransferFeeConfigArgs =
+                [ BurnMintTokenPool.TokenTransferFeeConfigArgs with
+                    destChainSelector = destChainSelector
+                    isEnabled = True
+                    feeUSDCents = -1.0
+                    feeBps = 50.0
+                    destGasOverhead = 21000
+                    destBytesOverhead = 32
+                ]
+            disableTokenTransferFeeConfigArgs = []
+
+    pure ()
