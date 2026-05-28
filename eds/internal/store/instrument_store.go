@@ -7,9 +7,11 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
+	"golang.org/x/exp/maps"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 )
@@ -89,7 +91,13 @@ func (s *InstrumentHoldingStore) GetHolding(party types.PARTY, instrumentId spli
 	}
 	holdings := maps.Values(instrumentHoldings)
 
-	return holdings, true
+	// Clone all holdings before returning them
+	out := make([]*apiv2.ActiveContract, len(holdings))
+	for i, holding := range holdings {
+		out[i] = proto.CloneOf(holding)
+	}
+
+	return out, true
 }
 
 func (s *InstrumentHoldingStore) onActiveContract(ctx context.Context, activeContract *apiv2.ActiveContract) error {
@@ -112,7 +120,7 @@ func (s *InstrumentHoldingStore) onActiveContract(ctx context.Context, activeCon
 		}
 
 		s.activeContracts[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = view
-		instrumentHoldings[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
+		instrumentHoldings[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = proto.CloneOf(activeContract) // Create a copy of the ActiveContract
 		partyHoldings[view.InstrumentId] = instrumentHoldings
 		s.holdings[view.Owner] = partyHoldings
 	}
@@ -142,7 +150,7 @@ func (s *InstrumentHoldingStore) onCreatedEvent(ctx context.Context, transaction
 
 		s.activeContracts[types.CONTRACT_ID(createdEvent.GetContractId())] = view
 		instrumentHoldings[types.CONTRACT_ID(createdEvent.GetContractId())] = &apiv2.ActiveContract{
-			CreatedEvent:        createdEvent,
+			CreatedEvent:        proto.CloneOf(createdEvent), // Create a copy of the CreatedEvent
 			SynchronizerId:      transaction.GetSynchronizerId(),
 			ReassignmentCounter: 0,
 		}
@@ -154,7 +162,7 @@ func (s *InstrumentHoldingStore) onCreatedEvent(ctx context.Context, transaction
 	return nil
 }
 
-func (s *InstrumentHoldingStore) onArchivedEvent(ctx context.Context, transaction *apiv2.Transaction, archivedEvent *apiv2.ArchivedEvent) error {
+func (s *InstrumentHoldingStore) onArchivedEvent(ctx context.Context, _ *apiv2.Transaction, archivedEvent *apiv2.ArchivedEvent) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
