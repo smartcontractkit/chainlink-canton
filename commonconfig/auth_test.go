@@ -82,7 +82,7 @@ func TestAuthConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 
-		// --- clientCredentials: Type, UserID, AuthURL, ClientID, ClientSecret required; AuthURL must be valid URL ---
+		// --- clientCredentials: Type, AuthURL, ClientID, ClientSecret required; AuthURL must be valid URL ---
 		{
 			name: "clientCredentials_valid",
 			config: AuthConfig{
@@ -95,14 +95,14 @@ func TestAuthConfig_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "clientCredentials_missing_user_id",
+			name: "clientCredentials_valid_without_user_id",
 			config: AuthConfig{
 				Type:         AuthTypeClientCredentials,
 				AuthURL:      "https://auth.example.com/",
 				ClientID:     "client-id",
 				ClientSecret: "client-secret",
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "clientCredentials_missing_auth_url",
@@ -146,7 +146,7 @@ func TestAuthConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 
-		// --- authorizationCode: Type, UserID, AuthURL, ClientID required; ClientSecret must be unset (excluded_unless clientCredentials) ---
+		// --- authorizationCode: Type, AuthURL, ClientID required; ClientSecret must be unset (excluded_unless clientCredentials) ---
 		{
 			name: "authorizationCode_valid",
 			config: AuthConfig{
@@ -158,13 +158,13 @@ func TestAuthConfig_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "authorizationCode_missing_user_id",
+			name: "authorizationCode_valid_without_user_id",
 			config: AuthConfig{
 				Type:     AuthTypeAuthorizationCode,
 				AuthURL:  "https://auth.example.com/",
 				ClientID: "client-id",
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "authorizationCode_missing_auth_url",

@@ -25,25 +25,19 @@ func NewCLDF(ctx context.Context, b *blockchain.Input) (cldf_chain.BlockChain, u
 	}
 
 	for i, config := range b.Out.NetworkSpecificData.CantonData.ExternalEndpoints.Participants {
-		authProvider := authentication.NewInsecureStaticProvider(config.JWT)
-		// Get Primary Party for user
-		ledgerApiConn, err := grpc.NewClient(
-			config.GRPCLedgerAPIURL,
-			grpc.WithTransportCredentials(authProvider.TransportCredentials()),
-			grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
-		)
+		authCfg, err := buildParticipantAuthConfig(config)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to create gRPC connection to Ledger API for Canton participant %d: %w", i+1, err)
+			return nil, 0, fmt.Errorf("participant %d auth config: %w", i+1, err)
 		}
-		userResp, err := adminv2.NewUserManagementServiceClient(ledgerApiConn).GetUser(context.Background(), &adminv2.GetUserRequest{UserId: config.UserID})
+		authProvider, err := participantAuthProvider(ctx, authCfg)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get user info for user %s for Canton participant %d: %w", config.UserID, i+1, err)
+			return nil, 0, fmt.Errorf("participant %d auth provider: %w", i+1, err)
 		}
-		party := userResp.GetUser().GetPrimaryParty()
-		if party == "" {
-			return nil, 0, fmt.Errorf("no primary party found for user %s for Canton participant %d", config.UserID, i+1)
+
+		party, err := primaryPartyFromLedgerAPI(ctx, i+1, config.GRPCLedgerAPIURL, config.UserID, authProvider)
+		if err != nil {
+			return nil, 0, err
 		}
-		_ = ledgerApiConn.Close()
 
 		providerConfig.Participants[i] = cldf_canton_provider.ParticipantConfig{
 			Endpoints: cldf_canton_provider.Endpoints{
@@ -63,10 +57,39 @@ func NewCLDF(ctx context.Context, b *blockchain.Input) (cldf_chain.BlockChain, u
 			AuthProvider: authProvider,
 		}
 	}
-	p, err := cldf_canton_provider.NewRPCChainProvider(d.ChainSelector, providerConfig).Initialize(context.TODO())
+	p, err := cldf_canton_provider.NewRPCChainProvider(d.ChainSelector, providerConfig).Initialize(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	return p, d.ChainSelector, nil
+}
+
+func primaryPartyFromLedgerAPI(
+	ctx context.Context,
+	participantIndex int,
+	grpcLedgerAPIURL string,
+	userID string,
+	authProvider authentication.Provider,
+) (string, error) {
+	conn, err := grpc.NewClient(
+		grpcLedgerAPIURL,
+		grpc.WithTransportCredentials(authProvider.TransportCredentials()),
+		grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create gRPC connection to Ledger API for Canton participant %d: %w", participantIndex, err)
+	}
+	defer conn.Close()
+
+	userResp, err := adminv2.NewUserManagementServiceClient(conn).GetUser(ctx, &adminv2.GetUserRequest{UserId: userID})
+	if err != nil {
+		return "", fmt.Errorf("failed to get user info for user %s for Canton participant %d: %w", userID, participantIndex, err)
+	}
+	party := userResp.GetUser().GetPrimaryParty()
+	if party == "" {
+		return "", fmt.Errorf("no primary party found for user %s for Canton participant %d", userID, participantIndex)
+	}
+
+	return party, nil
 }

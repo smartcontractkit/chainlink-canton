@@ -11,13 +11,11 @@ import (
 	ledgerv2admin "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/testcontainers/testcontainers-go"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	"github.com/smartcontractkit/go-daml/pkg/auth"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
@@ -113,22 +111,32 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 
 		// Get the full party ID (name + hex id) from the canton participant.
 		// TODO: how to support multiple participants?
-		grpcURL := output.NetworkSpecificData.CantonData.ExternalEndpoints.Participants[0].GRPCLedgerAPIURL
-		jwt := output.NetworkSpecificData.CantonData.ExternalEndpoints.Participants[0].JWT
-		if grpcURL == "" || jwt == "" {
-			return nil, fmt.Errorf("GRPC ledger API URL or JWT is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
+		participant := output.NetworkSpecificData.CantonData.ExternalEndpoints.Participants[0]
+		grpcURL := participant.GRPCLedgerAPIURL
+		if grpcURL == "" {
+			return nil, fmt.Errorf("GRPC ledger API URL is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
+		}
+
+		authCfg, err := buildParticipantAuthConfig(participant)
+		if err != nil {
+			return nil, fmt.Errorf("participant auth config for chain %s: %w", strSelector, err)
+		}
+		authProvider, err := participantAuthProvider(context.Background(), authCfg)
+		if err != nil {
+			return nil, fmt.Errorf("participant auth provider for chain %s: %w", strSelector, err)
 		}
 
 		cantonConfigs.BlockchainInfos[strSelector] = ccip.BlockchainInfo{
 			GRPCLedgerAPIURL: output.NetworkSpecificData.CantonData.InternalEndpoints.Participants[0].GRPCLedgerAPIURL,
-			Auth: commonconfig.AuthConfig{
-				Type: commonconfig.AuthTypeInsecureStatic,
-				JWT:  jwt,
-			},
+			Auth:             authCfg,
 		}
 
 		// find the party that starts with the prefix that is listed in the canton config.
-		conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithPerRPCCredentials(auth.NewBearerToken(jwt)))
+		conn, err := grpc.NewClient(
+			grpcURL,
+			grpc.WithTransportCredentials(authProvider.TransportCredentials()),
+			grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gRPC connection: %w", err)
 		}

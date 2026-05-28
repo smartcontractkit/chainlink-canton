@@ -33,8 +33,8 @@ type AuthConfig struct {
 	// Defaults to "static" when omitted (backward compatible).
 	Type string `toml:"type" validate:"required,oneof=static insecureStatic clientCredentials authorizationCode"`
 
-	// UserID is the user ID for the authentication. Required for clientCredentials and authorizationCode only.
-	UserID string `toml:"user_id" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode"`
+	// UserID is an optional Canton ledger user identifier for downstream services (not used for OAuth).
+	UserID string `toml:"user_id,omitempty"`
 
 	// JWT is a pre-obtained token. Required when Type is "static" or "insecureStatic".
 	JWT string `toml:"jwt,omitempty" validate:"required_if=Type static,required_if=Type insecureStatic,excluded_unless=Type static|excluded_unless=Type insecureStatic,omitempty,jwt"`
