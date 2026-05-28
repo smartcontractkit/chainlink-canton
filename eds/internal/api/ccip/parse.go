@@ -7,9 +7,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
