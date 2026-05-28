@@ -2,8 +2,6 @@ module github.com/smartcontractkit/chainlink-canton/party-ceremony
 
 go 1.26.2
 
-replace github.com/smartcontractkit/chainlink-canton => ../
-
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/avast/retry-go/v4 v4.7.0
@@ -11,7 +9,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.52.0
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/google/uuid v1.6.0
-	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.106.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
