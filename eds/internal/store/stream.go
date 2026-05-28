@@ -284,17 +284,29 @@ func ReceiveFromStream[T any](ctx context.Context, stream grpc.ServerStreamingCl
 		defer close(errChan)
 
 		for {
-			resp, err := stream.Recv()
-			if err != nil {
-				errChan <- err
-				return
+			// Set up separate goroutine for reading from stream.
+			// In case the stream hangs, this allows for ReceiveFromStream to still return if the context is cancelled.
+			type recvResult struct {
+				msg *T
+				err error
 			}
+			ch := make(chan recvResult, 1)
+			go func() {
+				msg, err := stream.Recv()
+				ch <- recvResult{msg: msg, err: err}
+			}()
+
+			// Read incoming messages until context is cancelled or Recv returns an error
 			select {
 			case <-ctx.Done():
 				errChan <- ctx.Err()
 				return
-			case respChan <- resp:
-				// continue
+			case result := <-ch:
+				if result.err != nil {
+					errChan <- result.err
+					return
+				}
+				respChan <- result.msg
 			}
 		}
 	}()
