@@ -76,4 +76,10 @@ while IFS= read -r -d '' file; do
 done < <(find "$BINDINGS_SNAPSHOT_DIR" -name '*.go' -print0)
 
 echo "Snapshotted bindings to bindings/generated/$SNAPSHOT/"
+
+LEGACY_MCMS="$REPO_ROOT/bindings/generated/mcms/mcms.go"
+mkdir -p "$(dirname "$LEGACY_MCMS")"
+cp "$BINDINGS_SNAPSHOT_DIR/mcms/mcms.go" "$LEGACY_MCMS"
+echo "Updated legacy import path bindings/generated/mcms/ for mcms SDK compatibility"
+
 echo "Done."

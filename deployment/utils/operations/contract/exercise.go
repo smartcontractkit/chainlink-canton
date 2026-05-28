@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/common"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )

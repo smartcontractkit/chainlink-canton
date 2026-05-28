@@ -18,8 +18,8 @@ make generate-bindings
 make freeze-release VERSION=1.0.0
 ```
 
-Production deployment operations should import from a versioned directory (e.g. `bindings/generated/v1_0_0/...`).
-Development code, integration tests, and changesets should import from `bindings/generated/latest/...`.
+Production deployment operations and integration tests should import from `bindings/generated/v1_0_0/...`.
+The `latest/` directory is regenerated during contract development and is not for production use.
 
 DAR artifacts follow the same layout under `contracts/dars/`:
 

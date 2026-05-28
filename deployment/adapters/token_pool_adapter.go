@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonsequences "github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
