@@ -781,7 +781,9 @@ decodeRequestedFinalityAt encoded offset = do
     else if tagHex == "01" then Some (CCIP.FinalityConfig.WaitForSafe, offset + 1)
     else if tagHex == "02" then do
         (payload, newOffset) <- decodeInt64At encoded (offset + 1)
-        Some (CCIP.FinalityConfig.BlockDepth payload, newOffset)
+        if payload > 0
+        then Some (CCIP.FinalityConfig.BlockDepth payload, newOffset)
+        else None
     else None
 
 -- | Helper to assert that all bytes have been consumed (no trailing bytes)
