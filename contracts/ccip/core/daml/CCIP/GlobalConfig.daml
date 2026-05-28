@@ -19,6 +19,7 @@ import CCIP.GlobalConfigTypes (
     ApplyDestChainConfigUpdatesParams(..),
     ApplySourceChainConfigUpdatesParams(..),
     validateDefaultAndMandatedCCVs,
+    isValidDefaultExecutor,
     )
 import CCIP.GlobalConfigCodecGen (decodeApplyDestChainConfigUpdatesParamsAt, decodeApplySourceChainConfigUpdatesParamsAt)
 import Chainlink.InstanceAddress (assertValidInstanceId)
@@ -42,6 +43,7 @@ template GlobalConfig
             && chainSelector > 0.0 -- Local chain selector must be greater than zero
             && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)  -- All destination chain selectors must be greater than zero and not equal to the local chain selector
             && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)  -- All source chain selectors must be greater than zero and not equal to the local chain selector
+            && all (\cfg -> isValidDefaultExecutor cfg.defaultExecutor) (Map.values destChainConfigs)
 
         nonconsuming choice GetDestChainConfig : Optional DestChainConfig
             with
@@ -63,7 +65,7 @@ template GlobalConfig
             controller ccipOwner
             do
                 -- Validate
-                forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, addressBytesLength, baseExecutionGasCost, offRampAddress, defaultCCVs, laneMandatedCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} -> do
+                forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, addressBytesLength, baseExecutionGasCost, offRampAddress, defaultExecutor, defaultCCVs, laneMandatedCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} -> do
                     assertMsg "InvalidChainSelector: destination chain selector must be greater than zero" (destChainSelector > 0.0)
                     assertMsg "InvalidChainSelector: destination chain selector must not be the same as the local chain selector" (destChainSelector /= chainSelector)
                     assertMsg "InvalidAddressByteLength: address byte length must be greater than zero" (addressBytesLength > 0)
@@ -72,6 +74,7 @@ template GlobalConfig
                     assertMsg "InvalidTokenNetworkFee: token network fee must be non-negative" (tokenNetworkFeeUSDCents >= 0.0)
                     assertValidHex "offRampAddress" offRampAddress
                     assertMsg ("InvalidDestChainAddress: addressByteLength is " <> show addressBytesLength <> " but offRampAddress has byte length " <> show (byteCount offRampAddress) <> " for destination chain selector " <> show destChainSelector) (byteCount offRampAddress == addressBytesLength)
+                    assertMsg "InvalidConfig: defaultExecutor is required" (isValidDefaultExecutor defaultExecutor)
                     validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
                 -- Update

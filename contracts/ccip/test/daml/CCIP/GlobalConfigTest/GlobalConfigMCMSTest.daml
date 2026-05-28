@@ -18,7 +18,7 @@ import CCIP.GlobalConfigTypes (
     ApplyDestChainConfigUpdatesParams(..),
     ApplySourceChainConfigUpdatesParams(..),
     )
-import Chainlink.InstanceAddress (RawInstanceAddress(..))
+import Chainlink.InstanceAddress (RawInstanceAddress(..), empty)
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -377,6 +377,50 @@ testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
       functionName = "UpdateDestChainConfig"
       operationData = encoded
       contractIds = Map.empty  -- Missing self CID
+
+  pure ()
+
+testGlobalConfig_ApplyDestChainConfigUpdates_RejectsNoneDefaultExecutor : Script ()
+testGlobalConfig_ApplyDestChainConfigUpdates_RejectsNoneDefaultExecutor = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "globalconfig-default-executor-test"
+
+  gcCid <- submit ccipOwner do
+    createCmd GlobalConfig with
+      instanceId
+      ccipOwner
+      chainSelector = 123.0
+      destChainConfigs = Map.empty
+      sourceChainConfigs = Map.empty
+
+  let mkArgs defaultExecutor = DestChainConfigArgs with
+        destChainSelector = 456.0
+        isEnabled = True
+        addressBytesLength = 20
+        tokenReceiverAllowed = False
+        baseExecutionGasCost = 0
+        offRampAddress = "d589cf1d9ddc38d0aff8f324ed5d16d220f0fdbe"
+        defaultExecutor
+        laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
+        defaultCCVs = []
+        messageNetworkFeeUSDCents = 10.0
+        tokenNetworkFeeUSDCents = 5.0
+
+  -- None is rejected.
+  submitMustFail ccipOwner do
+    exerciseCmd gcCid ApplyDestChainConfigUpdates with
+      destChainConfigUpdates = [mkArgs None]
+
+  -- Empty address is rejected (EVM address(0) analogue).
+  submitMustFail ccipOwner do
+    exerciseCmd gcCid ApplyDestChainConfigUpdates with
+      destChainConfigUpdates = [mkArgs (Some empty)]
+
+  -- Some is accepted.
+  _ <- submit ccipOwner do
+    exerciseCmd gcCid ApplyDestChainConfigUpdates with
+      destChainConfigUpdates = [mkArgs (Some (RawInstanceAddress "default-executor@party"))]
 
   pure ()
 

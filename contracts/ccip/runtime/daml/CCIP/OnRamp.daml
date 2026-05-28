@@ -420,14 +420,16 @@ template OnRamp
                 let initialState = if hasTokenTransfer
                         then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
                         else CCIP.SendingMessageV1.SendingMessageState_Prepared
-                let resolveDefault = case destConfig.defaultExecutor of
-                        Some defaultExecutor ->
-                            ( Some defaultExecutor
-                            , RawInstanceAddress.toInstanceAddress defaultExecutor
-                            , Some CCIP.SendingMessageV1.ExecutionMode_Executor
-                            )
-                        None ->
-                            (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
+                -- defaultExecutor is required at config time - `GlobalConfig.ApplyDestChainConfigUpdates`
+                -- so the resolver can rely on `Some` here.
+                let resolveDefault =
+                        let defaultExecutor = fromSomeNote
+                                "onramp: defaultExecutor invariant violated (GlobalConfig must enforce Some)"
+                                destConfig.defaultExecutor
+                        in ( Some defaultExecutor
+                           , RawInstanceAddress.toInstanceAddress defaultExecutor
+                           , Some CCIP.SendingMessageV1.ExecutionMode_Executor
+                           )
                 let (resolvedRequiredExecutor, resolvedExecutorAddress, executionMode) = case extraArgs.executor of
                         CCIP.Client.Executor_UseDefault _ ->
                             resolveDefault
