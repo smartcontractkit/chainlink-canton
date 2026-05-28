@@ -412,7 +412,7 @@ Token expansion resolves **existing** Splice instrument refs — it does not min
 
 ```
 contracts/ccip/<pkg>/daml/*.daml
-  → bindings/generated/ccip/<pkg>/   (generated — do not hand-edit)
+  → bindings/generated/latest/ccip/<pkg>/   (generated — do not hand-edit)
   → operations/ccip/<pkg>/            (NewExercise / factory encoders use bindings)
 ```
 

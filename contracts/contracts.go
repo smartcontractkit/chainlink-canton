@@ -58,6 +58,12 @@ const (
 
 const CurrentVersion = "current"
 
+// ReleaseDir is the frozen production DAR snapshot (e.g. v1_0_0).
+// Individual packages keep their own semver in the filename; multiple package
+// versions (e.g. globalconfig-1.0.0 and globalconfig-2.0.0) live in the same
+// release directory.
+const ReleaseDir = "v1_0_0"
+
 var Versions map[Package][]string = map[Package][]string{
 	Coin: []string{"0.0.1", CurrentVersion},
 	Link: []string{"0.0.1", CurrentVersion},
@@ -86,6 +92,19 @@ var Versions map[Package][]string = map[Package][]string{
 	SpliceApiTokenTransferInstructionV1: []string{"1.0.0"},
 }
 
+// VersionDir maps a DAR version string to its artifact subdirectory.
+func VersionDir(version string) string {
+	if version == CurrentVersion {
+		return CurrentVersion
+	}
+
+	return ReleaseDir
+}
+
+func darPath(packageName Package, version string) string {
+	return fmt.Sprintf("dars/%s/%s-%s.dar", VersionDir(version), packageName, version)
+}
+
 func GetDar(packageName Package, version string) ([]byte, error) {
 	availableVersions, ok := Versions[packageName]
 	if !ok {
@@ -96,7 +115,7 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 		return nil, fmt.Errorf("version %s not found for package %s", version, packageName)
 	}
 
-	path := fmt.Sprintf("dars/%s-%s.dar", packageName, version)
+	path := darPath(packageName, version)
 	data, err := Dars.ReadFile(path)
 	if err != nil {
 		// Try to read from dependencies if not found in dars

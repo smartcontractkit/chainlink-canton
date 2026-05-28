@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
@@ -17,11 +18,11 @@ import (
 type DARLoader func(packageName, version string) ([]byte, error)
 
 // FileDARLoader returns a [DARLoader] that reads DARs from a directory on the
-// local filesystem. Files are expected to follow the naming convention
-// "<name>-<version>.dar" (matching the embedded FS layout in the contracts package).
+// local filesystem. Files live under versioned subdirectories (e.g. current/,
+// v1_0_0/) matching the embedded FS layout in the contracts package.
 func FileDARLoader(dir string) DARLoader {
 	return func(packageName, version string) ([]byte, error) {
-		path := filepath.Join(dir, fmt.Sprintf("%s-%s.dar", packageName, version))
+		path := filepath.Join(dir, contracts.VersionDir(version), fmt.Sprintf("%s-%s.dar", packageName, version))
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("reading DAR %q: %w", path, err)
