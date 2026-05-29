@@ -70,11 +70,18 @@ func (s *InstrumentHoldingStore) RegisterParty(parties ...string) {
 	}
 }
 
-func (s *InstrumentHoldingStore) Run(ctx context.Context, streamConfig StreamConfig) error {
+func (s *InstrumentHoldingStore) Run(ctx context.Context, streamConfig StreamConfig, opts ...RunOption) error {
+	options := &runOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	s.mux.Lock()
 	s.holdings = make(map[types.PARTY]map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 	s.activeContracts = make(map[types.CONTRACT_ID]splice_api_token_holding_v1.HoldingView)
+	s.mux.Unlock()
 
-	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, s.onArchivedEvent, nil)
+	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, s.onArchivedEvent, nil, options.onBackfillCompleted)
 }
 
 func (s *InstrumentHoldingStore) GetHolding(party types.PARTY, instrumentId splice_api_token_holding_v1.InstrumentId) ([]*apiv2.ActiveContract, bool) {

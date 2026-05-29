@@ -76,12 +76,19 @@ func (s *ActiveContractStore) RegisterTemplates(templates ...RegisteredTemplate)
 	}
 }
 
-func (s *ActiveContractStore) Run(ctx context.Context, streamConfig StreamConfig) error {
+func (s *ActiveContractStore) Run(ctx context.Context, streamConfig StreamConfig, opts ...RunOption) error {
+	options := &runOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	s.mux.Lock()
 	s.contractsByInstanceAddress = make(map[contracts.InstanceAddress]*apiv2.ActiveContract)
 	s.contractsByTemplateId = make(map[types.PARTY]map[contracts.TemplateID]*apiv2.ActiveContract)
 	s.contractsByContractId = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+	s.mux.Unlock()
 
-	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, s.onArchivedEvent, nil)
+	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, s.onArchivedEvent, nil, options.onBackfillCompleted)
 }
 
 func (s *ActiveContractStore) Get(address contracts.InstanceAddress) (*apiv2.ActiveContract, bool) {
