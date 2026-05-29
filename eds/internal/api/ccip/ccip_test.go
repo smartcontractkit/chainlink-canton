@@ -525,7 +525,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.ElementsMatch(t, []oapiCommon.RawOrHashedAddress{
-				converters.InstanceAddressAsRawOrHashedAddress(ccv1.InstanceAddress()), // SenderRequiredCCVs + LandMandatedCCVs
+				converters.InstanceAddressAsRawOrHashedAddress(ccv1.InstanceAddress()), // SenderRequiredCCVs + LaneMandatedCCVs
 				converters.RawInstanceAddressAsRawOrHashedAddress(ccv4),                // SenderRequiredCCVs
 				converters.RawInstanceAddressAsRawOrHashedAddress(ccv6),                // LaneMandatedCCVs
 				// No DefaultCCVs / TokenPoolRequiredCCVs
@@ -591,11 +591,82 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			require.NoError(t, err)
 			require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.ElementsMatch(t, []oapiCommon.RawOrHashedAddress{
-				converters.InstanceAddressAsRawOrHashedAddress(ccv1.InstanceAddress()), // SenderRequiredCCVs + LandMandatedCCVs
+				converters.InstanceAddressAsRawOrHashedAddress(ccv1.InstanceAddress()), // SenderRequiredCCVs + LaneMandatedCCVs
 				converters.RawInstanceAddressAsRawOrHashedAddress(ccv4),                // SenderRequiredCCVs
 				converters.RawInstanceAddressAsRawOrHashedAddress(ccv6),                // LaneMandatedCCVs
 				converters.InstanceAddressAsRawOrHashedAddress(ccv2.InstanceAddress()), // TokenPoolRequiredCCVs
 				converters.RawInstanceAddressAsRawOrHashedAddress(ccv3),                // TokenPoolRequiredCCVs
+			}, resp.JSON200.Ccvs)
+			require.ElementsMatch(t, []oapiCommon.DisclosedContract{
+				{
+					ContractId: "onRampContractId",
+					TemplateId: "package:module:OnRamp",
+				}, {
+					ContractId: "globalConfigContractId",
+					TemplateId: "package:module:GlobalConfig",
+				}, {
+					ContractId: "tokenAdminRegistryContractId",
+					TemplateId: "package:module:TokenAdminRegistry",
+				}, {
+					ContractId: "rmnRemoteContractId",
+					TemplateId: "package:module:RMNRemote",
+				}, {
+					ContractId: "feeQuoterContractId",
+					TemplateId: "package:module:FeeQuoter",
+				}, {
+					ContractId: "feeTokenConfigContractId",
+					TemplateId: "package:module:TokenConfig",
+				}, {
+					ContractId: "tokenConfigContractId",
+					TemplateId: "package:module:TokenConfig",
+				},
+			}, resp.JSON200.DisclosedContracts)
+			require.Equal(t, new(converters.RawInstanceAddressAsRawOrHashedAddress(defaultExecutor)), resp.JSON200.Executor)
+			require.Equal(t, "feeTokenConfigContractId", resp.JSON200.FeeTokenConfigCid)
+		})
+		t.Run("Pure Token Transfer", func(t *testing.T) {
+			t.Parallel()
+			resp, err := client.PostCCIPSendWithResponse(t.Context(), oapiCCIP.CCIPSendRequest{
+				Message: oapiCommon.Message{
+					DestinationChainSelector: destSelector,
+					Executor: struct {
+						Address *oapiCommon.RawOrHashedAddress `json:"address,omitempty"`
+						Type    oapiCommon.MessageExecutorType `json:"type"`
+					}{
+						Type: oapiCommon.Empty,
+					},
+					FeeToken: oapiCommon.InstrumentId{
+						Admin: "feeAdmin",
+						Id:    "LINK",
+					},
+					Payload:  "", // No payload
+					GasLimit: 0,  // No gas limit -> should lead to sender-required CCVs to not be included
+					Receiver: "0x1234567890",
+					TokenTransfer: &oapiCommon.TokenTransfer{
+						Amount: "42",
+						Token: oapiCommon.InstrumentId{
+							Admin: oapiCommon.PartyId(tokenInstrumentId.Admin),
+							Id:    string(tokenInstrumentId.Id),
+						},
+					},
+				},
+				SenderRequiredCCVs: new([]oapiCommon.RawOrHashedAddress{
+					converters.InstanceAddressAsRawOrHashedAddress(ccv1.InstanceAddress()),
+					converters.RawInstanceAddressAsRawOrHashedAddress(ccv4),
+				}),
+				TokenPoolRequiredCCVs: new([]oapiCommon.RawOrHashedAddress{
+					converters.InstanceAddressAsRawOrHashedAddress(ccv2.InstanceAddress()),
+					converters.RawInstanceAddressAsRawOrHashedAddress(ccv3),
+				}),
+			})
+			require.NoError(t, err)
+			require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+			require.ElementsMatch(t, []oapiCommon.RawOrHashedAddress{
+				converters.RawInstanceAddressAsRawOrHashedAddress(ccv1),                // LaneMandatedCCVs
+				converters.RawInstanceAddressAsRawOrHashedAddress(ccv6),                // LaneMandatedCCVs
+				converters.InstanceAddressAsRawOrHashedAddress(ccv2.InstanceAddress()), // TokenPoolRequiredCCVs
+				converters.RawInstanceAddressAsRawOrHashedAddress(ccv3),                // TokenPoolRequiredCCVs
+				// SenderRequiredCCVs must not be included as this is a pure token transfer
 			}, resp.JSON200.Ccvs)
 			require.ElementsMatch(t, []oapiCommon.DisclosedContract{
 				{

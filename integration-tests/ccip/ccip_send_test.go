@@ -586,6 +586,7 @@ func TestCCIPSend(t *testing.T) {
 		},
 		Payload:       "",
 		Receiver:      "",
+		GasLimit:      100_000,
 		TokenTransfer: nil,
 	}
 	ccipSendDisclosure, err := edsTesthelpers.GetCCIPSendDisclosure(t.Context(), ccipAPIClient, msg, nil, nil)
