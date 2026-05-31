@@ -13,7 +13,6 @@ replace (
 	github.com/smartcontractkit/chainlink-ccip => github.com/smartcontractkit/chainlink-ccip v0.0.0-20260416055149-75c017f534ca
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
-	github.com/smartcontractkit/mcms => github.com/smartcontractkit/mcms v0.41.2-0.20260423204345-3cd8c2672428
 	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
 	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )
@@ -25,7 +24,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.1
 	github.com/smartcontractkit/chain-selectors v1.0.100
-	github.com/smartcontractkit/chainlink-canton v0.0.0-20260423182618-78ffd32b7eb5
+	github.com/smartcontractkit/chainlink-canton v0.0.0-20260529130100-db9223908c02
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260519201156-791d8279a3ad
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260519201156-791d8279a3ad
@@ -34,7 +33,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.106.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260531155703-b89fa4d6c783
-	github.com/smartcontractkit/mcms v0.45.0
+	github.com/smartcontractkit/mcms v0.45.2-0.20260531163148-3a6d240f5aaf
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.11
 )
@@ -279,8 +278,8 @@ require (
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b // indirect
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9 // indirect
 	github.com/smartcontractkit/chainlink-protos/op-catalog v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20260429183453-39df0198aed8 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.1 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20260527160341-aa3adc0abf67 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.3 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
 	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260514223130-48bc90aca745 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect

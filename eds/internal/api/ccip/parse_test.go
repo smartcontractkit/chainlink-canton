@@ -5,9 +5,8 @@ import (
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
