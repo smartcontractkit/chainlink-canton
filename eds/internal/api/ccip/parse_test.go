@@ -17,6 +17,8 @@ import (
 )
 
 func TestParseGlobalConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		createdEvent *apiv2.CreatedEvent
@@ -97,7 +99,7 @@ func TestParseGlobalConfig(t *testing.T) {
 				}),
 			},
 			want: nil,
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+			wantErr: func(t assert.TestingT, err error, i ...any) bool {
 				assert.ErrorContains(t, err, "priceUpdaters") // Error message should contain the unknown source fields, i.e. the CreateArguments
 				return true
 			},
@@ -105,6 +107,7 @@ func TestParseGlobalConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := ParseGlobalConfig(tt.createdEvent)
 			if !tt.wantErr(t, err, fmt.Sprintf("ParseGlobalConfig(%v)", tt.createdEvent)) {
 				return
