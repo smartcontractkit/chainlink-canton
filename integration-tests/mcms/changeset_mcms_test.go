@@ -223,7 +223,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 
 	// Step 3b: Sign via SDK (2-of-3 quorum)
 	t.Log("Signing proposal via SDK...")
-	inspector := cantonsdk.NewInspector(participant.LedgerServices.State, party, cantonsdk.TimelockRoleProposer)
+	inspector := cantonsdk.NewInspector(participant.LedgerServices.State, []string{party}, cantonsdk.TimelockRoleProposer)
 	inspectorsMap := map[mcms_types.ChainSelector]sdk.Inspector{
 		mcms_types.ChainSelector(chainSelector): inspector,
 	}
