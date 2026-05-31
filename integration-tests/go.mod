@@ -33,7 +33,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.106.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
-	github.com/smartcontractkit/go-daml v0.0.0-20260514231151-fecd433dede9
+	github.com/smartcontractkit/go-daml v0.0.0-20260531155703-b89fa4d6c783
 	github.com/smartcontractkit/mcms v0.45.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.11
