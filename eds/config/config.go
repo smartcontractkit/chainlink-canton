@@ -147,7 +147,7 @@ type TokenPool struct {
 
 	TransferFactory     *TransferFactory     `toml:"transfer_factory" validate:"excluded_unless=Type lockRelease"`
 	BurnMintFactory     *BurnMintFactory     `toml:"burn_mint_factory" validate:"excluded_unless=Type burnMint"`
-	TransferPreapproval *TransferPreapproval `toml:"transfer_preapproval" validate:"omitnil,required"`
+	TransferPreapproval *TransferPreapproval `toml:"transfer_preapproval" validate:"omitnil"`
 }
 
 type TransferPreapproval struct {
