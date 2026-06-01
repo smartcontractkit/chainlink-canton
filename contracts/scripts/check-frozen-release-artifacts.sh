@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 #
-# Fail if a changeset modifies frozen release artifacts. Normal PRs should only
-# touch dev outputs (contracts/dars/current/, bindings/generated/latest/).
+# Fail if a changeset modifies existing frozen release artifacts. Normal PRs
+# should only touch dev outputs (contracts/dars/current/, bindings/generated/latest/).
 #
-# Frozen paths are updated deliberately via make freeze-release (use PR label
-# release-artifacts to allow those changes in CI).
+# Allowed without the release-artifacts label:
+#   - Adding a new release snapshot tree (e.g. first v1_0_0/ layout or v1_1_0/)
+#   - Renaming/moving legacy flat DARs into contracts/dars/v*_*/
+#   - Syncing bindings/generated/mcms/mcms.go when bootstrapping v1_0_0/mcms/
 #
-# Usage:
-#   ./contracts/scripts/check-frozen-release-artifacts.sh [base-ref]
+# Blocked:
+#   - Modifying or deleting a file that already exists on the base branch under
+#     a frozen path (contracts/dars/v*_*/, bindings/generated/v*_*/, mcms/)
 #
-# Examples:
-#   ./contracts/scripts/check-frozen-release-artifacts.sh origin/main
-#   FROZEN_ARTIFACT_CHANGES_OK=1 ./contracts/scripts/check-frozen-release-artifacts.sh
+# Bypass: FROZEN_ARTIFACT_CHANGES_OK=1 or PR label release-artifacts (see CI).
 #
 set -euo pipefail
 
@@ -50,22 +51,59 @@ is_frozen_path() {
   esac
 }
 
+# True if path exists in the merge-base tree.
+exists_on_base() {
+  git cat-file -e "$MERGE_BASE:$1" 2>/dev/null
+}
+
 violations=()
-while IFS= read -r -d '' file; do
-  [ -z "$file" ] && continue
-  if is_frozen_path "$file"; then
-    violations+=("$file")
-  fi
-done < <(git diff --name-only -z "$MERGE_BASE"...HEAD)
+bootstrapping_v1_mcms=false
+if git diff --name-status "$MERGE_BASE"...HEAD | grep -qE '^A[[:space:]]+bindings/generated/v[0-9]+_[0-9]+_[0-9]+/mcms/mcms\.go'; then
+  bootstrapping_v1_mcms=true
+fi
+
+while IFS=$'\t' read -r status path1 path2; do
+  [ -z "$status" ] && continue
+
+  case "$status" in
+    M*)
+      if is_frozen_path "$path1" && exists_on_base "$path1"; then
+        if [ "$path1" = "bindings/generated/mcms/mcms.go" ] && $bootstrapping_v1_mcms; then
+          continue
+        fi
+        violations+=("$path1 (modified)")
+      fi
+      ;;
+    D*)
+      if is_frozen_path "$path1" && exists_on_base "$path1"; then
+        violations+=("$path1 (deleted)")
+      fi
+      ;;
+    A*)
+      # New files under frozen dirs are OK (new snapshot dir or new package version).
+      ;;
+    R*|C*)
+      # Rename/copy: block only when both sides are frozen (in-place snapshot rewrite).
+      if is_frozen_path "$path1" && is_frozen_path "$path2" && exists_on_base "$path1"; then
+        violations+=("$path2 (renamed in frozen tree)")
+      fi
+      ;;
+    *)
+      if is_frozen_path "$path1" && exists_on_base "$path1"; then
+        violations+=("$path1 ($status)")
+      fi
+      ;;
+  esac
+done < <(git diff --name-status -M "$MERGE_BASE"...HEAD)
 
 if [ "${#violations[@]}" -eq 0 ]; then
-  echo "No frozen release artifacts modified (base: $MERGE_BASE)."
+  echo "No existing frozen release artifacts modified (base: $MERGE_BASE)."
   exit 0
 fi
 
-echo "ERROR: This change modifies frozen release artifacts." >&2
+echo "ERROR: This change modifies frozen release artifacts that already exist on the base branch." >&2
 echo "" >&2
-echo "The following paths must not change in normal development PRs:" >&2
+echo "The following changes are not allowed in normal development PRs:" >&2
 for f in "${violations[@]}"; do
   echo "  - $f" >&2
 done
@@ -74,7 +112,7 @@ echo "Day-to-day contract work should only update:" >&2
 echo "  - contracts/dars/current/     (make compile-contracts)" >&2
 echo "  - bindings/generated/latest/  (make generate-bindings)" >&2
 echo "" >&2
-echo "To cut or refresh a release snapshot intentionally:" >&2
+echo "To refresh an existing frozen snapshot (e.g. rewrite ccip-core-1.0.0.dar in v1_0_0/):" >&2
 echo "  1. make contracts && make freeze-release VERSION=<x.y.z>" >&2
 echo "  2. Open a PR with label: release-artifacts" >&2
 echo "     (or set FROZEN_ARTIFACT_CHANGES_OK=1 locally)" >&2
