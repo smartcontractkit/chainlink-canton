@@ -33,6 +33,7 @@ template Executor
         ensure assertValidInstanceId instanceId
             && maxCCVsPerMsg > 0
             && maxCCVsPerMsg <= CCIP.Internal.maxCCVsPerMessage
+            && CCIP.FinalityConfig.isValidFinalityConfig dynamicConfig.allowedFinalityConfig
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where
             view = CCIP.Interfaces.Executor.ExecutorView with
@@ -73,6 +74,8 @@ template Executor
                 newDynamicConfig : DynamicConfig
             controller owner
             do
+                assertMsg "SetDynamicConfig: BlockDepth finality must be positive"
+                    (CCIP.FinalityConfig.isValidFinalityConfig newDynamicConfig.allowedFinalityConfig)
                 create this with dynamicConfig = newDynamicConfig
 
         choice ApplyAllowedCCVUpdates : ContractId Executor
