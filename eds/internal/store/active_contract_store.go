@@ -7,6 +7,8 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -84,10 +86,12 @@ func (s *ActiveContractStore) Run(ctx context.Context, streamConfig StreamConfig
 
 func (s *ActiveContractStore) Get(address contracts.InstanceAddress) (*apiv2.ActiveContract, bool) {
 	s.mux.RLock()
-	value, ok := s.contractsByInstanceAddress[address]
-	s.mux.RUnlock()
+	defer s.mux.RUnlock()
 
-	return value, ok
+	value, ok := s.contractsByInstanceAddress[address]
+
+	// Return a copy of the ActiveContract
+	return proto.CloneOf(value), ok
 }
 
 // GetByTemplateId returns the active contract for the given TemplateID, if it exists.
@@ -105,18 +109,24 @@ func (s *ActiveContractStore) GetByTemplateId(party types.PARTY, templateId cont
 		return nil, false
 	}
 
-	return value, true
+	// Return a copy of the ActiveContract
+	return proto.CloneOf(value), true
 }
 
 func (s *ActiveContractStore) GetByContractId(contractId types.CONTRACT_ID) (*apiv2.ActiveContract, bool) {
 	s.mux.RLock()
-	value, ok := s.contractsByContractId[contractId]
-	s.mux.RUnlock()
+	defer s.mux.RUnlock()
 
-	return value, ok
+	value, ok := s.contractsByContractId[contractId]
+
+	// Return a copy of the ActiveContract
+	return proto.CloneOf(value), ok
 }
 
 func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContract *apiv2.ActiveContract) error {
+	// Create a copy of the ActiveContract, since it will be stored in state
+	activeContract = proto.CloneOf(activeContract)
+
 	instanceAddresses, _ := getInstanceAddresses(activeContract.GetCreatedEvent())
 
 	s.mux.Lock()
@@ -155,7 +165,7 @@ func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContra
 func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) error {
 	instanceAddresses, _ := getInstanceAddresses(createdEvent)
 	activeContract := &apiv2.ActiveContract{
-		CreatedEvent:        createdEvent,
+		CreatedEvent:        proto.CloneOf(createdEvent), // Copy the CreatedEvent
 		SynchronizerId:      transaction.GetSynchronizerId(),
 		ReassignmentCounter: 0,
 	}
@@ -192,7 +202,7 @@ func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *a
 	return nil
 }
 
-func (s *ActiveContractStore) onArchivedEvent(ctx context.Context, transaction *apiv2.Transaction, archivedEvent *apiv2.ArchivedEvent) error {
+func (s *ActiveContractStore) onArchivedEvent(ctx context.Context, _ *apiv2.Transaction, archivedEvent *apiv2.ArchivedEvent) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
