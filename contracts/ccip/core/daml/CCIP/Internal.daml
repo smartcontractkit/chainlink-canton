@@ -87,7 +87,10 @@ computeExecuteCCVs defaultCCVs laneMandatedCCVs message receiverRequiredCCVs rec
             && isSome message.tokenTransfer
     in
         if isTokenOnlyTransfer
-        then pure ([], [], 0)
+        then do
+            let mandated = dedup laneMandatedCCVs
+            assertMaxCCVListLength "offramp: lane mandated CCVs" mandated
+            pure (mandated, [], 0)
         else do
             assertMaxCCVListLength "offramp: receiver required CCVs" receiverRequiredCCVs
             assertMaxCCVListLength "offramp: receiver optional CCVs" receiverOptionalCCVs
