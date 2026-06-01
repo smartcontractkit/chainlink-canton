@@ -1,0 +1,186 @@
+module SendingMessageV1Test where
+
+import Daml.Script
+
+import DA.Assert ((===))
+
+import qualified CCIP.SendingMessageV1
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+
+-- | Two CCVs with the same instance id but different owners can both record verifier data.
+testDistinctCcvOwnersWithSameInstanceId : Script ()
+testDistinctCcvOwnersWithSameInstanceId = script do
+    ccipOwner <- allocateParty "ccip-owner-vdi"
+    ccvOwnerA <- allocateParty "ccv-owner-a-vdi"
+    ccvOwnerB <- allocateParty "ccv-owner-b-vdi"
+
+    let destChainSelector : Numeric 0 = 456.0
+    let ccvA = RawInstanceAddress.make "shared-ccv-id" ccvOwnerA
+    let ccvB = RawInstanceAddress.make "shared-ccv-id" ccvOwnerB
+    let feeToken = HoldingV1.InstrumentId with admin = ccipOwner; id = "feeToken"
+
+    let deps = CCIP.SendingMessageV1.SendingMessageDeps with
+            router = RawInstanceAddress.make "router-vdi" ccipOwner
+            onRamp = RawInstanceAddress.make "onramp-vdi" ccipOwner
+            globalConfig = RawInstanceAddress.make "globalconfig-vdi" ccipOwner
+            rmnRemote = RawInstanceAddress.make "rmn-vdi" ccipOwner
+            tokenAdminRegistry = RawInstanceAddress.make "tar-vdi" ccipOwner
+            feeQuoter = RawInstanceAddress.make "feequoter-vdi" ccipOwner
+
+    sendingMessageCid <- submit ccipOwner do
+        createCmd CCIP.SendingMessageV1.SendingMessageV1 with
+            deps = deps
+            ccipOwner = ccipOwner
+            sender = ccipOwner
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            destDefaultCCVs = []
+            requiredCCVs = [ccvA, ccvB]
+            requiredExecutor = None
+            executorAddress = "0000000000000000000000000000000000000000000000000000000000000000"
+            executionMode = Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor
+            sourceChainSelector = 123.0
+            senderAddress = ""
+            receiver = ""
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = ""
+            offRampAddress = ""
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorDestGasLimit = 0
+            executorDestBytesOverhead = 0
+            executorFeeTokenAmount = 0.0
+            observingParties = [ccvOwnerA, ccvOwnerB]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = CCIP.SendingMessageV1.SendingMessageState_FeeFinalized
+
+    sendingMessageCid <- submit ccipOwner do
+        exerciseCmd sendingMessageCid CCIP.SendingMessageV1.BuildMessage with
+            caller = ccipOwner
+
+    sendingMessageCid <- submit (actAs ccvOwnerA) do
+        exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
+            ccvInstanceId = "shared-ccv-id"
+            versionTag = "00000001"
+            verifierBlob = "aaaa"
+            messageSentObservers = []
+            caller = ccvOwnerA
+
+    _ <- submit (actAs ccvOwnerB) do
+        exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
+            ccvInstanceId = "shared-ccv-id"
+            versionTag = "00000002"
+            verifierBlob = "bbbb"
+            messageSentObservers = []
+            caller = ccvOwnerB
+
+    Some sm <- queryContractId ccipOwner sendingMessageCid
+    length sm.verifierData === 2
+
+    pure ()
+
+-- | A single party operating two CCVs with distinct instance ids can add fees for both.
+testSameOwnerDistinctInstanceIds : Script ()
+testSameOwnerDistinctInstanceIds = script do
+    ccipOwner <- allocateParty "ccip-owner-sodi"
+    ccvOwner <- allocateParty "ccv-owner-sodi"
+
+    let destChainSelector : Numeric 0 = 456.0
+    let ccvA = RawInstanceAddress.make "ccv-id-1" ccvOwner
+    let ccvB = RawInstanceAddress.make "ccv-id-2" ccvOwner
+    let feeToken = HoldingV1.InstrumentId with admin = ccipOwner; id = "feeToken"
+
+    let deps = CCIP.SendingMessageV1.SendingMessageDeps with
+            router = RawInstanceAddress.make "router-sodi" ccipOwner
+            onRamp = RawInstanceAddress.make "onramp-sodi" ccipOwner
+            globalConfig = RawInstanceAddress.make "globalconfig-sodi" ccipOwner
+            rmnRemote = RawInstanceAddress.make "rmn-sodi" ccipOwner
+            tokenAdminRegistry = RawInstanceAddress.make "tar-sodi" ccipOwner
+            feeQuoter = RawInstanceAddress.make "feequoter-sodi" ccipOwner
+
+    sendingMessageCid <- submit ccipOwner do
+        createCmd CCIP.SendingMessageV1.SendingMessageV1 with
+            deps = deps
+            ccipOwner = ccipOwner
+            sender = ccipOwner
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            destDefaultCCVs = []
+            requiredCCVs = [ccvA, ccvB]
+            requiredExecutor = None
+            executorAddress = "0000000000000000000000000000000000000000000000000000000000000000"
+            executionMode = Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor
+            sourceChainSelector = 123.0
+            senderAddress = ""
+            receiver = ""
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = ""
+            offRampAddress = ""
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorDestGasLimit = 0
+            executorDestBytesOverhead = 0
+            executorFeeTokenAmount = 0.0
+            observingParties = [ccvOwner]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = CCIP.SendingMessageV1.SendingMessageState_Prepared
+
+    sendingMessageCid <- submit (actAs ccvOwner) do
+        exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-id-1"
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+            caller = ccvOwner
+
+    _ <- submit (actAs ccvOwner) do
+        exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-id-2"
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+            caller = ccvOwner
+
+    Some sm <- queryContractId ccipOwner sendingMessageCid
+    length sm.ccvFees === 2
+
+    pure ()
