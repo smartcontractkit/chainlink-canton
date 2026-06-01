@@ -726,6 +726,10 @@ template BurnMintTokenPool
                     assertMsg ("ReleaseFromTicket: verified CCV owner is not a ticket signatory " <> show verifiedCCV)
                         (RawInstanceAddress.ownerParty verifiedCCV `elem` ticketSignatories)
 
+                -- Also check that the pool's owner is a signatory on the ticket
+                assertMsg "ReleaseFromTicket: pool owner is not a ticket signatory"
+                    (poolOwner `elem` ticketSignatories)
+
                 -- Validate the exact pool-required CCV instances are present on the ticket.
                 -- This preserves the configured instance-level trust model even when
                 -- multiple CCV instances share the same owner party.

@@ -190,12 +190,12 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
             versionTag = "0x01"
             caller = ccvOwner
 
-    executingMessageCid <- submit ccipOwner do
+    executingMessageCid <- submit (actAs ccipOwner <> actAs poolOwner) do
         exerciseCmd executingMessageCid SetInboundPoolCCVs with
             poolAddress = RawInstanceAddress.make "test-pool" poolOwner
             poolCCVs = []
 
-    executingMessageCid <- submit [ccipOwner, ccvOwner] do
+    executingMessageCid <- submit (actAs ccipOwner <> actAs ccvOwner) do
         exerciseCmd executingMessageCid AddCCVVerification with
             ccvInstanceId = "0xCCV1"
             versionTag = "0x01"
@@ -241,7 +241,7 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
                 extraData = "")
             messageData = ""
 
-    executingMessageCid <- submit ccipOwner do
+    executingMessageCid <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd ExecutingMessageV1 with
             ccipOwner = ccipOwner
             message = message

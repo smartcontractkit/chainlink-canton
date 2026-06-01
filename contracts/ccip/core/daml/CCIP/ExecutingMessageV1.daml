@@ -82,7 +82,13 @@ template ExecutingMessageV1
         --   token-receive: RequirePoolCCVs -> Prepared -(FinalizeExecute)-> consumed
         state : ExecutingMessageState
     where
-        signatory dedup (ccipOwner :: ccvOwners)
+        signatory dedup (
+            [ccipOwner]
+            ++ ccvOwners
+            -- Add the pool owner as a signatory as soon as the inboundPoolVerification is set.
+            ++ case inboundPoolVerification of
+                Some verification -> [RawInstanceAddress.ownerParty verification.poolAddress]
+                None -> [])
         observer observingParties
 
         -- Cleanup choice for failed or abandoned flows. Not used for the success path
@@ -123,14 +129,16 @@ template ExecutingMessageV1
                         versionTag]
                     ccvOwners = dedup (ccvOwners ++ [caller])
 
-        -- Record the pool's inbound CCV requirements. Only exercisable by ccipOwner,
-        -- authorized through TAR's signatory context when pool calls
-        -- SetInboundPoolCCVs. OffRamp verifies coverage.
+        -- Record the pool's inbound CCV requirements. Only exercisable by ccipOwner and the pool owner itself.
+        -- ccipOwner authorizes through TAR's signatory context when pool calls SetInboundPoolCCVs.
+        -- We don't validate the the poolOwner is the actual owner of the pool since this will have already been checked by TAR's SetInboundPoolCCVs.
+        -- The pool's signatory is later used to create the TokenReceiveTicket, which the pool is expected to validate before releasing tokens, 
+        -- so an invalid poolOwner would also lead to the pool's check to fail.
         choice SetInboundPoolCCVs : ContractId ExecutingMessageV1
             with
                 poolAddress : RawInstanceAddress
                 poolCCVs : [RawInstanceAddress]
-            controller ccipOwner
+            controller ccipOwner, RawInstanceAddress.ownerParty poolAddress
             do
                 assertMsg "executingMessage: SetInboundPoolCCVs only allowed while pool CCVs are required"
                     (state == ExecutingMessageState_RequirePoolCCVs)

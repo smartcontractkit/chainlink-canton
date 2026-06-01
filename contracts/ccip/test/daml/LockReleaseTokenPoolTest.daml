@@ -918,7 +918,7 @@ testReleaseFromTicket = script do
             deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-release" "test-feequoter-release" ccipOwner rmnOwner
 
     -- Create TokenReceiveTicket (simulating what OffRamp creates via finalize)
-    tokenReceiveTicket <- submit ccipOwner do
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -1111,7 +1111,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-bad-release" "test-feequoter-bad-release" ccipOwner rmnOwner
 
-    tokenReceiveTicket <- submit ccipOwner do
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -1284,7 +1284,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-release-drift" ccipOwner rmnOwner
 
-    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs ccvOwner) do
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner <> actAs ccvOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -1431,7 +1431,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-release-instance" ccipOwner rmnOwner
 
-    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs ccvOwner) do
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner <> actAs ccvOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -1449,7 +1449,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             sourceChainSelector = sourceChainSelector
             finality = finalityConfig 0
 
-    wrongPoolAddressTicket <- submit (actAs ccipOwner <> actAs ccvOwner) do
+    wrongPoolAddressTicket <- submit (actAs ccipOwner <> actAs poolOwner <> actAs ccvOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -1582,7 +1582,7 @@ testReleaseFromTicketDecimalConversion = script do
             deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-decimals" ccipOwner rmnOwner
 
     let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 18.0)
-    tokenReceiveTicket <- submit ccipOwner do
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -1726,7 +1726,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
 
     let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 38.0)
     let sourceAmount = fromSome (Uint256.decimalTextToUint256Bytes "100000000000000000000000000000000000000")
-    tokenReceiveTicket <- submit ccipOwner do
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -1860,7 +1860,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
 
     let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 6.0)
     let overflowingAmount : Numeric 0 = 100000000000000000000000000.0
-    tokenReceiveTicket <- submit ccipOwner do
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -1995,7 +1995,7 @@ testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
             deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-decimals-zero" ccipOwner rmnOwner
 
     let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 18.0)
-    tokenReceiveTicket <- submit ccipOwner do
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
@@ -2056,6 +2056,7 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory : Script ()
 testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
     ccipOwner <- allocateParty "ccip-owner-ccv-auth"
     ccvOwner <- allocateParty "ccv-owner-ccv-auth"
+    wrongCcvOwner <- allocateParty "wrong-ccv-owner-ccv-auth"
     rmnOwner <- allocateParty "rmn-owner-ccv-auth"
     poolOwner <- allocateParty "pool-owner-ccv-auth"
     receiver <- allocateParty "receiver-ccv-auth"
@@ -2132,8 +2133,8 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-ccv-auth" ccipOwner rmnOwner
 
-    let nonsignatoryVerifiedCCV = RawInstanceAddress.make "ccv-not-signer" poolOwner
-    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs ccvOwner) do
+    let nonsignatoryVerifiedCCV = RawInstanceAddress.make "ccv-not-signer" wrongCcvOwner
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner <> actAs ccvOwner) do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner

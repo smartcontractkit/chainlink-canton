@@ -458,7 +458,7 @@ template TokenAdminRegistry
                     (ticket.poolAddress == poolAddress)
                 assertMsg "ConsumeReceiveTicket: ticket instrument must match requested instrument"
                     (ticket.instrumentId == instrumentId)
-                exercise ticketCid CCIP.Tickets.ConsumeByCCIPOwner
+                exercise ticketCid CCIP.Tickets.Consume
 
         -- | Record pool's outbound CCV requirements on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,

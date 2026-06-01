@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "d35737e55d0d41ae227e1cd41ad7fb52c193b5bc595df3d9be2d17b2786cf51a"
+	PackageID   = "87b2c36bd6a65a0957747373c21ce019ab49ac1c972a2be2479493b813038da3"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1515,34 +1515,34 @@ func (t *Canton2AnyMessage) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ConsumeByCCIPOwner is a Record type
-type ConsumeByCCIPOwner struct {
+// Consume is a Record type
+type Consume struct {
 }
 
-// ToMap converts ConsumeByCCIPOwner to a map for DAML arguments
-func (t ConsumeByCCIPOwner) ToMap() map[string]any {
+// ToMap converts Consume to a map for DAML arguments
+func (t Consume) ToMap() map[string]any {
 	m := make(map[string]any)
 	return m
 }
 
-func (t ConsumeByCCIPOwner) MarshalJSON() ([]byte, error) {
+func (t Consume) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ConsumeByCCIPOwner) UnmarshalJSON(data []byte) error {
+func (t *Consume) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ConsumeByCCIPOwner to hex string (Canton MCMS format)
-func (t ConsumeByCCIPOwner) MarshalHex() (string, error) {
+// MarshalHex encodes Consume to hex string (Canton MCMS format)
+func (t Consume) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ConsumeByCCIPOwner from hex string (Canton MCMS format)
-func (t *ConsumeByCCIPOwner) UnmarshalHex(data string) error {
+// UnmarshalHex decodes Consume from hex string (Canton MCMS format)
+func (t *Consume) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -9379,23 +9379,23 @@ func (t *TokenReceiveTicket) UnmarshalHex(data string) error {
 
 // Choice methods for TokenReceiveTicket
 
-// ConsumeByCCIPOwner exercises the ConsumeByCCIPOwner choice on this TokenReceiveTicket contract
+// Consume exercises the Consume choice on this TokenReceiveTicket contract
 // This method uses the package name in the template ID
-func (t TokenReceiveTicket) ConsumeByCCIPOwner(contractID string, args ConsumeByCCIPOwner) *model.ExerciseCommand {
+func (t TokenReceiveTicket) Consume(contractID string, args Consume) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Tickets", "TokenReceiveTicket"),
 		ContractID: contractID,
-		Choice:     "ConsumeByCCIPOwner",
+		Choice:     "Consume",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ConsumeByCCIPOwnerWithPackageID exercises the ConsumeByCCIPOwner choice using the provided package ID instead of package name
-func (t TokenReceiveTicket) ConsumeByCCIPOwnerWithPackageID(contractID string, packageID string, args ConsumeByCCIPOwner) *model.ExerciseCommand {
+// ConsumeWithPackageID exercises the Consume choice using the provided package ID instead of package name
+func (t TokenReceiveTicket) ConsumeWithPackageID(contractID string, packageID string, args Consume) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "TokenReceiveTicket"),
 		ContractID: contractID,
-		Choice:     "ConsumeByCCIPOwner",
+		Choice:     "Consume",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -10585,7 +10585,7 @@ type MCMSEncoder interface {
 	BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
 	CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.EncodedChoice, error)
-	ConsumeByCCIPOwner(args ConsumeByCCIPOwner) (*bind.EncodedChoice, error)
+	Consume(args Consume) (*bind.EncodedChoice, error)
 	ConsumeCapacity(args ConsumeCapacity) (*bind.EncodedChoice, error)
 	ConsumeReceiveTicket(args ConsumeReceiveTicket) (*bind.EncodedChoice, error)
 	ConsumeReceiveTicketMCMSParams(args ConsumeReceiveTicketMCMSParams) (*bind.EncodedChoice, error)
@@ -10823,9 +10823,9 @@ func (e *encoder) CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.E
 	return e.EncodeChoiceArgs("CancelExecute", args)
 }
 
-// ConsumeByCCIPOwner encodes parameters for the ConsumeByCCIPOwner choice.
-func (e *encoder) ConsumeByCCIPOwner(args ConsumeByCCIPOwner) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ConsumeByCCIPOwner", args)
+// Consume encodes parameters for the Consume choice.
+func (e *encoder) Consume(args Consume) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Consume", args)
 }
 
 // ConsumeCapacity encodes parameters for the ConsumeCapacity choice.

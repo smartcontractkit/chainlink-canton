@@ -244,7 +244,7 @@ testFinalizeExecuteRejectsPoolChangedAfterInboundVerification = script do
           extraData = "")
         messageData = ""
 
-  executingMessageCid <- submit owner do
+  executingMessageCid <- submit (actAs owner <> actAs poolOwner) do
     createCmd CCIP.ExecutingMessageV1.ExecutingMessageV1 with
       ccipOwner = owner
       message
@@ -306,7 +306,7 @@ testConsumeReceiveTicketRejectsPoolAddressMismatch = script do
       tokenPool = Some registeredPool
       caller = owner
 
-  ticketCid <- submit owner do
+  ticketCid <- submit (actAs owner <> actAs poolOwner) do
     createCmd CCIP.Tickets.TokenReceiveTicket with
       ccipOwner = owner
       ccvOwners = []

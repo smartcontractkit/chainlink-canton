@@ -357,7 +357,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             messageData = ""
     let encodedMessage = MessageCodecV1.encodeMessageV1 message
 
-    executingMessageCid <- submit ccipOwner do
+    executingMessageCid <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd ExecutingMessageV1.ExecutingMessageV1 with
             ccipOwner = ccipOwner
             message = message
@@ -493,7 +493,7 @@ testTokenAdminRegistryFinalizeExecuteRequiresOwner = script do
             messageData = ""
     let encodedMessage = MessageCodecV1.encodeMessageV1 message
 
-    executingMessageCid <- submit ccipOwner do
+    executingMessageCid <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd ExecutingMessageV1.ExecutingMessageV1 with
             ccipOwner = ccipOwner
             message = message
