@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "f060297563395d4cbbba82027be95ff9d30dcaedc692f1ad3ebef9a9b43d4e66"
+	PackageID   = "7beaee2928ac31a3c7833764a748b27c2a28607f65583942158419d97b17c96d"
 	SDKVersion  = "3.4.11"
 )
 
