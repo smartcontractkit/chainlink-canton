@@ -257,6 +257,9 @@ template LockReleaseTokenPool
 
         ensure assertValidInstanceId instanceId
             && all
+                (\cfg -> CCIP.FinalityConfig.isValidFinalityConfig cfg.finalityConfig)
+                (Map.values remoteChainConfigs)
+            && all
                 (\cfg ->
                     cfg.feeBps >= 0.0
                         && cfg.feeBps < bpsDenominator
@@ -389,6 +392,7 @@ template LockReleaseTokenPool
                     assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
                     -- If the chain already exists, the update should first remove it.
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
+                    assertMsg "ApplyChainUpdates: BlockDepth finality must be positive" (CCIP.FinalityConfig.isValidFinalityConfig finalityConfig)
                     -- Validate rate limiters
                     assertMsg "ApplyChainUpdates: inbound/outbound rate limiters cannot be empty" (inboundRateLimiter /= RawInstanceAddress.empty && outboundRateLimiter /= RawInstanceAddress.empty)
                     when (customFinalityRateLimiterRequired finalityConfig) $
