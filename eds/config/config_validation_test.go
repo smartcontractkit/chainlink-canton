@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/go-playground/validator/v10"
@@ -194,6 +193,153 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: true,
 				},
 			},
+		}, {
+			structName: "TokenPool",
+			tests: []test{
+				{
+					name: "valid",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:                TokenPoolTypeBurnMint,
+						PoolOwner:           "owner",
+						BurnMintFactory:     nil,
+						TransferPreapproval: nil,
+					},
+					wantErr: false,
+				}, {
+					name: "valid BurnMintFactory",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:      TokenPoolTypeBurnMint,
+						PoolOwner: "owner",
+						BurnMintFactory: &BurnMintFactory{
+							Type: FactoryTypeDisabled,
+						},
+						TransferPreapproval: nil,
+					},
+					wantErr: false,
+				}, {
+					name: "valid TransferFactory",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:      TokenPoolTypeLockRelease,
+						PoolOwner: "owner",
+						TransferFactory: &TransferFactory{
+							Type: FactoryTypeDisabled,
+						},
+						TransferPreapproval: nil,
+					},
+					wantErr: false,
+				}, {
+					name: "valid",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:      TokenPoolTypeBurnMint,
+						PoolOwner: "owner",
+						BurnMintFactory: &BurnMintFactory{
+							Type: FactoryTypeDisabled,
+						},
+						TransferPreapproval: &TransferPreapproval{
+							ContextKey: "preapproval",
+							TemplateId: "package:module:entity",
+						},
+					},
+					wantErr: false,
+				}, {
+					name: "invalid TransferPreapproval",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:      TokenPoolTypeBurnMint,
+						PoolOwner: "owner",
+						BurnMintFactory: &BurnMintFactory{
+							Type: FactoryTypeDisabled,
+						},
+						TransferPreapproval: &TransferPreapproval{
+							ContextKey: "",
+							TemplateId: "",
+						},
+					},
+					wantErr: true,
+				}, {
+					name: "invalid BurnMintFactory",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:      TokenPoolTypeBurnMint,
+						PoolOwner: "owner",
+						BurnMintFactory: &BurnMintFactory{
+							Type: FactoryTypeAddress,
+						},
+						TransferPreapproval: nil,
+					},
+					wantErr: true,
+				}, {
+					name: "invalid TransferFactory",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:      TokenPoolTypeLockRelease,
+						PoolOwner: "owner",
+						TransferFactory: &TransferFactory{
+							Type: FactoryTypeAddress,
+						},
+						TransferPreapproval: nil,
+					},
+					wantErr: true,
+				}, {
+					name: "invalid TransferFactory for TokenPoolTypeBurnMint",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:      TokenPoolTypeBurnMint,
+						PoolOwner: "owner",
+						TransferFactory: &TransferFactory{
+							Type: FactoryTypeDisabled,
+						},
+						TransferPreapproval: nil,
+					},
+					wantErr: true,
+				}, {
+					name: "invalid BurnMintFactory for TokenPoolTypeLockRelease",
+					s: TokenPool{
+						ContractIdentifier: ContractIdentifier{
+							PartyID:         "owner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+						},
+						Type:      TokenPoolTypeLockRelease,
+						PoolOwner: "owner",
+						BurnMintFactory: &BurnMintFactory{
+							Type: FactoryTypeDisabled,
+						},
+						TransferFactory: &TransferFactory{
+							Type: FactoryTypeDisabled,
+						},
+						TransferPreapproval: nil,
+					},
+					wantErr: true,
+				},
+			},
 		},
 	}
 
@@ -205,7 +351,6 @@ func TestConfigValidation(t *testing.T) {
 					t.Parallel()
 					validate := validator.New(validator.WithRequiredStructEnabled())
 					err := validate.Struct(tt.s)
-					fmt.Println(err)
 					if (err != nil) != tt.wantErr {
 						t.Errorf("Validate: error = %v, wantErr %v", err, tt.wantErr)
 						return
