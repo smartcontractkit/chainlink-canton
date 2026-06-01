@@ -346,8 +346,14 @@ template CommitteeVerifier
                 let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag + 2) signatureLength)
                 let signatures = parseSignatures signatureData
 
+                -- re-calculate messageId hash for signature verification.
+                let messageId = CCIP.MessageCodecV1.messageId execMsg.message
+
+                -- validate that exec message content matches the calculated messageId
+                assertMsg "verifier: executing message ID mismatch" (messageId == execMsg.messageId)
+
                 -- Matches EVM: signers sign keccak256(versionTag ++ messageHash)
-                let signedHash = keccak256 (versionTag <> execMsg.messageId)
+                let signedHash = keccak256 (versionTag <> messageId)
 
                 -- Verify signatures
                 let validSigners = findValidSigners signedHash signatures signerConfig.signerKeys
