@@ -24,15 +24,15 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/google/uuid v1.6.0
-	github.com/icza/gox v0.2.6
+	github.com/icza/gox v0.2.7
 	github.com/jpillora/backoff v1.0.0
 	github.com/lib/pq v1.12.3
 	github.com/moby/moby/api v1.54.1
-	github.com/oapi-codegen/runtime v1.4.0
+	github.com/oapi-codegen/runtime v1.4.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.0
-	github.com/smartcontractkit/chain-selectors v1.0.100
+	github.com/smartcontractkit/chain-selectors v1.0.101
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260512180815-d7a89b0a5784
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260516222345-f2f143454dbd
 	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260518191934-8eaeb5f036e1
@@ -41,15 +41,15 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.106.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.1
-	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.2
+	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.3
 	github.com/smartcontractkit/go-daml v0.0.0-20260514231151-fecd433dede9
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
-	go.opentelemetry.io/otel v1.43.0
-	go.opentelemetry.io/otel/metric v1.43.0
+	go.opentelemetry.io/otel v1.44.0
+	go.opentelemetry.io/otel/metric v1.44.0
 	go.opentelemetry.io/otel/sdk/metric v1.43.0
 	go.uber.org/zap v1.28.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/grpc v1.81.1
@@ -507,7 +507,7 @@ require (
 	go.opentelemetry.io/otel/log v0.19.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.19.0 // indirect
-	go.opentelemetry.io/otel/trace v1.43.0 // indirect
+	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.1 // indirect
@@ -515,7 +515,7 @@ require (
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
