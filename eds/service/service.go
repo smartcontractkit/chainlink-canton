@@ -172,7 +172,6 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 				default:
 					logger.Warn().Err(err).Msg("Instrument holding store encountered an error that could not be handled, likely due to a pending shutdown.")
 				}
-
 			}
 		}(errChan)
 	}
@@ -205,7 +204,6 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			default:
 				logger.Warn().Err(err).Msg("Active contract store encountered an error that could not be handled, likely due to a pending shutdown.")
 			}
-
 		}
 	}(errChan)
 
@@ -241,6 +239,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		if closeErr := s.Close(); closeErr != nil {
 			logger.Err(closeErr).Msg("Failed to close HTTP server.")
 		}
+
 		return fmt.Errorf("unexpected error received: %w", err)
 	case <-ctx.Done():
 		logger.Info().Msg("Context cancelled. Shutting down server gracefully with a timeout of 20s...")
