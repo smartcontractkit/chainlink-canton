@@ -55,31 +55,18 @@ decodeBlockConfirmations finalityConfig = do
         blockConfirmationsHex <- extractBytes finalityConfig 2 2
         decodeUint16 blockConfirmationsHex
 
-isOdd : Int -> Bool
-isOdd n = n /= 2 * (n / 2)
-
--- Count how many flag bits are turned on in the upper 16-bit flags field.
--- We use this to enforce that a requested finality picks only one mode.
-countSetBits : Int -> Int
-countSetBits n =
-    if n <= 0 then 0
-    else (if isOdd n then 1 else 0) + countSetBits (n / 2)
-
--- A requested finality must choose exactly one mode:
---   * finalized-only, or
---   * one flag like safe, or
---   * a positive block depth.
--- Mixed requests like "safe + 12 blocks" are invalid.
+-- A requested finality must match exactly one of the patterns the decoder
+-- accepts below:
+--   * flags == 0 and blockConfirmations == 0  -> WaitForFinality
+--   * flags == 1 and blockConfirmations == 0  -> WaitForSafe
+--   * flags == 0 and blockConfirmations  > 0  -> BlockDepth n
 validateRequestedFinality : BytesHex -> Bool
 validateRequestedFinality finalityConfig =
     case (decodeFlags finalityConfig, decodeBlockConfirmations finalityConfig) of
         (Some flags, Some blockConfirmations) ->
-            let isFinalizedOnly = flags == 0 && blockConfirmations == 0
-                hasBlockDepth = blockConfirmations > 0
-                activeModes = (if hasBlockDepth then 1 else 0) + countSetBits flags
-            -- Valid requests are either finalized-only (00000000),
-            -- or exactly one active mode: one flag or a positive block depth.
-            in isFinalizedOnly || activeModes == 1
+            (flags == 0 && blockConfirmations == 0)
+                || (flags == 1 && blockConfirmations == 0)
+                || (flags == 0 && blockConfirmations > 0)
         _ -> False
 
 -- Decode only well-formed requested finality values.
