@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "39c8faa4fb99f8ee7c0752f36825ea2dce9f0e35d738783202e78250321f546d"
+	PackageID   = "56779a7d9595209f81afc73e796dd55a593994546e29548e7f43f183c5ad9436"
 	SDKVersion  = "3.4.11"
 )
 
@@ -530,6 +530,27 @@ func (t Executor) ApplyDestChainUpdatesWithPackageID(contractID string, packageI
 	}
 }
 
+// SetDynamicConfig exercises the SetDynamicConfig choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
+func (t Executor) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // CalculateFee exercises the CalculateFee choice on this Executor contract
 // This method uses the package name in the template ID
 func (t Executor) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
@@ -694,27 +715,6 @@ func (t Executor) GetAllowedFinalityConfigWithPackageID(contractID string, packa
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
 		Choice:     "GetAllowedFinalityConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDynamicConfig exercises the SetDynamicConfig choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "SetDynamicConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
-func (t Executor) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "SetDynamicConfig",
 		Arguments:  argsToMap(args),
 	}
 }

@@ -86,7 +86,7 @@ testDistinctCcvOwnersWithSameInstanceId = script do
             messageSentObservers = []
             caller = ccvOwnerA
 
-    _ <- submit (actAs ccvOwnerB) do
+    sendingMessageCid <- submit (actAs ccvOwnerB) do
         exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
             ccvInstanceId = "shared-ccv-id"
             versionTag = "00000002"
@@ -172,7 +172,7 @@ testSameOwnerDistinctInstanceIds = script do
             destBytesOverhead = 0
             caller = ccvOwner
 
-    _ <- submit (actAs ccvOwner) do
+    sendingMessageCid <- submit (actAs ccvOwner) do
         exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-id-2"
             feeUSDCents = 0.0
