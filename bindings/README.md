@@ -14,6 +14,8 @@ Generated Go bindings and DAR artifacts use the same layout: **dev** (`current/`
 
 - Application code (deployment, integration-tests, EDS, CCIP devenv, etc.) imports **`bindings/generated/v1_0_0/...`** (or whichever release the repo is pinned to). **Do not** import `latest/`.
 - `latest/` and `current/` are regenerated during development and are not guaranteed stable or audited.
+- **Do not** change `contracts/dars/v1_0_0/` or `bindings/generated/v1_0_0/` in normal PRs. CI enforces this (`make check-frozen-release-artifacts`). After DAML changes, run `make contracts` and commit only `current/` + `latest/`.
+- Frozen snapshots change only via **`make freeze-release VERSION=…`** on a dedicated release PR. Add the GitHub label **`release-artifacts`** so CI allows those paths to change.
 - Git tags for releases: `contracts-canton-v<x.y.z>` (e.g. `contracts-canton-v1.0.0`).
 - Snapshot folder names use underscores: release `1.1.0` → `v1_1_0/`.
 
