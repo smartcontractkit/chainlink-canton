@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -36,6 +37,10 @@ import (
 )
 
 func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) error {
+	logger = logger.With().Str("component", "RunEDS").Logger()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	cfg, err := config.DefaultConfig().Merge(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to merge config: %w", err)
@@ -162,7 +167,12 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			logger.Info().Msg("starting instrument holding store")
 			err := instrumentHoldingStore.Run(ctx, store.DefaultStreamConfig())
 			if err != nil {
-				errChan <- fmt.Errorf("failed to run instrument holding store: %w", err)
+				select {
+				case errChan <- fmt.Errorf("failed to run instrument holding store: %w", err):
+				default:
+					logger.Warn().Err(err).Msg("Instrument holding store encountered an error that could not be handled, likely due to a pending shutdown.")
+				}
+
 			}
 		}(errChan)
 	}
@@ -190,7 +200,12 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		logger.Info().Msg("starting active contract store")
 		err := activeContractStore.Run(ctx, store.DefaultStreamConfig())
 		if err != nil {
-			errChan <- fmt.Errorf("failed to run active contract store: %w", err)
+			select {
+			case errChan <- fmt.Errorf("failed to run active contract store: %w", err):
+			default:
+				logger.Warn().Err(err).Msg("Active contract store encountered an error that could not be handled, likely due to a pending shutdown.")
+			}
+
 		}
 	}(errChan)
 
@@ -200,21 +215,45 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		BaseContext:  func(_ net.Listener) context.Context { return ctx },
 	}
 
 	// Run server in the background
 	go func() {
 		logger.Info().Msg("starting server")
-		err := s.ListenAndServe()
-		if err != nil {
-			errChan <- fmt.Errorf("failed to run server: %w", err)
+		if s.ListenAndServe() != nil {
+			select {
+			case errChan <- fmt.Errorf("failed to run server: %w", err):
+			default:
+				logger.Warn().Err(err).Msg("HTTP server encountered an error that could not be handled, likely due to a pending shutdown.")
+			}
 		}
 	}()
 
+	// RunEDS has two conditions under which it terminates:
+	// 1. An unexpected error is returned by one of the background processes (active contract store, instrument holding store, or HTTP server)
+	//    and sent on errChan, in which case it immediately closes the HTTP server and returns the error that lead to the shutdown.
+	// 2. The provided context is cancelled by the caller, in which case we trigger a graceful shutdown of the HTTP server to wait for all
+	//    in-flight requests to complete.
 	select {
 	case err := <-errChan:
-		return err
+		logger.Err(err).Msg("Unexpected error received. Shutting down immediately.")
+		if closeErr := s.Close(); closeErr != nil {
+			logger.Err(closeErr).Msg("Failed to close HTTP server.")
+		}
+		return fmt.Errorf("unexpected error received: %w", err)
 	case <-ctx.Done():
+		logger.Info().Msg("Context cancelled. Shutting down server gracefully with a timeout of 20s...")
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second*20) // Higher than read & write timeouts to allow in-flight requests to complete
+		defer shutdownCancel()
+
+		if err := s.Shutdown(shutdownCtx); err != nil {
+			logger.Warn().Err(err).Msg("Server shutdown encountered an error.")
+			return fmt.Errorf("server shutdown: %w", err)
+		}
+		logger.Info().Msg("Server shutdown complete.")
+
 		return ctx.Err()
 	}
 }
