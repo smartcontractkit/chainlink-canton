@@ -412,11 +412,11 @@ Token expansion resolves **existing** Splice instrument refs — it does not min
 
 ```
 contracts/ccip/<pkg>/daml/*.daml
-  → bindings/generated/v1_0_0/ccip/<pkg>/   (generated — do not hand-edit)
+  → bindings/generated/latest/ccip/<pkg>/   (generated — do not hand-edit)
   → operations/ccip/<pkg>/            (NewExercise / factory encoders use bindings)
 ```
 
-After DAML changes: `make contracts` (regenerates `latest/` and `current/`). Production imports use the pinned release tree (currently `v1_0_0/`). To ship a new release and migrate imports, see **[bindings/README.md](../bindings/README.md)**.
+After DAML changes: `make contracts` (regenerates `latest/` and `current/`). Deployment and operations import `latest/`. To ship an audited release snapshot for external consumers, see **[bindings/README.md](../bindings/README.md)** (`make freeze-release`, `v1_x_y/` trees).
 
 MCMS routing maps must match **`mcmsEntrypoint`** choice names in DAML, not runtime choices like `VerifyMessage`.
 
