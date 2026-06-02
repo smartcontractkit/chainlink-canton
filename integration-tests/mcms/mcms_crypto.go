@@ -852,13 +852,18 @@ func HexToHash(hexStr string) common.Hash {
 // OPERATION DATA ENCODING (like Aptos BCS)
 // ===========================================================================
 
+// wireToHex encodes raw MCMS wire bytes (go-daml HexCodec.Marshal / MarshalHex output) as hex ASCII.
+func wireToHex(wire string) string {
+	return hex.EncodeToString([]byte(wire))
+}
+
 // MustEncodeBlockedFunction encodes a BlockedFunction to hex bytes using binding's MarshalHex.
 func MustEncodeBlockedFunction(t testing.TB, bf mcms.BlockedFunction) string {
 	t.Helper()
-	encoded, err := bf.MarshalHex()
+	wire, err := bf.MarshalHex()
 	require.NoError(t, err, "failed to encode BlockedFunction")
 
-	return encoded
+	return wireToHex(wire)
 }
 
 // EncodeSelfDispatchSetConfig encodes role + SetConfigParams for self-dispatch set_config
@@ -866,13 +871,14 @@ func MustEncodeBlockedFunction(t testing.TB, bf mcms.BlockedFunction) string {
 //
 //	uint8(roleToInt(role)) <> encodeSetConfigParams(params)
 func EncodeSelfDispatchSetConfig(role MCMSRole, params mcms.SetConfigParams) (string, error) {
-	roleByte := hex.EncodeToString([]byte{byte(role)}) //nolint:gosec // MCMSole is a controlled value
-	encoded, err := params.MarshalHex()
+	wire, err := params.MarshalHex()
 	if err != nil {
 		return "", fmt.Errorf("MarshalHex failed: %w", err)
 	}
 
-	return roleByte + encoded, nil
+	// uint8(role) <> encodeSetConfigParams(params), then hex for TimelockCall hex:"bytes16".
+	payload := append([]byte{byte(role)}, []byte(wire)...) //nolint:gosec // MCMSRole is a controlled value
+	return hex.EncodeToString(payload), nil
 }
 
 // EncodePruneSeenHashesParams encodes the role byte for a PruneSeenHashes self-dispatch call.
