@@ -336,6 +336,12 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		}
 	}
 
+	// Validate that resolvedCCVs is non-zero - every message must be validated by at least one ccv
+	if len(resolvedCCVs) == 0 {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "no CCVs specified and no defaults available for destination chain, every message must be validated by at least one CCV"})
+		return
+	}
+
 	// Determine Executor
 	var executor *oapiCommon.RawOrHashedAddress
 	switch req.Message.Executor.Type {

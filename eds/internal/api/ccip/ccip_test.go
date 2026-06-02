@@ -872,7 +872,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				Message: validMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("GlobalConfig not found in store", func(t *testing.T) {
 			t.Parallel()
@@ -885,7 +885,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				Message: validMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("TokenAdminRegistry not found in store", func(t *testing.T) {
 			t.Parallel()
@@ -899,7 +899,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				Message: validMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("RMNRemote not found in store", func(t *testing.T) {
 			t.Parallel()
@@ -914,7 +914,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				Message: validMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("FeeQuoter not found in store", func(t *testing.T) {
 			t.Parallel()
@@ -930,7 +930,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				Message: validMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("GlobalConfig not returned from store", func(t *testing.T) {
 			t.Parallel()
@@ -946,7 +946,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				Message: validMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equalf(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("GlobalConfig - no DestChainConfig", func(t *testing.T) {
 			t.Parallel()
@@ -1064,6 +1064,42 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 			require.Contains(t, string(resp.Body), "invalid token pool required CCV address")
 		})
+		t.Run("Empty resolvedCCVs", func(t *testing.T) {
+			t.Parallel()
+			mockActiveContractStore, client := setup(t)
+
+			mockActiveContractStore.EXPECT().Get(cfg.OnRamp.InstanceAddress).Return(nil, true)
+			mockActiveContractStore.EXPECT().Get(cfg.GlobalConfig.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+				CreateArguments: bindings.MarshalTemplateToRecord(core.GlobalConfig{
+					InstanceId:    "globalconfig",
+					CcipOwner:     "owner",
+					ChainSelector: types.NUMERIC(sourceSelector),
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+						types.NUMERIC(destSelector): {
+							IsEnabled:                 true,
+							MessageNetworkFeeUSDCents: "0",
+							TokenNetworkFeeUSDCents:   "0",
+							// This should lead to no resolved CCVs as there are no default CCVs and no provided CCVs
+							// This shouldn't happen, since either lane-mandated or default CCVs always need to be set, still breaking out early in the API
+							DefaultCCVs:      nil, // No default CCVs
+							LaneMandatedCCVs: nil, // No lane-mandated CCVs
+						},
+					},
+				}),
+			}}, true)
+			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(nil, true) // No ActiveContract - parsing will fail
+			mockActiveContractStore.EXPECT().Get(cfg.RMNRemote.InstanceAddress).Return(nil, true)
+			mockActiveContractStore.EXPECT().Get(cfg.FeeQuoter.InstanceAddress).Return(nil, true)
+
+			resp, err := client.PostCCIPSendWithResponse(t.Context(), oapiCCIP.CCIPSendRequest{
+				Message:               validMessage,
+				TokenPoolRequiredCCVs: nil, // No TokenPoolRequiredCCVs
+				SenderRequiredCCVs:    nil, //  No SenderRequiredCCVs
+			})
+			require.NoError(t, err)
+			require.Equalf(t, http.StatusBadRequest, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+			require.Contains(t, string(resp.Body), "every message must be validated by at least one CCV")
+		})
 		t.Run("TokenAdminRegistry not returned from store", func(t *testing.T) {
 			t.Parallel()
 			mockActiveContractStore, client := setup(t)
@@ -1079,6 +1115,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
 							TokenNetworkFeeUSDCents:   "0",
+							DefaultCCVs:               []chainlinkapi.RawInstanceAddress{contracts.NewRawInstanceAddress("ccv1", "owner").Binding()},
 						},
 					},
 				}),
@@ -1091,7 +1128,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				Message: validMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equalf(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("TokenConfig not found in store", func(t *testing.T) {
 			t.Parallel()
@@ -1108,6 +1145,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
 							TokenNetworkFeeUSDCents:   "0",
+							DefaultCCVs:               []chainlinkapi.RawInstanceAddress{contracts.NewRawInstanceAddress("ccv1", "owner").Binding()},
 						},
 					},
 				}),
@@ -1146,6 +1184,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
 							TokenNetworkFeeUSDCents:   "0",
+							DefaultCCVs:               []chainlinkapi.RawInstanceAddress{contracts.NewRawInstanceAddress("ccv1", "owner").Binding()},
 						},
 					},
 				}),
@@ -1183,6 +1222,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
 							TokenNetworkFeeUSDCents:   "0",
+							DefaultCCVs:               []chainlinkapi.RawInstanceAddress{contracts.NewRawInstanceAddress("ccv1", "owner").Binding()},
 						},
 					},
 				}),
@@ -1464,7 +1504,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				EncodedMessage: validEncodedMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("GlobalConfig not found in store", func(t *testing.T) {
 			t.Parallel()
@@ -1477,7 +1517,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				EncodedMessage: validEncodedMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("TokenAdminRegistry not found in store", func(t *testing.T) {
 			t.Parallel()
@@ -1491,7 +1531,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				EncodedMessage: validEncodedMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("RMNRemote not found in store", func(t *testing.T) {
 			t.Parallel()
@@ -1506,7 +1546,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				EncodedMessage: validEncodedMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("TokenAdminRegistry not returned from store", func(t *testing.T) {
 			t.Parallel()
@@ -1521,7 +1561,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				EncodedMessage: validEncodedMessage,
 			})
 			require.NoError(t, err)
-			require.Equal(t, http.StatusInternalServerError, resp.StatusCode())
+			require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		})
 		t.Run("TokenConfig not found in store", func(t *testing.T) {
 			t.Parallel()
