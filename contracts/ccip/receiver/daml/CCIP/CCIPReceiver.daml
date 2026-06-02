@@ -58,6 +58,7 @@ template CCIPReceiver
         -- Ensure that requiredCCVs are unique
         ensure assertValidInstanceId instanceId
             && unique requiredCCVs
+            && CCIP.FinalityConfig.isValidFinalityConfig receiverFinalityConfig
 
         -- | Query the final required CCVs for executing an inbound message.
         -- Aggregates receiver policy with token-pool requirements and delegates

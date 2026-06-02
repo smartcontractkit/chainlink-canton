@@ -464,6 +464,25 @@ testDecodeDeployExecutorParams = script do
 
   pure ()
 
+testDecodeDeployExecutorParamsRejectsNonPositiveBlockDepth : Script ()
+testDecodeDeployExecutorParamsRejectsNonPositiveBlockDepth = script do
+  owner <- allocateParty "ExecutorOwner"
+
+  let encodeWith finality =
+        encodeDeployExecutorParams (DeployExecutorParams with
+          instanceId = "executor-1"
+          owner
+          maxCCVsPerMsg = 10
+          allowedFinalityConfig = finality
+          ccvAllowlistEnabled = False)
+      assertDecodeFails finality =
+        case decodeDeployExecutorParams (encodeWith finality) of
+          None -> pure ()
+          Some _ -> abort "expected DeployExecutorParams decode to reject non-positive BlockDepth"
+
+  assertDecodeFails (FinalityCodec.BlockDepth 0)
+  assertDecodeFails (FinalityCodec.BlockDepth (-1))
+
 testDecodeDeployLockReleaseTokenPoolParams : Script ()
 testDecodeDeployLockReleaseTokenPoolParams = script do
   poolOwner <- allocateParty "pool_owner"
