@@ -82,14 +82,31 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewExercise(contract.ExerciseP
 	EncodeMethod: lrtpEncoder.ApplyTokenTransferFeeConfigUpdates,
 })
 
+var SetRateLimiterReferences = contract.NewExercise(contract.ExerciseParams[burnminttokenpool.SetRateLimiterReferences]{
+	Name:         "canton/ccip/burn_mint_token_pool/set_rate_limiter_references",
+	Version:      Version,
+	Description:  "Updates which RateLimiter contract identities a Canton BurnMintTokenPool references per remote chain",
+	ContractType: ContractType,
+	Validate: func(input burnminttokenpool.SetRateLimiterReferences) error {
+		if len(input.RateLimitConfigArgs) == 0 {
+			return errors.New("rateLimitConfigArgs is required")
+		}
+
+		return nil
+	},
+	Template:     burnminttokenpool.BurnMintTokenPool{},
+	Method:       burnminttokenpool.BurnMintTokenPool{}.SetRateLimiterReferences,
+	EncodeMethod: lrtpEncoder.SetRateLimiterReferences,
+})
+
 var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[burnminttokenpool.SetRateLimitConfig]{
 	Name:         "canton/ccip/burn_mint_token_pool/set_rate_limit_config",
 	Version:      Version,
-	Description:  "Sets rate limit configs for a Canton BurnMintTokenPool",
+	Description:  "Tunes capacity, rate, and isEnabled on a RateLimiter referenced by a Canton BurnMintTokenPool",
 	ContractType: ContractType,
 	Validate: func(input burnminttokenpool.SetRateLimitConfig) error {
-		if len(input.RateLimitConfigArgs) == 0 {
-			return errors.New("rateLimitConfigArgs is required")
+		if input.RateLimiterCid == "" {
+			return errors.New("rateLimiterCid is required")
 		}
 
 		return nil

@@ -6,12 +6,10 @@ import (
 	"math/big"
 	"strings"
 
-	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
 	ccipruntime "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	committeeverifier "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executor "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	link "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
@@ -545,7 +543,7 @@ var _ api.IMCMSReceiver = (*CCIPFactory)(nil)
 
 // DeployBurnMintTokenPool is a Record type
 type DeployBurnMintTokenPool struct {
-	Contract burnminttokenpool.BurnMintTokenPool `json:"contract"`
+	Contract BurnMintTokenPool `json:"contract"`
 }
 
 // ToMap converts DeployBurnMintTokenPool to a map for DAML arguments
@@ -591,7 +589,7 @@ type DeployBurnMintTokenPoolParams struct {
 	FeeQuoter          chainlinkapi.RawInstanceAddress            `json:"feeQuoter"`
 	RmnRemote          chainlinkapi.RawInstanceAddress            `json:"rmnRemote"`
 	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
-	TransferTimeout    burnminttokenpool.TransferTimeout          `json:"transferTimeout"`
+	TransferTimeout    TransferTimeout                            `json:"transferTimeout"`
 }
 
 // ToMap converts DeployBurnMintTokenPoolParams to a map for DAML arguments
@@ -1087,7 +1085,7 @@ func (t *DeployLinkTokenParams) UnmarshalHex(data string) error {
 
 // DeployLockReleaseTokenPool is a Record type
 type DeployLockReleaseTokenPool struct {
-	Contract lockreleasetokenpool.LockReleaseTokenPool `json:"contract"`
+	Contract LockReleaseTokenPool `json:"contract"`
 }
 
 // ToMap converts DeployLockReleaseTokenPool to a map for DAML arguments
@@ -1133,7 +1131,7 @@ type DeployLockReleaseTokenPoolParams struct {
 	FeeQuoter          chainlinkapi.RawInstanceAddress            `json:"feeQuoter"`
 	RmnRemote          chainlinkapi.RawInstanceAddress            `json:"rmnRemote"`
 	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
-	TransferTimeout    lockreleasetokenpool.TransferTimeout       `json:"transferTimeout"`
+	TransferTimeout    TransferTimeout                            `json:"transferTimeout"`
 }
 
 // ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments

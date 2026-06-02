@@ -17,8 +17,8 @@ import CCIP.BurnMintTokenPool
 import CCIP.BurnMintTokenPoolCodecGen (
     encodeSetDynamicConfigParams,
     encodeApplyChainUpdatesParams,
+    encodeSetRateLimiterReferencesParams,
     encodeSetRateLimitConfigParams,
-    encodeSetRateLimiterConfigParams,
     encodeSetTransferTimeoutParams,
     encodeAddPoolReceiveContextNonContractValueParams,
     encodeAddPoolReceiveContextContractValueParams,
@@ -27,8 +27,8 @@ import CCIP.BurnMintTokenPoolCodecGen (
 import CCIP.BurnMintTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
+    SetRateLimiterReferencesParams(..),
     SetRateLimitConfigParams(..),
-    SetRateLimiterConfigParams(..),
     RemoteChainConfig(..),
     SetTransferTimeoutParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
@@ -258,11 +258,11 @@ testBurnMintTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script do
     pure ()
 
 -- ========================================================
--- |        MCMS Entrypoint - SetRateLimitConfig          |
+-- |     MCMS Entrypoint - SetRateLimiterReferences       |
 -- ========================================================
 
-testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig : Script ()
-testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
+testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterReferences : Script ()
+testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterReferences = script do
     ccipOwner <- allocateParty "ccip_owner"
     poolOwner <- allocateParty "pool_owner"
 
@@ -305,13 +305,13 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-updated@owner"
             ]
 
-        encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
+        encoded = encodeSetRateLimiterReferencesParams (SetRateLimiterReferencesParams with
             rateLimitConfigArgs = args)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "SetRateLimitConfig"
+            functionName = "SetRateLimiterReferences"
             operationData = encoded
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
 
@@ -328,11 +328,11 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
     pure ()
 
 -- ========================================================
--- |      MCMS Entrypoint - SetRateLimiterConfig          |
+-- |        MCMS Entrypoint - SetRateLimitConfig          |
 -- ========================================================
 
-testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterConfig : Script ()
-testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterConfig = script do
+testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig : Script ()
+testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
     ccipOwner <- allocateParty "ccip_owner"
     poolOwner <- allocateParty "pool_owner"
     rateLimitAdmin <- allocateParty "rate_limit_admin"
@@ -385,7 +385,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterConfig = script do
     let poolAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
-    let encoded = encodeSetRateLimiterConfigParams (SetRateLimiterConfigParams with
+    let encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
             caller = rateLimitAdmin
             rateLimiterInstanceAddress = rlAddr
             newIsEnabled = True
@@ -394,7 +394,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterConfig = script do
 
     _newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "SetRateLimiterConfig"
+            functionName = "SetRateLimitConfig"
             operationData = encoded
             contractIds = Map.fromList
                 [ (poolAddr, toAnyContractId poolCid)
@@ -409,7 +409,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterConfig = script do
         _ -> abort "Expected exactly one tuned RateLimiter contract"
 
     pools <- query @BurnMintTokenPool poolOwner
-    assertMsg "pool contract must remain after nonconsuming SetRateLimiterConfig"
+    assertMsg "pool contract must remain after nonconsuming SetRateLimitConfig"
         (any (\(_, p) -> p.instanceId == instanceId) pools)
 
     pure ()

@@ -14,8 +14,8 @@ import CCIP.BurnMintTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
     ApplyTokenTransferFeeConfigUpdatesParams(..),
+    SetRateLimiterReferencesParams(..),
     SetRateLimitConfigParams(..),
-    SetRateLimiterConfigParams(..),
     SetTransferTimeoutParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
@@ -125,11 +125,11 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
     fst (fromSome (BurnMintTokenPoolCodec.decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
--- |             SetRateLimitConfig              |
+-- |          SetRateLimiterReferences           |
 -- ===============================================
 
-testSetRateLimitConfigParamsRoundtrip : Script ()
-testSetRateLimitConfigParamsRoundtrip = do
+testSetRateLimiterReferencesParamsRoundtrip : Script ()
+testSetRateLimiterReferencesParamsRoundtrip = do
     let rateLimitConfigs = [
             RateLimitConfigArgs with
                 remoteChainSelector = 1.0
@@ -147,24 +147,28 @@ testSetRateLimitConfigParamsRoundtrip = do
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party3"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party3"
             ]
-        args = SetRateLimitConfigParams with
+        args = SetRateLimiterReferencesParams with
             rateLimitConfigArgs = rateLimitConfigs
-    let encoded = BurnMintTokenPoolCodec.encodeSetRateLimitConfigParams args
-    fst (fromSome (BurnMintTokenPoolCodec.decodeSetRateLimitConfigParamsAt encoded 0)) === args
+    let encoded = BurnMintTokenPoolCodec.encodeSetRateLimiterReferencesParams args
+    fst (fromSome (BurnMintTokenPoolCodec.decodeSetRateLimiterReferencesParamsAt encoded 0)) === args
     pure ()
 
-testSetRateLimiterConfigParamsRoundtrip : Script ()
-testSetRateLimiterConfigParamsRoundtrip = script do
+-- ===============================================
+-- |             SetRateLimitConfig              |
+-- ===============================================
+
+testSetRateLimitConfigParamsRoundtrip : Script ()
+testSetRateLimitConfigParamsRoundtrip = script do
     admin <- allocateParty "rate_limit_admin"
     poolOwner <- allocateParty "pool_owner"
-    let args = SetRateLimiterConfigParams with
+    let args = SetRateLimitConfigParams with
             caller = admin
             rateLimiterInstanceAddress = RawInstanceAddress.make "rl-in" poolOwner
             newIsEnabled = True
             newCapacity = 42.0
             newRate = 3.0
-    let encoded = BurnMintTokenPoolCodec.encodeSetRateLimiterConfigParams args
-    fst (fromSome (BurnMintTokenPoolCodec.decodeSetRateLimiterConfigParamsAt encoded 0)) === args
+    let encoded = BurnMintTokenPoolCodec.encodeSetRateLimitConfigParams args
+    fst (fromSome (BurnMintTokenPoolCodec.decodeSetRateLimitConfigParamsAt encoded 0)) === args
     pure ()
 
 -- ===============================================

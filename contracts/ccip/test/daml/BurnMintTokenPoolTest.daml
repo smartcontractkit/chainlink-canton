@@ -1546,7 +1546,7 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
       deps = mkPoolDeps "tar-bm-rl-admin" "rmn-bm-rl-admin" "fq-bm-rl-admin" ccipOwner ccipOwner
 
   submitMustFail rateLimitAdmin do
-    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimitConfig with
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimiterReferences with
       rateLimitConfigArgs =
         [ BurnMintTokenPool.RateLimitConfigArgs with
             remoteChainSelector = sourceChainSelector
@@ -1562,7 +1562,7 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
       newRate = 5.0
 
   updatedInboundCid <- submit poolOwner do
-    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimiterConfig with
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimitConfig with
       caller = rateLimitAdmin
       rateLimiterCid = inboundRateLimiterCid
       newIsEnabled = True

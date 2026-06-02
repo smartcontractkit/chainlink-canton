@@ -4112,8 +4112,8 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
 
     pure ()
 
-testLockReleaseTokenPool_SetRateLimitConfig : Script ()
-testLockReleaseTokenPool_SetRateLimitConfig = script do
+testLockReleaseTokenPool_SetRateLimiterReferences : Script ()
+testLockReleaseTokenPool_SetRateLimiterReferences = script do
     owner <- allocateParty "owner"
     ccipOwner <- allocateParty "ccip-owner"
     rateLimitAdmin <- allocateParty "rate-limit-admin"
@@ -4172,7 +4172,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated-456@owner"
             ]
     tokenPoolCid <- submit owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = rateLimitConfigArgs1
     -- Fetch the updated TokenPool and verify the rate limiters were updated correctly
     tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
@@ -4195,7 +4195,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner" -- unchanged
             ]
     tokenPoolCid <- submit owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = rateLimitConfigArgs2
     -- Fetch the updated TokenPool and verify the rate limiters were updated correctly
     tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
@@ -4218,7 +4218,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated-3@owner"
             ]
     submitMustFail rateLimitAdmin do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = rateLimitConfigArgs3
 
     -- | ========= Test 3b ========
@@ -4246,7 +4246,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
             newRate = 9.0
 
     updatedInbound456Cid <- submit owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
             caller = rateLimitAdmin
             rateLimiterCid = inbound456Cid
             newIsEnabled = True
@@ -4268,7 +4268,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-no-custom@owner"
             ]
     tokenPoolCid <- submit owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = rateLimitConfigArgs4
     tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
     case Map.lookup 123.0 tokenPool.remoteChainConfigs of
@@ -4280,7 +4280,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
     -- | ========================
     -- Attempt to update rate limiters for a non-existent chain config
     submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
                 LockReleaseTokenPool.RateLimitConfigArgs with
                     remoteChainSelector = 999.0 -- does not exist
@@ -4290,7 +4290,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 ]
     -- Attempt to update with an invalid chain selector (negative)
     submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
                 LockReleaseTokenPool.RateLimitConfigArgs with
                     remoteChainSelector = -1.0 -- invalid
@@ -4300,7 +4300,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 ]
     -- Attempt to update with an invalid inbound rate limiter address (empty)
     submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
                 LockReleaseTokenPool.RateLimitConfigArgs with
                     remoteChainSelector = 123.0
@@ -4310,7 +4310,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 ]
     -- Attempt to update with an invalid outbound rate limiter address (empty)
     submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
                 LockReleaseTokenPool.RateLimitConfigArgs with
                     remoteChainSelector = 123.0
@@ -4320,7 +4320,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 ]
     -- Attempt to update with an identical rate limiter for both inbound and outbound (invalid)
     submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
                 LockReleaseTokenPool.RateLimitConfigArgs with
                     remoteChainSelector = 123.0
@@ -4330,7 +4330,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 ]
     -- Attempt to update a chain that requires custom finality with an empty custom rate limiter
     submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
                 LockReleaseTokenPool.RateLimitConfigArgs with
                     remoteChainSelector = 456.0

@@ -82,14 +82,31 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewExercise(contract.ExerciseP
 	EncodeMethod: lrtpEncoder.ApplyTokenTransferFeeConfigUpdates,
 })
 
+var SetRateLimiterReferences = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.SetRateLimiterReferences]{
+	Name:         "canton/ccip/lock_release_token_pool/set_rate_limiter_references",
+	Version:      Version,
+	Description:  "Updates which RateLimiter contract identities a Canton LockReleaseTokenPool references per remote chain",
+	ContractType: ContractType,
+	Validate: func(input lockreleasetokenpool.SetRateLimiterReferences) error {
+		if len(input.RateLimitConfigArgs) == 0 {
+			return errors.New("rateLimitConfigArgs is required")
+		}
+
+		return nil
+	},
+	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
+	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.SetRateLimiterReferences,
+	EncodeMethod: lrtpEncoder.SetRateLimiterReferences,
+})
+
 var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.SetRateLimitConfig]{
 	Name:         "canton/ccip/lock_release_token_pool/set_rate_limit_config",
 	Version:      Version,
-	Description:  "Sets rate limit configs for a Canton LockReleaseTokenPool",
+	Description:  "Tunes capacity, rate, and isEnabled on a RateLimiter referenced by a Canton LockReleaseTokenPool",
 	ContractType: ContractType,
 	Validate: func(input lockreleasetokenpool.SetRateLimitConfig) error {
-		if len(input.RateLimitConfigArgs) == 0 {
-			return errors.New("rateLimitConfigArgs is required")
+		if input.RateLimiterCid == "" {
+			return errors.New("rateLimiterCid is required")
 		}
 
 		return nil
