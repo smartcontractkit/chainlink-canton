@@ -2877,7 +2877,8 @@ testVerifyInboundMessage = script do
     assertMsg "ExecutingMessageV1 should exist" (isSome newExecMsg)
     let em = fromSome newExecMsg
     em.inboundPoolVerification === Some (ExecutingMessageV1.InboundPoolVerification with
-        poolAddress = RawInstanceAddress.make "test-lock-release-pool-verify" poolOwner
+        poolInstanceId = "test-lock-release-pool-verify"
+        poolOwner = poolOwner
         poolCCVs = [ccvAddr])
 
     debug "testVerifyInboundMessage: PASSED"
@@ -2995,7 +2996,8 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
     assertMsg "ExecutingMessageV1 should exist" (isSome newExecMsg)
     let em = fromSome newExecMsg
     em.inboundPoolVerification === Some (ExecutingMessageV1.InboundPoolVerification with
-        poolAddress = RawInstanceAddress.make "test-lock-release-pool-verify-safe" poolOwner
+        poolInstanceId = "test-lock-release-pool-verify-safe"
+        poolOwner = poolOwner
         poolCCVs = [ccvAddr])
 
     debug "testVerifyInboundMessageAllowsSafeFinalityConfig: PASSED"

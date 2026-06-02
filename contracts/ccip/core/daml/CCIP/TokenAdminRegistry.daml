@@ -588,9 +588,9 @@ template TokenAdminRegistry
                 assertTokenConfigForTokenAddress instanceId owner entryCount tt.destTokenAddress config
                 pool <- registeredPoolOrAbort "SetInboundPoolCCVs" config
                 assertRegisteredPoolCaller "SetInboundPoolCCVs" caller poolInstanceId pool
-                let poolAddress = RawInstanceAddress.make pool.poolInstanceId pool.poolOwner
                 exercise executingMessageCid CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
-                    poolAddress = poolAddress
+                    poolInstanceId = pool.poolInstanceId
+                    poolOwner = pool.poolOwner
                     poolCCVs
 
         -- | Resolve token-side finalization data for an inbound token transfer and
@@ -625,7 +625,7 @@ template TokenAdminRegistry
                     None -> abort "TAR finalize: missing inbound pool verification"
                     Some verification -> pure verification
                 assertMsg "TAR finalize: registered pool changed since inbound verification"
-                    (poolVerification.poolAddress == poolAddress)
+                    (RawInstanceAddress.make poolVerification.poolInstanceId poolVerification.poolOwner == poolAddress)
 
                 exercise executingMessageCid CCIP.ExecutingMessageV1.FinalizeExecute with
                     tokenAdminRegistryInstanceId = instanceId

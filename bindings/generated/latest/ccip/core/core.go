@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "767d3bc6b48ba15224b11bcceecd039a0efeaef8ee07379f671ec647c4e31918"
+	PackageID   = "f41af78a33ed7cae38b6d5f5c62d953b0fc6c6869e6f806093eaa5e2e901b038"
 	SDKVersion  = "3.4.11"
 )
 
@@ -4960,15 +4960,18 @@ var _ api.IMCMSReceiver = (*GlobalConfig)(nil)
 
 // InboundPoolVerification is a Record type
 type InboundPoolVerification struct {
-	PoolAddress chainlinkapi.RawInstanceAddress   `json:"poolAddress"`
-	PoolCCVs    []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
+	PoolInstanceId types.TEXT                        `json:"poolInstanceId"`
+	PoolOwner      types.PARTY                       `json:"poolOwner"`
+	PoolCCVs       []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts InboundPoolVerification to a map for DAML arguments
 func (t InboundPoolVerification) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
+	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
 
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
@@ -7952,15 +7955,18 @@ func (t *SetConfig) UnmarshalHex(data string) error {
 
 // SetInboundPoolCCVs is a Record type
 type SetInboundPoolCCVs struct {
-	PoolAddress chainlinkapi.RawInstanceAddress   `json:"poolAddress"`
-	PoolCCVs    []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
+	PoolInstanceId types.TEXT                        `json:"poolInstanceId"`
+	PoolOwner      types.PARTY                       `json:"poolOwner"`
+	PoolCCVs       []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetInboundPoolCCVs to a map for DAML arguments
 func (t SetInboundPoolCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["poolAddress"] = model.NestedToDAMLValue(t.PoolAddress)
+	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
 
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
