@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"

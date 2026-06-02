@@ -11,7 +11,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"

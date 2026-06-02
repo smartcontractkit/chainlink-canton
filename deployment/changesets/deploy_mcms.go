@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	mcmsops "github.com/smartcontractkit/chainlink-canton/deployment/operations/mcms"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
