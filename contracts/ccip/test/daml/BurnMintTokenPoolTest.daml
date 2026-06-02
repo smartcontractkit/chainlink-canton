@@ -122,7 +122,6 @@ createLinkRegistry admin instrumentId registryInstanceId =
       registryInstrumentId = instrumentId
       instanceId = registryInstanceId
       registryMeta = MetadataV1.emptyMetadata
-      transferPreapprovals = Map.empty
 
 mintLink
   : Party

@@ -35,6 +35,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
+	latest_splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	latest_splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/ccvs"
@@ -44,7 +47,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/link"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/splice/splice_api_token_burn_mint_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/splice/splice_api_token_holding_v1"
@@ -372,10 +374,12 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	linkTokenOut, err := cld_ops.ExecuteOperation(bundle, linkregistry.Deploy, env.Chain, contractops.DeployInput[link.LinkRegistry]{
 		OwnerParty: types.PARTY(partyCCIP),
 		Template: link.LinkRegistry{
-			RegistryAdmin:        types.PARTY(partyCCIP),
-			RegistryInstrumentId: linkInstrumentId,
-			RegistryMeta:         splice_api_token_metadata_v1.Metadata{},
-			TransferPreapprovals: nil,
+			RegistryAdmin: types.PARTY(partyCCIP),
+			RegistryInstrumentId: latest_splice_api_token_holding_v1.InstrumentId{
+				Admin: linkInstrumentId.Admin,
+				Id:    linkInstrumentId.Id,
+			},
+			RegistryMeta: latest_splice_api_token_metadata_v1.Metadata{},
 		},
 	})
 	require.NoError(t, err)

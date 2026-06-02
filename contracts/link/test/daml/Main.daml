@@ -3,7 +3,6 @@ module Main where
 import Daml.Script
 
 import DA.Assert
-import DA.Map qualified as Map
 import DA.Optional (fromSome)
 import DA.TextMap qualified as TextMap
 import DA.Time (addRelTime, seconds)
@@ -16,13 +15,13 @@ import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
 
 runAll : Script ()
 runAll = script do
-  testTransferUsesKeyedPreapproval
+  testTransferUsesContextPreapproval
   testTransferFallsBackToPending
   testPendingTransferExpiresBeforeAccept
   testBurnMintRequiresActors
 
-testTransferUsesKeyedPreapproval : Script ()
-testTransferUsesKeyedPreapproval = script do
+testTransferUsesContextPreapproval : Script ()
+testTransferUsesContextPreapproval = script do
   admin <- allocateParty "link-admin"
   alice <- allocateParty "alice"
   bob <- allocateParty "bob"
@@ -37,19 +36,12 @@ testTransferUsesKeyedPreapproval = script do
       registryInstrumentId = instrumentId
       instanceId = "link-registry"
       registryMeta = MetadataV1.Metadata with
-        -- Registry metadata is only used for the registry itself, and not for holdings
         values = TextMap.fromList [("registryKey", "registryValue")]
-      transferPreapprovals = Map.empty
 
   preapprovalCid <- submit (actAs admin <> actAs bob) do
     createCmd LinkTransferPreapproval with
       preapprovalAdmin = admin
       preapprovalReceiver = bob
-
-  registryCid <- submit admin do
-    exerciseCmd registryCid SetTransferPreapproval with
-      receiver = bob
-      newPreapprovalCid = Some preapprovalCid
 
   disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
   disclosedPreapproval <- fromSome <$> queryDisclosure admin preapprovalCid
@@ -96,23 +88,22 @@ testTransferUsesKeyedPreapproval = script do
         inputHoldingCids = mintResult.outputCids
         meta = transferMetadata
       extraArgs = MetadataV1.ExtraArgs with
-        context = MetadataV1.emptyChoiceContext
+        context = MetadataV1.ChoiceContext with
+          values = TextMap.fromList
+            [(transferPreapprovalContextKey, MetadataV1.AV_ContractId (coerceContractId preapprovalCid))]
         meta = MetadataV1.emptyMetadata
 
-  -- Assert change
   [receiverChangeCid] <- pure transferResult.senderChangeCids
   Some senderChangeHolding <- queryContractId alice (fromInterfaceContractId @LinkHolding receiverChangeCid)
   senderChangeHolding.holdingAmount === 8.0
   senderChangeHolding.meta === MetadataV1.emptyMetadata
 
-  -- Assert transfer result
   case transferResult.output of
     TransferV1.TransferInstructionResult_Completed receiverHoldingCids -> do
       [receiverHoldingCid] <- pure receiverHoldingCids
       Some receiverHolding <- queryContractId bob (fromInterfaceContractId @LinkHolding receiverHoldingCid)
       receiverHolding.holdingAmount === 12.0
       receiverHolding.meta === transferMetadata
-
     _ -> abort "expected direct transfer completion"
 
 testTransferFallsBackToPending : Script ()
@@ -131,9 +122,7 @@ testTransferFallsBackToPending = script do
       registryInstrumentId = instrumentId
       instanceId = "link-registry-no-pa"
       registryMeta = MetadataV1.Metadata with
-        -- Registry metadata is only used for the registry itself, and not for holdings
         values = TextMap.fromList [("registryKey", "registryValue")]
-      transferPreapprovals = Map.empty
 
   disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
 
@@ -183,13 +172,11 @@ testTransferFallsBackToPending = script do
         meta = MetadataV1.Metadata with
           values = TextMap.fromList [("unusedKey", "unusedValue")]
 
-  -- Assert change
   [receiverChangeCid] <- pure transferResult.senderChangeCids
   Some senderChangeHolding <- queryContractId alice (fromInterfaceContractId @LinkHolding receiverChangeCid)
   senderChangeHolding.holdingAmount === 5.0
   senderChangeHolding.meta === MetadataV1.emptyMetadata
 
-  -- Accept the pending transfer
   case transferResult.output of
     TransferV1.TransferInstructionResult_Pending transferInstructionCid -> do
       acceptResult <- submit bob do
@@ -223,7 +210,6 @@ testPendingTransferExpiresBeforeAccept = script do
       registryInstrumentId = instrumentId
       instanceId = "link-registry-expiry"
       registryMeta = MetadataV1.emptyMetadata
-      transferPreapprovals = Map.empty
   disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
 
   mintResult <- submit (actAs admin <> actAs alice) do
@@ -293,7 +279,6 @@ testBurnMintRequiresActors = script do
       registryInstrumentId = instrumentId
       instanceId = "link-registry-bm"
       registryMeta = MetadataV1.emptyMetadata
-      transferPreapprovals = Map.empty
 
   _ <- submit (actAs admin <> actAs alice) do
     exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
