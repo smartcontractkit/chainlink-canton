@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -146,6 +145,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	// ========================================================================
 
 	destChainSelector := "999"
+	testOffRampHex := "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 
 	t.Log("Generating MCMS proposal via ConfigureGlobalConfig changeset...")
 	csOut, err := changesets.ConfigureGlobalConfig{}.Apply(*env, changesets.CantonCSDeps[changesets.ConfigureGlobalConfigConfig]{
@@ -160,7 +160,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 				AddressBytesLength:        20,
 				TokenReceiverAllowed:      true,
 				BaseExecutionGasCost:      21000,
-				OffRampAddress:            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+				OffRampAddress:            types.TEXT(testOffRampHex),
 				DefaultCCVs:               []mcms_bindings.RawInstanceAddress{ccvRaw},
 				MessageNetworkFeeUSDCents: "100",
 				TokenNetworkFeeUSDCents:   "50",
@@ -323,7 +323,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 			case "baseExecutionGasCost":
 				assert.Equal(t, int64(21000), f.GetValue().GetInt64(), "baseExecutionGasCost")
 			case "offRampAddress":
-				assert.Equal(t, hex.EncodeToString([]byte("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")), f.GetValue().GetText(), "offRampAddress (stored as hex-encoded ASCII)")
+				assert.Equal(t, testOffRampHex, f.GetValue().GetText(), "offRampAddress (BytesHex on ledger)")
 			case "messageNetworkFeeUSDCents":
 				assert.Equal(t, "100.", f.GetValue().GetNumeric(), "messageNetworkFeeUSDCents")
 			case "tokenNetworkFeeUSDCents":
