@@ -567,7 +567,10 @@ template LockReleaseTokenPool
                 case Map.lookup remoteChainSelector remoteChainConfigs of
                     None -> abort "pool: unsupported remote chain selector"
                     Some config -> case direction of
-                        CCIP.Interfaces.TokenPool.Inbound -> pure config.inboundCCVs
+                        CCIP.Interfaces.TokenPool.Inbound -> do
+                            assertMsg "pool: finality not allowed by pool config"
+                                (CCIP.FinalityConfig.requestedFinalityAllowed finality config.finalityConfig)
+                            pure config.inboundCCVs
                         CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
 
         -- Validate inbound token transfer message and record pool CCV requirements.

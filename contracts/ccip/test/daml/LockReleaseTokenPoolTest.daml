@@ -2757,6 +2757,64 @@ testAddTokenSendRejectsExtraDataBeyondQuotedOverhead = script do
 
     debug "testAddTokenSendRejectsExtraDataBeyondQuotedOverhead: PASSED"
 
+-- | Inbound GetRequiredCCVs rejects finality stricter than pool config at quote time.
+testGetRequiredCCVsRejectsDisallowedInboundFinality : Script ()
+testGetRequiredCCVsRejectsDisallowedInboundFinality = script do
+    poolOwner <- allocateParty "pool-owner-grc"
+    ccipOwner <- allocateParty "ccip-owner-grc"
+    caller <- allocateParty "caller-grc"
+
+    let chainSelector : Numeric 0 = 123.0
+    let inboundCcv = RawInstanceAddress.make "inbound-ccv-grc" ccipOwner
+    let chainConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["remote-pool"]
+            remoteTokenAddress = "token"
+            inboundCCVs = [inboundCcv]
+            outboundCCVs = []
+            finalityConfig = FinalityCodec.BlockDepth 2000
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+
+    let testInstrumentId = HoldingV1.InstrumentId with admin = ccipOwner; id = "TestToken"
+
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            poolOwner
+            ccipOwner
+            instanceId = "test-pool-grc"
+            instrumentId = testInstrumentId
+            decimals = 10
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(chainSelector, chainConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar-grc" "test-rmn-grc" "test-feequoter-grc" ccipOwner ccipOwner
+
+    let mkGetRequiredCCVs finality direction =
+            LockReleaseTokenPool.GetRequiredCCVs with
+                remoteChainSelector = chainSelector
+                sourceAmount = "00"
+                finality = finality
+                extraData = ""
+                direction = direction
+                caller = caller
+
+    ccvs <- submit caller do
+        exerciseCmd tokenPool (mkGetRequiredCCVs (FinalityCodec.BlockDepth 2000) ITokenPool.Inbound)
+    ccvs === [inboundCcv]
+
+    submitMustFail caller do
+        exerciseCmd tokenPool (mkGetRequiredCCVs (FinalityCodec.BlockDepth 1000) ITokenPool.Inbound)
+
+    -- Outbound uses WaitForFinality placeholder before the send message is finalized.
+    outboundCcvs <- submit caller do
+        exerciseCmd tokenPool (mkGetRequiredCCVs FinalityCodec.WaitForFinality ITokenPool.Outbound)
+    outboundCcvs === []
+
+    debug "testGetRequiredCCVsRejectsDisallowedInboundFinality: PASSED"
+
 -- | Test VerifyInboundMessage succeeds when sourcePoolAddress is in remotePools.
 testVerifyInboundMessage : Script ()
 testVerifyInboundMessage = script do
