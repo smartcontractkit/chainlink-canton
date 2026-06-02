@@ -18,6 +18,7 @@ import CCIP.BurnMintTokenPoolCodecGen (
     encodeSetDynamicConfigParams,
     encodeApplyChainUpdatesParams,
     encodeSetRateLimitConfigParams,
+    encodeSetRateLimiterConfigParams,
     encodeSetTransferTimeoutParams,
     encodeAddPoolReceiveContextNonContractValueParams,
     encodeAddPoolReceiveContextContractValueParams,
@@ -27,6 +28,8 @@ import CCIP.BurnMintTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
     SetRateLimitConfigParams(..),
+    SetRateLimiterConfigParams(..),
+    RemoteChainConfig(..),
     SetTransferTimeoutParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
@@ -35,6 +38,7 @@ import CCIP.BurnMintTokenPoolTypes (
 import CCIP.ContextCodec (encodeAnyValue)
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import qualified CCIP.Context
+import qualified CCIP.RateLimiter
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
@@ -320,6 +324,93 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
                 Some got -> do
                     assertRateLimitConfigArgsEqual got (head args)
         _ -> abort "Expected exactly one BurnMintTokenPool contract"
+
+    pure ()
+
+-- ========================================================
+-- |      MCMS Entrypoint - SetRateLimiterConfig          |
+-- ========================================================
+
+testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterConfig : Script ()
+testBurnMintTokenPoolMCMSEntrypoint_SetRateLimiterConfig = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    rateLimitAdmin <- allocateParty "rate_limit_admin"
+
+    let instanceId = "pool-tune-rl-test"
+        rlInstanceId = "rl-mcms-tune-in"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "LINK"
+
+    now <- getTime
+    rlCid <- submit poolOwner do
+        createCmd CCIP.RateLimiter.RateLimiter with
+            instanceId = rlInstanceId
+            poolInstanceId = instanceId
+            poolOwner
+            remoteChainSelector = 123.0
+            direction = CCIP.RateLimiter.RateLimitDirection_Inbound
+            mode = CCIP.RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = 10.0
+            tokens = 100.0
+            lastUpdated = now
+
+    let rlAddr = RawInstanceAddress.make rlInstanceId poolOwner
+    let chainConfig = RemoteChainConfig with
+            remotePools = []
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = mkFinalityConfig 0
+            inboundRateLimiter = rlAddr
+            inboundCustomBlockConfirmationsRateLimiter = rlAddr
+            outboundRateLimiter = rlAddr
+
+    poolCid <- submit poolOwner do
+        createCmd BurnMintTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals = 18
+            rateLimitAdmin = Some rateLimitAdmin
+            remoteChainConfigs = Map.fromList [(123.0, chainConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    let instAddr = RawInstanceAddress.toText rlAddr
+    let poolAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+    let encoded = encodeSetRateLimiterConfigParams (SetRateLimiterConfigParams with
+            caller = rateLimitAdmin
+            rateLimiterInstanceAddress = rlAddr
+            newIsEnabled = True
+            newCapacity = 50.0
+            newRate = 5.0)
+
+    _newContractIds <- submit poolOwner do
+        exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+            functionName = "SetRateLimiterConfig"
+            operationData = encoded
+            contractIds = Map.fromList
+                [ (poolAddr, toAnyContractId poolCid)
+                , (instAddr, toAnyContractId rlCid)
+                ]
+
+    rlContracts <- query @CCIP.RateLimiter.RateLimiter poolOwner
+    case filter (\(_, rl) -> rl.instanceId == rlInstanceId) rlContracts of
+        [(_, rl)] -> do
+            rl.capacity === 50.0
+            rl.rate === 5.0
+        _ -> abort "Expected exactly one tuned RateLimiter contract"
+
+    pools <- query @BurnMintTokenPool poolOwner
+    assertMsg "pool contract must remain after nonconsuming SetRateLimiterConfig"
+        (any (\(_, p) -> p.instanceId == instanceId) pools)
 
     pure ()
 

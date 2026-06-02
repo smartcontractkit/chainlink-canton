@@ -489,7 +489,7 @@ template LockReleaseTokenPool
 
         -- Tunes capacity/rate/isEnabled on a rate limiter already referenced by this pool's remote chain config.
         -- Callable by poolOwner; caller must be poolOwner or rateLimitAdmin (admin does not sign—owner executes on their behalf).
-        choice SetRateLimiterConfig : ContractId CCIP.RateLimiter.RateLimiter
+        nonconsuming choice SetRateLimiterConfig : ContractId CCIP.RateLimiter.RateLimiter
             with
                 caller : Party
                 rateLimiterCid : ContractId CCIP.RateLimiter.RateLimiter
@@ -1208,6 +1208,9 @@ template LockReleaseTokenPool
                         None -> abort "E_INVALID_PARAMS: SetRateLimiterConfig"
                         Some (SetRateLimiterConfigParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetRateLimiterConfig" (finalOffset == byteCount operationData)
+                            pool <- fetch selfCid
+                            assertMsg "E_RATE_LIMITER_NOT_ON_POOL"
+                                (rateLimiterInstanceAddress `elem` remoteChainRateLimiterAddresses pool.remoteChainConfigs)
                             let limiterAddr = RawInstanceAddress.toText rateLimiterInstanceAddress
                             rateLimiterCid <- case Map.lookup limiterAddr contractIds of
                                 None -> abort ("E_RATE_LIMITER_NOT_IN_MAP: " <> limiterAddr)
