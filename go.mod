@@ -47,7 +47,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.42.0
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/metric v1.44.0
-	go.opentelemetry.io/otel/sdk/metric v1.43.0
+	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.52.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
@@ -505,7 +505,7 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.43.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/log v0.19.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.19.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
