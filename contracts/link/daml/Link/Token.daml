@@ -68,13 +68,9 @@ template LinkTransferPreapproval
             receiverHoldingCids = [toInterfaceContractId receiverCid]
           meta = MetadataV1.emptyMetadata
 
-    choice Cancel : ()
-      with
-        actor : Party
-      controller actor
-      do
-        assertMsg "LinkTransferPreapproval.Cancel: unauthorized actor"
-          (actor == preapprovalAdmin || actor == preapprovalReceiver)
+    choice Revoke : ()
+      controller preapprovalAdmin
+      do pure ()
 
 template LinkTransferInstruction
   with
@@ -238,6 +234,28 @@ template LinkRegistry
               None -> Map.delete receiver transferPreapprovals
 
         create this with transferPreapprovals = updatedTransferPreapprovals
+
+    choice RemoveTransferPreapproval : ContractId LinkRegistry
+      with
+        receiver : Party
+        actor : Party
+      controller actor
+      do
+        assertMsg "LinkRegistry.RemoveTransferPreapproval: unauthorized actor"
+          (actor == registryAdmin || actor == receiver)
+        case Map.lookup receiver transferPreapprovals of
+          None ->
+            abort "LinkRegistry.RemoveTransferPreapproval: no preapproval registered for receiver"
+          Some preapprovalCid -> do
+            preapproval <- fetch preapprovalCid
+            assertMsg "LinkRegistry.RemoveTransferPreapproval: admin mismatch"
+              (preapproval.preapprovalAdmin == registryAdmin)
+            assertMsg "LinkRegistry.RemoveTransferPreapproval: receiver mismatch"
+              (preapproval.preapprovalReceiver == receiver)
+            if actor == registryAdmin
+              then exercise preapprovalCid Revoke
+              else archive preapprovalCid
+            create this with transferPreapprovals = Map.delete receiver transferPreapprovals
 
 sumAndArchiveInputs
   : Party

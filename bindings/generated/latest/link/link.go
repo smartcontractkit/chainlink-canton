@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "link"
-	PackageID   = "aa19509051d526bf61558354b47e7e19bb160ebe3c860865ace77efd56634c92"
+	PackageID   = "c0d96527222573d600cc8cfe50f2031c96bdf15a34e3d25dae8f19d079d1ea0f"
 	SDKVersion  = "3.4.11"
 )
 
@@ -57,42 +57,6 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
-}
-
-// Cancel is a Record type
-type Cancel struct {
-	Actor types.PARTY `json:"actor"`
-}
-
-// ToMap converts Cancel to a map for DAML arguments
-func (t Cancel) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["actor"] = t.Actor.ToMap()
-
-	return m
-}
-
-func (t Cancel) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *Cancel) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes Cancel to hex string (Canton MCMS format)
-func (t Cancel) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes Cancel from hex string (Canton MCMS format)
-func (t *Cancel) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
 }
 
 // LinkHolding is a Template type
@@ -335,6 +299,27 @@ func (t LinkRegistry) SetTransferPreapprovalWithPackageID(contractID string, pac
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.Token", "LinkRegistry"),
 		ContractID: contractID,
 		Choice:     "SetTransferPreapproval",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveTransferPreapproval exercises the RemoveTransferPreapproval choice on this LinkRegistry contract
+// This method uses the package name in the template ID
+func (t LinkRegistry) RemoveTransferPreapproval(contractID string, args RemoveTransferPreapproval) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.Token", "LinkRegistry"),
+		ContractID: contractID,
+		Choice:     "RemoveTransferPreapproval",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveTransferPreapprovalWithPackageID exercises the RemoveTransferPreapproval choice using the provided package ID instead of package name
+func (t LinkRegistry) RemoveTransferPreapprovalWithPackageID(contractID string, packageID string, args RemoveTransferPreapproval) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.Token", "LinkRegistry"),
+		ContractID: contractID,
+		Choice:     "RemoveTransferPreapproval",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -731,27 +716,6 @@ func (t LinkTransferPreapproval) SendWithPackageID(contractID string, packageID 
 	}
 }
 
-// Cancel exercises the Cancel choice on this LinkTransferPreapproval contract
-// This method uses the package name in the template ID
-func (t LinkTransferPreapproval) Cancel(contractID string, args Cancel) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.Token", "LinkTransferPreapproval"),
-		ContractID: contractID,
-		Choice:     "Cancel",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CancelWithPackageID exercises the Cancel choice using the provided package ID instead of package name
-func (t LinkTransferPreapproval) CancelWithPackageID(contractID string, packageID string, args Cancel) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.Token", "LinkTransferPreapproval"),
-		ContractID: contractID,
-		Choice:     "Cancel",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // Archive exercises the Archive choice on this LinkTransferPreapproval contract
 // This method uses the package name in the template ID
 func (t LinkTransferPreapproval) Archive(contractID string) *model.ExerciseCommand {
@@ -770,6 +734,27 @@ func (t LinkTransferPreapproval) ArchiveWithPackageID(contractID string, package
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
+	}
+}
+
+// Revoke exercises the Revoke choice on this LinkTransferPreapproval contract
+// This method uses the package name in the template ID
+func (t LinkTransferPreapproval) Revoke(contractID string, args Revoke) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.Token", "LinkTransferPreapproval"),
+		ContractID: contractID,
+		Choice:     "Revoke",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RevokeWithPackageID exercises the Revoke choice using the provided package ID instead of package name
+func (t LinkTransferPreapproval) RevokeWithPackageID(contractID string, packageID string, args Revoke) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.Token", "LinkTransferPreapproval"),
+		ContractID: contractID,
+		Choice:     "Revoke",
+		Arguments:  argsToMap(args),
 	}
 }
 
@@ -896,6 +881,77 @@ func (t LockedLinkHolding) ArchiveWithPackageID(contractID string, packageID str
 	}
 }
 
+// RemoveTransferPreapproval is a Record type
+type RemoveTransferPreapproval struct {
+	Receiver types.PARTY `json:"receiver"`
+	Actor    types.PARTY `json:"actor"`
+}
+
+// ToMap converts RemoveTransferPreapproval to a map for DAML arguments
+func (t RemoveTransferPreapproval) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	m["actor"] = t.Actor.ToMap()
+
+	return m
+}
+
+func (t RemoveTransferPreapproval) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoveTransferPreapproval) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoveTransferPreapproval to hex string (Canton MCMS format)
+func (t RemoveTransferPreapproval) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoveTransferPreapproval from hex string (Canton MCMS format)
+func (t *RemoveTransferPreapproval) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Revoke is a Record type
+type Revoke struct {
+}
+
+// ToMap converts Revoke to a map for DAML arguments
+func (t Revoke) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t Revoke) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *Revoke) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes Revoke to hex string (Canton MCMS format)
+func (t Revoke) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Revoke from hex string (Canton MCMS format)
+func (t *Revoke) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Send is a Record type
 type Send struct {
 	Sender           types.PARTY                              `json:"sender"`
@@ -1002,7 +1058,8 @@ func (t *SetTransferPreapproval) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	Cancel(args Cancel) (*bind.EncodedChoice, error)
+	RemoveTransferPreapproval(args RemoveTransferPreapproval) (*bind.EncodedChoice, error)
+	Revoke(args Revoke) (*bind.EncodedChoice, error)
 	Send(args Send) (*bind.EncodedChoice, error)
 	SetTransferPreapproval(args SetTransferPreapproval) (*bind.EncodedChoice, error)
 }
@@ -1034,9 +1091,14 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// Cancel encodes parameters for the Cancel choice.
-func (e *encoder) Cancel(args Cancel) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("Cancel", args)
+// RemoveTransferPreapproval encodes parameters for the RemoveTransferPreapproval choice.
+func (e *encoder) RemoveTransferPreapproval(args RemoveTransferPreapproval) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemoveTransferPreapproval", args)
+}
+
+// Revoke encodes parameters for the Revoke choice.
+func (e *encoder) Revoke(args Revoke) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Revoke", args)
 }
 
 // Send encodes parameters for the Send choice.

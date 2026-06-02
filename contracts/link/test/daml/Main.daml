@@ -18,6 +18,8 @@ runAll : Script ()
 runAll = script do
   testTransferUsesKeyedPreapproval
   testTransferFallsBackToPending
+  testRemoveTransferPreapprovalFallsBackToPending
+  testRemoveTransferPreapprovalByAdmin
   testPendingTransferExpiresBeforeAccept
   testBurnMintRequiresActors
 
@@ -206,6 +208,117 @@ testTransferFallsBackToPending = script do
           receiverHolding.meta === transferMetadata
         _ -> abort "expected completed accept result"
     _ -> abort "expected pending transfer result"
+
+testRemoveTransferPreapprovalFallsBackToPending : Script ()
+testRemoveTransferPreapprovalFallsBackToPending = script do
+  admin <- allocateParty "link-admin-remove-pa"
+  alice <- allocateParty "alice-remove-pa"
+  bob <- allocateParty "bob-remove-pa"
+
+  let instrumentId = HoldingV1.InstrumentId with
+        admin
+        id = "LINK"
+
+  registryCid <- submit admin do
+    createCmd LinkRegistry with
+      registryAdmin = admin
+      registryInstrumentId = instrumentId
+      instanceId = "link-registry-remove-pa"
+      registryMeta = MetadataV1.emptyMetadata
+      transferPreapprovals = Map.empty
+
+  preapprovalCid <- submit (actAs admin <> actAs bob) do
+    createCmd LinkTransferPreapproval with
+      preapprovalAdmin = admin
+      preapprovalReceiver = bob
+
+  registryCid <- submit admin do
+    exerciseCmd registryCid SetTransferPreapproval with
+      receiver = bob
+      newPreapprovalCid = Some preapprovalCid
+
+  disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
+
+  registryCid <- submit (actAs bob <> disclose disclosedRegistry) do
+    exerciseCmd registryCid RemoveTransferPreapproval with
+      receiver = bob
+      actor = bob
+
+  None <- queryContractId admin preapprovalCid
+  pure ()
+
+  disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
+
+  mintResult <- submit (actAs admin <> actAs alice) do
+    exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
+      expectedAdmin = admin
+      instrumentId
+      inputHoldingCids = []
+      outputs =
+        [BurnMintV1.BurnMintOutput with
+          owner = alice
+          amount = 8.0
+          context = MetadataV1.emptyChoiceContext]
+      extraActors = [alice]
+      extraArgs = MetadataV1.ExtraArgs with
+        context = MetadataV1.emptyChoiceContext
+        meta = MetadataV1.emptyMetadata
+
+  now <- getTime
+  transferResult <- submit (actAs alice <> disclose disclosedRegistry) do
+    exerciseCmd (toInterfaceContractId @TransferV1.TransferFactory registryCid) TransferV1.TransferFactory_Transfer with
+      expectedAdmin = admin
+      transfer = TransferV1.Transfer with
+        sender = alice
+        receiver = bob
+        amount = 3.0
+        instrumentId
+        requestedAt = now
+        executeBefore = addRelTime now (seconds 60)
+        inputHoldingCids = mintResult.outputCids
+        meta = MetadataV1.emptyMetadata
+      extraArgs = MetadataV1.ExtraArgs with
+        context = MetadataV1.emptyChoiceContext
+        meta = MetadataV1.emptyMetadata
+
+  case transferResult.output of
+    TransferV1.TransferInstructionResult_Pending _ -> pure ()
+    _ -> abort "expected pending transfer after preapproval removal"
+
+testRemoveTransferPreapprovalByAdmin : Script ()
+testRemoveTransferPreapprovalByAdmin = script do
+  admin <- allocateParty "link-admin-remove-by-admin"
+  bob <- allocateParty "bob-remove-by-admin"
+
+  let instrumentId = HoldingV1.InstrumentId with
+        admin
+        id = "LINK"
+
+  registryCid <- submit admin do
+    createCmd LinkRegistry with
+      registryAdmin = admin
+      registryInstrumentId = instrumentId
+      instanceId = "link-registry-remove-by-admin"
+      registryMeta = MetadataV1.emptyMetadata
+      transferPreapprovals = Map.empty
+
+  preapprovalCid <- submit (actAs admin <> actAs bob) do
+    createCmd LinkTransferPreapproval with
+      preapprovalAdmin = admin
+      preapprovalReceiver = bob
+
+  registryCid <- submit admin do
+    exerciseCmd registryCid SetTransferPreapproval with
+      receiver = bob
+      newPreapprovalCid = Some preapprovalCid
+
+  registryCid <- submit admin do
+    exerciseCmd registryCid RemoveTransferPreapproval with
+      receiver = bob
+      actor = admin
+
+  None <- queryContractId admin preapprovalCid
+  pure ()
 
 testPendingTransferExpiresBeforeAccept : Script ()
 testPendingTransferExpiresBeforeAccept = script do
