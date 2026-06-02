@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -155,6 +153,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
+		lane := defaultDevenvTokenLane(t, lib, in, cantonChain.ChainSelector(), evmChain.ChainSelector())
+
 		// Setup message send
 		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMFeeAmount)))           // Holdings for fee
 		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMTokenTransferAmount))) // Holdings for token transfer
@@ -182,16 +182,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			"source executor",
 		)
 		require.NoError(t, err)
-		destTokenRef, err := ds.Addresses().Get(
-			datastore.NewAddressRefKey(
-				evmChain.ChainSelector(),
-				datastore.ContractType("BurnMintERC20WithDripToken"),
-				semver.MustParse("1.0.0"),
-				burnMint20ToLockRelease20TokenQualifier(t),
-			),
-		)
-		require.NoError(t, err)
-		destTokenAddress := protocol.UnknownAddress(gethcommon.HexToAddress(destTokenRef.Address).Bytes())
+		destTokenAddress := lane.DestToken
 		receiverBalanceBefore, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)

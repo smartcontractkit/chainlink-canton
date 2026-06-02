@@ -44,6 +44,7 @@ Schedule is configured via env vars (defaults are `1/1s` for 90s):
 |---|---|---|---|
 | `CANTON_LOAD_MESSAGE_RATE` | `<int>/<duration>` (e.g. `1/1s`, `1/20s`, `10/5m`) | `1/1s` | rate per rate-limit window |
 | `CANTON_LOAD_DURATION` | Go duration (e.g. `90s`, `10m`, `1h`) | `90s` | total runtime |
+| `CANTON_LOAD_TOKEN_QUALIFIER` | pool qualifier string (e.g. `TEST` on staging) | _(auto)_ | override token lane when multiple lanes exist |
 
 Example — 1 message every 20 seconds for 10 minutes:
 
@@ -63,6 +64,20 @@ cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestCanton2
 ```
 
 If the out file is missing the test skips with a hint.
+
+### Canton → EVM token load (requires devenv)
+
+Separate test from message-only load: `TestCanton2EVM_TokenLoad`. Discovers the BM 2.0 ↔ LR 2.0 lane from the env file (override with `CANTON_LOAD_TOKEN_QUALIFIER`). Pre-mints Canton fee + transfer holdings, runs WASP, then asserts EVM receiver token balance delta.
+
+```bash
+make run-canton2evm-token-load
+```
+
+Equivalent:
+
+```bash
+cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestCanton2EVM_TokenLoad$'
+```
 
 ### EVM → Canton load (requires devenv)
 
@@ -85,15 +100,28 @@ Equivalent:
 cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Canton_Load$'
 ```
 
+### EVM → Canton token load (requires devenv)
+
+Separate test from message-only load: `TestEVM2Canton_TokenLoad`. Discovers token lane from deployment, logs EVM sender balance vs estimated transfer need (devenv pre-funds sender), runs WASP, logs Canton holdings post-run.
+
+```bash
+make run-evm2canton-token-load
+```
+
+Equivalent:
+
+```bash
+cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestEVM2Canton_TokenLoad$'
+```
+
 ### CI (on demand)
 
 The **CCIP Canton Load Tests** workflow (`ccip-load-tests.yml`) can be triggered manually from GitHub Actions
-(`workflow_dispatch`). It reuses the same devenv setup as the CCIP E2E workflow and runs either
-`TestCanton2EVM_Load` or `TestEVM2Canton_Load` depending on the `direction` input. Inputs:
+(`workflow_dispatch`). It reuses the same devenv setup as the CCIP E2E workflow and runs one of the load tests depending on the `direction` input. Inputs:
 
 | Input | Default | Maps to |
 |---|---|---|
-| `direction` | `canton2evm` | `canton2evm` → `TestCanton2EVM_Load`; `evm2canton` → `TestEVM2Canton_Load` |
+| `direction` | `canton2evm` | `canton2evm` → `TestCanton2EVM_Load`; `evm2canton` → `TestEVM2Canton_Load`; `canton2evm-token` → `TestCanton2EVM_TokenLoad`; `evm2canton-token` → `TestEVM2Canton_TokenLoad` |
 | `message_rate` | `1/1s` | `CANTON_LOAD_MESSAGE_RATE` |
 | `load_duration` | `90s` | `CANTON_LOAD_DURATION` |
 | `test_timeout` | `40m` | `go test -timeout` |

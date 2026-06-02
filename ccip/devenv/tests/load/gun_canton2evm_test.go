@@ -97,5 +97,5 @@ func TestCanton2EVM_Load(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-canton2evm", sched)
+	runWASP(t, gun, "canton-load-canton2evm", sched, "message_only")
 }

@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
@@ -139,16 +137,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	t.Run("token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		tokenRef, err := ds.Addresses().Get(
-			datastore.NewAddressRefKey(
-				srcSelector,
-				datastore.ContractType("BurnMintERC20WithDripToken"),
-				semver.MustParse("1.0.0"),
-				burnMint20ToLockRelease20TokenQualifier(t),
-			),
-		)
-		require.NoError(t, err)
-		srcToken := protocol.UnknownAddress(gethcommon.HexToAddress(tokenRef.Address).Bytes())
+		lane := defaultDevenvTokenLane(t, lib, in, srcSelector, dstSelector)
+		srcToken := lane.SrcToken
 		srcSender, err := srcChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
 		seqNo, err := srcChain.GetExpectedNextSequenceNumber(subtestCtx, dstSelector)

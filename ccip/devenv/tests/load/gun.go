@@ -11,6 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
+
+	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
 
 type loadMessageBuilder func(
@@ -24,6 +26,7 @@ type loadMessageBuilder func(
 type Destination struct {
 	Chain        cciptestinterfaces.CCIP17
 	Receiver     protocol.UnknownAddress
+	TokenLane    *devenvtests.TokenLane // nil = message-only; non-nil = token test
 	buildMessage loadMessageBuilder
 }
 
@@ -77,6 +80,7 @@ func NewCCIPLoadGun(
 	if len(destinations) == 0 {
 		return nil, fmt.Errorf("CCIPLoadGun: at least one destination is required")
 	}
+	tokenMode := destinations[0].TokenLane != nil
 	for i, d := range destinations {
 		if d.Chain == nil {
 			return nil, fmt.Errorf("CCIPLoadGun: destination[%d].Chain is nil", i)
@@ -86,6 +90,9 @@ func NewCCIPLoadGun(
 		}
 		if d.buildMessage == nil {
 			return nil, fmt.Errorf("CCIPLoadGun: destination[%d].buildMessage is nil", i)
+		}
+		if (d.TokenLane != nil) != tokenMode {
+			return nil, fmt.Errorf("CCIPLoadGun: destination[%d] mixes token and message-only destinations", i)
 		}
 	}
 	if confirmExecTimeout <= 0 {
