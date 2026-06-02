@@ -12,8 +12,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
+	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/common"
+	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
