@@ -31,7 +31,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260519201156-791d8279a3ad
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260518191934-8eaeb5f036e1
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
-	github.com/smartcontractkit/chainlink-deployments-framework v0.107.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.108.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260514231151-fecd433dede9
 	github.com/smartcontractkit/mcms v0.45.0
@@ -57,20 +57,20 @@ require (
 	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
 	github.com/aws/aws-sdk-go v1.55.8 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.9 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.32.17 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.16 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.20 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.19 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.25 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.25 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.25 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.24 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.26 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.59.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.23 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.25 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kms v1.52.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.0.11 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.30.17 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.21 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.42.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.1.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.30.19 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.36.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.42.3 // indirect
 	github.com/aws/smithy-go v1.26.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
@@ -211,7 +211,7 @@ require (
 	github.com/mitchellh/pointerstructure v1.2.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
-	github.com/moby/moby/api v1.54.1 // indirect
+	github.com/moby/moby/api v1.54.2 // indirect
 	github.com/moby/moby/client v0.4.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
@@ -337,9 +337,9 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/log v0.19.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.19.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.43.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
