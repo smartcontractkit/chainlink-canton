@@ -49,6 +49,7 @@ func (s *BackfilledStream) Run(
 	onCreatedEvent func(ctx context.Context, transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) error,
 	onArchivedEvent func(ctx context.Context, transaction *apiv2.Transaction, archivedEvent *apiv2.ArchivedEvent) error,
 	onExercisedEvent func(ctx context.Context, transaction *apiv2.Transaction, exercisedEvent *apiv2.ExercisedEvent) error,
+	onFinishedBackfill func(),
 ) error {
 	s.logger.Debug().Msg("Starting BackfilledStream")
 	ledgerEndResponse, err := s.stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
@@ -64,6 +65,9 @@ func (s *BackfilledStream) Run(
 	}
 
 	s.logger.Debug().Msg("Backfill complete, starting stream...")
+	if onFinishedBackfill != nil {
+		onFinishedBackfill()
+	}
 
 	// Run stream
 	return s.stream(ctx, offset, filters, streamConfig, onCreatedEvent, onArchivedEvent, onExercisedEvent)

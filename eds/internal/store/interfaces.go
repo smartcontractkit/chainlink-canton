@@ -33,3 +33,15 @@ type InstrumentHoldingStoreInterface interface {
 	// RegisterParty registers parties whose holdings should be tracked by the store.
 	RegisterParty(parties ...string)
 }
+
+type runOptions struct {
+	onBackfillCompleted func()
+}
+
+type RunOption func(o *runOptions)
+
+func WithOnBackfillCompleted(callback func()) RunOption {
+	return func(o *runOptions) {
+		o.onBackfillCompleted = callback
+	}
+}
