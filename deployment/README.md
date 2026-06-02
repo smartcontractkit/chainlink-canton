@@ -412,11 +412,13 @@ Token expansion resolves **existing** Splice instrument refs — it does not min
 
 ```
 contracts/ccip/<pkg>/daml/*.daml
-  → bindings/generated/ccip/<pkg>/   (generated — do not hand-edit)
+  → bindings/generated/v1_0_0/ccip/<pkg>/   (generated — do not hand-edit)
   → operations/ccip/<pkg>/            (NewExercise / factory encoders use bindings)
 ```
 
-After DAML changes: regenerate bindings (repo Makefile / CI). MCMS routing maps must match **`mcmsEntrypoint`** choice names in DAML, not runtime choices like `VerifyMessage`.
+After DAML changes: `make contracts` (regenerates `latest/` and `current/`). Production imports use the pinned release tree (currently `v1_0_0/`). To ship a new release and migrate imports, see **[bindings/README.md](../bindings/README.md)**.
+
+MCMS routing maps must match **`mcmsEntrypoint`** choice names in DAML, not runtime choices like `VerifyMessage`.
 
 ---
 
