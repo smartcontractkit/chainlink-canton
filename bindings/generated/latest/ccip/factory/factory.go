@@ -6,17 +6,17 @@ import (
 	"math/big"
 	"strings"
 
-	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
-	ccipruntime "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipruntime"
-	committeeverifier "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/committeeverifier"
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
-	executor "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
-	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
-	link "github.com/smartcontractkit/chainlink-canton/bindings/generated/link"
-	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/api"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	ccipruntime "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	committeeverifier "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	executor "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
+	link "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
+	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -34,7 +34,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "73c5fd620821c22bf60c035c34ef9e398a8937c507f9f2ce7482963ca5b839b6"
+	PackageID   = "ce282bd26ac24f7636f8f9a1b3d3d0680fa0fd287d900ea3bfab902e13e4c6e3"
 	SDKVersion  = "3.4.11"
 )
 
