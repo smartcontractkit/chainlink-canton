@@ -13,6 +13,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-frozen-release-artifacts:
+    name: Check frozen release artifacts
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release-artifacts')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Ensure frozen snapshots are unchanged
+        env:
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
+        run: |
+          chmod +x ./contracts/scripts/check-frozen-release-artifacts.sh
+          ./contracts/scripts/check-frozen-release-artifacts.sh "origin/${GITHUB_BASE_REF}"
+
   compile-contracts:
     name: Compile Contracts
     runs-on: ubuntu-latest
@@ -28,11 +44,12 @@ jobs:
         uses: ./.github/actions/install-dpm
       - name: Compile contracts
         run: make compile-contracts
-      - name: Check if any files have been changed
+      - name: Check if dev DARs are up to date
         run: |
-          if ! git diff --quiet HEAD; then
-              echo "The following artifacts don't match the latest compiled version, run \`make compile-contracts\` and commit your changes:" >> $GITHUB_STEP_SUMMARY
-              git diff --name-only | while read -r n ; do
+          set -euo pipefail
+          if ! git diff --quiet HEAD -- contracts/dars/current/; then
+              echo "Dev DARs under \`contracts/dars/current/\` are out of date. Run \`make compile-contracts\` and commit only those files (do not rewrite \`contracts/dars/v1_0_0/\`)." >> $GITHUB_STEP_SUMMARY
+              git diff --name-only -- contracts/dars/current/ | while read -r n ; do
                   echo "- $n" >> $GITHUB_STEP_SUMMARY
               done
               exit 1
@@ -51,33 +68,27 @@ jobs:
           cache-dependency-path: go.sum
       - name: Generate bindings
         run: make generate-bindings
-      - name: Verify bindings are up-to-date
+      - name: Verify dev bindings are up-to-date
         run: |
           set -euo pipefail
-          
-          # Check for changes in the workspace
-          if ! git diff --quiet HEAD; then
-            echo "### Bindings are out of date!" >> $GITHUB_STEP_SUMMARY
-            echo "The bindings in the repository do not match the output of \`make generate-bindings\` using godaml (Go 1.25.5)." >> $GITHUB_STEP_SUMMARY
+          if ! git diff --quiet HEAD -- bindings/generated/latest/; then
+            echo "### Dev bindings are out of date!" >> $GITHUB_STEP_SUMMARY
+            echo "The bindings under \`bindings/generated/latest/\` do not match \`make generate-bindings\`." >> $GITHUB_STEP_SUMMARY
+            echo "Do not rewrite \`bindings/generated/v1_0_0/\` in normal PRs — use \`make freeze-release\` on a release PR (label \`release-artifacts\`)." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "#### To fix this, run these commands locally and commit the result:" >> $GITHUB_STEP_SUMMARY
+            echo "#### To fix:" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo 'gvm use go1.25.5' >> $GITHUB_STEP_SUMMARY
             echo 'make generate-bindings' >> $GITHUB_STEP_SUMMARY
-            echo 'git add . && git commit -m "chore: update generated bindings"' >> $GITHUB_STEP_SUMMARY
+            echo 'git add bindings/generated/latest/' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            
-            echo "#### Drifted Files:" >> $GITHUB_STEP_SUMMARY
+            echo "#### Drifted files:" >> $GITHUB_STEP_SUMMARY
             echo '```text' >> $GITHUB_STEP_SUMMARY
-            git diff --name-only >> $GITHUB_STEP_SUMMARY
+            git diff --name-only -- bindings/generated/latest/ >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-
-            # Show the raw diff in the CI log output for debugging
-            echo "Displaying diff for debugging..."
-            git diff
+            git diff -- bindings/generated/latest/
             exit 1
           else
-            echo "### Bindings are up-to-date" >> $GITHUB_STEP_SUMMARY
+            echo "### Dev bindings are up-to-date" >> $GITHUB_STEP_SUMMARY
           fi
 
   test-contracts:
