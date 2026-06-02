@@ -1208,8 +1208,7 @@ template LockReleaseTokenPool
                         None -> abort "E_INVALID_PARAMS: SetRateLimiterConfig"
                         Some (SetRateLimiterConfigParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetRateLimiterConfig" (finalOffset == byteCount operationData)
-                            pool <- fetch selfCid
-                            let limiterAddr = RawInstanceAddress.makeText rateLimiterInstanceId pool.poolOwner
+                            let limiterAddr = RawInstanceAddress.toText rateLimiterInstanceAddress
                             rateLimiterCid <- case Map.lookup limiterAddr contractIds of
                                 None -> abort ("E_RATE_LIMITER_NOT_IN_MAP: " <> limiterAddr)
                                 Some c -> pure (coerceContractId c : ContractId CCIP.RateLimiter.RateLimiter)

@@ -98,11 +98,11 @@ data SetRateLimitConfigParams = SetRateLimitConfigParams
     deriving (Eq, Show)
 
 -- | Params for SetRateLimiterConfig (tune existing limiter; MCMS entrypoint).
--- | rateLimiterInstanceId is resolved against contractIds via poolOwner@instanceId.
+-- | rateLimiterInstanceAddress is the MCMS contractIds map key (instanceId@owner).
 data SetRateLimiterConfigParams = SetRateLimiterConfigParams
     with
         caller : Party
-        rateLimiterInstanceId : Text
+        rateLimiterInstanceAddress : RawInstanceAddress
         newIsEnabled : Bool
         newCapacity : Numeric 0
         newRate : Numeric 0

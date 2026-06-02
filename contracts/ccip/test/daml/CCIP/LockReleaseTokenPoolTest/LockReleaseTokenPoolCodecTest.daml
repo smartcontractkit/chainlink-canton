@@ -156,9 +156,10 @@ testSetRateLimitConfigParamsRoundtrip = do
 testSetRateLimiterConfigParamsRoundtrip : Script ()
 testSetRateLimiterConfigParamsRoundtrip = script do
     admin <- allocateParty "rate_limit_admin"
+    poolOwner <- allocateParty "pool_owner"
     let args = SetRateLimiterConfigParams with
             caller = admin
-            rateLimiterInstanceId = "rl-in"
+            rateLimiterInstanceAddress = RawInstanceAddress.make "rl-in" poolOwner
             newIsEnabled = True
             newCapacity = 42.0
             newRate = 3.0

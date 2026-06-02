@@ -223,7 +223,7 @@ decodeSetRateLimitConfigParamsAt encoded offset = do
 encodeSetRateLimiterConfigParams : SetRateLimiterConfigParams -> BytesHex
 encodeSetRateLimiterConfigParams params =
     encodeParty params.caller
-    <> encodeText params.rateLimiterInstanceId
+    <> encodeRawInstanceAddress params.rateLimiterInstanceAddress
     <> encodeBool params.newIsEnabled
     <> encodeNumeric0 params.newCapacity
     <> encodeNumeric0 params.newRate
@@ -231,7 +231,7 @@ encodeSetRateLimiterConfigParams params =
 decodeSetRateLimiterConfigParamsAt : BytesHex -> Int -> Optional (SetRateLimiterConfigParams, Int)
 decodeSetRateLimiterConfigParamsAt encoded offset = do
     (caller, offset) <- decodePartyAt encoded offset
-    (rateLimiterInstanceId, offset) <- decodeTextAt encoded offset
+    (rateLimiterInstanceAddress, offset) <- decodeRawInstanceAddressAt encoded offset
     (newIsEnabled, offset) <- decodeBoolAt encoded offset
     (newCapacity, offset) <- decodeNumeric0At encoded offset
     (newRate, offset) <- decodeNumeric0At encoded offset
