@@ -157,7 +157,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 			DestChainUpdates: []common.DestChainConfigArgs{{
 				DestChainSelector:         types.NUMERIC(destChainSelector),
 				IsEnabled:                 true,
-				AddressBytesLength:        40,
+				AddressBytesLength:        20,
 				TokenReceiverAllowed:      true,
 				BaseExecutionGasCost:      21000,
 				OffRampAddress:            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
@@ -244,7 +244,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	encoder := encoders[mcms_types.ChainSelector(chainSelector)].(*cantonsdk.Encoder)
 	executor, err := cantonsdk.NewExecutor(
 		encoder, inspector,
-		participant.LedgerServices.Command, participant.UserID, []string{party},
+		participant.LedgerServices.Command, party, []string{party},
 		cantonsdk.TimelockRoleProposer,
 	)
 	require.NoError(t, err, "create executor")
@@ -317,7 +317,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 			case "isEnabled":
 				assert.True(t, f.GetValue().GetBool(), "isEnabled")
 			case "addressBytesLength":
-				assert.Equal(t, int64(40), f.GetValue().GetInt64(), "addressBytesLength")
+				assert.Equal(t, int64(20), f.GetValue().GetInt64(), "addressBytesLength")
 			case "tokenReceiverAllowed":
 				assert.True(t, f.GetValue().GetBool(), "tokenReceiverAllowed")
 			case "baseExecutionGasCost":
