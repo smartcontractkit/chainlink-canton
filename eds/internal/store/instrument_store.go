@@ -110,8 +110,8 @@ func (s *InstrumentHoldingStore) GetHolding(party types.PARTY, instrumentId spli
 func (s *InstrumentHoldingStore) onActiveContract(ctx context.Context, activeContract *apiv2.ActiveContract) error {
 	holdingViews, err := getHoldingViews(activeContract.GetCreatedEvent())
 	if err != nil {
-		s.logger.Debug().Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get HoldingViews for active contract, skipping")
-		return nil
+		s.logger.Err(err).Str("contractID", activeContract.GetCreatedEvent().GetContractId()).Msg("Failed to get HoldingViews for active contract in onActiveContract handler")
+		return fmt.Errorf("failed to get HoldingViews for contract %q: %w", activeContract.GetCreatedEvent().GetContractId(), err)
 	}
 
 	s.mux.Lock()
@@ -139,8 +139,8 @@ func (s *InstrumentHoldingStore) onActiveContract(ctx context.Context, activeCon
 func (s *InstrumentHoldingStore) onCreatedEvent(ctx context.Context, transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) error {
 	holdingViews, err := getHoldingViews(createdEvent)
 	if err != nil {
-		s.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get HoldingViews for active contract, skipping")
-		return nil
+		s.logger.Debug().Err(err).Str("contractID", createdEvent.GetContractId()).Msg("Failed to get HoldingViews for active contract in onCreatedEvent handler")
+		return fmt.Errorf("failed to get HoldingViews for contract %q: %w", createdEvent.GetContractId(), err)
 	}
 
 	s.mux.Lock()

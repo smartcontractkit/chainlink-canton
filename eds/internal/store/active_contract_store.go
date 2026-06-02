@@ -163,7 +163,6 @@ func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContra
 			EntityName: activeContract.GetCreatedEvent().GetTemplateId().GetEntityName(),
 		}] = activeContract
 	}
-	activeContract.GetCreatedEvent().GetWitnessParties()
 	s.mux.Unlock()
 
 	return nil
