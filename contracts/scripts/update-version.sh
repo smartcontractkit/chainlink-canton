@@ -82,19 +82,26 @@ fi
 echo ""
 
 # ──────────────────────────────────────────────
-# 4. Rename DAR files in contracts/dars/
+# 4. Rename DAR files in contracts/dars/<version-dir>/
 # ──────────────────────────────────────────────
+OLD_DIR="v${OLD_VERSION//./_}"
+NEW_DIR="v${NEW_VERSION//./_}"
 DARS_DIR="$CONTRACTS_DIR/dars"
-echo "Step 4: Renaming DAR files in contracts/dars/..."
+echo "Step 4: Renaming DAR files in contracts/dars/${OLD_DIR}/..."
 count=0
-if [ -d "$DARS_DIR" ]; then
-  for dar in "$DARS_DIR"/*-"${OLD_VERSION}".dar; do
+if [ -d "$DARS_DIR/$OLD_DIR" ]; then
+  for dar in "$DARS_DIR/$OLD_DIR"/*-"${OLD_VERSION}".dar; do
     [ -e "$dar" ] || continue
     new_dar="${dar%-"${OLD_VERSION}".dar}-${NEW_VERSION}.dar"
     mv "$dar" "$new_dar"
     echo "  Renamed: $(basename "$dar") -> $(basename "$new_dar")"
     count=$((count + 1))
   done
+  if [ "$OLD_DIR" != "$NEW_DIR" ] && [ -d "$DARS_DIR/$OLD_DIR" ]; then
+    mkdir -p "$DARS_DIR/$NEW_DIR"
+    mv "$DARS_DIR/$OLD_DIR"/* "$DARS_DIR/$NEW_DIR/" 2>/dev/null || true
+    rmdir "$DARS_DIR/$OLD_DIR" 2>/dev/null || true
+  fi
 fi
 echo "  -> Renamed $count DAR file(s)"
 echo ""
@@ -104,4 +111,5 @@ echo ""
 echo "Next steps:"
 echo "  1. Rebuild contracts:  make compile-contracts"
 echo "  2. Regenerate bindings: make generate-bindings"
+echo "  3. Freeze release:      make freeze-release VERSION=${NEW_VERSION}"
 echo "  Or just run:           make contracts"

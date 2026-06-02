@@ -772,3 +772,69 @@ testBurnMintTokenPoolMCMSEntrypoint_SetTransferTimeout_InvalidData = script do
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
 
     pure ()
+
+testBurnMintTokenPool_RejectsInvalidBlockDepthConfig : Script ()
+testBurnMintTokenPool_RejectsInvalidBlockDepthConfig = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+
+    let instanceId = "pool-blockdepth-test"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "USDC"
+        mkRemoteConfig finality = RemoteChainConfig with
+            remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
+            remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
+            inboundCCVs = [RawInstanceAddress "in1@owner"]
+            outboundCCVs = []
+            finalityConfig = finality
+            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+        mkPool remoteChainConfigs = BurnMintTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals = 6
+            rateLimitAdmin = None
+            remoteChainConfigs
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    submitMustFail poolOwner do
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (FinalityCodec.BlockDepth 0))]))
+
+    submitMustFail poolOwner do
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (FinalityCodec.BlockDepth (-1)))]))
+
+    poolCid <- submit poolOwner do
+        createCmd (mkPool Map.empty)
+
+    let mkUpdate finality = ChainUpdate with
+            remoteChainSelector = 123.0
+            remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
+            remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
+            inboundCCVs = [RawInstanceAddress "in1@owner"]
+            outboundCCVs = []
+            finalityConfig = finality
+            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+
+    submitMustFail poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 0)]
+
+    submitMustFail poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth (-1))]
+
+    _ <- submit poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 1)]
+
+    pure ()

@@ -49,6 +49,7 @@ func (s *BackfilledStream) Run(
 	onCreatedEvent func(ctx context.Context, transaction *apiv2.Transaction, createdEvent *apiv2.CreatedEvent) error,
 	onArchivedEvent func(ctx context.Context, transaction *apiv2.Transaction, archivedEvent *apiv2.ArchivedEvent) error,
 	onExercisedEvent func(ctx context.Context, transaction *apiv2.Transaction, exercisedEvent *apiv2.ExercisedEvent) error,
+	onFinishedBackfill func(),
 ) error {
 	s.logger.Debug().Msg("Starting BackfilledStream")
 	ledgerEndResponse, err := s.stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
@@ -64,6 +65,9 @@ func (s *BackfilledStream) Run(
 	}
 
 	s.logger.Debug().Msg("Backfill complete, starting stream...")
+	if onFinishedBackfill != nil {
+		onFinishedBackfill()
+	}
 
 	// Run stream
 	return s.stream(ctx, offset, filters, streamConfig, onCreatedEvent, onArchivedEvent, onExercisedEvent)
@@ -237,8 +241,7 @@ func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64,
 	b := &backoff.Backoff{Min: streamConfig.BackoffMin, Max: streamConfig.BackoffMax, Factor: streamConfig.BackoffFactor}
 	b.Reset()
 
-	var lastErr error
-	for attempt := 0; ; attempt++ {
+	for attempt := 1; ; attempt++ {
 		stream, err := s.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
 			BeginExclusive: offset,
 			EndInclusive:   nil, // not set, stream will not terminate
@@ -253,8 +256,9 @@ func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64,
 			},
 		})
 		if err != nil {
-			if streamConfig.MaxRetries > 0 && attempt > streamConfig.MaxRetries {
-				return nil, fmt.Errorf("max retries reached: %w", lastErr)
+			// If MaxRetries is enabled/non-zero and the maximum number of retries has been reached, return an error.
+			if streamConfig.MaxRetries > 0 && attempt >= streamConfig.MaxRetries {
+				return nil, fmt.Errorf("max retries (%v) reached: %w", streamConfig.MaxRetries, err)
 			}
 
 			wait := b.Duration()
