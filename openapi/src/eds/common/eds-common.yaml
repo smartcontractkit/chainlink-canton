@@ -113,6 +113,7 @@ components:
         - payload
         - feeToken
         - executor
+        - gasLimit
       properties:
         destinationChainSelector:
           type: string
@@ -145,6 +146,11 @@ components:
               $ref: '#/components/schemas/RawOrHashedAddress'
           example:
             type: "noExecutor"
+        gasLimit:
+          type: integer
+          description: Gas limit for the callback on the destination chain.
+          example: 150000
+
 
     TokenTransfer:
       type: object
