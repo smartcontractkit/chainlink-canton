@@ -89,6 +89,21 @@ func (m *signTestClient) ListDecentralizedNamespaces(context.Context, string) ([
 	return nil, nil
 }
 func (m *signTestClient) UploadDar(context.Context, []byte) (string, error) { return "", nil }
+func (m *signTestClient) ExportAcs(_ context.Context, _ []string, _ string, _ int64) ([]byte, error) {
+	return nil, nil
+}
+func (m *signTestClient) ImportAcs(_ context.Context, _ []byte, _ string) error    { return nil }
+func (m *signTestClient) DisconnectSynchronizer(_ context.Context, _ string) error { return nil }
+func (m *signTestClient) ReconnectSynchronizer(_ context.Context, _ string) error  { return nil }
+func (m *signTestClient) ListConnectedSynchronizers(_ context.Context) ([]client.SynchronizerInfo, error) {
+	return nil, nil
+}
+func (m *signTestClient) ClearPartyOnboardingFlag(_ context.Context, _ string, _ string, _ int64) (bool, error) {
+	return true, nil
+}
+func (m *signTestClient) LookupOffsetByTime(_ context.Context, _ int64) (int64, error) {
+	return 0, nil
+}
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
 

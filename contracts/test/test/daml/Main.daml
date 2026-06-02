@@ -60,6 +60,12 @@ template DisclosedTarget
       controller p
       do pure WrappedTarget with target = this
 
+    choice UpdateValue : ContractId DisclosedTarget
+      with
+        newValue : Int
+      controller owner
+      do create this with value = newValue
+
 data WrappedTarget = WrappedTarget
   with
     target : DisclosedTarget
