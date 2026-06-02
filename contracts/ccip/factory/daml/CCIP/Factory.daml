@@ -606,7 +606,6 @@ data DeployRateLimiterParams = DeployRateLimiterParams
         instanceId : Text
         poolInstanceId : Text
         poolOwner : Party
-        rateLimitAdmin : Optional Party
         remoteChainSelector : Numeric 0
         direction : CCIP.RateLimiter.RateLimitDirection
         mode : CCIP.RateLimiter.RateLimitMode
@@ -765,7 +764,6 @@ mkRateLimiterContract params = do
         instanceId = params.instanceId
         poolInstanceId = params.poolInstanceId
         poolOwner = params.poolOwner
-        rateLimitAdmin = params.rateLimitAdmin
         remoteChainSelector = params.remoteChainSelector
         direction = params.direction
         mode = params.mode
@@ -996,19 +994,17 @@ decodeDeployRateLimiterParams encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (poolInstanceId, offset2) <- decodeTextAt encoded offset1
     (poolOwner, offset3) <- decodePartyAt encoded offset2
-    (rateLimitAdmin, offset4) <- decodeOptional encoded offset3 decodePartyAt
-    (remoteChainSelector, offset5) <- decodeNumeric0At encoded offset4
-    (direction, offset6) <- decodeRateLimitDirectionAt encoded offset5
-    (mode, offset7) <- decodeRateLimitModeAt encoded offset6
-    (isEnabled, offset8) <- decodeBoolAt encoded offset7
-    (capacity, offset9) <- decodeNumeric0At encoded offset8
-    (rate, finalOffset) <- decodeNumeric0At encoded offset9
+    (remoteChainSelector, offset4) <- decodeNumeric0At encoded offset3
+    (direction, offset5) <- decodeRateLimitDirectionAt encoded offset4
+    (mode, offset6) <- decodeRateLimitModeAt encoded offset5
+    (isEnabled, offset7) <- decodeBoolAt encoded offset6
+    (capacity, offset8) <- decodeNumeric0At encoded offset7
+    (rate, finalOffset) <- decodeNumeric0At encoded offset8
     assertOffset finalOffset (byteCount encoded)
     Some DeployRateLimiterParams with
         instanceId
         poolInstanceId
         poolOwner
-        rateLimitAdmin
         remoteChainSelector
         direction
         mode

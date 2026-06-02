@@ -4,7 +4,7 @@ module CCIP.BurnMintTokenPoolCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.BurnMintTokenPoolTypes (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), TransferTimeout(..))
+import CCIP.BurnMintTokenPoolTypes (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimitConfigParams(..), SetRateLimiterConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), TransferTimeout(..))
 
 import MCMS.Codec (
     decodeBoolAt,
@@ -214,6 +214,28 @@ decodeSetRateLimitConfigParamsAt : BytesHex -> Int -> Optional (SetRateLimitConf
 decodeSetRateLimitConfigParamsAt encoded offset = do
     (rateLimitConfigArgs, offset) <- decodeList encoded offset decodeRateLimitConfigArgsAt
     Some (SetRateLimitConfigParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetRateLimiterConfigParams
+-- ===============================================
+
+encodeSetRateLimiterConfigParams : SetRateLimiterConfigParams -> BytesHex
+encodeSetRateLimiterConfigParams params =
+    encodeParty params.caller
+    <> encodeText params.rateLimiterInstanceId
+    <> encodeBool params.newIsEnabled
+    <> encodeNumeric0 params.newCapacity
+    <> encodeNumeric0 params.newRate
+
+decodeSetRateLimiterConfigParamsAt : BytesHex -> Int -> Optional (SetRateLimiterConfigParams, Int)
+decodeSetRateLimiterConfigParamsAt encoded offset = do
+    (caller, offset) <- decodePartyAt encoded offset
+    (rateLimiterInstanceId, offset) <- decodeTextAt encoded offset
+    (newIsEnabled, offset) <- decodeBoolAt encoded offset
+    (newCapacity, offset) <- decodeNumeric0At encoded offset
+    (newRate, offset) <- decodeNumeric0At encoded offset
+    Some (SetRateLimiterConfigParams{..}, offset)
 
 
 -- ===============================================

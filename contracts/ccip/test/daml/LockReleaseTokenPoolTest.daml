@@ -118,14 +118,13 @@ mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOw
 
 createRateLimiter
     : Party
-    -> Optional Party
     -> Text
     -> Numeric 0
     -> RateLimiter.RateLimitDirection
     -> Numeric 0
     -> Numeric 0
     -> Script (ContractId RateLimiter.RateLimiter, RawInstanceAddress.RawInstanceAddress)
-createRateLimiter poolOwner rateLimitAdminOpt poolInstanceId remoteChainSelector direction capacity rate = do
+createRateLimiter poolOwner poolInstanceId remoteChainSelector direction capacity rate = do
     now <- getTime
     let instanceId = poolInstanceId <> "-"
             <> (case direction of
@@ -138,8 +137,6 @@ createRateLimiter poolOwner rateLimitAdminOpt poolInstanceId remoteChainSelector
             instanceId = instanceId
             poolInstanceId = poolInstanceId
             poolOwner = poolOwner
-        None
-            rateLimitAdmin = rateLimitAdminOpt
             remoteChainSelector = remoteChainSelector
             direction = direction
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -272,7 +269,6 @@ testLockOrBurn = script do
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         destChainSelector
         RateLimiter.RateLimitDirection_Outbound
@@ -523,7 +519,6 @@ testLockOrBurnValidatesExistingPoolHoldingsAndPreservesThem = script do
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         destChainSelector
         RateLimiter.RateLimitDirection_Outbound
@@ -713,7 +708,6 @@ testLockOrBurnDeductsFeeBps = script do
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         destChainSelector
         RateLimiter.RateLimitDirection_Outbound
@@ -893,7 +887,6 @@ testReleaseFromTicket = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1089,7 +1082,6 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1260,7 +1252,6 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1411,7 +1402,6 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1561,7 +1551,6 @@ testReleaseFromTicketDecimalConversion = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1706,7 +1695,6 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1841,7 +1829,6 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1978,7 +1965,6 @@ testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -2118,7 +2104,6 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -4245,7 +4230,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
             instanceId = "inbound-rl-updated-456"
             poolInstanceId = "test-lock-release-pool"
             poolOwner = owner
-            rateLimitAdmin = Some rateLimitAdmin
             remoteChainSelector = 456.0
             direction = RateLimiter.RateLimitDirection_Inbound
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -4255,8 +4239,16 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
             tokens = 100.0
             lastUpdated = now
 
-    updatedInbound456Cid <- submit rateLimitAdmin do
+    submitMustFail rateLimitAdmin do
         exerciseCmd inbound456Cid RateLimiter.SetConfig with
+            newIsEnabled = True
+            newCapacity = 99.0
+            newRate = 9.0
+
+    updatedInbound456Cid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterConfig with
+            caller = rateLimitAdmin
+            rateLimiterCid = inbound456Cid
             newIsEnabled = True
             newCapacity = 99.0
             newRate = 9.0

@@ -47,7 +47,6 @@ mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOw
 
 createRateLimiter
   : Party
-  -> Optional Party
   -> Text
   -> Text
   -> Numeric 0
@@ -56,14 +55,13 @@ createRateLimiter
   -> Numeric 0
   -> Numeric 0
   -> Script (ContractId RateLimiter.RateLimiter, RawInstanceAddress.RawInstanceAddress)
-createRateLimiter poolOwner rateLimitAdminOpt instanceId poolInstanceId remoteChainSelector direction mode capacity rate = do
+createRateLimiter poolOwner instanceId poolInstanceId remoteChainSelector direction mode capacity rate = do
   now <- getTime
   rateLimiterCid <- submit poolOwner do
     createCmd RateLimiter.RateLimiter with
       instanceId
       poolInstanceId
       poolOwner
-      rateLimitAdmin = rateLimitAdminOpt
       remoteChainSelector
       direction
       mode
@@ -278,7 +276,6 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   sendingMessageCid <- mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInstanceId feeQuoterInstanceId destChainSelector instrumentId
   (outboundRateLimiterCid, outboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-lock-out"
     tokenPoolInstanceId
     destChainSelector
@@ -397,7 +394,6 @@ testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
   sendingMessageCid <- mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInstanceId feeQuoterInstanceId destChainSelector instrumentId
   (outboundRateLimiterCid, outboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-bad-lock-out"
     tokenPoolInstanceId
     destChainSelector
@@ -530,7 +526,6 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-release-in"
     tokenPoolInstanceId
     sourceChainSelector
@@ -627,7 +622,6 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-bad-mint-in"
     tokenPoolInstanceId
     sourceChainSelector
@@ -803,7 +797,6 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-release-raw-uint256-in"
     tokenPoolInstanceId
     sourceChainSelector
@@ -903,7 +896,6 @@ testBurnMintPoolReleaseFromTicketDecimalConversionTruncatesToZeroFails = script 
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-release-zero-in"
     tokenPoolInstanceId
     sourceChainSelector
@@ -1001,7 +993,6 @@ testBurnMintPoolReleaseFromTicketDecimalConversionOverflowFails = script do
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-release-overflow-in"
     tokenPoolInstanceId
     sourceChainSelector
@@ -1107,7 +1098,6 @@ testBurnMintPoolReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-release-drift-in"
     tokenPoolInstanceId
     sourceChainSelector
@@ -1222,7 +1212,6 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-release-instance-in"
     tokenPoolInstanceId
     sourceChainSelector
@@ -1341,7 +1330,6 @@ testBurnMintPoolReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-release-ccv-auth-in"
     tokenPoolInstanceId
     sourceChainSelector
@@ -1432,7 +1420,6 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
   sendingMessageCid <- mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInstanceId feeQuoterInstanceId destChainSelector instrumentId
   (outboundRateLimiterCid, outboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    None
     "rl-bm-missing-out"
     tokenPoolInstanceId
     destChainSelector
@@ -1484,7 +1471,6 @@ testBurnMintTokenPool_ApplyTokenTransferFeeConfigUpdates_RejectsNegativeFeeUSDCe
     let tokenPoolInstanceId = "bm-pool-fee"
     (_, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
-    None
         "rl-bm-fee-out"
         tokenPoolInstanceId
         destChainSelector
@@ -1536,7 +1522,6 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
 
   (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
     poolOwner
-    (Some rateLimitAdmin)
     "rl-bm-admin-in"
     "burn-mint-pool-rl-admin"
     sourceChainSelector
@@ -1570,8 +1555,16 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
             outboundRateLimiter = outbound
         ]
 
-  updatedInboundCid <- submit rateLimitAdmin do
+  submitMustFail rateLimitAdmin do
     exerciseCmd inboundRateLimiterCid RateLimiter.SetConfig with
+      newIsEnabled = True
+      newCapacity = 50.0
+      newRate = 5.0
+
+  updatedInboundCid <- submit poolOwner do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimiterConfig with
+      caller = rateLimitAdmin
+      rateLimiterCid = inboundRateLimiterCid
       newIsEnabled = True
       newCapacity = 50.0
       newRate = 5.0

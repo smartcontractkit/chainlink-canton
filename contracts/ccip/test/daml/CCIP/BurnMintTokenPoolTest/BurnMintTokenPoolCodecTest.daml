@@ -15,6 +15,7 @@ import CCIP.BurnMintTokenPoolTypes (
     ApplyChainUpdatesParams(..),
     ApplyTokenTransferFeeConfigUpdatesParams(..),
     SetRateLimitConfigParams(..),
+    SetRateLimiterConfigParams(..),
     SetTransferTimeoutParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
@@ -150,6 +151,19 @@ testSetRateLimitConfigParamsRoundtrip = do
             rateLimitConfigArgs = rateLimitConfigs
     let encoded = BurnMintTokenPoolCodec.encodeSetRateLimitConfigParams args
     fst (fromSome (BurnMintTokenPoolCodec.decodeSetRateLimitConfigParamsAt encoded 0)) === args
+    pure ()
+
+testSetRateLimiterConfigParamsRoundtrip : Script ()
+testSetRateLimiterConfigParamsRoundtrip = script do
+    admin <- allocateParty "rate_limit_admin"
+    let args = SetRateLimiterConfigParams with
+            caller = admin
+            rateLimiterInstanceId = "rl-in"
+            newIsEnabled = True
+            newCapacity = 42.0
+            newRate = 3.0
+    let encoded = BurnMintTokenPoolCodec.encodeSetRateLimiterConfigParams args
+    fst (fromSome (BurnMintTokenPoolCodec.decodeSetRateLimiterConfigParamsAt encoded 0)) === args
     pure ()
 
 -- ===============================================

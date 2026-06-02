@@ -171,7 +171,6 @@ encodeDeployRateLimiterParams params =
   encodeText params.instanceId
   <> encodeText params.poolInstanceId
   <> encodeParty params.poolOwner
-  <> encodeOptional params.rateLimitAdmin encodeParty
   <> encodeNumeric0 params.remoteChainSelector
   <> encodeRateLimitDirection params.direction
   <> encodeRateLimitMode params.mode
@@ -634,7 +633,6 @@ testDecodeDeployRateLimiterParams = script do
         instanceId = "rl-1"
         poolInstanceId = "pool-1"
         poolOwner
-        rateLimitAdmin = None
         remoteChainSelector = 137.0
         direction = RateLimitDirection_Outbound
         mode = RateLimitMode_DefaultFinality
@@ -649,7 +647,6 @@ testDecodeDeployRateLimiterParams = script do
       decoded.instanceId === params.instanceId
       decoded.poolInstanceId === params.poolInstanceId
       decoded.poolOwner === params.poolOwner
-      decoded.rateLimitAdmin === params.rateLimitAdmin
       decoded.remoteChainSelector === params.remoteChainSelector
       decoded.direction === params.direction
       decoded.mode === params.mode
@@ -667,7 +664,6 @@ testDecodeDeployRateLimiterParams_Inbound = script do
         instanceId = "rl-inbound"
         poolInstanceId = "pool-1"
         poolOwner
-        rateLimitAdmin = None
         remoteChainSelector = 1.0
         direction = RateLimitDirection_Inbound
         mode = RateLimitMode_CustomFinality
