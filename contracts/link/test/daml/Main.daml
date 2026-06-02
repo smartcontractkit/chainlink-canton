@@ -16,6 +16,8 @@ import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
 runAll : Script ()
 runAll = script do
   testTransferUsesContextPreapproval
+  testCreateTransferPreapprovalReplacesExisting
+  testCancelPreapprovalFallsBackToPending
   testTransferFallsBackToPending
   testPendingTransferExpiresBeforeAccept
   testBurnMintRequiresActors
@@ -38,12 +40,13 @@ testTransferUsesContextPreapproval = script do
       registryMeta = MetadataV1.Metadata with
         values = TextMap.fromList [("registryKey", "registryValue")]
 
-  preapprovalCid <- submit (actAs admin <> actAs bob) do
-    createCmd LinkTransferPreapproval with
-      preapprovalAdmin = admin
-      preapprovalReceiver = bob
-
   disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
+
+  preapprovalCid <- submit (disclose disclosedRegistry <> actAs bob) do
+    exerciseCmd registryCid CreateTransferPreapproval with
+      receiver = bob
+      existingPreapprovalCid = None
+
   disclosedPreapproval <- fromSome <$> queryDisclosure admin preapprovalCid
 
   let mintMetadata = MetadataV1.Metadata with
@@ -105,6 +108,105 @@ testTransferUsesContextPreapproval = script do
       receiverHolding.holdingAmount === 12.0
       receiverHolding.meta === transferMetadata
     _ -> abort "expected direct transfer completion"
+
+testCreateTransferPreapprovalReplacesExisting : Script ()
+testCreateTransferPreapprovalReplacesExisting = script do
+  admin <- allocateParty "link-admin-replace"
+  bob <- allocateParty "bob-replace"
+
+  let instrumentId = HoldingV1.InstrumentId with
+        admin
+        id = "LINK"
+
+  registryCid <- submit admin do
+    createCmd LinkRegistry with
+      registryAdmin = admin
+      registryInstrumentId = instrumentId
+      instanceId = "link-registry-replace"
+      registryMeta = MetadataV1.emptyMetadata
+
+  disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
+
+  preapprovalCid1 <- submit (disclose disclosedRegistry <> actAs bob) do
+    exerciseCmd registryCid CreateTransferPreapproval with
+      receiver = bob
+      existingPreapprovalCid = None
+
+  preapprovalCid2 <- submit (disclose disclosedRegistry <> actAs bob) do
+    exerciseCmd registryCid CreateTransferPreapproval with
+      receiver = bob
+      existingPreapprovalCid = Some preapprovalCid1
+
+  None <- queryContractId admin preapprovalCid1
+  Some _ <- queryContractId admin preapprovalCid2
+  if preapprovalCid1 == preapprovalCid2
+    then abort "expected replacement preapproval to have a new contract id"
+    else pure ()
+
+testCancelPreapprovalFallsBackToPending : Script ()
+testCancelPreapprovalFallsBackToPending = script do
+  admin <- allocateParty "link-admin-cancel"
+  alice <- allocateParty "alice-cancel"
+  bob <- allocateParty "bob-cancel"
+
+  let instrumentId = HoldingV1.InstrumentId with
+        admin
+        id = "LINK"
+
+  registryCid <- submit admin do
+    createCmd LinkRegistry with
+      registryAdmin = admin
+      registryInstrumentId = instrumentId
+      instanceId = "link-registry-cancel"
+      registryMeta = MetadataV1.emptyMetadata
+
+  disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
+
+  preapprovalCid <- submit (disclose disclosedRegistry <> actAs bob) do
+    exerciseCmd registryCid CreateTransferPreapproval with
+      receiver = bob
+      existingPreapprovalCid = None
+
+  submit bob do
+    exerciseCmd preapprovalCid Cancel with actor = bob
+
+  None <- queryContractId admin preapprovalCid
+
+  mintResult <- submit (actAs admin <> actAs alice) do
+    exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
+      expectedAdmin = admin
+      instrumentId
+      inputHoldingCids = []
+      outputs =
+        [BurnMintV1.BurnMintOutput with
+          owner = alice
+          amount = 5.0
+          context = MetadataV1.emptyChoiceContext]
+      extraActors = [alice]
+      extraArgs = MetadataV1.ExtraArgs with
+        context = MetadataV1.emptyChoiceContext
+        meta = MetadataV1.emptyMetadata
+
+  now <- getTime
+  transferResult <- submit (actAs alice <> disclose disclosedRegistry) do
+    exerciseCmd (toInterfaceContractId @TransferV1.TransferFactory registryCid) TransferV1.TransferFactory_Transfer with
+      expectedAdmin = admin
+      transfer = TransferV1.Transfer with
+        sender = alice
+        receiver = bob
+        amount = 2.0
+        instrumentId
+        requestedAt = now
+        executeBefore = addRelTime now (seconds 60)
+        inputHoldingCids = mintResult.outputCids
+        meta = MetadataV1.emptyMetadata
+      extraArgs = MetadataV1.ExtraArgs with
+        context = MetadataV1.emptyChoiceContext
+        meta = MetadataV1.emptyMetadata
+
+  case transferResult.output of
+    TransferV1.TransferInstructionResult_Pending _ -> pure ()
+    _ -> abort "expected pending transfer after preapproval cancel"
 
 testTransferFallsBackToPending : Script ()
 testTransferFallsBackToPending = script do

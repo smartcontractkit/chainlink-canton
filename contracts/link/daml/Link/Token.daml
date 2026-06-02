@@ -67,6 +67,14 @@ template LinkTransferPreapproval
             receiverHoldingCids = [toInterfaceContractId receiverCid]
           meta = MetadataV1.emptyMetadata
 
+    choice Cancel : ()
+      with
+        actor : Party
+      controller actor
+      do
+        assertMsg "LinkTransferPreapproval.Cancel: unauthorized actor"
+          (actor == preapprovalAdmin || actor == preapprovalReceiver)
+
 template LinkTransferInstruction
   with
     instructionAdmin : Party
@@ -206,6 +214,17 @@ template LinkRegistry
         pure BurnMintV1.BurnMintFactoryView with
           admin = registryAdmin
           meta = registryMeta
+
+    nonconsuming choice CreateTransferPreapproval : ContractId LinkTransferPreapproval
+      with
+        receiver : Party
+        existingPreapprovalCid : Optional (ContractId LinkTransferPreapproval)
+      controller receiver
+      do
+        archiveExistingPreapprovalIfProvided registryAdmin receiver existingPreapprovalCid
+        create LinkTransferPreapproval with
+          preapprovalAdmin = registryAdmin
+          preapprovalReceiver = receiver
 
 sumAndArchiveInputs
   : Party
@@ -349,6 +368,22 @@ lookupTransferPreapproval admin receiver context = do
       pure (Some preapprovalCid)
     Some value ->
       abort ("LinkRegistry.TransferFactory_Transfer: invalid transfer-preapproval context value: " <> show value)
+
+archiveExistingPreapprovalIfProvided
+  : Party
+  -> Party
+  -> Optional (ContractId LinkTransferPreapproval)
+  -> Update ()
+archiveExistingPreapprovalIfProvided admin receiver existingPreapprovalCid =
+  case existingPreapprovalCid of
+    None -> pure ()
+    Some cid -> do
+      preapproval <- fetch cid
+      assertMsg "LinkRegistry.CreateTransferPreapproval: preapproval admin mismatch"
+        (preapproval.preapprovalAdmin == admin)
+      assertMsg "LinkRegistry.CreateTransferPreapproval: preapproval receiver mismatch"
+        (preapproval.preapprovalReceiver == receiver)
+      exercise cid Cancel with actor = receiver
 
 assertAuthorizedOwner : Party -> [Party] -> Party -> Update ()
 assertAuthorizedOwner admin extraActors owner =
