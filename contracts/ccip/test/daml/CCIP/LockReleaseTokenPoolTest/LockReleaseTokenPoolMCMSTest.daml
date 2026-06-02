@@ -304,8 +304,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
             ]
 
         encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
-            rateLimitConfigArgs = args
-            caller = poolOwner)
+            rateLimitConfigArgs = args)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do

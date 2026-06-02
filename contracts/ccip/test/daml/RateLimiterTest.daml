@@ -17,6 +17,7 @@ testRateLimiterConsumeAndRefill = script do
             instanceId = "rl-refill"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
+            rateLimitAdmin = None
             remoteChainSelector = 123.0
             direction = RateLimiter.RateLimitDirection_Outbound
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -48,6 +49,7 @@ testRateLimiterRejectsOverCapacity = script do
             instanceId = "rl-over-cap"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
+            rateLimitAdmin = None
             remoteChainSelector = 123.0
             direction = RateLimiter.RateLimitDirection_Outbound
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -72,6 +74,7 @@ testRateLimiterSetConfigResetsBucket = script do
             instanceId = "rl-set-config"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
+            rateLimitAdmin = None
             remoteChainSelector = 123.0
             direction = RateLimiter.RateLimitDirection_Inbound
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -103,6 +106,7 @@ testRateLimiterRejectsNegativeRequest = script do
             instanceId = "rl-negative"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
+            rateLimitAdmin = None
             remoteChainSelector = 123.0
             direction = RateLimiter.RateLimitDirection_Outbound
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -129,6 +133,7 @@ testRateLimiterRejectsNegativeConfig = script do
             instanceId = "rl-neg-cap"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
+            rateLimitAdmin = None
             remoteChainSelector = 123.0
             direction = RateLimiter.RateLimitDirection_Outbound
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -144,6 +149,7 @@ testRateLimiterRejectsNegativeConfig = script do
             instanceId = "rl-neg-rate"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
+            rateLimitAdmin = None
             remoteChainSelector = 123.0
             direction = RateLimiter.RateLimitDirection_Outbound
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -158,6 +164,7 @@ testRateLimiterRejectsNegativeConfig = script do
             instanceId = "rl-neg-setconfig"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
+            rateLimitAdmin = None
             remoteChainSelector = 123.0
             direction = RateLimiter.RateLimitDirection_Outbound
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -182,3 +189,43 @@ testRateLimiterRejectsNegativeConfig = script do
             newRate = -5.0
 
     debug "testRateLimiterRejectsNegativeConfig: PASSED"
+
+testRateLimiterSetConfigCallableByRateLimitAdmin : Script ()
+testRateLimiterSetConfigCallableByRateLimitAdmin = script do
+    poolOwner <- allocateParty "pool-owner"
+    rateLimitAdmin <- allocateParty "rate-limit-admin"
+
+    now <- getTime
+    limiter <- submit poolOwner do
+        createCmd RateLimiter.RateLimiter with
+            instanceId = "rl-admin-setconfig"
+            poolInstanceId = "pool-1"
+            poolOwner = poolOwner
+            rateLimitAdmin = Some rateLimitAdmin
+            remoteChainSelector = 123.0
+            direction = RateLimiter.RateLimitDirection_Inbound
+            mode = RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = 5.0
+            tokens = 100.0
+            lastUpdated = now
+
+    updatedCid <- submit rateLimitAdmin do
+        exerciseCmd limiter RateLimiter.SetConfig with
+            newIsEnabled = True
+            newCapacity = 42.0
+            newRate = 3.0
+
+    limiterState <- fromSome <$> queryContractId poolOwner updatedCid
+    limiterState.capacity === 42.0
+    limiterState.rate === 3.0
+
+    stranger <- allocateParty "stranger"
+    submitMustFail stranger do
+        exerciseCmd updatedCid RateLimiter.SetConfig with
+            newIsEnabled = True
+            newCapacity = 1.0
+            newRate = 1.0
+
+    debug "testRateLimiterSetConfigCallableByRateLimitAdmin: PASSED"

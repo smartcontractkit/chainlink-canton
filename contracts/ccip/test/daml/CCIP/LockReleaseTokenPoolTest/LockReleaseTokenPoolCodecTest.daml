@@ -129,7 +129,6 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
 
 testSetRateLimitConfigParamsRoundtrip : Script ()
 testSetRateLimitConfigParamsRoundtrip = do
-    caller <- allocateParty "caller"
     let rateLimitConfigs = [
             RateLimitConfigArgs with
                 remoteChainSelector = 1.0
@@ -149,7 +148,6 @@ testSetRateLimitConfigParamsRoundtrip = do
             ]
         args = SetRateLimitConfigParams with
             rateLimitConfigArgs = rateLimitConfigs
-            caller
     let encoded = LockReleaseTokenPoolCodec.encodeSetRateLimitConfigParams args
     fst (fromSome (LockReleaseTokenPoolCodec.decodeSetRateLimitConfigParamsAt encoded 0)) === args
     pure ()

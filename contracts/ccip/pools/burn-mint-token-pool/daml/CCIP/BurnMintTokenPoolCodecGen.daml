@@ -209,12 +209,10 @@ decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded offset = do
 encodeSetRateLimitConfigParams : SetRateLimitConfigParams -> BytesHex
 encodeSetRateLimitConfigParams params =
     encodeList params.rateLimitConfigArgs encodeRateLimitConfigArgs
-    <> encodeParty params.caller
 
 decodeSetRateLimitConfigParamsAt : BytesHex -> Int -> Optional (SetRateLimitConfigParams, Int)
 decodeSetRateLimitConfigParamsAt encoded offset = do
     (rateLimitConfigArgs, offset) <- decodeList encoded offset decodeRateLimitConfigArgsAt
-    (caller, offset) <- decodePartyAt encoded offset
     Some (SetRateLimitConfigParams{..}, offset)
 
 

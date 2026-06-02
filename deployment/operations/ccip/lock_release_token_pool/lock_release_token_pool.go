@@ -88,8 +88,8 @@ var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[lockreleas
 	Description:  "Sets rate limit configs for a Canton LockReleaseTokenPool",
 	ContractType: ContractType,
 	Validate: func(input lockreleasetokenpool.SetRateLimitConfig) error {
-		if input.Caller == "" {
-			return errors.New("caller is required")
+		if len(input.RateLimitConfigArgs) == 0 {
+			return errors.New("rateLimitConfigArgs is required")
 		}
 
 		return nil

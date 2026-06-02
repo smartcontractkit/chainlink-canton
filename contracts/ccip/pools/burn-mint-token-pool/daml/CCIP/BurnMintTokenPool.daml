@@ -487,22 +487,15 @@ template BurnMintTokenPool
                 create this with
                     tokenTransferFeeConfigs = tokenTransferFeeConfigsRemoved
 
-        -- Sets the rate limit configurations for specified remote chains.
-        -- 
-        -- Params:
-        -- rateLimitConfigArgs: Array of structs containing remote chain selectors and their rate limiter configs.
-        -- caller: The party initiating the rate limit configuration update.
-        -- 
-        -- Callable by poolOwner or rateLimitAdmin if set.
+        -- Sets rate limiter contract identities for specified remote chains.
+        -- Rate parameters are updated on existing limiters via RateLimiter.SetConfig (poolOwner or rateLimitAdmin).
+        --
+        -- Callable by poolOwner only.
         choice SetRateLimitConfig : ContractId BurnMintTokenPool
             with
                 rateLimitConfigArgs : [RateLimitConfigArgs]
-                caller : Party
-            controller caller
+            controller poolOwner
             do
-                -- Callable by poolOwner or rateLimitAdmin if set
-                assertMsg "SetRateLimitConfig: only callable by owner or rateLimitAdmin" (caller == poolOwner || (rateLimitAdmin == Some caller))
-
                 -- Validate
                 forA_ rateLimitConfigArgs $ \arg -> do
                     assertMsg "SetRateLimitConfig: invalid chain selector" (arg.remoteChainSelector > 0.0)
@@ -1132,7 +1125,6 @@ template BurnMintTokenPool
                         assertMsg "E_TRAILING_BYTES: SetRateLimitConfig" (finalOffset == byteCount operationData)
                         newCid <- exercise selfCid SetRateLimitConfig with
                             rateLimitConfigArgs
-                            caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "AddPoolReceiveContextNonContractValue" -> do
                     case decodeAddPoolReceiveContextNonContractValueParamsAt operationData 0 of

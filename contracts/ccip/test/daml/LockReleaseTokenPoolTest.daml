@@ -118,13 +118,14 @@ mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOw
 
 createRateLimiter
     : Party
+    -> Optional Party
     -> Text
     -> Numeric 0
     -> RateLimiter.RateLimitDirection
     -> Numeric 0
     -> Numeric 0
     -> Script (ContractId RateLimiter.RateLimiter, RawInstanceAddress.RawInstanceAddress)
-createRateLimiter poolOwner poolInstanceId remoteChainSelector direction capacity rate = do
+createRateLimiter poolOwner rateLimitAdminOpt poolInstanceId remoteChainSelector direction capacity rate = do
     now <- getTime
     let instanceId = poolInstanceId <> "-"
             <> (case direction of
@@ -137,6 +138,8 @@ createRateLimiter poolOwner poolInstanceId remoteChainSelector direction capacit
             instanceId = instanceId
             poolInstanceId = poolInstanceId
             poolOwner = poolOwner
+        None
+            rateLimitAdmin = rateLimitAdminOpt
             remoteChainSelector = remoteChainSelector
             direction = direction
             mode = RateLimiter.RateLimitMode_DefaultFinality
@@ -269,6 +272,7 @@ testLockOrBurn = script do
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         destChainSelector
         RateLimiter.RateLimitDirection_Outbound
@@ -519,6 +523,7 @@ testLockOrBurnValidatesExistingPoolHoldingsAndPreservesThem = script do
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         destChainSelector
         RateLimiter.RateLimitDirection_Outbound
@@ -708,6 +713,7 @@ testLockOrBurnDeductsFeeBps = script do
 
     (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         destChainSelector
         RateLimiter.RateLimitDirection_Outbound
@@ -887,6 +893,7 @@ testReleaseFromTicket = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1082,6 +1089,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1252,6 +1260,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1402,6 +1411,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1551,6 +1561,7 @@ testReleaseFromTicketDecimalConversion = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1695,6 +1706,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1829,6 +1841,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -1965,6 +1978,7 @@ testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -2104,6 +2118,7 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
 
     (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
         poolOwner
+        None
         tokenPoolInstanceId
         sourceChainSelector
         RateLimiter.RateLimitDirection_Inbound
@@ -4174,7 +4189,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
     tokenPoolCid <- submit owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
             rateLimitConfigArgs = rateLimitConfigArgs1
-            caller = owner
     -- Fetch the updated TokenPool and verify the rate limiters were updated correctly
     tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
     assertMsg "Expected 2 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 2)
@@ -4198,7 +4212,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
     tokenPoolCid <- submit owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
             rateLimitConfigArgs = rateLimitConfigArgs2
-            caller = owner
     -- Fetch the updated TokenPool and verify the rate limiters were updated correctly
     tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
     assertMsg "Expected 2 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 2)
@@ -4210,29 +4223,48 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
         Some config -> assertRateLimitConfigArgsEqual config (rateLimitConfigArgs1 !! 1) -- unchanged from Test 1
 
     -- | ========= Test 3 ========
-    -- | Update a rate limit using the rateLimitAdmin (instead of pool owner)
+    -- | rateLimitAdmin cannot redirect rate limiter identities
     -- | ========================
     let rateLimitConfigArgs3 = [
             LockReleaseTokenPool.RateLimitConfigArgs with
                 remoteChainSelector = 456.0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated-again-3@owner"
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated-again-3@owner"
-                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated-3@owner" -- unchanged
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated-3@owner"
             ]
-    tokenPoolCid <- submit rateLimitAdmin do
+    submitMustFail rateLimitAdmin do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
             rateLimitConfigArgs = rateLimitConfigArgs3
-            caller = rateLimitAdmin
-    -- Fetch the updated TokenPool and verify the rate limiters were updated correctly
-    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
-    assertMsg "Expected 2 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 2)
-    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
-        None -> assertMsg "Missing chain config for selector 123.0" False
-        Some config -> assertRateLimitConfigArgsEqual config (head rateLimitConfigArgs2) -- unchanged from Test 2
-    case Map.lookup 456.0 tokenPool.remoteChainConfigs of
-        None -> assertMsg "Missing chain config for selector 456.0" False
-        Some config -> assertRateLimitConfigArgsEqual config (head rateLimitConfigArgs3)
-    
+
+    -- | ========= Test 3b ========
+    -- | rateLimitAdmin may tune the deployed inbound limiter for chain 456 via SetConfig
+    -- | ========================
+    now <- getTime
+    inbound456Cid <- submit owner do
+        createCmd RateLimiter.RateLimiter with
+            instanceId = "inbound-rl-updated-456"
+            poolInstanceId = "test-lock-release-pool"
+            poolOwner = owner
+            rateLimitAdmin = Some rateLimitAdmin
+            remoteChainSelector = 456.0
+            direction = RateLimiter.RateLimitDirection_Inbound
+            mode = RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = 10.0
+            tokens = 100.0
+            lastUpdated = now
+
+    updatedInbound456Cid <- submit rateLimitAdmin do
+        exerciseCmd inbound456Cid RateLimiter.SetConfig with
+            newIsEnabled = True
+            newCapacity = 99.0
+            newRate = 9.0
+
+    inbound456State <- fromSome <$> queryContractId owner updatedInbound456Cid
+    inbound456State.capacity === 99.0
+    inbound456State.rate === 9.0
+
     -- | ========= Test 4 ========
     -- | Empty custom-finality rate limiter is allowed when finalityConfig = finalized-only
     -- | ========================
@@ -4246,7 +4278,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
     tokenPoolCid <- submit owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
             rateLimitConfigArgs = rateLimitConfigArgs4
-            caller = owner
     tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
     case Map.lookup 123.0 tokenPool.remoteChainConfigs of
         None -> assertMsg "Missing chain config for selector 123.0" False
@@ -4265,7 +4296,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
-            caller = owner
     -- Attempt to update with an invalid chain selector (negative)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
@@ -4276,7 +4306,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
-            caller = owner
     -- Attempt to update with an invalid inbound rate limiter address (empty)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
@@ -4287,7 +4316,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
-            caller = owner
     -- Attempt to update with an invalid outbound rate limiter address (empty)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
@@ -4298,7 +4326,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
                 ]
-            caller = owner
     -- Attempt to update with an identical rate limiter for both inbound and outbound (invalid)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
@@ -4309,7 +4336,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner" -- invalid
                 ]
-            caller = owner
     -- Attempt to update a chain that requires custom finality with an empty custom rate limiter
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
@@ -4320,7 +4346,6 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
-            caller = owner
 
     pure ()
 

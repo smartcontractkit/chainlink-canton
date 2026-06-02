@@ -52,11 +52,20 @@ availableTokensAt now rl =
     else
         min rl.capacity (rl.tokens + (elapsedSeconds rl.lastUpdated now * rl.rate))
 
+-- | Controllers for SetConfig: pool owner plus optional delegated rate-limit admin.
+setConfigControllers : Party -> Optional Party -> [Party]
+setConfigControllers poolOwner adminOpt =
+    case adminOpt of
+        None -> [poolOwner]
+        Some admin ->
+            if admin == poolOwner then [poolOwner] else [poolOwner, admin]
+
 template RateLimiter
     with
         instanceId : Text
         poolInstanceId : Text
         poolOwner : Party
+        rateLimitAdmin : Optional Party
         remoteChainSelector : Numeric 0
         direction : RateLimitDirection
         mode : RateLimitMode
@@ -67,6 +76,7 @@ template RateLimiter
         lastUpdated : Time
     where
         signatory poolOwner
+        observer optional [] pure rateLimitAdmin
         ensure assertValidInstanceId instanceId
             && capacity >= 0.0
             && rate >= 0.0
@@ -77,7 +87,7 @@ template RateLimiter
                 newIsEnabled : Bool
                 newCapacity : Numeric 0
                 newRate : Numeric 0
-            controller poolOwner
+            controller setConfigControllers poolOwner rateLimitAdmin
             do
                 assertMsg "RateLimiter: capacity must be non-negative"
                     (newCapacity >= 0.0)

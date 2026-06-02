@@ -91,11 +91,10 @@ data ApplyTokenTransferFeeConfigUpdatesParams = ApplyTokenTransferFeeConfigUpdat
         disableTokenTransferFeeConfigArgs : [Numeric 0]
     deriving (Eq, Show)
 
--- | Params for SetRateLimitConfig choice
+-- | Params for SetRateLimitConfig choice (poolOwner only; MCMS entrypoint).
 data SetRateLimitConfigParams = SetRateLimitConfigParams
     with
         rateLimitConfigArgs : [RateLimitConfigArgs]
-        caller : Party
     deriving (Eq, Show)
 
 -- | Params for SetTransferTimeout choice
