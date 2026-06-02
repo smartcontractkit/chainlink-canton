@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -105,14 +106,13 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	cantonChain := chain.(*canton.Chain)
 
 	// Stores
-
+	backfillWaitGroup := sync.WaitGroup{}
 	activeContractStore := store.NewActiveContractStore(
 		logger,
 		cantonChain.Participants[0].LedgerServices.Update,
 		cantonChain.Participants[0].LedgerServices.State,
 		metrics.With("store", "ActiveContractStore"),
 	)
-
 	instrumentHoldingStore := store.NewInstrumentHoldingStore(
 		logger,
 		cantonChain.Participants[0].LedgerServices.Update,
@@ -163,9 +163,13 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 
 		// Run instrument holding store in the background
 		// This should only be run if the TokenPool API is enabled, as it will fail if no filters are specified.
+		backfillWaitGroup.Add(1)
 		go func(errChan chan<- error) {
 			logger.Info().Msg("starting instrument holding store")
-			err := instrumentHoldingStore.Run(ctx, store.DefaultStreamConfig())
+			err := instrumentHoldingStore.Run(ctx, store.DefaultStreamConfig(), store.WithOnBackfillCompleted(func() {
+				logger.Info().Msg("instrument holding store backfill completed")
+				backfillWaitGroup.Done()
+			}))
 			if err != nil {
 				select {
 				case errChan <- fmt.Errorf("failed to run instrument holding store: %w", err):
@@ -195,9 +199,13 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	oapiGlobal.RegisterHandlers(router, globalAPIServer)
 
 	// Run update store in the background
+	backfillWaitGroup.Add(1)
 	go func(errChan chan<- error) {
 		logger.Info().Msg("starting active contract store")
-		err := activeContractStore.Run(ctx, store.DefaultStreamConfig())
+		err := activeContractStore.Run(ctx, store.DefaultStreamConfig(), store.WithOnBackfillCompleted(func() {
+			logger.Info().Msg("active contract store backfill completed")
+			backfillWaitGroup.Done()
+		}))
 		if err != nil {
 			select {
 			case errChan <- fmt.Errorf("failed to run active contract store: %w", err):
@@ -206,6 +214,21 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			}
 		}
 	}(errChan)
+
+	// Wait for backfill of all stores to be completed
+	backfillCompleted := make(chan struct{})
+	go func() {
+		backfillWaitGroup.Wait()
+		close(backfillCompleted)
+	}()
+	select {
+	case <-backfillCompleted:
+		logger.Info().Msg("all stores backfill completed, server is fully operational")
+	case err := <-errChan:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	s := &http.Server{
 		Handler:      router,
