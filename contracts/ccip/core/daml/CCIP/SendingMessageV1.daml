@@ -260,7 +260,8 @@ template SendingMessageV1
                     outboundPoolCCVs
                     ccvInstanceId
                     caller
-                assertMsg "sendingMessage: duplicate CCV fee" (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
+                assertMsg "sendingMessage: duplicate CCV fee"
+                    (all (\fee -> not (fee.ccvInstanceId == ccvInstanceId && fee.ccvOwner == caller)) ccvFees)
 
                 let fee = CCVFee with
                         ccvInstanceId, ccvOwner = caller
@@ -452,7 +453,8 @@ template SendingMessageV1
                     ccvInstanceId
                     caller
                 assertMsg "version tag must be 4 bytes" (byteCount versionTag == 4)
-                assertMsg "sendingMessage: duplicate verifier data for CCV" (all (\v -> v.ccvInstanceId /= ccvInstanceId) verifierData)
+                assertMsg "sendingMessage: duplicate verifier data for CCV"
+                    (all (\v -> not (v.ccvInstanceId == ccvInstanceId && v.ccvOwner == caller)) verifierData)
 
                 let vd = VerifierData with
                         ccvInstanceId

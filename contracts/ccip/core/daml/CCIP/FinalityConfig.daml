@@ -105,3 +105,9 @@ requestedFinalityAllowed requestedFinality allowedFinality =
 customFinalityRateLimiterRequired : FinalityConfig -> Bool
 customFinalityRateLimiterRequired allowedFinalityConfig =
     allowedFinalityConfig /= WaitForFinality
+
+isValidFinalityConfig : FinalityConfig -> Bool
+isValidFinalityConfig fc = case fc of
+    BlockDepth depth -> depth > 0
+    WaitForFinality -> True
+    WaitForSafe -> True
