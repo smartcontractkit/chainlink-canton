@@ -99,19 +99,18 @@ var SetRateLimiterReferences = contract.NewExercise(contract.ExerciseParams[burn
 	EncodeMethod: lrtpEncoder.SetRateLimiterReferences,
 })
 
-var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[burnminttokenpool.SetRateLimitConfig]{
+var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[burnminttokenpool.SetRateLimitConfigParams]{
 	Name:         "canton/ccip/burn_mint_token_pool/set_rate_limit_config",
 	Version:      Version,
 	Description:  "Tunes capacity, rate, and isEnabled on a RateLimiter referenced by a Canton BurnMintTokenPool",
 	ContractType: ContractType,
-	Validate: func(input burnminttokenpool.SetRateLimitConfig) error {
-		if input.RateLimiterCid == "" {
-			return errors.New("rateLimiterCid is required")
+	Validate: func(input burnminttokenpool.SetRateLimitConfigParams) error {
+		if input.RateLimiterInstanceAddress.Unpack == "" {
+			return errors.New("rateLimiterInstanceAddress is required")
 		}
 
 		return nil
 	},
 	Template:     burnminttokenpool.BurnMintTokenPool{},
-	Method:       burnminttokenpool.BurnMintTokenPool{}.SetRateLimitConfig,
-	EncodeMethod: lrtpEncoder.SetRateLimitConfig,
+	EncodeMethod: lrtpEncoder.SetRateLimitConfigParams,
 })

@@ -4222,7 +4222,7 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
             rateLimitConfigArgs = rateLimitConfigArgs3
 
     -- | ========= Test 3b ========
-    -- | rateLimitAdmin may tune the deployed inbound limiter for chain 456 via SetConfig
+    -- | poolOwner may tune the deployed inbound limiter for chain 456 via SetRateLimitConfig
     -- | ========================
     (inbound456Cid, inbound456Addr) <- createRateLimiter owner "test-lock-release-pool" 456.0 RateLimiter.RateLimitDirection_Inbound 100.0 10.0
     tokenPoolCid <- submit owner do
