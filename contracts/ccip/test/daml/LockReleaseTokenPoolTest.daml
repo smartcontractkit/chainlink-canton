@@ -4224,20 +4224,16 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
     -- | ========= Test 3b ========
     -- | rateLimitAdmin may tune the deployed inbound limiter for chain 456 via SetConfig
     -- | ========================
-    now <- getTime
-    inbound456Cid <- submit owner do
-        createCmd RateLimiter.RateLimiter with
-            instanceId = "inbound-rl-updated-456"
-            poolInstanceId = "test-lock-release-pool"
-            poolOwner = owner
-            remoteChainSelector = 456.0
-            direction = RateLimiter.RateLimitDirection_Inbound
-            mode = RateLimiter.RateLimitMode_DefaultFinality
-            isEnabled = True
-            capacity = 100.0
-            rate = 10.0
-            tokens = 100.0
-            lastUpdated = now
+    (inbound456Cid, inbound456Addr) <- createRateLimiter owner "test-lock-release-pool" 456.0 RateLimiter.RateLimitDirection_Inbound 100.0 10.0
+    tokenPoolCid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
+            rateLimitConfigArgs = [
+                LockReleaseTokenPool.RateLimitConfigArgs with
+                    remoteChainSelector = 456.0
+                    inboundRateLimiter = inbound456Addr
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated-456@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated-456@owner"
+                ]
 
     submitMustFail rateLimitAdmin do
         exerciseCmd inbound456Cid RateLimiter.SetConfig with
