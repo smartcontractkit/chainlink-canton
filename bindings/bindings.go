@@ -21,7 +21,7 @@ import (
 //	    return err
 //	}
 //	// Now use type-safe fields: mcmsContract.McmsId, mcmsContract.Config.Signers, etc.
-func UnmarshalActiveContract[T any](ac *apiv2.GetActiveContractsResponse_ActiveContract) (*T, error) {
+func UnmarshalActiveContract[T model.CreateCommander](ac *apiv2.GetActiveContractsResponse_ActiveContract) (*T, error) {
 	if ac == nil {
 		return nil, errors.New("active contract is nil")
 	}
@@ -36,7 +36,7 @@ func UnmarshalActiveContract[T any](ac *apiv2.GetActiveContractsResponse_ActiveC
 
 // UnmarshalCreatedEvent unmarshalls a CreatedEvent into a typed DAML binding struct.
 // This is useful when you have a CreatedEvent directly (e.g., from transaction events).
-func UnmarshalCreatedEvent[T any](event *apiv2.CreatedEvent) (*T, error) {
+func UnmarshalCreatedEvent[T model.CreateCommander](event *apiv2.CreatedEvent) (*T, error) {
 	if event == nil {
 		return nil, errors.New("created event is nil")
 	}

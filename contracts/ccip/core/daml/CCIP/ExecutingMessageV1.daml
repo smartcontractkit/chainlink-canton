@@ -41,7 +41,8 @@ data ExecutingMessageDeps = ExecutingMessageDeps
 
 data InboundPoolVerification = InboundPoolVerification
     with
-        poolAddress : RawInstanceAddress
+        poolInstanceId : Text
+        poolOwner : Party
         poolCCVs : [RawInstanceAddress]
     deriving (Eq, Show)
 
@@ -82,7 +83,13 @@ template ExecutingMessageV1
         --   token-receive: RequirePoolCCVs -> Prepared -(FinalizeExecute)-> consumed
         state : ExecutingMessageState
     where
-        signatory dedup (ccipOwner :: ccvOwners)
+        signatory dedup (
+            [ccipOwner]
+            ++ ccvOwners
+            -- Add the pool owner as a signatory as soon as the inboundPoolVerification is set.
+            ++ case inboundPoolVerification of
+                Some verification -> [verification.poolOwner]
+                None -> [])
         observer observingParties
 
         -- Cleanup choice for failed or abandoned flows. Not used for the success path
@@ -123,14 +130,17 @@ template ExecutingMessageV1
                         versionTag]
                     ccvOwners = dedup (ccvOwners ++ [caller])
 
-        -- Record the pool's inbound CCV requirements. Only exercisable by ccipOwner,
-        -- authorized through TAR's signatory context when pool calls
-        -- SetInboundPoolCCVs. OffRamp verifies coverage.
+        -- Record the pool's inbound CCV requirements. Only exercisable by ccipOwner and the pool owner itself.
+        -- ccipOwner authorizes through TAR's signatory context when pool calls SetInboundPoolCCVs.
+        -- We don't validate the the poolOwner is the actual owner of the pool since this will have already been checked by TAR's SetInboundPoolCCVs.
+        -- The pool's signatory is later used to create the TokenReceiveTicket, which the pool is expected to validate before releasing tokens, 
+        -- so an invalid poolOwner would also lead to the pool's check to fail.
         choice SetInboundPoolCCVs : ContractId ExecutingMessageV1
             with
-                poolAddress : RawInstanceAddress
+                poolInstanceId : Text
+                poolOwner : Party
                 poolCCVs : [RawInstanceAddress]
-            controller ccipOwner
+            controller ccipOwner, poolOwner
             do
                 assertMsg "executingMessage: SetInboundPoolCCVs only allowed while pool CCVs are required"
                     (state == ExecutingMessageState_RequirePoolCCVs)
@@ -153,7 +163,8 @@ template ExecutingMessageV1
                     optionalCCVs = mergedOptionalCCVs
                     optionalCCVThreshold = mergedOptionalCCVThreshold
                     inboundPoolVerification = Some (InboundPoolVerification with
-                        poolAddress = poolAddress
+                        poolInstanceId = poolInstanceId
+                        poolOwner = poolOwner
                         poolCCVs = poolCCVs)
                     state = ExecutingMessageState_Prepared
 
@@ -183,7 +194,7 @@ template ExecutingMessageV1
                             Some verification -> pure verification
                             None -> abort "executingMessage: missing inbound pool CCVs for token ticket"
                         assertMsg "executingMessage: inbound pool address mismatch"
-                            (poolAddress == poolVerification.poolAddress)
+                            (poolAddress == RawInstanceAddress.make poolVerification.poolInstanceId poolVerification.poolOwner)
                         CCIP.Internal.assertMaxCCVListLength "executingMessage: inbound pool CCVs" poolVerification.poolCCVs
                         let resolvedInboundPoolCCVs = dedup (CCIP.Internal.resolveRequiredCCVsWithDefaults
                                 sourceDefaultCCVs

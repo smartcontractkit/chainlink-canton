@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "link"
-	PackageID   = "080c7fb440efe21d2b9bbbe33490a77ff3fe776a80727c04102c437c07e88cc8"
+	PackageID   = "94bf4152061006321bde8a1b5e685a1a407dc86607894bb5a65d408ade0f4785"
 	SDKVersion  = "3.4.11"
 )
 
@@ -91,6 +91,55 @@ func (t Cancel) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes Cancel from hex string (Canton MCMS format)
 func (t *Cancel) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CreateTransferPreapproval is a Record type
+type CreateTransferPreapproval struct {
+	Receiver               types.PARTY        `json:"receiver"`
+	ExistingPreapprovalCid *types.CONTRACT_ID `json:"existingPreapprovalCid" hex:"optional"`
+}
+
+// ToMap converts CreateTransferPreapproval to a map for DAML arguments
+func (t CreateTransferPreapproval) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	if t.ExistingPreapprovalCid != nil {
+		m["existingPreapprovalCid"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.ExistingPreapprovalCid),
+		}
+	} else {
+		m["existingPreapprovalCid"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	return m
+}
+
+func (t CreateTransferPreapproval) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CreateTransferPreapproval) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CreateTransferPreapproval to hex string (Canton MCMS format)
+func (t CreateTransferPreapproval) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CreateTransferPreapproval from hex string (Canton MCMS format)
+func (t *CreateTransferPreapproval) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -221,7 +270,6 @@ type LinkRegistry struct {
 	RegistryInstrumentId splice_api_token_holding_v1.InstrumentId `json:"registryInstrumentId"`
 	InstanceId           types.TEXT                               `json:"instanceId"`
 	RegistryMeta         splice_api_token_metadata_v1.Metadata    `json:"registryMeta"`
-	TransferPreapprovals map[types.PARTY]types.CONTRACT_ID        `json:"transferPreapprovals"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -250,14 +298,6 @@ func (t LinkRegistry) CreateCommand() *model.CreateCommand {
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["registryMeta"] = model.NestedToDAMLValue(t.RegistryMeta)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["transferPreapprovals"] = func() any {
-		if t.TransferPreapprovals == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.TransferPreapprovals}
-	}()
-
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -279,14 +319,6 @@ func (t LinkRegistry) CreateCommandWithPackageID(packageID string) *model.Create
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["registryMeta"] = model.NestedToDAMLValue(t.RegistryMeta)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["transferPreapprovals"] = func() any {
-		if t.TransferPreapprovals == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.TransferPreapprovals}
-	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -318,23 +350,23 @@ func (t *LinkRegistry) UnmarshalHex(data string) error {
 
 // Choice methods for LinkRegistry
 
-// SetTransferPreapproval exercises the SetTransferPreapproval choice on this LinkRegistry contract
+// CreateTransferPreapproval exercises the CreateTransferPreapproval choice on this LinkRegistry contract
 // This method uses the package name in the template ID
-func (t LinkRegistry) SetTransferPreapproval(contractID string, args SetTransferPreapproval) *model.ExerciseCommand {
+func (t LinkRegistry) CreateTransferPreapproval(contractID string, args CreateTransferPreapproval) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.Token", "LinkRegistry"),
 		ContractID: contractID,
-		Choice:     "SetTransferPreapproval",
+		Choice:     "CreateTransferPreapproval",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// SetTransferPreapprovalWithPackageID exercises the SetTransferPreapproval choice using the provided package ID instead of package name
-func (t LinkRegistry) SetTransferPreapprovalWithPackageID(contractID string, packageID string, args SetTransferPreapproval) *model.ExerciseCommand {
+// CreateTransferPreapprovalWithPackageID exercises the CreateTransferPreapproval choice using the provided package ID instead of package name
+func (t LinkRegistry) CreateTransferPreapprovalWithPackageID(contractID string, packageID string, args CreateTransferPreapproval) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.Token", "LinkRegistry"),
 		ContractID: contractID,
-		Choice:     "SetTransferPreapproval",
+		Choice:     "CreateTransferPreapproval",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -950,61 +982,12 @@ func (t *Send) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// SetTransferPreapproval is a Record type
-type SetTransferPreapproval struct {
-	Receiver          types.PARTY        `json:"receiver"`
-	NewPreapprovalCid *types.CONTRACT_ID `json:"newPreapprovalCid" hex:"optional"`
-}
-
-// ToMap converts SetTransferPreapproval to a map for DAML arguments
-func (t SetTransferPreapproval) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["receiver"] = t.Receiver.ToMap()
-
-	if t.NewPreapprovalCid != nil {
-		m["newPreapprovalCid"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.NewPreapprovalCid),
-		}
-	} else {
-		m["newPreapprovalCid"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
-	return m
-}
-
-func (t SetTransferPreapproval) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *SetTransferPreapproval) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes SetTransferPreapproval to hex string (Canton MCMS format)
-func (t SetTransferPreapproval) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes SetTransferPreapproval from hex string (Canton MCMS format)
-func (t *SetTransferPreapproval) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	Cancel(args Cancel) (*bind.EncodedChoice, error)
+	CreateTransferPreapproval(args CreateTransferPreapproval) (*bind.EncodedChoice, error)
 	Send(args Send) (*bind.EncodedChoice, error)
-	SetTransferPreapproval(args SetTransferPreapproval) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1039,14 +1022,14 @@ func (e *encoder) Cancel(args Cancel) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("Cancel", args)
 }
 
+// CreateTransferPreapproval encodes parameters for the CreateTransferPreapproval choice.
+func (e *encoder) CreateTransferPreapproval(args CreateTransferPreapproval) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CreateTransferPreapproval", args)
+}
+
 // Send encodes parameters for the Send choice.
 func (e *encoder) Send(args Send) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("Send", args)
-}
-
-// SetTransferPreapproval encodes parameters for the SetTransferPreapproval choice.
-func (e *encoder) SetTransferPreapproval(args SetTransferPreapproval) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetTransferPreapproval", args)
 }
 
 // Verify MCMSEncoder interface implementation

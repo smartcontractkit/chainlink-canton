@@ -863,9 +863,10 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Encode using binding's MarshalHex
-			encoded, err := tc.params.MarshalHex()
+			// Encode using binding's MarshalHex (wire bytes) then hex for transport/UnmarshalHex.
+			wire, err := tc.params.MarshalHex()
 			require.NoError(t, err, "failed to encode")
+			encoded := wireToHex(wire)
 			t.Logf("Encoded %s: %s (%d hex chars = %d bytes)",
 				tc.name, truncateString(encoded, 60), len(encoded), len(encoded)/2)
 
@@ -948,8 +949,9 @@ func TestMCMSCodec_SetConfigParams_KnownValues(t *testing.T) {
 		ClearRoot:    false,
 	}
 
-	encoded, err := params.MarshalHex()
+	wire, err := params.MarshalHex()
 	require.NoError(t, err)
+	encoded := wireToHex(wire)
 
 	// Parse and verify structure manually
 	// Format: numSigners(1) + [addrLen(1) + addr(20) + index(4) + group(4)]... + numQuorums(1) + quorums(4*n) + numParents(1) + parents(4*n) + clearRoot(1)

@@ -45,3 +45,12 @@ var TransferFactory_Transfer = contract.NewExercise(contract.ExerciseParams[spli
 	Template:     link.LinkRegistry{},
 	Method:       link.LinkRegistry{}.TransferFactoryTransfer,
 })
+
+var CreateTransferPreapproval = contract.NewExercise(contract.ExerciseParams[link.CreateTransferPreapproval]{
+	Name:         "canton/link_registry/create_transfer_preapproval",
+	Version:      Version,
+	Description:  "Creates a transfer preapproval for the receiver via LinkRegistry",
+	ContractType: ContractType,
+	Template:     link.LinkRegistry{},
+	Method:       link.LinkRegistry{}.CreateTransferPreapproval,
+})
