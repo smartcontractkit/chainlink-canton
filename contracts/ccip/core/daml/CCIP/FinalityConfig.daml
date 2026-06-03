@@ -20,6 +20,17 @@ data DecodedFinality = DecodedFinality
 finalityConfigByteLength : Int
 finalityConfigByteLength = 4
 
+-- BlockDepth block confirmations must fit in a uint16 to match the on-wire
+-- encoding in MessageV1.finality.
+minBlockDepth : Int
+minBlockDepth = 1
+
+maxBlockDepth : Int
+maxBlockDepth = 65535  -- uint16 max (2^16 - 1)
+
+isValidBlockDepth : Int -> Bool
+isValidBlockDepth depth = depth >= minBlockDepth && depth <= maxBlockDepth
+
 -- EVM-compatible layout:
 --   bytes 0-1 = flags (upper 16 bits)
 --   bytes 2-3 = block depth (lower 16 bits)
@@ -59,14 +70,14 @@ decodeBlockConfirmations finalityConfig = do
 -- accepts below:
 --   * flags == 0 and blockConfirmations == 0  -> WaitForFinality
 --   * flags == 1 and blockConfirmations == 0  -> WaitForSafe
---   * flags == 0 and blockConfirmations  > 0  -> BlockDepth n
+--   * flags == 0 and valid block depth     -> BlockDepth n
 validateRequestedFinality : BytesHex -> Bool
 validateRequestedFinality finalityConfig =
     case (decodeFlags finalityConfig, decodeBlockConfirmations finalityConfig) of
         (Some flags, Some blockConfirmations) ->
             (flags == 0 && blockConfirmations == 0)
                 || (flags == 1 && blockConfirmations == 0)
-                || (flags == 0 && blockConfirmations > 0)
+                || (flags == 0 && isValidBlockDepth blockConfirmations)
         _ -> False
 
 -- Decode only well-formed requested finality values.
@@ -108,6 +119,6 @@ customFinalityRateLimiterRequired allowedFinalityConfig =
 
 isValidFinalityConfig : FinalityConfig -> Bool
 isValidFinalityConfig fc = case fc of
-    BlockDepth depth -> depth > 0
+    BlockDepth depth -> isValidBlockDepth depth
     WaitForFinality -> True
     WaitForSafe -> True

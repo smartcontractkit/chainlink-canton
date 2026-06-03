@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "f41af78a33ed7cae38b6d5f5c62d953b0fc6c6869e6f806093eaa5e2e901b038"
+	PackageID   = "bb58d8338d3d2120bcac2a5a568176678e6973fbbf9f012e0db69f180bcdd881"
 	SDKVersion  = "3.4.11"
 )
 
@@ -49,6 +49,8 @@ const (
 	RmnRemoteKey             = types.TEXT("rmn-remote")
 	FeeQuoterKey             = types.TEXT("fee-quoter")
 	WaitForFinalityFlag      = types.TEXT("00000000")
+	MinBlockDepth            = types.INT64(1)
+	MaxBlockDepth            = types.INT64(65535)
 	FinalityConfigByteLength = types.INT64(4)
 	MaxNumeric0IntegerText   = types.TEXT("99999999999999999999999999999999999999")
 	GlobalConfigKey          = types.TEXT("global-config")
