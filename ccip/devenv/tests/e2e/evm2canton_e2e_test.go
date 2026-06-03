@@ -27,11 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
-const (
-	// 1e11 (10-decimal units) gives a stable non-dust transfer in this lane after fee handling.
-	evmToCantonTransferAmount = int64(100_000_000_000)
-)
-
 //nolint:paralleltest // we won't run this in parallel.
 func TestEVM2Canton_Basic(t *testing.T) {
 	if testing.Short() {
@@ -137,8 +132,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	t.Run("token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		tokenInput := devenvtests.LoadTokenTransferInput(t, devenvtests.DirectionEVMToCanton)
-		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, srcSelector, []uint64{dstSelector}, tokenInput)
+		// Send params (transfer amount, gas limit, finality) come from token_transfer_config.toml.
+		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, srcSelector, []uint64{dstSelector})
 		srcToken := lane.SrcToken
 		srcSender, err := srcChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -148,12 +143,12 @@ func TestEVM2Canton_Basic(t *testing.T) {
 			Receiver: receiver,
 			Data:     []byte("Hello token transfer from EVM!"),
 			TokenAmount: cciptestinterfaces.TokenAmount{
-				Amount:       big.NewInt(evmToCantonTransferAmount),
+				Amount:       lane.TransferAmount,
 				TokenAddress: srcToken,
 			},
 		}, cciptestinterfaces.MessageOptions{
-			ExecutionGasLimit: 200_000,
-			FinalityConfig:    0,
+			ExecutionGasLimit: lane.ExecutionGasLimit,
+			FinalityConfig:    lane.FinalityConfig,
 			Executor:          executorAddress,
 			CCVs: []protocol.CCV{
 				{

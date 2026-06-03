@@ -23,8 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/stretchr/testify/require"
 
-	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 )
@@ -166,8 +166,9 @@ func discoverEVMTokenDestinations(
 ) []Destination {
 	t.Helper()
 
-	dests := make([]Destination, 0)
-	for _, selector := range discoverEVMTokenSelectors(t, in) {
+	selectors := discoverEVMTokenSelectors(t, in)
+	dests := make([]Destination, 0, len(selectors))
+	for _, selector := range selectors {
 		chain, ok := chainMap[selector]
 		require.True(t, ok, "EVM chain %d not in harness chain map", selector)
 
@@ -181,10 +182,15 @@ func discoverEVMTokenDestinations(
 }
 
 func estimateMessages(sched scheduleConfig) uint64 {
-	estimated := uint64(sched.rate) * uint64(sched.duration/sched.rateUnit)
+	// rate and rateUnit are validated positive in loadSchedule.
+	if sched.rate <= 0 {
+		return 1
+	}
+	estimated := uint64(sched.rate) * uint64(sched.duration/sched.rateUnit) //nolint:gosec // rate > 0
 	if estimated == 0 {
 		return 1
 	}
+
 	return estimated
 }
 

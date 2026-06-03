@@ -18,9 +18,6 @@ import (
 )
 
 const (
-	// cantonToEVMFeeAmount matches the message-only path in canton2evm_e2e_test.go.
-	cantonToEVMFeeAmount int64 = 2_000
-
 	// mintBuffer is a safety multiplier on top of estimated message count so a slow fee
 	// burn does not starve the run mid-flight (1.5x).
 	mintBufferNumerator   uint64 = 3
@@ -82,11 +79,11 @@ func TestCanton2EVM_Load(t *testing.T) {
 	if estimatedMessages == 0 {
 		estimatedMessages = 1
 	}
-	mintAmount := estimatedMessages * uint64(cantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
+	mintAmount := estimatedMessages * uint64(devenvtests.CantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
 	t.Logf("Pre-mint: estimatedMessages=%d feePerMessage=%d totalFeeMint=%d",
-		estimatedMessages, cantonToEVMFeeAmount, mintAmount)
+		estimatedMessages, devenvtests.CantonToEVMFeeAmount, mintAmount)
 	require.NoError(t, cantonImpl.MintTokens(ctx, mintAmount))
-	require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), 0))
+	require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), 0))
 
 	gun, err := NewCCIPLoadGun(
 		cantonChain,

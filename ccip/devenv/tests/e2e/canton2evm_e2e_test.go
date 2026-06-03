@@ -25,13 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 )
 
-const (
-	cantonToEVMFeeAmount            = int64(2_000)
-	cantonToEVMTokenTransferAmount  = int64(1_000)                     // 1000 tokens (1000 * 10^10) on canton decimals
-	evmDecimalsScale                = int64(1_000_000_000_000_000_000) // EVM 18 decimals
-	cantonToEVMTokenSequentialSends = 2
-)
-
 //nolint:paralleltest // we won't run this in parallel.
 func TestCanton2EVM_Basic(t *testing.T) {
 	if testing.Short() {
@@ -64,8 +57,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		// Setup message send
-		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(cantonToEVMFeeAmount)))
-		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), 0))
+		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)))
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), 0))
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)
@@ -153,13 +146,18 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		tokenInput := devenvtests.LoadTokenTransferInput(t, devenvtests.DirectionCantonToEVM)
-		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()}, tokenInput)
+		// Send params (transfer amount, gas limit, finality) come from token_transfer_config.toml.
+		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
+		tokenTransferAmount := lane.TransferAmount.Uint64()
 
 		// Setup message send
-		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMFeeAmount)))           // Holdings for fee
-		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMTokenTransferAmount))) // Holdings for token transfer
-		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantonToEVMFeeAmount), uint64(cantonToEVMTokenTransferAmount)))    // Setup with fee and token transfer amounts
+		require.NoError(t, cantonImpl.MintTokens(ctx,
+			devenvtests.CantonToEVMTokenSequentialSends*uint64(devenvtests.CantonToEVMFeeAmount),
+		)) // Holdings for fee
+		require.NoError(t, cantonImpl.MintTokens(ctx,
+			devenvtests.CantonToEVMTokenSequentialSends*tokenTransferAmount,
+		)) // Holdings for token transfer
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)
@@ -188,8 +186,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)
 
-		for sendIdx := range cantonToEVMTokenSequentialSends {
-			t.Logf("Token transfer send %d/%d", sendIdx+1, cantonToEVMTokenSequentialSends)
+		for sendIdx := range devenvtests.CantonToEVMTokenSequentialSends {
+			t.Logf("Token transfer send %d/%d", sendIdx+1, devenvtests.CantonToEVMTokenSequentialSends)
 			sendMessageResult, err := cantonChain.SendMessage(
 				subtestCtx,
 				evmChain.ChainSelector(),
@@ -197,12 +195,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 					Receiver: receiver,
 					Data:     []byte("canton2evm token transfer"),
 					TokenAmount: cciptestinterfaces.TokenAmount{
-						Amount: big.NewInt(cantonToEVMTokenTransferAmount),
+						Amount: lane.TransferAmount,
 					},
 				},
 				cciptestinterfaces.MessageOptions{
-					ExecutionGasLimit: 500_000,
-					FinalityConfig:    1,
+					ExecutionGasLimit: lane.ExecutionGasLimit,
+					FinalityConfig:    lane.FinalityConfig,
 					Executor:          executorAddr,
 					CCVs: []protocol.CCV{
 						{
@@ -233,8 +231,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
 
-		expectedTransferPerMessage := new(big.Int).Mul(big.NewInt(cantonToEVMTokenTransferAmount), big.NewInt(evmDecimalsScale))
-		totalExpectedTransfer := new(big.Int).Mul(expectedTransferPerMessage, big.NewInt(cantonToEVMTokenSequentialSends))
+		expectedTransferPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(devenvtests.EVMDecimalsScale))
+		totalExpectedTransfer := new(big.Int).Mul(expectedTransferPerMessage, big.NewInt(devenvtests.CantonToEVMTokenSequentialSends))
 		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), totalExpectedTransfer)
 		t.Logf("EVM receiver token balance: before=%s after=%s totalExpectedTransfer=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String(), totalExpectedTransfer.String())
 		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter)
