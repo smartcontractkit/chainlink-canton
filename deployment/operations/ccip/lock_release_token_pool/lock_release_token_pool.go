@@ -34,7 +34,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockR
 		if template.InstrumentId == (splice_api_token_holding_v1.InstrumentId{}) {
 			return errors.New("instrument ID cannot be empty")
 		}
-		if err := tokenpool.ValidateTokenDecimals(template.Decimals); err != nil {
+		if err := tokenpool.ValidateTokenDecimals(int64(template.Decimals)); err != nil {
 			return err
 		}
 
