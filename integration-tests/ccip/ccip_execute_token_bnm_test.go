@@ -347,7 +347,6 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			RegistryAdmin:        types.PARTY(partyTokenPoolOwner),
 			RegistryInstrumentId: linkInstrumentId,
 			RegistryMeta:         splice_api_token_metadata_v1.Metadata{},
-			TransferPreapprovals: nil,
 		},
 	})
 	require.NoError(t, err)
