@@ -315,7 +315,6 @@ testAcceptMergesReceiverMetaOverSenderOnConflict = script do
       registryInstrumentId = instrumentId
       instanceId = "link-registry-meta-merge"
       registryMeta = MetadataV1.emptyMetadata
-      transferPreapprovals = Map.empty
 
   disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
 
