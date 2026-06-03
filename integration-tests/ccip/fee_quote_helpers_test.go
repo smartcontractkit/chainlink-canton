@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
 )
 
 // getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as

@@ -4,10 +4,6 @@
 --
 --   floor(feeUsdScale * premiumMultiplier / feeTokenPrice)
 --
--- and cap checks such as:
---
---   floor(feeTokenAmount * feeTokenPrice / linkTokenPrice) <= maxFeeJuelsPerMsg
---
 -- Solidity uses uint256 for these operations. Daml's Numeric 0 has much less
 -- headroom, so naive `a * b / c` can overflow, and `a / c * b` is not parity
 -- safe because it rounds too early.
@@ -28,9 +24,7 @@
 -- arithmetic, Decimal/Numeric0 boundary shifts, and protocol-side amount
 -- normalization, not as a general math library.
 module CCIP.Math
-  ( integerAmountWithinCap
-  , normalizedFeeWithinCap
-  , mulDivDown
+  ( mulDivDown
   , mulDivUp
   , calculateLocalAmountChecked
   , decimalToNumeric0
@@ -48,9 +42,6 @@ baseInt = 100000000
 
 baseNumeric : Numeric 0
 baseNumeric = 100000000.0
-
-juelsPerLocalLink : Numeric 0
-juelsPerLocalLink = 10000000000.0
 
 calculateLocalAmountChecked : Text -> Numeric 0 -> Int -> Int -> Numeric 0
 calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
@@ -103,21 +94,6 @@ e10PerPercent = 100000000.0
 usdPerUsdCent : Numeric 0
 usdPerUsdCent = 100000000.0
 
--- | Check whether a LINK-denominated fee amount in local LINK smallest units
--- is within the juels-denominated cap.
-integerAmountWithinCap : Numeric 0 -> Numeric 0 -> Bool
-integerAmountWithinCap feeAmount maxFeeJuelsPerMsg =
-    feeAmount <= juelsCapToLocalLinkCap maxFeeJuelsPerMsg
-
--- | Check whether a fee amount in a non-LINK token is within the juels cap.
--- The non-LINK amount is first converted into local LINK smallest units using
--- exact floor(a*b/c), then compared against the juels cap converted into local
--- LINK units.
-normalizedFeeWithinCap : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0 -> Bool
-normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice maxFeeJuelsPerMsg =
-    convertTokenAmountLocal feeTokenAmount feeTokenPrice linkTokenPrice
-        <= juelsCapToLocalLinkCap maxFeeJuelsPerMsg
-
 -- | Exact floor(a * b / c) over integer-valued Numeric 0 inputs.
 mulDivDown : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
 mulDivDown a b c
@@ -143,12 +119,6 @@ mulDivUp a b c
             needsRoundUp = not (null remainder)
             rounded = if needsRoundUp then addLimbs quotient [1] else quotient
         in fromLimbs "mulDivUp result" rounded
-
-convertTokenAmountLocal : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
-convertTokenAmountLocal amount fromPrice toPrice = mulDivDown amount fromPrice toPrice
-
-juelsCapToLocalLinkCap : Numeric 0 -> Numeric 0
-juelsCapToLocalLinkCap maxFeeJuelsPerMsg = mulDivDown maxFeeJuelsPerMsg 1.0 juelsPerLocalLink
 
 -- -----------------------------------------------------------------------------
 -- Exact base-1e8 integer arithmetic

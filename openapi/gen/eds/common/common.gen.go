@@ -70,6 +70,9 @@ type Message struct {
 	// FeeToken A globally unique identifier for instruments.
 	FeeToken InstrumentId `json:"feeToken"`
 
+	// GasLimit Gas limit for the callback on the destination chain.
+	GasLimit int `json:"gasLimit"`
+
 	// Payload The payload of the message, encoded as a hex string.
 	Payload string `json:"payload"`
 

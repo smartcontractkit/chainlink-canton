@@ -5,6 +5,7 @@ import Coin.Utils
 import Coin.Transfer
 
 import DA.Assert
+import DA.Foldable (forA_)
 import DA.List
 import DA.Optional
 import DA.Text qualified as T
@@ -32,7 +33,7 @@ template CoinRegistry
             burnMintFactory_burnMintImpl _self arg = do
                 arg.expectedAdmin === issuer
                 -- burn
-                do forA arg.inputHoldingCids (archive)
+                forA_ arg.inputHoldingCids archive
                 -- mint
                 cids <- do forA arg.outputs 
                     (\ output -> do

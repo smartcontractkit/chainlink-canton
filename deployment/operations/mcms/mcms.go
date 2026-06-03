@@ -6,7 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -14,7 +14,7 @@ import (
 
 var ContractType = deployment.ContractType("CantonMCMS")
 
-var Version = semver.MustParse("0.1.0")
+var Version = semver.MustParse("1.0.0")
 
 var mcmsEncoder = mcms.NewContract("", "MCMS.Main", "MCMS").Encoder()
 

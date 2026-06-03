@@ -1,0 +1,114 @@
+name: Setup CCIP Canton devenv
+description: >-
+  Check out chainlink-canton and chainlink-ccv, build Docker images, and spin up
+  the env-canton-evm devenv used by CCIP e2e and load tests.
+
+inputs:
+  ccv-ref:
+    description: chainlink-ccv git ref (branch, tag, or SHA)
+    required: false
+    default: 8eaeb5f036e177733b82983ab074eb8ca60d88c2
+  canton-ref:
+    description: >-
+      chainlink-canton git ref. Leave empty to use the ref that triggered the workflow.
+    required: false
+    default: ''
+  ccv-iam-role:
+    description: AWS IAM role ARN for CCV ECR authentication
+    required: true
+  jd-registry:
+    description: JD private ECR registry ID
+    required: true
+  jd-image:
+    description: JD Docker image reference
+    required: true
+  env-config:
+    description: devenv TOML config passed to ccv up
+    required: false
+    default: env-canton-evm.toml
+  canton-path:
+    description: Checkout path for chainlink-canton
+    required: false
+    default: chainlink-canton
+  ccv-path:
+    description: Checkout path for chainlink-ccv
+    required: false
+    default: chainlink-ccv
+  free-disk-space:
+    description: Run the free-disk-space action before builds
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Free up disk space
+      if: inputs.free-disk-space == 'true'
+      uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
+
+    - name: Enable S3 Cache for Self-Hosted Runners
+      uses: runs-on/action@cd2b598b0515d39d78c38a02d529db87d2196d1e # v2.0.3
+
+    - name: Check out chainlink-canton
+      uses: actions/checkout@v6
+      with:
+        repository: smartcontractkit/chainlink-canton
+        path: ${{ inputs.canton-path }}
+        ref: ${{ inputs.canton-ref != '' && inputs.canton-ref || github.sha }}
+
+    - name: Check out chainlink-ccv
+      uses: actions/checkout@v6
+      with:
+        repository: smartcontractkit/chainlink-ccv
+        path: ${{ inputs.ccv-path }}
+        ref: ${{ inputs.ccv-ref }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+    - name: Install Just
+      uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
+
+    - name: Authenticate to AWS ECR (JD)
+      uses: ./chainlink-canton/.github/actions/aws-ecr-auth
+      with:
+        role-to-assume: ${{ inputs.ccv-iam-role }}
+        aws-region: us-west-2
+        registry-type: private
+        registries: ${{ inputs.jd-registry }}
+
+    - name: Install Go
+      uses: actions/setup-go@v6
+      with:
+        cache: true
+        go-version-file: ${{ inputs.canton-path }}/go.mod
+        cache-dependency-path: ${{ inputs.canton-path }}/go.sum
+
+    - name: Download Go dependencies
+      shell: bash
+      working-directory: ${{ inputs.canton-path }}
+      run: go mod download
+
+    - name: Build CCIP Docker images
+      shell: bash
+      working-directory: ${{ inputs.ccv-path }}/build/devenv
+      env:
+        DOCKER_BUILDKIT: 1
+      run: just build-docker-dev-ci
+
+    - name: Build canton committee verifier docker image
+      shell: bash
+      working-directory: ${{ inputs.canton-path }}
+      run: make build-committeeverifier
+
+    - name: Build EDS docker image
+      shell: bash
+      working-directory: ${{ inputs.canton-path }}
+      run: make build-eds
+
+    - name: Spin up CCIP environment
+      shell: bash
+      working-directory: ${{ inputs.canton-path }}/ccip/devenv
+      env:
+        JD_IMAGE: ${{ inputs.jd-image }}
+      run: go run cmd/ccv/main.go up ${{ inputs.env-config }}

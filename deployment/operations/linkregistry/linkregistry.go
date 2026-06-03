@@ -5,9 +5,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/link"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_burn_mint_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_burn_mint_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -44,4 +44,13 @@ var TransferFactory_Transfer = contract.NewExercise(contract.ExerciseParams[spli
 	ContractType: ContractType,
 	Template:     link.LinkRegistry{},
 	Method:       link.LinkRegistry{}.TransferFactoryTransfer,
+})
+
+var CreateTransferPreapproval = contract.NewExercise(contract.ExerciseParams[link.CreateTransferPreapproval]{
+	Name:         "canton/link_registry/create_transfer_preapproval",
+	Version:      Version,
+	Description:  "Creates a transfer preapproval for the receiver via LinkRegistry",
+	ContractType: ContractType,
+	Template:     link.LinkRegistry{},
+	Method:       link.LinkRegistry{}.CreateTransferPreapproval,
 })
