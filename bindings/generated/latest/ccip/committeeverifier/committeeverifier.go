@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "6e7869881e65e48e40f72d01eebff85e0ba41a655d46c1682b2e032db5538bfb"
+	PackageID   = "3c888f9bd4ad3c2b36241d4ba31f06c664f999a73ac0ac6af74c7379859fc56c"
 	SDKVersion  = "3.4.11"
 )
 
@@ -40,6 +40,7 @@ const (
 	VersionTagV200           = types.TEXT("e9a05a20")
 	SignatureLength          = types.INT64(64)
 	SignatureComponentLength = types.INT64(32)
+	Secp256k1HalfOrder       = types.TEXT("7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0")
 )
 
 func argsToMap(args any) map[string]any {

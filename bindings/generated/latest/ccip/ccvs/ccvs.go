@@ -7,6 +7,7 @@ import committeeverifier "github.com/smartcontractkit/chainlink-canton/bindings/
 const PackageID = committeeverifier.PackageID
 const PackageName = committeeverifier.PackageName
 const SDKVersion = committeeverifier.SDKVersion
+const Secp256k1HalfOrder = committeeverifier.Secp256k1HalfOrder
 const SignatureComponentLength = committeeverifier.SignatureComponentLength
 const SignatureLength = committeeverifier.SignatureLength
 const VersionTagV200 = committeeverifier.VersionTagV200
