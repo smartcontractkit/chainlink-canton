@@ -260,7 +260,6 @@ func TestServer_GetTransferFactory(t *testing.T) {
 						"admin": "admin",
 						"id":    "LINK",
 					},
-					"lock":             nil,
 					"requestedAt":      time.Now().Add(time.Hour * -1).Format(time.RFC3339),
 					"executeBefore":    time.Now().Add(time.Hour * 24).Format(time.RFC3339),
 					"inputHoldingCids": []string{""},

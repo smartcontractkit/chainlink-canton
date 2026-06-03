@@ -3,7 +3,6 @@ module Link.Token where
 import DA.Action (foldlA)
 import DA.Foldable (forA_)
 import DA.List (dedup)
-import DA.Map qualified as Map
 import DA.Text qualified as T
 import DA.TextMap qualified as TextMap
 
@@ -139,7 +138,6 @@ template LinkRegistry
     registryInstrumentId : HoldingV1.InstrumentId
     instanceId : Text
     registryMeta : MetadataV1.Metadata
-    transferPreapprovals : Map.Map Party (ContractId LinkTransferPreapproval)
   where
     signatory registryAdmin
     ensure registryInstrumentId.admin == registryAdmin
@@ -159,7 +157,6 @@ template LinkRegistry
           registryAdmin
           transfer.receiver
           arg.extraArgs.context
-          transferPreapprovals
         case (transfer.sender == transfer.receiver, optPreapprovalCid) of
           (True, _) -> executeDirectTransfer registryAdmin transfer
           (False, Some preapprovalCid) -> do
@@ -218,26 +215,16 @@ template LinkRegistry
           admin = registryAdmin
           meta = registryMeta
 
-    choice SetTransferPreapproval : ContractId LinkRegistry
+    nonconsuming choice CreateTransferPreapproval : ContractId LinkTransferPreapproval
       with
         receiver : Party
-        newPreapprovalCid : Optional (ContractId LinkTransferPreapproval)
-      controller registryAdmin
+        existingPreapprovalCid : Optional (ContractId LinkTransferPreapproval)
+      controller receiver
       do
-        case newPreapprovalCid of
-          Some preapprovalCid -> do
-            preapproval <- fetch preapprovalCid
-            assertMsg "LinkRegistry.SetTransferPreapproval: admin mismatch"
-              (preapproval.preapprovalAdmin == registryAdmin)
-            assertMsg "LinkRegistry.SetTransferPreapproval: receiver mismatch"
-              (preapproval.preapprovalReceiver == receiver)
-          None -> pure ()
-
-        let updatedTransferPreapprovals = case newPreapprovalCid of
-              Some preapprovalCid -> Map.insert receiver preapprovalCid transferPreapprovals
-              None -> Map.delete receiver transferPreapprovals
-
-        create this with transferPreapprovals = updatedTransferPreapprovals
+        archiveExistingPreapprovalIfProvided registryAdmin receiver existingPreapprovalCid
+        create LinkTransferPreapproval with
+          preapprovalAdmin = registryAdmin
+          preapprovalReceiver = receiver
 
 sumAndArchiveInputs
   : Party
@@ -367,34 +354,36 @@ lookupTransferPreapproval
   : Party
   -> Party
   -> MetadataV1.ChoiceContext
-  -> Map.Map Party (ContractId LinkTransferPreapproval)
   -> Update (Optional (ContractId LinkTransferPreapproval))
-lookupTransferPreapproval admin receiver context configuredPreapprovals = do
-  optContextCid <- case TextMap.lookup transferPreapprovalContextKey context.values of
+lookupTransferPreapproval admin receiver context = do
+  case TextMap.lookup transferPreapprovalContextKey context.values of
     None -> pure None
-    Some (MetadataV1.AV_ContractId cid) -> pure (Some (coerceContractId cid))
-    Some value ->
-      abort ("LinkRegistry.TransferFactory_Transfer: invalid transfer-preapproval context value: " <> show value)
-
-  case optContextCid of
-    Some preapprovalCid -> do
+    Some (MetadataV1.AV_ContractId cid) -> do
+      let preapprovalCid = coerceContractId cid : ContractId LinkTransferPreapproval
       preapproval <- fetch preapprovalCid
       assertMsg "LinkRegistry.TransferFactory_Transfer: preapproval admin mismatch"
         (preapproval.preapprovalAdmin == admin)
       assertMsg "LinkRegistry.TransferFactory_Transfer: preapproval receiver mismatch"
         (preapproval.preapprovalReceiver == receiver)
       pure (Some preapprovalCid)
-    None -> do
-      let optPreapprovalCid = Map.lookup receiver configuredPreapprovals
-      case optPreapprovalCid of
-        Some preapprovalCid -> do
-          preapproval <- fetch preapprovalCid
-          assertMsg "LinkRegistry.TransferFactory_Transfer: keyed preapproval admin mismatch"
-            (preapproval.preapprovalAdmin == admin)
-          assertMsg "LinkRegistry.TransferFactory_Transfer: keyed preapproval receiver mismatch"
-            (preapproval.preapprovalReceiver == receiver)
-          pure (Some preapprovalCid)
-        None -> pure None
+    Some value ->
+      abort ("LinkRegistry.TransferFactory_Transfer: invalid transfer-preapproval context value: " <> show value)
+
+archiveExistingPreapprovalIfProvided
+  : Party
+  -> Party
+  -> Optional (ContractId LinkTransferPreapproval)
+  -> Update ()
+archiveExistingPreapprovalIfProvided admin receiver existingPreapprovalCid =
+  case existingPreapprovalCid of
+    None -> pure ()
+    Some cid -> do
+      preapproval <- fetch cid
+      assertMsg "LinkRegistry.CreateTransferPreapproval: preapproval admin mismatch"
+        (preapproval.preapprovalAdmin == admin)
+      assertMsg "LinkRegistry.CreateTransferPreapproval: preapproval receiver mismatch"
+        (preapproval.preapprovalReceiver == receiver)
+      exercise cid Cancel with actor = receiver
 
 assertAuthorizedOwner : Party -> [Party] -> Party -> Update ()
 assertAuthorizedOwner admin extraActors owner =
