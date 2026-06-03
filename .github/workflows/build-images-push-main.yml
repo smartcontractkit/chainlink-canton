@@ -27,7 +27,7 @@ jobs:
       - name: Authenticate to ECR Public
         uses: ./.github/actions/aws-ecr-auth
         with:
-          role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
+          role-to-assume: ${{ secrets.CANTON_IAM_ROLE_PROD }}
           aws-region: us-east-1
           registry-type: public
       - name: Build and push image to ECR
