@@ -75,6 +75,7 @@ var ClearOnboardingFlagOp = operations.NewOperation(
 					"party", in.PartyID,
 					"attempts", attempt+1,
 				)
+
 				return ClearOnboardingFlagOutput{
 					ParticipantID: in.ParticipantID,
 					Onboarded:     true,

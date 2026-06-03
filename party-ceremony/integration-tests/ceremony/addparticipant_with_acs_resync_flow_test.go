@@ -205,6 +205,7 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestResyncOnArchive() {
 		for _, c := range cs {
 			seen[c.GetContractId()] = true
 		}
+
 		return seen[s.ContractID] && seen[newContractB] && !seen[s.ContractIDB]
 	}, 15*time.Second, 500*time.Millisecond, "p1 should see A and newContractB but not the old B")
 
@@ -232,6 +233,7 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestResyncOnArchive() {
 			t.Logf("p3 query not yet ready: %v", qErr)
 			return false
 		}
+
 		return len(p3Contracts) == 2
 	}, 30*time.Second, 1*time.Second, "p3 should see exactly 2 contracts (A and newContractB) after resync")
 
@@ -315,6 +317,7 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestNewParticipantConfirms() 
 			if qErr != nil {
 				return false
 			}
+
 			return len(cs) == 0
 		}, 15*time.Second, 500*time.Millisecond, "%s should see contract A archived", participantLabel)
 	}
@@ -331,6 +334,7 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestNewParticipantConfirms() 
 		if qErr != nil {
 			return false
 		}
+
 		return len(cs) == 0
 	}, 30*time.Second, 1*time.Second, "p2 should converge to post-archive state after reconnecting")
 }

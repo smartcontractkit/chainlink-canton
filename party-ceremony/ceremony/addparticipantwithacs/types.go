@@ -4,19 +4,19 @@ package addparticipantwithacs
 type Phase string
 
 const (
-	PhaseKeyGen              Phase = "key-gen"
-	PhaseRecordTargetOffset  Phase = "record-target-offset"
-	PhaseNSD             Phase = "nsd"
-	PhaseReadState       Phase = "read-state"
-	PhaseDNSProposal     Phase = "dns-proposal"
-	PhaseDNSSigning      Phase = "dns-signing"
-	PhaseDNSSubmit       Phase = "dns-submit"
-	PhaseRecordOffset    Phase = "record-offset"
-	PhaseP2POnboarding   Phase = "p2p-onboarding"
-	PhaseAcsExport       Phase = "acs-export"
-	PhaseAcsImport       Phase = "acs-import"
-	PhaseClearOnboarding Phase = "clear-onboarding"
-	PhaseCompleted       Phase = "completed"
+	PhaseKeyGen             Phase = "key-gen"
+	PhaseRecordTargetOffset Phase = "record-target-offset"
+	PhaseNSD                Phase = "nsd"
+	PhaseReadState          Phase = "read-state"
+	PhaseDNSProposal        Phase = "dns-proposal"
+	PhaseDNSSigning         Phase = "dns-signing"
+	PhaseDNSSubmit          Phase = "dns-submit"
+	PhaseRecordOffset       Phase = "record-offset"
+	PhaseP2POnboarding      Phase = "p2p-onboarding"
+	PhaseAcsExport          Phase = "acs-export"
+	PhaseAcsImport          Phase = "acs-import"
+	PhaseClearOnboarding    Phase = "clear-onboarding"
+	PhaseCompleted          Phase = "completed"
 )
 
 // AddParticipantWithAcsInput is the top-level input to [AddParticipantWithAcsSequence].

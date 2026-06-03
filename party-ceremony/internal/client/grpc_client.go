@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -648,9 +649,10 @@ func (c *GRPCCantonClient) ExportAcs(ctx context.Context, partyIDs []string, syn
 	for {
 		resp, recvErr := stream.Recv()
 		if recvErr != nil {
-			if recvErr == io.EOF {
+			if errors.Is(recvErr, io.EOF) {
 				break
 			}
+
 			return nil, fmt.Errorf("ExportAcs recv: %w", recvErr)
 		}
 		snapshot = append(snapshot, resp.GetChunk()...)
@@ -670,10 +672,7 @@ func (c *GRPCCantonClient) ImportAcs(ctx context.Context, acsSnapshot []byte, sy
 	// subsequent chunks only carry the acs_snapshot bytes.
 	const chunkSize = 1 << 20 // 1 MB
 	for offset := 0; offset < len(acsSnapshot); offset += chunkSize {
-		end := offset + chunkSize
-		if end > len(acsSnapshot) {
-			end = len(acsSnapshot)
-		}
+		end := min(offset+chunkSize, len(acsSnapshot))
 		req := &participantv30.ImportAcsRequest{
 			AcsSnapshot: acsSnapshot[offset:end],
 		}

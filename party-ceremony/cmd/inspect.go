@@ -673,6 +673,8 @@ func addParticipantWithAcsPhaseLabel(p addparticipantwithacs.Phase) string {
 	switch p {
 	case addparticipantwithacs.PhaseKeyGen:
 		return "key-gen — waiting for new member to generate keys"
+	case addparticipantwithacs.PhaseRecordTargetOffset:
+		return "record-target-offset — recording ledger offset on target"
 	case addparticipantwithacs.PhaseNSD:
 		return "nsd — waiting for NSD proposal"
 	case addparticipantwithacs.PhaseReadState:

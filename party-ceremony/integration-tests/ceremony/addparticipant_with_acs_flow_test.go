@@ -284,6 +284,7 @@ func (s *AddParticipantWithAcsFlowTestSuite) TestAddParticipantWithAcsFlow() {
 			t.Logf("GetActiveContractsByTemplate on p3 not yet ready: %v", qErr)
 			return false
 		}
+
 		return len(postImportContracts) >= 1
 	}, 30*time.Second, 1*time.Second, "p3 should see the pre-deployed contract after ACS import")
 	require.Len(t, postImportContracts, 1, "p3 should see exactly the pre-deployed contract after ACS import")

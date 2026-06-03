@@ -56,6 +56,7 @@ func (s *CeremonyTestSuite) exerciseChoiceAsParty(
 			},
 		},
 	}}
+
 	return s.submitCommandsAsParty(t, submitterActorIndex, signers, partyID, synchronizerID, commands)
 }
 
