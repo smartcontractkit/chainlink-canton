@@ -25,6 +25,28 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
+testReceiver_Create_RejectsInvalidBlockDepthConfig : Script ()
+testReceiver_Create_RejectsInvalidBlockDepthConfig = script do
+    owner <- allocateParty "receiver_owner"
+
+    let mkReceiver finality = CCIP.CCIPReceiver.CCIPReceiver with
+            instanceId = "receiver-finality-test"
+            owner
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalThreshold = 0
+            receiverFinalityConfig = finality
+
+    submitMustFail owner do
+        createCmd (mkReceiver (CCIP.FinalityConfig.BlockDepth 0))
+
+    submitMustFail owner do
+        createCmd (mkReceiver (CCIP.FinalityConfig.BlockDepth (-1)))
+
+    _ <- submit owner do
+        createCmd (mkReceiver (CCIP.FinalityConfig.BlockDepth 1))
+    pure ()
+
 mkContext
     : ContractId CCIP.RMNRemote.RMNRemote
     -> ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry

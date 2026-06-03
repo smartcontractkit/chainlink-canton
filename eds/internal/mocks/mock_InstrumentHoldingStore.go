@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 )
 
 // NewMockInstrumentHoldingStore creates a new instance of MockInstrumentHoldingStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

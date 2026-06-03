@@ -66,7 +66,7 @@ func (s *CeremonyTestSuite) runContractDeployFlow(
 	input := contractdeploy.ContractDeployInput{
 		DecentralizedPartyID: partyID,
 		SynchronizerID:       s.SynchronizerID,
-		Packages:             []contractdeploy.PackageRef{{Name: "test-test", Version: "0.0.1"}},
+		Packages:             []contractdeploy.PackageRef{{Name: "test-test", Version: "current"}},
 		TemplateModule:       "Main",
 		TemplateEntity:       "DisclosedTarget",
 		ContractArgs:         buildContractArgs(t, partyID),

@@ -35,21 +35,21 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/link"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_burn_mint_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_burn_mint_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -375,7 +375,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			RegistryAdmin:        types.PARTY(partyCCIP),
 			RegistryInstrumentId: linkInstrumentId,
 			RegistryMeta:         splice_api_token_metadata_v1.Metadata{},
-			TransferPreapprovals: nil,
 		},
 	})
 	require.NoError(t, err)

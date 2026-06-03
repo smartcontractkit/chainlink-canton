@@ -125,17 +125,19 @@ func main() {
 			log.Fatalf("failed to read compiled DAR file for package %q: %v", pkg, err)
 		}
 
-		// Write DAR file to artifacts directory
-
-		// Create two files, one with the version included and one with `current`
-		for _, suffix := range []string{config.Version, "current"} {
-			outPath := filepath.Join(*artifactsDir, config.Name+"-"+suffix+".dar")
-			err = os.WriteFile(outPath, darBytes, 0600) //nolint:gosec // Only used during compilation
-			if err != nil {
-				log.Fatalf("failed to write DAR file for package %q to artifacts directory: %v", pkg, err)
-			}
-			log.Printf("added DAR file for package %q version %q", pkg, suffix)
+		// Write dev DAR to dars/current/. Versioned snapshots (e.g. v1_0_0/) are
+		// created separately via make freeze-release.
+		currentDir := filepath.Join(*artifactsDir, "current")
+		err = os.MkdirAll(currentDir, 0o755)
+		if err != nil {
+			log.Fatalf("failed to create current DAR directory: %v", err)
 		}
+		outPath := filepath.Join(currentDir, config.Name+"-current.dar")
+		err = os.WriteFile(outPath, darBytes, 0600) //nolint:gosec // Only used during compilation
+		if err != nil {
+			log.Fatalf("failed to write DAR file for package %q to artifacts directory: %v", pkg, err)
+		}
+		log.Printf("added DAR file for package %q version %q", pkg, "current")
 	}
 
 	log.Println("Artifacts assembled successfully")
