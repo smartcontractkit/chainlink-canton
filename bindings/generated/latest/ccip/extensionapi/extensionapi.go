@@ -6,10 +6,10 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
-	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -27,8 +27,8 @@ var (
 
 const (
 	PackageName = "ccip-extension-api"
-	PackageID   = "9b4af09e5481ee7079894a591386bf965172d6022c9efdf335197975e28661f8"
-	SDKVersion  = "3.4.10"
+	PackageID   = "b3411c824f3092fb9dc8b9f0b65a81f1f8f1e51c579949a1bdc954b72dc3ccf3"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -474,6 +474,7 @@ func (t *ExecutorView) UnmarshalHex(data string) error {
 
 // ExecutorCalculateFee is a Record type
 type ExecutorCalculateFee struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
 	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
@@ -483,6 +484,8 @@ type ExecutorCalculateFee struct {
 // ToMap converts ExecutorCalculateFee to a map for DAML arguments
 func (t ExecutorCalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expectedExecutor"] = model.NestedToDAMLValue(t.ExpectedExecutor)
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
@@ -519,6 +522,7 @@ func (t *ExecutorCalculateFee) UnmarshalHex(data string) error {
 
 // ExecutorGetFee is a Record type
 type ExecutorGetFee struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
 	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
 	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
 	Caller            types.PARTY                       `json:"caller"`
@@ -527,6 +531,8 @@ type ExecutorGetFee struct {
 // ToMap converts ExecutorGetFee to a map for DAML arguments
 func (t ExecutorGetFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expectedExecutor"] = model.NestedToDAMLValue(t.ExpectedExecutor)
 
 	m["destChainSelector"] = t.DestChainSelector
 

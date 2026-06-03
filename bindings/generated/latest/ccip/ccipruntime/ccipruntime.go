@@ -6,12 +6,12 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
-	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/extensionapi"
-	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
-	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/api"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
+	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -29,8 +29,8 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "acd63bc12467c40b05bc5fe5807bf15b408e8e115267a74dc6eecd374fc2911c"
-	SDKVersion  = "3.4.10"
+	PackageID   = "2b40da11362f42656b251a8acad59c987ae55152a81cf01f0fd15adb1404eff6"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -289,6 +289,7 @@ type CCIPSend struct {
 	Context                 splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	SendingMessageCid       types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	FeeTokenHoldingCids     []types.CONTRACT_ID                        `json:"feeTokenHoldingCids"`
+	FeeTokenConfigCid       types.CONTRACT_ID                          `json:"feeTokenConfigCid"`
 	FeeTokenTransferFactory types.CONTRACT_ID                          `json:"feeTokenTransferFactory"`
 	FeeTokenExtraArgs       splice_api_token_metadata_v1.ExtraArgs     `json:"feeTokenExtraArgs"`
 }
@@ -308,6 +309,8 @@ func (t CCIPSend) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["feeTokenConfigCid"] = model.NestedToDAMLValue(t.FeeTokenConfigCid)
 
 	m["feeTokenTransferFactory"] = model.NestedToDAMLValue(t.FeeTokenTransferFactory)
 
@@ -470,10 +473,11 @@ func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
 
 // CCIPSendResult is a Record type
 type CCIPSendResult struct {
-	Router          types.CONTRACT_ID   `json:"router"`
-	CcipMessageSent types.CONTRACT_ID   `json:"ccipMessageSent"`
-	MessageId       types.TEXT          `json:"messageId"`
-	FeeChangeCids   []types.CONTRACT_ID `json:"feeChangeCids"`
+	Router                 types.CONTRACT_ID   `json:"router"`
+	CcipMessageSent        types.CONTRACT_ID   `json:"ccipMessageSent"`
+	MessageId              types.TEXT          `json:"messageId"`
+	FeeChangeCids          []types.CONTRACT_ID `json:"feeChangeCids"`
+	PendingFeeInstructions []types.CONTRACT_ID `json:"pendingFeeInstructions"`
 }
 
 // ToMap converts CCIPSendResult to a map for DAML arguments
@@ -489,6 +493,14 @@ func (t CCIPSendResult) ToMap() map[string]any {
 	m["feeChangeCids"] = func() []any {
 		res := make([]any, 0, len(t.FeeChangeCids))
 		for _, e := range t.FeeChangeCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["pendingFeeInstructions"] = func() []any {
+		res := make([]any, 0, len(t.PendingFeeInstructions))
+		for _, e := range t.PendingFeeInstructions {
 			res = append(res, e)
 		}
 		return res

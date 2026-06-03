@@ -6,11 +6,11 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
-	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/extensionapi"
-	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
-	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/api"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
+	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -28,8 +28,8 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "8458f55453fdad1e9cc792e1969b2324faca6c5284dd126348517d97e2704b23"
-	SDKVersion  = "3.4.10"
+	PackageID   = "d53369162d18201ec20d60c4808eff65c5f93e61d55d32234647cbb4343b7d55"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
@@ -268,6 +268,7 @@ func (t *ApplyDestChainUpdatesParams) UnmarshalHex(data string) error {
 
 // CalculateFee is a Record type
 type CalculateFee struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
 	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
@@ -277,6 +278,8 @@ type CalculateFee struct {
 // ToMap converts CalculateFee to a map for DAML arguments
 func (t CalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expectedExecutor"] = model.NestedToDAMLValue(t.ExpectedExecutor)
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
@@ -314,6 +317,7 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CalculateFeeMCMSParams struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
 	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
@@ -505,6 +509,48 @@ func (t *Executor) UnmarshalHex(data string) error {
 
 // Choice methods for Executor
 
+// ApplyDestChainUpdates exercises the ApplyDestChainUpdates choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) ApplyDestChainUpdates(contractID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "ApplyDestChainUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyDestChainUpdatesWithPackageID exercises the ApplyDestChainUpdates choice using the provided package ID instead of package name
+func (t Executor) ApplyDestChainUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "ApplyDestChainUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDynamicConfig exercises the SetDynamicConfig choice on this Executor contract
+// This method uses the package name in the template ID
+func (t Executor) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
+func (t Executor) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // CalculateFee exercises the CalculateFee choice on this Executor contract
 // This method uses the package name in the template ID
 func (t Executor) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
@@ -669,48 +715,6 @@ func (t Executor) GetAllowedFinalityConfigWithPackageID(contractID string, packa
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
 		ContractID: contractID,
 		Choice:     "GetAllowedFinalityConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyDestChainUpdates exercises the ApplyDestChainUpdates choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) ApplyDestChainUpdates(contractID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "ApplyDestChainUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyDestChainUpdatesWithPackageID exercises the ApplyDestChainUpdates choice using the provided package ID instead of package name
-func (t Executor) ApplyDestChainUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "ApplyDestChainUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDynamicConfig exercises the SetDynamicConfig choice on this Executor contract
-// This method uses the package name in the template ID
-func (t Executor) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "SetDynamicConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
-func (t Executor) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Executor", "Executor"),
-		ContractID: contractID,
-		Choice:     "SetDynamicConfig",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1019,6 +1023,7 @@ func (t *GetDynamicConfigMCMSParams) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
 	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
 	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
 	Caller            types.PARTY                       `json:"caller"`
@@ -1027,6 +1032,8 @@ type GetFee struct {
 // ToMap converts GetFee to a map for DAML arguments
 func (t GetFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expectedExecutor"] = model.NestedToDAMLValue(t.ExpectedExecutor)
 
 	m["destChainSelector"] = t.DestChainSelector
 
@@ -1068,6 +1075,7 @@ func (t *GetFee) UnmarshalHex(data string) error {
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type GetFeeMCMSParams struct {
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
 	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
 	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
 }

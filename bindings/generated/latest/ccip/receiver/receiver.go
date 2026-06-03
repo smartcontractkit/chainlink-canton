@@ -6,10 +6,10 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/core"
-	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/extensionapi"
-	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/chainlink/chainlinkapi"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -27,8 +27,8 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "51c55309234b465dc197bb30cde6e879af161e7c766748ea9cd41069fe39881f"
-	SDKVersion  = "3.4.10"
+	PackageID   = "3694ef5ad881fbc6184accc4395c117eaa9be10b439b0f50f03c93307a3b5c09"
+	SDKVersion  = "3.4.11"
 )
 
 type Template interface {
