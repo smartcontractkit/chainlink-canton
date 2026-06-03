@@ -444,7 +444,7 @@ template CommitteeVerifier
                 -- Assert that the sender is allowed to send messages if allowlist is enabled for the destination chain
                 let destChainConfig = fromSomeNote "no config for dest chain" (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
                 DA.Action.when destChainConfig.allowListEnabled
-                    $ assertMsg "Sender not allowed to send messages to destination chain" (caller `elem` destChainConfig.allowedSendersList)
+                    $ assertMsg "Sender not allowed to send messages to destination chain" (sendingMsg.sender `elem` destChainConfig.allowedSendersList)
 
                 let verifierBlob = versionTag
 

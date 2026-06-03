@@ -36,17 +36,17 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -586,6 +586,7 @@ func TestCCIPSend(t *testing.T) {
 		},
 		Payload:       "",
 		Receiver:      "",
+		GasLimit:      100_000,
 		TokenTransfer: nil,
 	}
 	ccipSendDisclosure, err := edsTesthelpers.GetCCIPSendDisclosure(t.Context(), ccipAPIClient, msg, nil, nil)

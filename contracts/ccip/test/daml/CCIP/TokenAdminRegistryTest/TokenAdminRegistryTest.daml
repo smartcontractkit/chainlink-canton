@@ -210,7 +210,6 @@ testFinalizeExecuteRejectsPoolChangedAfterInboundVerification = script do
       poolV2 = TokenAdminRegistryTypes.PoolRegistration with
         poolOwner
         poolInstanceId = "pool-v2"
-      poolV1Address = RawInstanceAddress.make poolV1.poolInstanceId poolV1.poolOwner
       tokenAddress = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
   (tarCid, configCid0) <- createRegistryWithAdmin owner registryInstanceId instrumentId
@@ -244,7 +243,7 @@ testFinalizeExecuteRejectsPoolChangedAfterInboundVerification = script do
           extraData = "")
         messageData = ""
 
-  executingMessageCid <- submit owner do
+  executingMessageCid <- submit (actAs owner <> actAs poolOwner) do
     createCmd CCIP.ExecutingMessageV1.ExecutingMessageV1 with
       ccipOwner = owner
       message
@@ -261,7 +260,8 @@ testFinalizeExecuteRejectsPoolChangedAfterInboundVerification = script do
       receiverFinalityConfig = CCIP.FinalityConfig.WaitForFinality
       sourceDefaultCCVs = []
       inboundPoolVerification = Some (CCIP.ExecutingMessageV1.InboundPoolVerification with
-        poolAddress = poolV1Address
+        poolInstanceId = poolV1.poolInstanceId
+        poolOwner = poolV1.poolOwner
         poolCCVs = [])
       deps = CCIP.ExecutingMessageV1.ExecutingMessageDeps with
         offRamp = RawInstanceAddress.make "offramp-finalize-pool-change" owner
@@ -306,7 +306,7 @@ testConsumeReceiveTicketRejectsPoolAddressMismatch = script do
       tokenPool = Some registeredPool
       caller = owner
 
-  ticketCid <- submit owner do
+  ticketCid <- submit (actAs owner <> actAs poolOwner) do
     createCmd CCIP.Tickets.TokenReceiveTicket with
       ccipOwner = owner
       ccvOwners = []
