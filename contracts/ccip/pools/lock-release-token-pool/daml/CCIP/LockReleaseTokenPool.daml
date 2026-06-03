@@ -281,6 +281,7 @@ template LockReleaseTokenPool
         observer optional [] pure rateLimitAdmin
 
         ensure assertValidInstanceId instanceId
+            && CCIP.Math.isValidTokenDecimals decimals
             && all
                 (\cfg -> CCIP.FinalityConfig.isValidFinalityConfig cfg.finalityConfig)
                 (Map.values remoteChainConfigs)
