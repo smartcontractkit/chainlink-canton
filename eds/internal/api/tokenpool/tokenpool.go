@@ -17,11 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/tokenadminregistry"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -312,7 +312,7 @@ func (s Server) burnMintTokenPoolSend(
 ) {
 	burnMintTokenPool, err := ParseBurnMintTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
-		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse lock release token pool contract")
+		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse burn mint token pool contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -347,7 +347,7 @@ func (s Server) burnMintTokenPoolSend(
 	}}
 
 	// The ChoiceContext that will be passed to the BurnMintFactory by the Token Pool
-	transferFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
+	burnMintFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
 		Values: make(map[string]splice_api_token_metadata_v1.AnyValue),
 	}
 
@@ -356,7 +356,7 @@ func (s Server) burnMintTokenPoolSend(
 	if cfg.burnMintFactory != nil {
 		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
 		if err != nil {
-			s.logger.Error().Err(err).Msg("transfer factory returned an error")
+			s.logger.Error().Err(err).Msg("burn mint factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
@@ -375,16 +375,16 @@ func (s Server) burnMintTokenPoolSend(
 			return
 		}
 
-		transferFactoryContext.Values[contextKey] = splice_api_token_metadata_v1.AnyValue{
+		burnMintFactoryContext.Values[contextKey] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTransferPreapproval.GetCreatedEvent().GetContractId())),
 		}
 		factoryDisclosures = append(factoryDisclosures, converters.ActiveContractToDisclosedContract(activeTransferPreapproval))
 	}
 
-	// If the TransferFactory context contains any values, set it as part of the choiceContext
-	if len(transferFactoryContext.Values) > 0 {
+	// If the BurnMintFactory context contains any values, set it as part of the choiceContext
+	if len(burnMintFactoryContext.Values) > 0 {
 		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryExtraArgsContextValuesContextKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVMap: new(transferFactoryContext.Values),
+			AVMap: new(burnMintFactoryContext.Values),
 		}
 	}
 
@@ -503,14 +503,14 @@ func (s Server) lockReleaseTokenPoolExecute(
 	if message.Finality == protocol.FinalityWaitForFinality {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
 		if !ok {
-			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("inbound active rate limiter not found")
+			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.InboundRateLimiter).Msg("inbound active rate limiter not found")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
 	} else {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
 		if !ok {
-			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("custom inbound active rate limiter not found")
+			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter).Msg("custom inbound active rate limiter not found")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
@@ -603,7 +603,7 @@ func (s Server) burnMintTokenPoolExecute(
 ) {
 	burnMintTokenPool, err := ParseBurnMintTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
-		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse lock release token pool contract")
+		s.logger.Err(err).Stringer("address", instanceAddress).Msg("failed to parse burn mint token pool contract")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
@@ -626,14 +626,14 @@ func (s Server) burnMintTokenPoolExecute(
 	if message.Finality == protocol.FinalityWaitForFinality {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundRateLimiter)
 		if !ok {
-			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("inbound active rate limiter not found")
+			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.InboundRateLimiter).Msg("inbound active rate limiter not found")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
 	} else {
 		rateLimiter, ok = s.activeContractStore.Get(remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter)
 		if !ok {
-			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.OutboundRateLimiter).Msg("custom inbound active rate limiter not found")
+			s.logger.Error().Uint64("sourceChainSelector", sourceChainSelector).Stringer("poolAddress", instanceAddress).Stringer("rateLimiterAddress", remoteChainConfig.InboundCustomBlockConfirmationsRateLimiter).Msg("custom inbound active rate limiter not found")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
@@ -650,7 +650,7 @@ func (s Server) burnMintTokenPoolExecute(
 	}}
 
 	// The ChoiceContext that will be passed to the BurnMintFactory by the Token Pool
-	transferFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
+	burnMintFactoryContext := splice_api_token_metadata_v1.ChoiceContext{
 		Values: make(map[string]splice_api_token_metadata_v1.AnyValue),
 	}
 
@@ -659,7 +659,7 @@ func (s Server) burnMintTokenPoolExecute(
 	if cfg.burnMintFactory != nil {
 		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
 		if err != nil {
-			s.logger.Error().Err(err).Msg("transfer factory returned an error")
+			s.logger.Error().Err(err).Msg("burn mint factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
@@ -669,10 +669,10 @@ func (s Server) burnMintTokenPoolExecute(
 		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
 	}
 
-	// If the TransferFactory context contains any values, set it as part of the choiceContext
-	if len(transferFactoryContext.Values) > 0 {
+	// If the BurnMintFactory context contains any values, set it as part of the choiceContext
+	if len(burnMintFactoryContext.Values) > 0 {
 		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryExtraArgsContextValuesContextKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVMap: new(transferFactoryContext.Values),
+			AVMap: new(burnMintFactoryContext.Values),
 		}
 	}
 

@@ -12,7 +12,8 @@ Generated Go bindings and DAR artifacts use the same layout: **dev** (`current/`
 
 **Rules**
 
-- Application code (deployment, integration-tests, EDS, CCIP devenv, etc.) imports **`bindings/generated/v1_0_0/...`** (or whichever release the repo is pinned to). **Do not** import `latest/`.
+- In-repo application code (**deployment**, **integration-tests**, **EDS**, **CCIP devenv**) imports **`bindings/generated/latest/...`** and must stay aligned with **`contracts/dars/current/`** (run `make contracts` after DAML changes).
+- Frozen **`v1_0_0/`** (and future `v1_x_y/`) snapshots are for audited releases, external consumers, and components still pinned to a release cut (e.g. **party-ceremony** production DARs). **Do not** import `latest/` from released/tag-pinned downstream repos.
 - `latest/` and `current/` are regenerated during development and are not guaranteed stable or audited.
 - **Do not rewrite** existing files under `contracts/dars/v1_0_0/` or `bindings/generated/v1_0_0/` in normal PRs. CI blocks **modifications** to frozen paths that already exist on the base branch (`make check-frozen-release-artifacts`). After DAML changes, run `make contracts` and commit only `current/` + `latest/`.
 - Frozen snapshots change only via **`make freeze-release VERSION=…`** on a dedicated release PR. Add the GitHub label **`release-artifacts`** so CI allows those paths to change.
@@ -21,7 +22,7 @@ Generated Go bindings and DAR artifacts use the same layout: **dev** (`current/`
 
 There are two notions of “version”:
 
-1. **Release snapshot** — whole audited cut (`v1_0_0`, `v1_1_0`). What production pins to.
+1. **Release snapshot** — whole audited cut (`v1_0_0`, `v1_1_0`). Published for external pin; in-repo dev stacks use `latest/` until migrated on freeze.
 2. **Package semver** — per-package `version:` in each `daml.yaml` (e.g. `mcms-core-1.0.0.dar`, `globalconfig-2.0.0.dar`). Multiple package versions can live in the **same** release folder.
 
 ---
@@ -125,7 +126,7 @@ MCMS spans `mcms-api` and `mcms-core` DAML packages; generated code also provide
 
 The flat path `github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms` exists for **`github.com/smartcontractkit/mcms/sdk/canton`**, which predates versioned bindings. Only `mcms.go` lives there; it is refreshed on **`make freeze-release`**, not on `make contracts`.
 
-In-repo Canton deployment code should use versioned imports (e.g. `bindings/generated/v1_0_0/mcms`), not the flat shim.
+In-repo Canton code should use `bindings/generated/latest/mcms` (or the frozen tree after a release migration), not the flat shim.
 
 ---
 

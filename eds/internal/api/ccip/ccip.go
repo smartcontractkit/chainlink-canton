@@ -16,15 +16,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/offramp"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/onramp"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/tokenadminregistry"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/offramp"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -262,6 +262,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 	}
 
 	// Determine CCVs
+	// Parse GlobalConfig to determine the lane-mandated CCVs and default CCVs for the destination chain
 	parsedGlobalConfig, err := ParseGlobalConfig(activeGlobalConfigContract.GetCreatedEvent())
 	if err != nil {
 		s.logger.Err(err).Msg("failed to parse global config contract")
@@ -284,8 +285,13 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		resolvedCCVs[laneMandatedCCV.InstanceAddress()] = converters.RawInstanceAddressAsRawOrHashedAddress(laneMandatedCCV)
 	}
 	addDefaults := false
-	// If the message contains a payload, add the sender-required CCVs
-	if len(payload) > 0 {
+
+	// Same pure token transfer handling as on EVM
+	isTokenOnlyTransfer := len(payload) == 0 &&
+		req.Message.TokenTransfer != nil &&
+		req.Message.GasLimit == 0
+	// If the message isn't a pure token transfer, add the sender-required CCVs
+	if !isTokenOnlyTransfer {
 		if req.SenderRequiredCCVs == nil || len(*req.SenderRequiredCCVs) == 0 {
 			// If no CCVs are specified, use defaults
 			addDefaults = true
@@ -328,6 +334,12 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		for _, defaultCCV := range destChainConfig.DefaultCCVs {
 			resolvedCCVs[defaultCCV.InstanceAddress()] = converters.RawInstanceAddressAsRawOrHashedAddress(defaultCCV)
 		}
+	}
+
+	// Validate that resolvedCCVs is non-zero - every message must be validated by at least one ccv
+	if len(resolvedCCVs) == 0 {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "no CCVs specified and no defaults available for destination chain, every message must be validated by at least one CCV"})
+		return
 	}
 
 	// Determine Executor
