@@ -190,12 +190,13 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
             versionTag = "0x01"
             caller = ccvOwner
 
-    executingMessageCid <- submit ccipOwner do
+    executingMessageCid <- submit (actAs ccipOwner <> actAs poolOwner) do
         exerciseCmd executingMessageCid SetInboundPoolCCVs with
-            poolAddress = RawInstanceAddress.make "test-pool" poolOwner
+            poolInstanceId = "test-pool"
+            poolOwner = poolOwner
             poolCCVs = []
 
-    executingMessageCid <- submit [ccipOwner, ccvOwner] do
+    executingMessageCid <- submit (actAs ccipOwner <> actAs ccvOwner) do
         exerciseCmd executingMessageCid AddCCVVerification with
             ccvInstanceId = "0xCCV1"
             versionTag = "0x01"
@@ -241,7 +242,7 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
                 extraData = "")
             messageData = ""
 
-    executingMessageCid <- submit ccipOwner do
+    executingMessageCid <- submit (actAs ccipOwner <> actAs poolOwner) do
         createCmd ExecutingMessageV1 with
             ccipOwner = ccipOwner
             message = message
@@ -258,7 +259,8 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = [defaultCCV]
             inboundPoolVerification = Some (InboundPoolVerification with
-                poolAddress = RawInstanceAddress.make "snapshot-pool" poolOwner
+                poolInstanceId = "snapshot-pool"
+                poolOwner = poolOwner
                 poolCCVs = [Internal.useDefaultCCVs, explicitCCV])
             deps = ExecutingMessageDeps with
                 offRamp = RawInstanceAddress.make "test-offramp-snapshot" ccipOwner
