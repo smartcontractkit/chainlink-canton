@@ -14,6 +14,7 @@ import CCIP.LockReleaseTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
     ApplyTokenTransferFeeConfigUpdatesParams(..),
+    SetRateLimiterReferencesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
@@ -124,12 +125,11 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
     fst (fromSome (LockReleaseTokenPoolCodec.decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
--- |             SetRateLimitConfig              |
+-- |          SetRateLimiterReferences           |
 -- ===============================================
 
-testSetRateLimitConfigParamsRoundtrip : Script ()
-testSetRateLimitConfigParamsRoundtrip = do
-    caller <- allocateParty "caller"
+testSetRateLimiterReferencesParamsRoundtrip : Script ()
+testSetRateLimiterReferencesParamsRoundtrip = do
     let rateLimitConfigs = [
             RateLimitConfigArgs with
                 remoteChainSelector = 1.0
@@ -147,9 +147,26 @@ testSetRateLimitConfigParamsRoundtrip = do
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party3"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party3"
             ]
-        args = SetRateLimitConfigParams with
+        args = SetRateLimiterReferencesParams with
             rateLimitConfigArgs = rateLimitConfigs
-            caller
+    let encoded = LockReleaseTokenPoolCodec.encodeSetRateLimiterReferencesParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetRateLimiterReferencesParamsAt encoded 0)) === args
+    pure ()
+
+-- ===============================================
+-- |             SetRateLimitConfig              |
+-- ===============================================
+
+testSetRateLimitConfigParamsRoundtrip : Script ()
+testSetRateLimitConfigParamsRoundtrip = script do
+    admin <- allocateParty "rate_limit_admin"
+    poolOwner <- allocateParty "pool_owner"
+    let args = SetRateLimitConfigParams with
+            caller = admin
+            rateLimiterInstanceAddress = RawInstanceAddress.make "rl-in" poolOwner
+            newIsEnabled = True
+            newCapacity = 42.0
+            newRate = 3.0
     let encoded = LockReleaseTokenPoolCodec.encodeSetRateLimitConfigParams args
     fst (fromSome (LockReleaseTokenPoolCodec.decodeSetRateLimitConfigParamsAt encoded 0)) === args
     pure ()

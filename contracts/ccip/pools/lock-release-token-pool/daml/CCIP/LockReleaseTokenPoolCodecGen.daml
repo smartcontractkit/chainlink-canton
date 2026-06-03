@@ -4,7 +4,7 @@ module CCIP.LockReleaseTokenPoolCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), TransferTimeout(..))
+import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimiterReferencesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), TransferTimeout(..))
 
 import MCMS.Codec (
     decodeBoolAt,
@@ -203,18 +203,38 @@ decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded offset = do
 
 
 -- ===============================================
+-- |              SetRateLimiterReferencesParams
+-- ===============================================
+
+encodeSetRateLimiterReferencesParams : SetRateLimiterReferencesParams -> BytesHex
+encodeSetRateLimiterReferencesParams params =
+    encodeList params.rateLimitConfigArgs encodeRateLimitConfigArgs
+
+decodeSetRateLimiterReferencesParamsAt : BytesHex -> Int -> Optional (SetRateLimiterReferencesParams, Int)
+decodeSetRateLimiterReferencesParamsAt encoded offset = do
+    (rateLimitConfigArgs, offset) <- decodeList encoded offset decodeRateLimitConfigArgsAt
+    Some (SetRateLimiterReferencesParams{..}, offset)
+
+
+-- ===============================================
 -- |              SetRateLimitConfigParams
 -- ===============================================
 
 encodeSetRateLimitConfigParams : SetRateLimitConfigParams -> BytesHex
 encodeSetRateLimitConfigParams params =
-    encodeList params.rateLimitConfigArgs encodeRateLimitConfigArgs
-    <> encodeParty params.caller
+    encodeParty params.caller
+    <> encodeRawInstanceAddress params.rateLimiterInstanceAddress
+    <> encodeBool params.newIsEnabled
+    <> encodeNumeric0 params.newCapacity
+    <> encodeNumeric0 params.newRate
 
 decodeSetRateLimitConfigParamsAt : BytesHex -> Int -> Optional (SetRateLimitConfigParams, Int)
 decodeSetRateLimitConfigParamsAt encoded offset = do
-    (rateLimitConfigArgs, offset) <- decodeList encoded offset decodeRateLimitConfigArgsAt
     (caller, offset) <- decodePartyAt encoded offset
+    (rateLimiterInstanceAddress, offset) <- decodeRawInstanceAddressAt encoded offset
+    (newIsEnabled, offset) <- decodeBoolAt encoded offset
+    (newCapacity, offset) <- decodeNumeric0At encoded offset
+    (newRate, offset) <- decodeNumeric0At encoded offset
     Some (SetRateLimitConfigParams{..}, offset)
 
 
