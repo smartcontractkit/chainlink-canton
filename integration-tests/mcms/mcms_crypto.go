@@ -878,6 +878,7 @@ func EncodeSelfDispatchSetConfig(role MCMSRole, params mcms.SetConfigParams) (st
 
 	// uint8(role) <> encodeSetConfigParams(params), then hex for TimelockCall hex:"bytes16".
 	payload := append([]byte{byte(role)}, []byte(wire)...) //nolint:gosec // MCMSRole is a controlled value
+
 	return hex.EncodeToString(payload), nil
 }
 

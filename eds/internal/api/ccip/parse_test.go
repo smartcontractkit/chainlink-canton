@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/chainlink/chainlinkapi"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
