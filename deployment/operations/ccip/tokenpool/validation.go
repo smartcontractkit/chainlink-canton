@@ -19,5 +19,6 @@ func ValidateTokenDecimals(decimals int64) error {
 	if decimals > MaxTokenDecimals {
 		return fmt.Errorf("decimals %d exceeds maximum %d", decimals, MaxTokenDecimals)
 	}
+
 	return nil
 }
