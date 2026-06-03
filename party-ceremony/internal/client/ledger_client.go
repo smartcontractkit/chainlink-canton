@@ -48,10 +48,13 @@ type LedgerClient interface {
 	// CanReadAs rights for the given party — no participant/IDP admin
 	// claims — so it works for users that have been granted per-party
 	// rights via [LedgerClient.GrantPartyRights].
+	//
+	// packageName is the Daml package name (e.g. "test-test"); the client encodes
+	// it as "#<name>" in Identifier.package_id for FiltersByParty filters.
 	GetActiveContractsByTemplateForParty(
 		ctx context.Context,
 		partyID string,
-		packageID string,
+		packageName string,
 		moduleName string,
 		entityName string,
 	) ([]*apiv2.CreatedEvent, error)

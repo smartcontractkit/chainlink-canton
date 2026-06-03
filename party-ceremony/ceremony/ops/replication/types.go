@@ -30,14 +30,41 @@ type RecordTargetLedgerOffsetOutput struct {
 	TimestampSeconds int64  `json:"timestamp_seconds"`
 }
 
+// ── DisconnectSynchronizer ──────────────────────────────────────────────────
+
+// DisconnectSynchronizerInput is the input to [DisconnectSynchronizerOp].
+type DisconnectSynchronizerInput struct {
+	ParticipantID     string `json:"participant_id"`
+	SynchronizerAlias string `json:"synchronizer_alias"`
+}
+
+// DisconnectSynchronizerOutput is the output of [DisconnectSynchronizerOp].
+type DisconnectSynchronizerOutput struct {
+	ParticipantID string `json:"participant_id"`
+	Disconnected  bool   `json:"disconnected"`
+}
+
+// ReconnectSynchronizerInput is the input to [ReconnectSynchronizerOp].
+type ReconnectSynchronizerInput struct {
+	ParticipantID     string `json:"participant_id"`
+	SynchronizerAlias string `json:"synchronizer_alias"`
+}
+
+// ReconnectSynchronizerOutput is the output of [ReconnectSynchronizerOp].
+type ReconnectSynchronizerOutput struct {
+	ParticipantID string `json:"participant_id"`
+	Reconnected   bool   `json:"reconnected"`
+}
+
 // ── ExportAcs ────────────────────────────────────────────────────────────────
 
 // ExportAcsInput is the input to [ExportAcsOp].
 type ExportAcsInput struct {
-	ParticipantID  string   `json:"participant_id"`
-	PartyIDs       []string `json:"party_ids"`
-	SynchronizerID string   `json:"synchronizer_id"`
-	LedgerOffset   int64    `json:"ledger_offset"`
+	ParticipantID    string   `json:"participant_id"`
+	PartyIDs         []string `json:"party_ids"`
+	SynchronizerID   string   `json:"synchronizer_id"`
+	LedgerOffset     int64    `json:"ledger_offset"`
+	TimestampSeconds int64    `json:"timestamp_seconds"`
 }
 
 // ExportAcsOutput is the output of [ExportAcsOp].

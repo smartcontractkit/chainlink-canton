@@ -2,6 +2,7 @@ package tests
 
 import (
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -37,6 +38,8 @@ type AddParticipantWithAcsResyncFlowTestSuite struct {
 	AddParticipantWithAcsFlowTestSuite
 
 	ContractIDB string // second pre-deployed contract (the one we archive mid-ceremony)
+
+	UpdatedContractIDB string // replacement for ContractIDB created during the resync window
 }
 
 func (s *AddParticipantWithAcsResyncFlowTestSuite) SetupSuite() {
@@ -143,18 +146,6 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestResyncOnArchive() {
 			"run %d: expected threshold-not-met", i+1)
 	}
 
-	// ── Disconnect target (p3) before the divergent update ────────────────
-	// Canton's reference party-replication flow disconnects the target before
-	// any post-snapshot events are broadcast. Our async ceremony keeps p3
-	// connected through Runs 1–6 (it has to consent), so without this manual
-	// disconnect p3's local ledger would absorb the upcoming archive of B-old
-	// and refuse to re-mark it active during Run 7's ACS import
-	// (IMPORT_ACS_ERROR: "archived contracts cannot become active"). Run 7's
-	// own flow reconnects p3 after the import.
-	t.Log("Disconnecting target (p3) from synchronizer before divergent update")
-	require.NoError(t, s.Actors[2].deps.Client.DisconnectSynchronizer(t.Context(), s.SynchronizerAlias),
-		"DisconnectSynchronizer on p3 before UpdateValue")
-
 	// ── Inject: update contract B with p1+p2 (between Run 6 and Run 7) ────
 	// At this point the source has the ACS snapshot containing B (contract ID
 	// B-old). We exercise the consuming `UpdateValue` choice on B, which
@@ -183,31 +174,8 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestResyncOnArchive() {
 	)
 	require.NotEmpty(t, newContractB, "UpdateValue must return the new contract ID")
 	require.NotEqual(t, s.ContractIDB, newContractB, "new contract ID must differ from the consumed one")
+	s.UpdatedContractIDB = newContractB
 	t.Logf("Contract B updated: old=%s new=%s", s.ContractIDB, newContractB)
-
-	// Verify replace landed on source-side before proceeding: p1 should now
-	// see exactly {A, newContractB} (B-old archived).
-	p1Ledger, p1Conn := s.NewLedgerClient(s.chain.Participants[0])
-	t.Cleanup(func() { _ = p1Conn.Close() })
-	if s.chain.Participants[0].UserID != "" {
-		err = p1Ledger.GrantPartyRights(t.Context(), s.chain.Participants[0].UserID, s.PartyID)
-		require.NoError(t, err, "GrantPartyRights to p1 user pre-check")
-	}
-	require.Eventually(t, func() bool {
-		cs, qErr := p1Ledger.GetActiveContractsByTemplateForParty(t.Context(), s.PartyID, s.PackageIDs[0], "Main", "DisclosedTarget")
-		if qErr != nil {
-			return false
-		}
-		if len(cs) != 2 {
-			return false
-		}
-		seen := map[string]bool{}
-		for _, c := range cs {
-			seen[c.GetContractId()] = true
-		}
-
-		return seen[s.ContractID] && seen[newContractB] && !seen[s.ContractIDB]
-	}, 15*time.Second, 500*time.Millisecond, "p1 should see A and newContractB but not the old B")
 
 	// ── Run 7: target imports snapshot + reconnects + clears flag ──────────
 	t.Log("Resync ceremony run 7: target imports + reconnects + clears flag")
@@ -224,24 +192,26 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestResyncOnArchive() {
 	}
 
 	var p3Contracts []*apiv2.CreatedEvent
-	require.Eventually(t, func() bool {
+	var p3IDs []string
+	targetOK := assert.Eventually(t, func() bool {
 		var qErr error
 		p3Contracts, qErr = p3Ledger.GetActiveContractsByTemplateForParty(
-			t.Context(), s.PartyID, s.PackageIDs[0], "Main", "DisclosedTarget",
+			t.Context(), s.PartyID, disclosedTargetPackageName, "Main", "DisclosedTarget",
 		)
 		if qErr != nil {
 			t.Logf("p3 query not yet ready: %v", qErr)
 			return false
 		}
 
-		return len(p3Contracts) == 2
-	}, 30*time.Second, 1*time.Second, "p3 should see exactly 2 contracts (A and newContractB) after resync")
+		p3IDs = activeContractIDs(p3Contracts)
+		seen := contractIDSet(p3IDs)
 
-	require.Len(t, p3Contracts, 2, "p3 should see exactly 2 contracts post-resync")
-	seenOnTarget := map[string]bool{}
-	for _, c := range p3Contracts {
-		seenOnTarget[c.GetContractId()] = true
-	}
+		return seen[s.ContractID] && seen[newContractB] && !seen[s.ContractIDB]
+	}, 30*time.Second, 1*time.Second, "p3 should see A and newContractB, but not old B, after resync")
+	require.Truef(t, targetOK,
+		"p3 active contracts=%v; expected A=%s and newContractB=%s active, oldB=%s absent",
+		p3IDs, s.ContractID, newContractB, s.ContractIDB)
+	seenOnTarget := contractIDSet(p3IDs)
 	assert.True(t, seenOnTarget[s.ContractID], "p3 should see contract A (unchanged through ceremony)")
 	assert.True(t, seenOnTarget[newContractB], "p3 should see newContractB (created during resync window)")
 	assert.False(t, seenOnTarget[s.ContractIDB], "p3 must NOT see the archived snapshot version of B")
@@ -286,6 +256,9 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestNewParticipantConfirms() 
 		_ = s.Actors[1].deps.Client.ReconnectSynchronizer(s.T().Context(), s.SynchronizerAlias)
 	})
 
+	require.NotEmpty(t, s.UpdatedContractIDB,
+		"TestNewParticipantConfirms requires TestResyncOnArchive to record B's replacement contract ID")
+
 	// Archive contract A using only p1 + p3 signatures. Submit via p1 (since
 	// p2 is disconnected and p3 may still be settling its rights).
 	signers := []signerActor{
@@ -304,7 +277,7 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestNewParticipantConfirms() 
 		templateID, s.ContractID, "Archive", nil,
 	)
 
-	// Verify on p1 and p3: contract A is gone.
+	// Verify on p1 and p3: contract A is gone while B's replacement remains.
 	p1Ledger, p1Conn := s.NewLedgerClient(s.chain.Participants[0])
 	t.Cleanup(func() { _ = p1Conn.Close() })
 	p3Ledger, p3Conn := s.NewLedgerClient(s.chain.Participants[2])
@@ -312,29 +285,65 @@ func (s *AddParticipantWithAcsResyncFlowTestSuite) TestNewParticipantConfirms() 
 
 	for idx, lc := range []client.LedgerClient{p1Ledger, p3Ledger} {
 		participantLabel := []string{"p1", "p3"}[idx]
-		require.Eventually(t, func() bool {
-			cs, qErr := lc.GetActiveContractsByTemplateForParty(t.Context(), s.PartyID, s.PackageIDs[0], "Main", "DisclosedTarget")
+		var ids []string
+		ok := assert.Eventually(t, func() bool {
+			cs, qErr := lc.GetActiveContractsByTemplateForParty(t.Context(), s.PartyID, disclosedTargetPackageName, "Main", "DisclosedTarget")
 			if qErr != nil {
 				return false
 			}
 
-			return len(cs) == 0
-		}, 15*time.Second, 500*time.Millisecond, "%s should see contract A archived", participantLabel)
+			ids = activeContractIDs(cs)
+			seen := contractIDSet(ids)
+
+			return !seen[s.ContractID] && seen[s.UpdatedContractIDB] && !seen[s.ContractIDB]
+		}, 15*time.Second, 500*time.Millisecond,
+			"%s should see contract A archived while B's replacement remains active", participantLabel)
+		require.Truef(t, ok,
+			"%s active contracts=%v; expected A=%s absent, updatedB=%s active, oldB=%s absent",
+			participantLabel, ids, s.ContractID, s.UpdatedContractIDB, s.ContractIDB)
 	}
 
-	// Reconnect p2 and verify it converges to the same (empty) ACS.
+	// Reconnect p2 and verify it converges to the same ACS.
 	t.Log("Reconnecting p2; verifying it converges to the post-archive state")
 	require.NoError(t, s.Actors[1].deps.Client.ReconnectSynchronizer(t.Context(), s.SynchronizerAlias),
 		"ReconnectSynchronizer on p2")
 
 	p2Ledger, p2Conn := s.NewLedgerClient(s.chain.Participants[1])
 	t.Cleanup(func() { _ = p2Conn.Close() })
-	require.Eventually(t, func() bool {
-		cs, qErr := p2Ledger.GetActiveContractsByTemplateForParty(t.Context(), s.PartyID, s.PackageIDs[0], "Main", "DisclosedTarget")
+	var p2IDs []string
+	p2OK := assert.Eventually(t, func() bool {
+		cs, qErr := p2Ledger.GetActiveContractsByTemplateForParty(t.Context(), s.PartyID, disclosedTargetPackageName, "Main", "DisclosedTarget")
 		if qErr != nil {
 			return false
 		}
 
-		return len(cs) == 0
+		p2IDs = activeContractIDs(cs)
+		seen := contractIDSet(p2IDs)
+
+		return !seen[s.ContractID] && seen[s.UpdatedContractIDB] && !seen[s.ContractIDB]
 	}, 30*time.Second, 1*time.Second, "p2 should converge to post-archive state after reconnecting")
+	require.Truef(t, p2OK,
+		"p2 active contracts=%v; expected A=%s absent, updatedB=%s active, oldB=%s absent",
+		p2IDs, s.ContractID, s.UpdatedContractIDB, s.ContractIDB)
+}
+
+func activeContractIDs(contracts []*apiv2.CreatedEvent) []string {
+	ids := make([]string, 0, len(contracts))
+	for _, c := range contracts {
+		if id := c.GetContractId(); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+
+	return ids
+}
+
+func contractIDSet(ids []string) map[string]bool {
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		seen[id] = true
+	}
+
+	return seen
 }

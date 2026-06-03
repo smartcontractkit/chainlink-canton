@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	apiv2admin "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
@@ -161,10 +162,13 @@ func (c *GRPCLedgerClient) GetActiveContractsByTemplate(
 // for users granted per-party rights via [GRPCLedgerClient.GrantPartyRights].
 // FiltersForAnyParty (used by [GRPCLedgerClient.GetActiveContractsByTemplate])
 // requires participant/IDP admin claims, which per-party-granted users lack.
+//
+// packageName is the Daml package name (without the "#" prefix); Canton encodes
+// package names in Identifier.package_id as "#<name>" for FiltersByParty filters.
 func (c *GRPCLedgerClient) GetActiveContractsByTemplateForParty(
 	ctx context.Context,
 	partyID string,
-	packageID string,
+	packageName string,
 	moduleName string,
 	entityName string,
 ) ([]*apiv2.CreatedEvent, error) {
@@ -185,7 +189,7 @@ func (c *GRPCLedgerClient) GetActiveContractsByTemplateForParty(
 						IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
 							TemplateFilter: &apiv2.TemplateFilter{
 								TemplateId: &apiv2.Identifier{
-									PackageId:  packageID,
+									PackageId:  ledgerPackageNameRef(packageName),
 									ModuleName: moduleName,
 									EntityName: entityName,
 								},
@@ -218,6 +222,15 @@ func (c *GRPCLedgerClient) GetActiveContractsByTemplateForParty(
 	}
 
 	return contracts, nil
+}
+
+// ledgerPackageNameRef encodes a Daml package name for Identifier.package_id when
+// FiltersByParty requires a package-name reference (#<name> per ledger API v2).
+func ledgerPackageNameRef(name string) string {
+	if strings.HasPrefix(name, "#") {
+		return name
+	}
+	return "#" + name
 }
 
 // ExecuteSubmission calls InteractiveSubmissionService.ExecuteSubmissionAndWaitForTransaction

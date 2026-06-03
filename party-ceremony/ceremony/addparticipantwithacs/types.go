@@ -13,8 +13,10 @@ const (
 	PhaseDNSSubmit          Phase = "dns-submit"
 	PhaseRecordOffset       Phase = "record-offset"
 	PhaseP2POnboarding      Phase = "p2p-onboarding"
+	PhaseTargetDisconnect   Phase = "target-disconnect"
 	PhaseAcsExport          Phase = "acs-export"
 	PhaseAcsImport          Phase = "acs-import"
+	PhaseTargetReconnect    Phase = "target-reconnect"
 	PhaseClearOnboarding    Phase = "clear-onboarding"
 	PhaseCompleted          Phase = "completed"
 )
@@ -26,7 +28,8 @@ type AddParticipantWithAcsInput struct {
 	DecentralizedPartyID string `json:"decentralized_party_id"`
 
 	// NewParticipantID is the Canton UID of the participant being added
-	// (e.g. "PAR::newnode::fingerprint").
+	// (e.g. "PAR::newnode::fingerprint"). During ACS replication (steps 1b,
+	// 9, 11–13) this participant is the target actor.
 	NewParticipantID string `json:"new_participant_id"`
 
 	// NamespaceName is the human-readable label used when generating the
@@ -41,7 +44,7 @@ type AddParticipantWithAcsInput struct {
 	SynchronizerAlias string `json:"synchronizer_alias"`
 
 	// SourceParticipantID is the Canton UID of the existing participant
-	// that will export the ACS for the new participant.
+	// that exports the ACS snapshot (steps 7 and 10).
 	SourceParticipantID string `json:"source_participant_id"`
 
 	// NewThreshold overrides the threshold after the addition.
@@ -65,8 +68,10 @@ type CeremonyState struct {
 	AllOwners               []string `json:"all_owners,omitempty"`
 	TargetLedgerOffset      int64    `json:"target_ledger_offset"`
 	LedgerOffsetRecorded    bool     `json:"ledger_offset_recorded"`
+	TargetDisconnected      bool     `json:"target_disconnected"`
 	AcsExported             bool     `json:"acs_exported"`
 	AcsImported             bool     `json:"acs_imported"`
+	TargetReconnected       bool     `json:"target_reconnected"`
 	OnboardingFlagCleared   bool     `json:"onboarding_flag_cleared"`
 }
 

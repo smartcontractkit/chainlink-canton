@@ -18,11 +18,12 @@ import (
 )
 
 // ImportAcsOp imports an ACS snapshot into the target participant.
-// It disconnects from the synchronizer, imports the ACS, then reconnects.
+// The target must already be disconnected from the synchronizer. The caller is
+// responsible for reconnecting after a successful import.
 var ImportAcsOp = operations.NewOperation(
 	"canton-ceremony/replication/import-acs",
 	semver.MustParse("1.0.0"),
-	"Import ACS into target participant (disconnect → import → reconnect)",
+	"Import ACS into target participant",
 	func(b operations.Bundle, deps ceremony.CantonDeps, in ImportAcsInput) (ImportAcsOutput, error) {
 		if in.ParticipantID == "" || in.SynchronizerID == "" || in.SynchronizerAlias == "" || in.AcsSnapshotB64 == "" {
 			return ImportAcsOutput{}, operations.NewUnrecoverableError(
@@ -76,36 +77,16 @@ var ImportAcsOp = operations.NewOperation(
 			}
 		}
 
-		// Disconnect → Import → Reconnect.
-		deps.Logger.Infow("Disconnecting from synchronizer for ACS import",
-			"participant", in.ParticipantID,
-			"alias", in.SynchronizerAlias,
-		)
-		if err := deps.Client.DisconnectSynchronizer(ctx, in.SynchronizerAlias); err != nil {
-			return ImportAcsOutput{}, fmt.Errorf("disconnecting synchronizer: %w", err)
-		}
-
 		deps.Logger.Infow("Importing ACS",
 			"participant", in.ParticipantID,
 			"raw_size", len(raw),
 		)
 		if err := deps.Client.ImportAcs(ctx, raw, in.SynchronizerID); err != nil {
-			// Attempt reconnect even if import fails.
-			deps.Logger.Errorw("ACS import failed, attempting reconnect",
+			deps.Logger.Errorw("ACS import failed",
 				"err", err,
-				"alias", in.SynchronizerAlias,
 			)
-			_ = deps.Client.ReconnectSynchronizer(ctx, in.SynchronizerAlias)
 
 			return ImportAcsOutput{}, fmt.Errorf("importing ACS: %w", err)
-		}
-
-		deps.Logger.Infow("Reconnecting to synchronizer after ACS import",
-			"participant", in.ParticipantID,
-			"alias", in.SynchronizerAlias,
-		)
-		if err := deps.Client.ReconnectSynchronizer(ctx, in.SynchronizerAlias); err != nil {
-			return ImportAcsOutput{}, fmt.Errorf("reconnecting synchronizer: %w", err)
 		}
 
 		deps.Logger.Infow("ACS imported successfully",

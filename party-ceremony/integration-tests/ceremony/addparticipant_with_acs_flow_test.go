@@ -120,9 +120,9 @@ func (s *AddParticipantWithAcsFlowTestSuite) TestAddParticipantFlow() {
 //   - Run 3 (p2/source): signs DNS (2/2) → submits DNS → records ledger offset →
 //     P2P w/flag (1/2 existing) → ErrThresholdNotMet.
 //   - Run 4 (p1):        P2P w/flag (2/2 existing) → new participant consent pending → ErrThresholdNotMet.
-//   - Run 5 (p3/new):    P2P consent w/flag → P2P confirmed → ACS export pending → ErrThresholdNotMet.
+//   - Run 5 (p3/new):    P2P consent w/flag → P2P confirmed → disconnects → ACS export pending → ErrThresholdNotMet.
 //   - Run 6 (p2/source): ACS export → snapshot stored in reporter → ACS import pending → ErrThresholdNotMet.
-//   - Run 7 (p3/target): disconnect → ACS import → reconnect → clear onboarding flag → SUCCESS.
+//   - Run 7 (p3/target): ACS import → reconnect → clear onboarding flag → SUCCESS.
 func (s *AddParticipantWithAcsFlowTestSuite) TestAddParticipantWithAcsFlow() {
 	t := s.T()
 
@@ -211,8 +211,8 @@ func (s *AddParticipantWithAcsFlowTestSuite) TestAddParticipantWithAcsFlow() {
 	_, err = operations.ExecuteSequence(newAddBundle(), addparticipantwithacs.AddParticipantWithAcsSequence, addDeps[0], addInput)
 	require.ErrorContains(t, err, addparticipantwithacs.ErrThresholdNotMet.Error(), "run 4: new participant consent pending")
 
-	// Run 5 (p3/new): consents to P2P hosting → P2P confirmed → ACS export pending → ErrThresholdNotMet.
-	t.Log("ACS run 5: p3 consents to P2P w/flag → P2P confirmed → ACS export pending")
+	// Run 5 (p3/new): consents to P2P hosting → P2P confirmed → disconnects → ACS export pending → ErrThresholdNotMet.
+	t.Log("ACS run 5: p3 consents to P2P w/flag → P2P confirmed → disconnects → ACS export pending")
 	_, err = operations.ExecuteSequence(newAddBundle(), addparticipantwithacs.AddParticipantWithAcsSequence, addDeps[2], addInput)
 	require.ErrorContains(t, err, addparticipantwithacs.ErrThresholdNotMet.Error(), "run 5: ACS export pending")
 
@@ -221,7 +221,7 @@ func (s *AddParticipantWithAcsFlowTestSuite) TestAddParticipantWithAcsFlow() {
 	_, err = operations.ExecuteSequence(newAddBundle(), addparticipantwithacs.AddParticipantWithAcsSequence, addDeps[1], addInput)
 	require.ErrorContains(t, err, addparticipantwithacs.ErrThresholdNotMet.Error(), "run 6: ACS import pending")
 
-	// Run 7 (p3/target): disconnect → import ACS → reconnect → clear onboarding flag → SUCCESS.
+	// Run 7 (p3/target): import ACS → reconnect → clear onboarding flag → SUCCESS.
 	t.Log("ACS run 7: p3 imports ACS + clears onboarding flag — completing ceremony")
 	addResult, err := operations.ExecuteSequence(newAddBundle(), addparticipantwithacs.AddParticipantWithAcsSequence, addDeps[2], addInput)
 	require.NoError(t, err, "add-participant-with-acs ceremony should complete successfully")
@@ -278,7 +278,7 @@ func (s *AddParticipantWithAcsFlowTestSuite) TestAddParticipantWithAcsFlow() {
 		// the GrantPartyRights call above, but does NOT have the
 		// participant/IDP admin claims that FiltersForAnyParty requires.
 		postImportContracts, qErr = p3LedgerClient.GetActiveContractsByTemplateForParty(
-			t.Context(), s.PartyID, s.PackageIDs[0], "Main", "DisclosedTarget",
+			t.Context(), s.PartyID, disclosedTargetPackageName, "Main", "DisclosedTarget",
 		)
 		if qErr != nil {
 			t.Logf("GetActiveContractsByTemplate on p3 not yet ready: %v", qErr)
@@ -320,7 +320,7 @@ func (s *AddParticipantWithAcsFlowTestSuite) TestAddParticipantWithAcsFlow() {
 		// Use FiltersByParty (CanReadAs is enough); FiltersForAnyParty would
 		// fail on participants without super-reader-wildcard admin claims.
 		allContracts, qErr := lc.GetActiveContractsByTemplateForParty(
-			t.Context(), s.PartyID, sr2.Output.PackageIDs[0], "Main", "DisclosedTarget",
+			t.Context(), s.PartyID, disclosedTargetPackageName, "Main", "DisclosedTarget",
 		)
 		require.NoError(t, qErr, "GetActiveContractsByTemplateForParty on participant %d after second deploy", i+1)
 		assert.Len(t, allContracts, 2, "participant %d should see 2 contracts after second deploy", i+1)

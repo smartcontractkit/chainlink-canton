@@ -662,14 +662,18 @@ func (c *GRPCCantonClient) ExportAcs(ctx context.Context, partyIDs []string, syn
 }
 
 func (c *GRPCCantonClient) ImportAcs(ctx context.Context, acsSnapshot []byte, synchronizerID string) error {
+	if synchronizerID == "" {
+		return fmt.Errorf("ImportAcs: synchronizer_id is required")
+	}
+
 	stream, err := c.repair.ImportAcs(ctx)
 	if err != nil {
 		return fmt.Errorf("ImportAcs: %w", err)
 	}
 
 	// Send the ACS snapshot in chunks to avoid exceeding gRPC message size limits.
-	// The first chunk carries ContractImportMode (required by Canton ≥3.4.4);
-	// subsequent chunks only carry the acs_snapshot bytes.
+	// The first chunk carries contract_import_mode and synchronizer_id (required by
+	// Canton ≥3.4); subsequent chunks only carry acs_snapshot bytes.
 	const chunkSize = 1 << 20 // 1 MB
 	for offset := 0; offset < len(acsSnapshot); offset += chunkSize {
 		end := min(offset+chunkSize, len(acsSnapshot))
@@ -677,9 +681,9 @@ func (c *GRPCCantonClient) ImportAcs(ctx context.Context, acsSnapshot []byte, sy
 			AcsSnapshot: acsSnapshot[offset:end],
 		}
 		if offset == 0 {
-			// ACCEPT is safe here because we import snapshots exported by a
-			// trusted participant within the same ceremony.
-			req.ContractImportMode = participantv30.ContractImportMode_CONTRACT_IMPORT_MODE_ACCEPT
+			if metaErr := setImportAcsFirstChunkMetadata(req, synchronizerID); metaErr != nil {
+				return fmt.Errorf("ImportAcs: %w", metaErr)
+			}
 		}
 		if sendErr := stream.Send(req); sendErr != nil {
 			return fmt.Errorf("ImportAcs send: %w", sendErr)

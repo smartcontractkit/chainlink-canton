@@ -15,11 +15,18 @@
 //  4. CreateAddDNSProposalOp  – coordinator creates updated DNS proposal.
 //  5. SignAddDNSProposalOp    – each existing participant signs the proposal.
 //  6. SubmitAddDNSOp          – merge signatures, submit updated DNS.
+//  1b. RecordTargetLedgerOffsetOp – target records offset before topology changes.
 //  7. RecordLedgerOffsetOp    – source records offset BEFORE P2P authorization.
 //  8. ProposeAddP2PWithOnboardingOp – P2P mapping with onboarding flag on new participant.
-//  9. ExportAcsOp             – source exports ACS at recorded offset.
-//  10. ImportAcsOp            – target: disconnect → import → reconnect.
-//  11. ClearOnboardingFlagOp  – target clears the onboarding flag.
+//  9. DisconnectSynchronizerOp – target disconnects after onboarding consent.
+//  10. ExportAcsOp            – source exports party ACS at recorded offset.
+//  11. ImportAcsOp            – target imports ACS while disconnected.
+//  12. ReconnectSynchronizerOp – target reconnects after successful import.
+//  13. ClearOnboardingFlagOp   – target clears the onboarding flag.
+//
+// Steps 1b and 7–13 are participant-scoped: only the designated actor executes
+// the handler, but any participant may resume the sequence and pick up cached
+// operation reports from the shared reporter.
 package addparticipantwithacs
 
 import (
@@ -44,6 +51,23 @@ import (
 // enough actors have contributed keys, signatures, or proposals.
 var ErrThresholdNotMet = errors.New("threshold not met: more participants must resume")
 
+// replicationStepErr classifies an operation result for async multi-actor resume.
+// A nil error means the step succeeded (including via a cached report from the
+// designated actor). When the current runner is not the designated actor and the
+// operation failed, ErrThresholdNotMet is returned so the caller can signal
+// that another participant must act. When the runner is the designated actor,
+// the underlying error is returned unchanged.
+func replicationStepErr(runnerUID, actorUID string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if runnerUID != actorUID {
+		return ErrThresholdNotMet
+	}
+
+	return err
+}
+
 // AddParticipantWithAcsSequence orchestrates the full eleven-step combined
 // add-participant + ACS replication ceremony. It is designed to be called
 // multiple times by different actors in an async workflow.
@@ -66,6 +90,11 @@ var AddParticipantWithAcsSequence = operations.NewSequence(
 			)
 		}
 		decNS := parts[1]
+
+		runnerUID, err := deps.Client.GetParticipantUID(ctx)
+		if err != nil {
+			return out, fmt.Errorf("fetching runner participant UID: %w", err)
+		}
 
 		// ── Step 1: New participant generates keys ───────────────────────────
 		keyReport, err := operations.ExecuteOperation(b, keys.CreateMemberKeyOp, deps, keys.CreateMemberKeyInput{
@@ -93,9 +122,14 @@ var AddParticipantWithAcsSequence = operations.NewSequence(
 			ParticipantID:  in.NewParticipantID,
 			SynchronizerID: in.SynchronizerID,
 		})
-		if err != nil {
-			deps.Logger.Infow("Target ledger offset recording pending",
-				"target", in.NewParticipantID, "err", err)
+		if stepErr := replicationStepErr(runnerUID, in.NewParticipantID, err); stepErr != nil {
+			if errors.Is(stepErr, ErrThresholdNotMet) {
+				deps.Logger.Infow("Target ledger offset recording pending",
+					"runner", runnerUID, "target", in.NewParticipantID)
+			} else {
+				deps.Logger.Infow("Target ledger offset recording pending",
+					"target", in.NewParticipantID, "err", stepErr)
+			}
 
 			return out, fmt.Errorf("%w: target participant has not recorded ledger offset yet",
 				ErrThresholdNotMet)
@@ -279,15 +313,21 @@ var AddParticipantWithAcsSequence = operations.NewSequence(
 			ParticipantID:  in.SourceParticipantID,
 			SynchronizerID: in.SynchronizerID,
 		})
-		if err != nil {
-			deps.Logger.Infow("Ledger offset recording pending",
-				"source", in.SourceParticipantID, "err", err)
+		if stepErr := replicationStepErr(runnerUID, in.SourceParticipantID, err); stepErr != nil {
+			if errors.Is(stepErr, ErrThresholdNotMet) {
+				deps.Logger.Infow("Ledger offset recording pending",
+					"runner", runnerUID, "source", in.SourceParticipantID)
+			} else {
+				deps.Logger.Infow("Ledger offset recording pending",
+					"source", in.SourceParticipantID, "err", stepErr)
+			}
 
 			return out, fmt.Errorf("%w: source participant has not recorded ledger offset yet",
 				ErrThresholdNotMet)
 		}
 		out.State.LedgerOffsetRecorded = true
 		ledgerOffset := offsetReport.Output.LedgerOffset
+		ledgerTimestamp := offsetReport.Output.TimestampSeconds
 
 		// ── Step 8: P2P proposals with onboarding flag ──────────────────────
 		out.State.Phase = PhaseP2POnboarding
@@ -384,24 +424,54 @@ var AddParticipantWithAcsSequence = operations.NewSequence(
 		out.DNSUpdated = true
 		out.P2PUpdated = true
 
-		// ── Step 9: Export ACS from source ───────────────────────────────────
+		// ── Step 9: Disconnect target before ACS export/import ───────────────
+		// Per Canton's offline party replication flow, the target must go
+		// offline immediately after authorizing hosting with the onboarding
+		// flag set. That prevents it from processing post-snapshot events until
+		// the source ACS has been imported.
+		out.State.Phase = PhaseTargetDisconnect
+		_, err = operations.ExecuteOperation(b, replication.DisconnectSynchronizerOp, deps, replication.DisconnectSynchronizerInput{
+			ParticipantID:     in.NewParticipantID,
+			SynchronizerAlias: in.SynchronizerAlias,
+		})
+		if stepErr := replicationStepErr(runnerUID, in.NewParticipantID, err); stepErr != nil {
+			if errors.Is(stepErr, ErrThresholdNotMet) {
+				deps.Logger.Infow("Target disconnect pending",
+					"runner", runnerUID, "target", in.NewParticipantID)
+			} else {
+				deps.Logger.Infow("Target disconnect pending",
+					"target", in.NewParticipantID, "err", stepErr)
+			}
+
+			return out, fmt.Errorf("%w: target participant has not disconnected for ACS replication yet",
+				ErrThresholdNotMet)
+		}
+		out.State.TargetDisconnected = true
+
+		// ── Step 10: Export ACS from source ──────────────────────────────────
 		out.State.Phase = PhaseAcsExport
 		exportReport, err := operations.ExecuteOperation(b, replication.ExportAcsOp, deps, replication.ExportAcsInput{
-			ParticipantID:  in.SourceParticipantID,
-			PartyIDs:       []string{in.DecentralizedPartyID},
-			SynchronizerID: in.SynchronizerID,
-			LedgerOffset:   ledgerOffset,
+			ParticipantID:    in.SourceParticipantID,
+			PartyIDs:         []string{in.DecentralizedPartyID},
+			SynchronizerID:   in.SynchronizerID,
+			LedgerOffset:     ledgerOffset,
+			TimestampSeconds: ledgerTimestamp,
 		})
-		if err != nil {
-			deps.Logger.Infow("ACS export pending",
-				"source", in.SourceParticipantID, "err", err)
+		if stepErr := replicationStepErr(runnerUID, in.SourceParticipantID, err); stepErr != nil {
+			if errors.Is(stepErr, ErrThresholdNotMet) {
+				deps.Logger.Infow("ACS export pending",
+					"runner", runnerUID, "source", in.SourceParticipantID)
+			} else {
+				deps.Logger.Infow("ACS export pending",
+					"source", in.SourceParticipantID, "err", stepErr)
+			}
 
 			return out, fmt.Errorf("%w: source participant has not exported ACS yet",
 				ErrThresholdNotMet)
 		}
 		out.State.AcsExported = true
 
-		// ── Step 10: Import ACS into target ──────────────────────────────────
+		// ── Step 11: Import ACS into target ──────────────────────────────────
 		out.State.Phase = PhaseAcsImport
 		_, err = operations.ExecuteOperation(b, replication.ImportAcsOp, deps, replication.ImportAcsInput{
 			ParticipantID:     in.NewParticipantID,
@@ -410,16 +480,41 @@ var AddParticipantWithAcsSequence = operations.NewSequence(
 			AcsSnapshotB64:    exportReport.Output.AcsSnapshotB64,
 			ExpectedSHA256:    exportReport.Output.SHA256,
 		})
-		if err != nil {
-			deps.Logger.Infow("ACS import pending",
-				"target", in.NewParticipantID, "err", err)
+		if stepErr := replicationStepErr(runnerUID, in.NewParticipantID, err); stepErr != nil {
+			if errors.Is(stepErr, ErrThresholdNotMet) {
+				deps.Logger.Infow("ACS import pending",
+					"runner", runnerUID, "target", in.NewParticipantID)
+			} else {
+				deps.Logger.Infow("ACS import pending",
+					"target", in.NewParticipantID, "err", stepErr)
+			}
 
 			return out, fmt.Errorf("%w: target participant has not imported ACS yet",
 				ErrThresholdNotMet)
 		}
 		out.State.AcsImported = true
 
-		// ── Step 11: Clear onboarding flag ───────────────────────────────────
+		// ── Step 12: Reconnect target ────────────────────────────────────────
+		out.State.Phase = PhaseTargetReconnect
+		_, err = operations.ExecuteOperation(b, replication.ReconnectSynchronizerOp, deps, replication.ReconnectSynchronizerInput{
+			ParticipantID:     in.NewParticipantID,
+			SynchronizerAlias: in.SynchronizerAlias,
+		})
+		if stepErr := replicationStepErr(runnerUID, in.NewParticipantID, err); stepErr != nil {
+			if errors.Is(stepErr, ErrThresholdNotMet) {
+				deps.Logger.Infow("Target reconnect pending",
+					"runner", runnerUID, "target", in.NewParticipantID)
+			} else {
+				deps.Logger.Infow("Target reconnect pending",
+					"target", in.NewParticipantID, "err", stepErr)
+			}
+
+			return out, fmt.Errorf("%w: target participant has not reconnected after ACS import yet",
+				ErrThresholdNotMet)
+		}
+		out.State.TargetReconnected = true
+
+		// ── Step 13: Clear onboarding flag ───────────────────────────────────
 		// Use the target ledger offset recorded in Step 1b. Forward search
 		// from here skips past any prior activation of this party on the
 		// target (e.g. before an earlier kick) and lands on the new one,
@@ -431,9 +526,14 @@ var AddParticipantWithAcsSequence = operations.NewSequence(
 			SynchronizerID:       in.SynchronizerID,
 			BeginOffsetExclusive: out.State.TargetLedgerOffset,
 		})
-		if err != nil {
-			deps.Logger.Infow("Clear onboarding flag pending",
-				"target", in.NewParticipantID, "err", err)
+		if stepErr := replicationStepErr(runnerUID, in.NewParticipantID, err); stepErr != nil {
+			if errors.Is(stepErr, ErrThresholdNotMet) {
+				deps.Logger.Infow("Clear onboarding flag pending",
+					"runner", runnerUID, "target", in.NewParticipantID)
+			} else {
+				deps.Logger.Infow("Clear onboarding flag pending",
+					"target", in.NewParticipantID, "err", stepErr)
+			}
 
 			return out, fmt.Errorf("%w: target participant has not cleared onboarding flag yet",
 				ErrThresholdNotMet)
