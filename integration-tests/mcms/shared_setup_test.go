@@ -10,8 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/factory"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
