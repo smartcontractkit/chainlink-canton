@@ -92,19 +92,20 @@ template LinkTransferInstruction
         status = TransferV1.TransferPendingReceiverAcceptance
         meta = MetadataV1.emptyMetadata
 
-      transferInstruction_acceptImpl _self _arg = do
+      transferInstruction_acceptImpl _self arg = do
         now <- getTime
         assertMsg "LinkTransferInstruction.TransferInstruction_Accept: transfer instruction expired"
           (instructionTransfer.executeBefore > now)
         lockedHolding <- fetch instructionLockedHoldingCid
         archive instructionLockedHoldingCid
+        let mergedMeta = mergeAcceptMeta arg.extraArgs.meta lockedHolding.meta
 
         receiverCid <- create LinkHolding with
           holdingOwner = instructionTransfer.receiver
           holdingAdmin = instructionAdmin
           holdingInstrumentId = instructionTransfer.instrumentId
           holdingAmount = lockedHolding.lockedAmount
-          meta = lockedHolding.meta
+          meta = mergedMeta
 
         pure TransferV1.TransferInstructionResult with
           senderChangeCids = []
@@ -238,6 +239,13 @@ template LinkRegistry
               None -> Map.delete receiver transferPreapprovals
 
         create this with transferPreapprovals = updatedTransferPreapprovals
+
+-- | Receiver accept-time metadata takes precedence on key conflicts; sender
+-- metadata from the locked holding fills in the rest.
+mergeAcceptMeta : MetadataV1.Metadata -> MetadataV1.Metadata -> MetadataV1.Metadata
+mergeAcceptMeta acceptMeta lockedMeta =
+  MetadataV1.Metadata with
+    values = TextMap.union acceptMeta.values lockedMeta.values
 
 sumAndArchiveInputs
   : Party
