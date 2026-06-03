@@ -63,13 +63,13 @@ func GenerateTimelockProposal(
 
 	mcmsAddrHex := config.MCMSContract.InstanceAddress.Hex()
 
-	inspector := cantonsdk.NewInspector(stateClient, party, config.Role)
+	inspector := cantonsdk.NewInspector(stateClient, []string{party}, config.Role)
 	opCount, err := inspector.GetOpCount(ctx, mcmsAddrHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get op count: %w", err)
 	}
 
-	mcmsContract, err := cantonsdk.GetMCMSContract(ctx, stateClient, party, mcmsAddrHex)
+	mcmsContract, err := cantonsdk.GetMCMSContract(ctx, stateClient, []string{party}, mcmsAddrHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get MCMS contract state: %w", err)
 	}
