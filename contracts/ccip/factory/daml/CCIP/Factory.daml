@@ -646,7 +646,6 @@ mkLinkTokenContract owner params = Link.Token.LinkRegistry with
     registryInstrumentId = params.instrumentId
     instanceId = params.instanceId
     registryMeta = Splice.Api.Token.MetadataV1.emptyMetadata
-    transferPreapprovals = Map.empty
 
 mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.TokenAdminRegistry.TokenAdminRegistry
 mkTokenAdminRegistryContract owner params = CCIP.TokenAdminRegistry.TokenAdminRegistry with

@@ -375,7 +375,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			RegistryAdmin:        types.PARTY(partyCCIP),
 			RegistryInstrumentId: linkInstrumentId,
 			RegistryMeta:         splice_api_token_metadata_v1.Metadata{},
-			TransferPreapprovals: nil,
 		},
 	})
 	require.NoError(t, err)
