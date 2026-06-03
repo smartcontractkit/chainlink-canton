@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"testing"
@@ -41,7 +42,7 @@ type captureImportAcsServer struct {
 func (s *captureImportAcsServer) ImportAcs(stream grpc.ClientStreamingServer[participantv30.ImportAcsRequest, participantv30.ImportAcsResponse]) error {
 	for {
 		req, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

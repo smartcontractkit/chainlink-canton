@@ -150,7 +150,7 @@ func TestReplicationStepErr(t *testing.T) {
 		t.Parallel()
 		err := replicationStepErr("p2", "p2", opErr)
 		require.Error(t, err)
-		assert.False(t, errors.Is(err, ErrThresholdNotMet))
+		require.NotErrorIs(t, err, ErrThresholdNotMet)
 		assert.Contains(t, err.Error(), "participant ID mismatch")
 	})
 }

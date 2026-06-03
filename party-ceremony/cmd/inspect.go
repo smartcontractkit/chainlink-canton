@@ -689,10 +689,14 @@ func addParticipantWithAcsPhaseLabel(p addparticipantwithacs.Phase) string {
 		return "record-offset — recording ledger offset on source"
 	case addparticipantwithacs.PhaseP2POnboarding:
 		return "p2p-onboarding — collecting P2P proposals with onboarding flag"
+	case addparticipantwithacs.PhaseTargetDisconnect:
+		return "target-disconnect — target disconnects from synchronizer"
 	case addparticipantwithacs.PhaseAcsExport:
 		return "acs-export — exporting ACS from source participant"
 	case addparticipantwithacs.PhaseAcsImport:
 		return "acs-import — importing ACS into target participant"
+	case addparticipantwithacs.PhaseTargetReconnect:
+		return "target-reconnect — target reconnects to synchronizer"
 	case addparticipantwithacs.PhaseClearOnboarding:
 		return "clear-onboarding — clearing onboarding flag on target"
 	case addparticipantwithacs.PhaseCompleted:

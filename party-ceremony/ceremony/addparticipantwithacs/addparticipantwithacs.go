@@ -15,7 +15,7 @@
 //  4. CreateAddDNSProposalOp  – coordinator creates updated DNS proposal.
 //  5. SignAddDNSProposalOp    – each existing participant signs the proposal.
 //  6. SubmitAddDNSOp          – merge signatures, submit updated DNS.
-//  1b. RecordTargetLedgerOffsetOp – target records offset before topology changes.
+//     1b. RecordTargetLedgerOffsetOp – target records offset before topology changes.
 //  7. RecordLedgerOffsetOp    – source records offset BEFORE P2P authorization.
 //  8. ProposeAddP2PWithOnboardingOp – P2P mapping with onboarding flag on new participant.
 //  9. DisconnectSynchronizerOp – target disconnects after onboarding consent.

@@ -230,6 +230,7 @@ func ledgerPackageNameRef(name string) string {
 	if strings.HasPrefix(name, "#") {
 		return name
 	}
+
 	return "#" + name
 }
 

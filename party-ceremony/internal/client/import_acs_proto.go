@@ -48,12 +48,14 @@ func importAcsSynchronizerID(req *participantv30.ImportAcsRequest) (string, bool
 				return "", false
 			}
 			b = b[n:]
+
 			continue
 		}
 		v, n := protowire.ConsumeString(b)
 		if n < 0 {
 			return "", false
 		}
+
 		return v, true
 	}
 
