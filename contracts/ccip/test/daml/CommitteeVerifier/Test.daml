@@ -404,6 +404,21 @@ testCommitteeVerifier = script do
     debug ("===== Passed Test10 =====")
 
     debug ("===== Test10b =====")
+    -- mismatched map key vs embedded sourceChainSelector should be rejected at creation time
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv10b-mismatch"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(456.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     -- duplicate signer keys should be rejected at creation time
     submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
