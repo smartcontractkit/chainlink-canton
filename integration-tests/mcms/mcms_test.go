@@ -9,16 +9,17 @@ import (
 	"testing"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 // ===========================================================================
@@ -619,11 +620,7 @@ func createMCMS(ctx context.Context, participant canton.Participant, owner strin
 				{
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
+							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
 								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: baseMcmsId}}},
@@ -675,11 +672,7 @@ func setMCMSConfig(ctx context.Context, participant canton.Participant, owner st
 				{
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
+							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
 							ContractId: mcmsCid,
 							Choice:     "SetConfig",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -749,11 +742,7 @@ func setMCMSRoot(ctx context.Context, participant canton.Participant, owner stri
 				{
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
+							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -874,9 +863,10 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Encode using binding's MarshalHex
-			encoded, err := tc.params.MarshalHex()
+			// Encode using binding's MarshalHex (wire bytes) then hex for transport/UnmarshalHex.
+			wire, err := tc.params.MarshalHex()
 			require.NoError(t, err, "failed to encode")
+			encoded := wireToHex(wire)
 			t.Logf("Encoded %s: %s (%d hex chars = %d bytes)",
 				tc.name, truncateString(encoded, 60), len(encoded), len(encoded)/2)
 
@@ -959,8 +949,9 @@ func TestMCMSCodec_SetConfigParams_KnownValues(t *testing.T) {
 		ClearRoot:    false,
 	}
 
-	encoded, err := params.MarshalHex()
+	wire, err := params.MarshalHex()
 	require.NoError(t, err)
+	encoded := wireToHex(wire)
 
 	// Parse and verify structure manually
 	// Format: numSigners(1) + [addrLen(1) + addr(20) + index(4) + group(4)]... + numQuorums(1) + quorums(4*n) + numParents(1) + parents(4*n) + clearRoot(1)

@@ -181,6 +181,18 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
         exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
             sourceChainConfigUpdates = invalidSourceChainConfigUpdates
 
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 456.0
+                isEnabled = True
+                onRampAddresses = [""] -- empty string onramp address must be rejected
+                defaultCCVs = [RawInstanceAddress "0xabc"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123"]
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
     -- | ======== Test 4 ========
     -- | Test creating a GlobalConfig with invalid chain selector and verify that the transaction is reverted
     -- | =======================
@@ -527,7 +539,23 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     submitMustFail owner do
         exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
             destChainConfigUpdates = invalidDestChainConfigUpdates
-    
+
+    -- negative message network fees are rejected.
+    let invalidDestChainConfigUpdates = [
+            (head destChainConfigUpdates1) with messageNetworkFeeUSDCents = -1.0
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
+            destChainConfigUpdates = invalidDestChainConfigUpdates
+
+    -- negative token network fees are rejected.
+    let invalidDestChainConfigUpdates = [
+            (head destChainConfigUpdates1) with tokenNetworkFeeUSDCents = -1.0
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
+            destChainConfigUpdates = invalidDestChainConfigUpdates
+
     pure()
 
 -- Assertion helpers

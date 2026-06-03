@@ -97,6 +97,26 @@ computeRequiredCCVsForSend destConfig message extraArgs senderRequestedCCVs =
                 senderRequestedCCVs
     in dedup (resolvedSenderRequiredCCVs ++ destConfig.laneMandatedCCVs)
 
+validateExecutorFeeQuote
+    : CCIP.Client.ExecutorExtraArg
+    -> Optional RawInstanceAddress.RawInstanceAddress
+    -> Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
+    -> Update ()
+validateExecutorFeeQuote executorArg defaultExecutor executorFeeQuote =
+    let expectedExecutor = case executorArg of
+            CCIP.Client.Executor_NoExecutor -> None
+            CCIP.Client.Executor_UseDefault _ -> defaultExecutor
+            CCIP.Client.Executor_WithAddress executorAddress _ -> Some executorAddress
+    in case (expectedExecutor, executorFeeQuote) of
+        (None, None) -> pure ()
+        (None, Some _) ->
+            abort "onramp: executor fee quote not allowed"
+        (Some _, None) ->
+            abort "onramp: executor fee quote required"
+        (Some expectedExecutor, Some quote) ->
+            RawInstanceAddress.assertEqual "onramp: executor fee quote executor mismatch"
+                quote.executorInstanceId quote.executorOwner expectedExecutor
+
 data GetFeeFromRouterResult = GetFeeFromRouterResult
     with
         -- Final amount payable in the selected fee token, including CCV fees,
@@ -140,9 +160,10 @@ calculateFeeResult
     -> Numeric 0
     -> CCIP.GlobalConfig.DestChainConfig
     -> CCIP.FeeQuoter.FeeQuoterDestChainConfig
+    -> [Numeric 0]
     -> FeeCalculationInputs
     -> Update FeeCalculationResult
-calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector destConfig feeDestConfig inputs = do
+calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector destConfig feeDestConfig ccvFeeUSDCentsByVerifier inputs = do
     let executorDestGasLimit = destConfig.baseExecutionGasCost + inputs.ccipReceiveGasLimit
     let executorDestBytesOverhead = if inputs.hasTokenTransfer
             then computeExecutorDestBytesOverheadWithToken
@@ -204,8 +225,10 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
     let convertDirect feeUSDCents =
             let feeUsd10 = promoteUsdCentsToUsd10 feeUSDCents
             in CCIP.Math.mulDivDown feeUsd10 CCIP.Math.premiumIdentity feeTokenPriceN
+    let ccvFeeTokenAmount =
+            sum (map convertWithPremium ccvFeeUSDCentsByVerifier)
     let totalFeeTokenAmount =
-            convertWithPremium inputs.ccvFeeUSDCents
+            ccvFeeTokenAmount
             + convertWithPremium inputs.poolFeeUSDCents
             + convertWithPremium networkFeeUSDCents
             + convertDirect inputs.executorFeeUSDCents
@@ -268,18 +291,24 @@ template OnRamp
                         extraArgs <- case message.extraArgs of
                                 CCIP.Client.V3 v3 -> pure v3
                                 _ -> abort "onramp: unsupported extraArgs version"
+                        let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
+                        CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                        CCIP.Internal.assertMaxCCVListLength "onramp: pool-reported CCVs" poolReportedCCVs
+                        assertMsg "onramp: pool-reported CCVs cannot contain duplicates"
+                            (unique poolReportedCCVs)
                         let senderRequiredCCVs =
                                 computeRequiredCCVsForSend
                                     config
                                     message
                                     extraArgs
-                                    (map (.ccvAddress) extraArgs.ccvs)
+                                    senderRequestedCCVs
                         let finalRequiredCCVs = case message.tokenTransfer of
                                 None -> senderRequiredCCVs
                                 Some _ ->
                                     dedup (senderRequiredCCVs ++ CCIP.Internal.resolveRequiredCCVsWithDefaults
                                         config.defaultCCVs
                                         poolReportedCCVs)
+                        CCIP.Internal.assertMaxCCVListLength "onramp: required CCVs" finalRequiredCCVs
                         pure finalRequiredCCVs
 
         -- | Build SendingMessageV1 for outbound message.
@@ -339,6 +368,8 @@ template OnRamp
                 -- Parse extraArgs and validate fields
                 extraArgs <- case message.extraArgs of
                         CCIP.Client.V3 v3 -> pure v3
+                let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
+                CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
                 assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
@@ -346,7 +377,7 @@ template OnRamp
                 Foldable.forA_ extraArgs.ccvs (\ccvExtraArg ->
                     assertValidHex "ccvArgs" ccvExtraArg.ccvArgs)
                 assertMsg "onramp: CCVs cannot contain duplicates"
-                    (unique (map (.ccvAddress) extraArgs.ccvs))
+                    (unique senderRequestedCCVs)
                 case extraArgs.executor of
                     CCIP.Client.Executor_NoExecutor -> pure ()
                     CCIP.Client.Executor_UseDefault executorArgs ->
@@ -372,7 +403,8 @@ template OnRamp
                             destConfig
                             message
                             extraArgs
-                            (map (.ccvAddress) extraArgs.ccvs)
+                            senderRequestedCCVs
+                CCIP.Internal.assertMaxCCVListLength "onramp: required CCVs" resolvedSenderRequiredCCVs
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 assertMsg "onramp: sequence number exceeds uint64"
@@ -474,6 +506,11 @@ template OnRamp
             do
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
+                let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
+                CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                CCIP.Internal.assertMaxCCVListLength "onramp: CCV fee quotes" ccvFeeQuotes
+                assertMsg "onramp: CCVs cannot contain duplicates"
+                    (unique senderRequestedCCVs)
                 let executorArgs = case extraArgs.executor of
                         CCIP.Client.Executor_NoExecutor -> ""
                         CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
@@ -515,6 +552,11 @@ template OnRamp
                         assertMsg "onramp: destination chain disabled" cfg.isEnabled
                         pure cfg
 
+                validateExecutorFeeQuote
+                    extraArgs.executor
+                    destConfig.defaultExecutor
+                    executorFeeQuote
+
                 feeDestConfig <- exercise feeQuoterCid
                     CCIP.FeeQuoter.GetDestChainConfig with
                         destChainSelector = destChainSelector
@@ -549,6 +591,7 @@ template OnRamp
                     destChainSelector
                     destConfig
                     feeDestConfig
+                    (map (.feeUSDCents) ccvFeeQuotes)
                     inputs
 
                 pure GetFeeFromRouterResult with
@@ -644,6 +687,7 @@ template OnRamp
                     sendingMsg.destChainSelector
                     destConfig
                     feeDestConfig
+                    (map (.feeUSDCents) sendingMsg.ccvFees)
                     inputs
 
                 finalizedCid <- exercise sendingMessageCid

@@ -9,7 +9,7 @@ paths:
     post:
       operationId: postGetExplicitDisclosureBatch
       description: |
-        Get the explicit disclosures for instantiating a PerPartyRouter using the PerPartyRouterFactory.
+        Get the explicit disclosures for one or multiple contracts.
       requestBody:
         required: true
         content:

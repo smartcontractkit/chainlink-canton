@@ -17,9 +17,11 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		ChainSelector: "",
-		Server:        ServerConfig{},
-		Node:          NodeConfig{},
-		Monitoring:    MonitoringConfig{},
+		Server: ServerConfig{
+			MaxRequestSizeBytes: 1024 * 1024 * 10, // 10MiB
+		},
+		Node:       NodeConfig{},
+		Monitoring: MonitoringConfig{},
 		GlobalAPIConfig: GlobalAPIConfig{
 			MaxBatchSize: 1024,
 		},
@@ -46,8 +48,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host string `toml:"host" validate:"required"`
-	Port uint16 `toml:"port" validate:"required,port"`
+	Host                string `toml:"host" validate:"required"`
+	Port                uint16 `toml:"port" validate:"required,port"`
+	MaxRequestSizeBytes int64  `toml:"max_request_size_bytes" validate:"required"`
 }
 
 type NodeConfig struct {
@@ -117,18 +120,18 @@ const (
 )
 
 type TransferFactory struct {
-	Type FactoryType `toml:"type" validate:"oneof=address url"`
+	Type FactoryType `toml:"type" validate:"oneof='' address url"`
 
 	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
 	Party           *string                    `toml:"party" validate:"required_if=Type address"`
 	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
 
-	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"required_if=Type url,url"`
+	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"excluded_unless=Type url,required_if=Type url,omitnil,url"`
 	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url"`
 }
 
 type BurnMintFactory struct {
-	Type FactoryType `toml:"type" validate:"oneof=address"`
+	Type FactoryType `toml:"type" validate:"oneof='' address"`
 
 	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
 	Party           *string                    `toml:"party" validate:"required_if=Type address"`
@@ -144,7 +147,7 @@ type TokenPool struct {
 
 	TransferFactory     *TransferFactory     `toml:"transfer_factory" validate:"excluded_unless=Type lockRelease"`
 	BurnMintFactory     *BurnMintFactory     `toml:"burn_mint_factory" validate:"excluded_unless=Type burnMint"`
-	TransferPreapproval *TransferPreapproval `toml:"transfer_preapproval" validate:"omitnil,required"`
+	TransferPreapproval *TransferPreapproval `toml:"transfer_preapproval" validate:"omitnil"`
 }
 
 type TransferPreapproval struct {

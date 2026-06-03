@@ -10,8 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -21,8 +21,6 @@ import (
 // Contract instances (MCMS, Counter, etc.) are NOT shared as each test needs its own isolated state.
 type SharedCantonEnvironment struct {
 	Participant   canton.Participant
-	McmsPkgID     string
-	McmsTestPkgID string
 	McmsEncoder   mcms.MCMSEncoder
 	CcipOwner     string
 	Signers       []*MCMSSigner
@@ -34,16 +32,13 @@ type SharedCantonEnvironment struct {
 // Used for tests that interact with TokenAdminRegistry contracts.
 type SharedTAREnvironment struct {
 	SharedCantonEnvironment
-	TarPkgID string
 }
 
 // SharedCCIPMCMSEnvironment extends SharedCantonEnvironment with all CCIP + Factory packages.
 // Used for tests that validate MCMS-driven CCIP deployment and configuration.
 type SharedCCIPMCMSEnvironment struct {
 	SharedCantonEnvironment
-	CCIPCommonPkgID string
-	FactoryPkgID    string
-	FactoryEncoder  factory.MCMSEncoder
+	FactoryEncoder factory.MCMSEncoder
 }
 
 // SharedCCIPMCMSTwoParticipantEnvironment extends SharedCCIPMCMSEnvironment with a second party.
@@ -108,16 +103,12 @@ func GetSharedEnvironment(t *testing.T) *SharedCantonEnvironment {
 			return
 		}
 
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedEnv = &SharedCantonEnvironment{
 			Participant:   participant,
-			McmsPkgID:     mcmsPkgID,
-			McmsTestPkgID: mcmsTestPkgID,
-			McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+			McmsEncoder:   NewMCMSEncoder(),
 			CcipOwner:     participant.PartyID,
 			Signers:       signers,
 			SortedSigners: sortedSigners,
@@ -181,24 +172,18 @@ func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
 			return
 		}
 
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
-		tarPkgID := packageIDs[len(packageIDs)-1]
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedTAREnv = &SharedTAREnvironment{
 			SharedCantonEnvironment: SharedCantonEnvironment{
 				Participant:   participant,
-				McmsPkgID:     mcmsPkgID,
-				McmsTestPkgID: mcmsTestPkgID,
-				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+				McmsEncoder:   NewMCMSEncoder(),
 				CcipOwner:     participant.PartyID,
 				Signers:       signers,
 				SortedSigners: sortedSigners,
 				Config:        New2of3Config(signers),
 			},
-			TarPkgID: tarPkgID,
 		}
 	})
 
@@ -246,41 +231,27 @@ func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
 			darBytes = append(darBytes, dar)
 		}
 
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
+		_, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
 		if err != nil {
 			errSharedCCIPMCMSEnv = err
 			return
 		}
 
-		if len(packageIDs) < len(darPackages) {
-			errSharedCCIPMCMSEnv = fmt.Errorf("expected %d package IDs, got %d", len(darPackages), len(packageIDs))
-			return
-		}
-
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
-		ccipCommonPkgID := packageIDs[2]
-		factoryPkgID := packageIDs[len(packageIDs)-1]
-
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
-		factoryEncoder := factory.NewContract(factoryPkgID, "CCIP.Factory", "CCIPFactory").Encoder()
+		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.Factory", "CCIPFactory").Encoder()
 
 		sharedCCIPMCMSEnv = &SharedCCIPMCMSEnvironment{
 			SharedCantonEnvironment: SharedCantonEnvironment{
 				Participant:   participant,
-				McmsPkgID:     mcmsPkgID,
-				McmsTestPkgID: mcmsTestPkgID,
-				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+				McmsEncoder:   NewMCMSEncoder(),
 				CcipOwner:     participant.PartyID,
 				Signers:       signers,
 				SortedSigners: sortedSigners,
 				Config:        New2of3Config(signers),
 			},
-			CCIPCommonPkgID: ccipCommonPkgID,
-			FactoryPkgID:    factoryPkgID,
-			FactoryEncoder:  factoryEncoder,
+			FactoryEncoder: factoryEncoder,
 		}
 	})
 
@@ -334,42 +305,28 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 		}
 
 		// Upload DARs to the participant
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
+		_, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant)
 		if err != nil {
 			errSharedCCIPMCMSTwoPartEnv = err
 			return
 		}
 
-		if len(packageIDs) < len(darPackages) {
-			errSharedCCIPMCMSTwoPartEnv = fmt.Errorf("expected %d package IDs, got %d", len(darPackages), len(packageIDs))
-			return
-		}
-
-		mcmsPkgID := packageIDs[0]
-		mcmsTestPkgID := packageIDs[1]
-		ccipCommonPkgID := packageIDs[2]
-		factoryPkgID := packageIDs[len(packageIDs)-1]
-
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
-		factoryEncoder := factory.NewContract(factoryPkgID, "CCIP.Factory", "CCIPFactory").Encoder()
+		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.Factory", "CCIPFactory").Encoder()
 
 		sharedCCIPMCMSTwoPartEnv = &SharedCCIPMCMSTwoParticipantEnvironment{
 			SharedCCIPMCMSEnvironment: SharedCCIPMCMSEnvironment{
 				SharedCantonEnvironment: SharedCantonEnvironment{
 					Participant:   participant,
-					McmsPkgID:     mcmsPkgID,
-					McmsTestPkgID: mcmsTestPkgID,
-					McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+					McmsEncoder:   NewMCMSEncoder(),
 					CcipOwner:     participant.PartyID,
 					Signers:       signers,
 					SortedSigners: sortedSigners,
 					Config:        New2of3Config(signers),
 				},
-				CCIPCommonPkgID: ccipCommonPkgID,
-				FactoryPkgID:    factoryPkgID,
-				FactoryEncoder:  factoryEncoder,
+				FactoryEncoder: factoryEncoder,
 			},
 			BootstrapParty: bootstrapParty,
 		}
