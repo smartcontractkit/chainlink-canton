@@ -1561,7 +1561,10 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
       newCapacity = 50.0
       newRate = 5.0
 
-  updatedInboundCid <- submit poolOwner do
+  -- the rate limit admin can call SetConfig on the rate limiter, but isn't an observer of the rate limiter itself
+  disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiterCid
+
+  updatedInboundCid <- submit (actAs rateLimitAdmin <> disclose disclosedRateLimiter ) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimitConfig with
       caller = rateLimitAdmin
       rateLimiterCid = inboundRateLimiterCid

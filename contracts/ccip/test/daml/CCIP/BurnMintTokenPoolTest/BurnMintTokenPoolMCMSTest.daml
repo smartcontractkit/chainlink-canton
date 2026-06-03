@@ -386,7 +386,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     let encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
-            caller = rateLimitAdmin
+            caller = poolOwner
             rateLimiterInstanceAddress = rlAddr
             newIsEnabled = True
             newCapacity = 50.0
