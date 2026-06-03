@@ -25,7 +25,7 @@ module CCIP.MessageCodecV1
 
 import DA.Crypto.Text
 import qualified DA.Text as Text
-import DA.Optional (fromSome)
+import DA.Optional (fromSome, fromSomeNote)
 
 import qualified CCIP.FinalityConfig
 import qualified CCIP.NumericHex as NumericHex
@@ -101,7 +101,7 @@ encodeMessageV1 message =
             <> fromSome (encodeUint64 message.sequenceNumber)       -- messageNumber (8 bytes)
             <> fromSome (encodeUint32 message.executionGasLimit)    -- executionGasLimit (4 bytes)
             <> fromSome (encodeUint32 message.ccipReceiveGasLimit)  -- ccipReceiveGasLimit (4 bytes)
-            <> fromSome (if byteCount message.finality.raw == 4 then Some message.finality.raw else None)
+            <> fromSomeNote "MessageCodecV1.encodeMessageV1: finality must be 4 bytes" (if byteCount message.finality.raw == 4 then Some message.finality.raw else None)
             <> NumericHex.padLeft 64 "0" message.ccvAndExecutorHash -- ccvAndExecutorHash (32 bytes = 64 hex chars)
 
         -- Variable length section - MUST match EVM order exactly
