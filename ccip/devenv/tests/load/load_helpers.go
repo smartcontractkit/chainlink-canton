@@ -1,6 +1,7 @@
 package load
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 )
@@ -186,14 +188,29 @@ func estimateMessages(sched scheduleConfig) uint64 {
 	return estimated
 }
 
-func cantonTokenPreMintAmounts(estimated uint64, lane devenvtests.TokenLane) (feeMint, transferMint uint64) {
-	const (
-		mintBufferNumerator   uint64 = 3
-		mintBufferDenominator uint64 = 2
-	)
-	feeMint = estimated * uint64(devenvtests.CantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
-	transferMint = estimated * lane.TransferAmount.Uint64() * mintBufferNumerator / mintBufferDenominator
-	return feeMint, transferMint
+// setupCantonTokenLoadHoldings pre-mints two separate Amulet holdings (fee + transfer) and
+// calls SetupSend once, matching the e2e canton2evm token transfer pattern.
+func setupCantonTokenLoadHoldings(
+	t *testing.T,
+	ctx context.Context,
+	cantonImpl *cantondevenv.Chain,
+	sched scheduleConfig,
+	lane devenvtests.TokenLane,
+) {
+	t.Helper()
+
+	estimated := estimateMessages(sched)
+	feeMint := estimated * uint64(devenvtests.CantonToEVMFeeAmount)
+	transferMint := estimated * lane.TransferAmount.Uint64()
+	t.Logf("Pre-mint: estimatedMessages=%d feeMint=%d transferMint=%d",
+		estimated, feeMint, transferMint)
+	require.NoError(t, cantonImpl.MintTokens(ctx, feeMint))
+	require.NoError(t, cantonImpl.MintTokens(ctx, transferMint))
+	require.NoError(t, cantonImpl.SetupSend(
+		ctx,
+		uint64(devenvtests.CantonToEVMFeeAmount),
+		lane.TransferAmount.Uint64(),
+	))
 }
 
 func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress) Destination {

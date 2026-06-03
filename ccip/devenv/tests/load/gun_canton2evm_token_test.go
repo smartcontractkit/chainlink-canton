@@ -72,13 +72,7 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 	ccvAddr, executorAddr := resolveCantonSourceAddrs(t, lib, cantonChain.ChainSelector())
 	sched := loadSchedule(t)
 
-	estimatedMessages := estimateMessages(sched)
-	feeMint, transferMint := cantonTokenPreMintAmounts(estimatedMessages, lane)
-	t.Logf("Pre-mint: estimatedMessages=%d feeMint=%d transferMint=%d",
-		estimatedMessages, feeMint, transferMint)
-	require.NoError(t, cantonImpl.MintTokens(ctx, feeMint))
-	require.NoError(t, cantonImpl.MintTokens(ctx, transferMint))
-	require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), lane.TransferAmount.Uint64()))
+	setupCantonTokenLoadHoldings(t, ctx, cantonImpl, sched, lane)
 
 	gun, err := NewCCIPLoadGun(
 		cantonChain,
