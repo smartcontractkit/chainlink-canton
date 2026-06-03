@@ -16,6 +16,16 @@ data MessageExecutionState
 useDefaultCCVs : RawInstanceAddress
 useDefaultCCVs = RawInstanceAddress "default-ccvs"
 
+-- EVM GenericExtraArgsV3 encodes the user CCV count in one byte. Keep Canton
+-- bounded to the same absolute protocol ceiling; executors may enforce lower
+-- deployment-specific caps.
+maxCCVsPerMessage : Int
+maxCCVsPerMessage = 255
+
+assertMaxCCVListLength : Text -> [a] -> Update ()
+assertMaxCCVListLength label ccvs =
+    assertMsg (label <> ": too many CCVs") (length ccvs <= maxCCVsPerMessage)
+
 assertCCVInstanceId
     : Text
     -> [RawInstanceAddress]
@@ -30,10 +40,10 @@ assertCCVInstanceId msg requiredCCVs extraAllowedCCVs ccvInstanceId caller =
 
 resolveDefaultCCVs : [RawInstanceAddress] -> RawInstanceAddress -> [RawInstanceAddress] -> [RawInstanceAddress]
 resolveDefaultCCVs defaultCCVs useDefaultCCVs ccvs =
-    foldl (\acc ccv ->
+    foldr (\ccv acc ->
         if ccv == useDefaultCCVs
-        then acc ++ defaultCCVs
-        else acc ++ [ccv]
+        then defaultCCVs ++ acc
+        else ccv :: acc
     ) [] ccvs
 
 -- EVM-style required CCV resolution: empty means use defaults; otherwise the
@@ -77,8 +87,13 @@ computeExecuteCCVs defaultCCVs laneMandatedCCVs message receiverRequiredCCVs rec
             && isSome message.tokenTransfer
     in
         if isTokenOnlyTransfer
-        then pure ([], [], 0)
+        then do
+            let mandated = dedup laneMandatedCCVs
+            assertMaxCCVListLength "offramp: lane mandated CCVs" mandated
+            pure (mandated, [], 0)
         else do
+            assertMaxCCVListLength "offramp: receiver required CCVs" receiverRequiredCCVs
+            assertMaxCCVListLength "offramp: receiver optional CCVs" receiverOptionalCCVs
             assertMsg "offramp: receiver required CCVs cannot contain duplicates" (dedup receiverRequiredCCVs == receiverRequiredCCVs)
             assertMsg "offramp: receiver optional CCVs cannot contain duplicates" (dedup receiverOptionalCCVs == receiverOptionalCCVs)
             assertMsg "offramp: receiver optional threshold must be non-negative" (receiverOptionalThreshold >= 0)
@@ -91,6 +106,8 @@ computeExecuteCCVs defaultCCVs laneMandatedCCVs message receiverRequiredCCVs rec
                         baseRequiredCCVs
                         receiverOptionalCCVs
                         receiverOptionalThreshold
+            assertMaxCCVListLength "offramp: resolved required CCVs" baseRequiredCCVs
+            assertMaxCCVListLength "offramp: resolved optional CCVs" baseOptionalCCVs
             pure (baseRequiredCCVs, baseOptionalCCVs, baseOptionalCCVThreshold)
 
 mergeInboundPoolCCVs

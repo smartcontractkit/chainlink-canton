@@ -1,4 +1,4 @@
-sdk-version: 3.4.10
+sdk-version: 3.4.11
 name: ccip-core
 source: daml
 version: 1.0.0
@@ -8,6 +8,7 @@ build-options:
 data-dependencies:
   - ../../dependencies/splice-api-token-metadata-v1-1.0.0.dar
   - ../../dependencies/splice-api-token-holding-v1-1.0.0.dar
+  - ../../dependencies/splice-api-token-burn-mint-v1-1.0.0.dar
   - ../../dependencies/splice-api-token-transfer-instruction-v1-1.0.0.dar
 dependencies:
   - daml-prim

@@ -19,7 +19,7 @@ import DA.TextMap qualified as TextMap
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext(..), AnyValue(..), AnyContractId(..))
+import Splice.Api.Token.MetadataV1 (ChoiceContext(..), AnyValue(..))
 
 import MCMS.Codec
   ( extractBytes
@@ -107,7 +107,7 @@ encodeAnyValue (AV_Date d) = "04" <> encodeDate d
 encodeAnyValue (AV_Time t) = "05" <> encodeTime t
 encodeAnyValue (AV_RelTime r) = "06" <> encodeRelTime r
 encodeAnyValue (AV_Party p) = "07" <> encodePartyValue p
-encodeAnyValue (AV_ContractId cid) = "08" <> encodeContractIdValue cid
+encodeAnyValue (AV_ContractId _) = error "AV_ContractId cannot be encoded: use AddPoolReceiveContextContractValue to pass contract IDs via the MCMS contractIds map"
 encodeAnyValue (AV_List items) = "09" <> encodeList items encodeAnyValue
 encodeAnyValue (AV_Map m) = "0a" <> encodeTextMapAnyValue m
 
@@ -141,9 +141,7 @@ decodeAnyValueAt encoded offset = do
     "07" -> do  -- AV_Party
       (p, newOffset) <- decodePartyValueAt encoded tagOffset
       Some (AV_Party p, newOffset)
-    "08" -> do  -- AV_ContractId
-      (cid, newOffset) <- decodeContractIdValueAt encoded tagOffset
-      Some (AV_ContractId cid, newOffset)
+    "08" -> None  -- AV_ContractId: not decodable (Daml has no contractIdFromText)
     "09" -> do  -- AV_List
       (items, newOffset) <- decodeList encoded tagOffset decodeAnyValueAt
       Some (AV_List items, newOffset)
@@ -229,23 +227,3 @@ decodePartyValueAt encoded offset = do
   (text, newOffset) <- decodeTextAt encoded offset
   party <- partyFromText text
   Some (party, newOffset)
-
--- ===========================================================================
--- CONTRACTID ENCODING/DECODING
--- Format: length-prefixed contract ID text
--- LIMITATION: Encode-only. Daml has no contractIdFromText, so decoding
--- always returns None. Use AV_Text for contract IDs that need round-trip.
--- ===========================================================================
-
--- | Encode ContractId as text (encode-only)
-encodeContractIdValue : AnyContractId -> BytesHex
-encodeContractIdValue cid = encodeText (show cid)
-
--- | Decode ContractId - ALWAYS RETURNS NONE
--- Daml has no contractIdFromText. Use AV_Text for contract IDs instead.
-decodeContractIdValueAt : BytesHex -> Int -> Optional (AnyContractId, Int)
-decodeContractIdValueAt encoded offset = do
-  -- Skip the text bytes to advance offset correctly
-  (_cidText, newOffset) <- decodeTextAt encoded offset
-  -- Cannot reconstruct ContractId - return None
-  None

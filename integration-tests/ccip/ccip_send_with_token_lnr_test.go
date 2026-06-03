@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -35,18 +34,18 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -75,8 +74,6 @@ import (
 
 	// Import to register adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
-
-	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 // TestLnRTokenPool_FullSendFlow tests full send flow with token transfer.
@@ -188,6 +185,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		Config: changesets.DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: partyCCIP,
+				RMNOwnerParty:  partyCCIP,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
@@ -274,8 +272,6 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err, "failed to get Executor address")
 
 	// Deploy and configure lane for outbound sends
-	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
-	require.Truef(t, ok, "failed to get Canton Lane adapter")
 
 	// 8 cents outgoing CCV verification fee
 	ccvFeeUSDCents := 7
@@ -298,53 +294,56 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		},
 	}
 
-	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
-		Source: &lanes.ChainDefinition{
-			Selector: env.Chain.ChainSelector(),
-			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-				{
-					CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
-					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						remoteSelector: {
-							AllowlistEnabled:          false,
-							AddedAllowlistedSenders:   nil,
-							RemovedAllowlistedSenders: nil,
-							FeeUSDCents:               uint16(ccvFeeUSDCents),
-							GasForVerification:        50_000,
-							PayloadSizeBytes:          6*64 + 2*32,
-							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
-								Signers:   ccvSignerPubKeys,
-								Threshold: 2,
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, sequences.ConfigureLaneLegAsSourceWithInput, cldfEnv.BlockChains, sequences.ConfigureLaneLegInput{
+		DataStore: cldfEnv.DataStore,
+		Lane: lanes.UpdateLanesInput{
+			Source: &lanes.ChainDefinition{
+				Selector: env.Chain.ChainSelector(),
+				CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					{
+						CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {
+								AllowlistEnabled:          false,
+								AddedAllowlistedSenders:   nil,
+								RemovedAllowlistedSenders: nil,
+								FeeUSDCents:               uint16(ccvFeeUSDCents),
+								GasForVerification:        50_000,
+								PayloadSizeBytes:          6*64 + 2*32,
+								SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   ccvSignerPubKeys,
+									Threshold: 2,
+								},
 							},
 						},
 					},
 				},
+				LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifierRef},
+				DefaultOutboundCCVs:      nil,
+				CantonLaneConfig: &lanes.CantonLaneConfig{
+					GlobalConfig: globalConfigRef,
+				},
+				DefaultExecutor: executorRef,
+				FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
+				OnRamp:          onRampAddress.InstanceAddress().Bytes(),
+				OffRamp:         offRampAddress.InstanceAddress().Bytes(),
 			},
-			LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifierRef},
-			DefaultOutboundCCVs:      nil,
-			CantonLaneConfig: &lanes.CantonLaneConfig{
-				GlobalConfig: globalConfigRef,
+			Dest: &lanes.ChainDefinition{
+				Selector:                 remoteSelector,
+				AddressBytesLength:       20,
+				FeeQuoterDestChainConfig: feeQuoterDestChainConfig,
+				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+					USDCentsFee: 50,
+					Enabled:     true,
+				},
+				OnRamp:  hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+				OffRamp: hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+				Router:  hexutil.MustDecode("0xe3ddcb2fde5d27a33c450fddc54a3f9bb2ecaa9f"),
 			},
-			DefaultExecutor: executorRef,
-			FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
-			OnRamp:          onRampAddress.InstanceAddress().Bytes(),
-			OffRamp:         offRampAddress.InstanceAddress().Bytes(),
+			IsDisabled:   false,
+			TestRouter:   false,
+			ExtraConfigs: lanes.ExtraConfigs{},
 		},
-		Dest: &lanes.ChainDefinition{
-			Selector:                 remoteSelector,
-			AddressBytesLength:       20,
-			FeeQuoterDestChainConfig: feeQuoterDestChainConfig,
-			ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
-				USDCentsFee: 50,
-				Enabled:     true,
-			},
-			OnRamp:  hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
-			OffRamp: hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
-			Router:  hexutil.MustDecode("0xe3ddcb2fde5d27a33c450fddc54a3f9bb2ecaa9f"),
-		},
-		IsDisabled:   false,
-		TestRouter:   false,
-		ExtraConfigs: lanes.ExtraConfigs{},
 	})
 	require.NoErrorf(t, err, "Failed to configure chain for lanes")
 	runningDs := datastore.NewMemoryDataStore()
@@ -702,7 +701,10 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			Type:    oapiCommon.WithAddress,
 			Address: &executorRawOrHashedAddress,
 		},
-		FeeToken: oapiCommon.InstrumentId{},
+		FeeToken: oapiCommon.InstrumentId{
+			Admin: oapiCommon.PartyId(nativeInstrumentId.Admin),
+			Id:    string(nativeInstrumentId.Id),
+		},
 		Payload:  "",
 		Receiver: "",
 		TokenTransfer: &oapiCommon.TokenTransfer{
@@ -766,6 +768,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			FeeTokenConfigCid:       contractID(ccipSendDisclosure.FeeTokenConfigCid),
 			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{
@@ -823,6 +826,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	executorSendDisclosure, err = edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
+	sendArgs.FeeTokenInput.FeeTokenConfigCid = contractID(ccipSendDisclosure.FeeTokenConfigCid)
 	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
 	sendArgs.CcvSendInputs[0].CcvExtraContext = ccvSendDisclosure.ChoiceContext
 	sendArgs.TokenTransferInput.TokenPoolCid = types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId)

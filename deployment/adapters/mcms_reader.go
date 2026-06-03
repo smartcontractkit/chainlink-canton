@@ -40,7 +40,7 @@ func (r *CantonMCMSReader) GetChainMetadata(
 
 	inspector := cantonsdk.NewInspector(
 		participant.LedgerServices.State,
-		participant.PartyID,
+		[]string{participant.PartyID},
 		timelockRoleForAction(input.TimelockAction),
 	)
 
