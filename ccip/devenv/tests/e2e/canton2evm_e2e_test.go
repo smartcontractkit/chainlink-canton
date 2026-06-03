@@ -153,7 +153,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		lane := defaultDevenvTokenLane(t, lib, in, cantonChain.ChainSelector(), evmChain.ChainSelector())
+		tokenInput := devenvtests.LoadTokenTransferInput(t, devenvtests.DirectionCantonToEVM)
+		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()}, tokenInput)
 
 		// Setup message send
 		require.NoError(t, cantonImpl.MintTokens(ctx, cantonToEVMTokenSequentialSends*uint64(cantonToEVMFeeAmount)))           // Holdings for fee
@@ -182,7 +183,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			"source executor",
 		)
 		require.NoError(t, err)
-		destTokenAddress := lane.DestToken
+		destTokenAddress := lane.DestTokenBySelector[evmChain.ChainSelector()]
 		receiverBalanceBefore, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)

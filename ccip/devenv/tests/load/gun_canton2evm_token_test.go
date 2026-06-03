@@ -48,19 +48,19 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
 	require.True(t, ok, "Canton chain must be *cantondevenv.Chain")
 
-	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
-	lane := devenvtests.DefaultDevenvTokenLane(t, in, lib, cantonChain.ChainSelector(), evmChain.ChainSelector())
-	t.Logf("Token lane: local=%s remote=%s transfer=%s",
-		lane.Combo.LocalPoolAddressRef().Qualifier,
-		lane.Combo.RemotePoolAddressRef().Qualifier,
-		lane.TransferAmount.String())
+	tokenInput := devenvtests.LoadTokenTransferInput(t, devenvtests.DirectionCantonToEVM)
+	evmSelectors := discoverEVMTokenSelectors(t, in)
+	require.NotEmpty(t, evmSelectors, "need at least one EVM token destination in the env file")
+	lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), evmSelectors, tokenInput)
+	t.Logf("Token lane: pool=%s transfer=%s", lane.PoolRef.Qualifier, lane.TransferAmount.String())
 
 	destinations := discoverEVMTokenDestinations(t, in, chainMap, lane)
 	require.NotEmpty(t, destinations, "need at least one EVM token destination in the env file")
 	t.Logf("Canton→EVM token load destinations: %d EVM chain(s)", len(destinations))
 
 	firstDest := destinations[0]
-	receiverBalanceBefore, err := firstDest.Chain.GetTokenBalance(ctx, firstDest.Receiver, lane.DestToken)
+	destToken := lane.DestTokenBySelector[firstDest.Chain.ChainSelector()]
+	receiverBalanceBefore, err := firstDest.Chain.GetTokenBalance(ctx, firstDest.Receiver, destToken)
 	require.NoError(t, err)
 	require.NotNil(t, receiverBalanceBefore)
 
@@ -91,7 +91,7 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 
 	runWASP(t, gun, "canton-load-canton2evm-token", sched, "token_transfer")
 
-	receiverBalanceAfter, err := firstDest.Chain.GetTokenBalance(ctx, firstDest.Receiver, lane.DestToken)
+	receiverBalanceAfter, err := firstDest.Chain.GetTokenBalance(ctx, firstDest.Receiver, destToken)
 	require.NoError(t, err)
 	require.NotNil(t, receiverBalanceAfter)
 

@@ -137,7 +137,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	t.Run("token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		lane := defaultDevenvTokenLane(t, lib, in, srcSelector, dstSelector)
+		tokenInput := devenvtests.LoadTokenTransferInput(t, devenvtests.DirectionEVMToCanton)
+		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, srcSelector, []uint64{dstSelector}, tokenInput)
 		srcToken := lane.SrcToken
 		srcSender, err := srcChain.GetEOAReceiverAddress()
 		require.NoError(t, err)

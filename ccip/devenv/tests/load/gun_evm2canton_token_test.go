@@ -49,10 +49,10 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
 	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
 
-	lane := devenvtests.DefaultDevenvTokenLane(t, in, lib, evmChain.ChainSelector(), cantonChain.ChainSelector())
-	t.Logf("Token lane: local=%s remote=%s transfer=%s srcToken=%x",
-		lane.Combo.LocalPoolAddressRef().Qualifier,
-		lane.Combo.RemotePoolAddressRef().Qualifier,
+	tokenInput := devenvtests.LoadTokenTransferInput(t, devenvtests.DirectionEVMToCanton)
+	lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, evmChain.ChainSelector(), []uint64{cantonChain.ChainSelector()}, tokenInput)
+	t.Logf("Token lane: pool=%s transfer=%s srcToken=%x",
+		lane.PoolRef.Qualifier,
 		lane.TransferAmount.String(),
 		lane.SrcToken)
 

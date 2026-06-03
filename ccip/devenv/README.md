@@ -44,7 +44,6 @@ Schedule is configured via env vars (defaults are `1/1s` for 90s):
 |---|---|---|---|
 | `CANTON_LOAD_MESSAGE_RATE` | `<int>/<duration>` (e.g. `1/1s`, `1/20s`, `10/5m`) | `1/1s` | rate per rate-limit window |
 | `CANTON_LOAD_DURATION` | Go duration (e.g. `90s`, `10m`, `1h`) | `90s` | total runtime |
-| `CANTON_LOAD_TOKEN_QUALIFIER` | pool qualifier string (e.g. `TEST` on staging) | _(auto)_ | override token lane when multiple lanes exist |
 
 Example — 1 message every 20 seconds for 10 minutes:
 
@@ -67,7 +66,7 @@ If the out file is missing the test skips with a hint.
 
 ### Canton → EVM token load (requires devenv)
 
-Separate test from message-only load: `TestCanton2EVM_TokenLoad`. Discovers the BM 2.0 ↔ LR 2.0 lane from the env file (override with `CANTON_LOAD_TOKEN_QUALIFIER`). Pre-mints Canton fee + transfer holdings, runs WASP, then asserts EVM receiver token balance delta.
+Separate test from message-only load: `TestCanton2EVM_TokenLoad`. Resolves the token lane declared in [`token_transfer_config.toml`](./tests/token_transfer_config.toml) (see [Token lane configuration](#token-lane-configuration)) against the source chain's `GetTokenTransferConfigs`, validating every destination has the lane. Pre-mints Canton fee + transfer holdings, runs WASP, then asserts EVM receiver token balance delta.
 
 ```bash
 make run-canton2evm-token-load
@@ -102,7 +101,7 @@ cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Can
 
 ### EVM → Canton token load (requires devenv)
 
-Separate test from message-only load: `TestEVM2Canton_TokenLoad`. Discovers token lane from deployment, logs EVM sender balance vs estimated transfer need (devenv pre-funds sender), runs WASP, logs Canton holdings post-run.
+Separate test from message-only load: `TestEVM2Canton_TokenLoad`. Resolves the token lane declared in [`token_transfer_config.toml`](./tests/token_transfer_config.toml) (see [Token lane configuration](#token-lane-configuration)), logs EVM sender balance vs estimated transfer need (devenv pre-funds sender), runs WASP, logs Canton holdings post-run.
 
 ```bash
 make run-evm2canton-token-load
@@ -112,6 +111,47 @@ Equivalent:
 
 ```bash
 cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestEVM2Canton_TokenLoad$'
+```
+
+### Token lane configuration
+
+Token transfer tests (both e2e and load) declare the token lane to send in [`tests/token_transfer_config.toml`](./tests/token_transfer_config.toml). The test resolves the declared **token pool identity** against the source chain's `GetTokenTransferConfigs`, then validates that every destination chain has that lane configured before running. The committed file holds the devenv defaults.
+
+Override the file path with `CANTON_TOKEN_TEST_CONFIG`:
+
+```bash
+CANTON_TOKEN_TEST_CONFIG=/path/to/custom.toml make run-canton2evm-token-load
+```
+
+The file has one block per direction (`[evm_to_canton]`, `[canton_to_evm]`):
+
+| Key | Required | Meaning |
+|---|---|---|
+| `pool_type` | yes | token pool contract type on the source chain (e.g. `BurnMintTokenPool`, `LockReleaseTokenPool`) |
+| `pool_version` | yes | semantic version of the token pool (e.g. `2.0.0`) |
+| `pool_qualifier` | yes | datastore qualifier identifying the exact pool |
+| `transfer_amount` | no | per-message token amount (string integer); falls back to a per-direction default |
+| `execution_gas_limit` | no | per-message execution gas limit; falls back to a per-direction default |
+| `finality_config` | no | per-message finality config; falls back to a per-direction default |
+
+Token **identity** (`pool_type` / `pool_version` / `pool_qualifier`) is always required and is never defaulted; only the numeric send params have code-level fallbacks. If the qualifier matches zero or multiple pools, or a destination lacks the lane, the test fails fast listing the available pool refs / selectors.
+
+```toml
+[evm_to_canton]
+pool_type      = "BurnMintTokenPool"
+pool_version   = "2.0.0"
+pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::BurnMintTokenPool 2.0.0 [default]"
+transfer_amount     = "100000000000"
+execution_gas_limit = 200000
+finality_config     = 0
+
+[canton_to_evm]
+pool_type      = "LockReleaseTokenPool"
+pool_version   = "2.0.0"
+pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::LockReleaseTokenPool 2.0.0 [default]"
+transfer_amount     = "1000"
+execution_gas_limit = 500000
+finality_config     = 1
 ```
 
 ### CI (on demand)

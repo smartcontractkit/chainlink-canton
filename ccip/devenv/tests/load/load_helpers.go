@@ -132,15 +132,13 @@ func discoverEVMDestinations(t *testing.T, in *ccv.Cfg, chainMap map[uint64]ccip
 	return dests
 }
 
-func discoverEVMTokenDestinations(
-	t *testing.T,
-	in *ccv.Cfg,
-	chainMap map[uint64]cciptestinterfaces.CCIP17,
-	lane devenvtests.TokenLane,
-) []Destination {
+// discoverEVMTokenSelectors returns the chain selectors of every EVM chain in the
+// env file. Callers resolve the token lane over these selectors before building
+// destinations.
+func discoverEVMTokenSelectors(t *testing.T, in *ccv.Cfg) []uint64 {
 	t.Helper()
 
-	dests := make([]Destination, 0)
+	selectors := make([]uint64, 0)
 	seen := make(map[uint64]struct{})
 	for _, bc := range in.Blockchains {
 		if bc.Type != blockchain.TypeAnvil {
@@ -151,14 +149,30 @@ func discoverEVMTokenDestinations(
 		if _, dup := seen[details.ChainSelector]; dup {
 			continue
 		}
-		chain, ok := chainMap[details.ChainSelector]
-		require.True(t, ok, "EVM chain %d not in harness chain map", details.ChainSelector)
+		selectors = append(selectors, details.ChainSelector)
+		seen[details.ChainSelector] = struct{}{}
+	}
+
+	return selectors
+}
+
+func discoverEVMTokenDestinations(
+	t *testing.T,
+	in *ccv.Cfg,
+	chainMap map[uint64]cciptestinterfaces.CCIP17,
+	lane devenvtests.TokenLane,
+) []Destination {
+	t.Helper()
+
+	dests := make([]Destination, 0)
+	for _, selector := range discoverEVMTokenSelectors(t, in) {
+		chain, ok := chainMap[selector]
+		require.True(t, ok, "EVM chain %d not in harness chain map", selector)
 
 		receiver, err := chain.GetEOAReceiverAddress()
 		require.NoError(t, err)
 
 		dests = append(dests, evmTokenLoadDestination(chain, receiver, lane))
-		seen[details.ChainSelector] = struct{}{}
 	}
 
 	return dests

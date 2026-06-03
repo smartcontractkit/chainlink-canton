@@ -1,0 +1,24 @@
+# Token lane inputs for devenv e2e/load tests.
+#
+# Token identity (pool_type / pool_version / pool_qualifier) is REQUIRED and is
+# matched against the source chain's GetTokenTransferConfigs to discover the lane.
+# Numeric send params (transfer_amount / execution_gas_limit / finality_config)
+# are optional; when omitted, code-level per-direction defaults are used.
+#
+# Override the file path with the CANTON_TOKEN_TEST_CONFIG env var.
+
+[evm_to_canton]
+pool_type      = "BurnMintTokenPool"
+pool_version   = "2.0.0"
+pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::BurnMintTokenPool 2.0.0 [default]"
+transfer_amount     = "100000000000"
+execution_gas_limit = 200000
+finality_config     = 0
+
+[canton_to_evm]
+pool_type      = "LockReleaseTokenPool"
+pool_version   = "2.0.0"
+pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::LockReleaseTokenPool 2.0.0 [default]"
+transfer_amount     = "1000"
+execution_gas_limit = 500000
+finality_config     = 1
