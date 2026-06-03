@@ -1510,3 +1510,70 @@ testBurnMintTokenPool_ApplyTokenTransferFeeConfigUpdates_RejectsNegativeFeeUSDCe
             disableTokenTransferFeeConfigArgs = []
 
     pure ()
+
+testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters : Script ()
+testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
+  poolOwner <- allocateParty "pool-owner-rl-admin"
+  ccipOwner <- allocateParty "ccip-owner-rl-admin"
+  rateLimitAdmin <- allocateParty "rate-limit-admin-bm"
+
+  let sourceChainSelector = 123.0
+  let outbound = RawInstanceAddress.make "outbound-rl-bm" poolOwner
+
+  (inboundRateLimiterCid, inboundRateLimiterAddr) <- createRateLimiter
+    poolOwner
+    "rl-bm-admin-in"
+    "burn-mint-pool-rl-admin"
+    sourceChainSelector
+    RateLimiter.RateLimitDirection_Inbound
+    RateLimiter.RateLimitMode_DefaultFinality
+    100000000000.0
+    10000000.0
+
+  let remoteChainConfig = mkRemoteChainConfig [] [] inboundRateLimiterAddr inboundRateLimiterAddr outbound
+  tokenPoolCid <- submit poolOwner do
+    createCmd BurnMintTokenPool.BurnMintTokenPool with
+      instanceId = "burn-mint-pool-rl-admin"
+      poolOwner = poolOwner
+      ccipOwner = ccipOwner
+      instrumentId = HoldingV1.InstrumentId with admin = poolOwner; id = "LINK"
+      decimals = 8
+      rateLimitAdmin = Some rateLimitAdmin
+      remoteChainConfigs = Map.fromList [(sourceChainSelector, remoteChainConfig)]
+      tokenTransferFeeConfigs = Map.empty
+      poolReceiveContext = MetadataV1.emptyChoiceContext
+      transferTimeout = BurnMintTokenPool.Indefinite
+      deps = mkPoolDeps "tar-bm-rl-admin" "rmn-bm-rl-admin" "fq-bm-rl-admin" ccipOwner ccipOwner
+
+  submitMustFail rateLimitAdmin do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimiterReferences with
+      rateLimitConfigArgs =
+        [ BurnMintTokenPool.RateLimitConfigArgs with
+            remoteChainSelector = sourceChainSelector
+            inboundRateLimiter = RawInstanceAddress.make "inbound-rl-bm-new" poolOwner
+            inboundCustomBlockConfirmationsRateLimiter = inboundRateLimiterAddr
+            outboundRateLimiter = outbound
+        ]
+
+  submitMustFail rateLimitAdmin do
+    exerciseCmd inboundRateLimiterCid RateLimiter.SetConfig with
+      newIsEnabled = True
+      newCapacity = 50.0
+      newRate = 5.0
+
+  -- the rate limit admin can call SetConfig on the rate limiter, but isn't an observer of the rate limiter itself
+  disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiterCid
+
+  updatedInboundCid <- submit (actAs rateLimitAdmin <> disclose disclosedRateLimiter ) do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimitConfig with
+      caller = rateLimitAdmin
+      rateLimiterCid = inboundRateLimiterCid
+      newIsEnabled = True
+      newCapacity = 50.0
+      newRate = 5.0
+
+  limiter <- fromSome <$> queryContractId poolOwner updatedInboundCid
+  limiter.capacity === 50.0
+  limiter.rate === 5.0
+
+  pure ()

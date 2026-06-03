@@ -17,7 +17,7 @@ import CCIP.LockReleaseTokenPool
 import CCIP.LockReleaseTokenPoolCodecGen (
     encodeSetDynamicConfigParams,
     encodeApplyChainUpdatesParams,
-    encodeSetRateLimitConfigParams,
+    encodeSetRateLimiterReferencesParams,
     encodeSetTransferTimeoutParams,
     encodeAddPoolReceiveContextNonContractValueParams,
     encodeAddPoolReceiveContextContractValueParams,
@@ -26,7 +26,7 @@ import CCIP.LockReleaseTokenPoolCodecGen (
 import CCIP.LockReleaseTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
-    SetRateLimitConfigParams(..),
+    SetRateLimiterReferencesParams(..),
     SetTransferTimeoutParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
@@ -255,11 +255,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
     pure ()
 
 -- ========================================================
--- |        MCMS Entrypoint - SetRateLimitConfig          |
+-- |     MCMS Entrypoint - SetRateLimiterReferences       |
 -- ========================================================
 
-testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig : Script ()
-testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences = script do
     ccipOwner <- allocateParty "ccip_owner"
     poolOwner <- allocateParty "pool_owner"
     tokenAdmin <- allocateParty "token_admin"
@@ -303,14 +303,13 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-updated@owner"
             ]
 
-        encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
-            rateLimitConfigArgs = args
-            caller = poolOwner)
+        encoded = encodeSetRateLimiterReferencesParams (SetRateLimiterReferencesParams with
+            rateLimitConfigArgs = args)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "SetRateLimitConfig"
+            functionName = "SetRateLimiterReferences"
             operationData = encoded
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
 

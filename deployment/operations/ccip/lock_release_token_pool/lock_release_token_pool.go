@@ -82,19 +82,35 @@ var ApplyTokenTransferFeeConfigUpdates = contract.NewExercise(contract.ExerciseP
 	EncodeMethod: lrtpEncoder.ApplyTokenTransferFeeConfigUpdates,
 })
 
-var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.SetRateLimitConfig]{
-	Name:         "canton/ccip/lock_release_token_pool/set_rate_limit_config",
+var SetRateLimiterReferences = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.SetRateLimiterReferences]{
+	Name:         "canton/ccip/lock_release_token_pool/set_rate_limiter_references",
 	Version:      Version,
-	Description:  "Sets rate limit configs for a Canton LockReleaseTokenPool",
+	Description:  "Updates which RateLimiter contract identities a Canton LockReleaseTokenPool references per remote chain",
 	ContractType: ContractType,
-	Validate: func(input lockreleasetokenpool.SetRateLimitConfig) error {
-		if input.Caller == "" {
-			return errors.New("caller is required")
+	Validate: func(input lockreleasetokenpool.SetRateLimiterReferences) error {
+		if len(input.RateLimitConfigArgs) == 0 {
+			return errors.New("rateLimitConfigArgs is required")
 		}
 
 		return nil
 	},
 	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
-	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.SetRateLimitConfig,
-	EncodeMethod: lrtpEncoder.SetRateLimitConfig,
+	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.SetRateLimiterReferences,
+	EncodeMethod: lrtpEncoder.SetRateLimiterReferences,
+})
+
+var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.SetRateLimitConfigParams]{
+	Name:         "canton/ccip/lock_release_token_pool/set_rate_limit_config",
+	Version:      Version,
+	Description:  "Tunes capacity, rate, and isEnabled on a RateLimiter referenced by a Canton LockReleaseTokenPool",
+	ContractType: ContractType,
+	Validate: func(input lockreleasetokenpool.SetRateLimitConfigParams) error {
+		if input.RateLimiterInstanceAddress.Unpack == "" {
+			return errors.New("rateLimiterInstanceAddress is required")
+		}
+
+		return nil
+	},
+	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
+	EncodeMethod: lrtpEncoder.SetRateLimitConfigParams,
 })

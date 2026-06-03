@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-burn-mint-token-pool"
-	PackageID   = "dec740efa062d6a764a4390c67b9c44d5813efa8b4d10c67ed955805f14ba82d"
+	PackageID   = "2b27ee2470155f6e9bb793abe239f1116a59d290f8de43a73956f1db97a3c1d4"
 	SDKVersion  = "3.4.11"
 )
 
@@ -597,27 +597,6 @@ func (t *BurnMintTokenPool) UnmarshalHex(data string) error {
 
 // Choice methods for BurnMintTokenPool
 
-// ReleaseFromTicket exercises the ReleaseFromTicket choice on this BurnMintTokenPool contract
-// This method uses the package name in the template ID
-func (t BurnMintTokenPool) ReleaseFromTicket(contractID string, args ReleaseFromTicket) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "ReleaseFromTicket",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ReleaseFromTicketWithPackageID exercises the ReleaseFromTicket choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) ReleaseFromTicketWithPackageID(contractID string, packageID string, args ReleaseFromTicket) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "ReleaseFromTicket",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // LockOrBurn exercises the LockOrBurn choice on this BurnMintTokenPool contract
 // This method uses the package name in the template ID
 func (t BurnMintTokenPool) LockOrBurn(contractID string, args LockOrBurn) *model.ExerciseCommand {
@@ -639,23 +618,23 @@ func (t BurnMintTokenPool) LockOrBurnWithPackageID(contractID string, packageID 
 	}
 }
 
-// ApplyTokenTransferFeeConfigUpdates exercises the ApplyTokenTransferFeeConfigUpdates choice on this BurnMintTokenPool contract
+// ReleaseFromTicket exercises the ReleaseFromTicket choice on this BurnMintTokenPool contract
 // This method uses the package name in the template ID
-func (t BurnMintTokenPool) ApplyTokenTransferFeeConfigUpdates(contractID string, args ApplyTokenTransferFeeConfigUpdates) *model.ExerciseCommand {
+func (t BurnMintTokenPool) ReleaseFromTicket(contractID string, args ReleaseFromTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
 		ContractID: contractID,
-		Choice:     "ApplyTokenTransferFeeConfigUpdates",
+		Choice:     "ReleaseFromTicket",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ApplyTokenTransferFeeConfigUpdatesWithPackageID exercises the ApplyTokenTransferFeeConfigUpdates choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) ApplyTokenTransferFeeConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyTokenTransferFeeConfigUpdates) *model.ExerciseCommand {
+// ReleaseFromTicketWithPackageID exercises the ReleaseFromTicket choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) ReleaseFromTicketWithPackageID(contractID string, packageID string, args ReleaseFromTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
 		ContractID: contractID,
-		Choice:     "ApplyTokenTransferFeeConfigUpdates",
+		Choice:     "ReleaseFromTicket",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -681,6 +660,48 @@ func (t BurnMintTokenPool) SetRateLimitConfigWithPackageID(contractID string, pa
 	}
 }
 
+// ApplyTokenTransferFeeConfigUpdates exercises the ApplyTokenTransferFeeConfigUpdates choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) ApplyTokenTransferFeeConfigUpdates(contractID string, args ApplyTokenTransferFeeConfigUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "ApplyTokenTransferFeeConfigUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyTokenTransferFeeConfigUpdatesWithPackageID exercises the ApplyTokenTransferFeeConfigUpdates choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) ApplyTokenTransferFeeConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyTokenTransferFeeConfigUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "ApplyTokenTransferFeeConfigUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetRateLimiterReferences exercises the SetRateLimiterReferences choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) SetRateLimiterReferences(contractID string, args SetRateLimiterReferences) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetRateLimiterReferences",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetRateLimiterReferencesWithPackageID exercises the SetRateLimiterReferences choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) SetRateLimiterReferencesWithPackageID(contractID string, packageID string, args SetRateLimiterReferences) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetRateLimiterReferences",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // ApplyChainUpdates exercises the ApplyChainUpdates choice on this BurnMintTokenPool contract
 // This method uses the package name in the template ID
 func (t BurnMintTokenPool) ApplyChainUpdates(contractID string, args ApplyChainUpdates) *model.ExerciseCommand {
@@ -699,132 +720,6 @@ func (t BurnMintTokenPool) ApplyChainUpdatesWithPackageID(contractID string, pac
 		ContractID: contractID,
 		Choice:     "ApplyChainUpdates",
 		Arguments:  argsToMap(args),
-	}
-}
-
-// VerifyInboundMessage exercises the VerifyInboundMessage choice on this BurnMintTokenPool contract
-// This method uses the package name in the template ID
-func (t BurnMintTokenPool) VerifyInboundMessage(contractID string, args VerifyInboundMessage) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "VerifyInboundMessage",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// VerifyInboundMessageWithPackageID exercises the VerifyInboundMessage choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) VerifyInboundMessageWithPackageID(contractID string, packageID string, args VerifyInboundMessage) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "VerifyInboundMessage",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// VerifyOutboundCCVs exercises the VerifyOutboundCCVs choice on this BurnMintTokenPool contract
-// This method uses the package name in the template ID
-func (t BurnMintTokenPool) VerifyOutboundCCVs(contractID string, args VerifyOutboundCCVs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "VerifyOutboundCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// VerifyOutboundCCVsWithPackageID exercises the VerifyOutboundCCVs choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) VerifyOutboundCCVsWithPackageID(contractID string, packageID string, args VerifyOutboundCCVs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "VerifyOutboundCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CalculateFee exercises the CalculateFee choice on this BurnMintTokenPool contract
-// This method uses the package name in the template ID
-func (t BurnMintTokenPool) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "CalculateFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "CalculateFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetFee exercises the GetFee choice on this BurnMintTokenPool contract
-// This method uses the package name in the template ID
-func (t BurnMintTokenPool) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "GetFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "GetFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetRequiredCCVs exercises the GetRequiredCCVs choice on this BurnMintTokenPool contract
-// This method uses the package name in the template ID
-func (t BurnMintTokenPool) GetRequiredCCVs(contractID string, args GetRequiredCCVs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "GetRequiredCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetRequiredCCVsWithPackageID exercises the GetRequiredCCVs choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) GetRequiredCCVsWithPackageID(contractID string, packageID string, args GetRequiredCCVs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
-		ContractID: contractID,
-		Choice:     "GetRequiredCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// Archive exercises the Archive choice on this BurnMintTokenPool contract via the IITokenPool interface
-// This method uses the package name in the template ID
-func (t BurnMintTokenPool) Archive(contractID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "TokenPool"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
-func (t BurnMintTokenPool) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "TokenPool"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
 	}
 }
 
@@ -950,6 +845,132 @@ func (t BurnMintTokenPool) SetTransferTimeoutWithPackageID(contractID string, pa
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
 		ContractID: contractID,
 		Choice:     "SetTransferTimeout",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetRequiredCCVs exercises the GetRequiredCCVs choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) GetRequiredCCVs(contractID string, args GetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetRequiredCCVsWithPackageID exercises the GetRequiredCCVs choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) GetRequiredCCVsWithPackageID(contractID string, packageID string, args GetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// VerifyInboundMessage exercises the VerifyInboundMessage choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) VerifyInboundMessage(contractID string, args VerifyInboundMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "VerifyInboundMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// VerifyInboundMessageWithPackageID exercises the VerifyInboundMessage choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) VerifyInboundMessageWithPackageID(contractID string, packageID string, args VerifyInboundMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "VerifyInboundMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// VerifyOutboundCCVs exercises the VerifyOutboundCCVs choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) VerifyOutboundCCVs(contractID string, args VerifyOutboundCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "VerifyOutboundCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// VerifyOutboundCCVsWithPackageID exercises the VerifyOutboundCCVs choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) VerifyOutboundCCVsWithPackageID(contractID string, packageID string, args VerifyOutboundCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "VerifyOutboundCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CalculateFee exercises the CalculateFee choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Archive exercises the Archive choice on this BurnMintTokenPool contract via the IITokenPool interface
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "TokenPool"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "TokenPool"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// GetFee exercises the GetFee choice on this BurnMintTokenPool contract
+// This method uses the package name in the template ID
+func (t BurnMintTokenPool) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t BurnMintTokenPool) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.BurnMintTokenPool", "BurnMintTokenPool"),
+		ContractID: contractID,
+		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1941,23 +1962,26 @@ func (t *SetDynamicConfigParams) UnmarshalHex(data string) error {
 
 // SetRateLimitConfig is a Record type
 type SetRateLimitConfig struct {
-	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
-	Caller              types.PARTY           `json:"caller"`
+	Caller         types.PARTY       `json:"caller"`
+	RateLimiterCid types.CONTRACT_ID `json:"rateLimiterCid"`
+	NewIsEnabled   types.BOOL        `json:"newIsEnabled"`
+	NewCapacity    types.NUMERIC     `json:"newCapacity"`
+	NewRate        types.NUMERIC     `json:"newRate"`
 }
 
 // ToMap converts SetRateLimitConfig to a map for DAML arguments
 func (t SetRateLimitConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rateLimitConfigArgs"] = func() []any {
-		res := make([]any, 0, len(t.RateLimitConfigArgs))
-		for _, e := range t.RateLimitConfigArgs {
-			res = append(res, model.NestedToDAMLValue(e))
-		}
-		return res
-	}()
-
 	m["caller"] = t.Caller.ToMap()
+
+	m["rateLimiterCid"] = model.NestedToDAMLValue(t.RateLimiterCid)
+
+	m["newIsEnabled"] = bool(t.NewIsEnabled)
+
+	m["newCapacity"] = t.NewCapacity
+
+	m["newRate"] = t.NewRate
 
 	return m
 }
@@ -1987,7 +2011,10 @@ func (t *SetRateLimitConfig) UnmarshalHex(data string) error {
 // SetRateLimitConfigMCMSParams is SetRateLimitConfig without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type SetRateLimitConfigMCMSParams struct {
-	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
+	RateLimiterCid types.CONTRACT_ID `json:"rateLimiterCid"`
+	NewIsEnabled   types.BOOL        `json:"newIsEnabled"`
+	NewCapacity    types.NUMERIC     `json:"newCapacity"`
+	NewRate        types.NUMERIC     `json:"newRate"`
 }
 
 // MarshalHex encodes SetRateLimitConfigMCMSParams to hex string for MCMS operationData.
@@ -2004,23 +2031,26 @@ func (t *SetRateLimitConfigMCMSParams) UnmarshalHex(data string) error {
 
 // SetRateLimitConfigParams is a Record type
 type SetRateLimitConfigParams struct {
-	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
-	Caller              types.PARTY           `json:"caller"`
+	Caller                     types.PARTY                     `json:"caller"`
+	RateLimiterInstanceAddress chainlinkapi.RawInstanceAddress `json:"rateLimiterInstanceAddress"`
+	NewIsEnabled               types.BOOL                      `json:"newIsEnabled"`
+	NewCapacity                types.NUMERIC                   `json:"newCapacity"`
+	NewRate                    types.NUMERIC                   `json:"newRate"`
 }
 
 // ToMap converts SetRateLimitConfigParams to a map for DAML arguments
 func (t SetRateLimitConfigParams) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rateLimitConfigArgs"] = func() []any {
-		res := make([]any, 0, len(t.RateLimitConfigArgs))
-		for _, e := range t.RateLimitConfigArgs {
-			res = append(res, model.NestedToDAMLValue(e))
-		}
-		return res
-	}()
-
 	m["caller"] = t.Caller.ToMap()
+
+	m["rateLimiterInstanceAddress"] = model.NestedToDAMLValue(t.RateLimiterInstanceAddress)
+
+	m["newIsEnabled"] = bool(t.NewIsEnabled)
+
+	m["newCapacity"] = t.NewCapacity
+
+	m["newRate"] = t.NewRate
 
 	return m
 }
@@ -2043,6 +2073,90 @@ func (t SetRateLimitConfigParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetRateLimitConfigParams from hex string (Canton MCMS format)
 func (t *SetRateLimitConfigParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetRateLimiterReferences is a Record type
+type SetRateLimiterReferences struct {
+	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
+}
+
+// ToMap converts SetRateLimiterReferences to a map for DAML arguments
+func (t SetRateLimiterReferences) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["rateLimitConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.RateLimitConfigArgs))
+		for _, e := range t.RateLimitConfigArgs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetRateLimiterReferences) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetRateLimiterReferences) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetRateLimiterReferences to hex string (Canton MCMS format)
+func (t SetRateLimiterReferences) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetRateLimiterReferences from hex string (Canton MCMS format)
+func (t *SetRateLimiterReferences) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetRateLimiterReferencesParams is a Record type
+type SetRateLimiterReferencesParams struct {
+	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
+}
+
+// ToMap converts SetRateLimiterReferencesParams to a map for DAML arguments
+func (t SetRateLimiterReferencesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["rateLimitConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.RateLimitConfigArgs))
+		for _, e := range t.RateLimitConfigArgs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetRateLimiterReferencesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetRateLimiterReferencesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetRateLimiterReferencesParams to hex string (Canton MCMS format)
+func (t SetRateLimiterReferencesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetRateLimiterReferencesParams from hex string (Canton MCMS format)
+func (t *SetRateLimiterReferencesParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2465,6 +2579,8 @@ type MCMSEncoder interface {
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
+	SetRateLimiterReferences(args SetRateLimiterReferences) (*bind.EncodedChoice, error)
+	SetRateLimiterReferencesParams(args SetRateLimiterReferencesParams) (*bind.EncodedChoice, error)
 	SetTransferTimeout(args SetTransferTimeout) (*bind.EncodedChoice, error)
 	SetTransferTimeoutParams(args SetTransferTimeoutParams) (*bind.EncodedChoice, error)
 	VerifyInboundMessage(args VerifyInboundMessage) (*bind.EncodedChoice, error)
@@ -2628,6 +2744,16 @@ func (e *encoder) SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams
 // SetRateLimitConfigParams encodes parameters for the SetRateLimitConfig choice.
 func (e *encoder) SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetRateLimitConfig", args)
+}
+
+// SetRateLimiterReferences encodes parameters for the SetRateLimiterReferences choice.
+func (e *encoder) SetRateLimiterReferences(args SetRateLimiterReferences) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetRateLimiterReferences", args)
+}
+
+// SetRateLimiterReferencesParams encodes parameters for the SetRateLimiterReferences choice.
+func (e *encoder) SetRateLimiterReferencesParams(args SetRateLimiterReferencesParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetRateLimiterReferences", args)
 }
 
 // SetTransferTimeout encodes parameters for the SetTransferTimeout choice.
