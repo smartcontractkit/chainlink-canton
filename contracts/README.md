@@ -3,6 +3,12 @@
 This document describes the Daml smart contract architecture for Chainlink CCIP (Cross-Chain Interoperability Protocol)
 on Canton.
 
+## Contract artifacts & releases
+
+DARs live under `contracts/dars/` (`current/` for dev, `v1_0_0/` etc. for frozen releases). Go bindings live under `bindings/generated/` with the same split (`latest/` vs `v1_0_0/`).
+
+For day-to-day builds (`make contracts`) and **how to cut and migrate to a new release** (e.g. 1.1.0 — freeze, `ReleaseDir`, import updates, git tag), see **[bindings/README.md](../bindings/README.md)**.
+
 ## Overview
 
 CCIP Canton enables cross-chain messaging between Canton and other blockchain networks (EVM, Solana, Aptos, SUI, TVM).

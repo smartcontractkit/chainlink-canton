@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonsequences "github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -76,6 +76,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 		return 0, fmt.Errorf("canton chain with selector %d not found", chainSelector)
 	}
 	participant := chain.Participants[0]
+	queryParties := opcontract.LedgerQueryParties(participant)
 	ctx := context.Background()
 	if e.GetContext != nil {
 		ctx = e.GetContext()
@@ -87,7 +88,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 		activePool, err := opcontract.FindActiveContractByInstanceAddress(
 			ctx,
 			participant.LedgerServices.State,
-			participant.PartyID,
+			queryParties,
 			lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
 			poolAddress,
 		)
@@ -105,7 +106,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 		activePool, err := opcontract.FindActiveContractByInstanceAddress(
 			ctx,
 			participant.LedgerServices.State,
-			participant.PartyID,
+			queryParties,
 			burnminttokenpool.BurnMintTokenPool{}.GetTemplateID(),
 			poolAddress,
 		)
