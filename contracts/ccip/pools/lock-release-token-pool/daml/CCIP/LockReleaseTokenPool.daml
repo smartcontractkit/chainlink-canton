@@ -102,16 +102,6 @@ tokenPoolHoldingsContextKey = "token-pool-holdings"
 lookupTokenPoolHoldings : Splice.Api.Token.MetadataV1.ChoiceContext -> Update [ContractId Splice.Api.Token.HoldingV1.Holding]
 lookupTokenPoolHoldings ctx = CCIP.Context.getFromContextU ctx tokenPoolHoldingsContextKey
 
-abiEncodedAddressPrefix : BytesHex
-abiEncodedAddressPrefix = "000000000000000000000000"
-
-remoteTokenAddressMatches : BytesHex -> BytesHex -> Bool
-remoteTokenAddressMatches sourceTokenAddress configuredRemoteTokenAddress =
-    sourceTokenAddress == configuredRemoteTokenAddress
-        || (byteCount sourceTokenAddress == 32
-            && byteCount configuredRemoteTokenAddress == 20
-            && sourceTokenAddress == abiEncodedAddressPrefix <> configuredRemoteTokenAddress)
-
 data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
     with
         tokenAdminRegistry : RawInstanceAddress
@@ -660,7 +650,7 @@ template LockReleaseTokenPool
                     (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)
 
                 assertMsg "pool: sourceTokenAddress does not match remote token address for lane"
-                    (remoteTokenAddressMatches tt.sourceTokenAddress remoteChainCfg.remoteTokenAddress)
+                    (tt.sourceTokenAddress == remoteChainCfg.remoteTokenAddress)
 
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.SetInboundPoolCCVs with
