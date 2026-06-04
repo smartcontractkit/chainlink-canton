@@ -131,7 +131,7 @@ mintLink
   -> Decimal
   -> Script (ContractId HoldingV1.Holding)
 mintLink admin owner registryCid instrumentId amount = do
-  result <- submitMulti [admin, owner] [] do
+  result <- submit (actAs admin <> actAs owner) do
     exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
       expectedAdmin = admin
       instrumentId
@@ -345,7 +345,7 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   senderChangeHolding.holdingAmount === 3.0
   poolFeeHolding.holdingAmount === 0.35
 
-  tokenSendData <- pure (fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData)
+  let tokenSendData = fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData
   tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 66500000000.0)
   tokenSendData.instrumentId === instrumentId
   rateLimiters <- query @RateLimiter.RateLimiter poolOwner
@@ -1575,5 +1575,103 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
   limiter <- fromSome <$> queryContractId poolOwner updatedInboundCid
   limiter.capacity === 50.0
   limiter.rate === 5.0
+
+  pure ()
+
+-- Inbound, outbound, and custom-finality limiters must reference distinct RateLimiter contracts.
+testBurnMintTokenPool_RateLimiterPathIsolation : Script ()
+testBurnMintTokenPool_RateLimiterPathIsolation = script do
+  owner <- allocateParty "bm-rl-iso-owner"
+  ccipOwner <- allocateParty "bm-rl-iso-ccip"
+  rmnOwner <- allocateParty "bm-rl-iso-rmn"
+
+  tokenPoolCid <- submit owner do
+    createCmd BurnMintTokenPool.BurnMintTokenPool with
+      instanceId = "bm-pool-rl-iso"
+      poolOwner = owner
+      ccipOwner = ccipOwner
+      instrumentId = HoldingV1.InstrumentId with admin = owner; id = "LINK"
+      decimals = 8
+      rateLimitAdmin = None
+      remoteChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      poolReceiveContext = MetadataV1.emptyChoiceContext
+      transferTimeout = BurnMintTokenPool.Indefinite
+      deps = mkPoolDeps "tar-bm-rl-iso" "rmn-bm-rl-iso" "fq-bm-rl-iso" ccipOwner rmnOwner
+
+  let mk updSel fin inboundRl customRl outboundRl = BurnMintTokenPool.ChainUpdate with
+        remoteChainSelector = updSel
+        remotePools = []
+        remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+        inboundCCVs = []
+        outboundCCVs = []
+        finalityConfig = fin
+        inboundRateLimiter = inboundRl
+        inboundCustomBlockConfirmationsRateLimiter = customRl
+        outboundRateLimiter = outboundRl
+
+  submitMustFail owner do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.ApplyChainUpdates with
+      remoteChainSelectorsToRemove = []
+      chainsToAdd =
+        [ mk 801.0 FinalityConfig.WaitForFinality
+            (RawInstanceAddress.RawInstanceAddress "in-a@owner")
+            (RawInstanceAddress.RawInstanceAddress "custom-a@owner")
+            (RawInstanceAddress.RawInstanceAddress "out-a@owner")
+        , mk 801.0 FinalityConfig.WaitForFinality
+            (RawInstanceAddress.RawInstanceAddress "in-b@owner")
+            (RawInstanceAddress.RawInstanceAddress "custom-b@owner")
+            (RawInstanceAddress.RawInstanceAddress "out-b@owner")
+        ]
+
+  submitMustFail owner do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.ApplyChainUpdates with
+      remoteChainSelectorsToRemove = []
+      chainsToAdd =
+        [ mk 802.0 FinalityConfig.WaitForSafe
+            (RawInstanceAddress.RawInstanceAddress "shared-in@owner")
+            (RawInstanceAddress.RawInstanceAddress "shared-in@owner")
+            (RawInstanceAddress.RawInstanceAddress "out@owner")
+        ]
+
+  submitMustFail owner do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.ApplyChainUpdates with
+      remoteChainSelectorsToRemove = []
+      chainsToAdd =
+        [ mk 803.0 FinalityConfig.WaitForSafe
+            (RawInstanceAddress.RawInstanceAddress "in@owner")
+            (RawInstanceAddress.RawInstanceAddress "out@owner")
+            (RawInstanceAddress.RawInstanceAddress "out@owner")
+        ]
+
+  tokenPoolCid <- submit owner do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.ApplyChainUpdates with
+      remoteChainSelectorsToRemove = []
+      chainsToAdd =
+        [ mk 450.0 (FinalityConfig.BlockDepth 12)
+            (RawInstanceAddress.RawInstanceAddress "in-450@owner")
+            (RawInstanceAddress.RawInstanceAddress "custom-450@owner")
+            (RawInstanceAddress.RawInstanceAddress "out-450@owner")
+        ]
+
+  submitMustFail owner do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimiterReferences with
+      rateLimitConfigArgs =
+        [ BurnMintTokenPool.RateLimitConfigArgs with
+            remoteChainSelector = 450.0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "x@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "x@owner"
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "y@owner"
+        ]
+
+  submitMustFail owner do
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimiterReferences with
+      rateLimitConfigArgs =
+        [ BurnMintTokenPool.RateLimitConfigArgs with
+            remoteChainSelector = 450.0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "a@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "b@owner"
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "b@owner"
+        ]
 
   pure ()

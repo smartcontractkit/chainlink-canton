@@ -13,6 +13,29 @@ import Chainlink.InstanceAddress (assertValidInstanceId)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec (decodeBoolAt, decodeNumeric0At)
 
+-- | Enforce distinct RateLimiter contract references per logical path. Sharing one RateLimiter
+-- across paths merges quota. Pass Some for the custom-finality slot when it is required.
+assertDistinctRateLimiters
+    : Text
+    -> RawInstanceAddress.RawInstanceAddress
+    -> RawInstanceAddress.RawInstanceAddress
+    -> Optional RawInstanceAddress.RawInstanceAddress
+    -> Update ()
+assertDistinctRateLimiters label inbound outbound maybeCustom = do
+    assertMsg (label <> ": inbound/outbound rate limiters cannot be empty")
+        (inbound /= RawInstanceAddress.empty && outbound /= RawInstanceAddress.empty)
+    assertMsg (label <> ": rate limiters cannot be the same for inbound and outbound")
+        (inbound /= outbound)
+    case maybeCustom of
+        None -> pure ()
+        Some custom -> do
+            assertMsg (label <> ": custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality")
+                (custom /= RawInstanceAddress.empty)
+            assertMsg (label <> ": custom finality inbound rate limiter must be distinct from the default inbound limiter")
+                (custom /= inbound)
+            assertMsg (label <> ": custom finality inbound rate limiter must be distinct from the outbound limiter")
+                (custom /= outbound)
+
 rateLimiterKey : Text
 rateLimiterKey = "rate-limiter"
 

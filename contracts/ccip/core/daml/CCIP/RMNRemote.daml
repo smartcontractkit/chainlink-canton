@@ -2,7 +2,7 @@
 -- Provides emergency stop capability via curse mechanism matching EVM RMNRemote.sol.
 module CCIP.RMNRemote where
 
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Map qualified as Map
@@ -11,7 +11,6 @@ import DA.Optional (fromSomeNote)
 import CCIP.NumericHex qualified as NumericHex
 import Chainlink.InstanceAddress (assertValidInstanceId)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import DA.Crypto.Text (byteCount)
 import CCIP.RMNRemoteCodecGen (
     decodeCurseParamsAt,
     decodeUncurseParamsAt,
@@ -88,6 +87,10 @@ template RMNRemote
             controller caller
             do
                 let chainSubject = chainSelectorToSubject chainSelector
+                -- Reject any selector whose derived subject equals the global curse subject so
+                -- per-chain checks stay distinct from global curse state.
+                assertMsg "rmn: chain selector maps to reserved global curse subject"
+                    (chainSubject /= globalCurseSubject)
                 pure (globalCurseSubject `elem` cursedSubjects
                       || chainSubject `elem` cursedSubjects)
 
@@ -137,6 +140,8 @@ template RMNRemote
             controller rmnOwner
             do
                 let subject = chainSelectorToSubject chainSelector
+                assertMsg "rmn: chain selector maps to reserved global curse subject"
+                    (subject /= globalCurseSubject)
                 assertMsg "rmn: chain already cursed" (subject `notElem` cursedSubjects)
                 create this with cursedSubjects = subject :: cursedSubjects
 
@@ -147,6 +152,8 @@ template RMNRemote
             controller rmnOwner
             do
                 let subject = chainSelectorToSubject chainSelector
+                assertMsg "rmn: chain selector maps to reserved global curse subject"
+                    (subject /= globalCurseSubject)
                 assertMsg "rmn: chain not cursed" (subject `elem` cursedSubjects)
                 create this with cursedSubjects = filter (/= subject) cursedSubjects
 

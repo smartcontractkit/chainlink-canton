@@ -27,6 +27,9 @@ module CCIP.Math
   ( mulDivDown
   , mulDivUp
   , calculateLocalAmountChecked
+  , minTokenDecimals
+  , maxTokenDecimals
+  , isValidTokenDecimals
   , decimalToNumeric0
   , numeric0ToDecimal
   , premiumIdentity
@@ -43,12 +46,24 @@ baseInt = 100000000
 baseNumeric : Numeric 0
 baseNumeric = 100000000.0
 
+-- | Supported token decimal precision for pool config and cross-chain amount
+-- conversion. Upper bound matches Numeric 0 scale limits in checkedPow10Numeric0.
+minTokenDecimals : Int
+minTokenDecimals = 0
+
+maxTokenDecimals : Int
+maxTokenDecimals = 37
+
+isValidTokenDecimals : Int -> Bool
+isValidTokenDecimals decimals =
+    decimals >= minTokenDecimals && decimals <= maxTokenDecimals
+
 calculateLocalAmountChecked : Text -> Numeric 0 -> Int -> Int -> Numeric 0
 calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
     if remoteAmount < 0.0 then error (label <> ": negative remote amount")
     else
         let validateDecimals fieldName decimals =
-                if decimals < 0 || decimals > 37
+                if not (isValidTokenDecimals decimals)
                 then error (label <> ": unsupported " <> fieldName)
                 else decimals
             remoteDecimals' = validateDecimals "remote decimals" remoteDecimals
@@ -64,7 +79,7 @@ calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
 checkedPow10Numeric0 : Text -> Int -> Numeric 0
 checkedPow10Numeric0 label exponent
     | exponent < 0 = error (label <> ": negative exponent")
-    | exponent > 37 = error (label <> ": scale factor exceeds Numeric 0 range")
+    | exponent > maxTokenDecimals = error (label <> ": scale factor exceeds Numeric 0 range")
     | otherwise = checkedPow10Numeric0Go exponent 1.0
 
 checkedPow10Numeric0Go : Int -> Numeric 0 -> Numeric 0

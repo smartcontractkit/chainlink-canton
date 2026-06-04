@@ -2854,7 +2854,7 @@ testVerifyInboundMessage = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
@@ -2975,7 +2975,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig-safe" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn-safe" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify-safe" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
@@ -4077,6 +4077,64 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
+    -- Duplicate remote chain selectors within chainsToAdd
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 996.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    finalityConfig = finalityConfig 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                , LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 996.0
+                    remotePools = []
+                    remoteTokenAddress = "d8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    finalityConfig = finalityConfig 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-b@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-b@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-b@owner"
+                ]
+    -- Custom-finality limiter must not reuse inbound limiter instance
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 995.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    finalityConfig = finalityConfig 7
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "shared-with-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "shared-with-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Custom-finality limiter must not reuse outbound limiter instance
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 994.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    finalityConfig = finalityConfig 7
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-shared@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-shared@owner"
+                ]
     -- Attempt to add an invalid chain config (duplicate remote pool addresses)
     submitMustFail owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
@@ -4333,6 +4391,26 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Chain requires custom finality: custom limiter must not equal inbound
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
+            rateLimitConfigArgs = [
+                LockReleaseTokenPool.RateLimitConfigArgs with
+                    remoteChainSelector = 456.0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-as-custom-in@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-as-custom-in@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-distinct@owner"
+                ]
+    -- Chain requires custom finality: custom limiter must not equal outbound
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
+            rateLimitConfigArgs = [
+                LockReleaseTokenPool.RateLimitConfigArgs with
+                    remoteChainSelector = 456.0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-distinct@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-as-out@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-as-out@owner"
                 ]
 
     pure ()

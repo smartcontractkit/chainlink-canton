@@ -10,7 +10,7 @@ module CCIP.BurnMintTokenPool (
     , module CCIP.BurnMintTokenPoolTypes
   ) where
 
-import DA.Action (foldlA, when)
+import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
@@ -66,7 +66,7 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
 import qualified CCIP.Uint256
 import qualified CCIP.RateLimiter
-import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId, makeText, toText)
+import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
@@ -306,6 +306,7 @@ template BurnMintTokenPool
 
         ensure assertValidInstanceId instanceId
             && instrumentId.admin == poolOwner
+            && CCIP.Math.isValidTokenDecimals decimals
             && all
                 (\cfg -> CCIP.FinalityConfig.isValidFinalityConfig cfg.finalityConfig)
                 (Map.values remoteChainConfigs)
@@ -444,11 +445,12 @@ template BurnMintTokenPool
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
                     assertMsg "ApplyChainUpdates: BlockDepth finality must be positive" (CCIP.FinalityConfig.isValidFinalityConfig finalityConfig)
                     -- Validate rate limiters
-                    assertMsg "ApplyChainUpdates: inbound/outbound rate limiters cannot be empty" (inboundRateLimiter /= RawInstanceAddress.empty && outboundRateLimiter /= RawInstanceAddress.empty)
-                    when (customFinalityRateLimiterRequired finalityConfig) $
-                        assertMsg "ApplyChainUpdates: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
-                            (inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
-                    assertMsg "ApplyChainUpdates: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
+                    CCIP.RateLimiter.assertDistinctRateLimiters "ApplyChainUpdates"
+                        inboundRateLimiter
+                        outboundRateLimiter
+                        (if customFinalityRateLimiterRequired finalityConfig
+                            then Some inboundCustomBlockConfirmationsRateLimiter
+                            else None)
                     -- Validate remote pools
                     assertMsg "ApplyChainUpdates: remotePools cannot contain empty address" ("" `notElem` remotePools)
                     assertMsg "ApplyChainUpdates: remotePools cannot contain duplicates" (length remotePools == length (dedup remotePools))
@@ -541,14 +543,15 @@ template BurnMintTokenPool
                 -- Validate
                 forA_ rateLimitConfigArgs $ \arg -> do
                     assertMsg "SetRateLimiterReferences: invalid chain selector" (arg.remoteChainSelector > 0.0)
-                    assertMsg "SetRateLimiterReferences: inbound/outbound rate limiters cannot be empty" (arg.inboundRateLimiter /= RawInstanceAddress.empty && arg.outboundRateLimiter /= RawInstanceAddress.empty)
-                    assertMsg "SetRateLimiterReferences: rate limiters cannot be the same for inbound and outbound" (arg.inboundRateLimiter /= arg.outboundRateLimiter)
                     cfg <- case Map.lookup arg.remoteChainSelector remoteChainConfigs of
                         None -> abort ("SetRateLimiterReferences: unsupported chain selector: " <> show arg.remoteChainSelector)
                         Some cfg -> pure cfg
-                    when (customFinalityRateLimiterRequired cfg.finalityConfig) $
-                        assertMsg "SetRateLimiterReferences: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
-                            (arg.inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
+                    CCIP.RateLimiter.assertDistinctRateLimiters "SetRateLimitConfig"
+                        arg.inboundRateLimiter
+                        arg.outboundRateLimiter
+                        (if customFinalityRateLimiterRequired cfg.finalityConfig
+                            then Some arg.inboundCustomBlockConfirmationsRateLimiter
+                            else None)
 
                 -- Update
                 let remoteChainConfigsUpdated = foldl
@@ -650,6 +653,8 @@ template BurnMintTokenPool
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: executing message tokenAdminRegistry mismatch"
                     (execMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                assertMsg "pool: executing message rmnRemote mismatch"
+                    (execMsg.deps.rmnRemote == deps.rmnRemote)
                 let message = execMsg.message
 
                 tt <- case message.tokenTransfer of
@@ -699,6 +704,8 @@ template BurnMintTokenPool
                     (sm.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
                     (sm.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                assertMsg "pool: sending message rmnRemote mismatch"
+                    (sm.deps.rmnRemote == deps.rmnRemote)
 
                 poolCCVs <- case Map.lookup sm.destChainSelector remoteChainConfigs of
                         None -> abort "pool: unsupported dest chain"

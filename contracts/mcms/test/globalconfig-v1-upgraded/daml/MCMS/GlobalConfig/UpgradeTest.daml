@@ -7,6 +7,7 @@
 module MCMS.GlobalConfig.UpgradeTest where
 
 import DA.Map qualified as Map
+import DA.Optional (isNone)
 import Daml.Script
 import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSReceiver_Entrypoint(..))
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
@@ -147,7 +148,7 @@ testNonConsumingMigrateV1ToV2 = script do
             assertMsg "ccipOwner preserved" $ v2.ccipOwner == ccipOwner
             assertMsg "chainSelector preserved" $ v2.chainSelector == 1
             assertMsg "onRampAddress preserved" $ v2.onRampAddress == "aa"
-            assertMsg "newFeatureEnabled defaults to None" $ v2.newFeatureEnabled == None
+            assertMsg "newFeatureEnabled defaults to None" $ isNone v2.newFeatureEnabled
 
             destResult <- submit ccipOwner do
                 exerciseCmd v2Cid GetDestChainConfigV2 with

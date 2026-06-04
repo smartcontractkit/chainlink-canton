@@ -31,7 +31,6 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Interfaces.Executor
-import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Executor
 import qualified CCIP.ExecutorTypes as CCIP.Executor
 import qualified CommitteeVerifier.DummyCommitteeVerifier
