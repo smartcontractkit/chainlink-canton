@@ -1326,8 +1326,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get update %q: %w", ccipSendReport.Output.ExecInfo.UpdateID, err)
 	}
 
-	debugPrintSplitHoldingSubmitResponseJSON(update)
-
 	parsedSend, err := parseFirstCCIPMessageSentFromLedgerEvents(update.GetTransaction().GetEvents(), c.nextSeq)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, err
