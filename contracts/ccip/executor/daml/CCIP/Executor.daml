@@ -85,7 +85,7 @@ template Executor
                 ccvAllowlistEnabled : Bool
             controller owner
             do
-                let kept = filter (\ccv -> not (ccv `elem` ccvsToRemove)) allowedCCVs
+                let kept = filter ((`notElem` ccvsToRemove)) allowedCCVs
                 let merged = dedup (kept ++ ccvsToAdd)
                 create this with
                     allowedCCVs = merged

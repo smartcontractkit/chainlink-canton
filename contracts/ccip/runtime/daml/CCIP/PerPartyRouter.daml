@@ -21,7 +21,6 @@ import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.Math
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)

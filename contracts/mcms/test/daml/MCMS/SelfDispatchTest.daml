@@ -4,6 +4,7 @@ module MCMS.SelfDispatchTest where
 
 import DA.Map qualified as Map
 import DA.List (head)
+import DA.Optional (isNone)
 import DA.Time (seconds, addRelTime)
 import DA.Date (datetime, Month(..))
 import Daml.Script
@@ -295,7 +296,7 @@ testExecuteScheduledBatchRejectsMissingOpId = script do
       submitter = ccipOwner
       opId = "missing-op-id"
 
-  assertMsg "Missing operation should remain absent after failed execution" $ timestamp == None
+  assertMsg "Missing operation should remain absent after failed execution" $ isNone timestamp
 
 testExecuteScheduledBatchRejectsShortPredecessor : Script ()
 testExecuteScheduledBatchRejectsShortPredecessor = script do
@@ -581,7 +582,7 @@ testTimelockViewFunctions = script do
       submitter = ccipOwner
       opId = "nonexistent"
 
-  assertMsg "Timestamp should be None" $ tsNone == None
+  assertMsg "Timestamp should be None" $ isNone tsNone
 
   -- Test IsOperation
   isOp <- submit ccipOwner do

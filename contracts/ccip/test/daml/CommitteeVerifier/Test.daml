@@ -5,7 +5,7 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable (forA_)
-import DA.List ((!!))
+import DA.List (head)
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
 import DA.Text qualified as Text
@@ -417,7 +417,7 @@ testCommitteeVerifier = script do
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(456.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
+            signerConfigs = Map.fromList [(456.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     -- duplicate signer keys should be rejected at creation time
     submitMustFail owner do
@@ -432,7 +432,7 @@ testCommitteeVerifier = script do
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [PayloadBuilder.pubkeys !! 0, PayloadBuilder.pubkeys !! 0])]
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [head PayloadBuilder.pubkeys, head PayloadBuilder.pubkeys])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
     -- duplicate signer keys should be rejected on config updates as well
@@ -448,12 +448,12 @@ testCommitteeVerifier = script do
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail owner do
         exerciseCmd ccv10b CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
-            signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [PayloadBuilder.pubkeys !! 0, PayloadBuilder.pubkeys !! 0]]
+            signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [head PayloadBuilder.pubkeys, head PayloadBuilder.pubkeys]]
     debug ("===== Passed Test10b =====")
 
     debug ("===== Test11: Malformed keys rejected at config time =====")
@@ -505,7 +505,7 @@ testCommitteeVerifier = script do
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail owner do
         exerciseCmd ccv11c CommitteeVerifier.ApplySignatureConfigs with

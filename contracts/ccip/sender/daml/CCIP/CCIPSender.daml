@@ -24,7 +24,6 @@ import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Uint256
-import qualified Splice.Api.Token.HoldingV1
 
 import Chainlink.InstanceAddress (assertValidInstanceId)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
@@ -87,9 +86,9 @@ assertExactCCVSet requiredCCVs providedCCVs = do
     assertMsg "sender: GetFee duplicate CCV inputs"
         (unique providedCCVs)
     assertMsg "sender: GetFee missing required CCV"
-        (all (\requiredCCV -> requiredCCV `elem` providedCCVs) requiredCCVs)
+        (all ((`elem` providedCCVs)) requiredCCVs)
     assertMsg "sender: GetFee unexpected CCV input"
-        (all (\providedCCV -> providedCCV `elem` requiredCCVs) providedCCVs)
+        (all ((`elem` requiredCCVs)) providedCCVs)
 
 validateCCVFeeQuote
     : RawInstanceAddress.RawInstanceAddress
