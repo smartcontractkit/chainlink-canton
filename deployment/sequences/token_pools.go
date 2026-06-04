@@ -9,8 +9,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	tokenadaptersfinality "github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipsequences "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -259,21 +258,10 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			}
 			out.Addresses = append(out.Addresses, customRef)
 
-			remoteFamily, err := chain_selectors.GetSelectorFamily(remoteSelector)
-			if err != nil {
-				return out, fmt.Errorf("get remote chain family for %d: %w", remoteSelector, err)
-			}
-			remotePoolAddress := strings.ToLower(hex.EncodeToString(remoteCfg.RemotePool))
-			remoteTokenAddress := strings.ToLower(hex.EncodeToString(remoteCfg.RemoteToken))
-			if remoteFamily == chain_selectors.FamilyEVM {
-				remotePoolAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToHash(remoteCfg.RemotePool).Hex()), "0x")
-				remoteTokenAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToAddress(remoteCfg.RemoteToken).Hex()), "0x")
-			}
-
 			updates = append(updates, tokenPoolChainUpdate{
 				RemoteChainSelector: remoteSelectorKey,
-				RemotePools:         []types.TEXT{types.TEXT(remotePoolAddress)},
-				RemoteTokenAddress:  types.TEXT(remoteTokenAddress),
+				RemotePools:         []types.TEXT{types.TEXT(hex.EncodeToString(remoteCfg.RemotePool))},
+				RemoteTokenAddress:  types.TEXT(hex.EncodeToString(remoteCfg.RemoteToken)),
 				InboundCCVs:         inboundCCVs,
 				OutboundCCVs:        outboundCCVs,
 				FinalityConfig:      toCantonFinalityConfig(input.AllowedFinalityConfig),
