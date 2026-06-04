@@ -22,49 +22,6 @@ func (r *CantonMCMSReader) GetChainMetadata(
 	chainSelector uint64,
 	input ccipmcms.Input,
 ) (mcms_types.ChainMetadata, error) {
-	return r.getRootMetadata(e, chainSelector, input)
-}
-
-// GetChainMetadataForBatch implements changesets.mcmsBatchMetadataReader.
-// Uses live ledger op count and the proposal batch size for Canton additionalFields.
-func (r *CantonMCMSReader) GetChainMetadataForBatch(
-	e cldf.Environment,
-	chainSelector uint64,
-	input ccipmcms.Input,
-	batch mcms_types.BatchOperation,
-) (mcms_types.ChainMetadata, error) {
-	mcmsRef, err := r.GetMCMSRef(e, chainSelector, input)
-	if err != nil {
-		return mcms_types.ChainMetadata{}, err
-	}
-
-	chain, ok := e.BlockChains.CantonChains()[chainSelector]
-	if !ok || len(chain.Participants) == 0 {
-		return mcms_types.ChainMetadata{}, fmt.Errorf("canton chain %d not found or has no participants", chainSelector)
-	}
-
-	participant := chain.Participants[0]
-	ctx := context.Background()
-	if e.GetContext != nil {
-		ctx = e.GetContext()
-	}
-
-	return buildCantonChainMetadata(
-		ctx,
-		participant.LedgerServices.State,
-		participant.PartyID,
-		mcmsRef.Address,
-		timelockRoleForAction(input.TimelockAction),
-		uint64(len(batch.Transactions)),
-		input.OverridePreviousRoot,
-	)
-}
-
-func (r *CantonMCMSReader) getRootMetadata(
-	e cldf.Environment,
-	chainSelector uint64,
-	input ccipmcms.Input,
-) (mcms_types.ChainMetadata, error) {
 	mcmsRef, err := r.GetMCMSRef(e, chainSelector, input)
 	if err != nil {
 		return mcms_types.ChainMetadata{}, err
