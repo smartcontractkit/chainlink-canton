@@ -180,6 +180,7 @@ components:
         - contextData
         - disclosedContracts
         - ccvs
+        - feeTokenConfigCid
       properties:
         contextData:
           type: object
@@ -200,6 +201,9 @@ components:
             - "0x4bed5af0e77b4d7a552a1f933b13c275bbdc231b8499b2e14edcc634a6869a5f"
         executor:
           $ref: "../common/eds-common.yaml#/components/schemas/RawOrHashedAddress"
+        feeTokenConfigCid:
+          type: string
+          description: TokenConfig contract ID for the message fee token.
 
     CCIPExecuteRequest:
       type: object

@@ -7,7 +7,7 @@ module CCIP.SendingMessageV1 where
 
 import DA.Crypto.Text (BytesHex, byteCount, keccak256)
 import DA.Foldable qualified as Foldable
-import DA.List (dedup)
+import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome, fromSome, fromOptional)
 
 import qualified CCIP.Events
@@ -52,7 +52,7 @@ data TokenSendData = TokenSendData
         poolInstanceId : Text
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
+        amount : BytesHex
         destTokenAddress : BytesHex
         extraData : BytesHex
     deriving (Eq, Show)
@@ -260,7 +260,8 @@ template SendingMessageV1
                     outboundPoolCCVs
                     ccvInstanceId
                     caller
-                assertMsg "sendingMessage: duplicate CCV fee" (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
+                assertMsg "sendingMessage: duplicate CCV fee"
+                    (all (\fee -> not (fee.ccvInstanceId == ccvInstanceId && fee.ccvOwner == caller)) ccvFees)
 
                 let fee = CCVFee with
                         ccvInstanceId, ccvOwner = caller
@@ -296,9 +297,12 @@ template SendingMessageV1
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
                 assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
+                CCIP.Internal.assertMaxCCVListLength "sendingMessage: outbound pool CCVs" poolCCVs
+                assertMsg "sendingMessage: outbound pool CCVs cannot contain duplicates" (unique poolCCVs)
                 let resolvedPoolCCVs = CCIP.Internal.resolveRequiredCCVsWithDefaults
                         destDefaultCCVs
                         poolCCVs
+                CCIP.Internal.assertMaxCCVListLength "sendingMessage: resolved outbound pool CCVs" resolvedPoolCCVs
 
                 create this with
                     outboundPoolCCVs = Some resolvedPoolCCVs
@@ -424,6 +428,7 @@ template SendingMessageV1
 
                 let (finalCCVs, finalHash, messageV1, encoded, msgId) =
                         buildMessageArtifacts this
+                CCIP.Internal.assertMaxCCVListLength "sendingMessage: final CCVs" finalCCVs
                 create this with
                     requiredCCVs = finalCCVs
                     ccvAndExecutorHash = finalHash
@@ -448,7 +453,8 @@ template SendingMessageV1
                     ccvInstanceId
                     caller
                 assertMsg "version tag must be 4 bytes" (byteCount versionTag == 4)
-                assertMsg "sendingMessage: duplicate verifier data for CCV" (all (\v -> v.ccvInstanceId /= ccvInstanceId) verifierData)
+                assertMsg "sendingMessage: duplicate verifier data for CCV"
+                    (all (\v -> not (v.ccvInstanceId == ccvInstanceId && v.ccvOwner == caller)) verifierData)
 
                 let vd = VerifierData with
                         ccvInstanceId
@@ -467,7 +473,7 @@ template SendingMessageV1
                 poolInstanceId : Text
                 poolOwner : Party
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                amount : Numeric 0
+                amount : BytesHex
                 destTokenAddress : BytesHex
                 extraData : BytesHex
             controller ccipOwner
@@ -479,6 +485,7 @@ template SendingMessageV1
                 quotedTokenSendFee <- case tokenSendFee of
                     None -> abort "sendingMessage: token send fee must be finalized before token data"
                     Some fee -> pure fee
+                assertMsg "sendingMessage: token amount must be 32 bytes" (byteCount amount == 32)
                 assertMsg "sendingMessage: pool extraData exceeds quoted destBytesOverhead"
                     (byteCount extraData <= quotedTokenSendFee.destBytesOverhead)
 
@@ -492,6 +499,7 @@ template SendingMessageV1
                 let updated = this with tokenSendData = Some tsd
                 let (finalCCVs, finalHash, messageV1, encoded, msgId) =
                         buildMessageArtifacts updated
+                CCIP.Internal.assertMaxCCVListLength "sendingMessage: final CCVs" finalCCVs
                 create updated with
                     requiredCCVs = finalCCVs
                     ccvAndExecutorHash = finalHash

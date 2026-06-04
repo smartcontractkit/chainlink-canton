@@ -20,8 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -457,7 +457,7 @@ func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Byt
 	activeContract, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
 		c.stateServiceClient,
-		c.config.NodeOperatorParty,
+		[]string{c.config.NodeOperatorParty},
 		c.config.RMNRemoteTemplateID.String(),
 		c.rmnRemoteInstanceAddress,
 	)

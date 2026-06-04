@@ -6,48 +6,28 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
+	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipreceiver"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
-
-func receiverWaitForFinalityConfig() common.FinalityConfig {
-	return common.FinalityConfig{WaitForFinality: &types.UNIT{}}
-}
-
-func receiverWaitForSafeConfig() common.FinalityConfig {
-	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
-}
-
-func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error) {
-	switch {
-	case finality < 0:
-		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
-	case finality == 0:
-		return receiverWaitForFinalityConfig(), nil
-	case finality == 0x00010000:
-		return receiverWaitForSafeConfig(), nil
-	case finality > 0xFFFF:
-		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
-	default:
-		return common.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
-	}
-}
 
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
@@ -143,7 +123,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
 
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{participant.PartyID}, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get router contract ID: %w", err)
 	}
@@ -165,7 +145,11 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	disclosedContracts := ccipExecuteDisclosure.DisclosedContracts
 
 	// CCVs
-	for i, verifier := range ccvs {
+	if len(verifierResults) != len(verifiers) {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("verifierResults length %d does not match verifiers length %d", len(verifierResults), len(verifiers))
+	}
+	for i, vr := range verifierResults {
+		verifier := ccvs[i]
 		ccvExecuteDisclosure, err := c.GetCCVExecuteDisclosure(ctx, encodedMessageHex, verifier)
 		if err != nil {
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCV execute disclosure for verifier %s: %w", verifier.String(), err)
@@ -173,7 +157,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 		executeArgs.CcvInputs[i] = ccipreceiver.CCVInput{
 			CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
-			VerifierResults: types.TEXT(hex.EncodeToString(verifierResults[i])),
+			VerifierResults: types.TEXT(hex.EncodeToString(vr)),
 			CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
 		}
 		disclosedContracts = append(disclosedContracts, ccvExecuteDisclosure.DisclosedContracts...)
@@ -215,6 +199,8 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to execute message: %w", err)
 	}
+
+	// TODO: refactor to use our standard unmarshaler
 	c.logger.Info().Str("UpdateID", executeReport.Output.ExecInfo.UpdateID).Msg("Message executed")
 	update, err := participant.LedgerServices.Update.GetUpdateById(ctx, &apiv2.GetUpdateByIdRequest{
 		UpdateId: executeReport.Output.ExecInfo.UpdateID,
@@ -341,4 +327,143 @@ func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfa
 		State:               executionState,
 		ReturnData:          returnData,
 	}, nil
+}
+
+// lockForParty serializes manual-execute work per receiver party. Two ConfirmExecOnDest
+// invocations targeting the same party will queue, because the receiver's PerPartyRouter
+// contract is consumed and recreated on every execute (line ~146 of this file): a parallel
+// caller would race on routerCid resolution and one would fail with "already archived".
+func (c *Chain) lockForParty(party string) func() {
+	c.partyMutexesMu.Lock()
+	m, ok := c.partyMutexes[party]
+	if !ok {
+		m = &sync.Mutex{}
+		c.partyMutexes[party] = m
+	}
+	c.partyMutexesMu.Unlock()
+	m.Lock()
+
+	return m.Unlock
+}
+
+// findExistingExecutionState scans active ExecutionStateChanged contracts on the receiver
+// party and returns the parsed event matching (sourceChainSelector, seqNo, messageID) if
+// present. Used by ConfirmExecOnDest for idempotency: if a message has already been
+// executed, repeated calls return the same event instead of attempting to re-execute
+// (which would fail because the underlying PerPartyRouter contract has been consumed).
+func (c *Chain) findExistingExecutionState(
+	ctx context.Context, sourceChainSelector, seqNo uint64, messageID protocol.Bytes32,
+) (cciptestinterfaces.ExecutionStateChangedEvent, bool, error) {
+	if len(c.chain.Participants) == 0 {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: no participants on chain")
+	}
+	participant := c.chain.Participants[0]
+
+	templateID := contracts.TemplateIDFromBinding(common.ExecutionStateChanged{}).ToLedgerIdentifier()
+	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, templateID)
+	if err != nil {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: list active ExecutionStateChanged contracts: %w", err)
+	}
+	for _, ac := range activeContracts {
+		created := ac.GetCreatedEvent()
+		if created == nil {
+			continue
+		}
+		ev, err := parseExecutionStateChangedEvent(created)
+		if err != nil {
+			c.logger.Debug().Err(err).Msg("Skipping unparseable ExecutionStateChanged active contract")
+			continue
+		}
+		if uint64(ev.SourceChainSelector) == sourceChainSelector &&
+			ev.MessageNumber == seqNo &&
+			ev.MessageID == messageID {
+			return ev, true, nil
+		}
+	}
+
+	return cciptestinterfaces.ExecutionStateChangedEvent{}, false, nil
+}
+
+// verifierResult is a minimal view of a CCIP verifier result, with the verifier
+// destination address already translated to the hashed Canton instance address.
+type verifierResult struct {
+	Message                protocol.Message
+	HashedVerifierDestAddr protocol.UnknownAddress
+	CCVData                []byte
+}
+
+// verifierAssertTimeout maps ConfirmExecOnDest's timeout to the verifier poll window.
+func verifierAssertTimeout(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return 5 * time.Minute
+	}
+
+	return timeout
+}
+
+// fetchVerifierResult queries the aggregator + indexer for the verifier output for
+// messageID. Caller must have wired [VerifierObservation] on the chain first.
+func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Bytes32, timeout time.Duration) (verifierResult, error) {
+	if !c.verifierObs.wired() {
+		return verifierResult{}, fmt.Errorf("verifier observation not wired")
+	}
+
+	res, err := AssertMessageWithVerifierObservation(ctx, c.verifierObs, messageID, tcapi.AssertMessageOptions{
+		TickInterval:            time.Second,
+		Timeout:                 verifierAssertTimeout(timeout),
+		ExpectedVerifierResults: 1,
+		AssertVerifierLogs:      false,
+		AssertExecutorLogs:      false,
+	})
+	if err != nil {
+		return verifierResult{}, fmt.Errorf("assertMessage: %w", err)
+	}
+	if res.AggregatedResult == nil {
+		return verifierResult{}, fmt.Errorf("aggregated verifier result missing")
+	}
+	if len(res.IndexedVerifications.Results) != 1 {
+		return verifierResult{}, fmt.Errorf("expected 1 indexed verifier result, got %d", len(res.IndexedVerifications.Results))
+	}
+	vr := res.IndexedVerifications.Results[0].VerifierResult
+
+	hashedDestAddr, err := hashInstanceAddress(vr.VerifierDestAddress)
+	if err != nil {
+		return verifierResult{}, fmt.Errorf("hashInstanceAddress: %w", err)
+	}
+
+	return verifierResult{
+		Message:                vr.Message,
+		HashedVerifierDestAddr: hashedDestAddr,
+		CCVData:                vr.CCVData,
+	}, nil
+}
+
+func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error) {
+	switch {
+	case finality < 0:
+		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
+	case finality == 0:
+		return common.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
+	case finality == 0x00010000:
+		return common.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
+	case finality > 0xFFFF:
+		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
+	default:
+		return common.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
+	}
+}
+
+// hashInstanceAddress decodes a verifier result's VerifierDestAddress on Canton.
+// On Canton the verifier result carries the raw instance address as a hex-encoded
+// string (bytes); to look up its disclosure from EDS we need the hashed instance
+// address. This helper is the non-test counterpart of getHashedInstanceAddress
+// previously kept in evm2canton_e2e_test.go.
+func hashInstanceAddress(rawInstanceAddressBytes protocol.UnknownAddress) (protocol.UnknownAddress, error) {
+	rawInstanceAddressStr := string(rawInstanceAddressBytes.Bytes())
+	rawInstanceAddress, err := contracts.RawInstanceAddressFromString(rawInstanceAddressStr)
+	if err != nil {
+		return nil, fmt.Errorf("hashInstanceAddress: %w", err)
+	}
+
+	return protocol.UnknownAddress(rawInstanceAddress.InstanceAddress().Bytes()), nil
 }

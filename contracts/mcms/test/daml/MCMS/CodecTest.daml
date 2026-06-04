@@ -12,6 +12,23 @@ assertRoundTrip d = do
     Some (decoded, _) ->
       assertMsg ("round-trip failed for " <> show d <> ": got " <> show decoded) (decoded == d)
 
+-- | Verify encode produces expected hex AND decode recovers the original value.
+-- Each entry tests both directions of the int64 codec in a single pass.
+assertInt64Codec : Int -> Text -> Script ()
+assertInt64Codec n expectedHex = do
+  case encodeInt64 n of
+    None -> assertFail ("encodeInt64 returned None for: " <> show n)
+    Some encoded -> do
+      -- Verify encoding matches expected two's complement big-endian hex
+      assertMsg ("encode mismatch for " <> show n <> ": expected " <> expectedHex <> " got " <> encoded)
+        (encoded == expectedHex)
+      -- Verify decoding the encoded hex recovers the original value
+      case decodeInt64 encoded of
+        None -> assertFail ("decodeInt64 returned None for: " <> show n)
+        Some decoded ->
+          assertMsg ("decode mismatch for " <> show n <> ": got " <> show decoded)
+            (decoded == n)
+
 testDecimalRoundTrip : Script ()
 testDecimalRoundTrip = script do
   assertRoundTrip 0.0
@@ -71,6 +88,53 @@ testDecimalSignBit = script do
   debug "✓ Decimal sign bit tests passed"
 
 -- ===========================================================================
+-- INT64 CODEC TESTS
+-- Verifies encodeInt64/decodeInt64 against known two's complement big-endian
+-- values (matching Go's binary.Write(BigEndian, int64)), testing both
+-- encode and decode directions in a single pass per value.
+-- ===========================================================================
+
+testInt64Codec : Script ()
+testInt64Codec = script do
+  -- Zero
+  assertInt64Codec 0                      "0000000000000000"
+  -- Positive: byte boundaries
+  assertInt64Codec 1                      "0000000000000001"
+  assertInt64Codec 127                    "000000000000007f"  -- max signed byte
+  assertInt64Codec 128                    "0000000000000080"  -- first value needing 2nd byte
+  assertInt64Codec 255                    "00000000000000ff"  -- max unsigned byte
+  assertInt64Codec 256                    "0000000000000100"  -- first value needing 2nd byte position
+  -- Positive: word boundaries
+  assertInt64Codec 65535                  "000000000000ffff"  -- max uint16
+  assertInt64Codec 2147483647             "000000007fffffff"  -- max int32
+  assertInt64Codec 9223372036854775807    "7fffffffffffffff"  -- max int64 (2^63 - 1)
+  -- Negative: small magnitudes
+  assertInt64Codec (-1)                   "ffffffffffffffff"
+  assertInt64Codec (-2)                   "fffffffffffffffe"
+  -- Negative: byte boundaries
+  assertInt64Codec (-128)                 "ffffffffffffff80"  -- min signed byte
+  assertInt64Codec (-256)                 "ffffffffffffff00"
+  -- Negative: word boundaries
+  assertInt64Codec (-65536)               "ffffffffffff0000"
+  assertInt64Codec (-2147483648)          "ffffffff80000000"  -- min int32
+  assertInt64Codec (-9223372036854775808) "8000000000000000"  -- min int64 (-2^63)
+  debug "✓ Int64 codec tests passed"
+
+testInt64AtOffset : Script ()
+testInt64AtOffset = script do
+  let prefix = "abcd"
+  case encodeInt64 (-42) of
+    None -> assertFail "encodeInt64 returned None for -42"
+    Some encoded -> do
+      let padded = prefix <> encoded
+      case decodeInt64At padded 2 of
+        None -> assertFail "decodeInt64At returned None with offset"
+        Some (decoded, newOffset) -> do
+          assertMsg ("offset decode mismatch: " <> show decoded) (decoded == -42)
+          assertMsg ("newOffset mismatch: expected 10 got " <> show newOffset) (newOffset == 10)
+  debug "✓ Int64 offset tests passed"
+
+-- ===========================================================================
 -- ALL CODEC TESTS
 -- ===========================================================================
 
@@ -82,6 +146,8 @@ testAllCodec = script do
   testDecimalRoundTrip
   testDecimalOffset
   testDecimalSignBit
+  testInt64Codec
+  testInt64AtOffset
   debug "=========================================="
   debug "All codec tests passed! ✓"
   debug "=========================================="

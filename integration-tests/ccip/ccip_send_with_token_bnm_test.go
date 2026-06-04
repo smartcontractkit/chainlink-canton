@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -36,21 +35,21 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/link"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_burn_mint_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_burn_mint_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -74,14 +73,13 @@ import (
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 
 	// Import to register adapters
 	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
-
-	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 // TestBnMTokenPool_FullSendFlow tests full send flow with token transfer.
@@ -199,6 +197,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		Config: changesets.DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: partyCCIP,
+				RMNOwnerParty:  partyCCIP,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
@@ -285,8 +284,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err, "failed to get Executor address")
 
 	// Deploy and configure lane for outbound sends
-	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
-	require.Truef(t, ok, "failed to get Canton Lane adapter")
 
 	// 8 cents outgoing CCV verification fee
 	ccvFeeUSDCents := 7
@@ -309,53 +306,56 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		},
 	}
 
-	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
-		Source: &lanes.ChainDefinition{
-			Selector: env.Chain.ChainSelector(),
-			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
-				{
-					CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
-					RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
-						remoteSelector: {
-							AllowlistEnabled:          false,
-							AddedAllowlistedSenders:   nil,
-							RemovedAllowlistedSenders: nil,
-							FeeUSDCents:               uint16(ccvFeeUSDCents),
-							GasForVerification:        50_000,
-							PayloadSizeBytes:          6*64 + 2*32,
-							SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
-								Signers:   ccvSignerPubKeys,
-								Threshold: 2,
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, sequences.ConfigureLaneLegAsSourceWithInput, cldfEnv.BlockChains, sequences.ConfigureLaneLegInput{
+		DataStore: cldfEnv.DataStore,
+		Lane: lanes.UpdateLanesInput{
+			Source: &lanes.ChainDefinition{
+				Selector: env.Chain.ChainSelector(),
+				CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
+					{
+						CommitteeVerifier: []datastore.AddressRef{committeeVerifierRef},
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {
+								AllowlistEnabled:          false,
+								AddedAllowlistedSenders:   nil,
+								RemovedAllowlistedSenders: nil,
+								FeeUSDCents:               uint16(ccvFeeUSDCents),
+								GasForVerification:        50_000,
+								PayloadSizeBytes:          6*64 + 2*32,
+								SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   ccvSignerPubKeys,
+									Threshold: 2,
+								},
 							},
 						},
 					},
 				},
+				LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifierRef},
+				DefaultOutboundCCVs:      nil,
+				CantonLaneConfig: &lanes.CantonLaneConfig{
+					GlobalConfig: globalConfigRef,
+				},
+				DefaultExecutor: executorRef,
+				FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
+				OnRamp:          onRampAddress.InstanceAddress().Bytes(),
+				OffRamp:         offRampAddress.InstanceAddress().Bytes(),
 			},
-			LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifierRef},
-			DefaultOutboundCCVs:      nil,
-			CantonLaneConfig: &lanes.CantonLaneConfig{
-				GlobalConfig: globalConfigRef,
+			Dest: &lanes.ChainDefinition{
+				Selector:                 remoteSelector,
+				AddressBytesLength:       20,
+				FeeQuoterDestChainConfig: feeQuoterDestChainConfig,
+				ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+					USDCentsFee: 50,
+					Enabled:     true,
+				},
+				OnRamp:  hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+				OffRamp: hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+				Router:  hexutil.MustDecode("0xe3ddcb2fde5d27a33c450fddc54a3f9bb2ecaa9f"),
 			},
-			DefaultExecutor: executorRef,
-			FeeQuoter:       feeQuoterAddress.InstanceAddress().Bytes(),
-			OnRamp:          onRampAddress.InstanceAddress().Bytes(),
-			OffRamp:         offRampAddress.InstanceAddress().Bytes(),
+			IsDisabled:   false,
+			TestRouter:   false,
+			ExtraConfigs: lanes.ExtraConfigs{},
 		},
-		Dest: &lanes.ChainDefinition{
-			Selector:                 remoteSelector,
-			AddressBytesLength:       20,
-			FeeQuoterDestChainConfig: feeQuoterDestChainConfig,
-			ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
-				USDCentsFee: 50,
-				Enabled:     true,
-			},
-			OnRamp:  hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
-			OffRamp: hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
-			Router:  hexutil.MustDecode("0xe3ddcb2fde5d27a33c450fddc54a3f9bb2ecaa9f"),
-		},
-		IsDisabled:   false,
-		TestRouter:   false,
-		ExtraConfigs: lanes.ExtraConfigs{},
 	})
 	require.NoErrorf(t, err, "Failed to configure chain for lanes")
 	runningDs := datastore.NewMemoryDataStore()
@@ -375,7 +375,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			RegistryAdmin:        types.PARTY(partyCCIP),
 			RegistryInstrumentId: linkInstrumentId,
 			RegistryMeta:         splice_api_token_metadata_v1.Metadata{},
-			TransferPreapprovals: nil,
 		},
 	})
 	require.NoError(t, err)
@@ -557,6 +556,20 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 					},
 				},
 			},
+			TokenStandardAPIConfig: config.TokenStandardAPIConfig{
+				Enabled: true,
+				Admin:   partyCCIP,
+				Registries: map[string]config.Registry{
+					linkRegistryAddress.InstanceAddress().Hex(): {
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partyCCIP,
+							InstanceAddress: linkRegistryAddress.InstanceAddress(),
+						},
+						TokenType: config.TokenTypeLINK,
+						TokenId:   "LINK",
+					},
+				},
+			},
 		})
 		log.Info().Err(err).Msg("EDS terminated")
 		if !errors.Is(err, context.Canceled) {
@@ -567,6 +580,8 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	}()
 
 	// Create EDS clients
+	globalAPIClient, err := oapiGlobal.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create GlobalConfig API client")
 	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
 	require.NoError(t, err, "Failed to create CCIP API client")
 	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
@@ -652,7 +667,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
 
 	// Mint LINK
-	linkRegistryCid, err := contractops.FindActiveContractIDByInstanceAddress(t.Context(), ccipParticipant.LedgerServices.State, partyCCIP, contracts.TemplateIDFromBinding(link.LinkRegistry{}).String(), linkRegistryAddress.InstanceAddress())
+	linkRegistryCid, err := contractops.FindActiveContractIDByInstanceAddress(t.Context(), ccipParticipant.LedgerServices.State, []string{partyCCIP}, contracts.TemplateIDFromBinding(link.LinkRegistry{}).String(), linkRegistryAddress.InstanceAddress())
 	require.NoError(t, err)
 	t.Logf("LinkRegistry ContractId: %v", linkRegistryCid)
 	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -814,7 +829,10 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			Type:    oapiCommon.WithAddress,
 			Address: &executorRawOrHashedAddress,
 		},
-		FeeToken: oapiCommon.InstrumentId{},
+		FeeToken: oapiCommon.InstrumentId{
+			Admin: oapiCommon.PartyId(nativeInstrumentId.Admin),
+			Id:    string(nativeInstrumentId.Id),
+		},
 		Payload:  "",
 		Receiver: "",
 		TokenTransfer: &oapiCommon.TokenTransfer{
@@ -840,6 +858,23 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	executorSendDisclosure, err := edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
+
+	// Sanity check - validate that all disclosures can be queried from the Global EDS API endpoint
+	// TODO: these EDS-specific tests should be separated
+	disclosedContracts, err := edsTesthelpers.GetGlobalDisclosureBatch(t.Context(), globalAPIClient, []contracts.InstanceAddress{
+		perPartyRouterFactoryAddress.InstanceAddress(),
+		globalConfigAddress.InstanceAddress(),
+		feeQuoterAddress.InstanceAddress(),
+		onRampAddress.InstanceAddress(),
+		offRampAddress.InstanceAddress(),
+		tokenAdminRegistryAddress.InstanceAddress(),
+		rmnRemoteAddress.InstanceAddress(),
+		committeeVerifierAddress.InstanceAddress(),
+		executorAddress.InstanceAddress(),
+		linkRegistryAddress.InstanceAddress(),
+	})
+	require.NoError(t, err)
+	require.Lenf(t, disclosedContracts, 10, "expected to retrieve disclosures for all queried addresses")
 
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
@@ -878,6 +913,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		},
 		FeeTokenInput: ccipsender.FeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+			FeeTokenConfigCid:       contractID(ccipSendDisclosure.FeeTokenConfigCid),
 			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{
@@ -935,6 +971,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	executorSendDisclosure, err = edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
+	sendArgs.FeeTokenInput.FeeTokenConfigCid = contractID(ccipSendDisclosure.FeeTokenConfigCid)
 	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
 	sendArgs.CcvSendInputs[0].CcvExtraContext = ccvSendDisclosure.ChoiceContext
 	sendArgs.TokenTransferInput.TokenPoolCid = types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId)

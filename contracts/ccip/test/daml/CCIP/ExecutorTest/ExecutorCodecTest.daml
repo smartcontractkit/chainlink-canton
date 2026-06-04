@@ -81,6 +81,24 @@ testSetDynamicConfigParamsRoundtrip = do
         encoded = ExecutorCodecGen.encodeSetDynamicConfigParams args
     fst (fromSome (ExecutorCodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args
 
+testSetDynamicConfigParamsRejectsInvalidBlockDepth : Script ()
+testSetDynamicConfigParamsRejectsInvalidBlockDepth = do
+    let encodeWith finality =
+            ExecutorCodecGen.encodeSetDynamicConfigParams (SetDynamicConfigParams with
+                newDynamicConfig = DynamicConfig with
+                    feeAggregator = None
+                    allowedFinalityConfig = finality
+                    ccvAllowlistEnabled = False)
+        assertDecodeFails finality =
+            case ExecutorCodecGen.decodeSetDynamicConfigParamsAt (encodeWith finality) 0 of
+                None -> pure ()
+                Some _ -> abort "expected SetDynamicConfig decode to reject invalid BlockDepth"
+
+    assertDecodeFails (FinalityCodec.BlockDepth 0)
+    assertDecodeFails (FinalityCodec.BlockDepth (-1))
+    assertDecodeFails (FinalityCodec.BlockDepth 65536)
+    assertDecodeFails (FinalityCodec.BlockDepth 70000)
+
 -- ===============================================
 -- |           ApplyAllowedCCVUpdates            |
 -- ===============================================

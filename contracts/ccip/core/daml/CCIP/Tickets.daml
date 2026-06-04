@@ -46,25 +46,27 @@ template TokenReceiveTicket
         --   * useDefaultCCVs sentinel expands to source defaults
         requiredInboundPoolCCVs : [RawInstanceAddress]
         tokenAdminRegistryInstanceId : Text  -- Identifies the issuing TAR
+        -- Exact registered pool instance that performed inbound pool verification.
+        poolAddress : RawInstanceAddress
         poolOwner : Party           -- Observer - pool that should release
         receiver : Party            -- Message receiver (observer)
         tokenReceiver : Party       -- Who gets the tokens (may differ from receiver)
 
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
+        amount : BytesHex
         sourcePoolData : BytesHex
 
         messageId : BytesHex
         sourceChainSelector : Numeric 0
         finality : CCIP.FinalityConfig.FinalityConfig
     where
-        signatory dedup (ccipOwner :: ccvOwners)
-        observer poolOwner, receiver, tokenReceiver
+        signatory dedup ([ccipOwner, poolOwner] ++ ccvOwners)
+        observer receiver, tokenReceiver
 
-        -- Consume the ticket under ccipOwner authority.
+        -- Consume the ticket under ccipOwner and poolOwner authority.
         -- Used by TokenAdminRegistry after it validates pool/instrument/instance checks,
         -- so pool claims do not require every CCV owner to co-authorize archive.
-        choice ConsumeByCCIPOwner : ()
-            controller ccipOwner
+        choice Consume : ()
+            controller ccipOwner, poolOwner
             do
                 pure ()
