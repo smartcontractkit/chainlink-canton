@@ -3,6 +3,7 @@ module SendingMessageV1Test where
 import Daml.Script
 
 import DA.Assert ((===))
+import DA.Either (isLeft)
 
 import qualified CCIP.SendingMessageV1
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
@@ -34,6 +35,7 @@ testDistinctCcvOwnersWithSameInstanceId = script do
             ccipOwner = ccipOwner
             sender = ccipOwner
             destChainSelector = destChainSelector
+            destAddressBytesLength = 20
             sequenceNumber = 1.0
             destDefaultCCVs = []
             requiredCCVs = [ccvA, ccvB]
@@ -42,7 +44,7 @@ testDistinctCcvOwnersWithSameInstanceId = script do
             executionMode = Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = 123.0
             senderAddress = ""
-            receiver = ""
+            receiver = "80adbb5ae1b4e8301bc3dd02aa0b7a0d6daeb2c7"
             payload = ""
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
@@ -124,6 +126,7 @@ testSameOwnerDistinctInstanceIds = script do
             ccipOwner = ccipOwner
             sender = ccipOwner
             destChainSelector = destChainSelector
+            destAddressBytesLength = 20
             sequenceNumber = 1.0
             destDefaultCCVs = []
             requiredCCVs = [ccvA, ccvB]
@@ -132,7 +135,7 @@ testSameOwnerDistinctInstanceIds = script do
             executionMode = Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = 123.0
             senderAddress = ""
-            receiver = ""
+            receiver = "842bfeb3bcb6ec81ceaec55cf9a0e9db5eb77be0"
             payload = ""
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
@@ -184,3 +187,55 @@ testSameOwnerDistinctInstanceIds = script do
     length sm.ccvFees === 2
 
     pure ()
+
+testValidateDestChainAddress : Script ()
+testValidateDestChainAddress = do
+    -- In: 20 bytes, unpadded
+    -- Out: 20 bytes, unpadded
+    let addr = "c31ea3de7f6eff3f70c3bfda0c4c4aabbea2c1b3"
+    CCIP.SendingMessageV1.validateDestChainAddress addr 20 === addr
+
+    -- In: 21 bytes, unpadded
+    -- Out: 21 bytes, unpadded
+    let addr = "1898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+    CCIP.SendingMessageV1.validateDestChainAddress addr 21 === addr
+
+    -- In: 30 bytes, unpadded
+    -- Out: 30 bytes, unpadded
+    let addr = "12ee197fd1e17f73ed3f6bed10a676aff0d852fe271fbad6fc85c267fcf1"
+    CCIP.SendingMessageV1.validateDestChainAddress addr 30 === addr
+
+    -- In: 32 bytes, unpadded
+    -- Out: 32 bytes, unpadded
+    let addr = "12ee197fd1e17f73ed3f6bed10a676aff0d852fe271fbad6fc85c267fcf1e2c3"
+    CCIP.SendingMessageV1.validateDestChainAddress addr 32 === addr
+
+    -- In: 20 bytes, padded to 32 bytes
+    -- Out: 20 bytes, unpadded
+    let addr = "000000000000000000000000135de120c28b8bfacbeb1cfdce3cc743b5f98dfb"
+    CCIP.SendingMessageV1.validateDestChainAddress addr 20 === "135de120c28b8bfacbeb1cfdce3cc743b5f98dfb"
+
+    -- In: 21 bytes, padded to 32 bytes
+    -- Out: 21 bytes, unpadded
+    let addr = "00000000000000000000001898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+    CCIP.SendingMessageV1.validateDestChainAddress addr 21 === "1898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+
+    -- In: 20 bytes, padded to 30 bytes
+    -- Out: 20 bytes, padded to 30 bytes (no trimming, only trims if input is 32 bytes)
+    let addr = "00000000000000000000aa6a78ecec748d11d2b179ac19c0d8fdc4c8e5dc"
+    CCIP.SendingMessageV1.validateDestChainAddress addr 30 === addr
+
+    -- Invalid - invalid hex
+    let addr = "00000000000000000000001898a4923b1bfc6dbdf6debb1fbe6adabcf227caeg"
+    result <- tryToEither (\() -> pure (CCIP.SendingMessageV1.validateDestChainAddress addr 20))
+    isLeft result === True
+
+    -- Invalid - 32-byte address with 20-byte addressBytesLength
+    let addr = "4ffd0dccc767ffbcdcdd2450cf3a766f02ada5a3b23eada4fec7bbb94dbd7acf"
+    result <- tryToEither (\() -> pure (CCIP.SendingMessageV1.validateDestChainAddress addr 20))
+    isLeft result === True
+
+    -- Invalid - 30-byte address with 20-byte addressBytesLength
+    let addr = "00000000000000000000aa6a78ecec748d11d2b179ac19c0d8fdc4c8e5dc"
+    result <- tryToEither (\() -> pure (CCIP.SendingMessageV1.validateDestChainAddress addr 20))
+    isLeft result === True
