@@ -208,6 +208,7 @@ mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInsta
         tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
         feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
       destChainSelector
+      destAddressBytesLength = 20
       sequenceNumber = 1.0
       destDefaultCCVs = []
       requiredCCVs = []
