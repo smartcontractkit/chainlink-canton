@@ -297,6 +297,42 @@ testExecuteScheduledBatchRejectsMissingOpId = script do
 
   assertMsg "Missing operation should remain absent after failed execution" $ timestamp == None
 
+testExecuteScheduledBatchRejectsShortPredecessor : Script ()
+testExecuteScheduledBatchRejectsShortPredecessor = script do
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-short-pred")
+  let instanceAddress = "mcms-short-pred@" <> partyToText ccipOwner
+
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      instanceId = "mcms-short-pred"
+      chainId = 1
+      proposer = emptyRoleState
+      canceller = emptyRoleState
+      bypasser = emptyRoleState
+      minDelay = seconds 0
+      blockedFunctions = []
+      timelockTimestamps = Map.empty
+
+  let calls = [TimelockCall with
+        targetInstanceAddress = instanceAddress
+        functionName = "UpdateMinDelay"
+        operationData = "0000000000000001"]
+  let salt = "73616c74"
+
+  -- predecessor is 1 byte ("00") instead of the required 32 bytes.
+  -- assertValidPredecessor runs before the opId lookup, so this fails on the
+  -- length check regardless of timelock state. The valid 32-byte case is
+  -- covered by testScheduleBatch (predecessor = zeroHash succeeds).
+  submitMustFail ccipOwner do
+    exerciseCmd mcmsCid ExecuteScheduledBatch with
+      submitter = ccipOwner
+      opId = hashTimelockOpId calls "00" salt
+      calls
+      predecessor = "00"
+      salt
+      targetCids = Map.empty
+
 -- | Test bypasser_execute_batch self-dispatch (immediate update_min_delay)
 -- Flow: Bypasser signs bypasser_execute_batch -> ExecuteOp (immediate execution)
 testBypasserExecuteBatch : Script ()

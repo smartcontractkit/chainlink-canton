@@ -228,6 +228,13 @@ assertValidHex fieldName hex =
   assertMsg (fieldName <> ": invalid hex (must be even-length, 0-9a-fA-F only): " <> hex)
     (isValidHex hex)
 
+-- | Validate that a predecessor is a well-formed 32-byte hash (hex-encoded).
+assertValidPredecessor : BytesHex -> Update ()
+assertValidPredecessor predecessor = do
+  assertValidHex "predecessor" predecessor
+  assertMsg ("mcms: predecessor must be 32 bytes, got " <> show (byteCount predecessor)) $
+    byteCount predecessor == 32
+
 -- ===========================================================================
 -- MERKLE PROOF VERIFICATION
 -- ===========================================================================
