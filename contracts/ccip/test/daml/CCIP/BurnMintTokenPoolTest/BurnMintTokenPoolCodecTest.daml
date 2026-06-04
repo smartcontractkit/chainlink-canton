@@ -14,12 +14,16 @@ import CCIP.BurnMintTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
     ApplyTokenTransferFeeConfigUpdatesParams(..),
+    SetRateLimiterReferencesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
+    AddPoolReceiveContextNonContractValueParams(..),
+    AddPoolReceiveContextContractValueParams(..),
+    RemovePoolReceiveContextValueParams(..),
     )
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.Context qualified as Context
-import CCIP.ContextCodec (encodeChoiceContext, decodeChoiceContextAt)
+import CCIP.ContextCodec (encodeChoiceContext, decodeChoiceContextAt, encodeAnyValue)
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
@@ -121,12 +125,11 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
     fst (fromSome (BurnMintTokenPoolCodec.decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
--- |             SetRateLimitConfig              |
+-- |          SetRateLimiterReferences           |
 -- ===============================================
 
-testSetRateLimitConfigParamsRoundtrip : Script ()
-testSetRateLimitConfigParamsRoundtrip = do
-    caller <- allocateParty "caller"
+testSetRateLimiterReferencesParamsRoundtrip : Script ()
+testSetRateLimiterReferencesParamsRoundtrip = do
     let rateLimitConfigs = [
             RateLimitConfigArgs with
                 remoteChainSelector = 1.0
@@ -144,9 +147,26 @@ testSetRateLimitConfigParamsRoundtrip = do
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party3"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party3"
             ]
-        args = SetRateLimitConfigParams with
+        args = SetRateLimiterReferencesParams with
             rateLimitConfigArgs = rateLimitConfigs
-            caller
+    let encoded = BurnMintTokenPoolCodec.encodeSetRateLimiterReferencesParams args
+    fst (fromSome (BurnMintTokenPoolCodec.decodeSetRateLimiterReferencesParamsAt encoded 0)) === args
+    pure ()
+
+-- ===============================================
+-- |             SetRateLimitConfig              |
+-- ===============================================
+
+testSetRateLimitConfigParamsRoundtrip : Script ()
+testSetRateLimitConfigParamsRoundtrip = script do
+    admin <- allocateParty "rate_limit_admin"
+    poolOwner <- allocateParty "pool_owner"
+    let args = SetRateLimitConfigParams with
+            caller = admin
+            rateLimiterInstanceAddress = RawInstanceAddress.make "rl-in" poolOwner
+            newIsEnabled = True
+            newCapacity = 42.0
+            newRate = 3.0
     let encoded = BurnMintTokenPoolCodec.encodeSetRateLimitConfigParams args
     fst (fromSome (BurnMintTokenPoolCodec.decodeSetRateLimitConfigParamsAt encoded 0)) === args
     pure ()
@@ -176,11 +196,36 @@ testTransferTimeoutRoundtrip = do
     fst (fromSome (BurnMintTokenPoolCodec.decodeTransferTimeoutAt encodedRelHoursLarge 0)) === relHoursLarge
 
 -- ===============================================
--- |           SetPoolReceiveContext             |
+-- |   Pool receive context MCMS param codecs    |
 -- ===============================================
 
-testSetPoolReceiveContextRoundtrip : Script ()
-testSetPoolReceiveContextRoundtrip = do
+testAddPoolReceiveContextNonContractValueParamsRoundtrip : Script ()
+testAddPoolReceiveContextNonContractValueParamsRoundtrip = do
+    let inner = encodeAnyValue (MetadataV1.AV_Text "hello")
+        args = AddPoolReceiveContextNonContractValueParams with contextKey = "myKey", valuePayload = inner
+        encoded = BurnMintTokenPoolCodec.encodeAddPoolReceiveContextNonContractValueParams args
+    fst (fromSome (BurnMintTokenPoolCodec.decodeAddPoolReceiveContextNonContractValueParamsAt encoded 0)) === args
+
+testAddPoolReceiveContextContractValueParamsRoundtrip : Script ()
+testAddPoolReceiveContextContractValueParamsRoundtrip = script do
+    p <- allocateParty "p"
+    let ria = RawInstanceAddress.make "other-inst" p
+        args = AddPoolReceiveContextContractValueParams with contextKey = "refKey", referentInstanceAddress = ria
+        encoded = BurnMintTokenPoolCodec.encodeAddPoolReceiveContextContractValueParams args
+    fst (fromSome (BurnMintTokenPoolCodec.decodeAddPoolReceiveContextContractValueParamsAt encoded 0)) === args
+
+testRemovePoolReceiveContextValueParamsRoundtrip : Script ()
+testRemovePoolReceiveContextValueParamsRoundtrip = do
+    let args = RemovePoolReceiveContextValueParams with contextKey = "toRemove"
+        encoded = BurnMintTokenPoolCodec.encodeRemovePoolReceiveContextValueParams args
+    fst (fromSome (BurnMintTokenPoolCodec.decodeRemovePoolReceiveContextValueParamsAt encoded 0)) === args
+
+-- ===============================================
+-- |           ChoiceContext (ContextCodec)      |
+-- ===============================================
+
+testChoiceContextCodecRoundtrip : Script ()
+testChoiceContextCodecRoundtrip = do
     -- Test empty context
     let emptyCtx = MetadataV1.emptyChoiceContext
         encodedEmpty = encodeChoiceContext emptyCtx

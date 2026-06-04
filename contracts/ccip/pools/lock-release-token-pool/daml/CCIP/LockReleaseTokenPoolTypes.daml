@@ -91,15 +91,48 @@ data ApplyTokenTransferFeeConfigUpdatesParams = ApplyTokenTransferFeeConfigUpdat
         disableTokenTransferFeeConfigArgs : [Numeric 0]
     deriving (Eq, Show)
 
--- | Params for SetRateLimitConfig choice
-data SetRateLimitConfigParams = SetRateLimitConfigParams
+-- | Params for SetRateLimiterReferences choice (poolOwner only; MCMS entrypoint).
+-- | Updates which RateLimiter contract identities the pool references per remote chain.
+data SetRateLimiterReferencesParams = SetRateLimiterReferencesParams
     with
         rateLimitConfigArgs : [RateLimitConfigArgs]
+    deriving (Eq, Show)
+
+-- | Params for SetRateLimitConfig (tune capacity/rate/isEnabled; MCMS entrypoint).
+-- | rateLimiterInstanceAddress: full RawInstanceAddress (instanceId@owner), not bare instanceId.
+-- | Resolved against MCMS contractIds map key; pool choice receives the resulting ContractId.
+data SetRateLimitConfigParams = SetRateLimitConfigParams
+    with
         caller : Party
+        rateLimiterInstanceAddress : RawInstanceAddress
+        newIsEnabled : Bool
+        newCapacity : Numeric 0
+        newRate : Numeric 0
     deriving (Eq, Show)
 
 -- | Params for SetTransferTimeout choice
 data SetTransferTimeoutParams = SetTransferTimeoutParams
     with
         transferTimeout : TransferTimeout
+    deriving (Eq, Show)
+
+-- | MCMS params: set one ChoiceContext entry from a serialized AnyValue payload.
+-- | valuePayload must be exactly encodeAnyValue output (see CCIP.ContextCodec); AV_ContractId is not round-trippable in bytes—use AddPoolReceiveContextContractValueParams instead.
+data AddPoolReceiveContextNonContractValueParams = AddPoolReceiveContextNonContractValueParams
+    with
+        contextKey : Text
+        valuePayload : BytesHex
+    deriving (Eq, Show)
+
+-- | MCMS params: set one ChoiceContext entry to AV_ContractId by resolving referentInstanceAddress in the MCMS contractIds map.
+data AddPoolReceiveContextContractValueParams = AddPoolReceiveContextContractValueParams
+    with
+        contextKey : Text
+        referentInstanceAddress : RawInstanceAddress
+    deriving (Eq, Show)
+
+-- | MCMS params: remove one ChoiceContext entry by key.
+data RemovePoolReceiveContextValueParams = RemovePoolReceiveContextValueParams
+    with
+        contextKey : Text
     deriving (Eq, Show)

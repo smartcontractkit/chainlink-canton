@@ -6,6 +6,8 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+permissions:
+  contents: read
 
 jobs:
   mocks:
@@ -18,6 +20,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Generate mocks
         run: make mocks
       - name: Check mocks are up to date

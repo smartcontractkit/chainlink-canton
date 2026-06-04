@@ -6,6 +6,7 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.List
 import DA.Map qualified as Map
+import DA.Optional (fromSome)
 import DA.TextMap qualified as TextMap
 
 import qualified Splice.Api.Token.HoldingV1
@@ -16,16 +17,22 @@ import CCIP.LockReleaseTokenPool
 import CCIP.LockReleaseTokenPoolCodecGen (
     encodeSetDynamicConfigParams,
     encodeApplyChainUpdatesParams,
-    encodeSetRateLimitConfigParams,
+    encodeSetRateLimiterReferencesParams,
     encodeSetTransferTimeoutParams,
+    encodeAddPoolReceiveContextNonContractValueParams,
+    encodeAddPoolReceiveContextContractValueParams,
+    encodeRemovePoolReceiveContextValueParams,
     )
 import CCIP.LockReleaseTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
-    SetRateLimitConfigParams(..),
+    SetRateLimiterReferencesParams(..),
     SetTransferTimeoutParams(..),
+    AddPoolReceiveContextNonContractValueParams(..),
+    AddPoolReceiveContextContractValueParams(..),
+    RemovePoolReceiveContextValueParams(..),
     )
-import CCIP.ContextCodec (encodeChoiceContext)
+import CCIP.ContextCodec (encodeAnyValue)
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
@@ -248,11 +255,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
     pure ()
 
 -- ========================================================
--- |        MCMS Entrypoint - SetRateLimitConfig          |
+-- |     MCMS Entrypoint - SetRateLimiterReferences       |
 -- ========================================================
 
-testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig : Script ()
-testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences = script do
     ccipOwner <- allocateParty "ccip_owner"
     poolOwner <- allocateParty "pool_owner"
     tokenAdmin <- allocateParty "token_admin"
@@ -296,14 +303,13 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-updated@owner"
             ]
 
-        encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
-            rateLimitConfigArgs = args
-            caller = poolOwner)
+        encoded = encodeSetRateLimiterReferencesParams (SetRateLimiterReferencesParams with
+            rateLimitConfigArgs = args)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "SetRateLimitConfig"
+            functionName = "SetRateLimiterReferences"
             operationData = encoded
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
 
@@ -477,11 +483,11 @@ assertRateLimitConfigArgsEqual got expected = do
     assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
 
 -- ========================================================
--- |       MCMS Entrypoint - SetPoolReceiveContext        |
+-- |   MCMS Entrypoint - pool receive context  |
 -- ========================================================
 
-testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext : Script ()
-testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext = script do
+testLockReleaseTokenPoolMCMSEntrypoint_AddPoolReceiveContextNonContractValue : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_AddPoolReceiveContextNonContractValue = script do
     ccipOwner <- allocateParty "ccip_owner"
     poolOwner <- allocateParty "pool_owner"
     tokenAdmin <- allocateParty "token_admin"
@@ -489,7 +495,6 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext = script do
     let instanceId = "pool-context-test"
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
 
-    -- Create LockReleaseTokenPool with empty context
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
             instanceId
@@ -507,26 +512,31 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext = script do
     let instAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
-    -- Create new context with text values
     let newContext = MetadataV1.ChoiceContext (TextMap.fromList [("key1", MetadataV1.AV_Text "value1"), ("key2", MetadataV1.AV_Int 42)])
-    let encodedParams = encodeChoiceContext newContext
-
-    newContractIds <- submit poolOwner do
+    let encoded1 = encodeAddPoolReceiveContextNonContractValueParams (AddPoolReceiveContextNonContractValueParams with contextKey = "key1", valuePayload = encodeAnyValue (MetadataV1.AV_Text "value1"))
+    cidMap1 <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "SetPoolReceiveContext"
-            operationData = encodedParams
+            functionName = "AddPoolReceiveContextNonContractValue"
+            operationData = encoded1
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
 
-    -- Verify context was updated
+    let poolCid2 = coerceContractId (fromSome (Map.lookup instAddr cidMap1)) : ContractId LockReleaseTokenPool
+    let target2 = toInterfaceContractId @MCMSReceiver poolCid2
+    let encoded2 = encodeAddPoolReceiveContextNonContractValueParams (AddPoolReceiveContextNonContractValueParams with contextKey = "key2", valuePayload = encodeAnyValue (MetadataV1.AV_Int 42))
+    _ <- submit poolOwner do
+        exerciseCmd target2 MCMSReceiver_Entrypoint with
+            functionName = "AddPoolReceiveContextNonContractValue"
+            operationData = encoded2
+            contractIds = Map.fromList [(instAddr, toAnyContractId poolCid2)]
+
     contracts <- query @LockReleaseTokenPool poolOwner
     case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
         [(_, pool)] -> do
             assertMsg ("poolReceiveContext mismatch, got: " <> show pool.poolReceiveContext <> ", expected: " <> show newContext) (pool.poolReceiveContext == newContext)
         _ -> abort "Expected exactly one LockReleaseTokenPool contract"
 
--- | Test SetPoolReceiveContext with empty context (reset)
-testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext_Empty : Script ()
-testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext_Empty = script do
+testLockReleaseTokenPoolMCMSEntrypoint_ClearPoolReceiveContext : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_ClearPoolReceiveContext = script do
     ccipOwner <- allocateParty "ccip_owner"
     poolOwner <- allocateParty "pool_owner"
     tokenAdmin <- allocateParty "token_admin"
@@ -535,7 +545,6 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext_Empty = script do
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
         initialContext = MetadataV1.ChoiceContext (TextMap.fromList [("existing", MetadataV1.AV_Text "data")])
 
-    -- Create LockReleaseTokenPool with non-empty context
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
             instanceId
@@ -553,21 +562,98 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetPoolReceiveContext_Empty = script do
     let instAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
-    -- Reset to empty context
     let emptyContext = MetadataV1.emptyChoiceContext
-    let encodedParams = encodeChoiceContext emptyContext
-
-    newContractIds <- submit poolOwner do
+    _ <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "SetPoolReceiveContext"
-            operationData = encodedParams
+            functionName = "ClearPoolReceiveContext"
+            operationData = ""
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
 
-    -- Verify context was cleared
     contracts <- query @LockReleaseTokenPool poolOwner
     case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
         [(_, pool)] -> do
             assertMsg ("poolReceiveContext should be empty") (pool.poolReceiveContext == emptyContext)
+        _ -> abort "Expected exactly one LockReleaseTokenPool contract"
+
+testLockReleaseTokenPoolMCMSEntrypoint_AddPoolReceiveContextContractValue : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_AddPoolReceiveContextContractValue = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    tokenAdmin <- allocateParty "token_admin"
+
+    let instanceId = "pool-context-contract-ref-test"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+
+    poolCid <- submit poolOwner do
+        createCmd LockReleaseTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals = 6
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+    let encoded = encodeAddPoolReceiveContextContractValueParams (AddPoolReceiveContextContractValueParams with contextKey = "selfRef", referentInstanceAddress = RawInstanceAddress instAddr)
+
+    _ <- submit poolOwner do
+        exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+            functionName = "AddPoolReceiveContextContractValue"
+            operationData = encoded
+            contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+    contracts <- query @LockReleaseTokenPool poolOwner
+    case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
+        [(_, pool)] -> do
+            let expected = MetadataV1.ChoiceContext (TextMap.fromList [("selfRef", MetadataV1.AV_ContractId (coerceContractId poolCid))])
+            assertMsg ("poolReceiveContext mismatch, got: " <> show pool.poolReceiveContext) (pool.poolReceiveContext == expected)
+        _ -> abort "Expected exactly one LockReleaseTokenPool contract"
+
+testLockReleaseTokenPoolMCMSEntrypoint_RemovePoolReceiveContextValue : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_RemovePoolReceiveContextValue = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    tokenAdmin <- allocateParty "token_admin"
+
+    let instanceId = "pool-context-remove-test"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+        initialContext = MetadataV1.ChoiceContext (TextMap.fromList [("keep", MetadataV1.AV_Text "me"), ("remove", MetadataV1.AV_Int 99)])
+
+    poolCid <- submit poolOwner do
+        createCmd LockReleaseTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals = 6
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = initialContext
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+    let encoded = encodeRemovePoolReceiveContextValueParams (RemovePoolReceiveContextValueParams with contextKey = "remove")
+
+    _ <- submit poolOwner do
+        exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+            functionName = "RemovePoolReceiveContextValue"
+            operationData = encoded
+            contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+    contracts <- query @LockReleaseTokenPool poolOwner
+    case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
+        [(_, pool)] -> do
+            let expected = MetadataV1.ChoiceContext (TextMap.fromList [("keep", MetadataV1.AV_Text "me")])
+            assertMsg ("poolReceiveContext mismatch, got: " <> show pool.poolReceiveContext) (pool.poolReceiveContext == expected)
         _ -> abort "Expected exactly one LockReleaseTokenPool contract"
 
 -- ========================================================
@@ -695,5 +781,103 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetTransferTimeout_InvalidData = script d
             functionName = "SetTransferTimeout"
             operationData = "ff"  -- Invalid tag byte
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+    pure ()
+
+testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig : Script ()
+testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    tokenAdmin <- allocateParty "token_admin"
+
+    let instanceId = "pool-blockdepth-test"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+        mkRemoteConfig finality = RemoteChainConfig with
+            remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
+            remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
+            inboundCCVs = [RawInstanceAddress "in1@owner"]
+            outboundCCVs = []
+            finalityConfig = finality
+            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+        mkPool remoteChainConfigs = LockReleaseTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals = 6
+            rateLimitAdmin = None
+            remoteChainConfigs
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    submitMustFail poolOwner do
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (FinalityCodec.BlockDepth 0))]))
+
+    submitMustFail poolOwner do
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (FinalityCodec.BlockDepth (-1)))]))
+
+    poolCid <- submit poolOwner do
+        createCmd (mkPool Map.empty)
+
+    let mkUpdate finality = ChainUpdate with
+            remoteChainSelector = 123.0
+            remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
+            remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
+            inboundCCVs = [RawInstanceAddress "in1@owner"]
+            outboundCCVs = []
+            finalityConfig = finality
+            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+
+    submitMustFail poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 0)]
+
+    submitMustFail poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth (-1))]
+
+    _ <- submit poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 1)]
+
+    pure ()
+
+testLockReleaseTokenPool_RejectsInvalidDecimals : Script ()
+testLockReleaseTokenPool_RejectsInvalidDecimals = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+
+    let instanceId = "pool-decimals-test"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "USDC"
+        mkPool decimals = LockReleaseTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    submitMustFail poolOwner do
+        createCmd (mkPool (-1))
+
+    submitMustFail poolOwner do
+        createCmd (mkPool 100)
+
+    _ <- submit poolOwner do
+        createCmd (mkPool 6)
 
     pure ()

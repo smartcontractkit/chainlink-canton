@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+
+	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 )
 
@@ -19,7 +21,7 @@ import (
 //	    return err
 //	}
 //	// Now use type-safe fields: mcmsContract.McmsId, mcmsContract.Config.Signers, etc.
-func UnmarshalActiveContract[T any](ac *apiv2.GetActiveContractsResponse_ActiveContract) (*T, error) {
+func UnmarshalActiveContract[T model.CreateCommander](ac *apiv2.GetActiveContractsResponse_ActiveContract) (*T, error) {
 	if ac == nil {
 		return nil, errors.New("active contract is nil")
 	}
@@ -34,7 +36,7 @@ func UnmarshalActiveContract[T any](ac *apiv2.GetActiveContractsResponse_ActiveC
 
 // UnmarshalCreatedEvent unmarshalls a CreatedEvent into a typed DAML binding struct.
 // This is useful when you have a CreatedEvent directly (e.g., from transaction events).
-func UnmarshalCreatedEvent[T any](event *apiv2.CreatedEvent) (*T, error) {
+func UnmarshalCreatedEvent[T model.CreateCommander](event *apiv2.CreatedEvent) (*T, error) {
 	if event == nil {
 		return nil, errors.New("created event is nil")
 	}
@@ -52,6 +54,16 @@ func UnmarshalCreatedEvent[T any](event *apiv2.CreatedEvent) (*T, error) {
 	}
 
 	return &result, nil
+}
+
+func MarshalTemplateToRecord(v model.CreateCommander) *apiv2.Record {
+	if v == nil {
+		return nil
+	}
+
+	createCommand := v.CreateCommand()
+
+	return ledger.MapToRecord(createCommand.Arguments)
 }
 
 // GetEntityName extracts the entity name from a template ID.

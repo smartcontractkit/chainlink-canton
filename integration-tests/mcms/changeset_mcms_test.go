@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -12,24 +11,23 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/go-daml/pkg/types"
-	mcmscore "github.com/smartcontractkit/mcms"
-	"github.com/smartcontractkit/mcms/sdk"
-	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
-	mcms_types "github.com/smartcontractkit/mcms/types"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcmscore "github.com/smartcontractkit/mcms"
+	"github.com/smartcontractkit/mcms/sdk"
+	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
+	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	mcms_bindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	mcms_bindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
@@ -49,9 +47,9 @@ import (
 //  5. Sign and execute the proposal on-chain via ScheduleBatch → ExecuteScheduledBatch
 //  6. Verify the GlobalConfig dest chain config was applied
 func TestMCMS_ChangesetProposalE2E(t *testing.T) {
-	//if os.Getenv("INTEGRATION_TEST") == "" {
+	// if os.Getenv("INTEGRATION_TEST") == "" {
 	//	t.Skip("Skipping integration test. Set INTEGRATION_TEST=1 to run.")
-	//}
+	// }
 
 	t.Parallel()
 
@@ -62,7 +60,6 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	sharedEnv := GetSharedCCIPMCMSEnvironment(t)
 	participant := sharedEnv.Participant
 	party := sharedEnv.CcipOwner
-	mcmsPkgID := sharedEnv.McmsPkgID
 	config := sharedEnv.Config
 	sortedSigners := sharedEnv.SortedSigners
 
@@ -88,6 +85,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	t.Log("Deploying CCIP chain contracts...")
 	deployOut, err := cld_ops.ExecuteSequence(bundle, sequences.DeployChainContracts, *cantonChain, sequences.DeployChainContractsParams{
 		CCIPOwnerParty: party,
+		RMNOwnerParty:  party,
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{{
 			Template: ccvs.CommitteeVerifier{
 				Owner:                        types.PARTY(party),
@@ -139,7 +137,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Deploying MCMS contract with 2-of-3 config...")
-	mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, party, chainID, baseMcmsID, config, 0, nil)
+	mcmsCid := createMCMSMultiRole(t, participant, party, chainID, baseMcmsID, config, 0, nil)
 	t.Logf("MCMS contract created: %s", mcmsCid)
 
 	// ========================================================================
@@ -147,6 +145,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	// ========================================================================
 
 	destChainSelector := "999"
+	testOffRampHex := "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 
 	t.Log("Generating MCMS proposal via ConfigureGlobalConfig changeset...")
 	csOut, err := changesets.ConfigureGlobalConfig{}.Apply(*env, changesets.CantonCSDeps[changesets.ConfigureGlobalConfigConfig]{
@@ -158,10 +157,10 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 			DestChainUpdates: []common.DestChainConfigArgs{{
 				DestChainSelector:         types.NUMERIC(destChainSelector),
 				IsEnabled:                 true,
-				AddressBytesLength:        40,
+				AddressBytesLength:        20,
 				TokenReceiverAllowed:      true,
 				BaseExecutionGasCost:      21000,
-				OffRampAddress:            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+				OffRampAddress:            types.TEXT(testOffRampHex),
 				DefaultCCVs:               []mcms_bindings.RawInstanceAddress{ccvRaw},
 				MessageNetworkFeeUSDCents: "100",
 				TokenNetworkFeeUSDCents:   "50",
@@ -224,7 +223,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 
 	// Step 3b: Sign via SDK (2-of-3 quorum)
 	t.Log("Signing proposal via SDK...")
-	inspector := cantonsdk.NewInspector(participant.LedgerServices.State, party, cantonsdk.TimelockRoleProposer)
+	inspector := cantonsdk.NewInspector(participant.LedgerServices.State, []string{party}, cantonsdk.TimelockRoleProposer)
 	inspectorsMap := map[mcms_types.ChainSelector]sdk.Inspector{
 		mcms_types.ChainSelector(chainSelector): inspector,
 	}
@@ -245,7 +244,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	encoder := encoders[mcms_types.ChainSelector(chainSelector)].(*cantonsdk.Encoder)
 	executor, err := cantonsdk.NewExecutor(
 		encoder, inspector,
-		participant.LedgerServices.Command, participant.UserID, party,
+		participant.LedgerServices.Command, party, []string{party},
 		cantonsdk.TimelockRoleProposer,
 	)
 	require.NoError(t, err, "create executor")
@@ -269,7 +268,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	// TargetCid resolution is now handled automatically by the SDK using TargetTemplateID.
 	t.Log("ExecuteScheduledBatch via SDK...")
 	timelockExecutor := cantonsdk.NewTimelockExecutor(
-		participant.LedgerServices.Command, participant.LedgerServices.State, party,
+		participant.LedgerServices.Command, participant.LedgerServices.State, party, []string{party},
 	)
 	timelockExecutors := map[mcms_types.ChainSelector]sdk.TimelockExecutor{
 		mcms_types.ChainSelector(chainSelector): timelockExecutor,
@@ -291,7 +290,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 
 	// Re-resolve the GlobalConfig (it may have a new contract ID after the update)
 	updatedGC, err := opcontract.FindActiveContractByInstanceAddress(
-		t.Context(), participant.LedgerServices.State, party,
+		t.Context(), participant.LedgerServices.State, []string{party},
 		common.GlobalConfig{}.GetTemplateID(), gcRaw.InstanceAddress(),
 	)
 	require.NoError(t, err, "find updated GlobalConfig")
@@ -318,13 +317,13 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 			case "isEnabled":
 				assert.True(t, f.GetValue().GetBool(), "isEnabled")
 			case "addressBytesLength":
-				assert.Equal(t, int64(40), f.GetValue().GetInt64(), "addressBytesLength")
+				assert.Equal(t, int64(20), f.GetValue().GetInt64(), "addressBytesLength")
 			case "tokenReceiverAllowed":
 				assert.True(t, f.GetValue().GetBool(), "tokenReceiverAllowed")
 			case "baseExecutionGasCost":
 				assert.Equal(t, int64(21000), f.GetValue().GetInt64(), "baseExecutionGasCost")
 			case "offRampAddress":
-				assert.Equal(t, hex.EncodeToString([]byte("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")), f.GetValue().GetText(), "offRampAddress (stored as hex-encoded ASCII)")
+				assert.Equal(t, testOffRampHex, f.GetValue().GetText(), "offRampAddress (BytesHex on ledger)")
 			case "messageNetworkFeeUSDCents":
 				assert.Equal(t, "100.", f.GetValue().GetNumeric(), "messageNetworkFeeUSDCents")
 			case "tokenNetworkFeeUSDCents":

@@ -64,7 +64,7 @@ data MessageV1 = MessageV1
 
 data TokenTransferV1 = TokenTransferV1
     with
-        amount : Numeric 0 -- uint256
+        amount : BytesHex -- uint256
         sourcePoolAddress : BytesHex -- bytes
         sourceTokenAddress : BytesHex -- bytes
         destTokenAddress : BytesHex -- bytes
@@ -128,7 +128,7 @@ encodeMessageV1 message =
 encodeTokenTransferV1 : TokenTransferV1 -> BytesHex
 encodeTokenTransferV1 tokenTransfer =
     (fromSome (encodeUint8 1)) -- version 1
-    <> fromSome (encodeUint256 tokenTransfer.amount)
+    <> (if byteCount tokenTransfer.amount == 32 then tokenTransfer.amount else error "MessageCodecV1.encodeTokenTransferV1: amount must be 32 bytes")
     <> fromSome (encodeUint8 (byteCount tokenTransfer.sourcePoolAddress))
     <> tokenTransfer.sourcePoolAddress
     <> fromSome (encodeUint8 (byteCount tokenTransfer.sourceTokenAddress))
@@ -632,7 +632,7 @@ decodeTokenTransfer encoded =
 
                 -- Extract amount (32 bytes)
                 amountHex <- extractBytes encoded 1 32
-                amount <- decodeUint256 amountHex
+                let amount = amountHex
 
                 -- Extract sourcePool length (1 byte)
                 sourcePoolLenHex <- extractBytes encoded 33 1

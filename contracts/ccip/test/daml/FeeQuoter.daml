@@ -10,10 +10,14 @@ import DA.Optional (fromSome)
 import DA.Set qualified as Set
 import DA.Time (time)
 
+import CCIP.Client qualified as Client
 import CCIP.FeeQuoter
 import CCIP.FinalityConfig qualified as FinalityCodec
+import CCIP.GlobalConfig qualified as GlobalConfig
+import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.OnRamp qualified as OnRamp
+import CCIP.OnRampTypes qualified as OnRampTypes
 import CCIP.Tickets qualified as Tickets
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
@@ -456,7 +460,8 @@ testFeeQuoter_ApplyPriceUpdatersUpdate = script do
                 gasPriceUpdates = []
             caller = priceUpdater
 
-    -- add owner as price updater
+    -- ApplyPriceUpdatersUpdate cannot add owner to priceUpdaters.
+    -- owner still updates via UpdatePrices when caller == owner.
     fq <- submit owner do
         exerciseCmd fq ApplyPriceUpdatersUpdate with
             addedPriceUpdaters = [owner]
@@ -1187,6 +1192,103 @@ testFinalizeFee_LinkCapMixedFees = script do
 
     debug "testFinalizeFee_LinkCapMixedFees: PASSED"
 
+testCalculateFeeResult_CCVRoundingMatchesFinalizeFee = script do
+    owner <- allocateParty "owner-ccv-rounding-quote"
+
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "USDC"
+
+    globalConfig <- submit owner do
+        createCmd GlobalConfig.GlobalConfig with
+            instanceId = "globalconfig-ccv-rounding-quote"
+            ccipOwner = owner
+            chainSelector = 123.0
+            destChainConfigs = Map.fromList
+                [ (456.0, GlobalConfig.DestChainConfig with
+                    isEnabled = True
+                    addressBytesLength = 20
+                    tokenReceiverAllowed = False
+                    baseExecutionGasCost = 0
+                    offRampAddress = ""
+                    defaultExecutor = None
+                    laneMandatedCCVs = []
+                    defaultCCVs = []
+                    messageNetworkFeeUSDCents = 0.0
+                    tokenNetworkFeeUSDCents = 0.0
+                  )
+                ]
+            sourceChainConfigs = Map.empty
+
+    feeQuoter <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-ccv-rounding-quote"
+            feeTokens = Set.fromList [feeToken]
+            destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList
+                [(456.0, TimestampedPrice 0.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList
+                [(feeToken, TimestampedPrice 6.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
+                admin = owner
+                id = "LINK"
+            priceUpdaters = [owner]
+
+    onRamp <- submit owner do
+        createCmd OnRamp.OnRamp with
+            instanceId = "onramp-ccv-rounding-quote"
+            ccipOwner = owner
+            maxUSDCentsPerMsg = 1000000.0
+            deps = OnRampTypes.OnRampDeps with
+                globalConfig = RawInstanceAddress.make "globalconfig-ccv-rounding-quote" owner
+                rmnRemote = RawInstanceAddress.make "rmn-ccv-rounding-quote" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-ccv-rounding-quote" owner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-ccv-rounding-quote" owner
+                ccvRegistry = RawInstanceAddress.make "ccvregistry-ccv-rounding-quote" owner
+
+    feeQuote <- submit owner do
+        exerciseCmd onRamp OnRamp.GetFeeFromRouter with
+            routerPartyOwner = owner
+            routerInstanceId = "router-ccv-rounding-quote"
+            globalConfigCid = globalConfig
+            feeQuoterCid = feeQuoter
+            destChainSelector = 456.0
+            message = Client.Canton2AnyMessage with
+                receiver = "02"
+                payload = ""
+                tokenTransfer = None
+                feeToken = feeToken
+                extraArgs = Client.V3 Client.GenericExtraArgsV3 with
+                    gasLimit = 0
+                    ccvs = []
+                    executor = Client.Executor_NoExecutor
+                    tokenReceiver = ""
+                    tokenArgs = ""
+            ccvFeeQuotes =
+                [ ICCV.CrossChainVerifierFeeQuote with
+                    ccvInstanceId = "ccv-rounding-quote-1"
+                    ccvOwner = owner
+                    feeUSDCents = 1.0
+                    gasForVerification = 0
+                    payloadSizeBytes = 0
+                , ICCV.CrossChainVerifierFeeQuote with
+                    ccvInstanceId = "ccv-rounding-quote-2"
+                    ccvOwner = owner
+                    feeUSDCents = 1.0
+                    gasForVerification = 0
+                    payloadSizeBytes = 0
+                ]
+            tokenPoolFeeQuote = None
+            executorFeeQuote = None
+
+    -- Each 1-cent CCV fee converts to 16666666 smallest units at 6 USD/token.
+    -- Aggregating before floor conversion would produce 33333333 instead.
+    feeQuote.feeTokenAmount === 33333332.0
+
+    debug "testCalculateFeeResult_CCVRoundingMatchesFinalizeFee: PASSED"
+
 testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
     owner <- allocateParty "owner-receipt-mixed"
     sender <- allocateParty "sender-receipt-mixed"
@@ -1306,7 +1408,7 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
             poolInstanceId = "pool-receipt-mixed"
             poolOwner = poolOwner
             instrumentId = feeToken
-            amount = 1.0
+            amount = fromSome (MessageCodecV1.encodeUint256 1.0)
             destTokenAddress = "05"
             extraData = ""
 

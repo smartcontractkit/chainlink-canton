@@ -10,15 +10,16 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/mcmstest"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/mcmstest"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -82,7 +83,6 @@ func buildMCMSBindingFromConfig(config MCMSConfig, owner, instanceID string, cha
 func createMCMSContract(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
 	config MCMSConfig,
 	owner, baseMcmsID string,
 	chainID int64,
@@ -96,11 +96,7 @@ func createMCMSContract(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:      contracts.IdentifierFromBinding(core.MCMS{}),
 						CreateArguments: ledger.ConvertToRecord(mcmsContract),
 					},
 				},
@@ -117,7 +113,6 @@ func createMCMSContract(
 func createCounterContract(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsTestPkgID string,
 	owner, instanceID string,
 ) string {
 	t.Helper()
@@ -133,11 +128,7 @@ func createCounterContract(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsTestPkgID,
-							ModuleName: "MCMS.Mock.Counter",
-							EntityName: "Counter",
-						},
+						TemplateId:      contracts.IdentifierFromBinding(mcmstest.Counter{}),
 						CreateArguments: ledger.ConvertToRecord(counter),
 					},
 				},
@@ -167,13 +158,8 @@ func TestMCMS_Execute(t *testing.T) {
 	mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, mcmsTestDar}, participant, randomUserParticipant)
+	_, err = testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, mcmsTestDar}, participant, randomUserParticipant)
 	require.NoError(t, err)
-	// Function returns package IDs for each DAR for each participant (2 DARs × 2 participants = 4)
-	// First 2 are the unique package IDs we need (same DAR has same package ID across participants)
-	require.GreaterOrEqual(t, len(packageIDs), 2)
-	mcmsPkgID := packageIDs[0]
-	mcmsTestPkgID := packageIDs[1]
 
 	ccipOwner := participant.PartyID
 	randomUser := randomUserParticipant.PartyID
@@ -186,23 +172,23 @@ func TestMCMS_Execute(t *testing.T) {
 	// Run tests
 	t.Run("ExecuteOp Flow", func(t *testing.T) {
 		t.Parallel()
-		testExecuteOpFlow(t, mcmsPkgID, mcmsTestPkgID, config, chainId, sortedSigners, participant, ccipOwner)
+		testExecuteOpFlow(t, config, chainId, sortedSigners, participant, ccipOwner)
 	})
 	t.Run("Signature Verification Failure", func(t *testing.T) {
 		t.Parallel()
-		testSignatureVerificationFails(t, mcmsPkgID, config, chainId, participant, ccipOwner)
+		testSignatureVerificationFails(t, config, chainId, participant, ccipOwner)
 	})
 	t.Run("Replay Protection", func(t *testing.T) {
 		t.Parallel()
-		testReplayProtection(t, mcmsPkgID, config, chainId, sortedSigners, participant, ccipOwner)
+		testReplayProtection(t, config, chainId, sortedSigners, participant, ccipOwner)
 	})
 	t.Run("MCMS Op", func(t *testing.T) {
 		t.Parallel()
-		testExecuteMCMSOp(t, mcmsPkgID, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
+		testExecuteMCMSOp(t, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
 	})
 	t.Run("Signatory Check", func(t *testing.T) {
 		t.Parallel()
-		testSignatoryCheck(t, mcmsPkgID, mcmsTestPkgID, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
+		testSignatoryCheck(t, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
 	})
 }
 
@@ -214,8 +200,6 @@ func TestMCMS_Execute(t *testing.T) {
 // 7. Verify counter value Incremented
 func testExecuteOpFlow(
 	t *testing.T,
-	mcmsPkgID string,
-	mcmsTestPkgID string,
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
@@ -223,7 +207,7 @@ func testExecuteOpFlow(
 	ccipOwnerParty string,
 ) {
 	// Create MCMS encoder for this package
-	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
+	mcmsEncoder := NewMCMSEncoder()
 
 	// ========================
 	// |   Contract Constants |
@@ -301,11 +285,7 @@ func testExecuteOpFlow(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:      contracts.IdentifierFromBinding(core.MCMS{}),
 						CreateArguments: ledger.ConvertToRecord(mcmsContract),
 					},
 				},
@@ -335,11 +315,7 @@ func testExecuteOpFlow(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsTestPkgID,
-							ModuleName: "MCMS.Mock.Counter",
-							EntityName: "Counter",
-						},
+						TemplateId:      contracts.IdentifierFromBinding(mcmstest.Counter{}),
 						CreateArguments: ledger.ConvertToRecord(counter),
 					},
 				},
@@ -447,11 +423,7 @@ func testExecuteOpFlow(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "SetRoot",
 						ChoiceArgument: ledger.MapToValue(setRootArgs),
@@ -508,11 +480,7 @@ func testExecuteOpFlow(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -550,11 +518,7 @@ func testExecuteOpFlow(
 
 	// Also query the ACS to verify the counter value
 	t.Log("Querying counter via ACS...")
-	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
-		PackageId:  mcmsTestPkgID,
-		ModuleName: "MCMS.Mock.Counter",
-		EntityName: "Counter",
-	})
+	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, contracts.IdentifierFromBinding(mcmstest.Counter{}))
 	require.NoError(t, err)
 
 	var queriedValue int64 = -1
@@ -589,7 +553,6 @@ func testExecuteOpFlow(
 // testSignatureVerificationFails tests that invalid signatures are rejected
 func testSignatureVerificationFails(
 	t *testing.T,
-	mcmsPkgID string,
 	config MCMSConfig,
 	chainId int64,
 	participant canton.Participant,
@@ -601,7 +564,7 @@ func testSignatureVerificationFails(
 	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 
 	t.Log("Creating MCMS contract...")
-	mcmsCid := createMCMSContract(t, participant, mcmsPkgID, config, ccipOwnerParty, baseMcmsId, chainId)
+	mcmsCid := createMCMSContract(t, participant, config, ccipOwnerParty, baseMcmsId, chainId)
 	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// Build a valid proposal
@@ -659,11 +622,7 @@ func testSignatureVerificationFails(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "SetRoot",
 						ChoiceArgument: ledger.MapToValue(setRootArgs),
@@ -688,7 +647,6 @@ func testSignatureVerificationFails(
 // testReplayProtection tests that the same root cannot be set twice
 func testReplayProtection(
 	t *testing.T,
-	mcmsPkgID string,
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
@@ -701,7 +659,7 @@ func testReplayProtection(
 	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 
 	t.Log("Creating MCMS contract...")
-	mcmsCid := createMCMSContract(t, participant, mcmsPkgID, config, ccipOwnerParty, baseMcmsId, chainId)
+	mcmsCid := createMCMSContract(t, participant, config, ccipOwnerParty, baseMcmsId, chainId)
 	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// Build proposal
@@ -757,11 +715,7 @@ func testReplayProtection(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "SetRoot",
 						ChoiceArgument: ledger.MapToValue(setRootArgs),
@@ -790,11 +744,7 @@ func testReplayProtection(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "SetRoot",
 						ChoiceArgument: ledger.MapToValue(setRootArgs), // Reuse same args
@@ -816,7 +766,6 @@ func testReplayProtection(
 // This demonstrates changing MCMS config via a signed proposal
 func testExecuteMCMSOp(
 	t *testing.T,
-	mcmsPkgID string,
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
@@ -837,7 +786,7 @@ func testExecuteMCMSOp(
 	// ========================
 
 	t.Log("Creating MCMS contract...")
-	mcmsCid := createMCMSContract(t, ccipParticipant, mcmsPkgID, config, ccipOwnerParty, baseMcmsId, chainId)
+	mcmsCid := createMCMSContract(t, ccipParticipant, config, ccipOwnerParty, baseMcmsId, chainId)
 	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// ========================
@@ -854,7 +803,7 @@ func testExecuteMCMSOp(
 	// Encode SetConfigParams with role prefix for self-dispatch
 	// executeSelfDispatch expects: role (1 byte) + SetConfigParams
 	// We target the Proposer role's config (the test verifies proposer config)
-	encoder := NewMCMSEncoder(mcmsPkgID)
+	encoder := NewMCMSEncoder()
 	setConfigParams := ToBindingSetConfigParams(config.Signers, newQuorums, newParents, false)
 	setConfigOpData, err := EncodeSelfDispatchSetConfig(MCMSRoleProposer, setConfigParams)
 	require.NoError(t, err)
@@ -945,11 +894,7 @@ func testExecuteMCMSOp(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "SetRoot",
 						ChoiceArgument: ledger.MapToValue(setRootArgs),
@@ -1023,11 +968,7 @@ func testExecuteMCMSOp(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -1068,11 +1009,7 @@ func testExecuteMCMSOp(
 						{
 							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
 								TemplateFilter: &apiv2.TemplateFilter{
-									TemplateId: &apiv2.Identifier{
-										PackageId:  mcmsPkgID,
-										ModuleName: "MCMS.Main",
-										EntityName: "MCMS",
-									},
+									TemplateId:              contracts.IdentifierFromBinding(core.MCMS{}),
 									IncludeCreatedEventBlob: true,
 								},
 							},
@@ -1178,8 +1115,6 @@ func testExecuteMCMSOp(
 // which creates MCMS and Counter with different owners in the same participant.
 func testSignatoryCheck(
 	t *testing.T,
-	mcmsPkgID string,
-	mcmsTestPkgID string,
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
@@ -1187,7 +1122,7 @@ func testSignatoryCheck(
 	ccipOwnerParty, _ string,
 ) {
 	// Create MCMS encoder for this package
-	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
+	mcmsEncoder := NewMCMSEncoder()
 
 	// ========================
 	// |   Contract Constants |
@@ -1206,7 +1141,7 @@ func testSignatoryCheck(
 	// ========================
 
 	t.Log("Creating MCMS contract owned by ccipOwner...")
-	mcmsCid := createMCMSContract(t, ccipParticipant, mcmsPkgID, config, ccipOwnerParty, baseMcmsId, chainId)
+	mcmsCid := createMCMSContract(t, ccipParticipant, config, ccipOwnerParty, baseMcmsId, chainId)
 	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// ========================
@@ -1219,7 +1154,7 @@ func testSignatoryCheck(
 	// - Signatory check: ccipOwnerParty `elem` signatory Counter ✓ PASSES
 
 	t.Log("Creating Counter contract also owned by ccipOwner (same as MCMS owner)...")
-	counterCid := createCounterContract(t, ccipParticipant, mcmsTestPkgID, ccipOwnerParty, counterBaseId)
+	counterCid := createCounterContract(t, ccipParticipant, ccipOwnerParty, counterBaseId)
 	t.Logf("Created Counter contract: %s", counterCid)
 
 	// ========================
@@ -1310,11 +1245,7 @@ func testSignatoryCheck(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "SetRoot",
 						ChoiceArgument: ledger.MapToValue(setRootArgs),
@@ -1369,11 +1300,7 @@ func testSignatoryCheck(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
+						TemplateId:     contracts.IdentifierFromBinding(core.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -1439,8 +1366,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	// Fixed test values
 	chainId := 1
 	baseMcmsId := "mcms-daml-test"
-	// Create encoder with placeholder package ID (not used in encoding, just for API consistency)
-	mcmsEncoder := NewMCMSEncoder("test-pkg-id")
+	mcmsEncoder := NewMCMSEncoder()
 	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, "ccip_owner-9cefe94d")
 	mcmsId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 
@@ -2218,8 +2144,8 @@ func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
 	newQuorums[0] = 1 // Changed from 2 to 1
 	newParents := make([]int, NumGroups)
 
-	// Encode SetConfigParams using the encoder (dummy package ID for test value generation)
-	encoder := NewMCMSEncoder("test-package-id")
+	// Encode SetConfigParams using the encoder
+	encoder := NewMCMSEncoder()
 	setConfigParams := ToBindingSetConfigParams(config.Signers, newQuorums, newParents, false)
 	encoded := MustEncodeSetConfigParams(t, encoder, setConfigParams)
 

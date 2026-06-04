@@ -45,24 +45,6 @@ testMulDivDown_LargePrice = script do
     let veryLargePrice = usd8 10000000.0
     Math.mulDivDown feeUsd8 100000000.0 veryLargePrice === 25.0
 
-testNormalizedFeeWithinCapBoundary = script do
-    let feeTokenAmount = 150000000.0
-        feeTokenPrice = usd8 1.0
-        linkTokenPrice = usd8 15.0
-        exactLocalLinkFee = 10000000.0
-
-    assert (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice 100000000000000000.0)
-    assert (not (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice 99999999999999999.0))
-    assert (Math.integerAmountWithinCap exactLocalLinkFee 100000000000000000.0)
-    assert (not (Math.integerAmountWithinCap exactLocalLinkFee 99999999999999999.0))
-
-testNormalizedFeeWithinCap_CloseBoundary = script do
-    let feeTokenAmount = 100000001.0
-        feeTokenPrice = usd8 1.0
-        linkTokenPrice = usd8 15.0
-        capJuels = 66666670000000000.0
-    assert (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice capJuels)
-
 testDecimalBoundaryShifts = script do
     Math.decimalToNumeric0 1.0 === 10000000000.0
     Math.decimalToNumeric0 0.0000000001 === 1.0

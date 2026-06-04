@@ -26,6 +26,12 @@ func (d DeployChainContracts) VerifyPreconditions(e cldf.Environment, config Can
 	if len(chain.Participants) < config.Participant {
 		return fmt.Errorf("participant index %d out of range for canton chain %d with %d participants", config.Participant, config.ChainSelector, len(chain.Participants))
 	}
+	if config.Config.Params.CCIPOwnerParty == "" {
+		return fmt.Errorf("CCIPOwnerParty is required")
+	}
+	if config.Config.Params.RMNOwnerParty == "" {
+		return fmt.Errorf("RMNOwnerParty is required")
+	}
 
 	return nil
 }

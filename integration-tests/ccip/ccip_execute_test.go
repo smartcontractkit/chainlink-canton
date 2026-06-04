@@ -47,13 +47,13 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipreceiver"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipreceiver"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -340,6 +340,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		Config: changesets.DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: partyCCIP,
+				RMNOwnerParty:  partyCCIP,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,

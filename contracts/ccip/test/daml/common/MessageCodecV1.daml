@@ -13,6 +13,7 @@ import qualified Splice.Api.Token.HoldingV1
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.OnRamp qualified as OnRamp
+import CCIP.Uint256 qualified as Uint256
 
 finalityConfig n =
     if n == 0
@@ -144,7 +145,7 @@ setup = script do
                 receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e"
                 destBlob = "636f6d706c65782064657374696e6174696f6e20626c6f62"
                 tokenTransfer = Some (MessageCodecV1.TokenTransferV1 with
-                    amount = 1000000.0
+                    amount = fromSome (MessageCodecV1.encodeUint256 1000000.0)
                     sourcePoolAddress = "ed3ee8542acd9e483c658350ad4984483eb0afdc"
                     sourceTokenAddress = "c283f6085a391df8e3f78ddc49c6b47016122838"
                     destTokenAddress = "c22ff98123e0785520915c5bd97e83ac649180a1"
@@ -261,7 +262,7 @@ setup = script do
     -- Test 1: TokenTransfer encoding (from EVM test__encodeTokenTransferV1_checkRawBytes)
     -- Input: amount=100, sourcePoolAddress=0x1234567890abcdef, etc.
     let tokenTransferTest = MessageCodecV1.TokenTransferV1 with
-            amount = 100.0
+            amount = fromSome (MessageCodecV1.encodeUint256 100.0)
             sourcePoolAddress = "1234567890abcdef"
             sourceTokenAddress = "abcdef1234567890"
             destTokenAddress = "fedcba0987654321"
@@ -372,7 +373,7 @@ testDecodeUint256_HexArithmetic = script do
 -- End-to-end: decode a full token transfer and verify extraData round-trips
 testDecodeTokenTransfer_WithExtraData : Script ()
 testDecodeTokenTransfer_WithExtraData = script do
-    let amount = 7000000000000.0
+    let amount = fromSome (MessageCodecV1.encodeUint256 7000000000000.0)
     let sourcePool = "7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3"
     let sourceToken = "acdafefb07bff5b120b7afa6ea777cf7eabacc0d"
     let destToken = "2851f23b4fbecadbe74222334f9d9032e6cb3f4a77ae563ec17de729bec33d33"
@@ -390,14 +391,145 @@ testDecodeTokenTransfer_WithExtraData = script do
     let encoded = MessageCodecV1.encodeTokenTransferV1 tt
     let decoded = fromSome (MessageCodecV1.decodeTokenTransfer encoded)
 
-    decoded.amount === 7000000000000.0
+    decoded.amount === amount
     decoded.extraData === sourcePoolData
     decoded.sourcePoolAddress === sourcePool
 
     let sourceDecimals = LockReleaseTokenPool.parseSourcePoolDecimals 6 decoded.extraData
     sourceDecimals === 18
 
-    let localAmount = LockReleaseTokenPool.calculateLocalAmount decoded.amount sourceDecimals 6
+    let localAmount = (fromSome (Uint256.calculateLocalAmountFromUint256Checked "testDecodeTokenTransfer_WithExtraData" decoded.amount sourceDecimals 6)).localAmount
     localAmount === 7.0
 
     debug "testDecodeTokenTransfer_WithExtraData: PASSED"
+
+testUint256_TextBytesRoundTripAndValidation : Script ()
+testUint256_TextBytesRoundTripAndValidation = script do
+    let maxBytes = fromSome (Uint256.decimalTextToUint256Bytes Uint256.maxUint256DecimalText)
+    Uint256.uint256BytesToDecimalText maxBytes === Some Uint256.maxUint256DecimalText
+    Uint256.isUint256Bytes maxBytes === True
+
+    let aboveNumeric0 = "100000000000000000000000000000000000000"
+    let aboveNumeric0Bytes = fromSome (Uint256.decimalTextToUint256Bytes aboveNumeric0)
+    Uint256.uint256BytesToDecimalText aboveNumeric0Bytes === Some aboveNumeric0
+    Uint256.decimalTextFitsNumeric0 aboveNumeric0 === False
+    Uint256.decimalTextFitsNumeric0 Uint256.maxNumeric0DecimalText === True
+
+    Uint256.decimalTextToUint256Bytes "00000123" === Uint256.decimalTextToUint256Bytes "123"
+    Uint256.decimalTextToUint256Bytes "" === None
+    Uint256.decimalTextToUint256Bytes "-1" === None
+    Uint256.decimalTextToUint256Bytes "1.0" === None
+    Uint256.decimalTextToUint256Bytes "abc" === None
+
+    let aboveUint256 = Uint256.maxUint256DecimalText <> "0"
+    Uint256.decimalTextToUint256Bytes aboveUint256 === None
+
+    debug "testUint256_TextBytesRoundTripAndValidation: PASSED"
+
+testUint256_LocalAmountConversion_EqualDecimals : Script ()
+testUint256_LocalAmountConversion_EqualDecimals = script do
+    let sameDecimals = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "same-decimals" "1234567890" 18 18)
+    sameDecimals.localAmount === 1234567890.0
+    sameDecimals.truncatedRemainder === "0"
+    sameDecimals.wasTruncated === False
+
+    let maxNumeric = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "max-numeric" Uint256.maxNumeric0DecimalText 18 18)
+    maxNumeric.localAmount === 99999999999999999999999999999999999999.0
+
+    Uint256.calculateLocalAmountFromDecimalTextChecked "too-large-same-decimals" "100000000000000000000000000000000000000" 18 18
+        === None
+    Uint256.calculateLocalAmountFromDecimalTextChecked "above-uint256-downscale" (Uint256.maxUint256DecimalText <> "0") 80 0
+        === None
+
+    debug "testUint256_LocalAmountConversion_EqualDecimals: PASSED"
+
+testUint256_LocalAmountConversion_Downscale : Script ()
+testUint256_LocalAmountConversion_Downscale = script do
+    let oneToken = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "one-token" "1000000000000000000" 18 6)
+    oneToken.localAmount === 1000000.0
+    oneToken.truncatedRemainder === "0"
+    oneToken.wasTruncated === False
+
+    let fractional = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "fractional" "123456789123456789" 18 6)
+    fractional.localAmount === 123456.0
+    fractional.truncatedRemainder === "789123456789"
+    fractional.wasTruncated === True
+
+    let belowUnit = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "below-unit" "999999999999" 18 6)
+    belowUnit.localAmount === 0.0
+    belowUnit.truncatedRemainder === "999999999999"
+    belowUnit.wasTruncated === True
+
+    let exactUnit = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "exact-unit" "1000000000000" 18 6)
+    exactUnit.localAmount === 1.0
+    exactUnit.truncatedRemainder === "0"
+    exactUnit.wasTruncated === False
+
+    let largeAboveNumeric0 = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "large-above-numeric0" "1000000000000000000000000000000000000000000000000" 30 6)
+    largeAboveNumeric0.localAmount === 1000000000000000000000000.0
+    largeAboveNumeric0.wasTruncated === False
+
+    let maxUint256TinyLocal = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256" Uint256.maxUint256DecimalText 77 0)
+    maxUint256TinyLocal.localAmount === 1.0
+    maxUint256TinyLocal.wasTruncated === True
+
+    debug "testUint256_LocalAmountConversion_Downscale: PASSED"
+
+testUint256_LocalAmountConversion_Upscale : Script ()
+testUint256_LocalAmountConversion_Upscale = script do
+    let sixToEighteen = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "six-to-eighteen" "123456" 6 18)
+    sixToEighteen.localAmount === 123456000000000000.0
+    sixToEighteen.wasTruncated === False
+
+    let zeroToEighteen = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "zero-to-eighteen" "1" 0 18)
+    zeroToEighteen.localAmount === 1000000000000000000.0
+
+    let boundary = fromSome (Uint256.calculateLocalAmountFromDecimalTextChecked "upscale-boundary" "99999999999999999999999999" 6 18)
+    boundary.localAmount === 99999999999999999999999999000000000000.0
+
+    Uint256.calculateLocalAmountFromDecimalTextChecked "upscale-overflow" "100000000000000000000000000" 6 18
+        === None
+    Uint256.calculateLocalAmountFromDecimalTextChecked "negative-decimals" "1" (-1) 18
+        === None
+    Uint256.calculateLocalAmountFromDecimalTextChecked "too-many-decimals" "1" 18 256
+        === None
+
+    debug "testUint256_LocalAmountConversion_Upscale: PASSED"
+
+testMessageCodec_TokenTransferAmountAboveNumeric0Decodes : Script ()
+testMessageCodec_TokenTransferAmountAboveNumeric0Decodes = script do
+    let amountAboveNumeric0 = fromSome (Uint256.decimalTextToUint256Bytes "100000000000000000000000000000000000000")
+    let maxAmount = fromSome (Uint256.decimalTextToUint256Bytes Uint256.maxUint256DecimalText)
+
+    let tt = MessageCodecV1.TokenTransferV1 with
+            amount = amountAboveNumeric0
+            sourcePoolAddress = "1234567890abcdef"
+            sourceTokenAddress = "abcdef1234567890"
+            destTokenAddress = "fedcba0987654321"
+            tokenReceiver = "aabbccdd"
+            extraData = fromSome (MessageCodecV1.encodeUint256 18.0)
+    let decodedTt = fromSome (MessageCodecV1.decodeTokenTransfer (MessageCodecV1.encodeTokenTransferV1 tt))
+    decodedTt.amount === amountAboveNumeric0
+    Uint256.uint256BytesToDecimalText decodedTt.amount === Some "100000000000000000000000000000000000000"
+
+    let msg = MessageCodecV1.MessageV1 with
+            sourceChainSelector = 123.0
+            destChainSelector = 456.0
+            sequenceNumber = 789.0
+            executionGasLimit = 400000
+            ccipReceiveGasLimit = 200000
+            finality = finalityConfig 0
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "f611F19236c999E05a62c9804F757A22553d2b50"
+            offRampAddress = "6B968538A8b1692451F18588C808E8D1702D5e3D"
+            sender = "CD1722F3947DEf4Cf144679Da39c4c32BDC35681"
+            receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e"
+            destBlob = ""
+            tokenTransfer = Some (tt with amount = maxAmount)
+            messageData = ""
+    let decodedMsg = fromSome (MessageCodecV1.decodeMessageV1 (MessageCodecV1.encodeMessageV1 msg))
+    let decodedMsgTt = fromSome decodedMsg.tokenTransfer
+    decodedMsgTt.amount === maxAmount
+    Uint256.uint256BytesToDecimalText decodedMsgTt.amount === Some Uint256.maxUint256DecimalText
+
+    debug "testMessageCodec_TokenTransferAmountAboveNumeric0Decodes: PASSED"

@@ -8,8 +8,8 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
@@ -20,7 +20,7 @@ import (
 
 type transferFactory func(ctx context.Context, instrumentId splice_api_token_holding_v1.InstrumentId) (string, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error)
 
-func getTransferFactory(ctx context.Context, poolOwner types.PARTY, acs *store.ActiveContractStore, cfg config.TransferFactory) (transferFactory, error) {
+func getTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.ActiveContractStoreInterface, cfg config.TransferFactory) (transferFactory, error) {
 	switch cfg.Type {
 	case config.FactoryTypeDisabled:
 		return nil, nil //nolint:nilnil
@@ -133,7 +133,7 @@ func getTransferFactory(ctx context.Context, poolOwner types.PARTY, acs *store.A
 
 type burnMintFactory func(ctx context.Context) (string, []oapiCommon.DisclosedContract, error)
 
-func getBurnMintFactory(acs *store.ActiveContractStore, cfg config.BurnMintFactory) (burnMintFactory, error) {
+func getBurnMintFactory(acs store.ActiveContractStoreInterface, cfg config.BurnMintFactory) (burnMintFactory, error) {
 	switch cfg.Type {
 	case config.FactoryTypeDisabled:
 		return nil, nil //nolint:nilnil

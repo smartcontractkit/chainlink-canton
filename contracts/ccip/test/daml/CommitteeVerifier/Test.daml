@@ -3,14 +3,16 @@ module CommitteeVerifier.Test where
 import Daml.Script
 
 import DA.Assert ((===))
-import DA.Crypto.Text (keccak256)
+import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable (forA_)
 import DA.List ((!!))
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
+import DA.Text qualified as Text
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
+import CCIP.SendingMessageV1 qualified as SendingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
@@ -18,6 +20,7 @@ import CCIP.RMNRemote qualified as RMNRemote
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
 
 import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.HoldingV1
 
 finalityConfig n =
     if n == 0
@@ -55,7 +58,7 @@ createExecMsg owner rmnOwner = submit owner do
         optionalCCVThreshold = 0
         receiverFinalityConfig = finalityConfig 0
         sourceDefaultCCVs = []
-        inboundPoolCCVs = None
+        inboundPoolVerification = None
         deps = CCIP.ExecutingMessageV1.ExecutingMessageDeps with
             offRamp = RawInstanceAddress.make "test-offramp" owner
             globalConfig = RawInstanceAddress.make "test-globalconfig" owner
@@ -401,6 +404,21 @@ testCommitteeVerifier = script do
     debug ("===== Passed Test10 =====")
 
     debug ("===== Test10b =====")
+    -- mismatched map key vs embedded sourceChainSelector should be rejected at creation time
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv10b-mismatch"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(456.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     -- duplicate signer keys should be rejected at creation time
     submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
@@ -438,8 +456,62 @@ testCommitteeVerifier = script do
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [PayloadBuilder.pubkeys !! 0, PayloadBuilder.pubkeys !! 0]]
     debug ("===== Passed Test10b =====")
 
-    debug ("===== Test11 =====")
-    -- Test updating storage locations
+    debug ("===== Test11: Malformed keys rejected at config time =====")
+    let shortKey = "04aabbcc"  -- 4 bytes, not 65
+    let wrongPrefixKey = "030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+
+    -- short key rejected at create time
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv11a"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = ["ipfs://example"]
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [shortKey])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+    -- wrong-prefix key (65 bytes, not starting with 04) rejected at create time
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv11b"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = ["ipfs://example"]
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [wrongPrefixKey])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+    -- malformed key rejected at ApplySignatureConfigs time
+    ccv11c <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv11c"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = ["ipfs://example"]
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+    submitMustFail owner do
+        exerciseCmd ccv11c CommitteeVerifier.ApplySignatureConfigs with
+            sourceChainSelectorsToRemove = []
+            signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [shortKey]]
+    debug ("===== Passed Test11 =====")
 
     debug ("===== All Tests Passed =====")
 
@@ -595,6 +667,16 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
                 payloadSizeBytes = -1
                 allowListEnabled = False]
 
+    -- Negative verifier fee fields are rejected.
+    submitMustFail owner do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CommitteeVerifier.RemoteChainConfigArgs with
+                remoteChainSelector = 123.0
+                feeUSDCents = -1.0
+                gasForVerification = 5000
+                payloadSizeBytes = 200
+                allowListEnabled = False]
+
     pure ()
  
 testCommitteeVerifier_ApplyAllowListUpdates : Script ()
@@ -748,3 +830,272 @@ testCommitteeVerifier_SetDynamicConfig = script do
     assertMsg "Message sent observers not updated correctly" (gotCCV.messageSentObservers == [owner, admin])
 
     pure ()
+
+-- VerifyMessage must reject an ExecutingMessageV1 whose ccipOwner differs
+-- from the verifier's, otherwise a verification produced under one ccipOwner domain could
+-- satisfy another domain's required verifier set because AddCCVVerification only records
+-- (ccvInstanceId, ccvOwner) without the ccipOwner.
+testVerifyMessage_RejectsCrossDomainExecutingMessage : Script ()
+testVerifyMessage_RejectsCrossDomainExecutingMessage = script do
+    owner <- allocateParty "owner"
+    otherCcipOwner <- allocateParty "other-ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
+
+    let rmnInstanceId = "test-rmn"
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = owner
+            customObservers = []
+            cursedSubjects = []
+
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    -- ExecutingMessageV1 is under `owner`'s ccipOwner domain.
+    executingMessageCid <- createExecMsg owner rmnOwner
+
+    let indices = [0]
+    let pubKeys = PayloadBuilder.getPubkeysForIndices indices
+    let verifierResults = PayloadBuilder.getVerifierResultsForIndices indices
+
+    -- Verifier is under a DIFFERENT ccipOwner domain.
+    ccvCid <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv-cross-domain"
+            owner = owner
+            ccipOwner = otherCcipOwner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys)]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
+        exerciseCmd ccvCid CommitteeVerifier.VerifyMessage with
+            rmnRemoteCid = rmnRemote
+            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            executingMessageCid = executingMessageCid
+            verifierResults = verifierResults
+            caller = owner
+
+    debug "testVerifyMessage_RejectsCrossDomainExecutingMessage: PASSED"
+
+-- | 130 hex chars (04 + 128 body); unique per index. Used only for signature config validation tests.
+syntheticCommitteePubKey : Int -> BytesHex
+syntheticCommitteePubKey i =
+  let dec = show i
+      padCount = 128 - Text.length dec
+      body = foldl (<>) "" (replicate padCount "0") <> dec
+  in "04" <> body
+
+-- | Threshold above max encodable signatures in verifierResults must be rejected.
+testCommitteeVerifier_MaxSignaturesPerProofThreshold : Script ()
+testCommitteeVerifier_MaxSignaturesPerProofThreshold = script do
+  owner <- allocateParty "cv-max-threshold-owner"
+  let rmnRemoteInstanceAddress = RawInstanceAddress.make "test-rmn" owner
+  let n = CommitteeVerifier.maxCommitteeSignaturesPerProof
+  let keysN = map syntheticCommitteePubKey [0 .. (n - 1)]
+  let keysNPlus1 = map syntheticCommitteePubKey [0 .. n]
+
+  -- At the cap: create and update succeed.
+  ccvOk <- submit owner do
+    createCmd CommitteeVerifier.CommitteeVerifier with
+      instanceId = "test-ccv-max-threshold-ok"
+      owner = owner
+      ccipOwner = owner
+      versionTag = CommitteeVerifier.versionTagV2_0_0
+      allowListAdmin = None
+      messageSentObservers = []
+      storageLocations = []
+      storageLocationsAdmin = owner
+      pendingStorageLocationsAdmin = owner
+      remoteChainConfigs = Map.empty
+      signerConfigs = Map.fromList [
+          (123.0, CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 123.0, threshold = n, signerKeys = keysN)
+        ]
+      deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+  _ <- submit owner do
+    exerciseCmd ccvOk CommitteeVerifier.ApplySignatureConfigs with
+      sourceChainSelectorsToRemove = []
+      signatureConfigs = [
+          CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 456.0, threshold = n, signerKeys = keysN
+        ]
+
+  -- One past the cap: create fails.
+  submitMustFail owner do
+    createCmd CommitteeVerifier.CommitteeVerifier with
+      instanceId = "test-ccv-max-threshold-bad-create"
+      owner = owner
+      ccipOwner = owner
+      versionTag = CommitteeVerifier.versionTagV2_0_0
+      allowListAdmin = None
+      messageSentObservers = []
+      storageLocations = []
+      storageLocationsAdmin = owner
+      pendingStorageLocationsAdmin = owner
+      remoteChainConfigs = Map.empty
+      signerConfigs = Map.fromList [
+          (123.0, CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 123.0, threshold = n + 1, signerKeys = keysNPlus1)
+        ]
+      deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+  -- One past the cap: ApplySignatureConfigs fails.
+  ccvUpd <- submit owner do
+    createCmd CommitteeVerifier.CommitteeVerifier with
+      instanceId = "test-ccv-max-threshold-bad-update"
+      owner = owner
+      ccipOwner = owner
+      versionTag = CommitteeVerifier.versionTagV2_0_0
+      allowListAdmin = None
+      messageSentObservers = []
+      storageLocations = []
+      storageLocationsAdmin = owner
+      pendingStorageLocationsAdmin = owner
+      remoteChainConfigs = Map.empty
+      signerConfigs = Map.empty
+      deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+  submitMustFail owner do
+    exerciseCmd ccvUpd CommitteeVerifier.ApplySignatureConfigs with
+      sourceChainSelectorsToRemove = []
+      signatureConfigs = [
+          CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 789.0, threshold = n + 1, signerKeys = keysNPlus1
+        ]
+
+  pure ()
+
+testForwardToVerifier_AllowlistChecksSender : Script ()
+testForwardToVerifier_AllowlistChecksSender = script do
+  owner <- allocateParty "ccvOwner"
+  allowlistedParty <- allocateParty "allowlistedParty"
+  nonAllowlistedSender <- allocateParty "nonAllowlistedSender"
+
+  let destChainSelector = 1.0 : Numeric 0
+      rmnRemoteInstanceAddress = RawInstanceAddress.make "rmnRemote" owner
+
+  rmnRemoteCid <- submit owner do
+    createCmd RMNRemote.RMNRemote with
+      instanceId = "rmnRemote"
+      rmnOwner = owner
+      ccipOwner = owner
+      customObservers = [allowlistedParty, nonAllowlistedSender]
+      cursedSubjects = []
+
+  let remoteChainConfig = CommitteeVerifier.RemoteChainConfig with
+        feeUSDCents = 0.0
+        gasForVerification = 0
+        payloadSizeBytes = 0
+        allowListEnabled = True
+        allowedSendersList = [allowlistedParty]
+
+  ccvCid <- submit owner do
+    createCmd CommitteeVerifier.CommitteeVerifier with
+      instanceId = "ccv1"
+      owner = owner
+      ccipOwner = owner
+      versionTag = CommitteeVerifier.versionTagV2_0_0
+      remoteChainConfigs = Map.fromList [(destChainSelector, remoteChainConfig)]
+      signerConfigs = Map.empty
+      allowListAdmin = None
+      messageSentObservers = [allowlistedParty]
+      storageLocations = []
+      storageLocationsAdmin = owner
+      pendingStorageLocationsAdmin = owner
+      deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+  let sendingMsgDeps = SendingMessageV1.SendingMessageDeps with
+        router = RawInstanceAddress.make "router" owner
+        onRamp = RawInstanceAddress.make "onRamp" owner
+        globalConfig = RawInstanceAddress.make "globalConfig" owner
+        rmnRemote = rmnRemoteInstanceAddress
+        tokenAdminRegistry = RawInstanceAddress.make "tokenAdminRegistry" owner
+        feeQuoter = RawInstanceAddress.make "feeQuoter" owner
+
+  let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with admin = owner; id = "feeToken"
+      ccvAddress = RawInstanceAddress.make "ccv1" owner
+      mkSendingMsg senderParty seqNum msgId = SendingMessageV1.SendingMessageV1 with
+        deps = sendingMsgDeps
+        ccipOwner = owner
+        sender = senderParty
+        destChainSelector = destChainSelector
+        sequenceNumber = seqNum
+        destDefaultCCVs = []
+        requiredCCVs = [ccvAddress]
+        requiredExecutor = None
+        executorAddress = ""
+        executionMode = None
+        sourceChainSelector = 100.0
+        senderAddress = ""
+        receiver = ""
+        payload = ""
+        executionGasLimit = 0
+        ccipReceiveGasLimit = 0
+        ccvAndExecutorHash = ""
+        onRampAddress = ""
+        offRampAddress = ""
+        tokenReceiver = ""
+        tokenArgs = ""
+        feeToken = feeToken
+        networkFeeUSDCents = 0.0
+        expectedTokenInstrumentId = None
+        outboundPoolCCVs = None
+        executorArgs = ""
+        executorFee = None
+        executorDestGasLimit = 0
+        executorDestBytesOverhead = 0
+        executorFeeTokenAmount = 0.0
+        observingParties = [allowlistedParty, nonAllowlistedSender]
+        ccvFees = []
+        tokenSendFee = None
+        ccvFeeTokenAmounts = []
+        tokenSendFeeTokenAmount = 0.0
+        networkFeeTokenAmount = 0.0
+        tokenSendData = None
+        verifierData = []
+        ccvOwners = []
+        message = None
+        encodedMessage = ""
+        messageId = msgId
+        state = SendingMessageV1.SendingMessageState_FeeFinalized
+
+  -- Message from non-allowlisted sender
+  nonAllowlistedMsgCid <- submit owner do
+    createCmd (mkSendingMsg nonAllowlistedSender 1.0 "msg1")
+
+  -- Get disclosures so allowlistedParty can see the CCV and RMNRemote contracts
+  disclosedCcv <- fromSome <$> queryDisclosure owner ccvCid
+  disclosedRmn <- fromSome <$> queryDisclosure owner rmnRemoteCid
+
+  -- Allowlisted party calls ForwardToVerifier for non-allowlisted sender's message → should FAIL
+  submitMustFail (actAs allowlistedParty <> disclose disclosedCcv <> disclose disclosedRmn) do
+    exerciseCmd ccvCid CommitteeVerifier.ForwardToVerifier with
+      rmnRemoteCid = rmnRemoteCid
+      extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+      sendingMessageCid = nonAllowlistedMsgCid
+      verifierArgs = ""
+      caller = allowlistedParty
+
+  -- Message from allowlisted sender
+  allowlistedMsgCid <- submit owner do
+    createCmd (mkSendingMsg allowlistedParty 2.0 "msg2")
+
+  -- Allowlisted sender's message via ForwardToVerifier → should SUCCEED
+  submit (actAs allowlistedParty <> disclose disclosedCcv <> disclose disclosedRmn) do
+    exerciseCmd ccvCid CommitteeVerifier.ForwardToVerifier with
+      rmnRemoteCid = rmnRemoteCid
+      extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+      sendingMessageCid = allowlistedMsgCid
+      verifierArgs = ""
+      caller = allowlistedParty
+
+  pure ()
