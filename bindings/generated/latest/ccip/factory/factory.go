@@ -1500,7 +1500,7 @@ type DeployRMNRemoteParams struct {
 	RmnOwner        types.PARTY   `json:"rmnOwner"`
 	CcipOwner       types.PARTY   `json:"ccipOwner"`
 	CustomObservers []types.PARTY `json:"customObservers"`
-	CursedSubjects  []types.TEXT  `json:"cursedSubjects"`
+	CursedSubjects  []types.TEXT  `json:"cursedSubjects" hex:"[]bytes"`
 }
 
 // ToMap converts DeployRMNRemoteParams to a map for DAML arguments

@@ -1570,7 +1570,7 @@ func (t *SetDynamicConfigParams) UnmarshalHex(data string) error {
 type SignatureConfig struct {
 	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
 	Threshold           types.INT64   `json:"threshold"`
-	SignerKeys          []types.TEXT  `json:"signerKeys"`
+	SignerKeys          []types.TEXT  `json:"signerKeys" hex:"[]bytes"`
 }
 
 // ToMap converts SignatureConfig to a map for DAML arguments

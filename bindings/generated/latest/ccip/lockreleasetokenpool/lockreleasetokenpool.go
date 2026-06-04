@@ -505,8 +505,8 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 // ChainUpdate is a Record type
 type ChainUpdate struct {
 	RemoteChainSelector                        types.NUMERIC                     `json:"remoteChainSelector"`
-	RemotePools                                []types.TEXT                      `json:"remotePools"`
-	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress"`
+	RemotePools                                []types.TEXT                      `json:"remotePools" hex:"[]bytes"`
+	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress" hex:"bytes"`
 	InboundCCVs                                []chainlinkapi.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []chainlinkapi.RawInstanceAddress `json:"outboundCCVs"`
 	FinalityConfig                             core.FinalityConfig               `json:"finalityConfig"`
@@ -1724,8 +1724,8 @@ func (t *ReleaseFromTicketMCMSParams) UnmarshalHex(data string) error {
 
 // RemoteChainConfig is a Record type
 type RemoteChainConfig struct {
-	RemotePools                                []types.TEXT                      `json:"remotePools"`
-	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress"`
+	RemotePools                                []types.TEXT                      `json:"remotePools" hex:"[]bytes"`
+	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress" hex:"bytes"`
 	InboundCCVs                                []chainlinkapi.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []chainlinkapi.RawInstanceAddress `json:"outboundCCVs"`
 	FinalityConfig                             core.FinalityConfig               `json:"finalityConfig"`
