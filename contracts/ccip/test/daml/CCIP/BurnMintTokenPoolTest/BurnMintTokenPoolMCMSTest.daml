@@ -24,20 +24,9 @@ import CCIP.BurnMintTokenPoolCodecGen (
     encodeAddPoolReceiveContextContractValueParams,
     encodeRemovePoolReceiveContextValueParams,
     )
-import CCIP.BurnMintTokenPoolTypes (
-    SetDynamicConfigParams(..),
-    ApplyChainUpdatesParams(..),
-    SetRateLimiterReferencesParams(..),
-    SetRateLimitConfigParams(..),
-    RemoteChainConfig(..),
-    SetTransferTimeoutParams(..),
-    AddPoolReceiveContextNonContractValueParams(..),
-    AddPoolReceiveContextContractValueParams(..),
-    RemovePoolReceiveContextValueParams(..),
-    )
+
 import CCIP.ContextCodec (encodeAnyValue)
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
-import qualified CCIP.Context
 import qualified CCIP.RateLimiter
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1

@@ -131,7 +131,7 @@ mintLink
   -> Decimal
   -> Script (ContractId HoldingV1.Holding)
 mintLink admin owner registryCid instrumentId amount = do
-  result <- submitMulti [admin, owner] [] do
+  result <- submit (actAs admin <> actAs owner) do
     exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
       expectedAdmin = admin
       instrumentId
@@ -345,7 +345,7 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   senderChangeHolding.holdingAmount === 3.0
   poolFeeHolding.holdingAmount === 0.35
 
-  tokenSendData <- pure (fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData)
+  let tokenSendData = (fromSomeNote "expected token send data" (DA.Internal.Record.getField @"tokenSendData" updatedSendingMessage))
   tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 66500000000.0)
   tokenSendData.instrumentId === instrumentId
   rateLimiters <- query @RateLimiter.RateLimiter poolOwner
