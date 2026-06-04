@@ -36,6 +36,7 @@ import CCIP.CommitteeVerifierTypes (
     TransferStorageLocationsAdminParams(..),
     UpdateStorageLocationsParams(..),
     )
+import DA.Text qualified as Text
 import qualified CCIP.Crypto.DerEncoding
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
@@ -98,9 +99,10 @@ template CommitteeVerifier
         observer storageLocationsAdmin :: pendingStorageLocationsAdmin :: optional [] pure allowListAdmin
 
         -- Ensure signer configs have a positive threshold within the verifierResults
-        -- proof limit, enough signers, and no duplicate signer keys.
+        -- proof limit, no duplicate signer keys, and that map keys match the embedded
+        -- sourceChainSelector in each config.
         ensure assertValidInstanceId instanceId
-          && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
+          && versionTag /= "" && all (\(k, config) -> k == config.sourceChainSelector && isValidSignatureConfig config) (Map.toList signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
@@ -570,9 +572,13 @@ countValidSigners : [(BytesHex, Bool)] -> Int
 countValidSigners validSignersMap =
     length (filter snd validSignersMap)
 
+isValidPublicKey : PublicKeyHex -> Bool
+isValidPublicKey key = byteCount key == 65 && Text.take 2 key == "04"
+
 isValidSignatureConfig : SignatureConfig -> Bool
 isValidSignatureConfig config =
     config.threshold > 0
         && config.threshold <= maxCommitteeSignaturesPerProof
         && length config.signerKeys >= config.threshold
         && length config.signerKeys == length (dedup config.signerKeys)
+        && all isValidPublicKey config.signerKeys
