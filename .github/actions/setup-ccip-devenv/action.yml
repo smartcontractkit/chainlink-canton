@@ -7,7 +7,7 @@ inputs:
   ccv-ref:
     description: chainlink-ccv git ref (branch, tag, or SHA)
     required: false
-    default: 8eaeb5f036e177733b82983ab074eb8ca60d88c2
+    default: 00a7cfe2889d7493c2950a687786f1be5ba0f23d
   canton-ref:
     description: >-
       chainlink-canton git ref. Leave empty to use the ref that triggered the workflow.

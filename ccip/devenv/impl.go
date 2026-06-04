@@ -436,56 +436,6 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	return chainDefinition, cvConfig, nil
 }
 
-func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64) (cciptestinterfaces.ChainLaneProfile, error) {
-	defaultFeeQuoterCfg := cantonadapters.DefaultCantonFeeQuoterDestChainConfig()
-
-	baseExecutionGasCost := uint32(1)
-	tokenReceiverAllowed := false
-	gasForVerification := uint32(50_000)
-
-	return cciptestinterfaces.ChainLaneProfile{
-		BaseExecutionGasCost: &baseExecutionGasCost,
-		TokenReceiverAllowed: &tokenReceiverAllowed,
-		AllowedFinalityConfig: &finality.Config{
-			WaitForFinality: true,
-		},
-		FeeQuoterDestChainConfig: ccipChangesets.FeeQuoterDestChainConfigOverrides{
-			OverrideExistingConfig:      defaultFeeQuoterCfg.OverrideExistingConfig,
-			IsEnabled:                   &defaultFeeQuoterCfg.IsEnabled,
-			MaxDataBytes:                &defaultFeeQuoterCfg.MaxDataBytes,
-			MaxPerMsgGasLimit:           &defaultFeeQuoterCfg.MaxPerMsgGasLimit,
-			DestGasPerPayloadByteBase:   &defaultFeeQuoterCfg.DestGasPerPayloadByteBase,
-			DefaultTokenFeeUSDCents:     &defaultFeeQuoterCfg.DefaultTokenFeeUSDCents,
-			DefaultTokenDestGasOverhead: &defaultFeeQuoterCfg.DefaultTokenDestGasOverhead,
-			DefaultTxGasLimit:           &defaultFeeQuoterCfg.DefaultTxGasLimit,
-			NetworkFeeUSDCents:          &defaultFeeQuoterCfg.NetworkFeeUSDCents,
-			LinkFeeMultiplierPercent:    &defaultFeeQuoterCfg.V2Params.LinkFeeMultiplierPercent,
-			USDPerUnitGas:               defaultFeeQuoterCfg.V2Params.USDPerUnitGas,
-		},
-		ExecutorDestChainConfig: &ccipadapters.ExecutorDestChainConfig{
-			Enabled: true,
-		},
-		DefaultExecutorQualifier: devenvcommon.DefaultExecutorQualifier,
-		DefaultInboundCCVs: []datastore.AddressRef{
-			{
-				ChainSelector: selector,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       committee_verifier.Version,
-				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
-			},
-		},
-		DefaultOutboundCCVs: []datastore.AddressRef{
-			{
-				ChainSelector: selector,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       committee_verifier.Version,
-				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
-			},
-		},
-		GasForVerification: &gasForVerification,
-	}, nil
-}
-
 func (c *Chain) PostConnect(env *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
 	return nil
 }
