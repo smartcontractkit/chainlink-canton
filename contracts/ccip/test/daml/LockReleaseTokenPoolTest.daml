@@ -4392,10 +4392,9 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.empty
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
-            caller = owner
     -- Chain requires custom finality: custom limiter must not equal inbound
     submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
                 LockReleaseTokenPool.RateLimitConfigArgs with
                     remoteChainSelector = 456.0
@@ -4403,10 +4402,9 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-as-custom-in@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-distinct@owner"
                 ]
-            caller = owner
     -- Chain requires custom finality: custom limiter must not equal outbound
     submitMustFail owner do
-        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
                 LockReleaseTokenPool.RateLimitConfigArgs with
                     remoteChainSelector = 456.0
@@ -4414,7 +4412,6 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-as-out@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-as-out@owner"
                 ]
-            caller = owner
 
     pure ()
 

@@ -1655,7 +1655,7 @@ testBurnMintTokenPool_RateLimiterPathIsolation = script do
         ]
 
   submitMustFail owner do
-    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimitConfig with
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimiterReferences with
       rateLimitConfigArgs =
         [ BurnMintTokenPool.RateLimitConfigArgs with
             remoteChainSelector = 450.0
@@ -1663,10 +1663,9 @@ testBurnMintTokenPool_RateLimiterPathIsolation = script do
             inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "x@owner"
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "y@owner"
         ]
-      caller = owner
 
   submitMustFail owner do
-    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimitConfig with
+    exerciseCmd tokenPoolCid BurnMintTokenPool.SetRateLimiterReferences with
       rateLimitConfigArgs =
         [ BurnMintTokenPool.RateLimitConfigArgs with
             remoteChainSelector = 450.0
@@ -1674,6 +1673,5 @@ testBurnMintTokenPool_RateLimiterPathIsolation = script do
             inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "b@owner"
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "b@owner"
         ]
-      caller = owner
 
   pure ()
