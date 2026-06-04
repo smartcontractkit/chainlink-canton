@@ -1698,7 +1698,7 @@ func (t *ConsumeReceiveTicketMCMSParams) UnmarshalHex(data string) error {
 
 // Curse is a Record type
 type Curse struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts Curse to a map for DAML arguments
@@ -1838,7 +1838,7 @@ func (t *CurseGlobal) UnmarshalHex(data string) error {
 
 // CurseMultiple is a Record type
 type CurseMultiple struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts CurseMultiple to a map for DAML arguments
@@ -1880,7 +1880,7 @@ func (t *CurseMultiple) UnmarshalHex(data string) error {
 
 // CurseMultipleParams is a Record type
 type CurseMultipleParams struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts CurseMultipleParams to a map for DAML arguments
@@ -1922,7 +1922,7 @@ func (t *CurseMultipleParams) UnmarshalHex(data string) error {
 
 // CurseParams is a Record type
 type CurseParams struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts CurseParams to a map for DAML arguments
@@ -5785,7 +5785,7 @@ type RMNRemote struct {
 	RmnOwner        types.PARTY   `json:"rmnOwner"`
 	CcipOwner       types.PARTY   `json:"ccipOwner"`
 	CustomObservers []types.PARTY `json:"customObservers"`
-	CursedSubjects  []types.TEXT  `json:"cursedSubjects"`
+	CursedSubjects  []types.TEXT  `json:"cursedSubjects" hex:"[]bytes"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -10119,7 +10119,7 @@ func (t *TransferAdminRoleMCMSParams) UnmarshalHex(data string) error {
 
 // Uncurse is a Record type
 type Uncurse struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts Uncurse to a map for DAML arguments
@@ -10259,7 +10259,7 @@ func (t *UncurseGlobal) UnmarshalHex(data string) error {
 
 // UncurseMultiple is a Record type
 type UncurseMultiple struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts UncurseMultiple to a map for DAML arguments
@@ -10301,7 +10301,7 @@ func (t *UncurseMultiple) UnmarshalHex(data string) error {
 
 // UncurseMultipleParams is a Record type
 type UncurseMultipleParams struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts UncurseMultipleParams to a map for DAML arguments
@@ -10343,7 +10343,7 @@ func (t *UncurseMultipleParams) UnmarshalHex(data string) error {
 
 // UncurseParams is a Record type
 type UncurseParams struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts UncurseParams to a map for DAML arguments
