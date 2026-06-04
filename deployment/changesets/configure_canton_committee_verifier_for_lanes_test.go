@@ -13,30 +13,34 @@ func TestCantonOnlyConfigureLanesConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := v2cs.ConfigureChainsForLanesFromTopologyConfig{
-		Chains: []v2cs.PartialChainConfig{
-			{ChainSelector: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector},
-			{ChainSelector: chainsel.CANTON_TESTNET.Selector},
+		BuildLanesCrossFamilyConfig: v2cs.BuildLanesCrossFamilyConfig{
+			Lanes: []v2cs.CrossFamilyLanePair{
+				{
+					ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+					ChainB: chainsel.CANTON_TESTNET.Selector,
+				},
+				{
+					ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+					ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector,
+				},
+			},
 		},
 	}
 
 	filtered := cantonOnlyConfigureLanesConfig(cfg)
-	require.Len(t, filtered.Chains, 1)
-	assert.Equal(t, chainsel.CANTON_TESTNET.Selector, filtered.Chains[0].ChainSelector)
+	require.Len(t, filtered.Lanes, 1)
+	assert.Equal(t, chainsel.CANTON_TESTNET.Selector, filtered.Lanes[0].ChainB)
 }
 
 func TestFamiliesInConfigureLanesConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := v2cs.ConfigureChainsForLanesFromTopologyConfig{
-		Chains: []v2cs.PartialChainConfig{
-			{
-				ChainSelector: chainsel.CANTON_TESTNET.Selector,
-				CommitteeVerifiers: []v2cs.CommitteeVerifierInputConfig{
-					{
-						RemoteChains: map[uint64]v2cs.CommitteeVerifierRemoteChainConfig{
-							chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector: {},
-						},
-					},
+		BuildLanesCrossFamilyConfig: v2cs.BuildLanesCrossFamilyConfig{
+			Lanes: []v2cs.CrossFamilyLanePair{
+				{
+					ChainA: chainsel.CANTON_TESTNET.Selector,
+					ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
 				},
 			},
 		},
@@ -51,14 +55,20 @@ func TestHasCantonChainsInConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := v2cs.ConfigureChainsForLanesFromTopologyConfig{
-		Chains: []v2cs.PartialChainConfig{
-			{ChainSelector: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector},
+		BuildLanesCrossFamilyConfig: v2cs.BuildLanesCrossFamilyConfig{
+			Lanes: []v2cs.CrossFamilyLanePair{
+				{
+					ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+					ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector,
+				},
+			},
 		},
 	}
 	assert.False(t, hasCantonChainsInConfig(cfg))
 
-	cfg.Chains = append(cfg.Chains, v2cs.PartialChainConfig{
-		ChainSelector: chainsel.CANTON_TESTNET.Selector,
+	cfg.Lanes = append(cfg.Lanes, v2cs.CrossFamilyLanePair{
+		ChainA: chainsel.CANTON_TESTNET.Selector,
+		ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
 	})
 	assert.True(t, hasCantonChainsInConfig(cfg))
 }
