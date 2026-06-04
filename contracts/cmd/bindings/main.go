@@ -70,6 +70,9 @@ func main() {
 			"root":                true, // Merkle root hash (32 bytes)
 			"newRoot":             true, // New merkle root hash (32 bytes)
 			"versionTag":          true, // CCV version tag is a 4-byte BytesHex field
+			"onRampAddresses": true, // Daml [BytesHex] → hex:"[]bytes" on []types.TEXT
+			"signerKeys":      true, // Daml [BytesHex] → hex:"[]bytes" on []types.TEXT
+			"offRampAddress":  true, // Daml BytesHex scalar → hex:"bytes" on types.TEXT
 		},
 		// hex:"bytes16" — fields that may exceed 255 bytes (uint16 length prefix)
 		BytesHexFields: map[string]bool{

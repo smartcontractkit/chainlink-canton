@@ -2001,7 +2001,7 @@ type DestChainConfig struct {
 	AddressBytesLength        types.INT64                       `json:"addressBytesLength"`
 	TokenReceiverAllowed      types.BOOL                        `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64                       `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT                        `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                        `json:"offRampAddress" hex:"bytes"`
 	DefaultExecutor           *chainlinkapi.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
@@ -2087,7 +2087,7 @@ type DestChainConfigArgs struct {
 	AddressBytesLength        types.INT64                       `json:"addressBytesLength"`
 	TokenReceiverAllowed      types.BOOL                        `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64                       `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT                        `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                        `json:"offRampAddress" hex:"bytes"`
 	DefaultExecutor           *chainlinkapi.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
@@ -5341,7 +5341,7 @@ type MessageV1 struct {
 	Finality            DecodedFinality  `json:"finality"`
 	CcvAndExecutorHash  types.TEXT       `json:"ccvAndExecutorHash"`
 	OnRampAddress       types.TEXT       `json:"onRampAddress"`
-	OffRampAddress      types.TEXT       `json:"offRampAddress"`
+	OffRampAddress      types.TEXT       `json:"offRampAddress" hex:"bytes"`
 	Sender              types.TEXT       `json:"sender"`
 	Receiver            types.TEXT       `json:"receiver"`
 	DestBlob            types.TEXT       `json:"destBlob"`
@@ -6975,7 +6975,7 @@ type SendingMessageV1 struct {
 	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
 	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
 	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
-	OffRampAddress            types.TEXT                                `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                                `json:"offRampAddress" hex:"bytes"`
 	TokenReceiver             types.TEXT                                `json:"tokenReceiver"`
 	TokenArgs                 types.TEXT                                `json:"tokenArgs"`
 	FeeToken                  splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
@@ -8296,7 +8296,7 @@ func (t *SetTransferFactoryParams) UnmarshalHex(data string) error {
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
 	IsEnabled        types.BOOL                        `json:"isEnabled"`
-	OnRampAddresses  []types.TEXT                      `json:"onRampAddresses"`
+	OnRampAddresses  []types.TEXT                      `json:"onRampAddresses" hex:"[]bytes"`
 	DefaultCCVs      []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
 	LaneMandatedCCVs []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
@@ -8360,7 +8360,7 @@ func (t *SourceChainConfig) UnmarshalHex(data string) error {
 type SourceChainConfigArgs struct {
 	SourceChainSelector types.NUMERIC                     `json:"sourceChainSelector"`
 	IsEnabled           types.BOOL                        `json:"isEnabled"`
-	OnRampAddresses     []types.TEXT                      `json:"onRampAddresses"`
+	OnRampAddresses     []types.TEXT                      `json:"onRampAddresses" hex:"[]bytes"`
 	DefaultCCVs         []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
 	LaneMandatedCCVs    []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 }

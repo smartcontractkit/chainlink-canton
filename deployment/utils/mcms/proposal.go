@@ -74,16 +74,14 @@ func GenerateTimelockProposal(
 		return nil, fmt.Errorf("failed to get MCMS contract state: %w", err)
 	}
 
-	txCount := countTransactions(batchOps)
 	multisigId := makeMultisigId(string(mcmsContract.InstanceId), string(mcmsContract.Owner), config.Role)
 
+	// postOpCount and overridePreviousRoot are applied at sign/execute time by mcms (encoder + executor), not in chainMetadata.
 	metadata, err := cantonsdk.NewChainMetadata(
 		opCount,
-		opCount+txCount,
 		int64(mcmsContract.ChainId),
 		multisigId,
 		mcmsAddrHex,
-		config.OverridePreviousRoot,
 		string(mcmsContract.InstanceId),
 	)
 	if err != nil {
@@ -109,6 +107,7 @@ func GenerateTimelockProposal(
 		SetVersion("v1").
 		SetValidUntil(validUntil).
 		SetDescription(config.Description).
+		SetOverridePreviousRoot(config.OverridePreviousRoot).
 		AddTimelockAddress(config.ChainSelector, timelockAddr).
 		AddChainMetadata(config.ChainSelector, metadata).
 		SetAction(config.Action)
