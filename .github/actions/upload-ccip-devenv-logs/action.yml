@@ -1,0 +1,47 @@
+name: Upload CCIP devenv logs
+description: >-
+  Dump container logs from a running devenv (if needed) and upload them as a
+  workflow artifact.
+
+inputs:
+  canton-path:
+    description: Checkout path for chainlink-canton
+    required: false
+    default: chainlink-canton
+  test-package-dir:
+    description: >-
+      Path under ccip/devenv/tests/ where go test ran (e.g. e2e, load, integration).
+    required: true
+  log-dump-suffix:
+    description: Suffix passed to ccv dl --dir-suffix
+    required: true
+  artifact-name:
+    description: Name of the uploaded artifact
+    required: true
+  retention-days:
+    description: Artifact retention in days
+    required: false
+    default: '1'
+
+runs:
+  using: composite
+  steps:
+    - name: Dump logs if they're not already dumped
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.canton-path }}/ccip/devenv/tests/${{ inputs.test-package-dir }}
+      run: |
+        if [ ! -d "logs" ] || [ -z "$(ls -A logs 2>/dev/null)" ]; then
+          echo "Logs not found or empty. Dumping logs manually..."
+          cd ../.. && go run cmd/ccv/main.go dl --dir-suffix "${{ inputs.log-dump-suffix }}"
+        else
+          echo "Logs already exist. Skipping manual dump."
+        fi
+
+    - name: Upload Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.canton-path }}/ccip/devenv/tests/${{ inputs.test-package-dir }}/logs
+        retention-days: ${{ inputs.retention-days }}

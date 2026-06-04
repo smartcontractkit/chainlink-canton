@@ -40,6 +40,7 @@ func main() {
 		logger.Info().Str("file", s).Int("index", i).Msg("Reading config...")
 		cfgReader, err := os.Open(s) //nolint:gosec
 		if err != nil {
+			stop()
 			logger.Fatal().Err(err).Str("file", s).Int("index", i).Msg("failed to open config file")
 		}
 
@@ -48,8 +49,14 @@ func main() {
 
 	cfg, err := config.ReadAndMerge(readers...)
 	if err != nil {
+		stop()
 		logger.Fatal().Err(err).Msg("failed to parse config files")
 	}
 
-	logger.Fatal().Err(service.RunEDS(ctx, logger, cfg)).Msg("Running EDS server")
+	runErr := service.RunEDS(ctx, logger, cfg)
+	stop()
+	if runErr != nil {
+		logger.Fatal().Err(runErr).Msg("EDS server exited with error")
+	}
+	logger.Info().Msg("EDS server exited without an error")
 }

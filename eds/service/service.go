@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -36,6 +38,10 @@ import (
 )
 
 func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) error {
+	logger = logger.With().Str("component", "RunEDS").Logger()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	cfg, err := config.DefaultConfig().Merge(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to merge config: %w", err)
@@ -100,14 +106,13 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	cantonChain := chain.(*canton.Chain)
 
 	// Stores
-
+	backfillWaitGroup := sync.WaitGroup{}
 	activeContractStore := store.NewActiveContractStore(
 		logger,
 		cantonChain.Participants[0].LedgerServices.Update,
 		cantonChain.Participants[0].LedgerServices.State,
 		metrics.With("store", "ActiveContractStore"),
 	)
-
 	instrumentHoldingStore := store.NewInstrumentHoldingStore(
 		logger,
 		cantonChain.Participants[0].LedgerServices.Update,
@@ -117,20 +122,20 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 
 	// Create HTTP Server
 	router := gin.Default()
-	router.Use(middleware.RequestMonitoringMiddleware(metrics))
+	router.Use(
+		middleware.RequestMonitoringMiddleware(metrics),
+		middleware.RequestSizeLimiterMiddleware(cfg.Server.MaxRequestSizeBytes),
+	)
 
 	errChan := make(chan error)
-	globalAPIServer, err := global.NewServer(ctx, logger, activeContractStore, cfg.GlobalAPIConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create Global API: %w", err)
-	}
-	oapiGlobal.RegisterHandlers(router, globalAPIServer)
+	var globalAddressFilters []global.InstanceAddressFilter
 	if cfg.CCIPAPIConfig.Enabled {
 		ccipAPIServer, err := ccip.NewServer(ctx, logger, activeContractStore, cfg.CCIPAPIConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create CCIP API: %w", err)
 		}
 		oapiCCIP.RegisterHandlers(router, ccipAPIServer)
+		globalAddressFilters = append(globalAddressFilters, ccipAPIServer)
 	}
 	if cfg.CCVAPIConfig.Enabled {
 		ccvAPIServer, err := ccv.NewServer(ctx, logger, activeContractStore, cfg.CCVAPIConfig)
@@ -138,6 +143,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			return fmt.Errorf("failed to create CCV API: %w", err)
 		}
 		oapiCCV.RegisterHandlers(router, ccvAPIServer)
+		globalAddressFilters = append(globalAddressFilters, ccvAPIServer)
 	}
 	if cfg.ExecutorAPIConfig.Enabled {
 		executorAPIServer, err := executor.NewServer(ctx, logger, activeContractStore, cfg.ExecutorAPIConfig)
@@ -145,6 +151,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			return fmt.Errorf("failed to create Executor API: %w", err)
 		}
 		oapiExecutor.RegisterHandlers(router, executorAPIServer)
+		globalAddressFilters = append(globalAddressFilters, executorAPIServer)
 	}
 	if cfg.TokenPoolAPIConfig.Enabled {
 		tokenPoolAPIServer, err := tokenpool.NewServer(ctx, logger, activeContractStore, instrumentHoldingStore, cfg.TokenPoolAPIConfig)
@@ -152,14 +159,23 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			return fmt.Errorf("failed to create TokenPool API: %w", err)
 		}
 		oapiTokenPool.RegisterHandlers(router, tokenPoolAPIServer)
+		globalAddressFilters = append(globalAddressFilters, tokenPoolAPIServer)
 
 		// Run instrument holding store in the background
 		// This should only be run if the TokenPool API is enabled, as it will fail if no filters are specified.
+		backfillWaitGroup.Add(1)
 		go func(errChan chan<- error) {
 			logger.Info().Msg("starting instrument holding store")
-			err := instrumentHoldingStore.Run(ctx, store.DefaultStreamConfig())
+			err := instrumentHoldingStore.Run(ctx, store.DefaultStreamConfig(), store.WithOnBackfillCompleted(func() {
+				logger.Info().Msg("instrument holding store backfill completed")
+				backfillWaitGroup.Done()
+			}))
 			if err != nil {
-				errChan <- fmt.Errorf("failed to run instrument holding store: %w", err)
+				select {
+				case errChan <- fmt.Errorf("failed to run instrument holding store: %w", err):
+				default:
+					logger.Warn().Err(err).Msg("Instrument holding store encountered an error that could not be handled, likely due to a pending shutdown.")
+				}
 			}
 		}(errChan)
 	}
@@ -170,16 +186,49 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		}
 		oapiTokenMetadataV1.RegisterHandlers(router, tokenStandardAPIServer)
 		oapiTransferInstruction.RegisterHandlers(router, tokenStandardAPIServer)
+		globalAddressFilters = append(globalAddressFilters, tokenStandardAPIServer)
 	}
 
+	// Global API
+	// Passing all configured API implementations as filters, as the Global API should only return disclosures for
+	// addresses that are already returned as part of the other API implementations.
+	globalAPIServer, err := global.NewServer(ctx, logger, activeContractStore, cfg.GlobalAPIConfig, globalAddressFilters...)
+	if err != nil {
+		return fmt.Errorf("failed to create Global API: %w", err)
+	}
+	oapiGlobal.RegisterHandlers(router, globalAPIServer)
+
 	// Run update store in the background
+	backfillWaitGroup.Add(1)
 	go func(errChan chan<- error) {
 		logger.Info().Msg("starting active contract store")
-		err := activeContractStore.Run(ctx, store.DefaultStreamConfig())
+		err := activeContractStore.Run(ctx, store.DefaultStreamConfig(), store.WithOnBackfillCompleted(func() {
+			logger.Info().Msg("active contract store backfill completed")
+			backfillWaitGroup.Done()
+		}))
 		if err != nil {
-			errChan <- fmt.Errorf("failed to run active contract store: %w", err)
+			select {
+			case errChan <- fmt.Errorf("failed to run active contract store: %w", err):
+			default:
+				logger.Warn().Err(err).Msg("Active contract store encountered an error that could not be handled, likely due to a pending shutdown.")
+			}
 		}
 	}(errChan)
+
+	// Wait for backfill of all stores to be completed
+	backfillCompleted := make(chan struct{})
+	go func() {
+		backfillWaitGroup.Wait()
+		close(backfillCompleted)
+	}()
+	select {
+	case <-backfillCompleted:
+		logger.Info().Msg("all stores backfill completed, server is fully operational")
+	case err := <-errChan:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	s := &http.Server{
 		Handler:      router,
@@ -187,21 +236,46 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		BaseContext:  func(_ net.Listener) context.Context { return ctx },
 	}
 
 	// Run server in the background
 	go func() {
 		logger.Info().Msg("starting server")
-		err := s.ListenAndServe()
-		if err != nil {
-			errChan <- fmt.Errorf("failed to run server: %w", err)
+		if s.ListenAndServe() != nil {
+			select {
+			case errChan <- fmt.Errorf("failed to run server: %w", err):
+			default:
+				logger.Warn().Err(err).Msg("HTTP server encountered an error that could not be handled, likely due to a pending shutdown.")
+			}
 		}
 	}()
 
+	// RunEDS has two conditions under which it terminates:
+	// 1. An unexpected error is returned by one of the background processes (active contract store, instrument holding store, or HTTP server)
+	//    and sent on errChan, in which case it immediately closes the HTTP server and returns the error that lead to the shutdown.
+	// 2. The provided context is cancelled by the caller, in which case we trigger a graceful shutdown of the HTTP server to wait for all
+	//    in-flight requests to complete.
 	select {
 	case err := <-errChan:
-		return err
+		logger.Err(err).Msg("Unexpected error received. Shutting down immediately.")
+		if closeErr := s.Close(); closeErr != nil {
+			logger.Err(closeErr).Msg("Failed to close HTTP server.")
+		}
+
+		return fmt.Errorf("unexpected error received: %w", err)
 	case <-ctx.Done():
+		logger.Info().Msg("Context cancelled. Shutting down server gracefully with a timeout of 20s...")
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second*20) // Higher than read & write timeouts to allow in-flight requests to complete
+		defer shutdownCancel()
+
+		if err := s.Shutdown(shutdownCtx); err != nil {
+			logger.Warn().Err(err).Msg("Server shutdown encountered an error.")
+			return fmt.Errorf("server shutdown: %w", err)
+		}
+		logger.Info().Msg("Server shutdown complete.")
+
 		return ctx.Err()
 	}
 }

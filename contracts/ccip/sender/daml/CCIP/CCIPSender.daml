@@ -5,6 +5,7 @@ module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
+import DA.List (unique)
 import DA.Optional (fromSomeNote, isNone)
 
 import qualified Splice.Api.Token.HoldingV1
@@ -39,6 +40,7 @@ data CCVSendInput = CCVSendInput
 data FeeTokenInput = FeeTokenInput
     with
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        feeTokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
         feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
         feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
     deriving (Eq, Show)
@@ -74,6 +76,31 @@ lookupVerifierArgs ccvExtraArgs ccvAddress =
         [] -> pure ""
         [arg] -> pure arg.ccvArgs
         _ -> abort "sender: duplicate verifier args for CCV"
+
+assertExactCCVSet
+    : [RawInstanceAddress.RawInstanceAddress]
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Update ()
+assertExactCCVSet requiredCCVs providedCCVs = do
+    assertMsg "sender: GetFee required CCVs cannot contain duplicates"
+        (unique requiredCCVs)
+    assertMsg "sender: GetFee duplicate CCV inputs"
+        (unique providedCCVs)
+    assertMsg "sender: GetFee missing required CCV"
+        (all (\requiredCCV -> requiredCCV `elem` providedCCVs) requiredCCVs)
+    assertMsg "sender: GetFee unexpected CCV input"
+        (all (\providedCCV -> providedCCV `elem` requiredCCVs) providedCCVs)
+
+validateCCVFeeQuote
+    : RawInstanceAddress.RawInstanceAddress
+    -> ICCV.CrossChainVerifierFeeQuote
+    -> Update ()
+validateCCVFeeQuote expectedCCV quote =
+    RawInstanceAddress.assertEqual
+        "sender: GetFee CCV quote address mismatch"
+        quote.ccvInstanceId
+        quote.ccvOwner
+        expectedCCV
 
 template CCIPSender
     with
@@ -151,10 +178,14 @@ template CCIPSender
                         None -> None
                         Some input -> Some input.tokenPoolCid
 
+                let providedCCVs = map (.ccvAddress) ccvSendInputs
+                assertExactCCVSet requiredCCVs providedCCVs
+
                 quotedCCVFees <- foldlA (\fees input -> do
                     q <- exercise input.ccvCid ICCV.CrossChainVerifier_GetFee with
                         destChainSelector = destinationChainSelector
                         caller = owner
+                    validateCCVFeeQuote input.ccvAddress q
                     pure (fees ++ [q])
                     ) [] ccvSendInputs
 
@@ -182,22 +213,28 @@ template CCIPSender
                             assertMsg "sender: executorInput not allowed when no default executor is configured"
                                 (isNone executorInput)
                             pure None
-                        Some _ -> case executorInput of
+                        Some expectedExecutor -> case executorInput of
                             None -> abort "sender: executorInput required for default executor mode"
                             Some executorInput -> do
                                 q <- exercise executorInput.executorCid CCIP.Interfaces.Executor.Executor_GetFee with
+                                    expectedExecutor = expectedExecutor
                                     destChainSelector = destinationChainSelector
                                     requiredCCVs = requiredCCVs
                                     caller = owner
+                                RawInstanceAddress.assertEqual "sender: executor fee quote executor mismatch"
+                                    q.executorInstanceId q.executorOwner expectedExecutor
                                 pure (Some q)
-                    CCIP.Client.Executor_WithAddress _ _executorArgs ->
+                    CCIP.Client.Executor_WithAddress expectedExecutor _executorArgs ->
                       case executorInput of
                         None -> abort "sender: executorInput required for explicit executor mode"
                         Some executorInput -> do
                             q <- exercise executorInput.executorCid CCIP.Interfaces.Executor.Executor_GetFee with
+                                expectedExecutor = expectedExecutor
                                 destChainSelector = destinationChainSelector
                                 requiredCCVs = requiredCCVs
                                 caller = owner
+                            RawInstanceAddress.assertEqual "sender: executor fee quote executor mismatch"
+                                q.executorInstanceId q.executorOwner expectedExecutor
                             pure (Some q)
 
                 quote <- exercise routerCid CCIP.PerPartyRouter.GetFee with
@@ -304,22 +341,24 @@ template CCIPSender
                             assertMsg "sender: executorInput not allowed when no default executor is configured"
                                 (isNone executorInput)
                             pure smCid
-                        Some _ ->
+                        Some expectedExecutor ->
                             case executorInput of
                                 None -> abort "sender: executorInput required for default executor mode"
                                 Some executorInput ->
                                     exercise executorInput.executorCid
                                         CCIP.Interfaces.Executor.Executor_CalculateFee with
+                                            expectedExecutor = expectedExecutor
                                             sendingMessageCid = smCid
                                             executorArgs = executorArgs
                                             extraContext = executorInput.executorExtraContext
                                             caller = owner
-                    CCIP.Client.Executor_WithAddress _ executorArgs ->
+                    CCIP.Client.Executor_WithAddress expectedExecutor executorArgs ->
                       case executorInput of
                         None -> abort "sender: executorInput required for explicit executor mode"
                         Some executorInput ->
                             exercise executorInput.executorCid
                                 CCIP.Interfaces.Executor.Executor_CalculateFee with
+                                    expectedExecutor = expectedExecutor
                                     sendingMessageCid = smCid
                                     executorArgs = executorArgs
                                     extraContext = executorInput.executorExtraContext
@@ -363,5 +402,6 @@ template CCIPSender
                     context
                     sendingMessageCid = smCid
                     feeTokenHoldingCids = feeTokenInput.senderInputCids
+                    feeTokenConfigCid = feeTokenInput.feeTokenConfigCid
                     feeTokenTransferFactory = feeTokenInput.feeTokenTransferFactory
                     feeTokenExtraArgs = feeTokenInput.feeTokenExtraArgs

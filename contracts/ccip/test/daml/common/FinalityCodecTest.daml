@@ -94,6 +94,34 @@ testRequestedFinalityAllowed = do
     assertMsg "safe requested should not satisfy a block-depth-only config"
         (not (FinalityCodec.requestedFinalityAllowed (requested safe) (requested depth12)))
 
+testValidateRequestedFinalityAlignsWithDecoder : Script ()
+testValidateRequestedFinalityAlignsWithDecoder = do
+    let finalizedOnly = "00000000"            -- flags=0, depth=0
+        safe          = "00010000"            -- flags=1, depth=0
+        depth5        = "00000005"            -- flags=0, depth=5
+
+        flagBit1      = "00020000"            -- flags=2: unknown single-bit flag
+        flagBit2      = "00040000"            -- flags=4: unknown single-bit flag
+        flagBit3      = "00080000"            -- flags=8: unknown single-bit flag
+        safePlusDepth = "0001000c"            -- flags=1 + depth=12: mixed
+
+    -- Patterns the decoder accepts must validate.
+    FinalityCodec.validateRequestedFinality finalizedOnly === True
+    FinalityCodec.validateRequestedFinality safe          === True
+    FinalityCodec.validateRequestedFinality depth5        === True
+
+    -- Patterns the decoder rejects must NOT validate.
+    FinalityCodec.validateRequestedFinality flagBit1      === False
+    FinalityCodec.validateRequestedFinality flagBit2      === False
+    FinalityCodec.validateRequestedFinality flagBit3      === False
+    FinalityCodec.validateRequestedFinality safePlusDepth === False
+
+    -- And the decoder must agree.
+    FinalityCodec.decodeRequestedFinality flagBit1      === None
+    FinalityCodec.decodeRequestedFinality flagBit2      === None
+    FinalityCodec.decodeRequestedFinality flagBit3      === None
+    FinalityCodec.decodeRequestedFinality safePlusDepth === None
+
 testCustomFinalityRateLimiterRequired : Script ()
 testCustomFinalityRateLimiterRequired = do
     let finalizedOnly = "00000000"

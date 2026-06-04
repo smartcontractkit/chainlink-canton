@@ -148,7 +148,9 @@ decodeRequestedFinalityAt encoded offset = do
     1 -> Some (FinalityCodec.WaitForSafe, offset + 1)
     2 -> do
       (depth, newOffset) <- decodeInt64At encoded (offset + 1)
-      Some (FinalityCodec.BlockDepth depth, newOffset)
+      if FinalityCodec.isValidBlockDepth depth
+      then Some (FinalityCodec.BlockDepth depth, newOffset)
+      else None
     _ -> None
 
 -- ===========================================================================

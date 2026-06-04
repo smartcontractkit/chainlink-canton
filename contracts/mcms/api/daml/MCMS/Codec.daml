@@ -63,7 +63,7 @@ module MCMS.Codec
   , decodePartyList
   ) where
 
-import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
+import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount, packHexBytes)
 import qualified DA.Text as Text
 import DA.Optional (fromSome)
 import DA.Foldable ()
@@ -197,7 +197,7 @@ extractBytes bs start len =
 encodeUint8 : Int -> Optional BytesHex
 encodeUint8 n =
   if n < 0 || n > 255 then None
-  else Some (padLeft 2 "0" (intToHex n))
+  else packHexBytes (toHex n) 1
 
 -- | Decode uint8 (1 byte)
 decodeUint8 : BytesHex -> Optional Int
@@ -209,7 +209,7 @@ decodeUint8 hex =
 encodeUint32 : Int -> Optional BytesHex
 encodeUint32 n =
   if n < 0 || n > 4294967295 then None
-  else Some (padLeft 8 "0" (intToHex n))
+  else packHexBytes (toHex n) 4
 
 -- | Decode uint32 (4 bytes)
 decodeUint32 : BytesHex -> Optional Int
@@ -228,7 +228,7 @@ decodeUint32WithOffset encoded offset = do
 encodeUint16 : Int -> Optional BytesHex
 encodeUint16 n =
   if n < 0 || n > 65535 then None
-  else Some (padLeft 4 "0" (intToHex n))
+  else packHexBytes (toHex n) 2
 
 -- | Decode uint16 (2 bytes)
 decodeUint16 : BytesHex -> Optional Int
@@ -243,17 +243,30 @@ decodeUint16At encoded offset = do
   value <- decodeUint16 hex
   return (value, offset + 2)
 
--- | Encode int64 (8 bytes) - rejects negative values to prevent silent sign loss
+-- | Encode int64 (8 bytes) as big-endian two's complement.
+-- Negative values use nibble-flip: encode |n|-1, then flip every hex digit.
+-- This avoids 64-bit overflow and matches Go's binary.Write(BigEndian, int64)
+-- which casts int64→uint64 (bit-preserving) then writes 8 bytes MSB-first:
+-- https://github.com/golang/go/blob/3c4102bfd4dc/src/encoding/binary/binary.go#L561-L562
+-- https://github.com/golang/go/blob/3c4102bfd4dc/src/encoding/binary/binary.go#L207-L218
 encodeInt64 : Int -> Optional BytesHex
-encodeInt64 n =
-  if n < 0 then None
-  else Some (padLeft 16 "0" (intToHex n))
+encodeInt64 n
+  | n >= 0    = Some (toHex n)
+  | otherwise = Some (flipHexString (toHex (negate (n + 1))))
 
--- | Decode int64 (8 bytes)
+-- | Decode int64 (8 bytes) from big-endian two's complement.
+-- High nibble >= 8 indicates a negative value; flip and negate to recover.
+-- Inverse of encodeInt64; matches Go's binary.Read which reads 8 bytes as
+-- uint64 then casts back to int64:
+-- https://github.com/golang/go/blob/3c4102bfd4dc/src/encoding/binary/binary.go#L201-L205
+-- https://github.com/golang/go/blob/3c4102bfd4dc/src/encoding/binary/binary.go#L346-L347
 decodeInt64 : BytesHex -> Optional Int
-decodeInt64 hex =
-  if byteCount hex /= 8 then None
-  else fromHex hex
+decodeInt64 hex
+  | byteCount hex /= 8 = None
+  | Text.take 1 hex >= "8" = do
+      k <- fromHex (flipHexString hex)
+      Some (negate k - 1)
+  | otherwise = fromHex hex
 
 -- | Decode int64 at offset, returns (value, newOffset)
 decodeInt64At : BytesHex -> Int -> Optional (Int, Int)
@@ -344,40 +357,30 @@ decodeOptional encoded offset decoder = do
 -- HELPERS
 -- ===========================================================================
 
--- | Convert int to hex string
-intToHex : Int -> Text
-intToHex 0 = "0"
-intToHex n = intToHexHelper n ""
+-- Two's complement helpers: flip each hex nibble (0↔f, 1↔e, ..., 7↔8)
+-- Used to compute bitwise NOT without exceeding 64-bit Int range.
+-- For negative n: encode |n|-1 then flip all nibbles = two's complement.
+flipHexChar : Text -> Text
+flipHexChar "0" = "f"
+flipHexChar "1" = "e"
+flipHexChar "2" = "d"
+flipHexChar "3" = "c"
+flipHexChar "4" = "b"
+flipHexChar "5" = "a"
+flipHexChar "6" = "9"
+flipHexChar "7" = "8"
+flipHexChar "8" = "7"
+flipHexChar "9" = "6"
+flipHexChar "a" = "5"
+flipHexChar "b" = "4"
+flipHexChar "c" = "3"
+flipHexChar "d" = "2"
+flipHexChar "e" = "1"
+flipHexChar "f" = "0"
+flipHexChar c = c
 
-intToHexHelper : Int -> Text -> Text
-intToHexHelper 0 acc = acc
-intToHexHelper n acc =
-  let
-    remainder = n % 16
-    quotient = n / 16
-    hexChar = case remainder of
-      0 -> "0"; 1 -> "1"; 2 -> "2"; 3 -> "3"
-      4 -> "4"; 5 -> "5"; 6 -> "6"; 7 -> "7"
-      8 -> "8"; 9 -> "9"; 10 -> "a"; 11 -> "b"
-      12 -> "c"; 13 -> "d"; 14 -> "e"; 15 -> "f"
-      _ -> "0"
-  in
-    intToHexHelper quotient (hexChar <> acc)
-
--- | Pad string on the left
-padLeft : Int -> Text -> Text -> Text
-padLeft targetLength padStr str =
-  let
-    currentLength = Text.length str
-    paddingNeeded = targetLength - currentLength
-  in
-    if paddingNeeded <= 0 then str
-    else padHelper paddingNeeded padStr <> str
-
-padHelper : Int -> Text -> Text
-padHelper n padStr =
-  if n <= 0 then ""
-  else padStr <> padHelper (n - 1) padStr
+flipHexString : Text -> Text
+flipHexString t = foldl (<>) "" (map flipHexChar (Text.explode t))
 
 encodeBlockedFunction : BlockedFunction -> BytesHex
 encodeBlockedFunction bf = encodeText bf.targetInstanceAddress <> encodeText bf.functionName
@@ -579,28 +582,8 @@ numeric0ToDecimalString n =
      else str
 
 -- | Parse decimal string to Numeric 0
--- Multiplies accumulated value by 10 and adds each digit
 parseNumeric0 : Text -> Optional (Numeric 0)
-parseNumeric0 text =
-  if Text.length text == 0 then None
-  else parseNumeric0Helper text 0.0
-
-parseNumeric0Helper : Text -> Numeric 0 -> Optional (Numeric 0)
-parseNumeric0Helper text acc =
-  if Text.length text == 0 then Some acc
-  else
-    let firstChar = Text.take 1 text
-        rest = Text.drop 1 text
-        digitOpt = charToDigit firstChar
-    in case digitOpt of
-      None -> None
-      Some digit -> parseNumeric0Helper rest (acc * 10.0 + digit)
-
-charToDigit : Text -> Optional (Numeric 0)
-charToDigit c = case c of
-  "0" -> Some 0.0; "1" -> Some 1.0; "2" -> Some 2.0; "3" -> Some 3.0; "4" -> Some 4.0
-  "5" -> Some 5.0; "6" -> Some 6.0; "7" -> Some 7.0; "8" -> Some 8.0; "9" -> Some 9.0
-  _ -> None
+parseNumeric0 = Text.parseNumeric
 
 -- ===========================================================================
 -- BYTES HEX ENCODING/DECODING
