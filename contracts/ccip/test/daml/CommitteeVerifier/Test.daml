@@ -456,8 +456,62 @@ testCommitteeVerifier = script do
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [PayloadBuilder.pubkeys !! 0, PayloadBuilder.pubkeys !! 0]]
     debug ("===== Passed Test10b =====")
 
-    debug ("===== Test11 =====")
-    -- Test updating storage locations
+    debug ("===== Test11: Malformed keys rejected at config time =====")
+    let shortKey = "04aabbcc"  -- 4 bytes, not 65
+    let wrongPrefixKey = "030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+
+    -- short key rejected at create time
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv11a"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = ["ipfs://example"]
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [shortKey])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+    -- wrong-prefix key (65 bytes, not starting with 04) rejected at create time
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv11b"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = ["ipfs://example"]
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [wrongPrefixKey])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
+    -- malformed key rejected at ApplySignatureConfigs time
+    ccv11c <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv11c"
+            owner = owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = ["ipfs://example"]
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+    submitMustFail owner do
+        exerciseCmd ccv11c CommitteeVerifier.ApplySignatureConfigs with
+            sourceChainSelectorsToRemove = []
+            signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [shortKey]]
+    debug ("===== Passed Test11 =====")
 
     debug ("===== All Tests Passed =====")
 
