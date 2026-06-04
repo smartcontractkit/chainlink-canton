@@ -850,3 +850,34 @@ testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig = script do
             chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 1)]
 
     pure ()
+
+testLockReleaseTokenPool_RejectsInvalidDecimals : Script ()
+testLockReleaseTokenPool_RejectsInvalidDecimals = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+
+    let instanceId = "pool-decimals-test"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "USDC"
+        mkPool decimals = LockReleaseTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    submitMustFail poolOwner do
+        createCmd (mkPool (-1))
+
+    submitMustFail poolOwner do
+        createCmd (mkPool 100)
+
+    _ <- submit poolOwner do
+        createCmd (mkPool 6)
+
+    pure ()

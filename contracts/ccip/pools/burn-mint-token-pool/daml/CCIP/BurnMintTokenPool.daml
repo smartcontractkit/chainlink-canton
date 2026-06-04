@@ -306,6 +306,7 @@ template BurnMintTokenPool
 
         ensure assertValidInstanceId instanceId
             && instrumentId.admin == poolOwner
+            && CCIP.Math.isValidTokenDecimals decimals
             && all
                 (\cfg -> CCIP.FinalityConfig.isValidFinalityConfig cfg.finalityConfig)
                 (Map.values remoteChainConfigs)
