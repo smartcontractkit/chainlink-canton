@@ -626,6 +626,8 @@ template LockReleaseTokenPool
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: executing message tokenAdminRegistry mismatch"
                     (execMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                assertMsg "pool: executing message rmnRemote mismatch"
+                    (execMsg.deps.rmnRemote == deps.rmnRemote)
                 let message = execMsg.message
 
                 tt <- case message.tokenTransfer of
@@ -675,6 +677,8 @@ template LockReleaseTokenPool
                     (sm.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
                     (sm.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                assertMsg "pool: sending message rmnRemote mismatch"
+                    (sm.deps.rmnRemote == deps.rmnRemote)
 
                 poolCCVs <- case Map.lookup sm.destChainSelector remoteChainConfigs of
                         None -> abort "pool: unsupported dest chain"
