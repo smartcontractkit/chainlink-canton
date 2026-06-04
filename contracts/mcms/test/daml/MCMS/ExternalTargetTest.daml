@@ -108,7 +108,7 @@ externalScheduleOp = Op
   , nonce = 0
   , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "ScheduleBatch"
-  , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409496e6372656d656e74000000200000000000000000000000000000000000000000000000000000000000000000000f65787465726e616c2d73616c742d310000000000000000"
+  , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409496e6372656d656e740000002000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000065787465726e616c2d73616c742d310000000000000000"
   }
 
 externalScheduleMetadata : RootMetadata
@@ -121,11 +121,11 @@ externalScheduleMetadata = RootMetadata
   }
 
 externalScheduleRoot : Text
-externalScheduleRoot = "4f91344c80e695656fef97b4c58382b66ce1b984c3bcf7d94efcb0daafa4772c"
+externalScheduleRoot = "a5de111064a236613fc3434e6832f8bc0d0e12a912d412705bc1730cb72b108c"
 
 externalScheduleMetadataProof : [Text]
 externalScheduleMetadataProof =
-  [ "e0a871ad97f2400815079772600b3e09b04d0487822918cf15db61344bc396f4"
+  [ "5ac687c6c469d00fca89f3a6b2909416ddd500456cff668dd94bca2d621a1ccf"
   ]
 
 externalScheduleOpProof : [Text]
@@ -138,18 +138,18 @@ externalScheduleSignatures : [RawSignature]
 externalScheduleSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "12b1795146cdb8c6c2ddd50aff263094a206f589e6667e2f5ea2af34f194d505"
-      , s = "123ddca05b3ad0a94e1bbd48b9f6b801a18e9b5dd0788480af496d2c63cfc0a0"
+      , r = "365ad57001ca8a19812e13f58cf6dbdc48856860c6d4e18727e758d703179751"
+      , s = "24b35648bbb1917913b589a91317e44ebd61287156e815f4fb1de43e5e38358f"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "c8f3b29c9185437668a2cdca62792c7285caaec86e39f3edb8cd6b9beacdd4b8"
-      , s = "4d6fdde4f1d737a933dfe760d59a45d644633a4c7dc61ded9d4c1ecc2306e969"
+      , r = "cf4c3ae13e7d37a905b35519209b24e05cbf4ac8597f7b9f7fd18f6466ba2720"
+      , s = "227a13c64283758057023e7f3ed30a4518b818b4ebba224ceaf3373e8c9fc692"
       }
   ]
 
 externalScheduleSalt : Text
-externalScheduleSalt = "65787465726e616c2d73616c742d31"
+externalScheduleSalt = "000000000000000000000000000000000065787465726e616c2d73616c742d31"
 
 -- ===========================================================================
 -- BYPASSER EXTERNAL CALL TESTS

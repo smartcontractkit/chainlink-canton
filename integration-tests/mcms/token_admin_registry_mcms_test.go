@@ -82,7 +82,7 @@ func TestSetPoolViaMCMS(t *testing.T) {
 		FunctionName:          types.TEXT("SetPool"),
 		OperationData:         types.TEXT(setPoolData),
 	}}
-	salt := uuid.New().String()[:8]
+	salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 
 	// Encode schedule params
 	scheduleParams := mcms.ScheduleBatchParams{
@@ -187,7 +187,7 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 		FunctionName:          types.TEXT("SetPool"),
 		OperationData:         types.TEXT(clearPoolData),
 	}}
-	salt := uuid.New().String()[:8]
+	salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 
 	scheduleParams := mcms.ScheduleBatchParams{
 		Calls:       calls,
@@ -271,7 +271,7 @@ func TestTokenAdminRegistry_ProposeAdminViaMCMS(t *testing.T) {
 		FunctionName:          types.TEXT("ProposeAdministrator"),
 		OperationData:         types.TEXT(proposeData),
 	}}
-	salt := uuid.New().String()[:8]
+	salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 
 	scheduleParams := mcms.ScheduleBatchParams{
 		Calls:       calls,

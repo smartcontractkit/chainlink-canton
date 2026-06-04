@@ -171,8 +171,10 @@ hashMetadataLeafNative meta =
 -- TIMELOCK HASH FUNCTIONS
 -- ===========================================================================
 
--- opId = keccak256(abi.encode(calls, predecessor, salt))
--- Uses length-prefixed encoding to prevent collision attacks
+-- opId = keccak256(calls, predecessor, salt)
+-- Every variable-length field is length-prefixed (not raw-concatenated), so the
+-- encoding is injective and immune to predecessor/salt boundary-shift collisions.
+-- predecessor and salt are additionally enforced to be 32 bytes at the call sites.
 hashTimelockOpId : [TimelockCall] -> BytesHex -> BytesHex -> BytesHex
 hashTimelockOpId calls predecessor salt =
   let
@@ -226,12 +228,13 @@ assertValidHex fieldName hex =
   assertMsg (fieldName <> ": invalid hex (must be even-length, 0-9a-fA-F only): " <> hex)
     (isValidHex hex)
 
--- | Validate that a predecessor is a well-formed 32-byte hash (hex-encoded).
-assertValidPredecessor : BytesHex -> Update ()
-assertValidPredecessor predecessor = do
-  assertValidHex "predecessor" predecessor
-  assertMsg ("mcms: predecessor must be 32 bytes, got " <> show (byteCount predecessor)) $
-    byteCount predecessor == 32
+-- | Validate that a field is a well-formed 32-byte value (hex-encoded).
+-- Used for timelock predecessor and salt
+assertValidBytes32 : Text -> BytesHex -> Update ()
+assertValidBytes32 fieldName hex = do
+  assertValidHex fieldName hex
+  assertMsg ("mcms: " <> fieldName <> " must be 32 bytes, got " <> show (byteCount hex)) $
+    byteCount hex == 32
 
 -- ===========================================================================
 -- MERKLE PROOF VERIFICATION

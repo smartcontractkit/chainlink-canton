@@ -145,7 +145,8 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	// ========================================================================
 
 	destChainSelector := "999"
-	testOffRampHex := "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+	// 64 hex chars → 32 decoded bytes; addressBytesLength must match byteCount(offRampAddress).
+	testOffRampHex := "00000000000000000000000000000000000000000000000000000000deadbeef"
 
 	t.Log("Generating MCMS proposal via ConfigureGlobalConfig changeset...")
 	csOut, err := changesets.ConfigureGlobalConfig{}.Apply(*env, changesets.CantonCSDeps[changesets.ConfigureGlobalConfigConfig]{
@@ -157,7 +158,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 			DestChainUpdates: []common.DestChainConfigArgs{{
 				DestChainSelector:         types.NUMERIC(destChainSelector),
 				IsEnabled:                 true,
-				AddressBytesLength:        20,
+				AddressBytesLength:        32,
 				TokenReceiverAllowed:      true,
 				BaseExecutionGasCost:      21000,
 				OffRampAddress:            types.TEXT(testOffRampHex),
@@ -317,7 +318,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 			case "isEnabled":
 				assert.True(t, f.GetValue().GetBool(), "isEnabled")
 			case "addressBytesLength":
-				assert.Equal(t, int64(20), f.GetValue().GetInt64(), "addressBytesLength")
+				assert.Equal(t, int64(32), f.GetValue().GetInt64(), "addressBytesLength")
 			case "tokenReceiverAllowed":
 				assert.True(t, f.GetValue().GetBool(), "tokenReceiverAllowed")
 			case "baseExecutionGasCost":

@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "mcms-test"
-	PackageID   = "6e5cd0827f2cedceebe6c0e9dce98fa2360af55dac8d089420a92ffb606b0b5a"
+	PackageID   = "874107ad63170d12635237dbddb8b0134b508d42f8d2147b288fe481d3ff65cf"
 	SDKVersion  = "3.4.11"
 )
 
@@ -35,17 +35,17 @@ type Template interface {
 
 const (
 	TimelockTestInstanceAddress = types.TEXT("mcms-daml-test@ccip_owner-9cefe94d")
-	TimelockScheduleRoot        = types.TEXT("a562ea5617f1ad48ba3712119a12ca1c2f7736e1f8f02d6c7c319653a8663cd4")
+	TimelockScheduleRoot        = types.TEXT("5f9210fbbf1a2d964e0d8e3a4bff0fcc130bdbf37bd0ca79d4263f63c39dc5ba")
 	TimelockBypasserRoot        = types.TEXT("03d506aeaffd933a56d3572797fa69aa96db825fa7c1c0bdaefc22cc40c51df7")
 	SelfDispatchTestBaseMcmsId  = types.TEXT("mcms-daml-test")
-	OverrideRoot                = types.TEXT("d618cc847a2ef8f4b445dd8328a05e64576d637d560f4d8caf2b34d34d8ff740")
+	OverrideRoot                = types.TEXT("d8e975a710b09604fe755f601c04c95dbee76ebe2e0f3cb160809574be932a8a")
 	RealTestRoot                = types.TEXT("e5aeef059e7037a3b83c98b67797721c3e93c9ed1c91c2629d2302939177817f")
 	RealTestMcmsId              = types.TEXT("mcms-daml-test")
 	RealTestInstanceId          = types.TEXT("mcms-daml-test@ccip_owner-9cefe94d")
 	RealTestChainId             = types.INT64(1)
 	ExternalTestBaseMcmsId      = types.TEXT("mcms-daml-test")
-	ExternalScheduleSalt        = types.TEXT("65787465726e616c2d73616c742d31")
-	ExternalScheduleRoot        = types.TEXT("4f91344c80e695656fef97b4c58382b66ce1b984c3bcf7d94efcb0daafa4772c")
+	ExternalScheduleSalt        = types.TEXT("000000000000000000000000000000000065787465726e616c2d73616c742d31")
+	ExternalScheduleRoot        = types.TEXT("a5de111064a236613fc3434e6832f8bc0d0e12a912d412705bc1730cb72b108c")
 	ExternalBypasserRoot        = types.TEXT("7d70e8ba5c202e505d587e0e8a84580ed6aee6e1fa2e5bc2de64ca24994cf7e5")
 )
 

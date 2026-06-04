@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "a88aabe4faf9b4b49ee8a6d0b4d8844ffeca4b1d55c57804f9dab411f84054ea"
+	PackageID   = "5d0456cc8ebfd092080606552d33bd2481932adaec23ab96bf8a84da14b7cb7f"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1700,7 +1700,7 @@ func (t *ConsumeReceiveTicketMCMSParams) UnmarshalHex(data string) error {
 
 // Curse is a Record type
 type Curse struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts Curse to a map for DAML arguments
@@ -1840,7 +1840,7 @@ func (t *CurseGlobal) UnmarshalHex(data string) error {
 
 // CurseMultiple is a Record type
 type CurseMultiple struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts CurseMultiple to a map for DAML arguments
@@ -1882,7 +1882,7 @@ func (t *CurseMultiple) UnmarshalHex(data string) error {
 
 // CurseMultipleParams is a Record type
 type CurseMultipleParams struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts CurseMultipleParams to a map for DAML arguments
@@ -1924,7 +1924,7 @@ func (t *CurseMultipleParams) UnmarshalHex(data string) error {
 
 // CurseParams is a Record type
 type CurseParams struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts CurseParams to a map for DAML arguments
@@ -2003,7 +2003,7 @@ type DestChainConfig struct {
 	AddressBytesLength        types.INT64                       `json:"addressBytesLength"`
 	TokenReceiverAllowed      types.BOOL                        `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64                       `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT                        `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                        `json:"offRampAddress" hex:"bytes"`
 	DefaultExecutor           *chainlinkapi.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
@@ -2089,7 +2089,7 @@ type DestChainConfigArgs struct {
 	AddressBytesLength        types.INT64                       `json:"addressBytesLength"`
 	TokenReceiverAllowed      types.BOOL                        `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64                       `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT                        `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                        `json:"offRampAddress" hex:"bytes"`
 	DefaultExecutor           *chainlinkapi.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
@@ -5343,7 +5343,7 @@ type MessageV1 struct {
 	Finality            DecodedFinality  `json:"finality"`
 	CcvAndExecutorHash  types.TEXT       `json:"ccvAndExecutorHash"`
 	OnRampAddress       types.TEXT       `json:"onRampAddress"`
-	OffRampAddress      types.TEXT       `json:"offRampAddress"`
+	OffRampAddress      types.TEXT       `json:"offRampAddress" hex:"bytes"`
 	Sender              types.TEXT       `json:"sender"`
 	Receiver            types.TEXT       `json:"receiver"`
 	DestBlob            types.TEXT       `json:"destBlob"`
@@ -5787,7 +5787,7 @@ type RMNRemote struct {
 	RmnOwner        types.PARTY   `json:"rmnOwner"`
 	CcipOwner       types.PARTY   `json:"ccipOwner"`
 	CustomObservers []types.PARTY `json:"customObservers"`
-	CursedSubjects  []types.TEXT  `json:"cursedSubjects"`
+	CursedSubjects  []types.TEXT  `json:"cursedSubjects" hex:"[]bytes"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -6977,7 +6977,7 @@ type SendingMessageV1 struct {
 	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
 	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
 	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
-	OffRampAddress            types.TEXT                                `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                                `json:"offRampAddress" hex:"bytes"`
 	TokenReceiver             types.TEXT                                `json:"tokenReceiver"`
 	TokenArgs                 types.TEXT                                `json:"tokenArgs"`
 	FeeToken                  splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
@@ -8298,7 +8298,7 @@ func (t *SetTransferFactoryParams) UnmarshalHex(data string) error {
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
 	IsEnabled        types.BOOL                        `json:"isEnabled"`
-	OnRampAddresses  []types.TEXT                      `json:"onRampAddresses"`
+	OnRampAddresses  []types.TEXT                      `json:"onRampAddresses" hex:"[]bytes"`
 	DefaultCCVs      []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
 	LaneMandatedCCVs []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
@@ -8362,7 +8362,7 @@ func (t *SourceChainConfig) UnmarshalHex(data string) error {
 type SourceChainConfigArgs struct {
 	SourceChainSelector types.NUMERIC                     `json:"sourceChainSelector"`
 	IsEnabled           types.BOOL                        `json:"isEnabled"`
-	OnRampAddresses     []types.TEXT                      `json:"onRampAddresses"`
+	OnRampAddresses     []types.TEXT                      `json:"onRampAddresses" hex:"[]bytes"`
 	DefaultCCVs         []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
 	LaneMandatedCCVs    []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
@@ -10121,7 +10121,7 @@ func (t *TransferAdminRoleMCMSParams) UnmarshalHex(data string) error {
 
 // Uncurse is a Record type
 type Uncurse struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts Uncurse to a map for DAML arguments
@@ -10261,7 +10261,7 @@ func (t *UncurseGlobal) UnmarshalHex(data string) error {
 
 // UncurseMultiple is a Record type
 type UncurseMultiple struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts UncurseMultiple to a map for DAML arguments
@@ -10303,7 +10303,7 @@ func (t *UncurseMultiple) UnmarshalHex(data string) error {
 
 // UncurseMultipleParams is a Record type
 type UncurseMultipleParams struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts UncurseMultipleParams to a map for DAML arguments
@@ -10345,7 +10345,7 @@ func (t *UncurseMultipleParams) UnmarshalHex(data string) error {
 
 // UncurseParams is a Record type
 type UncurseParams struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts UncurseParams to a map for DAML arguments

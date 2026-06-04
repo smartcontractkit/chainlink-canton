@@ -363,8 +363,8 @@ template MCMS
       controller submitter
       do
         -- 0. Validate BytesHex inputs
-        assertValidPredecessor predecessor
-        assertValidHex "salt" salt
+        assertValidBytes32 "predecessor" predecessor
+        assertValidBytes32 "salt" salt
         forA_ calls $ \call -> assertValidHex "call.operationData" call.operationData
 
         now <- getTime
@@ -696,7 +696,8 @@ executeSelfDispatch mcms call =
           forA_ params.calls $ \c ->
             assertMsg ("mcms: function blocked: " <> c.targetInstanceAddress <> ":" <> c.functionName) $
               BlockedFunction c.targetInstanceAddress c.functionName `notElem` mcms.blockedFunctions
-          assertValidPredecessor params.predecessor
+          assertValidBytes32 "predecessor" params.predecessor
+          assertValidBytes32 "salt" params.salt
           let opId = hashTimelockOpId params.calls params.predecessor params.salt
           assertMsg "mcms: operation already scheduled" $
             not $ Map.member opId mcms.timelockTimestamps
@@ -758,8 +759,9 @@ scheduleBatchInternal now mcms rs calls predecessor salt delay = do
     assertMsg ("mcms: function blocked: " <> call.targetInstanceAddress <> ":" <> call.functionName) $
       BlockedFunction call.targetInstanceAddress call.functionName `notElem` mcms.blockedFunctions
 
-  -- 3. Validate predecessor is a 32-byte hash, then compute opId
-  assertValidPredecessor predecessor
+  -- 3. Validate predecessor and salt are 32-byte values, then compute opId
+  assertValidBytes32 "predecessor" predecessor
+  assertValidBytes32 "salt" salt
   let opId = hashTimelockOpId calls predecessor salt
 
   -- 4. Check not already scheduled (on-chain duplicate prevention)

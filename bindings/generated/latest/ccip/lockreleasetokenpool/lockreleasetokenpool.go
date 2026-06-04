@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-lock-release-token-pool"
-	PackageID   = "cfed55bbb7ee538f7a0020d189dd16ea7857bd11a6fe670820dd24244f7cd3e9"
+	PackageID   = "fc4e5c4781a1da237ea5495d46f0e45264457c4868dca763414f11c2c488a3e6"
 	SDKVersion  = "3.4.11"
 )
 
@@ -505,8 +505,8 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 // ChainUpdate is a Record type
 type ChainUpdate struct {
 	RemoteChainSelector                        types.NUMERIC                     `json:"remoteChainSelector"`
-	RemotePools                                []types.TEXT                      `json:"remotePools"`
-	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress"`
+	RemotePools                                []types.TEXT                      `json:"remotePools" hex:"[]bytes"`
+	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress" hex:"bytes"`
 	InboundCCVs                                []chainlinkapi.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []chainlinkapi.RawInstanceAddress `json:"outboundCCVs"`
 	FinalityConfig                             core.FinalityConfig               `json:"finalityConfig"`
@@ -1724,8 +1724,8 @@ func (t *ReleaseFromTicketMCMSParams) UnmarshalHex(data string) error {
 
 // RemoteChainConfig is a Record type
 type RemoteChainConfig struct {
-	RemotePools                                []types.TEXT                      `json:"remotePools"`
-	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress"`
+	RemotePools                                []types.TEXT                      `json:"remotePools" hex:"[]bytes"`
+	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress" hex:"bytes"`
 	InboundCCVs                                []chainlinkapi.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []chainlinkapi.RawInstanceAddress `json:"outboundCCVs"`
 	FinalityConfig                             core.FinalityConfig               `json:"finalityConfig"`

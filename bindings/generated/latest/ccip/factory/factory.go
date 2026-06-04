@@ -34,7 +34,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "aa1893241f98629bb5c7982bfee164521bcd6d16348b4d78f6120b05c297ee7f"
+	PackageID   = "1cfaa997387b7aaedfab959778efad8c3794d5823c3dd0757f3a12114f2fbac1"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1500,7 +1500,7 @@ type DeployRMNRemoteParams struct {
 	RmnOwner        types.PARTY   `json:"rmnOwner"`
 	CcipOwner       types.PARTY   `json:"ccipOwner"`
 	CustomObservers []types.PARTY `json:"customObservers"`
-	CursedSubjects  []types.TEXT  `json:"cursedSubjects"`
+	CursedSubjects  []types.TEXT  `json:"cursedSubjects" hex:"[]bytes"`
 }
 
 // ToMap converts DeployRMNRemoteParams to a map for DAML arguments

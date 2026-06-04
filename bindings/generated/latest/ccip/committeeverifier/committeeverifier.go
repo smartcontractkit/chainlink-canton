@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "1577545b29a0af2734cdf23bfbb6ba54b72db83b99820dd958bbff7719f9f8d0"
+	PackageID   = "209ea7fac96084c880bfef6656b15a10d62f40d9872f6346cbacec85f52a74f0"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1570,7 +1570,7 @@ func (t *SetDynamicConfigParams) UnmarshalHex(data string) error {
 type SignatureConfig struct {
 	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
 	Threshold           types.INT64   `json:"threshold"`
-	SignerKeys          []types.TEXT  `json:"signerKeys"`
+	SignerKeys          []types.TEXT  `json:"signerKeys" hex:"[]bytes"`
 }
 
 // ToMap converts SignatureConfig to a map for DAML arguments

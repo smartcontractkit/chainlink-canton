@@ -53,7 +53,7 @@ func TestMCMS_Timelock(t *testing.T) {
 			FunctionName:          types.TEXT("Increment"),
 			OperationData:         types.TEXT(""),
 		}}
-		salt := uuid.New().String()[:8]
+		salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 		delaySecs := 0
 
 		// Encode schedule params using encoder pattern (gets choice name + operation data)
@@ -107,7 +107,7 @@ func TestMCMS_Timelock(t *testing.T) {
 			FunctionName:          types.TEXT("Increment"),
 			OperationData:         types.TEXT(""),
 		}}
-		salt := uuid.New().String()[:8]
+		salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 
 		// Encode schedule params using encoder pattern
@@ -171,7 +171,7 @@ func TestMCMS_Timelock(t *testing.T) {
 			FunctionName:          types.TEXT("dangerous_function"),
 			OperationData:         types.TEXT(""),
 		}}
-		salt := uuid.New().String()[:8]
+		salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 		delaySecs := 1
 
 		// Encode schedule params using encoder pattern
@@ -955,7 +955,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 			FunctionName:          types.TEXT("UpdateMinDelay"),
 			OperationData:         types.TEXT(EncodeMinDelay(1)), // 1 second
 		}}
-		salt := uuid.New().String()[:8]
+		salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 		delaySecs := 1
 
 		// Encode schedule params using encoder pattern
@@ -1008,7 +1008,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 			FunctionName:          types.TEXT("BlockFunction"),
 			OperationData:         types.TEXT(MustEncodeBlockedFunction(t, bf)),
 		}}
-		salt := uuid.New().String()[:8]
+		salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 		delaySecs := 1
 
 		// Encode schedule params using encoder pattern
@@ -1095,7 +1095,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 			{TargetInstanceAddress: types.TEXT(mcmsInstanceAddr), FunctionName: types.TEXT("UpdateMinDelay"), OperationData: types.TEXT(EncodeMinDelay(1))},
 			{TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr), FunctionName: types.TEXT("Increment"), OperationData: types.TEXT("")},
 		}
-		salt := uuid.New().String()[:8]
+		salt := PadLeft32(uuid.New().String()[:8]) // 32-byte salt
 		delaySecs := 0
 
 		// Encode schedule params using encoder pattern
