@@ -1,7 +1,8 @@
 module MCMS.FlowTest where
 
 import DA.Map qualified as Map
-import DA.List ((!!))
+import DA.List (head)
+import DA.Optional (isNone)
 import DA.Time (seconds)
 import DA.Date (datetime, Month(..))
 import Daml.Script
@@ -452,7 +453,7 @@ testCodecRoundtrip = script do
       assertMsg "Signers should match" $ decoded.signers == testSigners
       assertMsg "GroupQuorums should match" $ decoded.groupQuorums == testQuorums
       assertMsg "GroupParents should match" $ decoded.groupParents == testParents
-      assertMsg "ClearRoot should match" $ decoded.clearRoot == True
+      assertMsg "ClearRoot should match" $ decoded.clearRoot
 
   debug "Codec roundtrip test PASSED!"
   pure ()
@@ -502,7 +503,7 @@ testExecuteMcmsOp = script do
   case decodeSetConfigParams encodedParams of
     None -> abort "Failed to decode MCMS params"
     Some decoded -> do
-      assertMsg "Decoded quorum should be 1" $ (decoded.groupQuorums !! 0) == 1
+      assertMsg "Decoded quorum should be 1" $ (head decoded.groupQuorums) == 1
 
   debug "MCMS op encoding test PASSED!"
   debug "Full ExecuteMcmsOp flow is tested in Go integration tests"
@@ -621,7 +622,7 @@ testTimelockViewFunctions = script do
       submitter = ccipOwner
       opId = "nonexistent"
 
-  assertMsg "Timestamp should be None for nonexistent op" $ ts == None
+  assertMsg "Timestamp should be None for nonexistent op" $ isNone ts
 
   debug "Timelock view functions test PASSED!"
   pure ()
@@ -657,7 +658,7 @@ testSelfDispatchSetConfigCodec = script do
       assertMsg "Role should be Proposer" $ role == Proposer
       assertMsg "Signers mismatch" $ decoded.signers == params.signers
       assertMsg "Quorums mismatch" $ decoded.groupQuorums == params.groupQuorums
-      assertMsg "ClearRoot mismatch" $ decoded.clearRoot == True
+      assertMsg "ClearRoot mismatch" $ decoded.clearRoot
   let encodedBypasser = encodeSelfDispatchSetConfig Bypasser params
   case decodeSelfDispatchSetConfig encodedBypasser of
     None -> abort "Failed to decode bypasser set_config"
@@ -685,7 +686,7 @@ testBlockedFunctionOnMCMS = script do
   blocked <- submit ccipOwner do
     exerciseCmd mcmsCid GetBlockedFunctions with submitter = ccipOwner
   assertMsg "Should have 2 blocked functions" $ length blocked == 2
-  assertMsg "First blocked function mismatch" $ (blocked !! 0) == bf1
+  assertMsg "First blocked function mismatch" $ (head blocked) == bf1
   cnt <- submit ccipOwner do
     exerciseCmd mcmsCid GetBlockedFunctionsCount with submitter = ccipOwner
   assertMsg "Count should be 2" $ cnt == 2

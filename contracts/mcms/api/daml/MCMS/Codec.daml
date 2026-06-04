@@ -304,10 +304,10 @@ encodeBool b = if b then "01" else "00"
 
 -- | Decode bool (1 byte)
 decodeBool : BytesHex -> Optional Bool
-decodeBool hex =
-  if hex == "01" then Some True
-  else if hex == "00" then Some False
-  else None
+decodeBool hex
+  | hex == "01" = Some True
+  | hex == "00" = Some False
+  | otherwise = None
 
 -- | Decode bool at offset, returns (value, newOffset)
 decodeBoolAt : BytesHex -> Int -> Optional (Bool, Int)
