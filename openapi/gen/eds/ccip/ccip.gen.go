@@ -75,6 +75,9 @@ type CCIPSendResponse struct {
 
 	// Executor An address which can be either a RawInstanceAddress or an InstanceAddress.
 	Executor *externalRef0.RawOrHashedAddress `json:"executor,omitempty"`
+
+	// FeeTokenConfigCid TokenConfig contract ID for the message fee token.
+	FeeTokenConfigCid string `json:"feeTokenConfigCid"`
 }
 
 // LookupTokenPoolResponse defines model for LookupTokenPoolResponse.

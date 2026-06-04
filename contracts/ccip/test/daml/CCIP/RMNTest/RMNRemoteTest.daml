@@ -100,3 +100,66 @@ testRMNRemote_UncurseMultipleRejectsAllNotCursed = script do
       subjects = ["01000000000000000000000000000001"]
 
   pure ()
+
+-- | Chain selector whose uint128-style encoding aliases the global curse subject (EVM parity).
+-- With uint64 on-ledger encoding, these exercises still must fail (invalid range or reserved subject).
+chainSelectorAliasingGlobalSubject : Numeric 0
+chainSelectorAliasingGlobalSubject = 1329227995784915872903807060280344577.0
+
+testRMNRemote_CurseChainRejectsReservedSubjectMapping : Script ()
+testRMNRemote_CurseChainRejectsReservedSubjectMapping = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-curse-reserved-mapping-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid CurseChain with
+      chainSelector = chainSelectorAliasingGlobalSubject
+
+  pure ()
+
+testRMNRemote_UncurseChainRejectsReservedSubjectMapping : Script ()
+testRMNRemote_UncurseChainRejectsReservedSubjectMapping = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-uncurse-reserved-mapping-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = [globalCurseSubject]
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid UncurseChain with
+      chainSelector = chainSelectorAliasingGlobalSubject
+
+  pure ()
+
+testRMNRemote_IsCursedForChainRejectsReservedSubjectMapping : Script ()
+testRMNRemote_IsCursedForChainRejectsReservedSubjectMapping = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-iscursed-reserved-mapping-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid IsCursedForChain with
+      caller = rmnOwner
+      chainSelector = chainSelectorAliasingGlobalSubject
+
+  pure ()

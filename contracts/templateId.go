@@ -73,6 +73,10 @@ func (t TemplateID) ToLedgerIdentifier() *apiv2.Identifier {
 	}
 }
 
+func IdentifierFromBinding(template templateBinding) *apiv2.Identifier {
+	return TemplateIDFromBinding(template).ToLedgerIdentifier()
+}
+
 func (t TemplateID) String() string {
 	return fmt.Sprintf("%s:%s:%s", t.PackageID, t.ModuleName, t.EntityName)
 }

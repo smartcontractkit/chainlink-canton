@@ -11,6 +11,10 @@ import CCIP.TokenAdminRegistryCodecGen (
     decodePoolRegistrationAt,
     encodeSetPoolParams,
     decodeSetPoolParamsAt,
+    encodeSetTransferFactoryParams,
+    decodeSetTransferFactoryParamsAt,
+    encodeSetBurnMintFactoryParams,
+    decodeSetBurnMintFactoryParamsAt,
     encodeProposeAdminParams,
     decodeProposeAdminParamsAt,
     encodeTransferAdminParams,
@@ -21,11 +25,14 @@ import CCIP.TokenAdminRegistryCodecGen (
 import CCIP.TokenAdminRegistryTypes (
     PoolRegistration(..),
     SetPoolParams(..),
+    SetTransferFactoryParams(..),
+    SetBurnMintFactoryParams(..),
     ProposeAdminParams(..),
     TransferAdminParams(..),
     AcceptAdminParams(..),
     )
 import MCMS.Codec (encodeText, decodeTextAt)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 -- ===========================================================================
 -- TEXT ENCODING/DECODING TESTS
@@ -137,6 +144,84 @@ testSetPoolParamsNoPool = do
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
       decoded.tokenPool === None
+
+  pure ()
+
+-- ===========================================================================
+-- FACTORY PARAMS TESTS
+-- ===========================================================================
+
+testSetTransferFactoryParamsWithAddress : Script ()
+testSetTransferFactoryParamsWithAddress = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      factoryAddress = RawInstanceAddress.make "link-transfer-factory" tokenAdmin
+      params = SetTransferFactoryParams with
+        instrumentId
+        transferFactoryAddress = Some factoryAddress
+      encoded = encodeSetTransferFactoryParams params
+
+  case decodeSetTransferFactoryParamsAt encoded 0 of
+    None -> abort "Failed to decode set_transfer_factory params with address"
+    Some (decoded, _) -> do
+      decoded.instrumentId === instrumentId
+      decoded.transferFactoryAddress === Some factoryAddress
+
+  pure ()
+
+testSetTransferFactoryParamsNoAddress : Script ()
+testSetTransferFactoryParamsNoAddress = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      params = SetTransferFactoryParams with
+        instrumentId
+        transferFactoryAddress = None
+      encoded = encodeSetTransferFactoryParams params
+
+  case decodeSetTransferFactoryParamsAt encoded 0 of
+    None -> abort "Failed to decode set_transfer_factory params without address"
+    Some (decoded, _) -> do
+      decoded.instrumentId === instrumentId
+      decoded.transferFactoryAddress === None
+
+  pure ()
+
+testSetBurnMintFactoryParamsWithAddress : Script ()
+testSetBurnMintFactoryParamsWithAddress = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      factoryAddress = RawInstanceAddress.make "link-burn-mint-factory" tokenAdmin
+      params = SetBurnMintFactoryParams with
+        instrumentId
+        burnMintFactoryAddress = Some factoryAddress
+      encoded = encodeSetBurnMintFactoryParams params
+
+  case decodeSetBurnMintFactoryParamsAt encoded 0 of
+    None -> abort "Failed to decode set_burn_mint_factory params with address"
+    Some (decoded, _) -> do
+      decoded.instrumentId === instrumentId
+      decoded.burnMintFactoryAddress === Some factoryAddress
+
+  pure ()
+
+testSetBurnMintFactoryParamsNoAddress : Script ()
+testSetBurnMintFactoryParamsNoAddress = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      params = SetBurnMintFactoryParams with
+        instrumentId
+        burnMintFactoryAddress = None
+      encoded = encodeSetBurnMintFactoryParams params
+
+  case decodeSetBurnMintFactoryParamsAt encoded 0 of
+    None -> abort "Failed to decode set_burn_mint_factory params without address"
+    Some (decoded, _) -> do
+      decoded.instrumentId === instrumentId
+      decoded.burnMintFactoryAddress === None
 
   pure ()
 

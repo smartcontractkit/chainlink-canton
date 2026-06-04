@@ -6,20 +6,26 @@ import DA.Map qualified as Map
 import DA.Optional (fromSomeNote, isSome)
 
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.BurnMintV1
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Context
 import CCIP.TokenAdminRegistryCodecGen (
     decodeAcceptAdminParamsAt,
     decodeProposeAdminParamsAt,
+    decodeSetBurnMintFactoryParamsAt,
     decodeSetPoolParamsAt,
+    decodeSetTransferFactoryParamsAt,
     decodeTransferAdminParamsAt,
     )
 import CCIP.TokenAdminRegistryTypes (
     AcceptAdminParams(..),
     PoolRegistration(..),
     ProposeAdminParams(..),
+    SetBurnMintFactoryParams(..),
     SetPoolParams(..),
+    SetTransferFactoryParams(..),
     TransferAdminParams(..),
     )
 
@@ -130,6 +136,59 @@ assertRegisteredPoolCaller label caller poolInstanceId pool =
     assertMsg (label <> ": caller is not registered pool")
         (caller == pool.poolOwner && poolInstanceId == pool.poolInstanceId)
 
+assertConfiguredTransferFactory
+    : Text
+    -> TokenConfig
+    -> ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+    -> Update ()
+assertConfiguredTransferFactory label config suppliedFactory =
+    case config.transferFactory of
+        None -> pure ()
+        Some expectedFactory ->
+            assertMsg (label <> ": transfer factory mismatch")
+                (suppliedFactory == expectedFactory)
+
+assertConfiguredBurnMintFactory
+    : Text
+    -> TokenConfig
+    -> ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory
+    -> Update ()
+assertConfiguredBurnMintFactory label config suppliedFactory =
+    case config.burnMintFactory of
+        None -> pure ()
+        Some expectedFactory ->
+            assertMsg (label <> ": burn/mint factory mismatch")
+                (suppliedFactory == expectedFactory)
+
+lookupContractIdFromMap : Text -> Map.Map Text (ContractId ()) -> RawInstanceAddress -> Update (ContractId ())
+lookupContractIdFromMap label contractIds address =
+    let addressText = RawInstanceAddress.toText address
+    in case Map.lookup addressText contractIds of
+        None -> abort (label <> ": contract id not in map: " <> addressText)
+        Some cid -> pure cid
+
+resolveTransferFactoryFromMap
+    : Map.Map Text (ContractId ())
+    -> Optional RawInstanceAddress
+    -> Update (Optional (ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory))
+resolveTransferFactoryFromMap contractIds transferFactoryAddress =
+    case transferFactoryAddress of
+        None -> pure None
+        Some address -> do
+            cid <- lookupContractIdFromMap "SetTransferFactory" contractIds address
+            pure (Some (coerceContractId cid))
+
+resolveBurnMintFactoryFromMap
+    : Map.Map Text (ContractId ())
+    -> Optional RawInstanceAddress
+    -> Update (Optional (ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory))
+resolveBurnMintFactoryFromMap contractIds burnMintFactoryAddress =
+    case burnMintFactoryAddress of
+        None -> pure None
+        Some address -> do
+            cid <- lookupContractIdFromMap "SetBurnMintFactory" contractIds address
+            pure (Some (coerceContractId cid))
+
 data ProposeAdministratorResult = ProposeAdministratorResult
     with
         tokenAdminRegistryCid : ContractId TokenAdminRegistry
@@ -149,6 +208,8 @@ template TokenConfig
         admin : Optional Party
         pendingAdmin : Optional Party
         tokenPool : Optional PoolRegistration
+        transferFactory : Optional (ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory)
+        burnMintFactory : Optional (ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory)
     where
         signatory registryOwner
         observer tokenConfigObservers registryOwner isCCIPManaged instrumentId admin pendingAdmin tokenPool
@@ -203,6 +264,62 @@ template TokenAdminRegistry
                 assertMsg "SetPool: caller is not the admin" (admin == caller)
                 archive tokenConfigCid
                 create config with tokenPool
+
+        nonconsuming choice SetTransferFactory : ContractId TokenConfig
+            with
+                tokenConfigCid : ContractId TokenConfig
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                transferFactory : Optional (ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory)
+                caller : Party
+            controller caller
+            do
+                config <- fetch tokenConfigCid
+                assertTokenConfigForInstrument instanceId owner entryCount instrumentId config
+                admin <- case config.admin of
+                    None -> abort "SetTransferFactory: no admin set for instrument"
+                    Some admin -> pure admin
+                assertMsg "SetTransferFactory: caller is not the admin" (admin == caller)
+
+                case transferFactory of
+                    None -> pure ()
+                    Some factoryCid -> do
+                        factoryView <- exercise factoryCid
+                            Splice.Api.Token.TransferInstructionV1.TransferFactory_PublicFetch with
+                                expectedAdmin = instrumentId.admin
+                                actor = caller
+                        assertMsg "SetTransferFactory: factory admin mismatch"
+                            (factoryView.admin == instrumentId.admin)
+
+                archive tokenConfigCid
+                create config with transferFactory
+
+        nonconsuming choice SetBurnMintFactory : ContractId TokenConfig
+            with
+                tokenConfigCid : ContractId TokenConfig
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                burnMintFactory : Optional (ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory)
+                caller : Party
+            controller caller
+            do
+                config <- fetch tokenConfigCid
+                assertTokenConfigForInstrument instanceId owner entryCount instrumentId config
+                admin <- case config.admin of
+                    None -> abort "SetBurnMintFactory: no admin set for instrument"
+                    Some admin -> pure admin
+                assertMsg "SetBurnMintFactory: caller is not the admin" (admin == caller)
+
+                case burnMintFactory of
+                    None -> pure ()
+                    Some factoryCid -> do
+                        factoryView <- exercise factoryCid
+                            Splice.Api.Token.BurnMintV1.BurnMintFactory_PublicFetch with
+                                expectedAdmin = instrumentId.admin
+                                actor = caller
+                        assertMsg "SetBurnMintFactory: factory admin mismatch"
+                            (factoryView.admin == instrumentId.admin)
+
+                archive tokenConfigCid
+                create config with burnMintFactory
 
         nonconsuming choice AcceptAdminRole : ContractId TokenConfig
             with
@@ -304,6 +421,8 @@ template TokenAdminRegistry
                             admin = None
                             pendingAdmin = Some newAdmin
                             tokenPool = None
+                            transferFactory = None
+                            burnMintFactory = None
                         pure ProposeAdministratorResult with
                             tokenAdminRegistryCid = newTarCid
                             tokenConfigCid = configCid
@@ -319,14 +438,15 @@ template TokenAdminRegistry
                 tokenConfigCid : ContractId TokenConfig
                 ticketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                poolInstanceId : Text
                 caller : Party
             controller caller
             do
                 config <- fetch tokenConfigCid
                 assertTokenConfigForInstrument instanceId owner entryCount instrumentId config
                 pool <- registeredPoolOrAbort "ConsumeReceiveTicket" config
-                assertMsg "ConsumeReceiveTicket: caller is not the registered pool owner"
-                    (pool.poolOwner == caller)
+                assertRegisteredPoolCaller "ConsumeReceiveTicket" caller poolInstanceId pool
+                let poolAddress = RawInstanceAddress.make pool.poolInstanceId pool.poolOwner
                 ticket <- fetch ticketCid
                 assertMsg "ConsumeReceiveTicket: instanceId mismatch"
                     (ticket.tokenAdminRegistryInstanceId == instanceId)
@@ -334,9 +454,11 @@ template TokenAdminRegistry
                     (ticket.ccipOwner == owner)
                 assertMsg "ConsumeReceiveTicket: ticket pool owner must match registered pool owner"
                     (ticket.poolOwner == pool.poolOwner)
+                assertMsg "ConsumeReceiveTicket: ticket pool address must match registered pool"
+                    (ticket.poolAddress == poolAddress)
                 assertMsg "ConsumeReceiveTicket: ticket instrument must match requested instrument"
                     (ticket.instrumentId == instrumentId)
-                exercise ticketCid CCIP.Tickets.ConsumeByCCIPOwner
+                exercise ticketCid CCIP.Tickets.Consume
 
         -- | Record pool's outbound CCV requirements on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,
@@ -467,6 +589,8 @@ template TokenAdminRegistry
                 pool <- registeredPoolOrAbort "SetInboundPoolCCVs" config
                 assertRegisteredPoolCaller "SetInboundPoolCCVs" caller poolInstanceId pool
                 exercise executingMessageCid CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
+                    poolInstanceId = pool.poolInstanceId
+                    poolOwner = pool.poolOwner
                     poolCCVs
 
         -- | Resolve token-side finalization data for an inbound token transfer and
@@ -496,10 +620,16 @@ template TokenAdminRegistry
                 config <- fetch tokenConfigCid
                 assertTokenConfigForTokenAddress instanceId owner entryCount tt.destTokenAddress config
                 pool <- registeredPoolOrAbort "TAR finalize" config
+                let poolAddress = RawInstanceAddress.make pool.poolInstanceId pool.poolOwner
+                poolVerification <- case execMsg.inboundPoolVerification of
+                    None -> abort "TAR finalize: missing inbound pool verification"
+                    Some verification -> pure verification
+                assertMsg "TAR finalize: registered pool changed since inbound verification"
+                    (RawInstanceAddress.make poolVerification.poolInstanceId poolVerification.poolOwner == poolAddress)
 
                 exercise executingMessageCid CCIP.ExecutingMessageV1.FinalizeExecute with
                     tokenAdminRegistryInstanceId = instanceId
-                    maybePoolOwner = Some pool.poolOwner
+                    maybePoolAddress = Some poolAddress
                     maybeTicketReceiver = Some ticketReceiver
                     maybeTokenReceiver = Some resolvedTokenReceiver
                     maybeInstrumentId = Some config.instrumentId
@@ -535,6 +665,42 @@ template TokenAdminRegistry
                       tokenConfigCid
                       instrumentId
                       tokenPool
+                      caller = owner
+                    pure (Map.insert configAddr (coerceContractId newConfigCid) contractIds)
+
+              "SetTransferFactory" -> do
+                case decodeSetTransferFactoryParamsAt operationData 0 of
+                  None -> abort "E_INVALID_PARAMS: SetTransferFactory"
+                  Some (SetTransferFactoryParams{..}, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetTransferFactory" $
+                      finalOffset == byteCount operationData
+                    let configAddr = tokenConfigInstAddr instrumentId
+                    tokenConfigCid <- case Map.lookup configAddr contractIds of
+                      None -> abort $ "E_TOKEN_CONFIG_CID_NOT_IN_MAP: " <> configAddr
+                      Some cid -> pure (coerceContractId cid : ContractId TokenConfig)
+                    transferFactory <- resolveTransferFactoryFromMap contractIds transferFactoryAddress
+                    newConfigCid <- exercise selfTarCid SetTransferFactory with
+                      tokenConfigCid
+                      instrumentId
+                      transferFactory
+                      caller = owner
+                    pure (Map.insert configAddr (coerceContractId newConfigCid) contractIds)
+
+              "SetBurnMintFactory" -> do
+                case decodeSetBurnMintFactoryParamsAt operationData 0 of
+                  None -> abort "E_INVALID_PARAMS: SetBurnMintFactory"
+                  Some (SetBurnMintFactoryParams{..}, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetBurnMintFactory" $
+                      finalOffset == byteCount operationData
+                    let configAddr = tokenConfigInstAddr instrumentId
+                    tokenConfigCid <- case Map.lookup configAddr contractIds of
+                      None -> abort $ "E_TOKEN_CONFIG_CID_NOT_IN_MAP: " <> configAddr
+                      Some cid -> pure (coerceContractId cid : ContractId TokenConfig)
+                    burnMintFactory <- resolveBurnMintFactoryFromMap contractIds burnMintFactoryAddress
+                    newConfigCid <- exercise selfTarCid SetBurnMintFactory with
+                      tokenConfigCid
+                      instrumentId
+                      burnMintFactory
                       caller = owner
                     pure (Map.insert configAddr (coerceContractId newConfigCid) contractIds)
 
