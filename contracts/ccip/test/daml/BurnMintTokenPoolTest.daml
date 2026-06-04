@@ -345,7 +345,7 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   senderChangeHolding.holdingAmount === 3.0
   poolFeeHolding.holdingAmount === 0.35
 
-  let tokenSendData = (fromSomeNote "expected token send data" (DA.Internal.Record.getField @"tokenSendData" updatedSendingMessage))
+  let tokenSendData = fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData
   tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 66500000000.0)
   tokenSendData.instrumentId === instrumentId
   rateLimiters <- query @RateLimiter.RateLimiter poolOwner
