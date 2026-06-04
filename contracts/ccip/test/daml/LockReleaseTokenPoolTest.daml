@@ -2854,7 +2854,7 @@ testVerifyInboundMessage = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
@@ -2975,7 +2975,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig-safe" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn-safe" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-verify-safe" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
