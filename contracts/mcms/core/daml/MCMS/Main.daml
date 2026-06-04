@@ -14,13 +14,13 @@
 module MCMS.Main where
 
 import DA.Map qualified as Map
-import DA.List ((!!), dedup)
+import DA.List ((!!), dedup, head)
 import DA.Action (unless)
 import DA.Foldable (forA_)
 import DA.Text qualified as Text
 import DA.Time (RelTime, seconds, addRelTime, time)
 import DA.Date (date, Month(..))
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount)
 import MCMS.Types
   ( Role(..)
   , roleToText
@@ -53,7 +53,6 @@ import MCMS.Codec
   , extractBytes
   , decodeUint8
   )
-import DA.Crypto.Text (byteCount)
 
 -- | Validate MultisigConfig structure
 -- Shared validation for SetConfig choice and executeSelfDispatch handler
@@ -72,7 +71,7 @@ validateMultisigConfig config = do
     assertMsg ("mcms: groupQuorum[" <> show idx <> "] must be non-negative, got " <> show quorum) $
       quorum >= 0
   assertMsg "mcms: root group must be its own parent" $
-    (config.groupParents !! 0) == 0
+    (head config.groupParents) == 0
   -- Validate signerGroup bounds [0, 31] for all signers
   forA_ config.signers $ \signer ->
     assertMsg ("mcms: signerGroup out of bounds [0,31]: " <> show signer.signerGroup) $

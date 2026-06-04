@@ -16,12 +16,6 @@ import CCIP.FeeQuoterCodecGen (
     encodeRemoveFeeTokensParams,
     encodeApplyFeeQuoterDestChainConfigUpdatesParams,
     )
-import CCIP.FeeQuoterTypes (
-    FeeQuoterDestChainConfig(..),
-    FeeQuoterDestChainConfigArgs(..),
-    RemoveFeeTokensParams(..),
-    ApplyFeeQuoterDestChainConfigUpdatesParams(..),
-    )
 
 usd : Decimal -> Numeric 0
 usd d = intToNumeric (truncate (d * 100000000.0))

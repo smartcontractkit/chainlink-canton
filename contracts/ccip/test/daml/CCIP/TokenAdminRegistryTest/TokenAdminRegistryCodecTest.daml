@@ -3,7 +3,6 @@ module CCIP.TokenAdminRegistryTest.TokenAdminRegistryCodecTest where
 
 import Daml.Script
 import DA.Assert ((===))
-import DA.Optional (fromSome)
 
 import qualified Splice.Api.Token.HoldingV1
 import CCIP.TokenAdminRegistryCodecGen (
