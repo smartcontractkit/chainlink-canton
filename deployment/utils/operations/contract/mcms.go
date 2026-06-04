@@ -30,7 +30,6 @@ func NewCantonTransaction(
 	af, err := json.Marshal(cantonsdk.AdditionalFields{
 		TargetInstanceAddress: rawInstanceAddress,
 		FunctionName:          encodedChoice.Choice,
-		OperationData:         encodedChoice.OperationData,
 		TargetTemplateID:      targetTemplateID,
 	})
 	if err != nil {
@@ -101,9 +100,5 @@ func ValidateCantonAdditionalFields(raw json.RawMessage) error {
 	if af.FunctionName == "" {
 		return errors.New("functionName is required")
 	}
-	if af.OperationData == "" {
-		return errors.New("operationData is required")
-	}
-
 	return nil
 }
