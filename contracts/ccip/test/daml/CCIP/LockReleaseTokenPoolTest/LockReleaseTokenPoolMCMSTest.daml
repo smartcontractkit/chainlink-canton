@@ -17,7 +17,7 @@ import CCIP.LockReleaseTokenPool
 import CCIP.LockReleaseTokenPoolCodecGen (
     encodeSetDynamicConfigParams,
     encodeApplyChainUpdatesParams,
-    encodeSetRateLimitConfigParams,
+    encodeSetRateLimiterReferencesParams,
     encodeSetTransferTimeoutParams,
     encodeAddPoolReceiveContextNonContractValueParams,
     encodeAddPoolReceiveContextContractValueParams,
@@ -26,7 +26,7 @@ import CCIP.LockReleaseTokenPoolCodecGen (
 import CCIP.LockReleaseTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
-    SetRateLimitConfigParams(..),
+    SetRateLimiterReferencesParams(..),
     SetTransferTimeoutParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
@@ -255,11 +255,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
     pure ()
 
 -- ========================================================
--- |        MCMS Entrypoint - SetRateLimitConfig          |
+-- |     MCMS Entrypoint - SetRateLimiterReferences       |
 -- ========================================================
 
-testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig : Script ()
-testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences = script do
     ccipOwner <- allocateParty "ccip_owner"
     poolOwner <- allocateParty "pool_owner"
     tokenAdmin <- allocateParty "token_admin"
@@ -303,14 +303,13 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-updated@owner"
             ]
 
-        encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
-            rateLimitConfigArgs = args
-            caller = poolOwner)
+        encoded = encodeSetRateLimiterReferencesParams (SetRateLimiterReferencesParams with
+            rateLimitConfigArgs = args)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "SetRateLimitConfig"
+            functionName = "SetRateLimiterReferences"
             operationData = encoded
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
 
@@ -782,5 +781,72 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetTransferTimeout_InvalidData = script d
             functionName = "SetTransferTimeout"
             operationData = "ff"  -- Invalid tag byte
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+    pure ()
+
+testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig : Script ()
+testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    tokenAdmin <- allocateParty "token_admin"
+
+    let instanceId = "pool-blockdepth-test"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+        mkRemoteConfig finality = RemoteChainConfig with
+            remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
+            remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
+            inboundCCVs = [RawInstanceAddress "in1@owner"]
+            outboundCCVs = []
+            finalityConfig = finality
+            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+        mkPool remoteChainConfigs = LockReleaseTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals = 6
+            rateLimitAdmin = None
+            remoteChainConfigs
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    submitMustFail poolOwner do
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (FinalityCodec.BlockDepth 0))]))
+
+    submitMustFail poolOwner do
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (FinalityCodec.BlockDepth (-1)))]))
+
+    poolCid <- submit poolOwner do
+        createCmd (mkPool Map.empty)
+
+    let mkUpdate finality = ChainUpdate with
+            remoteChainSelector = 123.0
+            remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
+            remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
+            inboundCCVs = [RawInstanceAddress "in1@owner"]
+            outboundCCVs = []
+            finalityConfig = finality
+            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+
+    submitMustFail poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 0)]
+
+    submitMustFail poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth (-1))]
+
+    _ <- submit poolOwner do
+        exerciseCmd poolCid ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 1)]
 
     pure ()

@@ -21,6 +21,7 @@ import MCMS.Codec
 import CCIP.Codec
   ( decodeRawInstanceAddressAt
   , decodeInstrumentId
+  , decodeRequestedFinalityAt
   )
 import qualified CCIP.Context
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
@@ -645,7 +646,6 @@ mkLinkTokenContract owner params = Link.Token.LinkRegistry with
     registryInstrumentId = params.instrumentId
     instanceId = params.instanceId
     registryMeta = Splice.Api.Token.MetadataV1.emptyMetadata
-    transferPreapprovals = Map.empty
 
 mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.TokenAdminRegistry.TokenAdminRegistry
 mkTokenAdminRegistryContract owner params = CCIP.TokenAdminRegistry.TokenAdminRegistry with
@@ -773,16 +773,6 @@ mkRateLimiterContract params = do
         tokens = params.capacity
         lastUpdated = now
       )
-
-decodeRequestedFinalityAt : BytesHex -> Int -> Optional (CCIP.FinalityConfig.FinalityConfig, Int)
-decodeRequestedFinalityAt encoded offset = do
-    tagHex <- extractBytes encoded offset 1
-    if tagHex == "00" then Some (CCIP.FinalityConfig.WaitForFinality, offset + 1)
-    else if tagHex == "01" then Some (CCIP.FinalityConfig.WaitForSafe, offset + 1)
-    else if tagHex == "02" then do
-        (payload, newOffset) <- decodeInt64At encoded (offset + 1)
-        Some (CCIP.FinalityConfig.BlockDepth payload, newOffset)
-    else None
 
 -- | Helper to assert that all bytes have been consumed (no trailing bytes)
 assertOffset : Int -> Int -> Optional ()

@@ -20,6 +20,17 @@ data DecodedFinality = DecodedFinality
 finalityConfigByteLength : Int
 finalityConfigByteLength = 4
 
+-- BlockDepth block confirmations must fit in a uint16 to match the on-wire
+-- encoding in MessageV1.finality.
+minBlockDepth : Int
+minBlockDepth = 1
+
+maxBlockDepth : Int
+maxBlockDepth = 65535  -- uint16 max (2^16 - 1)
+
+isValidBlockDepth : Int -> Bool
+isValidBlockDepth depth = depth >= minBlockDepth && depth <= maxBlockDepth
+
 -- EVM-compatible layout:
 --   bytes 0-1 = flags (upper 16 bits)
 --   bytes 2-3 = block depth (lower 16 bits)
@@ -55,31 +66,18 @@ decodeBlockConfirmations finalityConfig = do
         blockConfirmationsHex <- extractBytes finalityConfig 2 2
         decodeUint16 blockConfirmationsHex
 
-isOdd : Int -> Bool
-isOdd n = n /= 2 * (n / 2)
-
--- Count how many flag bits are turned on in the upper 16-bit flags field.
--- We use this to enforce that a requested finality picks only one mode.
-countSetBits : Int -> Int
-countSetBits n =
-    if n <= 0 then 0
-    else (if isOdd n then 1 else 0) + countSetBits (n / 2)
-
--- A requested finality must choose exactly one mode:
---   * finalized-only, or
---   * one flag like safe, or
---   * a positive block depth.
--- Mixed requests like "safe + 12 blocks" are invalid.
+-- A requested finality must match exactly one of the patterns the decoder
+-- accepts below:
+--   * flags == 0 and blockConfirmations == 0  -> WaitForFinality
+--   * flags == 1 and blockConfirmations == 0  -> WaitForSafe
+--   * flags == 0 and valid block depth     -> BlockDepth n
 validateRequestedFinality : BytesHex -> Bool
 validateRequestedFinality finalityConfig =
     case (decodeFlags finalityConfig, decodeBlockConfirmations finalityConfig) of
         (Some flags, Some blockConfirmations) ->
-            let isFinalizedOnly = flags == 0 && blockConfirmations == 0
-                hasBlockDepth = blockConfirmations > 0
-                activeModes = (if hasBlockDepth then 1 else 0) + countSetBits flags
-            -- Valid requests are either finalized-only (00000000),
-            -- or exactly one active mode: one flag or a positive block depth.
-            in isFinalizedOnly || activeModes == 1
+            (flags == 0 && blockConfirmations == 0)
+                || (flags == 1 && blockConfirmations == 0)
+                || (flags == 0 && isValidBlockDepth blockConfirmations)
         _ -> False
 
 -- Decode only well-formed requested finality values.
@@ -118,3 +116,9 @@ requestedFinalityAllowed requestedFinality allowedFinality =
 customFinalityRateLimiterRequired : FinalityConfig -> Bool
 customFinalityRateLimiterRequired allowedFinalityConfig =
     allowedFinalityConfig /= WaitForFinality
+
+isValidFinalityConfig : FinalityConfig -> Bool
+isValidFinalityConfig fc = case fc of
+    BlockDepth depth -> isValidBlockDepth depth
+    WaitForFinality -> True
+    WaitForSafe -> True

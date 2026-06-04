@@ -610,11 +610,13 @@ testSetInboundPoolCCVsRejectsTooManyAndExpandedCCVs = script do
     msgTooMany <- mkExecutingMessage ccipOwner receiver []
     submitMustFail (actAs ccipOwner) do
         exerciseCmd msgTooMany CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
-            poolAddress = RawInstanceAddress.make "pool-inbound-pool-bounds-too-many" ccipOwner
+            poolInstanceId = "pool-inbound-pool-bounds-too-many"
+            poolOwner = ccipOwner
             poolCCVs = mkRawCCVs "inbound-pool-ccv-" ccvOwner overMaxCCVCount
 
     msgExpanded <- mkExecutingMessage ccipOwner receiver (mkRawCCVs "inbound-default-ccv-" ccvOwner overMaxCCVCount)
     submitMustFail (actAs ccipOwner) do
         exerciseCmd msgExpanded CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
-            poolAddress = RawInstanceAddress.make "pool-inbound-pool-bounds-expanded" ccipOwner
+            poolInstanceId = "pool-inbound-pool-bounds-expanded"
+            poolOwner = ccipOwner
             poolCCVs = [CCIP.Internal.useDefaultCCVs]

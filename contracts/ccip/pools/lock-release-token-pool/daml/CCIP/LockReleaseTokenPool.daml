@@ -26,6 +26,7 @@ import CCIP.LockReleaseTokenPoolCodecGen (
     decodeSetDynamicConfigParamsAt,
     decodeApplyChainUpdatesParamsAt,
     decodeApplyTokenTransferFeeConfigUpdatesParamsAt,
+    decodeSetRateLimiterReferencesParamsAt,
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
     decodeAddPoolReceiveContextNonContractValueParamsAt,
@@ -43,6 +44,7 @@ import CCIP.LockReleaseTokenPoolTypes (
     SetDynamicConfigParams(..),
     ApplyChainUpdatesParams(..),
     ApplyTokenTransferFeeConfigUpdatesParams(..),
+    SetRateLimiterReferencesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
@@ -64,7 +66,7 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
 import qualified CCIP.Uint256
 import qualified CCIP.RateLimiter
-import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId, makeText, toText)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
@@ -189,6 +191,29 @@ assertTransferInstructionMatches prefix expectedSender expectedReceiver expected
     assertMsg (prefix <> ": pending transfer instrumentId mismatch")
         (transfer.instrumentId == expectedInstrumentId)
 
+remoteChainRateLimiterAddresses : Map.Map (Numeric 0) RemoteChainConfig -> [RawInstanceAddress.RawInstanceAddress]
+remoteChainRateLimiterAddresses configs =
+    concatMap
+        (\(_, cfg) ->
+            [ cfg.inboundRateLimiter
+            , cfg.inboundCustomBlockConfirmationsRateLimiter
+            , cfg.outboundRateLimiter
+            ])
+        (Map.toList configs)
+
+assertPoolConfiguredRateLimiter
+    : Text
+    -> Party
+    -> Map.Map (Numeric 0) RemoteChainConfig
+    -> ContractId CCIP.RateLimiter.RateLimiter
+    -> Update ()
+assertPoolConfiguredRateLimiter poolInstanceId poolOwner remoteChainConfigs rateLimiterCid = do
+    rl <- fetch rateLimiterCid
+    assertMsg "SetRateLimitConfig: rate limiter not configured on pool"
+        (CCIP.RateLimiter.rawInstanceAddress rl `elem` remoteChainRateLimiterAddresses remoteChainConfigs)
+    assertMsg "SetRateLimitConfig: pool instance mismatch" (rl.poolInstanceId == poolInstanceId)
+    assertMsg "SetRateLimitConfig: pool owner mismatch" (rl.poolOwner == poolOwner)
+
 assertRateLimiter
     : Text
     -> Text
@@ -256,6 +281,9 @@ template LockReleaseTokenPool
         observer optional [] pure rateLimitAdmin
 
         ensure assertValidInstanceId instanceId
+            && all
+                (\cfg -> CCIP.FinalityConfig.isValidFinalityConfig cfg.finalityConfig)
+                (Map.values remoteChainConfigs)
             && all
                 (\cfg ->
                     cfg.feeBps >= 0.0
@@ -389,6 +417,7 @@ template LockReleaseTokenPool
                     assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
                     -- If the chain already exists, the update should first remove it.
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
+                    assertMsg "ApplyChainUpdates: BlockDepth finality must be positive" (CCIP.FinalityConfig.isValidFinalityConfig finalityConfig)
                     -- Validate rate limiters
                     assertMsg "ApplyChainUpdates: inbound/outbound rate limiters cannot be empty" (inboundRateLimiter /= RawInstanceAddress.empty && outboundRateLimiter /= RawInstanceAddress.empty)
                     when (customFinalityRateLimiterRequired finalityConfig) $
@@ -458,32 +487,42 @@ template LockReleaseTokenPool
                 create this with
                     tokenTransferFeeConfigs = tokenTransferFeeConfigsRemoved
 
-        -- Sets the rate limit configurations for specified remote chains.
-        -- 
-        -- Params:
-        -- rateLimitConfigArgs: Array of structs containing remote chain selectors and their rate limiter configs.
-        -- caller: The party initiating the rate limit configuration update.
-        -- 
-        -- Callable by poolOwner or rateLimitAdmin if set.
-        choice SetRateLimitConfig : ContractId LockReleaseTokenPool
+        -- Tunes capacity/rate/isEnabled on a rate limiter already referenced by this pool's remote chain config.
+        -- Callable by poolOwner; caller must be poolOwner or rateLimitAdmin (admin does not sign—owner executes on their behalf).
+        nonconsuming choice SetRateLimitConfig : ContractId CCIP.RateLimiter.RateLimiter
+            with
+                caller : Party
+                rateLimiterCid : ContractId CCIP.RateLimiter.RateLimiter
+                newIsEnabled : Bool
+                newCapacity : Numeric 0
+                newRate : Numeric 0
+            controller poolOwner
+            do
+                assertMsg "SetRateLimitConfig: unauthorized caller"
+                    (caller == poolOwner || rateLimitAdmin == Some caller)
+                assertPoolConfiguredRateLimiter instanceId poolOwner remoteChainConfigs rateLimiterCid
+                exercise rateLimiterCid CCIP.RateLimiter.SetConfig with
+                    newIsEnabled
+                    newCapacity
+                    newRate
+
+        -- Updates which RateLimiter contract identities the pool references per remote chain (Canton instance swap).
+        -- Callable by poolOwner only.
+        choice SetRateLimiterReferences : ContractId LockReleaseTokenPool
             with
                 rateLimitConfigArgs : [RateLimitConfigArgs]
-                caller : Party
-            controller caller
+            controller poolOwner
             do
-                -- Callable by poolOwner or rateLimitAdmin if set
-                assertMsg "SetRateLimitConfig: only callable by owner or rateLimitAdmin" (caller == poolOwner || (rateLimitAdmin == Some caller))
-
                 -- Validate
                 forA_ rateLimitConfigArgs $ \arg -> do
-                    assertMsg "SetRateLimitConfig: invalid chain selector" (arg.remoteChainSelector > 0.0)
-                    assertMsg "SetRateLimitConfig: inbound/outbound rate limiters cannot be empty" (arg.inboundRateLimiter /= RawInstanceAddress.empty && arg.outboundRateLimiter /= RawInstanceAddress.empty)
-                    assertMsg "SetRateLimitConfig: rate limiters cannot be the same for inbound and outbound" (arg.inboundRateLimiter /= arg.outboundRateLimiter)
+                    assertMsg "SetRateLimiterReferences: invalid chain selector" (arg.remoteChainSelector > 0.0)
+                    assertMsg "SetRateLimiterReferences: inbound/outbound rate limiters cannot be empty" (arg.inboundRateLimiter /= RawInstanceAddress.empty && arg.outboundRateLimiter /= RawInstanceAddress.empty)
+                    assertMsg "SetRateLimiterReferences: rate limiters cannot be the same for inbound and outbound" (arg.inboundRateLimiter /= arg.outboundRateLimiter)
                     cfg <- case Map.lookup arg.remoteChainSelector remoteChainConfigs of
-                        None -> abort ("SetRateLimitConfig: unsupported chain selector: " <> show arg.remoteChainSelector)
+                        None -> abort ("SetRateLimiterReferences: unsupported chain selector: " <> show arg.remoteChainSelector)
                         Some cfg -> pure cfg
                     when (customFinalityRateLimiterRequired cfg.finalityConfig) $
-                        assertMsg "SetRateLimitConfig: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
+                        assertMsg "SetRateLimiterReferences: custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality"
                             (arg.inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty)
 
                 -- Update
@@ -700,6 +739,10 @@ template LockReleaseTokenPool
                 Foldable.forA_ ticket.verifiedCCVs $ \verifiedCCV ->
                     assertMsg ("ReleaseFromTicket: verified CCV owner is not a ticket signatory " <> show verifiedCCV)
                         (RawInstanceAddress.ownerParty verifiedCCV `elem` ticketSignatories)
+
+                -- Also check that the pool's owner is a signatory on the ticket
+                assertMsg "ReleaseFromTicket: pool owner is not a ticket signatory"
+                    (poolOwner `elem` ticketSignatories)
 
                 -- Validate the exact pool-required CCV instances are present on the ticket.
                 -- This preserves the configured instance-level trust model even when
@@ -1152,15 +1195,33 @@ template LockReleaseTokenPool
                                 tokenTransferFeeConfigArgs
                                 disableTokenTransferFeeConfigArgs
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-                "SetRateLimitConfig" -> do
-                  case decodeSetRateLimitConfigParamsAt operationData 0 of
-                    None -> abort "E_INVALID_PARAMS: SetRateLimitConfig"
-                    Some (SetRateLimitConfigParams{..}, finalOffset) -> do
-                        assertMsg "E_TRAILING_BYTES: SetRateLimitConfig" (finalOffset == byteCount operationData)
-                        newCid <- exercise selfCid SetRateLimitConfig with
+                "SetRateLimiterReferences" -> do
+                  case decodeSetRateLimiterReferencesParamsAt operationData 0 of
+                    None -> abort "E_INVALID_PARAMS: SetRateLimiterReferences"
+                    Some (SetRateLimiterReferencesParams{..}, finalOffset) -> do
+                        assertMsg "E_TRAILING_BYTES: SetRateLimiterReferences" (finalOffset == byteCount operationData)
+                        newCid <- exercise selfCid SetRateLimiterReferences with
                             rateLimitConfigArgs
-                            caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetRateLimitConfig" -> do
+                    case decodeSetRateLimitConfigParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: SetRateLimitConfig"
+                        Some (SetRateLimitConfigParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetRateLimitConfig" (finalOffset == byteCount operationData)
+                            pool <- fetch selfCid
+                            assertMsg "E_RATE_LIMITER_NOT_ON_POOL"
+                                (rateLimiterInstanceAddress `elem` remoteChainRateLimiterAddresses pool.remoteChainConfigs)
+                            let limiterAddr = RawInstanceAddress.toText rateLimiterInstanceAddress
+                            rateLimiterCid <- case Map.lookup limiterAddr contractIds of
+                                None -> abort ("E_RATE_LIMITER_NOT_IN_MAP: " <> limiterAddr)
+                                Some c -> pure (coerceContractId c : ContractId CCIP.RateLimiter.RateLimiter)
+                            updatedLimiterCid <- exercise selfCid SetRateLimitConfig with
+                                caller
+                                rateLimiterCid
+                                newIsEnabled
+                                newCapacity
+                                newRate
+                            pure (Map.insert limiterAddr (coerceContractId updatedLimiterCid) contractIds)
                 "AddPoolReceiveContextNonContractValue" -> do
                     case decodeAddPoolReceiveContextNonContractValueParamsAt operationData 0 of
                         None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue"

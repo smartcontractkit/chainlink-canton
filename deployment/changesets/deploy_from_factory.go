@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/factory"
+	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"

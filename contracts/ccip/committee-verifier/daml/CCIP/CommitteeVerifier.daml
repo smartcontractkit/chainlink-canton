@@ -36,6 +36,7 @@ import CCIP.CommitteeVerifierTypes (
     TransferStorageLocationsAdminParams(..),
     UpdateStorageLocationsParams(..),
     )
+import DA.Text qualified as Text
 import qualified CCIP.Crypto.DerEncoding
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
@@ -98,9 +99,10 @@ template CommitteeVerifier
         observer storageLocationsAdmin :: pendingStorageLocationsAdmin :: optional [] pure allowListAdmin
 
         -- Ensure signer configs have a positive threshold within the verifierResults
-        -- proof limit, enough signers, and no duplicate signer keys.
+        -- proof limit, no duplicate signer keys, and that map keys match the embedded
+        -- sourceChainSelector in each config.
         ensure assertValidInstanceId instanceId
-          && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
+          && versionTag /= "" && all (\(k, config) -> k == config.sourceChainSelector && isValidSignatureConfig config) (Map.toList signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
@@ -346,8 +348,14 @@ template CommitteeVerifier
                 let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag + 2) signatureLength)
                 let signatures = parseSignatures signatureData
 
+                -- re-calculate messageId hash for signature verification.
+                let messageId = CCIP.MessageCodecV1.messageId execMsg.message
+
+                -- validate that exec message content matches the calculated messageId
+                assertMsg "verifier: executing message ID mismatch" (messageId == execMsg.messageId)
+
                 -- Matches EVM: signers sign keccak256(versionTag ++ messageHash)
-                let signedHash = keccak256 (versionTag <> execMsg.messageId)
+                let signedHash = keccak256 (versionTag <> messageId)
 
                 -- Verify signatures
                 let validSigners = findValidSigners signedHash signatures signerConfig.signerKeys
@@ -438,7 +446,7 @@ template CommitteeVerifier
                 -- Assert that the sender is allowed to send messages if allowlist is enabled for the destination chain
                 let destChainConfig = fromSomeNote "no config for dest chain" (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
                 DA.Action.when destChainConfig.allowListEnabled
-                    $ assertMsg "Sender not allowed to send messages to destination chain" (caller `elem` destChainConfig.allowedSendersList)
+                    $ assertMsg "Sender not allowed to send messages to destination chain" (sendingMsg.sender `elem` destChainConfig.allowedSendersList)
 
                 let verifierBlob = versionTag
 
@@ -564,9 +572,13 @@ countValidSigners : [(BytesHex, Bool)] -> Int
 countValidSigners validSignersMap =
     length (filter snd validSignersMap)
 
+isValidPublicKey : PublicKeyHex -> Bool
+isValidPublicKey key = byteCount key == 65 && Text.take 2 key == "04"
+
 isValidSignatureConfig : SignatureConfig -> Bool
 isValidSignatureConfig config =
     config.threshold > 0
         && config.threshold <= maxCommitteeSignaturesPerProof
         && length config.signerKeys >= config.threshold
         && length config.signerKeys == length (dedup config.signerKeys)
+        && all isValidPublicKey config.signerKeys

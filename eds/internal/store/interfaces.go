@@ -5,7 +5,7 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
@@ -32,4 +32,16 @@ type InstrumentHoldingStoreInterface interface {
 	GetHolding(party types.PARTY, instrumentId splice_api_token_holding_v1.InstrumentId) ([]*apiv2.ActiveContract, bool)
 	// RegisterParty registers parties whose holdings should be tracked by the store.
 	RegisterParty(parties ...string)
+}
+
+type runOptions struct {
+	onBackfillCompleted func()
+}
+
+type RunOption func(o *runOptions)
+
+func WithOnBackfillCompleted(callback func()) RunOption {
+	return func(o *runOptions) {
+		o.onBackfillCompleted = callback
+	}
 }
