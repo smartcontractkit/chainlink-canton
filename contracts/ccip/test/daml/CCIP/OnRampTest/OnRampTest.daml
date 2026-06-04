@@ -1,0 +1,60 @@
+module CCIP.OnRampTest.OnRampTest where
+
+import Daml.Script
+
+import DA.Assert ((===))
+import DA.Either (isLeft)
+
+import CCIP.OnRamp (validateDestChainAddress)
+
+testValidateDestChainAddress : Script ()
+testValidateDestChainAddress = do
+    -- In: 20 bytes, unpadded
+    -- Out: 20 bytes, unpadded
+    let addr = "c31ea3de7f6eff3f70c3bfda0c4c4aabbea2c1b3"
+    validateDestChainAddress addr 20 === addr
+
+    -- In: 21 bytes, unpadded
+    -- Out: 21 bytes, unpadded
+    let addr = "1898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+    validateDestChainAddress addr 21 === addr
+
+    -- In: 30 bytes, unpadded
+    -- Out: 30 bytes, unpadded
+    let addr = "12ee197fd1e17f73ed3f6bed10a676aff0d852fe271fbad6fc85c267fcf1"
+    validateDestChainAddress addr 30 === addr
+
+    -- In: 32 bytes, unpadded
+    -- Out: 32 bytes, unpadded
+    let addr = "12ee197fd1e17f73ed3f6bed10a676aff0d852fe271fbad6fc85c267fcf1e2c3"
+    validateDestChainAddress addr 32 === addr
+
+    -- In: 20 bytes, padded to 32 bytes
+    -- Out: 20 bytes, unpadded
+    let addr = "000000000000000000000000135de120c28b8bfacbeb1cfdce3cc743b5f98dfb"
+    validateDestChainAddress addr 20 === "135de120c28b8bfacbeb1cfdce3cc743b5f98dfb"
+
+    -- In: 21 bytes, padded to 32 bytes
+    -- Out: 21 bytes, unpadded
+    let addr = "00000000000000000000001898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+    validateDestChainAddress addr 21 === "1898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+
+    -- In: 20 bytes, padded to 30 bytes
+    -- Out: 20 bytes, padded to 30 bytes (no trimming, only trims if input is 32 bytes)
+    let addr = "00000000000000000000aa6a78ecec748d11d2b179ac19c0d8fdc4c8e5dc"
+    validateDestChainAddress addr 30 === addr
+
+    -- Invalid - invalid hex
+    let addr = "00000000000000000000001898a4923b1bfc6dbdf6debb1fbe6adabcf227caeg"
+    result <- tryToEither (\() -> pure (validateDestChainAddress addr 20))
+    isLeft result === True
+
+    -- Invalid - 32-byte address with 20-byte addressBytesLength
+    let addr = "4ffd0dccc767ffbcdcdd2450cf3a766f02ada5a3b23eada4fec7bbb94dbd7acf"
+    result <- tryToEither (\() -> pure (validateDestChainAddress addr 20))
+    isLeft result === True
+
+    -- Invalid - 30-byte address with 20-byte addressBytesLength
+    let addr = "00000000000000000000aa6a78ecec748d11d2b179ac19c0d8fdc4c8e5dc"
+    result <- tryToEither (\() -> pure (validateDestChainAddress addr 20))
+    isLeft result === True

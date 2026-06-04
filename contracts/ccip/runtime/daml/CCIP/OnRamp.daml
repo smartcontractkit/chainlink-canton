@@ -6,6 +6,7 @@ import DA.Foldable qualified as Foldable
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isNone, isSome)
+import DA.Text qualified as Text
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
@@ -979,13 +980,31 @@ findFeeWithAmount (f :: fs) (a :: as) pred =
     if pred f then (f, a)
     else findFeeWithAmount fs as pred
 
--- | Validates a destination-chain address against the chain's expected address length and hex validity.
+allZeroHex : BytesHex -> Bool
+allZeroHex hex =
+    Text.length hex == 0 || (Text.take 1 hex == "0" && allZeroHex (Text.drop 1 hex))
+
+-- | Validates a destination-chain address to be valid hex and strips leading padding iff the destination chain uses sub-32-byte addresses and the address is 32 bytes long with leading zeros.
 -- The message receiver, tokenReceiver, and destTokenAddress are all validated using this function since they're all remote chain addresses.
+-- This is the equivalent of EVM's _validateDestChainAddress().
+-- We must implement the same behavior here, since:
+--  - Pools store the remote chain's pool and token addresses (padded, in the case of EVM)
+--  - In the incoming direction (from EVM) the message's sourcePoolAddress & sourceTokenAddress will be 32-byte padded addresses
+--  - In the incoming directions, the pools will validate that sourcePoolAddress === the stored remote pool address
+--  - In the outgoing direction (to EVM), the pools will add this stored address to the message in destTokenAddress
+--  - In the outgoing direction, EVM expects the incoming destTokenAddress the be unpadded 20 bytes, so we must strip the padding before sending the outgoing message
 validateDestChainAddress : BytesHex -> Int -> BytesHex
 validateDestChainAddress address addressBytesLength =
     if not (isValidHex address)
     then error ("InvalidDestChainAddress: not valid hex: " <> show address)
     else let actualLength = byteCount address
-         in if actualLength == addressBytesLength
-            then address
-            else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
+         in if addressBytesLength < 32 && actualLength == 32
+            then
+                let paddingHexLength = (32 - addressBytesLength) * 2
+                    leftPadding = Text.take paddingHexLength address
+                in if allZeroHex leftPadding
+                   then Text.drop paddingHexLength address
+                   else error ("InvalidDestChainAddress: non-zero ABI padding for sub-32-byte address: " <> show address)
+            else if actualLength == addressBytesLength
+                 then address
+                 else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
