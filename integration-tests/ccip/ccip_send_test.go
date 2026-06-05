@@ -24,10 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/freeport"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
-	"github.com/smartcontractkit/go-daml/pkg/types"
-
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -35,16 +31,16 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/freeport"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
-	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
@@ -180,7 +176,7 @@ func TestCCIPSend(t *testing.T) {
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
-						Template: ccvs.CommitteeVerifier{
+						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
 							VersionTag:                   types.TEXT(versionTag),
@@ -188,7 +184,7 @@ func TestCCIPSend(t *testing.T) {
 							StorageLocations:             []types.TEXT{"ipfs://test-send"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
-							Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
+							Deps:                         committeeverifier.CommitteeVerifierDeps{}, // Set by sequence
 						},
 					},
 				},
@@ -200,7 +196,7 @@ func TestCCIPSend(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -208,20 +204,20 @@ func TestCCIPSend(t *testing.T) {
 					},
 				},
 				GlobalConfig: sequences.GlobalConfigParams{
-					Template: common.GlobalConfig{
+					Template: core.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10)),
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{
-					Template: rmn.RMNRemote{
+					Template: core.RMNRemote{
 						CcipOwner:      "", // Populated by the sequence
 						RmnOwner:       types.PARTY(partyCCIP),
 						CursedSubjects: nil,
 					},
 				},
 				FeeQuoterConfig: sequences.FeeQuoterParams{
-					Template: feequoter.FeeQuoter{
+					Template: core.FeeQuoter{
 						PriceUpdaters: []types.PARTY{types.PARTY(partyCCIP)},
 					},
 					USDPerNative: big.NewInt(100_000_000), // $1 with a decimals
@@ -436,10 +432,10 @@ func TestCCIPSend(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
-					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
+					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
 						PartyOwner: types.PARTY(partySender),
 						InstanceId: "router-sender",
 					}),
@@ -493,7 +489,7 @@ func TestCCIPSend(t *testing.T) {
 	})
 	require.NoError(t, err)
 	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, &apiv2.Identifier{
-		PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
+		PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
 	require.NoError(t, err)
 
@@ -596,27 +592,27 @@ func TestCCIPSend(t *testing.T) {
 	executorSendDisclosure, err := edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddress.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
 
-	ccvRawAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierAddress.String())}
-	execMcmsAddr := mcmsbindings.RawInstanceAddress{Unpack: types.TEXT(executorAddress.String())}
-	sendArgs := ccipsender.Send{
+	ccvRawAddr := chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierAddress.String())}
+	execMcmsAddr := chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(executorAddress.String())}
+	sendArgs := sender.Send{
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Message: ccipclient.Canton2AnyMessage{
+		Message: core.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
 			FeeToken: nativeInstrumentId,
-			ExtraArgs: ccipclient.ExtraArgs{
-				V3: &ccipclient.GenericExtraArgsV3{
+			ExtraArgs: core.ExtraArgs{
+				V3: &core.GenericExtraArgsV3{
 					GasLimit: 100_000,
-					Ccvs: []ccipclient.CCVExtraArg{
+					Ccvs: []core.CCVExtraArg{
 						{
 							CcvAddress: ccvRawAddr,
 							CcvArgs:    types.TEXT(""),
 						},
 					},
-					Executor: ccipclient.ExecutorExtraArg{
-						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
+					Executor: core.ExecutorExtraArg{
+						ExecutorWithAddress: &core.ExecutorWithAddress{
 							ExecutorAddress: execMcmsAddr,
 							ExecutorArgs:    types.TEXT(""),
 						},
@@ -626,9 +622,9 @@ func TestCCIPSend(t *testing.T) {
 				},
 			},
 		},
-		FeeTokenInput: ccipsender.FeeTokenInput{
+		FeeTokenInput: sender.FeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			FeeTokenConfigCid:       contractID(ccipSendDisclosure.FeeTokenConfigCid),
+			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
 			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{
@@ -639,14 +635,14 @@ func TestCCIPSend(t *testing.T) {
 				},
 			},
 		},
-		CcvSendInputs: []ccipsender.CCVSendInput{
+		CcvSendInputs: []sender.CCVSendInput{
 			{
 				CcvAddress:      ccvSendDisclosure.Address.Binding(),
 				CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
 				CcvExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
 			},
 		},
-		ExecutorInput: &ccipsender.ExecutorInput{
+		ExecutorInput: &sender.ExecutorInput{
 			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
 			ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
 		},
@@ -671,7 +667,7 @@ func TestCCIPSend(t *testing.T) {
 	executorSendDisclosure, err = edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddress.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
-	sendArgs.FeeTokenInput.FeeTokenConfigCid = contractID(ccipSendDisclosure.FeeTokenConfigCid)
+	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
 	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
 	sendArgs.ExecutorInput.ExecutorCid = types.CONTRACT_ID(executorSendDisclosure.ContractId)
 	allDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(

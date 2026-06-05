@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -18,8 +19,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	common_binding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
@@ -69,11 +69,11 @@ func (c *CantonCurseAdapter) Curse() *cldf_ops.Sequence[fastcurse.CurseInput, se
 			var proposalOutputs []contract.ExerciseOutput
 
 			for _, subject := range in.Subjects {
-				report, err := cldf_ops.ExecuteOperation(b, rmn_remote.Curse, chain, contract.ChoiceInput[rmn.Curse]{
+				report, err := cldf_ops.ExecuteOperation(b, rmn_remote.Curse, chain, contract.ChoiceInput[core.Curse]{
 					InstanceAddress:    rmnRemoteRaw.InstanceAddress(),
 					RawInstanceAddress: rmnRemoteRaw.String(),
 					MCMSEnabled:        mcmsEnabled,
-					Args: rmn.Curse{
+					Args: core.Curse{
 						Subject: types.TEXT(hex.EncodeToString(subject[:])),
 					},
 				})
@@ -123,7 +123,7 @@ func (c *CantonCurseAdapter) Initialize(e deployment.Environment, selector uint6
 	return nil
 }
 
-func (c *CantonCurseAdapter) getGlobalConfig(ctx context.Context, chain canton.Chain) (*common_binding.GlobalConfig, error) {
+func (c *CantonCurseAdapter) getGlobalConfig(ctx context.Context, chain canton.Chain) (*core.GlobalConfig, error) {
 	globalConfig, ok := c.globalConfigCache[chain.Selector]
 	if !ok {
 		return nil, fmt.Errorf("global config for chain %d not found in environment", chain.Selector)
@@ -134,7 +134,7 @@ func (c *CantonCurseAdapter) getGlobalConfig(ctx context.Context, chain canton.C
 		ctx,
 		participant.LedgerServices.State,
 		contract.LedgerQueryParties(participant),
-		common_binding.GlobalConfig{}.GetTemplateID(),
+		core.GlobalConfig{}.GetTemplateID(),
 		globalConfig,
 	)
 	if err != nil {
@@ -145,7 +145,7 @@ func (c *CantonCurseAdapter) getGlobalConfig(ctx context.Context, chain canton.C
 		return nil, fmt.Errorf("no active contract found for global config %s", globalConfig.String())
 	}
 
-	globalConfigCreated, err := bindings.UnmarshalCreatedEvent[common_binding.GlobalConfig](active.GetCreatedEvent())
+	globalConfigCreated, err := bindings.UnmarshalCreatedEvent[core.GlobalConfig](active.GetCreatedEvent())
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal global config: %w", err)
 	}
@@ -199,7 +199,7 @@ func (c *CantonCurseAdapter) IsSubjectCursedOnChain(e deployment.Environment, se
 		e.GetContext(),
 		participant.LedgerServices.State,
 		contract.LedgerQueryParties(participant),
-		rmn.RMNRemote{}.GetTemplateID(),
+		core.RMNRemote{}.GetTemplateID(),
 		rmnRemoteRaw.InstanceAddress(),
 	)
 	if err != nil {
@@ -210,7 +210,7 @@ func (c *CantonCurseAdapter) IsSubjectCursedOnChain(e deployment.Environment, se
 		return false, fmt.Errorf("no active contract found for RMNRemote %s", rmnRemoteRaw.InstanceAddress().String())
 	}
 
-	rmnRemoteCreated, err := bindings.UnmarshalCreatedEvent[rmn.RMNRemote](active.GetCreatedEvent())
+	rmnRemoteCreated, err := bindings.UnmarshalCreatedEvent[core.RMNRemote](active.GetCreatedEvent())
 	if err != nil {
 		return false, fmt.Errorf("unmarshal RMNRemote: %w", err)
 	}
@@ -281,11 +281,11 @@ func (c *CantonCurseAdapter) Uncurse() *cldf_ops.Sequence[fastcurse.CurseInput, 
 			var proposalOutputs []contract.ExerciseOutput
 
 			for _, subject := range in.Subjects {
-				report, err := cldf_ops.ExecuteOperation(b, rmn_remote.Uncurse, chain, contract.ChoiceInput[rmn.Uncurse]{
+				report, err := cldf_ops.ExecuteOperation(b, rmn_remote.Uncurse, chain, contract.ChoiceInput[core.Uncurse]{
 					InstanceAddress:    rmnRemoteRaw.InstanceAddress(),
 					RawInstanceAddress: rmnRemoteRaw.String(),
 					MCMSEnabled:        mcmsEnabled,
-					Args: rmn.Uncurse{
+					Args: core.Uncurse{
 						Subject: types.TEXT(hex.EncodeToString(subject[:])),
 					},
 				})

@@ -7,9 +7,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
@@ -20,7 +19,7 @@ type PerPartyRouterFactory struct {
 }
 
 func ParsePerPartyRouterFactory(createdEvent *apiv2.CreatedEvent) (*PerPartyRouterFactory, error) {
-	boundContract, err := bindings.UnmarshalCreatedEvent[perpartyrouter.PerPartyRouterFactory](createdEvent)
+	boundContract, err := bindings.UnmarshalCreatedEvent[ccipruntime.PerPartyRouterFactory](createdEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal PerPartyRouterFactory: %w", err)
 	}
@@ -52,7 +51,7 @@ type GlobalConfig struct {
 }
 
 func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) {
-	boundContract, err := bindings.UnmarshalCreatedEvent[common.GlobalConfig](createdEvent)
+	boundContract, err := bindings.UnmarshalCreatedEvent[core.GlobalConfig](createdEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal GlobalConfig: %w", err)
 	}
@@ -92,7 +91,7 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 	}, nil
 }
 
-func parseSourceChainConfig(sourceChainConfig common.SourceChainConfig) (SourceChainConfig, error) {
+func parseSourceChainConfig(sourceChainConfig core.SourceChainConfig) (SourceChainConfig, error) {
 	laneMandatedCCVs, err := parse.RawInstanceAddressList(sourceChainConfig.LaneMandatedCCVs)
 	if err != nil {
 		return SourceChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)
@@ -109,7 +108,7 @@ func parseSourceChainConfig(sourceChainConfig common.SourceChainConfig) (SourceC
 	}, nil
 }
 
-func parseDestChainConfig(destChainConfig common.DestChainConfig) (DestChainConfig, error) {
+func parseDestChainConfig(destChainConfig core.DestChainConfig) (DestChainConfig, error) {
 	laneMandatedCCVs, err := parse.RawInstanceAddressList(destChainConfig.LaneMandatedCCVs)
 	if err != nil {
 		return DestChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)
@@ -142,7 +141,7 @@ type TokenAdminRegistry struct {
 }
 
 func ParseTokenAdminRegistry(createdEvent *apiv2.CreatedEvent) (*TokenAdminRegistry, error) {
-	boundContract, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenAdminRegistry](createdEvent)
+	boundContract, err := bindings.UnmarshalCreatedEvent[core.TokenAdminRegistry](createdEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal TokenAdminRegistry: %w", err)
 	}
@@ -161,11 +160,11 @@ type TokenConfig struct {
 	Index           types.INT64
 	InstrumentId    contracts.EncodedInstrumentID
 	IsCCIPManaged   types.BOOL
-	Pool            *tokenadminregistry.PoolRegistration
+	Pool            *core.PoolRegistration
 }
 
 func ParseTokenConfig(createdEvent *apiv2.CreatedEvent) (*TokenConfig, error) {
-	boundContract, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenConfig](createdEvent)
+	boundContract, err := bindings.UnmarshalCreatedEvent[core.TokenConfig](createdEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal TokenConfig: %w", err)
 	}

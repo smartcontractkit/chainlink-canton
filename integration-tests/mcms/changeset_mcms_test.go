@@ -23,10 +23,9 @@ import (
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
-	mcms_bindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -87,7 +86,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 		CCIPOwnerParty: party,
 		RMNOwnerParty:  party,
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{{
-			Template: ccvs.CommitteeVerifier{
+			Template: committeeverifier.CommitteeVerifier{
 				Owner:                        types.PARTY(party),
 				CcipOwner:                    types.PARTY(party),
 				VersionTag:                   "test-v1",
@@ -97,12 +96,12 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 			},
 		}},
 		GlobalConfig: sequences.GlobalConfigParams{
-			Template: common.GlobalConfig{
+			Template: core.GlobalConfig{
 				ChainSelector: chainSelectorNumeric,
 			},
 		},
 		RMNRemote: sequences.RMNRemoteParams{
-			Template: rmn.RMNRemote{
+			Template: core.RMNRemote{
 				RmnOwner: types.PARTY(party),
 			},
 		},
@@ -115,7 +114,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 
 	// Extract GlobalConfig and CommitteeVerifier raw instance addresses from deploy output
 	var gcRaw contracts.RawInstanceAddress
-	var ccvRaw mcms_bindings.RawInstanceAddress
+	var ccvRaw chainlinkapi.RawInstanceAddress
 	for _, addr := range deployOut.Output.Addresses {
 		raw, err := contracts.RawInstanceAddressFromString(addr.Labels.List()[0])
 		require.NoError(t, err)
@@ -123,7 +122,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 		case "CantonGlobalConfig":
 			gcRaw = raw
 		case "CommitteeVerifier":
-			ccvRaw = mcms_bindings.RawInstanceAddress{Unpack: types.TEXT(raw.String())}
+			ccvRaw = chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(raw.String())}
 		}
 	}
 	require.NotEmpty(t, gcRaw.String(), "GlobalConfig address not found in deploy output")
@@ -154,14 +153,14 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 		Config: changesets.ConfigureGlobalConfigConfig{
 			InstanceAddress:    gcRaw.InstanceAddress(),
 			RawInstanceAddress: gcRaw.String(),
-			DestChainUpdates: []common.DestChainConfigArgs{{
+			DestChainUpdates: []core.DestChainConfigArgs{{
 				DestChainSelector:         types.NUMERIC(destChainSelector),
 				IsEnabled:                 true,
 				AddressBytesLength:        20,
 				TokenReceiverAllowed:      true,
 				BaseExecutionGasCost:      21000,
 				OffRampAddress:            types.TEXT(testOffRampHex),
-				DefaultCCVs:               []mcms_bindings.RawInstanceAddress{ccvRaw},
+				DefaultCCVs:               []chainlinkapi.RawInstanceAddress{ccvRaw},
 				MessageNetworkFeeUSDCents: "100",
 				TokenNetworkFeeUSDCents:   "50",
 			}},
@@ -291,7 +290,7 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	// Re-resolve the GlobalConfig (it may have a new contract ID after the update)
 	updatedGC, err := opcontract.FindActiveContractByInstanceAddress(
 		t.Context(), participant.LedgerServices.State, []string{party},
-		common.GlobalConfig{}.GetTemplateID(), gcRaw.InstanceAddress(),
+		core.GlobalConfig{}.GetTemplateID(), gcRaw.InstanceAddress(),
 	)
 	require.NoError(t, err, "find updated GlobalConfig")
 

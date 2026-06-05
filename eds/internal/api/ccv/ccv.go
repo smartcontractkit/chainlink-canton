@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
@@ -44,7 +44,7 @@ func NewServer(
 	for _, ccv := range config.CCVs {
 		s.contractConfigs[ccv.InstanceAddress] = ContractConfig{}
 		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
-			TemplateID: contracts.TemplateIDFromBinding(ccvs.CommitteeVerifier{}),
+			TemplateID: contracts.TemplateIDFromBinding(committeeverifier.CommitteeVerifier{}),
 			PartyID:    ccv.PartyID,
 		})
 	}

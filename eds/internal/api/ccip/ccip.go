@@ -16,13 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/offramp"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/onramp"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -75,28 +70,28 @@ func NewServer(
 	s.activeContractStore.RegisterTemplates(
 		[]store.RegisteredTemplate{
 			{
-				TemplateID: contracts.TemplateIDFromBinding(perpartyrouter.PerPartyRouterFactory{}),
+				TemplateID: contracts.TemplateIDFromBinding(ccipruntime.PerPartyRouterFactory{}),
 				PartyID:    config.OnRamp.PartyID,
 			}, {
-				TemplateID: contracts.TemplateIDFromBinding(onramp.OnRamp{}),
+				TemplateID: contracts.TemplateIDFromBinding(ccipruntime.OnRamp{}),
 				PartyID:    config.OnRamp.PartyID,
 			}, {
-				TemplateID: contracts.TemplateIDFromBinding(offramp.OffRamp{}),
+				TemplateID: contracts.TemplateIDFromBinding(ccipruntime.OffRamp{}),
 				PartyID:    config.OffRamp.PartyID,
 			}, {
-				TemplateID: contracts.TemplateIDFromBinding(common.GlobalConfig{}),
+				TemplateID: contracts.TemplateIDFromBinding(core.GlobalConfig{}),
 				PartyID:    config.GlobalConfig.PartyID,
 			}, {
-				TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenAdminRegistry{}),
+				TemplateID: contracts.TemplateIDFromBinding(core.TokenAdminRegistry{}),
 				PartyID:    config.TokenAdminRegistry.PartyID,
 			}, {
-				TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenConfig{}),
+				TemplateID: contracts.TemplateIDFromBinding(core.TokenConfig{}),
 				PartyID:    config.TokenAdminRegistry.PartyID,
 			}, {
-				TemplateID: contracts.TemplateIDFromBinding(rmn.RMNRemote{}),
+				TemplateID: contracts.TemplateIDFromBinding(core.RMNRemote{}),
 				PartyID:    config.RMNRemote.PartyID,
 			}, {
-				TemplateID: contracts.TemplateIDFromBinding(feequoter.FeeQuoter{}),
+				TemplateID: contracts.TemplateIDFromBinding(core.FeeQuoter{}),
 				PartyID:    config.FeeQuoter.PartyID,
 			},
 		}...,
@@ -360,19 +355,19 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{
 		Values: map[string]splice_api_token_metadata_v1.AnyValue{
-			string(onramp.OnRampKey): {
+			string(ccipruntime.OnRampKey): {
 				AVContractId: new(types.CONTRACT_ID(activeOnRampContract.GetCreatedEvent().GetContractId())),
 			},
-			string(common.GlobalConfigKey): {
+			string(core.GlobalConfigKey): {
 				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
 			},
-			string(tokenadminregistry.TokenAdminRegistryKey): {
+			string(core.TokenAdminRegistryKey): {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			string(common.RmnRemoteKey): {
+			string(core.RmnRemoteKey): {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
-			string(feequoter.FeeQuoterKey): {
+			string(core.FeeQuoterKey): {
 				AVContractId: new(types.CONTRACT_ID(activeFeeQuoterContract.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -436,7 +431,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token pool registered for token: %s", encodedInstrumentId.Hex())})
 			return
 		}
-		choiceContext.Values[string(tokenadminregistry.TokenConfigKey)] = splice_api_token_metadata_v1.AnyValue{
+		choiceContext.Values[string(core.TokenConfigKey)] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
 		}
 		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))
@@ -511,16 +506,16 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{
 		Values: map[string]splice_api_token_metadata_v1.AnyValue{
-			string(offramp.OffRampKey): {
+			string(ccipruntime.OffRampKey): {
 				AVContractId: new(types.CONTRACT_ID(activeOffRampContract.GetCreatedEvent().GetContractId())),
 			},
-			string(common.GlobalConfigKey): {
+			string(core.GlobalConfigKey): {
 				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
 			},
-			string(tokenadminregistry.TokenAdminRegistryKey): {
+			string(core.TokenAdminRegistryKey): {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			string(common.RmnRemoteKey): {
+			string(core.RmnRemoteKey): {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -562,7 +557,7 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 			return
 		}
 		tokenPool = new(oapiCommon.RawInstanceAddress(contracts.InstanceID(parsedTokenConfig.Pool.PoolInstanceId).RawInstanceAddress(parsedTokenConfig.Pool.PoolOwner)))
-		choiceContext.Values[string(tokenadminregistry.TokenConfigKey)] = splice_api_token_metadata_v1.AnyValue{
+		choiceContext.Values[string(core.TokenConfigKey)] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
 		}
 		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))

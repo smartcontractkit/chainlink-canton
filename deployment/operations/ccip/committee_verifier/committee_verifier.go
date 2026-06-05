@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -21,13 +21,13 @@ var ContractType = deployment.ContractType("CommitteeVerifier")
 
 var Version = semver.MustParse("0.1.0")
 
-var ccvsEncoder = ccvs.NewContract("", "CCIP.CommitteeVerifier", "CommitteeVerifier").Encoder()
+var ccvsEncoder = committeeverifier.NewContract("", "CCIP.CommitteeVerifier", "CommitteeVerifier").Encoder()
 
-var Deploy = contract.NewDeploy(contract.DeployParams[ccvs.CommitteeVerifier]{
+var Deploy = contract.NewDeploy(contract.DeployParams[committeeverifier.CommitteeVerifier]{
 	Name:           "canton/ccip/committee_verifier/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
 	Description:    "Deploys a CCIP CommitteeVerifier contract on Canton",
-	Validate: func(template ccvs.CommitteeVerifier) error {
+	Validate: func(template committeeverifier.CommitteeVerifier) error {
 		if template.Owner == "" {
 			return errors.New("owner cannot be empty")
 		}
@@ -58,12 +58,12 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccvs.CommitteeVerifier]{
 	Prefix:      "committeeverifier",
 })
 
-var ApplySignatureConfigs = contract.NewExercise(contract.ExerciseParams[ccvs.ApplySignatureConfigs]{
+var ApplySignatureConfigs = contract.NewExercise(contract.ExerciseParams[committeeverifier.ApplySignatureConfigs]{
 	Name:         "canton/ccip/committee_verifier/apply_signature_configs",
 	Version:      Version,
 	Description:  "Applies new signature configs to a CommitteeVerifier instance by adding/removing configs",
 	ContractType: ContractType,
-	Validate: func(input ccvs.ApplySignatureConfigs) error {
+	Validate: func(input committeeverifier.ApplySignatureConfigs) error {
 		for i, config := range input.SignatureConfigs {
 			// Verify all thresholds
 			if int(config.Threshold) > len(config.SignerKeys) {
@@ -83,85 +83,85 @@ var ApplySignatureConfigs = contract.NewExercise(contract.ExerciseParams[ccvs.Ap
 
 		return nil
 	},
-	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.ApplySignatureConfigs,
+	Template:     committeeverifier.CommitteeVerifier{},
+	Method:       committeeverifier.CommitteeVerifier{}.ApplySignatureConfigs,
 	EncodeMethod: ccvsEncoder.ApplySignatureConfigs,
 })
 
-var UpdateStorageLocations = contract.NewExercise(contract.ExerciseParams[ccvs.UpdateStorageLocations]{
+var UpdateStorageLocations = contract.NewExercise(contract.ExerciseParams[committeeverifier.UpdateStorageLocations]{
 	Name:         "canton/ccip/committee_verifier/update_storage_locations",
 	Version:      Version,
 	Description:  "Updates the storage locations of a CommitteeVerifier instance",
 	ContractType: ContractType,
 	Validate:     nil,
-	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.UpdateStorageLocations,
+	Template:     committeeverifier.CommitteeVerifier{},
+	Method:       committeeverifier.CommitteeVerifier{}.UpdateStorageLocations,
 	EncodeMethod: ccvsEncoder.UpdateStorageLocations,
 })
 
-var TransferStorageLocationsAdmin = contract.NewExercise(contract.ExerciseParams[ccvs.TransferStorageLocationsAdmin]{
+var TransferStorageLocationsAdmin = contract.NewExercise(contract.ExerciseParams[committeeverifier.TransferStorageLocationsAdmin]{
 	Name:         "canton/ccip/committee_verifier/transfer_storage_locations_admin",
 	Version:      Version,
 	Description:  "Initiates the two-step transfer of the storage locations admin role",
 	ContractType: ContractType,
-	Validate: func(input ccvs.TransferStorageLocationsAdmin) error {
+	Validate: func(input committeeverifier.TransferStorageLocationsAdmin) error {
 		if input.NewAdmin == "" {
 			return errors.New("newAdmin cannot be empty")
 		}
 
 		return nil
 	},
-	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.TransferStorageLocationsAdmin,
+	Template:     committeeverifier.CommitteeVerifier{},
+	Method:       committeeverifier.CommitteeVerifier{}.TransferStorageLocationsAdmin,
 	EncodeMethod: ccvsEncoder.TransferStorageLocationsAdmin,
 })
 
-var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExerciseParams[ccvs.AcceptStorageLocationsAdmin]{
+var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExerciseParams[committeeverifier.AcceptStorageLocationsAdmin]{
 	Name:         "canton/ccip/committee_verifier/accept_storage_locations_admin",
 	Version:      Version,
 	Description:  "Accepts a pending transfer of the storage locations admin role",
 	ContractType: ContractType,
 	Validate:     nil,
-	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.AcceptStorageLocationsAdmin,
+	Template:     committeeverifier.CommitteeVerifier{},
+	Method:       committeeverifier.CommitteeVerifier{}.AcceptStorageLocationsAdmin,
 	EncodeMethod: ccvsEncoder.AcceptStorageLocationsAdmin,
 })
 
-var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[ccvs.SetDynamicConfig]{
+var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[committeeverifier.SetDynamicConfig]{
 	Name:         "canton/ccip/committee_verifier/set_dynamic_config",
 	Version:      Version,
 	Description:  "Sets the dynamic config",
 	ContractType: ContractType,
 	Validate:     nil,
-	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.SetDynamicConfig,
+	Template:     committeeverifier.CommitteeVerifier{},
+	Method:       committeeverifier.CommitteeVerifier{}.SetDynamicConfig,
 	EncodeMethod: ccvsEncoder.SetDynamicConfig,
 })
 
-var ApplyRemoteChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[ccvs.ApplyRemoteChainConfigUpdates]{
+var ApplyRemoteChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[committeeverifier.ApplyRemoteChainConfigUpdates]{
 	Name:         "canton/ccip/committee_verifier/apply_remote_chain_config_updates",
 	Version:      Version,
 	Description:  "Applies remote chain configs to a CommitteeVerifier instance by adding/removing configs",
 	ContractType: ContractType,
 	Validate:     nil,
-	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.ApplyRemoteChainConfigUpdates,
+	Template:     committeeverifier.CommitteeVerifier{},
+	Method:       committeeverifier.CommitteeVerifier{}.ApplyRemoteChainConfigUpdates,
 	EncodeMethod: ccvsEncoder.ApplyRemoteChainConfigUpdates,
 })
 
-var ApplyAllowListUpdates = contract.NewExercise(contract.ExerciseParams[ccvs.ApplyAllowListUpdates]{
+var ApplyAllowListUpdates = contract.NewExercise(contract.ExerciseParams[committeeverifier.ApplyAllowListUpdates]{
 	Name:         "canton/ccip/committee_verifier/apply_allow_list_updates",
 	Version:      Version,
 	Description:  "Applies allow lists updates to a Canton CommitteeVerifier instance",
 	ContractType: ContractType,
 	Validate:     nil,
-	Modifier: func(chain canton.Chain, input ccvs.ApplyAllowListUpdates) (ccvs.ApplyAllowListUpdates, error) {
+	Modifier: func(chain canton.Chain, input committeeverifier.ApplyAllowListUpdates) (committeeverifier.ApplyAllowListUpdates, error) {
 		// Automatically set the caller
 		input.Caller = types.PARTY(chain.Participants[0].PartyID)
 
 		return input, nil
 	},
-	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.ApplyAllowListUpdates,
+	Template:     committeeverifier.CommitteeVerifier{},
+	Method:       committeeverifier.CommitteeVerifier{}.ApplyAllowListUpdates,
 	EncodeMethod: ccvsEncoder.ApplyAllowListUpdates,
 })
