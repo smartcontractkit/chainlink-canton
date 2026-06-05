@@ -15,7 +15,7 @@ replace (
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/aws/smithy-go v1.26.0
+	github.com/aws/smithy-go v1.27.1
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/ethereum/go-ethereum v1.17.3
 	github.com/evanphx/json-patch/v5 v5.9.11
@@ -38,7 +38,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260518191934-8eaeb5f036e1
 	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260518191934-8eaeb5f036e1
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
-	github.com/smartcontractkit/chainlink-deployments-framework v0.108.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.109.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.4
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260604143752-c6f6567940ba
