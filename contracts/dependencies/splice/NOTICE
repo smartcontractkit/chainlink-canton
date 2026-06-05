@@ -1,0 +1,7 @@
+Third-Party Notice
+
+This repository includes certain .dar files located in contracts/dependencies/splice that were obtained from the Splice project (https://github.com/canton-network/splice/tree/main/daml/dars).
+
+Those third-party files are licensed under the Apache License 2.0 and are excluded from the definition of the "Licensed Work" under the repository's Business Source License 1.1.
+
+A copy of the Apache License 2.0 applicable to those files from the Splice project is available in contracts/dependencies/splice.
