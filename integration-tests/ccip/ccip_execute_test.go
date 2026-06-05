@@ -98,7 +98,7 @@ func finalityConfigValueFromBlockConfirmations(blockConfirmations uint16) *apiv2
 // Format: versionTag (4 bytes) || signatureLength (2 bytes) || signatures (64 bytes each)
 // Matches EVM: signers sign keccak256(versionTag || messageId) where messageId = keccak256(encodedMessage).
 func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.PrivateKey) ([]byte, error) {
-	versionTag := hexutil.MustDecode(string(committeeverifier.VersionTagV200))
+	versionTag := gethcommon.FromHex(string(committeeverifier.VersionTagV200))
 
 	messageId := crypto.Keccak256(encodedMessage)
 	msgHash := crypto.Keccak256(append(versionTag, messageId...))
