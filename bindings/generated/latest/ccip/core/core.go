@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "7340737b258286acdb1fd04aa09d4401d4d1bb8f4502d5a51128ce21e998f5cf"
+	PackageID   = "e89320df31ce1ad984f46f35bf98533ff1a1405f61f610163c482e6f064a03f2"
 	SDKVersion  = "3.4.11"
 )
 
@@ -6963,6 +6963,7 @@ type SendingMessageV1 struct {
 	CcipOwner                 types.PARTY                               `json:"ccipOwner"`
 	Sender                    types.PARTY                               `json:"sender"`
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
+	DestAddressBytesLength    types.INT64                               `json:"destAddressBytesLength"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
 	DestDefaultCCVs           []chainlinkapi.RawInstanceAddress         `json:"destDefaultCCVs"`
 	RequiredCCVs              []chainlinkapi.RawInstanceAddress         `json:"requiredCCVs"`
@@ -7030,6 +7031,9 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	if t.DestChainSelector != "" {
 		args["destChainSelector"] = t.DestChainSelector
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["destAddressBytesLength"] = int64(t.DestAddressBytesLength)
 
 	if t.SequenceNumber != "" {
 		args["sequenceNumber"] = t.SequenceNumber
@@ -7291,6 +7295,9 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	if t.DestChainSelector != "" {
 		args["destChainSelector"] = t.DestChainSelector
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["destAddressBytesLength"] = int64(t.DestAddressBytesLength)
 
 	if t.SequenceNumber != "" {
 		args["sequenceNumber"] = t.SequenceNumber
@@ -7560,6 +7567,27 @@ func (t *SendingMessageV1) UnmarshalHex(data string) error {
 
 // Choice methods for SendingMessageV1
 
+// AddTokenSend exercises the AddTokenSend choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) AddTokenSend(contractID string, args AddTokenSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddTokenSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddTokenSendWithPackageID exercises the AddTokenSend choice using the provided package ID instead of package name
+func (t SendingMessageV1) AddTokenSendWithPackageID(contractID string, packageID string, args AddTokenSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddTokenSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
 func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
@@ -7598,27 +7626,6 @@ func (t SendingMessageV1) AddCCVFeeWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "AddCCVFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// AddTokenSend exercises the AddTokenSend choice on this SendingMessageV1 contract
-// This method uses the package name in the template ID
-func (t SendingMessageV1) AddTokenSend(contractID string, args AddTokenSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddTokenSend",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// AddTokenSendWithPackageID exercises the AddTokenSend choice using the provided package ID instead of package name
-func (t SendingMessageV1) AddTokenSendWithPackageID(contractID string, packageID string, args AddTokenSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddTokenSend",
 		Arguments:  argsToMap(args),
 	}
 }

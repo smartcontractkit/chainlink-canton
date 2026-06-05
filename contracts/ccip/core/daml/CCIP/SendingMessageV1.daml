@@ -9,6 +9,7 @@ import DA.Crypto.Text (BytesHex, byteCount, keccak256)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome, fromSome, fromOptional)
+import DA.Text qualified as Text
 
 import qualified CCIP.Events
 import qualified CCIP.FinalityConfig
@@ -17,6 +18,8 @@ import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.Tickets
+
+import MCMS.Crypto (isValidHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
@@ -53,7 +56,7 @@ data TokenSendData = TokenSendData
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         amount : BytesHex
-        destTokenAddress : BytesHex
+        destTokenAddress : BytesHex -- Dest address, unpadded bytes
         extraData : BytesHex
     deriving (Eq, Show)
 
@@ -87,6 +90,35 @@ data SendingMessageState
     | SendingMessageState_ExecutorFinalized
     | SendingMessageState_FeeFinalized
     deriving (Eq, Show)
+
+allZeroHex : BytesHex -> Bool
+allZeroHex hex =
+    Text.length hex == 0 || (Text.take 1 hex == "0" && allZeroHex (Text.drop 1 hex))
+
+-- | Validates a destination-chain address to be valid hex and strips leading padding iff the destination chain uses sub-32-byte addresses and the address is 32 bytes long with leading zeros.
+-- The message receiver, tokenReceiver, and destTokenAddress are all validated using this function since they're all remote chain addresses.
+-- This is the equivalent of EVM's _validateDestChainAddress().
+-- We must implement the same behavior here, since:
+--  - Pools store the remote chain's pool and token addresses (padded, in the case of EVM)
+--  - In the incoming direction (from EVM) the message's sourcePoolAddress & sourceTokenAddress will be 32-byte padded addresses
+--  - In the incoming directions, the pools will validate that sourcePoolAddress === the stored remote pool address
+--  - In the outgoing direction (to EVM), the pools will add this stored address to the message in destTokenAddress
+--  - In the outgoing direction, EVM expects the incoming destTokenAddress the be unpadded 20 bytes, so we must strip the padding before sending the outgoing message
+validateDestChainAddress : BytesHex -> Int -> BytesHex
+validateDestChainAddress address addressBytesLength =
+    if not (isValidHex address)
+    then error ("InvalidDestChainAddress: not valid hex: " <> show address)
+    else let actualLength = byteCount address
+         in if addressBytesLength < 32 && actualLength == 32
+            then
+                let paddingHexLength = (32 - addressBytesLength) * 2
+                    leftPadding = Text.take paddingHexLength address
+                in if allZeroHex leftPadding
+                   then Text.drop paddingHexLength address
+                   else error ("InvalidDestChainAddress: non-zero ABI padding for sub-32-byte address: " <> show address)
+            else if actualLength == addressBytesLength
+                 then address
+                 else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
 
 -- ceil(gasUnits * usdPerUnitGas / usdPerUsdCent) → integer USD cents.
 -- EVM FeeQuoter.sol line 333: (totalGas * price + (1e16 - 1)) / 1e16.
@@ -166,6 +198,7 @@ template SendingMessageV1
         ccipOwner : Party
         sender : Party
         destChainSelector : Numeric 0
+        destAddressBytesLength : Int
         sequenceNumber : Numeric 0
         -- Destination-chain defaults captured at PrepareSend, used to resolve
         -- pool-required CCV sentinel/default semantics later.
@@ -176,7 +209,7 @@ template SendingMessageV1
         executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
         senderAddress : BytesHex
-        receiver : BytesHex
+        receiver : BytesHex -- Dest address, unpadded bytes
         payload : BytesHex
         executionGasLimit : Int
         ccipReceiveGasLimit : Int
@@ -184,7 +217,7 @@ template SendingMessageV1
         onRampAddress : BytesHex
         offRampAddress : BytesHex
         -- Token transfer receiver (populated for token transfers, "" otherwise)
-        tokenReceiver : BytesHex
+        tokenReceiver : BytesHex -- Dest address, unpadded bytes
         -- Raw outbound token args provided by the sender. These are source-side
         -- pool inputs and may influence CCV selection, fee quoting, and
         -- LockOrBurn, but are not emitted directly into TokenTransferV1.
@@ -243,6 +276,14 @@ template SendingMessageV1
     where
         signatory dedup (ccipOwner :: ccvOwners)
         observer observingParties
+
+        -- receiver, tokenReceiver (if set), and tokenSendData.destTokenAddress (if set) must be valid hex and of destAddressBytesLength bytes.
+        ensure
+            isValidHex receiver && byteCount receiver == destAddressBytesLength
+            && (tokenReceiver == "" || (isValidHex tokenReceiver && byteCount tokenReceiver == destAddressBytesLength))
+            && (case tokenSendData of
+                    None -> True
+                    Some tsd -> isValidHex tsd.destTokenAddress && byteCount tsd.destTokenAddress == destAddressBytesLength)
 
         choice AddCCVFee : ContractId SendingMessageV1
             with
@@ -494,7 +535,8 @@ template SendingMessageV1
 
                 let tsd = TokenSendData with
                         poolInstanceId, poolOwner, instrumentId, amount
-                        destTokenAddress, extraData
+                        destTokenAddress = validateDestChainAddress destTokenAddress destAddressBytesLength
+                        extraData
 
                 let updated = this with tokenSendData = Some tsd
                 let (finalCCVs, finalHash, messageV1, encoded, msgId) =
