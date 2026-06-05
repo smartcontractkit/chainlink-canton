@@ -477,20 +477,26 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Build message (no token transfer, just payload data)
 	testPayload := []byte("Hello CCIP - this is a test message payload!")
 	msg := protocol.Message{
-		SourceChainSelector: protocol.ChainSelector(remoteSelector),
-		DestChainSelector:   protocol.ChainSelector(env.Chain.ChainSelector()),
-		SequenceNumber:      1,
-		ExecutionGasLimit:   200000,
-		CcipReceiveGasLimit: 100000,
-		Finality:            protocol.NewFinality().WithBlockDepth(2000),
-		CcvAndExecutorHash:  [32]byte{},
-		OnRampAddress:       gethcommon.LeftPadBytes(gethcommon.HexToAddress("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd").Bytes(), 32), // left-padded to 32 bytes
-		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
-		Sender:              gethcommon.HexToAddress("0000000000000000000000000000000000000003").Bytes(),
-		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
-		DestBlob:            []byte{},
-		TokenTransfer:       nil, // No token transfer
-		Data:                testPayload,
+		SourceChainSelector:  protocol.ChainSelector(remoteSelector),
+		DestChainSelector:    protocol.ChainSelector(env.Chain.ChainSelector()),
+		SequenceNumber:       1,
+		ExecutionGasLimit:    200000,
+		CcipReceiveGasLimit:  100000,
+		Finality:             protocol.NewFinality().WithBlockDepth(2000),
+		CcvAndExecutorHash:   [32]byte{},
+		OnRampAddress:        gethcommon.LeftPadBytes(gethcommon.HexToAddress("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd").Bytes(), 32), // left-padded to 32 bytes
+		OnRampAddressLength:  32,
+		OffRampAddress:       offRampAddress.InstanceAddress().Bytes(),
+		OffRampAddressLength: 32,
+		Sender:               gethcommon.HexToAddress("0000000000000000000000000000000000000003").Bytes(),
+		SenderLength:         20,
+		Receiver:             contracts.HashedPartyFromString(partyReceiver).Bytes(),
+		ReceiverLength:       32,
+		DestBlob:             nil,
+		DestBlobLength:       0,
+		TokenTransfer:        nil, // No token transfer
+		Data:                 testPayload,
+		DataLength:           uint16(len(testPayload)),
 	}
 	encodedMessage, err := msg.Encode()
 	require.NoError(t, err)

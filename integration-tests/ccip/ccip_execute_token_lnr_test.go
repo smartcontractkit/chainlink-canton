@@ -628,20 +628,26 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	// Build message
 	msg := protocol.Message{
-		SourceChainSelector: protocol.ChainSelector(remoteSelector),
-		DestChainSelector:   protocol.ChainSelector(env.Chain.ChainSelector()),
-		SequenceNumber:      1,
-		ExecutionGasLimit:   200000,
-		CcipReceiveGasLimit: 100000,
-		Finality:            protocol.NewFinality().WithBlockDepth(2000),
-		CcvAndExecutorHash:  [32]byte{},
-		OnRampAddress:       gethcommon.LeftPadBytes(gethcommon.HexToAddress("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd").Bytes(), 32),
-		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
-		Sender:              gethcommon.HexToAddress("0000000000000000000000000000000000000003").Bytes(),
-		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
-		DestBlob:            []byte{},
-		TokenTransfer:       tokenTransfer,
-		Data:                []byte{},
+		SourceChainSelector:  protocol.ChainSelector(remoteSelector),
+		DestChainSelector:    protocol.ChainSelector(env.Chain.ChainSelector()),
+		SequenceNumber:       1,
+		ExecutionGasLimit:    200000,
+		CcipReceiveGasLimit:  100000,
+		Finality:             protocol.NewFinality().WithBlockDepth(2000),
+		CcvAndExecutorHash:   [32]byte{},
+		OnRampAddress:        gethcommon.LeftPadBytes(gethcommon.HexToAddress("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd").Bytes(), 32),
+		OnRampAddressLength:  32,
+		OffRampAddress:       offRampAddress.InstanceAddress().Bytes(),
+		OffRampAddressLength: 32,
+		Sender:               gethcommon.HexToAddress("0000000000000000000000000000000000000003").Bytes(),
+		SenderLength:         20,
+		Receiver:             contracts.HashedPartyFromString(partyReceiver).Bytes(),
+		ReceiverLength:       32,
+		DestBlob:             nil,
+		DestBlobLength:       0,
+		TokenTransfer:        tokenTransfer,
+		Data:                 nil,
+		DataLength:           0,
 	}
 	encodedMessage, err := msg.Encode()
 	require.NoError(t, err)
@@ -803,12 +809,17 @@ func buildTokenTransferV1(
 	extraData []byte,
 ) *protocol.TokenTransfer {
 	return &protocol.TokenTransfer{
-		Amount:             amount,
-		SourcePoolAddress:  sourcePoolAddress,
-		SourceTokenAddress: sourceTokenAddress,
-		DestTokenAddress:   destTokenAddress.Bytes(),
-		TokenReceiver:      contracts.HashedPartyFromString(tokenReceiverParty).Bytes(),
-		ExtraData:          extraData,
+		Amount:                   amount,
+		SourcePoolAddress:        sourcePoolAddress,
+		SourcePoolAddressLength:  uint8(len(sourcePoolAddress)),
+		SourceTokenAddress:       sourceTokenAddress,
+		SourceTokenAddressLength: uint8(len(sourceTokenAddress)),
+		DestTokenAddress:         destTokenAddress.Bytes(),
+		DestTokenAddressLength:   32,
+		TokenReceiver:            contracts.HashedPartyFromString(tokenReceiverParty).Bytes(),
+		TokenReceiverLength:      32,
+		ExtraData:                extraData,
+		ExtraDataLength:          uint16(len(extraData)),
 	}
 }
 
