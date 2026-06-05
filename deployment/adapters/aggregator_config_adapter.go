@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -69,14 +69,14 @@ func (a *CantonCommitteeVerifierOnchain) ScanCommitteeStates(ctx context.Context
 			ctx,
 			participant.LedgerServices.State,
 			contract.LedgerQueryParties(participant),
-			ccvs.CommitteeVerifier{}.GetTemplateID(),
+			committeeverifier.CommitteeVerifier{}.GetTemplateID(),
 			instanceAddr,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find CommitteeVerifier %s on chain %d: %w", ref.Address, chainSelector, err)
 		}
 
-		cv, err := bindings.UnmarshalCreatedEvent[ccvs.CommitteeVerifier](active.GetCreatedEvent())
+		cv, err := bindings.UnmarshalCreatedEvent[committeeverifier.CommitteeVerifier](active.GetCreatedEvent())
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal CommitteeVerifier %s on chain %d: %w", ref.Address, chainSelector, err)
 		}
@@ -177,7 +177,7 @@ func (a *CantonAggregatorConfigAdapter) GetDeployedChains(ds datastore.DataStore
 	return chains
 }
 
-func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapters.SignatureConfig, error) {
+func signatureConfigsFromCommitteeVerifier(cv *committeeverifier.CommitteeVerifier) ([]adapters.SignatureConfig, error) {
 	if cv == nil || len(cv.SignerConfigs) == 0 {
 		return nil, nil
 	}
@@ -188,7 +188,7 @@ func signatureConfigsFromCommitteeVerifier(cv *ccvs.CommitteeVerifier) ([]adapte
 		if err != nil {
 			return nil, fmt.Errorf("marshal signer config value: %w", err)
 		}
-		var cfg ccvs.SignatureConfig
+		var cfg committeeverifier.SignatureConfig
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			return nil, fmt.Errorf("unmarshal signer config: %w", err)
 		}

@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
 )
 
 // ===========================================================================
@@ -100,7 +100,7 @@ var (
 // ===========================================================================
 
 // UnwrapTimelockCall extracts plain Go types from mcms.TimelockCall for hashing.
-func UnwrapTimelockCall(call mcms.TimelockCall) TimelockCall {
+func UnwrapTimelockCall(call mcmsApi.TimelockCall) TimelockCall {
 	return TimelockCall{
 		TargetInstanceAddress: string(call.TargetInstanceAddress),
 		FunctionName:          string(call.FunctionName),
@@ -110,7 +110,7 @@ func UnwrapTimelockCall(call mcms.TimelockCall) TimelockCall {
 
 // UnwrapTimelockCalls extracts plain Go types from mcms.TimelockCall slice for hashing.
 // This is needed because HashTimelockOpId requires plain Go types, not DAML-wrapped types.
-func UnwrapTimelockCalls(calls []mcms.TimelockCall) []TimelockCall {
+func UnwrapTimelockCalls(calls []mcmsApi.TimelockCall) []TimelockCall {
 	result := make([]TimelockCall, len(calls))
 	for i, call := range calls {
 		result[i] = UnwrapTimelockCall(call)
@@ -124,13 +124,13 @@ func UnwrapTimelockCalls(calls []mcms.TimelockCall) []TimelockCall {
 //
 //	choice, _ := encoder.ScheduleBatch(params)
 //	proposal.AddOperation(instanceAddress, choice.Choice, choice.OperationData)
-func NewMCMSEncoder() mcms.MCMSEncoder {
-	return mcms.NewContract(fmt.Sprintf("#%s", mcms.PackageName), "MCMS.Main", "MCMS").Encoder()
+func NewMCMSEncoder() mcmsApi.MCMSEncoder {
+	return mcmsApi.NewContract(fmt.Sprintf("#%s", mcmsApi.PackageName), "MCMS.Main", "MCMS").Encoder()
 }
 
 // MustEncodeScheduleBatch encodes ScheduleBatchParams and returns the full EncodedChoice.
 // Use choice.Choice for the function name, choice.OperationData for hex data.
-func MustEncodeScheduleBatch(t testing.TB, encoder mcms.MCMSEncoder, params mcms.ScheduleBatchParams) *bind.EncodedChoice {
+func MustEncodeScheduleBatch(t testing.TB, encoder mcmsApi.MCMSEncoder, params mcmsApi.ScheduleBatchParams) *bind.EncodedChoice {
 	t.Helper()
 	choice, err := encoder.ScheduleBatch(params)
 	require.NoError(t, err, "failed to encode ScheduleBatchParams")
@@ -140,7 +140,7 @@ func MustEncodeScheduleBatch(t testing.TB, encoder mcms.MCMSEncoder, params mcms
 
 // MustEncodeCancelBatch encodes CancelBatchParams and returns the full EncodedChoice.
 // Use choice.Choice for the function name, choice.OperationData for hex data.
-func MustEncodeCancelBatch(t testing.TB, encoder mcms.MCMSEncoder, params mcms.CancelBatchParams) *bind.EncodedChoice {
+func MustEncodeCancelBatch(t testing.TB, encoder mcmsApi.MCMSEncoder, params mcmsApi.CancelBatchParams) *bind.EncodedChoice {
 	t.Helper()
 	choice, err := encoder.CancelBatch(params)
 	require.NoError(t, err, "failed to encode CancelBatchParams")
@@ -150,7 +150,7 @@ func MustEncodeCancelBatch(t testing.TB, encoder mcms.MCMSEncoder, params mcms.C
 
 // MustEncodeBypasserExecuteBatch encodes BypasserExecuteBatchParams and returns the full EncodedChoice.
 // Use choice.Choice for the function name, choice.OperationData for hex data.
-func MustEncodeBypasserExecuteBatch(t testing.TB, encoder mcms.MCMSEncoder, params mcms.BypasserExecuteBatchParams) *bind.EncodedChoice {
+func MustEncodeBypasserExecuteBatch(t testing.TB, encoder mcmsApi.MCMSEncoder, params mcmsApi.BypasserExecuteBatchParams) *bind.EncodedChoice {
 	t.Helper()
 	choice, err := encoder.BypasserExecuteBatch(params)
 	require.NoError(t, err, "failed to encode BypasserExecuteBatchParams")
@@ -160,17 +160,17 @@ func MustEncodeBypasserExecuteBatch(t testing.TB, encoder mcms.MCMSEncoder, para
 
 // MustEncodeSetConfigParams encodes SetConfigParams and returns the full EncodedChoice.
 // Use choice.Choice for the function name, choice.OperationData for hex data.
-func MustEncodeSetConfigParams(t testing.TB, encoder mcms.MCMSEncoder, params mcms.SetConfigParams) *bind.EncodedChoice {
+func MustEncodeSetConfigParams(t testing.TB, encoder mcmsApi.MCMSEncoder, params mcmsApi.SetConfigParams) *bind.EncodedChoice {
 	t.Helper()
-	choice, err := encoder.SetConfigParams(params)
+	choice, err := encoder.SetConfig(params)
 	require.NoError(t, err, "failed to encode SetConfigParams")
 
 	return choice
 }
 
 // ToBindingSignerInfo converts local SignerInfo to mcms.SignerInfo binding type.
-func ToBindingSignerInfo(si SignerInfo) mcms.SignerInfo {
-	return mcms.SignerInfo{
+func ToBindingSignerInfo(si SignerInfo) mcmsApi.SignerInfo {
+	return mcmsApi.SignerInfo{
 		SignerAddress: types.TEXT(si.SignerAddress),
 		SignerIndex:   types.INT64(si.SignerIndex),
 		SignerGroup:   types.INT64(si.SignerGroup),
@@ -178,8 +178,8 @@ func ToBindingSignerInfo(si SignerInfo) mcms.SignerInfo {
 }
 
 // ToBindingSignerInfos converts a slice of local SignerInfo to mcms.SignerInfo binding types.
-func ToBindingSignerInfos(signers []SignerInfo) []mcms.SignerInfo {
-	result := make([]mcms.SignerInfo, len(signers))
+func ToBindingSignerInfos(signers []SignerInfo) []mcmsApi.SignerInfo {
+	result := make([]mcmsApi.SignerInfo, len(signers))
 	for i, si := range signers {
 		result[i] = ToBindingSignerInfo(si)
 	}
@@ -198,8 +198,8 @@ func ToINT64Slice(ints []int) []types.INT64 {
 }
 
 // ToBindingSetConfigParams converts local config to mcms.SetConfigParams binding type.
-func ToBindingSetConfigParams(signers []SignerInfo, groupQuorums, groupParents []int, clearRoot bool) mcms.SetConfigParams {
-	return mcms.SetConfigParams{
+func ToBindingSetConfigParams(signers []SignerInfo, groupQuorums, groupParents []int, clearRoot bool) mcmsApi.SetConfigParams {
+	return mcmsApi.SetConfigParams{
 		Signers:      ToBindingSignerInfos(signers),
 		GroupQuorums: ToINT64Slice(groupQuorums),
 		GroupParents: ToINT64Slice(groupParents),
@@ -858,7 +858,7 @@ func wireToHex(wire string) string {
 }
 
 // MustEncodeBlockedFunction encodes a BlockedFunction to hex bytes using binding's MarshalHex.
-func MustEncodeBlockedFunction(t testing.TB, bf mcms.BlockedFunction) string {
+func MustEncodeBlockedFunction(t testing.TB, bf mcmsApi.BlockedFunction) string {
 	t.Helper()
 	wire, err := bf.MarshalHex()
 	require.NoError(t, err, "failed to encode BlockedFunction")
@@ -870,7 +870,7 @@ func MustEncodeBlockedFunction(t testing.TB, bf mcms.BlockedFunction) string {
 // Format matches Canton MCMS.Codec.encodeSelfDispatchSetConfig:
 //
 //	uint8(roleToInt(role)) <> encodeSetConfigParams(params)
-func EncodeSelfDispatchSetConfig(role MCMSRole, params mcms.SetConfigParams) (string, error) {
+func EncodeSelfDispatchSetConfig(role MCMSRole, params mcmsApi.SetConfigParams) (string, error) {
 	wire, err := params.MarshalHex()
 	if err != nil {
 		return "", fmt.Errorf("MarshalHex failed: %w", err)

@@ -14,12 +14,11 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
-type DeployInput[TT common.Template] struct {
+type DeployInput[TT core.Template] struct {
 	Qualifier  *string     `json:"qualifier,omitempty"`
 	Template   TT          `json:"createCommand"`
 	OwnerParty types.PARTY `json:"ownerParty"`
@@ -47,7 +46,7 @@ type DeployParams[ARGS any] struct {
 // The template *must* have an InstanceId field of type types.TEXT.
 // If InstanceId is empty, it is generated using the provided prefix and a random suffix.
 // If InstanceId is set by the caller, that value is preserved.
-func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operation[DeployInput[TT], datastore.AddressRef, canton.Chain] {
+func NewDeploy[TT core.Template](params DeployParams[TT]) *operations.Operation[DeployInput[TT], datastore.AddressRef, canton.Chain] {
 	return operations.NewOperation(
 		params.Name,
 		&params.TypeAndVersion.Version,
@@ -69,7 +68,7 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to read InstanceID from template: %w", err)
 			}
-			templWithID := common.Template(input.Template)
+			templWithID := core.Template(input.Template)
 			if instanceID == "" {
 				// Generate InstanceID
 				instanceID, err = contracts.NewInstanceID(params.Prefix)
@@ -134,7 +133,7 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 }
 
 // setInstanceID sets the InstanceId field of the given template to the provided instanceID.
-func setInstanceID(template common.Template, instanceID contracts.InstanceID) (common.Template, error) {
+func setInstanceID(template core.Template, instanceID contracts.InstanceID) (core.Template, error) {
 	t := reflect.TypeOf(template)
 	v := reflect.ValueOf(template)
 
@@ -143,7 +142,7 @@ func setInstanceID(template common.Template, instanceID contracts.InstanceID) (c
 		t = reflect.PointerTo(t)
 		v = reflect.New(t.Elem())
 		v.Elem().Set(reflect.ValueOf(template))
-		template = v.Interface().(common.Template)
+		template = v.Interface().(core.Template)
 		deref = true
 	}
 
@@ -165,14 +164,14 @@ func setInstanceID(template common.Template, instanceID contracts.InstanceID) (c
 	field.Set(reflect.ValueOf(instanceIDText))
 
 	if deref {
-		return v.Elem().Interface().(common.Template), nil
+		return v.Elem().Interface().(core.Template), nil
 	}
 
 	return template, nil
 }
 
 // getInstanceID reads the InstanceId field from the given template.
-func getInstanceID(template common.Template) (contracts.InstanceID, error) {
+func getInstanceID(template core.Template) (contracts.InstanceID, error) {
 	t := reflect.TypeOf(template)
 	v := reflect.ValueOf(template)
 
@@ -195,7 +194,7 @@ func getInstanceID(template common.Template) (contracts.InstanceID, error) {
 }
 
 // TODO: packageName add package name to bindings instead
-func getDeployedContractIDFromEvents(events []*apiv2.Event, template common.Template, packageName string) (string, error) {
+func getDeployedContractIDFromEvents(events []*apiv2.Event, template core.Template, packageName string) (string, error) {
 	for _, event := range events {
 		created := event.GetCreated()
 		if created == nil {

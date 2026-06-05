@@ -12,9 +12,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -71,11 +70,11 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 
 	// Step 1: ProposeAdministrator (CCIP acts)
 	skipAcceptAdminRole := false
-	proposeReport, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.ProposeAdministrator]{
+	proposeReport, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[core.ProposeAdministrator]{
 		InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
 		RawInstanceAddress: tarRaw,
 		MCMSEnabled:        mcmsEnabled,
-		Args: tokenadminregistry.ProposeAdministrator{
+		Args: core.ProposeAdministrator{
 			TokenConfigCid: tokenConfigCidArg,
 			InstrumentId:   instrumentId,
 			NewAdmin:       types.PARTY(poolOwnerParty),
@@ -105,11 +104,11 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 
 	// Step 2: AcceptAdminRole (pool owner acts). Exercise resolves current TAR contract by InstanceAddress.
 	if !skipAcceptAdminRole {
-		acceptReport, err := operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.AcceptAdminRole]{
+		acceptReport, err := operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[core.AcceptAdminRole]{
 			InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
 			RawInstanceAddress: tarRaw,
 			MCMSEnabled:        mcmsEnabled,
-			Args: tokenadminregistry.AcceptAdminRole{
+			Args: core.AcceptAdminRole{
 				TokenConfigCid: tokenConfigCid,
 				InstrumentId:   instrumentId,
 				Caller:         types.PARTY(poolOwnerParty),
@@ -134,14 +133,14 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 
 	// Step 3: SetPool (pool owner acts)
 	poolOwnerPartyTyped := types.PARTY(poolOwnerParty)
-	setPoolReport, err := operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[tokenadminregistry.SetPool]{
+	setPoolReport, err := operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[core.SetPool]{
 		InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
 		RawInstanceAddress: tarRaw,
 		MCMSEnabled:        mcmsEnabled,
-		Args: tokenadminregistry.SetPool{
+		Args: core.SetPool{
 			TokenConfigCid: tokenConfigCid,
 			InstrumentId:   instrumentId,
-			TokenPool: &tokenadminregistry.PoolRegistration{
+			TokenPool: &core.PoolRegistration{
 				PoolOwner:      poolOwnerPartyTyped,
 				PoolInstanceId: types.TEXT(input.PoolInstanceID),
 			},
@@ -175,7 +174,7 @@ func findTokenConfigCid(b operations.Bundle, deps canton.Chain, address contract
 		b.GetContext(),
 		participant.LedgerServices.State,
 		contract.LedgerQueryParties(participant),
-		tokenadminregistry.TokenConfig{}.GetTemplateID(),
+		core.TokenConfig{}.GetTemplateID(),
 		address,
 	)
 	if err != nil {

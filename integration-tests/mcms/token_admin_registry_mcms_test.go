@@ -6,22 +6,19 @@ import (
 	"testing"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
 	splice "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
@@ -60,15 +57,15 @@ func TestSetPoolViaMCMS(t *testing.T) {
 	tokenConfigInstanceAddr := makeTokenConfigInstanceAddr(ccipOwner, testInstrumentId)
 
 	// Create MCMS encoder for TokenAdminRegistry
-	tarContract := tokenadminregistry.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Build set_pool operation
-	poolReg := &tokenadminregistry.PoolRegistration{
+	poolReg := &core.PoolRegistration{
 		PoolOwner:      types.PARTY(ccipOwner),
 		PoolInstanceId: types.TEXT("test-pool-001"),
 	}
 	encodedSetPool, err := tarContract.Encoder().SetPoolParams(
-		tokenadminregistry.SetPoolParams{
+		core.SetPoolParams{
 			InstrumentId: testInstrumentId,
 			TokenPool:    poolReg,
 		},
@@ -77,7 +74,7 @@ func TestSetPoolViaMCMS(t *testing.T) {
 	setPoolData := encodedSetPool.OperationData
 
 	// Build timelock calls
-	calls := []mcms.TimelockCall{{
+	calls := []mcmsApi.TimelockCall{{
 		TargetInstanceAddress: types.TEXT(tarInstanceAddr),
 		FunctionName:          types.TEXT("SetPool"),
 		OperationData:         types.TEXT(setPoolData),
@@ -85,7 +82,7 @@ func TestSetPoolViaMCMS(t *testing.T) {
 	salt := uuid.New().String()[:8]
 
 	// Encode schedule params
-	scheduleParams := mcms.ScheduleBatchParams{
+	scheduleParams := mcmsApi.ScheduleBatchParams{
 		Calls:       calls,
 		Predecessor: types.TEXT(ZeroHash),
 		Salt:        types.TEXT(salt),
@@ -158,7 +155,7 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 	tokenConfigInstanceAddr := makeTokenConfigInstanceAddr(ccipOwner, testInstrumentId)
 
 	// Set initial pool directly (not via MCMS) so we have something to clear
-	initialPool := &tokenadminregistry.PoolRegistration{
+	initialPool := &core.PoolRegistration{
 		PoolOwner:      types.PARTY(ccipOwner),
 		PoolInstanceId: types.TEXT("initial-pool"),
 	}
@@ -170,11 +167,11 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 	require.NotNil(t, config.TokenPool, "pool should be set initially")
 
 	// Create MCMS encoder for TokenAdminRegistry
-	tarContract := tokenadminregistry.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Clear pool by setting to None via MCMS
 	encodedClearPool, err := tarContract.Encoder().SetPoolParams(
-		tokenadminregistry.SetPoolParams{
+		core.SetPoolParams{
 			InstrumentId: testInstrumentId,
 			TokenPool:    nil, // nil = clear pool
 		},
@@ -182,14 +179,14 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 	require.NoError(t, err)
 	clearPoolData := encodedClearPool.OperationData
 
-	calls := []mcms.TimelockCall{{
+	calls := []mcmsApi.TimelockCall{{
 		TargetInstanceAddress: types.TEXT(tarInstanceAddr),
 		FunctionName:          types.TEXT("SetPool"),
 		OperationData:         types.TEXT(clearPoolData),
 	}}
 	salt := uuid.New().String()[:8]
 
-	scheduleParams := mcms.ScheduleBatchParams{
+	scheduleParams := mcmsApi.ScheduleBatchParams{
 		Calls:       calls,
 		Predecessor: types.TEXT(ZeroHash),
 		Salt:        types.TEXT(salt),
@@ -253,12 +250,12 @@ func TestTokenAdminRegistry_ProposeAdminViaMCMS(t *testing.T) {
 	tarCid := createTokenAdminRegistryEmpty(t, participant, ccipOwner, tarInstanceID)
 
 	// Create MCMS encoder for TokenAdminRegistry
-	tarContract := tokenadminregistry.NewContract(fmt.Sprintf("#%s", common.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Propose a new admin via MCMS
 	newAdmin := types.PARTY(ccipOwner) // For simplicity, propose self as admin
 	encodedPropose, err := tarContract.Encoder().ProposeAdministrator(
-		tokenadminregistry.ProposeAdministrator{
+		core.ProposeAdministrator{
 			InstrumentId: testInstrumentId,
 			NewAdmin:     newAdmin,
 		},
@@ -266,14 +263,14 @@ func TestTokenAdminRegistry_ProposeAdminViaMCMS(t *testing.T) {
 	require.NoError(t, err)
 	proposeData := encodedPropose.OperationData
 
-	calls := []mcms.TimelockCall{{
+	calls := []mcmsApi.TimelockCall{{
 		TargetInstanceAddress: types.TEXT(tarInstanceAddr),
 		FunctionName:          types.TEXT("ProposeAdministrator"),
 		OperationData:         types.TEXT(proposeData),
 	}}
 	salt := uuid.New().String()[:8]
 
-	scheduleParams := mcms.ScheduleBatchParams{
+	scheduleParams := mcmsApi.ScheduleBatchParams{
 		Calls:       calls,
 		Predecessor: types.TEXT(ZeroHash),
 		Salt:        types.TEXT(salt),
@@ -317,7 +314,7 @@ func createTokenAdminRegistryEmpty(
 ) string {
 	t.Helper()
 
-	tarContract := tokenadminregistry.TokenAdminRegistry{
+	tarContract := core.TokenAdminRegistry{
 		InstanceId: types.TEXT(instanceID),
 		Owner:      types.PARTY(owner),
 		EntryCount: 0,
@@ -351,11 +348,11 @@ func exerciseSetPoolDirectly(
 	tarCid string,
 	tokenConfigCid string,
 	instrumentId splice.InstrumentId,
-	pool *tokenadminregistry.PoolRegistration,
+	pool *core.PoolRegistration,
 ) string {
 	t.Helper()
 
-	setPoolArgs := tokenadminregistry.SetPool{
+	setPoolArgs := core.SetPool{
 		TokenConfigCid: types.CONTRACT_ID(tokenConfigCid),
 		InstrumentId:   instrumentId,
 		TokenPool:      pool,
@@ -402,7 +399,7 @@ func exerciseProposeAndAcceptAdmin(
 ) (string, string) {
 	t.Helper()
 
-	proposeArgs := tokenadminregistry.ProposeAdministrator{
+	proposeArgs := core.ProposeAdministrator{
 		InstrumentId: instrumentId,
 		NewAdmin:     types.PARTY(owner),
 		Caller:       types.PARTY(owner),
@@ -440,7 +437,7 @@ func exerciseProposeAndAcceptAdmin(
 	require.NotEmpty(t, newTarCid, "no TokenAdminRegistry contract created after ProposeAdministrator")
 	require.NotEmpty(t, tokenConfigCid, "no TokenConfig contract created after ProposeAdministrator")
 
-	acceptArgs := tokenadminregistry.AcceptAdminRole{
+	acceptArgs := core.AcceptAdminRole{
 		TokenConfigCid: types.CONTRACT_ID(tokenConfigCid),
 		InstrumentId:   instrumentId,
 		Caller:         types.PARTY(owner),
@@ -481,7 +478,7 @@ func executeScheduledBatchReturningTargetCid(
 	owner string,
 	mcmsCid string,
 	opID string,
-	calls []mcms.TimelockCall,
+	calls []mcmsApi.TimelockCall,
 	predecessor string,
 	salt string,
 	targetCids map[string]string,
@@ -489,7 +486,7 @@ func executeScheduledBatchReturningTargetCid(
 ) string {
 	t.Helper()
 
-	executeArgs := mcms.ExecuteScheduledBatch{
+	executeArgs := mcmsCore.ExecuteScheduledBatch{
 		Submitter:   types.PARTY(owner),
 		OpId:        types.TEXT(opID),
 		Calls:       calls,
@@ -504,7 +501,7 @@ func executeScheduledBatchReturningTargetCid(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteScheduledBatch",
 						ChoiceArgument: ledger.MapToValue(executeArgs),
@@ -535,7 +532,7 @@ func queryTokenConfig(
 	participant canton.Participant,
 	owner string,
 	instrumentId splice.InstrumentId,
-) *tokenadminregistry.TokenConfig {
+) *core.TokenConfig {
 	t.Helper()
 
 	contracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, contracts.IdentifierFromBinding(core.TokenAdminRegistry{}))
@@ -544,7 +541,7 @@ func queryTokenConfig(
 	expectedInstanceID := encodeInstrumentId(instrumentId)
 	for _, contract := range contracts {
 		createdEvent := contract.GetCreatedEvent()
-		config, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenConfig](createdEvent)
+		config, err := bindings.UnmarshalCreatedEvent[core.TokenConfig](createdEvent)
 		require.NoError(t, err)
 		if string(config.InstanceId) != expectedInstanceID {
 			continue

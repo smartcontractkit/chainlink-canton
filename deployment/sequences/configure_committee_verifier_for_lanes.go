@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -15,7 +16,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
@@ -53,10 +54,10 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		remoteChainConfigArgs := make([]ccvs.RemoteChainConfigArgs, 0, len(input.RemoteChains))
-		allowListArgs := make([]ccvs.AllowListConfigArgs, 0, len(input.RemoteChains))
+		remoteChainConfigArgs := make([]committeeverifier.RemoteChainConfigArgs, 0, len(input.RemoteChains))
+		allowListArgs := make([]committeeverifier.AllowListConfigArgs, 0, len(input.RemoteChains))
 		for remoteSelector, remoteConfig := range input.RemoteChains {
-			remoteChainConfigArgs = append(remoteChainConfigArgs, ccvs.RemoteChainConfigArgs{
+			remoteChainConfigArgs = append(remoteChainConfigArgs, committeeverifier.RemoteChainConfigArgs{
 				RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 				FeeUSDCents:         types.NUMERIC(strconv.FormatUint(uint64(remoteConfig.FeeUSDCents), 10)),
 				GasForVerification:  types.INT64(remoteConfig.GasForVerification),
@@ -64,7 +65,7 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 				AllowListEnabled:    types.BOOL(remoteConfig.AllowlistEnabled),
 			})
 
-			allowListArgs = append(allowListArgs, ccvs.AllowListConfigArgs{
+			allowListArgs = append(allowListArgs, committeeverifier.AllowListConfigArgs{
 				DestChainSelector:         types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 				AllowListEnabled:          types.BOOL(remoteConfig.AllowlistEnabled),
 				AddedAllowListedSenders:   convertPartySlice(remoteConfig.AddedAllowlistedSenders),
@@ -80,11 +81,11 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("committee verifier raw instance address: %w", err)
 			}
 
-			remoteReport, err := operations.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.ChoiceInput[ccvs.ApplyRemoteChainConfigUpdates]{
+			remoteReport, err := operations.ExecuteOperation(b, committee_verifier.ApplyRemoteChainConfigUpdates, chain, contract.ChoiceInput[committeeverifier.ApplyRemoteChainConfigUpdates]{
 				InstanceAddress:    address,
 				RawInstanceAddress: raw.String(),
 				MCMSEnabled:        input.MCMSEnabled,
-				Args: ccvs.ApplyRemoteChainConfigUpdates{
+				Args: committeeverifier.ApplyRemoteChainConfigUpdates{
 					RemoteChainConfigArgs: remoteChainConfigArgs,
 				},
 			})
@@ -95,11 +96,11 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 				proposalOutputs = append(proposalOutputs, remoteReport.Output)
 			}
 
-			allowListReport, err := operations.ExecuteOperation(b, committee_verifier.ApplyAllowListUpdates, chain, contract.ChoiceInput[ccvs.ApplyAllowListUpdates]{
+			allowListReport, err := operations.ExecuteOperation(b, committee_verifier.ApplyAllowListUpdates, chain, contract.ChoiceInput[committeeverifier.ApplyAllowListUpdates]{
 				InstanceAddress:    address,
 				RawInstanceAddress: raw.String(),
 				MCMSEnabled:        input.MCMSEnabled,
-				Args: ccvs.ApplyAllowListUpdates{
+				Args: committeeverifier.ApplyAllowListUpdates{
 					AllowListConfigArgsItems: allowListArgs,
 				},
 			})
@@ -137,7 +138,7 @@ var ConfigureCommitteeVerifierAsDest = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("chain with selector %d not found", input.ChainSelector)
 		}
 
-		signatureConfigs := make([]ccvs.SignatureConfig, 0, len(input.RemoteChains))
+		signatureConfigs := make([]committeeverifier.SignatureConfig, 0, len(input.RemoteChains))
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			signerKeys := make([]types.TEXT, len(remoteConfig.SignatureConfig.Signers))
 			for i, signer := range remoteConfig.SignatureConfig.Signers {
@@ -147,7 +148,7 @@ var ConfigureCommitteeVerifierAsDest = operations.NewSequence(
 				}
 				signerKeys[i] = types.TEXT(hex.EncodeToString(signerBytes))
 			}
-			signatureConfigs = append(signatureConfigs, ccvs.SignatureConfig{
+			signatureConfigs = append(signatureConfigs, committeeverifier.SignatureConfig{
 				SourceChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 				Threshold:           types.INT64(remoteConfig.SignatureConfig.Threshold),
 				SignerKeys:          signerKeys,
@@ -162,11 +163,11 @@ var ConfigureCommitteeVerifierAsDest = operations.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("committee verifier raw instance address: %w", err)
 			}
 
-			sigReport, err := operations.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.ChoiceInput[ccvs.ApplySignatureConfigs]{
+			sigReport, err := operations.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, chain, contract.ChoiceInput[committeeverifier.ApplySignatureConfigs]{
 				InstanceAddress:    address,
 				RawInstanceAddress: raw.String(),
 				MCMSEnabled:        input.MCMSEnabled,
-				Args: ccvs.ApplySignatureConfigs{
+				Args: committeeverifier.ApplySignatureConfigs{
 					SourceChainSelectorsToRemove: nil,
 					SignatureConfigs:             signatureConfigs,
 				},

@@ -14,7 +14,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/mcmstest"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
@@ -48,7 +49,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		t.Parallel()
 
 		// Define calls and salt first so we can encode them
-		calls := []mcms.TimelockCall{{
+		calls := []mcmsApi.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr),
 			FunctionName:          types.TEXT("Increment"),
 			OperationData:         types.TEXT(""),
@@ -57,7 +58,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		delaySecs := 0
 
 		// Encode schedule params using encoder pattern (gets choice name + operation data)
-		scheduleParams := mcms.ScheduleBatchParams{
+		scheduleParams := mcmsApi.ScheduleBatchParams{
 			Calls:       calls,
 			Predecessor: types.TEXT(ZeroHash),
 			Salt:        types.TEXT(salt),
@@ -102,7 +103,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid2 := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 0, nil)
 
 		// Define calls and salt first so we can encode them
-		calls := []mcms.TimelockCall{{
+		calls := []mcmsApi.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr),
 			FunctionName:          types.TEXT("Increment"),
 			OperationData:         types.TEXT(""),
@@ -111,7 +112,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 
 		// Encode schedule params using encoder pattern
-		scheduleParams := mcms.ScheduleBatchParams{
+		scheduleParams := mcmsApi.ScheduleBatchParams{
 			Calls:       calls,
 			Predecessor: types.TEXT(ZeroHash),
 			Salt:        types.TEXT(salt),
@@ -134,7 +135,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid2 = scheduleBatch(t, participant, ccipOwner, mcmsCid2, scheduleProposal.Operations[0], opProof)
 
 		// Encode cancel params using encoder pattern
-		cancelParams := mcms.CancelBatchParams{OpId: types.TEXT(opID)}
+		cancelParams := mcmsApi.CancelBatchParams{OpId: types.TEXT(opID)}
 		cancelChoice := MustEncodeCancelBatch(t, mcmsEncoder, cancelParams)
 
 		// Set canceller root authorizing cancel
@@ -161,12 +162,12 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		base := "mcms-timelock-blocked-" + uuid.New().String()[:8]
 		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid3 := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 1_000_000, []mcms.BlockedFunction{
+		mcmsCid3 := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 1_000_000, []mcmsApi.BlockedFunction{
 			{TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr), FunctionName: types.TEXT("dangerous_function")},
 		})
 
 		// Define calls and salt first so we can encode them
-		calls := []mcms.TimelockCall{{
+		calls := []mcmsApi.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr),
 			FunctionName:          types.TEXT("dangerous_function"),
 			OperationData:         types.TEXT(""),
@@ -175,7 +176,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		delaySecs := 1
 
 		// Encode schedule params using encoder pattern
-		scheduleParams := mcms.ScheduleBatchParams{
+		scheduleParams := mcmsApi.ScheduleBatchParams{
 			Calls:       calls,
 			Predecessor: types.TEXT(ZeroHash),
 			Salt:        types.TEXT(salt),
@@ -251,7 +252,7 @@ func createMCMSMultiRole(
 	baseMcmsID string,
 	config MCMSConfig,
 	minDelayMicros int64,
-	blockedFunctions []mcms.BlockedFunction,
+	blockedFunctions []mcmsApi.BlockedFunction,
 ) string {
 	t.Helper()
 	mcmsContract := buildMCMSMultiRoleContract(owner, chainID, baseMcmsID, config, minDelayMicros, blockedFunctions)
@@ -262,7 +263,7 @@ func createMCMSMultiRole(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
-						TemplateId:      contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:      contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						CreateArguments: ledger.ConvertToRecord(mcmsContract),
 					},
 				},
@@ -281,11 +282,11 @@ func buildMCMSMultiRoleContract(
 	baseMcmsID string,
 	config MCMSConfig,
 	minDelayMicros int64,
-	blockedFunctions []mcms.BlockedFunction,
-) mcms.MCMS {
-	signerInfos := make([]mcms.SignerInfo, len(config.Signers))
+	blockedFunctions []mcmsApi.BlockedFunction,
+) mcmsCore.MCMS {
+	signerInfos := make([]mcmsApi.SignerInfo, len(config.Signers))
 	for i, si := range config.Signers {
-		signerInfos[i] = mcms.SignerInfo{
+		signerInfos[i] = mcmsApi.SignerInfo{
 			SignerAddress: types.TEXT(si.SignerAddress),
 			SignerIndex:   types.INT64(si.SignerIndex),
 			SignerGroup:   types.INT64(si.SignerGroup),
@@ -301,22 +302,22 @@ func buildMCMSMultiRoleContract(
 	}
 
 	// Build MultisigConfig
-	multisigConfig := mcms.MultisigConfig{
+	multisigConfig := mcmsApi.MultisigConfig{
 		Signers:      signerInfos,
 		GroupQuorums: groupQuorums,
 		GroupParents: groupParents,
 	}
 
 	// Build empty RoleState (same for all roles initially)
-	roleState := mcms.RoleState{
+	roleState := mcmsApi.RoleState{
 		Config:     multisigConfig,
 		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
-		ExpiringRoot: mcms.ExpiringRoot{
+		ExpiringRoot: mcmsApi.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
 			OpCount:    types.INT64(0),
 		},
-		RootMetadata: mcms.RootMetadata{
+		RootMetadata: mcmsApi.RootMetadata{
 			ChainId:              types.INT64(0),
 			MultisigId:           types.TEXT(""),
 			PreOpCount:           types.INT64(0),
@@ -325,7 +326,7 @@ func buildMCMSMultiRoleContract(
 		},
 	}
 
-	return mcms.MCMS{
+	return mcmsCore.MCMS{
 		Owner:              types.PARTY(owner),
 		InstanceId:         types.TEXT(baseMcmsID),
 		ChainId:            types.INT64(chainID),
@@ -369,9 +370,9 @@ func setRootWithRoleAndDisclosureParty(
 	// Use bindings for type safety - convert local types to binding types
 
 	// Convert signatures to binding type
-	bindingSignatures := make([]mcms.RawSignature, len(signatures))
+	bindingSignatures := make([]mcmsApi.RawSignature, len(signatures))
 	for i, sig := range signatures {
-		bindingSignatures[i] = mcms.RawSignature{
+		bindingSignatures[i] = mcmsApi.RawSignature{
 			PublicKey: types.TEXT(sig.PublicKey),
 			R:         types.TEXT(sig.R),
 			S:         types.TEXT(sig.S),
@@ -387,12 +388,12 @@ func setRootWithRoleAndDisclosureParty(
 	}
 
 	// Build SetRoot choice argument using bindings
-	setRootArgs := mcms.SetRoot{
-		TargetRole: mcms.Role(roleConstructor),
+	setRootArgs := mcmsCore.SetRoot{
+		TargetRole: mcmsApi.Role(roleConstructor),
 		Submitter:  types.PARTY(submitter),
 		NewRoot:    types.TEXT(proposal.GetRoot()),
 		ValidUntil: types.TIMESTAMP(validUntil),
-		Metadata: mcms.RootMetadata{
+		Metadata: mcmsApi.RootMetadata{
 			ChainId:              types.INT64(proposal.Metadata.ChainId),
 			MultisigId:           types.TEXT(proposal.Metadata.MultisigId),
 			PreOpCount:           types.INT64(proposal.Metadata.PreOpCount),
@@ -411,7 +412,7 @@ func setRootWithRoleAndDisclosureParty(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "SetRoot",
 						ChoiceArgument: ledger.MapToValue(setRootArgs),
@@ -443,10 +444,10 @@ func scheduleBatch(
 	t.Helper()
 
 	// Use bindings for type safety
-	executeOpArgs := mcms.ExecuteOp{
-		TargetRole: mcms.RoleProposer,
+	executeOpArgs := mcmsCore.ExecuteOp{
+		TargetRole: mcmsApi.RoleProposer,
 		Submitter:  types.PARTY(owner),
-		Op: mcms.Op{
+		Op: mcmsApi.Op{
 			ChainId:               types.INT64(op.ChainId),
 			MultisigId:            types.TEXT(op.MultisigId),
 			Nonce:                 types.INT64(op.Nonce),
@@ -464,7 +465,7 @@ func scheduleBatch(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -506,10 +507,10 @@ func scheduleBatchExpectError(
 	t.Helper()
 
 	// Use bindings for type safety
-	executeOpArgs := mcms.ExecuteOp{
-		TargetRole: mcms.RoleProposer,
+	executeOpArgs := mcmsCore.ExecuteOp{
+		TargetRole: mcmsApi.RoleProposer,
 		Submitter:  types.PARTY(owner),
-		Op: mcms.Op{
+		Op: mcmsApi.Op{
 			ChainId:               types.INT64(op.ChainId),
 			MultisigId:            types.TEXT(op.MultisigId),
 			Nonce:                 types.INT64(op.Nonce),
@@ -527,7 +528,7 @@ func scheduleBatchExpectError(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -548,15 +549,15 @@ func executeScheduledBatch(
 	owner string,
 	mcmsCid string,
 	opID string,
-	calls []mcms.TimelockCall,
+	calls []mcmsApi.TimelockCall,
 	predecessor string,
 	salt string,
 	targetCids map[string]string,
 ) string {
 	t.Helper()
 
-	// Use bindings for type safety - calls is already []mcms.TimelockCall
-	executeArgs := mcms.ExecuteScheduledBatch{
+	// Use bindings for type safety - calls is already []mcmsApi.TimelockCall
+	executeArgs := mcmsCore.ExecuteScheduledBatch{
 		Submitter:   types.PARTY(owner),
 		OpId:        types.TEXT(opID),
 		Calls:       calls,
@@ -571,7 +572,7 @@ func executeScheduledBatch(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteScheduledBatch",
 						ChoiceArgument: ledger.MapToValue(executeArgs),
@@ -613,14 +614,14 @@ func executeScheduledBatchExpectError(
 	owner string,
 	mcmsCid string,
 	opID string,
-	calls []mcms.TimelockCall,
+	calls []mcmsApi.TimelockCall,
 	predecessor string,
 	salt string,
 	targetCids map[string]string,
 ) error {
 	t.Helper()
 
-	executeArgs := mcms.ExecuteScheduledBatch{
+	executeArgs := mcmsCore.ExecuteScheduledBatch{
 		Submitter:   types.PARTY(owner),
 		OpId:        types.TEXT(opID),
 		Calls:       calls,
@@ -635,7 +636,7 @@ func executeScheduledBatchExpectError(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteScheduledBatch",
 						ChoiceArgument: ledger.MapToValue(executeArgs),
@@ -659,10 +660,10 @@ func cancelBatch(
 ) string {
 	t.Helper()
 
-	executeOpArgs := mcms.ExecuteOp{
-		TargetRole: mcms.RoleCanceller,
+	executeOpArgs := mcmsCore.ExecuteOp{
+		TargetRole: mcmsApi.RoleCanceller,
 		Submitter:  types.PARTY(owner),
-		Op: mcms.Op{
+		Op: mcmsApi.Op{
 			ChainId:               types.INT64(op.ChainId),
 			MultisigId:            types.TEXT(op.MultisigId),
 			Nonce:                 types.INT64(op.Nonce),
@@ -680,7 +681,7 @@ func cancelBatch(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -752,10 +753,10 @@ func bypasserExecuteBatchWithDisclosureParty(
 	t.Helper()
 
 	// BypasserExecuteBatch is dispatched via ExecuteOp with targetRole=Bypasser
-	executeOpArgs := mcms.ExecuteOp{
-		TargetRole: mcms.RoleBypasser,
+	executeOpArgs := mcmsCore.ExecuteOp{
+		TargetRole: mcmsApi.RoleBypasser,
 		Submitter:  types.PARTY(submitter),
-		Op: mcms.Op{
+		Op: mcmsApi.Op{
 			ChainId:               types.INT64(op.ChainId),
 			MultisigId:            types.TEXT(op.MultisigId),
 			Nonce:                 types.INT64(op.Nonce),
@@ -775,7 +776,7 @@ func bypasserExecuteBatchWithDisclosureParty(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "ExecuteOp",
 						ChoiceArgument: ledger.MapToValue(executeOpArgs),
@@ -827,7 +828,7 @@ func findRefreshedMCMSCid(
 
 	queryParticipant := participant
 	queryParticipant.PartyID = party
-	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), queryParticipant, contracts.IdentifierFromBinding(mcms.MCMS{}))
+	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), queryParticipant, contracts.IdentifierFromBinding(mcmsCore.MCMS{}))
 	require.NoError(t, err)
 
 	for _, v := range slices.Backward(activeContracts) {
@@ -850,7 +851,7 @@ func queryMinDelay(
 ) int64 {
 	t.Helper()
 
-	getMinDelayArgs := mcms.GetMinDelay{
+	getMinDelayArgs := mcmsCore.GetMinDelay{
 		Submitter: types.PARTY(owner),
 	}
 
@@ -860,7 +861,7 @@ func queryMinDelay(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "GetMinDelay",
 						ChoiceArgument: ledger.MapToValue(getMinDelayArgs),
@@ -894,7 +895,7 @@ func queryBlockedFunctionsCount(
 ) int64 {
 	t.Helper()
 
-	getBlockedFunctionsCountArgs := mcms.GetBlockedFunctionsCount{
+	getBlockedFunctionsCountArgs := mcmsCore.GetBlockedFunctionsCount{
 		Submitter: types.PARTY(owner),
 	}
 
@@ -904,7 +905,7 @@ func queryBlockedFunctionsCount(
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(mcms.MCMS{}),
+						TemplateId:     contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 						ContractId:     mcmsCid,
 						Choice:         "GetBlockedFunctionsCount",
 						ChoiceArgument: ledger.MapToValue(getBlockedFunctionsCountArgs),
@@ -950,7 +951,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 
 		// Define calls and salt first so we can encode them
 		// Define calls and salt first so we can encode them
-		calls := []mcms.TimelockCall{{
+		calls := []mcmsApi.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
 			FunctionName:          types.TEXT("UpdateMinDelay"),
 			OperationData:         types.TEXT(EncodeMinDelay(1)), // 1 second
@@ -959,7 +960,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		delaySecs := 1
 
 		// Encode schedule params using encoder pattern
-		scheduleParams := mcms.ScheduleBatchParams{
+		scheduleParams := mcmsApi.ScheduleBatchParams{
 			Calls:       calls,
 			Predecessor: types.TEXT(ZeroHash),
 			Salt:        types.TEXT(salt),
@@ -1002,8 +1003,8 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsCid := createMCMSMultiRole(t, participant, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
 		// Define calls and salt first so we can encode them
-		bf := mcms.BlockedFunction{TargetInstanceAddress: "some-target@owner", FunctionName: "dangerous_op"}
-		calls := []mcms.TimelockCall{{
+		bf := mcmsApi.BlockedFunction{TargetInstanceAddress: "some-target@owner", FunctionName: "dangerous_op"}
+		calls := []mcmsApi.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
 			FunctionName:          types.TEXT("BlockFunction"),
 			OperationData:         types.TEXT(MustEncodeBlockedFunction(t, bf)),
@@ -1012,7 +1013,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		delaySecs := 1
 
 		// Encode schedule params using encoder pattern
-		scheduleParams := mcms.ScheduleBatchParams{
+		scheduleParams := mcmsApi.ScheduleBatchParams{
 			Calls:       calls,
 			Predecessor: types.TEXT(ZeroHash),
 			Salt:        types.TEXT(salt),
@@ -1050,14 +1051,14 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 
 		// Define calls first so we can encode them
 		// Define calls first so we can encode them
-		calls := []mcms.TimelockCall{{
+		calls := []mcmsApi.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
 			FunctionName:          types.TEXT("UpdateMinDelay"),
 			OperationData:         types.TEXT(EncodeMinDelay(2)), // 2 seconds
 		}}
 
 		// Encode bypasser execute params using encoder pattern
-		bypasserParams := mcms.BypasserExecuteBatchParams{Calls: calls}
+		bypasserParams := mcmsApi.BypasserExecuteBatchParams{Calls: calls}
 		bypasserChoice := MustEncodeBypasserExecuteBatch(t, mcmsEncoder, bypasserParams)
 
 		// Set bypasser root with encoded operationData
@@ -1091,7 +1092,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		counterTargetInstanceAddr := fmt.Sprintf("%s@%s", counterBase, ccipOwner)
 
 		// Define mixed calls and salt first so we can encode them
-		calls := []mcms.TimelockCall{
+		calls := []mcmsApi.TimelockCall{
 			{TargetInstanceAddress: types.TEXT(mcmsInstanceAddr), FunctionName: types.TEXT("UpdateMinDelay"), OperationData: types.TEXT(EncodeMinDelay(1))},
 			{TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr), FunctionName: types.TEXT("Increment"), OperationData: types.TEXT("")},
 		}
@@ -1099,7 +1100,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		delaySecs := 0
 
 		// Encode schedule params using encoder pattern
-		scheduleParams := mcms.ScheduleBatchParams{
+		scheduleParams := mcmsApi.ScheduleBatchParams{
 			Calls:       calls,
 			Predecessor: types.TEXT(ZeroHash),
 			Salt:        types.TEXT(salt),

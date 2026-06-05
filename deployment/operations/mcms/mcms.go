@@ -6,8 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
-
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -16,13 +15,13 @@ var ContractType = deployment.ContractType("CantonMCMS")
 
 var Version = semver.MustParse("1.0.0")
 
-var mcmsEncoder = mcms.NewContract("", "MCMS.Main", "MCMS").Encoder()
+var mcmsEncoder = mcmsCore.NewContract("", "MCMS.Main", "MCMS").Encoder()
 
-var Deploy = contract.NewDeploy(contract.DeployParams[mcms.MCMS]{
+var Deploy = contract.NewDeploy(contract.DeployParams[mcmsCore.MCMS]{
 	Name:           "canton/mcms/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
 	Description:    "Deploys the MCMS contract on Canton",
-	Validate: func(template mcms.MCMS) error {
+	Validate: func(template mcmsCore.MCMS) error {
 		if template.Owner == "" {
 			return errors.New("owner cannot be empty")
 		}
@@ -36,32 +35,32 @@ var Deploy = contract.NewDeploy(contract.DeployParams[mcms.MCMS]{
 	Prefix:      "mcms",
 })
 
-var SetRoot = contract.NewExercise(contract.ExerciseParams[mcms.SetRoot]{
+var SetRoot = contract.NewExercise(contract.ExerciseParams[mcmsCore.SetRoot]{
 	Name:         "canton/mcms/set_root",
 	Version:      Version,
 	Description:  "Sets a merkle root for MCMS",
 	ContractType: ContractType,
-	Validate: func(input mcms.SetRoot) error {
+	Validate: func(input mcmsCore.SetRoot) error {
 		// TODO add validation
 
 		return nil
 	},
-	Template:     mcms.MCMS{},
-	Method:       mcms.MCMS{}.SetRoot,
+	Template:     mcmsCore.MCMS{},
+	Method:       mcmsCore.MCMS{}.SetRoot,
 	EncodeMethod: mcmsEncoder.SetRoot,
 })
 
-var SetConfig = contract.NewExercise(contract.ExerciseParams[mcms.SetConfig]{
+var SetConfig = contract.NewExercise(contract.ExerciseParams[mcmsCore.SetConfig]{
 	Name:         "canton/mcms/set_config",
 	Version:      Version,
 	Description:  "Sets configuration for MCMS",
 	ContractType: ContractType,
-	Validate: func(input mcms.SetConfig) error {
+	Validate: func(input mcmsCore.SetConfig) error {
 		// TODO add validation
 
 		return nil
 	},
-	Template:     mcms.MCMS{},
-	Method:       mcms.MCMS{}.SetConfig,
+	Template:     mcmsCore.MCMS{},
+	Method:       mcmsCore.MCMS{}.SetConfig,
 	EncodeMethod: mcmsEncoder.SetConfig,
 })

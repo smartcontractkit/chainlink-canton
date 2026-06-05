@@ -6,13 +6,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
-func RawInstanceAddress(a mcms.RawInstanceAddress) (contracts.RawInstanceAddress, error) {
+func RawInstanceAddress(a chainlinkapi.RawInstanceAddress) (contracts.RawInstanceAddress, error) {
 	address, err := contracts.RawInstanceAddressFromString(string(a.Unpack))
 	if err != nil {
 		return contracts.RawInstanceAddress(""), fmt.Errorf("failed to parse raw instance address: %w", err)
@@ -21,7 +21,7 @@ func RawInstanceAddress(a mcms.RawInstanceAddress) (contracts.RawInstanceAddress
 	return address, nil
 }
 
-func RawInstanceAddressList(addrs []mcms.RawInstanceAddress) ([]contracts.RawInstanceAddress, error) {
+func RawInstanceAddressList(addrs []chainlinkapi.RawInstanceAddress) ([]contracts.RawInstanceAddress, error) {
 	addresses := make([]contracts.RawInstanceAddress, len(addrs))
 	for i, addr := range addrs {
 		parsedAddr, err := RawInstanceAddress(addr)

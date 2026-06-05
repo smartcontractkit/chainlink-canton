@@ -20,8 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -266,7 +265,7 @@ func processCreatedEvent(
 		return nil, errMetadataMismatch
 	}
 
-	parsed, err := bindings.UnmarshalCreatedEvent[common.CCIPMessageSent](created)
+	parsed, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](created)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal CCIPMessageSent created event: %w", err)
 	}
@@ -292,7 +291,7 @@ func processCreatedEvent(
 
 // ccipMessageSentEventToProtocol converts the binding type common.CCIPMessageSentEvent
 // to protocol.MessageSentEvent (hex decoding, message decode, receipt mapping, validations).
-func ccipMessageSentEventToProtocol(evt *common.CCIPMessageSentEvent) (*protocol.MessageSentEvent, error) {
+func ccipMessageSentEventToProtocol(evt *core.CCIPMessageSentEvent) (*protocol.MessageSentEvent, error) {
 	messageSentEvent := &protocol.MessageSentEvent{}
 
 	messageID, err := hex.DecodeString(string(evt.MessageId))
@@ -350,7 +349,7 @@ func ccipMessageSentEventToProtocol(evt *common.CCIPMessageSentEvent) (*protocol
 }
 
 // receiptsBindingToProtocol converts binding []common.Receipt to []protocol.ReceiptWithBlob.
-func receiptsBindingToProtocol(receipts []common.Receipt) ([]protocol.ReceiptWithBlob, error) {
+func receiptsBindingToProtocol(receipts []core.Receipt) ([]protocol.ReceiptWithBlob, error) {
 	protoReceipts := make([]protocol.ReceiptWithBlob, 0, len(receipts))
 	for i, r := range receipts {
 		decoded, err := protocol.NewUnknownAddressFromHex(string(r.IssuerAddress))
@@ -470,7 +469,7 @@ func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Byt
 		return nil, fmt.Errorf("created event is nil")
 	}
 
-	rmnRemote, err := bindings.UnmarshalCreatedEvent[rmn.RMNRemote](createdEvent)
+	rmnRemote, err := bindings.UnmarshalCreatedEvent[core.RMNRemote](createdEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal RMNRemote created event: %w", err)
 	}
