@@ -23,7 +23,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.3
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.1
-	github.com/smartcontractkit/chain-selectors v1.0.101
+	github.com/smartcontractkit/chain-selectors v1.0.102
 	github.com/smartcontractkit/chainlink-canton v0.0.0-20260602133237-99f834640c9d
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260519201156-791d8279a3ad
