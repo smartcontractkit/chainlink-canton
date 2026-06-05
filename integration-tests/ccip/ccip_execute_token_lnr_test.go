@@ -628,6 +628,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	// Build message
 	msg := protocol.Message{
+		Version:              1,
 		SourceChainSelector:  protocol.ChainSelector(remoteSelector),
 		DestChainSelector:    protocol.ChainSelector(env.Chain.ChainSelector()),
 		SequenceNumber:       1,

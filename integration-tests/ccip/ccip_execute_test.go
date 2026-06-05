@@ -477,6 +477,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Build message (no token transfer, just payload data)
 	testPayload := []byte("Hello CCIP - this is a test message payload!")
 	msg := protocol.Message{
+		Version:              1,
 		SourceChainSelector:  protocol.ChainSelector(remoteSelector),
 		DestChainSelector:    protocol.ChainSelector(env.Chain.ChainSelector()),
 		SequenceNumber:       1,
