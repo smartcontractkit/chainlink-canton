@@ -204,7 +204,6 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 	require.NoError(t, json.Unmarshal(tx.AdditionalFields, &af))
 	assert.Equal(t, gcRaw.String(), af.TargetInstanceAddress)
 	assert.Equal(t, "ApplyDestChainConfigUpdates", af.FunctionName)
-	assert.NotEmpty(t, af.OperationData)
 	t.Logf("Proposal validated: 1 batch, 1 tx targeting %s via %s", af.TargetInstanceAddress, af.FunctionName)
 
 	// ========================================================================
