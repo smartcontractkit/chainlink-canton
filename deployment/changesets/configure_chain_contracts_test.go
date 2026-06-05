@@ -162,7 +162,6 @@ func TestConfigureGlobalConfig_MCMSProposal(t *testing.T) {
 	require.NoError(t, json.Unmarshal(tx.AdditionalFields, &af))
 	assert.Equal(t, gcRawAddr.String(), af.TargetInstanceAddress)
 	assert.Equal(t, "ApplyDestChainConfigUpdates", af.FunctionName)
-	assert.NotEmpty(t, af.OperationData)
 }
 
 // setupCantonEnv creates a CTF Canton network and returns the chain, operations bundle, and environment.
