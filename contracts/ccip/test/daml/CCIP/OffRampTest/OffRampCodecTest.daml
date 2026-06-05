@@ -4,7 +4,6 @@ module CCIP.OffRampTest.OffRampCodecTest where
 import Daml.Script
 import DA.Assert ((===))
 
-import DA.Optional (fromSome)
 import CCIP.OffRampTypes (OffRampDeps(..), SetDepsParams(..))
 import CCIP.OffRampCodecGen (encodeSetDepsParams, decodeSetDepsParamsAt, encodeOffRampDeps, decodeOffRampDepsAt)
 import Chainlink.InstanceAddress (RawInstanceAddress(..))

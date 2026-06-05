@@ -4,7 +4,6 @@ import DA.Crypto.Text (BytesHex)
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
-import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Internal
 import qualified CCIP.RMNRemote

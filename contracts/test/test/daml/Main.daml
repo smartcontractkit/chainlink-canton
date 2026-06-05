@@ -1,6 +1,5 @@
 module Main where
 
-import DA.Assert
 import DA.Optional
 import Daml.Script
 

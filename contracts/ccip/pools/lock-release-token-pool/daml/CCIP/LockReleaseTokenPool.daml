@@ -66,7 +66,7 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
 import qualified CCIP.Uint256
 import qualified CCIP.RateLimiter
-import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId, makeText, toText)
+import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
@@ -648,6 +648,9 @@ template LockReleaseTokenPool
 
                 assertMsg "pool: invalid sourcePoolAddress"
                     (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)
+
+                assertMsg "pool: sourceTokenAddress does not match remote token address for lane"
+                    (tt.sourceTokenAddress == remoteChainCfg.remoteTokenAddress)
 
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.SetInboundPoolCCVs with

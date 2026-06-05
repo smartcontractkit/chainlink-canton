@@ -209,12 +209,10 @@ isValidHex t =
 
 allHexDigits : Text -> Bool
 allHexDigits t =
-  if T.length t == 0
-    then True
-    else
-      let c = T.take 1 t
-          rest = T.drop 1 t
-      in isHexDigit c && allHexDigits rest
+  (T.length t == 0)
+    || (let c = T.take 1 t in
+        let rest = T.drop 1 t in
+          isHexDigit c && allHexDigits rest)
 
 isHexDigit : Text -> Bool
 isHexDigit c =
