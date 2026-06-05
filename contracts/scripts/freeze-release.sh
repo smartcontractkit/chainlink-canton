@@ -77,9 +77,14 @@ done < <(find "$BINDINGS_SNAPSHOT_DIR" -name '*.go' -print0)
 
 echo "Snapshotted bindings to bindings/generated/$SNAPSHOT/"
 
+LEGACY_MCMS_SRC="$BINDINGS_SNAPSHOT_DIR/mcms/mcms.go"
 LEGACY_MCMS="$REPO_ROOT/bindings/generated/mcms/mcms.go"
-mkdir -p "$(dirname "$LEGACY_MCMS")"
-cp "$BINDINGS_SNAPSHOT_DIR/mcms/mcms.go" "$LEGACY_MCMS"
-echo "Updated legacy import path bindings/generated/mcms/ for mcms SDK compatibility"
+if [ -f "$LEGACY_MCMS_SRC" ]; then
+  mkdir -p "$(dirname "$LEGACY_MCMS")"
+  cp "$LEGACY_MCMS_SRC" "$LEGACY_MCMS"
+  echo "Updated legacy import path bindings/generated/mcms/ for mcms SDK compatibility"
+else
+  echo "Skipping legacy bindings/generated/mcms/mcms.go (not generated)"
+fi
 
 echo "Done."
