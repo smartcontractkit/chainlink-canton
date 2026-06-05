@@ -332,6 +332,7 @@ mkSendingMessage ccipOwner sender destDefaultCCVs sequenceNumber = do
                 tokenAdminRegistry = RawInstanceAddress.make "tar-pool-bounds" ccipOwner
                 feeQuoter = RawInstanceAddress.make "feequoter-pool-bounds" ccipOwner
             destChainSelector = 2222222222.0
+            destAddressBytesLength = 20
             sequenceNumber = sequenceNumber
             destDefaultCCVs = destDefaultCCVs
             requiredCCVs = []

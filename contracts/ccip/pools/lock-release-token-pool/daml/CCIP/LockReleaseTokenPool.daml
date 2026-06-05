@@ -649,6 +649,9 @@ template LockReleaseTokenPool
                 assertMsg "pool: invalid sourcePoolAddress"
                     (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)
 
+                assertMsg "pool: sourceTokenAddress does not match remote token address for lane"
+                    (tt.sourceTokenAddress == remoteChainCfg.remoteTokenAddress)
+
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.SetInboundPoolCCVs with
                         tokenConfigCid
