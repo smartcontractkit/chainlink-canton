@@ -1,9 +1,13 @@
 package contracts
 
 import (
+	"context"
 	"embed"
 	"fmt"
+	"os"
 	"slices"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts/utilitydars"
 )
 
 //go:embed dars
@@ -74,6 +78,33 @@ const (
 	GlobalConfig = Package("globalconfig")
 	MCMSTest     = Package("mcms-test")
 	CCIPTest     = Package("ccip-test")
+	SpliceApiFeaturedAppV1                = Package("splice-api-featured-app-v1")
+	SpliceApiTokenAllocationV1            = Package("splice-api-token-allocation-v1")
+	SpliceApiTokenAllocationInstructionV1 = Package("splice-api-token-allocation-instruction-v1")
+	SpliceApiTokenBurnMintV1              = Package("splice-api-token-burn-mint-v1")
+	SpliceApiTokenHoldingV1               = Package("splice-api-token-holding-v1")
+	SpliceApiTokenMetadataV1              = Package("splice-api-token-metadata-v1")
+	SpliceApiTokenTransferInstructionV1   = Package("splice-api-token-transfer-instruction-v1")
+
+	// Canton Network Utility DARs (bundle 0.12.5). Package IDs pinned in dar-versions.md.
+	UtilityCommercialsV0     = Package("utility-commercials-v0")
+	UtilityCredentialV0      = Package("utility-credential-v0")
+	UtilityCredentialAppV0   = Package("utility-credential-app-v0")
+	UtilityRegistryV0        = Package("utility-registry-v0")
+	UtilityRegistryHoldingV0 = Package("utility-registry-holding-v0")
+	UtilityRegistryAppV0     = Package("utility-registry-app-v0")
+)
+
+// Pinned package IDs from canton-network-utility-dars-0.12.5 / dar-versions.md.
+//
+//nolint:gosec // G101: These are safe package IDs
+const (
+	UtilityCommercialsV0PackageID     = "fa5b1cc5c8368dff7c2e6a74aa2af9d520d755e2a508f44acd17343326e41839"
+	UtilityCredentialAppV0PackageID   = "e9a3b7df354dfd2f15c7d015328c34256308c90ba96f86f185dad58ffca8299b"
+	UtilityCredentialV0PackageID      = "5a29ead611a0abd5f5b3fc3caf7d0f67c0ff802032ab6d392824aa9060e56d70"
+	UtilityRegistryAppV0PackageID     = "7a75ef6e69f69395a4e60919e228528bb8f3881150ccfde3f31bcc73864b18ab"
+	UtilityRegistryV0PackageID        = "a236e8e22a3b5f199e37d5554e82bafd2df688f901de02b00be3964bdfa8c1ab"
+	UtilityRegistryHoldingV0PackageID = "8107899ac4723ce986bf7d27416534e576e54b92161e46150a595fb78ff3d3a1"
 )
 
 const DevVersion = "dev"
@@ -150,6 +181,29 @@ var Versions map[Package][]string = map[Package][]string{
 	Coin:         []string{DevVersion},
 	GlobalConfig: []string{DevVersion},
 	MCMSTest:     []string{DevVersion},
+	SpliceApiFeaturedAppV1:                []string{"1.0.0"},
+	SpliceApiTokenAllocationV1:            []string{"1.0.0"},
+	SpliceApiTokenAllocationInstructionV1: []string{"1.0.0"},
+	SpliceApiTokenBurnMintV1:              []string{"1.0.0"},
+	SpliceApiTokenHoldingV1:               []string{"1.0.0"},
+	SpliceApiTokenMetadataV1:              []string{"1.0.0"},
+	SpliceApiTokenTransferInstructionV1:   []string{"1.0.0"},
+
+	// Fetched from canton-network-utility-dars-0.12.5; semver pinned in dependencies/utility/manifest.yaml.
+	UtilityCommercialsV0:     []string{CurrentVersion},
+	UtilityCredentialV0:      []string{CurrentVersion},
+	UtilityCredentialAppV0:   []string{CurrentVersion},
+	UtilityRegistryV0:        []string{CurrentVersion},
+	UtilityRegistryHoldingV0: []string{CurrentVersion},
+	UtilityRegistryAppV0:     []string{CurrentVersion},
+}
+
+func init() {
+	m, err := utilitydars.ParseManifest(utilityManifestYAML)
+	if err != nil {
+		panic(fmt.Sprintf("contracts: invalid utility manifest: %v", err))
+	}
+	utilitydars.SetManifest(m)
 }
 
 // versionDir maps a DAR version string to its artifact subdirectory.
@@ -165,6 +219,64 @@ func darPath(packageName Package, version string) string {
 	return fmt.Sprintf("dars/%s/%s-%s.dar", versionDir(version), packageName, version)
 }
 
+func isUtilityPackage(packageName Package) bool {
+	switch packageName {
+	case UtilityCommercialsV0,
+		UtilityCredentialV0,
+		UtilityCredentialAppV0,
+		UtilityRegistryV0,
+		UtilityRegistryHoldingV0,
+		UtilityRegistryAppV0:
+		return true
+	default:
+		return false
+	}
+}
+
+func utilityPackageIDs() map[string]string {
+	return map[string]string{
+		string(UtilityCommercialsV0):     UtilityCommercialsV0PackageID,
+		string(UtilityCredentialV0):      UtilityCredentialV0PackageID,
+		string(UtilityCredentialAppV0):   UtilityCredentialAppV0PackageID,
+		string(UtilityRegistryV0):        UtilityRegistryV0PackageID,
+		string(UtilityRegistryHoldingV0): UtilityRegistryHoldingV0PackageID,
+		string(UtilityRegistryAppV0):     UtilityRegistryAppV0PackageID,
+	}
+}
+
+func UtilityPackageIDs() map[string]string {
+	return utilityPackageIDs()
+}
+
+func getUtilityDar(packageName Package) ([]byte, error) {
+	if err := utilitydars.EnsureCache(context.Background(), utilityPackageIDs()); err != nil {
+		return nil, fmt.Errorf("ensure utility DAR cache: %w", err)
+	}
+
+	dir, err := utilitydars.ResolveDirectory()
+	if err != nil {
+		return nil, err
+	}
+
+	semver, err := utilitydars.SemverForPackage(string(packageName))
+	if err != nil {
+		return nil, err
+	}
+
+	path := utilitydars.ResolveDarPath(string(packageName), semver, dir)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read utility DAR %s: %w", path, err)
+	}
+
+	expectedID := utilityPackageIDs()[string(packageName)]
+	if err := utilitydars.VerifyPackageID(data, expectedID); err != nil {
+		return nil, fmt.Errorf("verify utility DAR %s: %w", packageName, err)
+	}
+
+	return data, nil
+}
+
 func GetDar(packageName Package, version string) ([]byte, error) {
 	availableVersions, ok := Versions[packageName]
 	if !ok {
@@ -173,6 +285,14 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 
 	if !slices.Contains(availableVersions, version) {
 		return nil, fmt.Errorf("version %s not found for package %s", version, packageName)
+	}
+
+	if isUtilityPackage(packageName) {
+		if version != CurrentVersion {
+			return nil, fmt.Errorf("utility package %s only supports version %q", packageName, CurrentVersion)
+		}
+
+		return getUtilityDar(packageName)
 	}
 
 	path := darPath(packageName, version)
@@ -257,8 +377,16 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
 
-	SpliceApiTokenBurnMintV1:            []string{"splice", "splice_api_token_burn_mint_v1"},
-	SpliceApiTokenHoldingV1:             []string{"splice", "splice_api_token_holding_v1"},
-	SpliceApiTokenMetadataV1:            []string{"splice", "splice_api_token_metadata_v1"},
-	SpliceApiTokenTransferInstructionV1: []string{"splice", "splice_api_token_transfer_instruction_v1"},
+	SpliceApiFeaturedAppV1:                []string{"splice", "splice_api_featured_app_v1"},
+	SpliceApiTokenAllocationV1:            []string{"splice", "splice_api_token_allocation_v1"},
+	SpliceApiTokenAllocationInstructionV1: []string{"splice", "splice_api_token_allocation_instruction_v1"},
+	SpliceApiTokenBurnMintV1:              []string{"splice", "splice_api_token_burn_mint_v1"},
+	SpliceApiTokenHoldingV1:               []string{"splice", "splice_api_token_holding_v1"},
+	SpliceApiTokenMetadataV1:              []string{"splice", "splice_api_token_metadata_v1"},
+	SpliceApiTokenTransferInstructionV1:   []string{"splice", "splice_api_token_transfer_instruction_v1"},
+
+	UtilityCredentialV0:      []string{"utility", "credential_v0"},
+	UtilityRegistryV0:        []string{"utility", "registry_v0"},
+	UtilityRegistryHoldingV0: []string{"utility", "registry_holding_v0"},
+	UtilityRegistryAppV0:     []string{"utility", "registry_app_v0"},
 }

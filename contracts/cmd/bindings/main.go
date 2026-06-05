@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/smartcontractkit/go-daml/codegen/model"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/utilitydars"
 )
 
 func main() {
@@ -28,10 +30,19 @@ func main() {
 	basePath := flag.String("basePath", buildInfo.Main.Path+"/bindings/generated/latest", "Base Go import path for generated bindings")
 	flag.Parse()
 
+	ctx := context.Background()
+	tmpDir, cleanup, err := utilitydars.FetchToTemp(ctx, contracts.UtilityPackageIDs())
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to fetch utility DARs for binding generation")
+	}
+	defer cleanup()
+	utilitydars.SetResolveDir(tmpDir)
+	defer utilitydars.SetResolveDir("")
+
 	log.Info().Str("artifacts", *artifactsDir).Msg("Generating bindings...")
 
 	// Ensure the output directory exists
-	err := os.MkdirAll(*artifactsDir, 0o755)
+	err = os.MkdirAll(*artifactsDir, 0o755)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create artifacts directory")
 	}
@@ -171,6 +182,16 @@ func main() {
 			log.Fatal().Err(err).Str("package", string(p)).Str("outputFile", outputFile).Msg("Failed to write generated bindings to file")
 		}
 	}
+
+	// Utility DARs need post-processing: Tuple2 shims (prim dalfs skipped above) and
+	// splice Transfer2 collision fix when registry packages define a local Transfer2 type.
+	if err := writeTuple2Shims(*artifactsDir); err != nil {
+		log.Fatal().Err(err).Msg("Failed to write utility Tuple2 shims")
+	}
+	if err := patchUtilityBindingCollisions(*artifactsDir); err != nil {
+		log.Fatal().Err(err).Msg("Failed to patch utility binding collisions")
+	}
+
 	log.Info().Msg("Successfully generated all bindings")
 }
 
@@ -208,7 +229,11 @@ func generatePackage(dar []byte, pkgFile string, externalPackages model.External
 		}
 
 		dalfLower := strings.ToLower(dalf)
-		if strings.Contains(dalfLower, "prim") || strings.Contains(dalfLower, "stdlib") {
+		if strings.Contains(dalfLower, "stdlib") {
+			continue
+		}
+		// Skip prim dalfs; utility Tuple2 references are shimmed in per-package tuple2.go.
+		if strings.Contains(dalfLower, "prim") {
 			continue
 		}
 
