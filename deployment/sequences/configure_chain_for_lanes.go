@@ -9,6 +9,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -17,10 +18,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -106,7 +106,7 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("getting default executor: %w", err)
 	}
-	laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
+	laneMandatedOutboundCCVs := make([]chainlinkapi.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
 	for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
 		outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 		if err != nil {
@@ -114,7 +114,7 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		}
 		laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, outboundCCV.Binding())
 	}
-	defaultOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.DefaultOutboundCCVs))
+	defaultOutboundCCVs := make([]chainlinkapi.RawInstanceAddress, 0, len(sourceChain.DefaultOutboundCCVs))
 	for _, ccv := range sourceChain.DefaultOutboundCCVs {
 		outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 		if err != nil {
@@ -122,12 +122,12 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		}
 		defaultOutboundCCVs = append(defaultOutboundCCVs, outboundCCV.Binding())
 	}
-	destChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[common.ApplyDestChainConfigUpdates]{
+	destChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[core.ApplyDestChainConfigUpdates]{
 		InstanceAddress:    globalConfigRaw.InstanceAddress(),
 		RawInstanceAddress: globalConfigRaw.String(),
 		MCMSEnabled:        mcmsEnabled,
-		Args: common.ApplyDestChainConfigUpdates{
-			DestChainConfigUpdates: []common.DestChainConfigArgs{
+		Args: core.ApplyDestChainConfigUpdates{
+			DestChainConfigUpdates: []core.DestChainConfigArgs{
 				{
 					DestChainSelector:         types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
 					IsEnabled:                 types.BOOL(isEnabled),
@@ -181,15 +181,15 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 	}
 
 	// FeeQuoter - Dest Chain Config
-	feeQuoterDestConfigReport, err := operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[feequoter.ApplyFeeQuoterDestChainConfigUpdates]{
+	feeQuoterDestConfigReport, err := operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[core.ApplyFeeQuoterDestChainConfigUpdates]{
 		InstanceAddress:    feeQuoterRaw.InstanceAddress(),
 		RawInstanceAddress: feeQuoterRaw.String(),
 		MCMSEnabled:        mcmsEnabled,
-		Args: feequoter.ApplyFeeQuoterDestChainConfigUpdates{
-			DestChainConfigArgs: []feequoter.FeeQuoterDestChainConfigArgs{
+		Args: core.ApplyFeeQuoterDestChainConfigUpdates{
+			DestChainConfigArgs: []core.FeeQuoterDestChainConfigArgs{
 				{
 					DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
-					DestChainConfig: feequoter.FeeQuoterDestChainConfig{
+					DestChainConfig: core.FeeQuoterDestChainConfig{
 						IsEnabled:                   types.BOOL(destChain.FeeQuoterDestChainConfig.IsEnabled),
 						MaxDataBytes:                types.INT64(destChain.FeeQuoterDestChainConfig.MaxDataBytes),
 						MaxPerMsgGasLimit:           types.INT64(destChain.FeeQuoterDestChainConfig.MaxPerMsgGasLimit),
@@ -211,11 +211,11 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		proposalOutputs = append(proposalOutputs, feeQuoterDestConfigReport.Output)
 	}
 
-	priceUpdatersReport, err := operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
+	priceUpdatersReport, err := operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[core.ApplyPriceUpdatersUpdate]{
 		InstanceAddress:    feeQuoterRaw.InstanceAddress(),
 		RawInstanceAddress: feeQuoterRaw.String(),
 		MCMSEnabled:        mcmsEnabled,
-		Args: feequoter.ApplyPriceUpdatersUpdate{
+		Args: core.ApplyPriceUpdatersUpdate{
 			AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
 			RemovedPriceUpdaters: nil,
 		},
@@ -233,14 +233,14 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 	}
 
 	// FeeQuoter - Update prices.
-	updatePricesReport, err := operations.ExecuteOperation(b, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
+	updatePricesReport, err := operations.ExecuteOperation(b, feequoterop.UpdatePrices, chain, contract.ChoiceInput[core.UpdatePrices]{
 		InstanceAddress:    feeQuoterRaw.InstanceAddress(),
 		RawInstanceAddress: feeQuoterRaw.String(),
 		MCMSEnabled:        mcmsEnabled,
-		Args: feequoter.UpdatePrices{
-			PriceUpdates: feequoter.PriceUpdates{
+		Args: core.UpdatePrices{
+			PriceUpdates: core.PriceUpdates{
 				TokenPriceUpdates: tokenPriceUpdates,
-				GasPriceUpdates: []feequoter.GasPriceUpdate{
+				GasPriceUpdates: []core.GasPriceUpdate{
 					{
 						DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
 						UsdPerUnitGas: cantonFeeQuoterUSDPerUnitGas(
@@ -327,7 +327,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		}
 
 		// GlobalConfig - Source Chain Config
-		laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(destChain.LaneMandatedInboundCCVs))
+		laneMandatedInboundCCVs := make([]chainlinkapi.RawInstanceAddress, 0, len(destChain.LaneMandatedInboundCCVs))
 		for _, ccv := range destChain.LaneMandatedInboundCCVs {
 			inboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 			if err != nil {
@@ -335,7 +335,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 			}
 			laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, inboundCCV.Binding())
 		}
-		defaultInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(destChain.DefaultInboundCCVs))
+		defaultInboundCCVs := make([]chainlinkapi.RawInstanceAddress, 0, len(destChain.DefaultInboundCCVs))
 		for _, ccv := range destChain.DefaultInboundCCVs {
 			inboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 			if err != nil {
@@ -346,12 +346,12 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 		inboundOnRampAddresses := []types.TEXT{
 			types.TEXT(hex.EncodeToString(gethcommon.LeftPadBytes(sourceChain.OnRamp, 32))),
 		}
-		sourceChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplySourceChainConfigUpdates, chain, contract.ChoiceInput[common.ApplySourceChainConfigUpdates]{
+		sourceChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplySourceChainConfigUpdates, chain, contract.ChoiceInput[core.ApplySourceChainConfigUpdates]{
 			InstanceAddress:    globalConfigRaw.InstanceAddress(),
 			RawInstanceAddress: globalConfigRaw.String(),
 			MCMSEnabled:        mcmsEnabled,
-			Args: common.ApplySourceChainConfigUpdates{
-				SourceChainConfigUpdates: []common.SourceChainConfigArgs{
+			Args: core.ApplySourceChainConfigUpdates{
+				SourceChainConfigUpdates: []core.SourceChainConfigArgs{
 					{
 						SourceChainSelector: types.NUMERIC(strconv.FormatUint(sourceChain.Selector, 10)),
 						IsEnabled:           types.BOOL(!input.IsDisabled),
@@ -404,11 +404,11 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	},
 )
 
-func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]feequoter.TokenPriceUpdate, error) {
+func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]core.TokenPriceUpdate, error) {
 	if len(tokenPrices) == 0 {
 		return nil, nil
 	}
-	updates := make([]feequoter.TokenPriceUpdate, 0, len(tokenPrices))
+	updates := make([]core.TokenPriceUpdate, 0, len(tokenPrices))
 	for instrument, price := range tokenPrices {
 		if price == nil {
 			continue
@@ -417,7 +417,7 @@ func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]feequoter.T
 		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
 			return nil, fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
 		}
-		updates = append(updates, feequoter.TokenPriceUpdate{
+		updates = append(updates, core.TokenPriceUpdate{
 			InstrumentId: splice_api_token_holding_v1.InstrumentId{
 				Admin: types.PARTY(strings.TrimSpace(parts[0])),
 				Id:    types.TEXT(strings.TrimSpace(parts[1])),

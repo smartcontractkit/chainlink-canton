@@ -7,10 +7,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/coin"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
-
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
@@ -18,13 +17,13 @@ func Test_setInstanceID(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		template   common.Template
+		template   core.Template
 		instanceID contracts.InstanceID
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    common.Template
+		want    core.Template
 		wantErr bool
 	}{
 		{
@@ -54,12 +53,12 @@ func Test_setInstanceID(t *testing.T) {
 		}, {
 			name: "sets InstanceId field (MCMS template)",
 			args: args{
-				template: mcms.MCMS{
+				template: mcmsCore.MCMS{
 					InstanceId: types.TEXT("old"),
 				},
 				instanceID: contracts.InstanceID("mcms-001"),
 			},
-			want: mcms.MCMS{
+			want: mcmsCore.MCMS{
 				InstanceId: types.TEXT("mcms-001"),
 			},
 			wantErr: false,

@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -21,7 +21,7 @@ import (
 // Contract instances (MCMS, Counter, etc.) are NOT shared as each test needs its own isolated state.
 type SharedCantonEnvironment struct {
 	Participant   canton.Participant
-	McmsEncoder   mcms.MCMSEncoder
+	McmsEncoder   mcmsApi.MCMSEncoder
 	CcipOwner     string
 	Signers       []*MCMSSigner
 	SortedSigners []*MCMSSigner

@@ -24,10 +24,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -61,12 +61,12 @@ type tokenPoolChainUpdate struct {
 	RemoteChainSelector                        types.NUMERIC
 	RemotePools                                []types.TEXT
 	RemoteTokenAddress                         types.TEXT
-	InboundCCVs                                []mcms.RawInstanceAddress
-	OutboundCCVs                               []mcms.RawInstanceAddress
-	FinalityConfig                             common.FinalityConfig
-	InboundRateLimiter                         mcms.RawInstanceAddress
-	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress
-	OutboundRateLimiter                        mcms.RawInstanceAddress
+	InboundCCVs                                []chainlinkapi.RawInstanceAddress
+	OutboundCCVs                               []chainlinkapi.RawInstanceAddress
+	FinalityConfig                             core.FinalityConfig
+	InboundRateLimiter                         chainlinkapi.RawInstanceAddress
+	InboundCustomBlockConfirmationsRateLimiter chainlinkapi.RawInstanceAddress
+	OutboundRateLimiter                        chainlinkapi.RawInstanceAddress
 }
 
 type rateLimiterPoolMeta struct {
@@ -211,7 +211,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteSelectorKeyStr,
 				"outbound",
 				outboundDefaultCfg,
-				common.RateLimitModeRateLimitMode_DefaultFinality,
+				core.RateLimitModeRateLimitMode_DefaultFinality,
 				&proposalOutputs,
 			)
 			if err != nil {
@@ -231,7 +231,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteSelectorKeyStr,
 				"inbound",
 				inboundDefaultCfg,
-				common.RateLimitModeRateLimitMode_DefaultFinality,
+				core.RateLimitModeRateLimitMode_DefaultFinality,
 				&proposalOutputs,
 			)
 			if err != nil {
@@ -251,7 +251,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteSelectorKeyStr,
 				"inbound-custom",
 				inboundCustomCfg,
-				common.RateLimitModeRateLimitMode_CustomFinality,
+				core.RateLimitModeRateLimitMode_CustomFinality,
 				&proposalOutputs,
 			)
 			if err != nil {
@@ -267,7 +267,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			remoteTokenAddress := strings.ToLower(hex.EncodeToString(remoteCfg.RemoteToken))
 			if remoteFamily == chain_selectors.FamilyEVM {
 				remotePoolAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToHash(remoteCfg.RemotePool).Hex()), "0x")
-				remoteTokenAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToAddress(remoteCfg.RemoteToken).Hex()), "0x")
+				remoteTokenAddress = strings.TrimPrefix(strings.ToLower(gethcommon.BytesToHash(remoteCfg.RemoteToken).Hex()), "0x")
 			}
 
 			updates = append(updates, tokenPoolChainUpdate{
@@ -601,16 +601,16 @@ var DeployTokenPoolForToken = operations.NewSequence(
 	},
 )
 
-func toCantonFinalityConfig(cfg tokenadaptersfinality.Config) common.FinalityConfig {
+func toCantonFinalityConfig(cfg tokenadaptersfinality.Config) core.FinalityConfig {
 	switch {
 	case cfg.WaitForFinality:
-		return common.FinalityConfig{WaitForFinality: &types.UNIT{}}
+		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}
 	case cfg.WaitForSafe:
-		return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
+		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}
 	case cfg.BlockDepth > 0:
-		return common.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
+		return core.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
 	default:
-		return common.FinalityConfig{}
+		return core.FinalityConfig{}
 	}
 }
 
@@ -634,9 +634,9 @@ func findTokenPoolRateLimiterInDataStore(
 	chainSelector uint64,
 	rlType datastore.ContractType,
 	qualifier string,
-) (datastore.AddressRef, mcms.RawInstanceAddress, bool, error) {
+) (datastore.AddressRef, chainlinkapi.RawInstanceAddress, bool, error) {
 	if ds == nil {
-		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, false, nil
+		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, false, nil
 	}
 
 	matches := ds.Addresses().Filter(
@@ -647,16 +647,16 @@ func findTokenPoolRateLimiterInDataStore(
 	)
 	switch len(matches) {
 	case 0:
-		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, false, nil
+		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, false, nil
 	case 1:
 		rawAddr, err := dsutils.GetRawInstanceAddressFromAddressRef(matches[0])
 		if err != nil {
-			return datastore.AddressRef{}, mcms.RawInstanceAddress{}, false, err
+			return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, false, err
 		}
 
 		return matches[0], rawAddr.Binding(), true, nil
 	default:
-		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, false, fmt.Errorf(
+		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, false, fmt.Errorf(
 			"multiple token pool rate limiter datastore entries for chain %d type %s qualifier %q",
 			chainSelector, rlType, qualifier,
 		)
@@ -675,13 +675,13 @@ func deployTokenPoolRateLimiter(
 	remoteSelectorKey string,
 	direction string,
 	cfg tokenadapters.RateLimiterConfig,
-	mode common.RateLimitMode,
+	mode core.RateLimitMode,
 	proposalOutputs *[]contract.ExerciseOutput,
-) (datastore.AddressRef, mcms.RawInstanceAddress, error) {
+) (datastore.AddressRef, chainlinkapi.RawInstanceAddress, error) {
 	qualifier := tokenPoolRateLimiterQualifier(tokenPoolAddress, direction, remoteSelectorKey)
 	rlType := tokenPoolRateLimiterDatastoreType(direction)
 	if ref, raw, found, err := findTokenPoolRateLimiterInDataStore(existingDataStore, cantonChainSelector, rlType, qualifier); err != nil {
-		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, err
+		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
 	} else if found {
 		b.Logger.Infof(
 			"skipping token pool rate limiter deploy; reusing datastore ref (type=%s qualifier=%s)",
@@ -692,9 +692,9 @@ func deployTokenPoolRateLimiter(
 		return ref, raw, nil
 	}
 
-	dirEnum := common.RateLimitDirectionRateLimitDirection_Inbound
+	dirEnum := core.RateLimitDirectionRateLimitDirection_Inbound
 	if direction == "outbound" {
-		dirEnum = common.RateLimitDirectionRateLimitDirection_Outbound
+		dirEnum = core.RateLimitDirectionRateLimitDirection_Outbound
 	}
 
 	capacity := types.NUMERIC("0")
@@ -708,10 +708,10 @@ func deployTokenPoolRateLimiter(
 
 	limiterInstanceID, err := ensureInstanceID(types.TEXT(qualifier), "ratelimiter")
 	if err != nil {
-		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, err
+		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
 	}
 	report, err := operations.ExecuteOperation(b, factoryops.DeployRateLimiter, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployRateLimiter{
-		Contract: common.RateLimiter{
+		Contract: core.RateLimiter{
 			InstanceId:          types.TEXT(limiterInstanceID),
 			PoolInstanceId:      poolMeta.InstanceId,
 			PoolOwner:           poolMeta.PoolOwner,
@@ -726,7 +726,7 @@ func deployTokenPoolRateLimiter(
 		},
 	}, mcmsEnabled))
 	if err != nil {
-		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, err
+		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
 	}
 	if mcmsEnabled && !report.Output.Executed() {
 		*proposalOutputs = append(*proposalOutputs, report.Output)
@@ -737,17 +737,17 @@ func deployTokenPoolRateLimiter(
 
 	addresses, ok := existingDataStore.Addresses().(datastore.MutableAddressRefStore)
 	if !ok {
-		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, fmt.Errorf("existing datastore addresses are not mutable")
+		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, fmt.Errorf("existing datastore addresses are not mutable")
 	}
 	if err := addresses.Add(addressRef); err != nil {
-		return datastore.AddressRef{}, mcms.RawInstanceAddress{}, err
+		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
 	}
 
 	return addressRef, rawAddr.Binding(), nil
 }
 
-func resolveCommitteeVerifierRawAddresses(refs []datastore.AddressRef, addresses []string) ([]mcms.RawInstanceAddress, error) {
-	result := make([]mcms.RawInstanceAddress, 0, len(addresses))
+func resolveCommitteeVerifierRawAddresses(refs []datastore.AddressRef, addresses []string) ([]chainlinkapi.RawInstanceAddress, error) {
+	result := make([]chainlinkapi.RawInstanceAddress, 0, len(addresses))
 	for _, address := range addresses {
 		var matchedRef *datastore.AddressRef
 		for _, ref := range refs {

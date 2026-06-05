@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
@@ -620,7 +620,7 @@ func createMCMS(ctx context.Context, participant canton.Participant, owner strin
 				{
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
-							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
+							TemplateId: contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
 								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: baseMcmsId}}},
@@ -672,7 +672,7 @@ func setMCMSConfig(ctx context.Context, participant canton.Participant, owner st
 				{
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
+							TemplateId: contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 							ContractId: mcmsCid,
 							Choice:     "SetConfig",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -697,7 +697,7 @@ func setMCMSConfig(ctx context.Context, participant canton.Participant, owner st
 
 	// Find the new MCMS contract ID
 	for _, event := range exerciseRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcmsCore.MCMS{}.GetTemplateID()) {
 			return created.GetContractId(), nil
 		}
 	}
@@ -742,7 +742,7 @@ func setMCMSRoot(ctx context.Context, participant canton.Participant, owner stri
 				{
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: contracts.IdentifierFromBinding(core.MCMS{}),
+							TemplateId: contracts.IdentifierFromBinding(mcmsCore.MCMS{}),
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -769,7 +769,7 @@ func setMCMSRoot(ctx context.Context, participant canton.Participant, owner stri
 
 	// Find the new MCMS contract ID
 	for _, event := range exerciseRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcmsCore.MCMS{}.GetTemplateID()) {
 			return created.GetContractId(), nil
 		}
 	}
@@ -797,12 +797,12 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		params mcms.SetConfigParams
+		params mcmsApi.SetConfigParams
 	}{
 		{
 			name: "empty config",
-			params: mcms.SetConfigParams{
-				Signers:      []mcms.SignerInfo{},
+			params: mcmsApi.SetConfigParams{
+				Signers:      []mcmsApi.SignerInfo{},
 				GroupQuorums: []types.INT64{},
 				GroupParents: []types.INT64{},
 				ClearRoot:    false,
@@ -810,8 +810,8 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 		},
 		{
 			name: "single signer",
-			params: mcms.SetConfigParams{
-				Signers: []mcms.SignerInfo{
+			params: mcmsApi.SetConfigParams{
+				Signers: []mcmsApi.SignerInfo{
 					{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 0},
 				},
 				GroupQuorums: []types.INT64{1},
@@ -821,8 +821,8 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 		},
 		{
 			name: "2-of-3 multisig",
-			params: mcms.SetConfigParams{
-				Signers: []mcms.SignerInfo{
+			params: mcmsApi.SetConfigParams{
+				Signers: []mcmsApi.SignerInfo{
 					{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 0},
 					{SignerAddress: "a4b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f80123", SignerIndex: 1, SignerGroup: 0},
 					{SignerAddress: "b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a87654", SignerIndex: 2, SignerGroup: 0},
@@ -834,8 +834,8 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 		},
 		{
 			name: "full 32-group config",
-			params: mcms.SetConfigParams{
-				Signers: []mcms.SignerInfo{
+			params: mcmsApi.SetConfigParams{
+				Signers: []mcmsApi.SignerInfo{
 					{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 0},
 					{SignerAddress: "a4b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f80123", SignerIndex: 1, SignerGroup: 1},
 				},
@@ -846,8 +846,8 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 		},
 		{
 			name: "hierarchical groups",
-			params: mcms.SetConfigParams{
-				Signers: []mcms.SignerInfo{
+			params: mcmsApi.SetConfigParams{
+				Signers: []mcmsApi.SignerInfo{
 					{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 1},
 					{SignerAddress: "a4b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f80123", SignerIndex: 1, SignerGroup: 1},
 					{SignerAddress: "b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a87654", SignerIndex: 2, SignerGroup: 2},
@@ -871,7 +871,7 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 				tc.name, truncateString(encoded, 60), len(encoded), len(encoded)/2)
 
 			// Decode using binding's UnmarshalHex
-			var decoded mcms.SetConfigParams
+			var decoded mcmsApi.SetConfigParams
 			err = decoded.UnmarshalHex(encoded)
 			require.NoError(t, err, "failed to decode")
 
@@ -927,7 +927,7 @@ func TestMCMSCodec_SetConfigParams_DecodeErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			var decoded mcms.SetConfigParams
+			var decoded mcmsApi.SetConfigParams
 			err := decoded.UnmarshalHex(tc.hexData)
 			require.Error(t, err, "should have failed to decode")
 		})
@@ -940,8 +940,8 @@ func TestMCMSCodec_SetConfigParams_KnownValues(t *testing.T) {
 	t.Parallel()
 
 	// Test with a specific config and verify exact hex output
-	params := mcms.SetConfigParams{
-		Signers: []mcms.SignerInfo{
+	params := mcmsApi.SetConfigParams{
+		Signers: []mcmsApi.SignerInfo{
 			{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 0},
 		},
 		GroupQuorums: []types.INT64{1, 0, 0}, // 3 quorums

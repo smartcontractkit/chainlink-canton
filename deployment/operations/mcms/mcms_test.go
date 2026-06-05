@@ -5,16 +5,17 @@ import (
 	"testing"
 
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+	"github.com/stretchr/testify/require"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
-
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -56,7 +57,7 @@ func TestMCMSOps(t *testing.T) {
 
 	// Create a simple 2-of-3 multisig config
 	// This is a minimal config for testing
-	signers := []mcms.SignerInfo{
+	signers := []mcmsApi.SignerInfo{
 		{
 			SignerAddress: types.TEXT("0x1111111111111111111111111111111111111111"),
 			SignerIndex:   types.INT64(0),
@@ -81,24 +82,24 @@ func TestMCMSOps(t *testing.T) {
 	// Create group parents (32 groups, all 0 for flat structure)
 	groupParents := make([]types.INT64, 32)
 
-	config := mcms.MultisigConfig{
+	config := mcmsApi.MultisigConfig{
 		Signers:      signers,
 		GroupQuorums: groupQuorums,
 		GroupParents: groupParents,
 	}
 
 	// Create RoleState for each role (multi-role MCMS structure)
-	roleState := mcms.RoleState{
+	roleState := mcmsApi.RoleState{
 		Config:       config,
 		SeenHashes:   nil,
-		ExpiringRoot: mcms.ExpiringRoot{},
-		RootMetadata: mcms.RootMetadata{},
+		ExpiringRoot: mcmsApi.ExpiringRoot{},
+		RootMetadata: mcmsApi.RootMetadata{},
 	}
 
 	var mcmsInstanceAddress contracts.InstanceAddress
 	t.Run("Deploy", func(t *testing.T) {
-		result, err := cld_ops.ExecuteOperation(bundle, Deploy, *cantonChain, contract.DeployInput[mcms.MCMS]{
-			Template: mcms.MCMS{
+		result, err := cld_ops.ExecuteOperation(bundle, Deploy, *cantonChain, contract.DeployInput[mcmsCore.MCMS]{
+			Template: mcmsCore.MCMS{
 				Owner:              types.PARTY(primaryParty),
 				InstanceId:         types.TEXT(mcmsID),
 				ChainId:            types.INT64(chainID),
@@ -118,7 +119,7 @@ func TestMCMSOps(t *testing.T) {
 
 	t.Run("SetConfig", func(t *testing.T) {
 		// Create updated config with a new signer
-		newSigners := []mcms.SignerInfo{
+		newSigners := []mcmsApi.SignerInfo{
 			{
 				SignerAddress: types.TEXT("0x1111111111111111111111111111111111111111"),
 				SignerIndex:   types.INT64(0),
@@ -145,10 +146,10 @@ func TestMCMSOps(t *testing.T) {
 		newGroupQuorums := make([]types.INT64, 32)
 		newGroupQuorums[0] = types.INT64(3) // 3-of-4 for group 0
 
-		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, *cantonChain, contract.ChoiceInput[mcms.SetConfig]{
+		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, *cantonChain, contract.ChoiceInput[mcmsCore.SetConfig]{
 			InstanceAddress: mcmsInstanceAddress,
-			Args: mcms.SetConfig{
-				TargetRole:      mcms.RoleProposer, // Target the proposer role
+			Args: mcmsCore.SetConfig{
+				TargetRole:      mcmsApi.RoleProposer, // Target the proposer role
 				NewSigners:      newSigners,
 				NewGroupQuorums: newGroupQuorums,
 				NewGroupParents: groupParents,      // Keep same parent structure

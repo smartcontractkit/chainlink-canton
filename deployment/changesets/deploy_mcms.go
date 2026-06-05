@@ -13,7 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	mcmsops "github.com/smartcontractkit/chainlink-canton/deployment/operations/mcms"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -22,26 +23,26 @@ import (
 const mcmsGroupCount = 32
 
 type MCMSConfigParams struct {
-	Signers      []mcmsbindings.SignerInfo `json:"signers" yaml:"signers"`
-	GroupQuorums []types.INT64             `json:"groupQuorums" yaml:"groupQuorums"`
-	GroupParents []types.INT64             `json:"groupParents" yaml:"groupParents"`
-	ClearRoot    bool                      `json:"clearRoot" yaml:"clearRoot"`
+	Signers      []mcmsApi.SignerInfo `json:"signers" yaml:"signers"`
+	GroupQuorums []types.INT64        `json:"groupQuorums" yaml:"groupQuorums"`
+	GroupParents []types.INT64        `json:"groupParents" yaml:"groupParents"`
+	ClearRoot    bool                 `json:"clearRoot" yaml:"clearRoot"`
 }
 
 type MCMSRoleConfigParams struct {
-	Role   mcmsbindings.Role `json:"role" yaml:"role"`
-	Config MCMSConfigParams  `json:"config" yaml:"config"`
+	Role   mcmsApi.Role     `json:"role" yaml:"role"`
+	Config MCMSConfigParams `json:"config" yaml:"config"`
 }
 
 type DeployAndConfigureMCMSParams struct {
-	OwnerParty       string                         `json:"ownerParty" yaml:"ownerParty"`
-	InstanceID       string                         `json:"instanceID,omitempty" yaml:"instanceID,omitempty"`
-	ChainID          int64                          `json:"chainID" yaml:"chainID"`
-	Qualifier        string                         `json:"qualifier,omitempty" yaml:"qualifier,omitempty"`
-	MinDelay         time.Duration                  `json:"minDelay" yaml:"minDelay"`
-	BlockedFunctions []mcmsbindings.BlockedFunction `json:"blockedFunctions" yaml:"blockedFunctions"`
-	InitialConfig    MCMSConfigParams               `json:"initialConfig" yaml:"initialConfig"`
-	RoleConfigs      []MCMSRoleConfigParams         `json:"roleConfigs" yaml:"roleConfigs"`
+	OwnerParty       string                    `json:"ownerParty" yaml:"ownerParty"`
+	InstanceID       string                    `json:"instanceID,omitempty" yaml:"instanceID,omitempty"`
+	ChainID          int64                     `json:"chainID" yaml:"chainID"`
+	Qualifier        string                    `json:"qualifier,omitempty" yaml:"qualifier,omitempty"`
+	MinDelay         time.Duration             `json:"minDelay" yaml:"minDelay"`
+	BlockedFunctions []mcmsApi.BlockedFunction `json:"blockedFunctions" yaml:"blockedFunctions"`
+	InitialConfig    MCMSConfigParams          `json:"initialConfig" yaml:"initialConfig"`
+	RoleConfigs      []MCMSRoleConfigParams    `json:"roleConfigs" yaml:"roleConfigs"`
 }
 
 type DeployAndConfigureMCMSConfig struct {
@@ -110,8 +111,8 @@ var deployAndConfigureMCMSSequence = operations.NewSequence(
 		roleState := emptyRoleState(initialConfig)
 		ownerParty := types.PARTY(input.OwnerParty)
 
-		deployReport, err := operations.ExecuteOperation(b, mcmsops.Deploy, deps, opcontract.DeployInput[mcmsbindings.MCMS]{
-			Template: mcmsbindings.MCMS{
+		deployReport, err := operations.ExecuteOperation(b, mcmsops.Deploy, deps, opcontract.DeployInput[mcmsCore.MCMS]{
+			Template: mcmsCore.MCMS{
 				Owner:              ownerParty,
 				InstanceId:         types.TEXT(input.InstanceID),
 				ChainId:            types.INT64(input.ChainID),
@@ -142,9 +143,9 @@ var deployAndConfigureMCMSSequence = operations.NewSequence(
 				return ccipsequences.OnChainOutput{}, fmt.Errorf("build MCMS config for role %s: %w", roleConfig.Role, err)
 			}
 
-			_, err = operations.ExecuteOperation(b, mcmsops.SetConfig, deps, opcontract.ChoiceInput[mcmsbindings.SetConfig]{
+			_, err = operations.ExecuteOperation(b, mcmsops.SetConfig, deps, opcontract.ChoiceInput[mcmsCore.SetConfig]{
 				InstanceAddress: rawInstanceAddress.InstanceAddress(),
-				Args: mcmsbindings.SetConfig{
+				Args: mcmsCore.SetConfig{
 					TargetRole:      roleConfig.Role,
 					NewSigners:      groupConfig.Signers,
 					NewGroupQuorums: groupConfig.GroupQuorums,
@@ -169,13 +170,13 @@ var deployAndConfigureMCMSSequence = operations.NewSequence(
 	},
 )
 
-func buildMultisigConfig(input MCMSConfigParams) (mcmsbindings.MultisigConfig, error) {
+func buildMultisigConfig(input MCMSConfigParams) (mcmsApi.MultisigConfig, error) {
 	cfg, err := buildNormalizedConfig(input)
 	if err != nil {
-		return mcmsbindings.MultisigConfig{}, err
+		return mcmsApi.MultisigConfig{}, err
 	}
 
-	return mcmsbindings.MultisigConfig{
+	return mcmsApi.MultisigConfig{
 		Signers:      cfg.Signers,
 		GroupQuorums: cfg.GroupQuorums,
 		GroupParents: cfg.GroupParents,
@@ -211,16 +212,16 @@ func normalizeGroups(input []types.INT64, name string) ([]types.INT64, error) {
 	return out, nil
 }
 
-func emptyRoleState(config mcmsbindings.MultisigConfig) mcmsbindings.RoleState {
-	return mcmsbindings.RoleState{
+func emptyRoleState(config mcmsApi.MultisigConfig) mcmsApi.RoleState {
+	return mcmsApi.RoleState{
 		Config:     config,
 		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
-		ExpiringRoot: mcmsbindings.ExpiringRoot{
+		ExpiringRoot: mcmsApi.ExpiringRoot{
 			Root:       types.TEXT(""),
 			ValidUntil: types.TIMESTAMP(time.Unix(0, 0)),
 			OpCount:    types.INT64(0),
 		},
-		RootMetadata: mcmsbindings.RootMetadata{
+		RootMetadata: mcmsApi.RootMetadata{
 			ChainId:              types.INT64(0),
 			MultisigId:           types.TEXT(""),
 			PreOpCount:           types.INT64(0),

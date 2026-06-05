@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	seqcore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
@@ -17,12 +18,10 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	ccvsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	executorbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
@@ -89,7 +88,7 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		RMNFactoryAddressRef: rmnFactoryAddressRef,
 		CommitteeVerifiers:   committeeVerifierParams(ownerParty, input.ContractParams.CommitteeVerifiers),
 		GlobalConfig: sequences.GlobalConfigParams{
-			Template: common.GlobalConfig{
+			Template: core.GlobalConfig{
 				CcipOwner:     "",
 				ChainSelector: types.NUMERIC(strconv.FormatUint(input.ChainSelector, 10)),
 			},
@@ -97,12 +96,12 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		ProposalDriven:     proposalDriven,
 		NativeInstrumentId: nativeInstrumentID,
 		FeeQuoterConfig: sequences.FeeQuoterParams{
-			Template: feequoter.FeeQuoter{
+			Template: core.FeeQuoter{
 				PriceUpdaters: []types.PARTY{types.PARTY(ownerParty)},
 			},
 		},
 		RMNRemote: sequences.RMNRemoteParams{
-			Template: rmn.RMNRemote{
+			Template: core.RMNRemote{
 				CursedSubjects: nil,
 			},
 		},
@@ -190,14 +189,14 @@ func committeeVerifierParams(ownerParty string, verifiers []ccipadapters.Committ
 		}
 		params = append(params, sequences.CommitteeVerifierParams{
 			Qualifier: qualifier,
-			Template: ccvsbindings.CommitteeVerifier{
+			Template: committeeverifier.CommitteeVerifier{
 				CcipOwner:                    types.PARTY(ownerParty),
 				VersionTag:                   types.TEXT("e9a05a20"),
 				MessageSentObservers:         nil,
 				StorageLocations:             storageLocations,
 				StorageLocationsAdmin:        types.PARTY(ownerParty),
 				PendingStorageLocationsAdmin: types.PARTY(ownerParty),
-				Deps:                         ccvsbindings.CommitteeVerifierDeps{},
+				Deps:                         committeeverifier.CommitteeVerifierDeps{},
 			},
 		})
 	}
@@ -225,10 +224,10 @@ func executorParams(
 		}
 		params = append(params, sequences.ExecutorParams{
 			Qualifier: qualifier,
-			Template: executorbindings.Executor{
+			Template: executor.Executor{
 				Owner:         types.PARTY(ownerParty),
 				MaxCCVsPerMsg: types.INT64(maxCCVs),
-				DynamicConfig: executorbindings.DynamicConfig{
+				DynamicConfig: executor.DynamicConfig{
 					FeeAggregator:         nil,
 					AllowedFinalityConfig: requestedFinality(exec.DynamicConfig.AllowedFinalityConfig),
 					CcvAllowlistEnabled:   types.BOOL(exec.DynamicConfig.CcvAllowlistEnabled),
@@ -244,10 +243,10 @@ func executorParams(
 func defaultExecutorParams(ownerParty string) sequences.ExecutorParams {
 	return sequences.ExecutorParams{
 		Qualifier: devenvcommon.DefaultExecutorQualifier,
-		Template: executorbindings.Executor{
+		Template: executor.Executor{
 			Owner:         types.PARTY(ownerParty),
 			MaxCCVsPerMsg: types.INT64(10),
-			DynamicConfig: executorbindings.DynamicConfig{
+			DynamicConfig: executor.DynamicConfig{
 				FeeAggregator:         nil,
 				AllowedFinalityConfig: waitForFinalityRequested(),
 				CcvAllowlistEnabled:   types.BOOL(false),
@@ -257,7 +256,7 @@ func defaultExecutorParams(ownerParty string) sequences.ExecutorParams {
 	}
 }
 
-func requestedFinality(cfg finality.Config) common.FinalityConfig {
+func requestedFinality(cfg finality.Config) core.FinalityConfig {
 	if cfg.IsZero() || cfg.WaitForFinality {
 		return waitForFinalityRequested()
 	}
@@ -268,16 +267,16 @@ func requestedFinality(cfg finality.Config) common.FinalityConfig {
 		return waitForSafeRequested()
 	}
 	if cfg.BlockDepth > 0 {
-		return common.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
+		return core.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
 	}
 
 	return waitForFinalityRequested()
 }
 
-func waitForFinalityRequested() common.FinalityConfig {
-	return common.FinalityConfig{WaitForFinality: &types.UNIT{}}
+func waitForFinalityRequested() core.FinalityConfig {
+	return core.FinalityConfig{WaitForFinality: &types.UNIT{}}
 }
 
-func waitForSafeRequested() common.FinalityConfig {
-	return common.FinalityConfig{WaitForSafe: &types.UNIT{}}
+func waitForSafeRequested() core.FinalityConfig {
+	return core.FinalityConfig{WaitForSafe: &types.UNIT{}}
 }

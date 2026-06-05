@@ -9,8 +9,8 @@ import (
 //go:embed dars
 var Dars embed.FS
 
-//go:embed dependencies
-var Dependencies embed.FS
+//go:embed dependencies/splice
+var SpliceDependencies embed.FS
 
 type Package string
 
@@ -118,8 +118,8 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 	path := darPath(packageName, version)
 	data, err := Dars.ReadFile(path)
 	if err != nil {
-		// Try to read from dependencies if not found in dars
-		data, err = Dependencies.ReadFile(fmt.Sprintf("dependencies/%s-%s.dar", packageName, version))
+		// Try to read from Splice dependencies if not found in dars
+		data, err = SpliceDependencies.ReadFile(fmt.Sprintf("dependencies/splice/%s-%s.dar", packageName, version))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read embedded DAR file %s: %w", path, err)
 		}
