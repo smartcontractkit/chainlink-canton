@@ -810,6 +810,7 @@ func buildTokenTransferV1(
 	extraData []byte,
 ) *protocol.TokenTransfer {
 	return &protocol.TokenTransfer{
+		Version:                  1,
 		Amount:                   amount,
 		SourcePoolAddress:        sourcePoolAddress,
 		SourcePoolAddressLength:  uint8(len(sourcePoolAddress)),
