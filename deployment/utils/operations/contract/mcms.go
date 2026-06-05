@@ -100,5 +100,6 @@ func ValidateCantonAdditionalFields(raw json.RawMessage) error {
 	if af.FunctionName == "" {
 		return errors.New("functionName is required")
 	}
+
 	return nil
 }
