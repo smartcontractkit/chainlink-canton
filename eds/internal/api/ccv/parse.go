@@ -6,7 +6,7 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
@@ -15,7 +15,7 @@ type CommitteeVerifier struct {
 }
 
 func ParseCommitteeVerifier(createdEvent *apiv2.CreatedEvent) (*CommitteeVerifier, error) {
-	boundContract, err := bindings.UnmarshalCreatedEvent[ccvs.CommitteeVerifier](createdEvent)
+	boundContract, err := bindings.UnmarshalCreatedEvent[committeeverifier.CommitteeVerifier](createdEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal committee verifier: %w", err)
 	}

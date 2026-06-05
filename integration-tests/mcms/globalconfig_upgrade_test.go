@@ -9,7 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -222,7 +222,7 @@ func exerciseMCMSReceiverEntrypoint(
 				Command: &apiv2.Command_Exercise{
 					Exercise: &apiv2.ExerciseCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  mcms.PackageName,
+							PackageId:  mcmsApi.PackageName,
 							ModuleName: "MCMS.MCMSReceiver",
 							EntityName: "MCMSReceiver",
 						},

@@ -18,9 +18,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
@@ -68,12 +67,12 @@ func NewServer(
 			Owner: types.PARTY(tokenPool.PoolOwner),
 		}
 		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
-			TemplateID: contracts.TemplateIDFromBinding(common.RateLimiter{}),
+			TemplateID: contracts.TemplateIDFromBinding(core.RateLimiter{}),
 			PartyID:    tokenPool.PartyID,
 		})
 		s.instrumentHoldingStore.RegisterParty(tokenPool.PoolOwner)
 		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
-			TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenConfig{}),
+			TemplateID: contracts.TemplateIDFromBinding(core.TokenConfig{}),
 			PartyID:    tokenPool.PartyID,
 		})
 		switch tokenPool.Type {
@@ -230,7 +229,7 @@ func (s Server) lockReleaseTokenPoolSend(
 
 	// The ChoiceContext that will be passed to the Token Pool
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
-		string(common.RateLimiterKey):                            {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(core.RateLimiterKey):                              {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
 		string(lockreleasetokenpool.TokenPoolHoldingsContextKey): {AVList: new(tokenPoolHoldings)},
 	}}
 
@@ -343,7 +342,7 @@ func (s Server) burnMintTokenPoolSend(
 
 	// The ChoiceContext that will be passed to the Token Pool
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
-		string(common.RateLimiterKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(core.RateLimiterKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
 	}}
 
 	// The ChoiceContext that will be passed to the BurnMintFactory by the Token Pool
@@ -536,7 +535,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 
 	// The ChoiceContext that will be passed to the Token Pool
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
-		string(common.RateLimiterKey):                            {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(core.RateLimiterKey):                              {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
 		string(lockreleasetokenpool.TokenPoolHoldingsContextKey): {AVList: new(tokenPoolHoldings)},
 	}}
 
@@ -646,7 +645,7 @@ func (s Server) burnMintTokenPoolExecute(
 
 	// The ChoiceContext that will be passed to the Token Pool
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
-		string(common.RateLimiterKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(core.RateLimiterKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
 	}}
 
 	// The ChoiceContext that will be passed to the BurnMintFactory by the Token Pool

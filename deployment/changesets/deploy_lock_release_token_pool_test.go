@@ -8,6 +8,8 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+	"github.com/stretchr/testify/require"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -17,12 +19,10 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -68,8 +68,8 @@ func TestDeployTokenPool(t *testing.T) {
 	)
 
 	// Deploy TAR so we have an instance address for register-with-TAR
-	tarAddrRef, err := cld_ops.ExecuteOperation(bundle, token_admin_registry.Deploy, *cantonChain, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
-		Template: tokenadminregistry.TokenAdminRegistry{
+	tarAddrRef, err := cld_ops.ExecuteOperation(bundle, token_admin_registry.Deploy, *cantonChain, contract.DeployInput[core.TokenAdminRegistry]{
+		Template: core.TokenAdminRegistry{
 			Owner:      types.PARTY(party),
 			InstanceId: "",
 			EntryCount: 0,
@@ -121,17 +121,17 @@ func findTokenConfigByInstanceAddress(
 	stateClient apiv2.StateServiceClient,
 	ccipParty string,
 	instrumentId splice_api_token_holding_v1.InstrumentId,
-) (*tokenadminregistry.TokenConfig, error) {
+) (*core.TokenConfig, error) {
 	activeContract, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
 		stateClient,
 		[]string{ccipParty},
-		tokenadminregistry.TokenConfig{}.GetTemplateID(),
+		core.TokenConfig{}.GetTemplateID(),
 		contracts.InstanceID(hex.EncodeToString(contracts.EncodeInstrumentID(instrumentId).Bytes())).RawInstanceAddress(types.PARTY(ccipParty)).InstanceAddress(),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenConfig](activeContract.GetCreatedEvent())
+	return bindings.UnmarshalCreatedEvent[core.TokenConfig](activeContract.GetCreatedEvent())
 }

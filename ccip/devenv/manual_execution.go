@@ -19,9 +19,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipreceiver"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
@@ -42,9 +42,9 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 	// Fixed instance ID for the router, this makes the InstanceAddress deterministic.
 	routerInstanceID := contracts.InstanceID("test-router")
 	// Ignore errors, since the router might already exist if this function is called multiple times for the same party. In that case we just want to return the existing router's address.
-	_, _ = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, c.chain, contract.ChoiceInput[perpartyrouter.CreateRouter]{
+	_, _ = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, c.chain, contract.ChoiceInput[ccipruntime.CreateRouter]{
 		InstanceAddress: perPartyRouterFactoryDisclosure.Address.InstanceAddress(),
-		Args: perpartyrouter.CreateRouter{
+		Args: ccipruntime.CreateRouter{
 			PartyOwner: types.PARTY(partyId),
 			InstanceId: types.TEXT(routerInstanceID.String()),
 		},
@@ -53,7 +53,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 
 	// Try to get the PerPartyRouter, to ensure that is actually exists
 	_, err = testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
+		PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to find per-party router: %w", err)
@@ -123,7 +123,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
 
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{participant.PartyID}, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{participant.PartyID}, ccipruntime.PerPartyRouter{}.GetTemplateID(), routerAddress)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get router contract ID: %w", err)
 	}
@@ -252,7 +252,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Get ExecutionStateChangedEvent from events
-	expectedTemplateID := common.ExecutionStateChanged{}.GetTemplateID()
+	expectedTemplateID := core.ExecutionStateChanged{}.GetTemplateID()
 	for _, event := range update.GetTransaction().GetEvents() {
 		//nolint:nestif // need to check if all of these are nil
 		if createdEvent := event.GetCreated(); createdEvent != nil {
@@ -278,7 +278,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 // parseExecutionStateChangedEvent parses a common.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.
 func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	executionStateChanged, err := bindings.UnmarshalCreatedEvent[common.ExecutionStateChanged](event)
+	executionStateChanged, err := bindings.UnmarshalCreatedEvent[core.ExecutionStateChanged](event)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to unmarshal ExecutionStateChanged event: %w", err)
 	}
@@ -303,13 +303,13 @@ func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfa
 	// Execution state
 	var executionState cciptestinterfaces.MessageExecutionState
 	switch executionStateChanged.Event.State {
-	case common.MessageExecutionStateUNTOUCHED:
+	case core.MessageExecutionStateUNTOUCHED:
 		executionState = cciptestinterfaces.ExecutionStateUntouched
-	case common.MessageExecutionStateIN_PROGRESS:
+	case core.MessageExecutionStateIN_PROGRESS:
 		executionState = cciptestinterfaces.ExecutionStateInProgress
-	case common.MessageExecutionStateSUCCESS:
+	case core.MessageExecutionStateSUCCESS:
 		executionState = cciptestinterfaces.ExecutionStateSuccess
-	case common.MessageExecutionStateFAILURE:
+	case core.MessageExecutionStateFAILURE:
 		executionState = cciptestinterfaces.ExecutionStateFailure
 	default:
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("unknown execution state %q", executionStateChanged.Event.State)
@@ -359,7 +359,7 @@ func (c *Chain) findExistingExecutionState(
 	}
 	participant := c.chain.Participants[0]
 
-	templateID := contracts.TemplateIDFromBinding(common.ExecutionStateChanged{}).ToLedgerIdentifier()
+	templateID := contracts.TemplateIDFromBinding(core.ExecutionStateChanged{}).ToLedgerIdentifier()
 	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, templateID)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: list active ExecutionStateChanged contracts: %w", err)
@@ -438,18 +438,18 @@ func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Byte
 	}, nil
 }
 
-func encodeReceiverFinalityConfig(finality int64) (common.FinalityConfig, error) {
+func encodeReceiverFinalityConfig(finality int64) (core.FinalityConfig, error) {
 	switch {
 	case finality < 0:
-		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
+		return core.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
 	case finality == 0:
-		return common.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
+		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
 	case finality == 0x00010000:
-		return common.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
+		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
 	case finality > 0xFFFF:
-		return common.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
+		return core.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
 	default:
-		return common.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
+		return core.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}
 }
 

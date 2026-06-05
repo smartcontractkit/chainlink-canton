@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/mcms"
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
@@ -35,8 +34,8 @@ type ConfigureGlobalConfigConfig struct {
 	InstanceAddress contracts.InstanceAddress
 	// RawInstanceAddress is the "instanceId@partyId" format needed for MCMS proposals.
 	RawInstanceAddress string
-	DestChainUpdates   []common.DestChainConfigArgs
-	SourceChainUpdates []common.SourceChainConfigArgs
+	DestChainUpdates   []core.DestChainConfigArgs
+	SourceChainUpdates []core.SourceChainConfigArgs
 	TimelockConfig     *MCMSTimelockConfig
 }
 
@@ -63,10 +62,10 @@ func (d ConfigureGlobalConfig) Apply(e cldf.Environment, config CantonCSDeps[Con
 	var exerciseOutputs []opcontract.ExerciseOutput
 
 	if len(config.Config.DestChainUpdates) > 0 {
-		out, err := operations.ExecuteOperation(e.OperationsBundle, global_config.ApplyDestChainConfigUpdates, chain, opcontract.ChoiceInput[common.ApplyDestChainConfigUpdates]{
+		out, err := operations.ExecuteOperation(e.OperationsBundle, global_config.ApplyDestChainConfigUpdates, chain, opcontract.ChoiceInput[core.ApplyDestChainConfigUpdates]{
 			InstanceAddress:    config.Config.InstanceAddress,
 			RawInstanceAddress: config.Config.RawInstanceAddress,
-			Args: common.ApplyDestChainConfigUpdates{
+			Args: core.ApplyDestChainConfigUpdates{
 				DestChainConfigUpdates: config.Config.DestChainUpdates,
 			},
 			MCMSEnabled: mcmsEnabled,
@@ -78,10 +77,10 @@ func (d ConfigureGlobalConfig) Apply(e cldf.Environment, config CantonCSDeps[Con
 	}
 
 	if len(config.Config.SourceChainUpdates) > 0 {
-		out, err := operations.ExecuteOperation(e.OperationsBundle, global_config.ApplySourceChainConfigUpdates, chain, opcontract.ChoiceInput[common.ApplySourceChainConfigUpdates]{
+		out, err := operations.ExecuteOperation(e.OperationsBundle, global_config.ApplySourceChainConfigUpdates, chain, opcontract.ChoiceInput[core.ApplySourceChainConfigUpdates]{
 			InstanceAddress:    config.Config.InstanceAddress,
 			RawInstanceAddress: config.Config.RawInstanceAddress,
-			Args: common.ApplySourceChainConfigUpdates{
+			Args: core.ApplySourceChainConfigUpdates{
 				SourceChainConfigUpdates: config.Config.SourceChainUpdates,
 			},
 			MCMSEnabled: mcmsEnabled,

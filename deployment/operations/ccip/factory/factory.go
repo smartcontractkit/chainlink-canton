@@ -8,11 +8,12 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -356,7 +357,7 @@ func writeBool(buf *bytes.Buffer, value types.BOOL) {
 	buf.WriteByte(0x00)
 }
 
-func writeRequestedFinality(buf *bytes.Buffer, finality common.FinalityConfig) error {
+func writeRequestedFinality(buf *bytes.Buffer, finality core.FinalityConfig) error {
 	switch {
 	case finality.WaitForFinality != nil:
 		buf.WriteByte(0x00)

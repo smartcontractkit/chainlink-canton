@@ -8,6 +8,9 @@ import (
 	"time"
 
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -19,13 +22,12 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
-	mcms_bindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
@@ -52,7 +54,7 @@ func TestConfigureGlobalConfig_DirectExecution(t *testing.T) {
 		CCIPOwnerParty: party,
 		RMNOwnerParty:  party,
 		CommitteeVerifiers: []sequences.CommitteeVerifierParams{{
-			Template: ccvs.CommitteeVerifier{
+			Template: committeeverifier.CommitteeVerifier{
 				Owner:                        types.PARTY(party),
 				CcipOwner:                    types.PARTY(party),
 				VersionTag:                   "test-v1",
@@ -62,12 +64,12 @@ func TestConfigureGlobalConfig_DirectExecution(t *testing.T) {
 			},
 		}},
 		GlobalConfig: sequences.GlobalConfigParams{
-			Template: common.GlobalConfig{
+			Template: core.GlobalConfig{
 				ChainSelector: chainSelector,
 			},
 		},
 		RMNRemote: sequences.RMNRemoteParams{
-			Template: rmn.RMNRemote{},
+			Template: core.RMNRemote{},
 		},
 		NativeInstrumentId: splice_api_token_holding_v1.InstrumentId{
 			Admin: types.PARTY(party),
@@ -83,7 +85,7 @@ func TestConfigureGlobalConfig_DirectExecution(t *testing.T) {
 		Participant:   0,
 		Config: ConfigureGlobalConfigConfig{
 			InstanceAddress: gcAddr.InstanceAddress(),
-			DestChainUpdates: []common.DestChainConfigArgs{
+			DestChainUpdates: []core.DestChainConfigArgs{
 				makeDestChainConfig("999", ccvAddr),
 			},
 		},
@@ -118,7 +120,7 @@ func TestConfigureGlobalConfig_MCMSProposal(t *testing.T) {
 		Config: ConfigureGlobalConfigConfig{
 			InstanceAddress:    gcRawAddr.InstanceAddress(),
 			RawInstanceAddress: gcRawAddr.String(),
-			DestChainUpdates: []common.DestChainConfigArgs{{
+			DestChainUpdates: []core.DestChainConfigArgs{{
 				DestChainSelector:         "999",
 				IsEnabled:                 true,
 				AddressBytesLength:        20,
@@ -230,8 +232,8 @@ func deployGlobalConfig(t *testing.T, bundle cld_ops.Bundle, chain canton.Chain,
 	t.Helper()
 
 	chainSelector := types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10))
-	result, err := cld_ops.ExecuteOperation(bundle, global_config.Deploy, chain, opcontract.DeployInput[common.GlobalConfig]{
-		Template: common.GlobalConfig{
+	result, err := cld_ops.ExecuteOperation(bundle, global_config.Deploy, chain, opcontract.DeployInput[core.GlobalConfig]{
+		Template: core.GlobalConfig{
 			CcipOwner:     types.PARTY(party),
 			ChainSelector: chainSelector,
 		},
@@ -246,22 +248,22 @@ func deployGlobalConfig(t *testing.T, bundle cld_ops.Bundle, chain canton.Chain,
 func deployMCMSContract(t *testing.T, bundle cld_ops.Bundle, chain canton.Chain, party string) datastore.AddressRef {
 	t.Helper()
 
-	emptyRoleState := mcms_bindings.RoleState{
-		Config: mcms_bindings.MultisigConfig{
+	emptyRoleState := mcmsApi.RoleState{
+		Config: mcmsApi.MultisigConfig{
 			Signers:      nil,
 			GroupQuorums: make([]types.INT64, 32),
 			GroupParents: make([]types.INT64, 32),
 		},
 		SeenHashes: map[types.TEXT]types.TIMESTAMP{},
-		ExpiringRoot: mcms_bindings.ExpiringRoot{
+		ExpiringRoot: mcmsApi.ExpiringRoot{
 			Root:    "",
 			OpCount: 0,
 		},
-		RootMetadata: mcms_bindings.RootMetadata{},
+		RootMetadata: mcmsApi.RootMetadata{},
 	}
 
-	result, err := cld_ops.ExecuteOperation(bundle, mcms_ops.Deploy, chain, opcontract.DeployInput[mcms_bindings.MCMS]{
-		Template: mcms_bindings.MCMS{
+	result, err := cld_ops.ExecuteOperation(bundle, mcms_ops.Deploy, chain, opcontract.DeployInput[mcmsCore.MCMS]{
+		Template: mcmsCore.MCMS{
 			Owner:              types.PARTY(party),
 			ChainId:            1,
 			Proposer:           emptyRoleState,
@@ -280,11 +282,11 @@ func deployMCMSContract(t *testing.T, bundle cld_ops.Bundle, chain canton.Chain,
 
 // extractAddresses finds the GlobalConfig and CommitteeVerifier addresses from the
 // deploy chain contracts output.
-func extractAddresses(t *testing.T, addresses []datastore.AddressRef) (contracts.RawInstanceAddress, mcms_bindings.RawInstanceAddress) {
+func extractAddresses(t *testing.T, addresses []datastore.AddressRef) (contracts.RawInstanceAddress, chainlinkapi.RawInstanceAddress) {
 	t.Helper()
 
 	var gcRaw contracts.RawInstanceAddress
-	var ccvRaw mcms_bindings.RawInstanceAddress
+	var ccvRaw chainlinkapi.RawInstanceAddress
 
 	for _, addr := range addresses {
 		raw, err := contracts.RawInstanceAddressFromString(addr.Labels.List()[0])
@@ -294,7 +296,7 @@ func extractAddresses(t *testing.T, addresses []datastore.AddressRef) (contracts
 		case "CantonGlobalConfig":
 			gcRaw = raw
 		case "CommitteeVerifier":
-			ccvRaw = mcms_bindings.RawInstanceAddress{Unpack: types.TEXT(raw.String())}
+			ccvRaw = chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(raw.String())}
 		}
 	}
 
@@ -304,15 +306,15 @@ func extractAddresses(t *testing.T, addresses []datastore.AddressRef) (contracts
 	return gcRaw, ccvRaw
 }
 
-func makeDestChainConfig(destChainSelector string, ccvAddr mcms_bindings.RawInstanceAddress) common.DestChainConfigArgs {
-	return common.DestChainConfigArgs{
+func makeDestChainConfig(destChainSelector string, ccvAddr chainlinkapi.RawInstanceAddress) core.DestChainConfigArgs {
+	return core.DestChainConfigArgs{
 		DestChainSelector:         types.NUMERIC(destChainSelector),
 		IsEnabled:                 true,
 		AddressBytesLength:        20,
 		TokenReceiverAllowed:      true,
 		BaseExecutionGasCost:      21000,
 		OffRampAddress:            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-		DefaultCCVs:               []mcms_bindings.RawInstanceAddress{ccvAddr},
+		DefaultCCVs:               []chainlinkapi.RawInstanceAddress{ccvAddr},
 		MessageNetworkFeeUSDCents: "100",
 		TokenNetworkFeeUSDCents:   "50",
 	}
