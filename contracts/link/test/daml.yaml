@@ -16,4 +16,4 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
-  - ../.daml/dist/link-0.0.1.dar
+  - ../.daml/dist/link-2.0.0.dar

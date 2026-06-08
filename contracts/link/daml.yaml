@@ -2,7 +2,7 @@ sdk-version: 3.4.11
 name: link
 source: daml
 init-script: Main:runAll
-version: 0.0.1
+version: 2.0.0
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"

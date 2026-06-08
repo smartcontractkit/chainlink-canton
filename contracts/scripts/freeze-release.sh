@@ -1,21 +1,23 @@
 #!/usr/bin/env bash
 #
-# Freezes a production release snapshot: DARs and Go bindings.
+# Freezes a production release snapshot: DARs only.
 #
 #   contracts/dars/v<x_y_z>/              from dars/current/
-#   bindings/generated/v<x_y_z>/         from bindings/generated/latest/
+#
+# Go bindings are not versioned in this repo — all in-repo code imports
+# bindings/generated/latest/. Pin consumers via the chainlink-canton git tag/SHA.
 #
 # Usage:
 #   ./contracts/scripts/freeze-release.sh <release-version>
 #
 # Example:
-#   ./contracts/scripts/freeze-release.sh 1.0.0
+#   ./contracts/scripts/freeze-release.sh 2.0.0
 #
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
   echo "Usage: $0 <release-version>"
-  echo "Example: $0 1.0.0"
+  echo "Example: $0 2.0.0"
   exit 1
 fi
 
@@ -27,9 +29,8 @@ CONTRACTS_DIR="$REPO_ROOT/contracts"
 CURRENT_DARS_DIR="$CONTRACTS_DIR/dars/current"
 DARS_SNAPSHOT_DIR="$CONTRACTS_DIR/dars/$SNAPSHOT"
 LATEST_BINDINGS_DIR="$REPO_ROOT/bindings/generated/latest"
-BINDINGS_SNAPSHOT_DIR="$REPO_ROOT/bindings/generated/$SNAPSHOT"
 
-echo "Freezing release $RELEASE_VERSION -> $SNAPSHOT/"
+echo "Freezing release $RELEASE_VERSION -> contracts/dars/$SNAPSHOT/"
 
 # ── DARs ──────────────────────────────────────────────────────────────────────
 if [ ! -d "$CURRENT_DARS_DIR" ]; then
@@ -39,10 +40,17 @@ fi
 
 mkdir -p "$DARS_SNAPSHOT_DIR"
 
+# Dev/test-only packages: built to dars/current/ but not part of the production release snapshot.
+RELEASE_SKIP_PKGS="coin link-test mcms-test ccip-test test-proxy test-test test-receiver test-interfaces"
+
 dar_count=0
 while IFS= read -r -d '' damlYaml; do
   pkgVersion="$(grep '^version:' "$damlYaml" | awk '{print $2}')"
   pkgName="$(grep '^name:' "$damlYaml" | awk '{print $2}')"
+  if [[ " ${RELEASE_SKIP_PKGS} " == *" ${pkgName} "* ]]; then
+    echo "  skip: ${pkgName}-${pkgVersion}.dar (dev/test only)"
+    continue
+  fi
   src="$CURRENT_DARS_DIR/${pkgName}-current.dar"
   dst="$DARS_SNAPSHOT_DIR/${pkgName}-${pkgVersion}.dar"
   if [ ! -f "$src" ]; then
@@ -61,25 +69,13 @@ fi
 
 echo "Snapshotted $dar_count DAR(s) to contracts/dars/$SNAPSHOT/"
 
-# ── Bindings ──────────────────────────────────────────────────────────────────
-if [ ! -d "$LATEST_BINDINGS_DIR" ]; then
-  echo "Missing $LATEST_BINDINGS_DIR — run 'make generate-bindings' first"
-  exit 1
+# ── Legacy MCMS SDK shim (optional) ───────────────────────────────────────────
+LEGACY_MCMS_SRC="$LATEST_BINDINGS_DIR/mcms/mcms.go"
+LEGACY_MCMS="$REPO_ROOT/bindings/generated/mcms/mcms.go"
+if [ -f "$LEGACY_MCMS_SRC" ]; then
+  mkdir -p "$(dirname "$LEGACY_MCMS")"
+  cp "$LEGACY_MCMS_SRC" "$LEGACY_MCMS"
+  echo "Updated legacy import path bindings/generated/mcms/ for mcms SDK compatibility"
 fi
 
-echo "Freezing bindings: latest/ -> $SNAPSHOT/"
-rm -rf "$BINDINGS_SNAPSHOT_DIR"
-cp -R "$LATEST_BINDINGS_DIR" "$BINDINGS_SNAPSHOT_DIR"
-
-while IFS= read -r -d '' file; do
-  sed -i '' "s|bindings/generated/latest|bindings/generated/$SNAPSHOT|g" "$file"
-done < <(find "$BINDINGS_SNAPSHOT_DIR" -name '*.go' -print0)
-
-echo "Snapshotted bindings to bindings/generated/$SNAPSHOT/"
-
-LEGACY_MCMS="$REPO_ROOT/bindings/generated/mcms/mcms.go"
-mkdir -p "$(dirname "$LEGACY_MCMS")"
-cp "$BINDINGS_SNAPSHOT_DIR/mcms/mcms.go" "$LEGACY_MCMS"
-echo "Updated legacy import path bindings/generated/mcms/ for mcms SDK compatibility"
-
-echo "Done."
+echo "Done. Bindings: use bindings/generated/latest/ at this commit (not snapshotted)."
