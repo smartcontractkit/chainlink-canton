@@ -94,7 +94,7 @@ runs:
       working-directory: ${{ inputs.ccv-path }}/build/devenv
       env:
         DOCKER_BUILDKIT: 1
-      run: just build-docker-dev
+      run: just build-docker-dev-ci
 
     - name: Build canton committee verifier docker image
       shell: bash
