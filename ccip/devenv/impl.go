@@ -311,9 +311,17 @@ func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector
 		return ccipChangesets.DeployChainContractsPerChainCfg{}, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
 
+	deployerContract := fmt.Sprintf("canton:%s", chain.Participants[0].PartyID)
+
 	return ccipChangesets.DeployChainContractsPerChainCfg{
-		DeployerContract: fmt.Sprintf("canton:%s", chain.Participants[0].PartyID),
+		DeployerContract: &deployerContract,
 		DeployerKeyOwned: true,
+	}, nil
+}
+
+func (c *Chain) GetChainLaneProfile(_ *deployment.Environment, _ uint64) (ccipChangesets.ChainOverrides, error) {
+	return ccipChangesets.ChainOverrides{
+		CommitteeVerifierFinalityConfig: &finality.Config{WaitForFinality: true},
 	}, nil
 }
 
