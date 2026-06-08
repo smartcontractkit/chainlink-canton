@@ -23,15 +23,7 @@ import CCIP.LockReleaseTokenPoolCodecGen (
     encodeAddPoolReceiveContextContractValueParams,
     encodeRemovePoolReceiveContextValueParams,
     )
-import CCIP.LockReleaseTokenPoolTypes (
-    SetDynamicConfigParams(..),
-    ApplyChainUpdatesParams(..),
-    SetRateLimiterReferencesParams(..),
-    SetTransferTimeoutParams(..),
-    AddPoolReceiveContextNonContractValueParams(..),
-    AddPoolReceiveContextContractValueParams(..),
-    RemovePoolReceiveContextValueParams(..),
-    )
+
 import CCIP.ContextCodec (encodeAnyValue)
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1

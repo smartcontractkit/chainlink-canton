@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -27,7 +26,7 @@ func TestParseGlobalConfig(t *testing.T) {
 		{
 			name: "valid",
 			createdEvent: &apiv2.CreatedEvent{
-				CreateArguments: bindings.MarshalTemplateToRecord(common.GlobalConfig{
+				CreateArguments: bindings.MarshalTemplateToRecord(core.GlobalConfig{
 					InstanceId:    "globalconfig",
 					CcipOwner:     "ccipOwner",
 					ChainSelector: "1",

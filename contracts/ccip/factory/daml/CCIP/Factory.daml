@@ -3,6 +3,8 @@ module CCIP.Factory where
 import DA.Map qualified as Map
 import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Optional (isNone)
+
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec
   ( decodeTextAt
@@ -23,7 +25,6 @@ import CCIP.Codec
   , decodeInstrumentId
   , decodeRequestedFinalityAt
   )
-import qualified CCIP.Context
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
 
@@ -1020,7 +1021,7 @@ assertFactoryIsMCMSControlled factory =
 assertComponentNotDeployed : Text -> Map.Map Text (ContractId ()) -> Update ()
 assertComponentNotDeployed componentKey deployedContracts =
     assertMsg ("component already deployed: " <> componentKey)
-        (Map.lookup componentKey deployedContracts == None)
+        (isNone (Map.lookup componentKey deployedContracts))
 
 assertSingletonNotDeployed : Text -> Map.Map Text (ContractId ()) -> Update ()
 assertSingletonNotDeployed = assertComponentNotDeployed
@@ -1028,7 +1029,7 @@ assertSingletonNotDeployed = assertComponentNotDeployed
 assertInstanceIdUnused : Text -> Map.Map Text Bool -> Update ()
 assertInstanceIdUnused newInstanceId usedInstanceIds =
     assertMsg ("instanceId already used: " <> newInstanceId)
-        (Map.lookup newInstanceId usedInstanceIds == None)
+        (isNone (Map.lookup newInstanceId usedInstanceIds))
 
 reserveInstanceId : Text -> Map.Map Text Bool -> Map.Map Text Bool
 reserveInstanceId instanceId usedInstanceIds =

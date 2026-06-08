@@ -21,10 +21,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -33,17 +35,15 @@ import (
 	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipreceiver"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
@@ -214,7 +214,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
-						Template: ccvs.CommitteeVerifier{
+						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
 							VersionTag:                   types.TEXT(versionTag),
@@ -222,12 +222,12 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
-							Deps:                         ccvs.CommitteeVerifierDeps{},
+							Deps:                         committeeverifier.CommitteeVerifierDeps{},
 						},
 					},
 				},
 				GlobalConfig: sequences.GlobalConfigParams{
-					Template: common.GlobalConfig{
+					Template: core.GlobalConfig{
 						CcipOwner:     "",
 						ChainSelector: types.NUMERIC(strconv.FormatUint(env.Chain.ChainSelector(), 10)),
 					},
@@ -240,7 +240,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -248,7 +248,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{
-					Template: rmn.RMNRemote{
+					Template: core.RMNRemote{
 						CcipOwner:      "",
 						RmnOwner:       types.PARTY(partyCCIP),
 						CursedSubjects: nil,
@@ -358,14 +358,14 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	// Keep it enabled but lower-capacity so the test fails if the default-finality limiter
 	// is selected for this FTF transfer instead of the custom-finality limiter.
 	poolInstanceId := "test-pool-receive"
-	inboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployInbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
+	inboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployInbound, env.Chain, contractops.DeployInput[core.RateLimiter]{
 		OwnerParty: types.PARTY(partyTokenPoolOwner),
-		Template: common.RateLimiter{
+		Template: core.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceId),
 			PoolOwner:           types.PARTY(partyTokenPoolOwner),
 			RemoteChainSelector: types.NUMERIC(sourceChainSelector),
-			Direction:           common.RateLimitDirectionRateLimitDirection_Inbound,
-			Mode:                common.RateLimitModeRateLimitMode_DefaultFinality,
+			Direction:           core.RateLimitDirectionRateLimitDirection_Inbound,
+			Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
 			IsEnabled:           true,
 			Capacity:            types.NUMERIC(tc.defaultInboundLimiterCapacity),
 			Rate:                types.NUMERIC(tc.defaultInboundLimiterCapacity),
@@ -378,14 +378,14 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	inboundRateLimiterAddr, err := contracts.RawInstanceAddressFromString(inboundRateLimiterRawAddr)
 	require.NoError(t, err, "failed to parse inbound rate limiter address")
 
-	inboundCustomRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployInbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
+	inboundCustomRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployInbound, env.Chain, contractops.DeployInput[core.RateLimiter]{
 		OwnerParty: types.PARTY(partyTokenPoolOwner),
-		Template: common.RateLimiter{
+		Template: core.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceId),
 			PoolOwner:           types.PARTY(partyTokenPoolOwner),
 			RemoteChainSelector: types.NUMERIC(sourceChainSelector),
-			Direction:           common.RateLimitDirectionRateLimitDirection_Inbound,
-			Mode:                common.RateLimitModeRateLimitMode_CustomFinality,
+			Direction:           core.RateLimitDirectionRateLimitDirection_Inbound,
+			Mode:                core.RateLimitModeRateLimitMode_CustomFinality,
 			IsEnabled:           true,
 			Capacity:            types.NUMERIC(tc.customInboundLimiterCapacity),
 			Rate:                types.NUMERIC(tc.customInboundLimiterCapacity),
@@ -398,14 +398,14 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	inboundCustomRateLimiterAddr, err := contracts.RawInstanceAddressFromString(inboundCustomRateLimiterRawAddr)
 	require.NoError(t, err, "failed to parse inbound custom rate limiter address")
 
-	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
+	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[core.RateLimiter]{
 		OwnerParty: types.PARTY(partyTokenPoolOwner),
-		Template: common.RateLimiter{
+		Template: core.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceId),
 			PoolOwner:           types.PARTY(partyTokenPoolOwner),
 			RemoteChainSelector: types.NUMERIC(sourceChainSelector),
-			Direction:           common.RateLimitDirectionRateLimitDirection_Outbound,
-			Mode:                common.RateLimitModeRateLimitMode_DefaultFinality,
+			Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
+			Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
 			IsEnabled:           false,
 			Capacity:            types.NUMERIC("0"),
 			Rate:                types.NUMERIC("0"),
@@ -437,9 +437,9 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 				types.NUMERIC(sourceChainSelector): {
 					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
 					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
-					InboundCCVs:        []mcms.RawInstanceAddress{},
-					OutboundCCVs:       []mcms.RawInstanceAddress{},
-					FinalityConfig: common.FinalityConfig{
+					InboundCCVs:        []chainlinkapi.RawInstanceAddress{},
+					OutboundCCVs:       []chainlinkapi.RawInstanceAddress{},
+					FinalityConfig: core.FinalityConfig{
 						BlockDepth: new(types.INT64(2000)),
 					},
 					InboundRateLimiter:                         inboundRateLimiterAddr.Binding(),
@@ -578,7 +578,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -606,26 +606,33 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 
 	// Build Message
 	// Build token transfer (5 LINK in Splice Decimal format)
-	encodedTokenTransfer := buildTokenTransferV1(tc.tokenAmount, remotePoolAddress, remoteTokenAddress, hashedLinkInstrumentId, partyReceiver, tc.sourcePoolData)
+	tokenTransfer := buildTokenTransferV1(tc.tokenAmount, remotePoolAddress, remoteTokenAddress, hashedLinkInstrumentId, partyReceiver, tc.sourcePoolData)
 
 	// Build message
-	msg := &MessageV1{
-		SourceChainSelector: remoteSelector,
-		DestChainSelector:   env.Chain.ChainSelector(),
-		SequenceNumber:      1,
-		ExecutionGasLimit:   200000,
-		CCIPReceiveGasLimit: 100000,
-		Finality:            finalityConfigFromBlockConfirmations(2000),
-		CCVAndExecutorHash:  [32]byte{},
-		OnRampAddress:       gethcommon.LeftPadBytes(hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"), 32),
-		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
-		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
-		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
-		DestBlob:            []byte{},
-		TokenTransfer:       encodedTokenTransfer,
-		MessageData:         []byte{},
+	msg := protocol.Message{
+		Version:              1,
+		SourceChainSelector:  protocol.ChainSelector(remoteSelector),
+		DestChainSelector:    protocol.ChainSelector(env.Chain.ChainSelector()),
+		SequenceNumber:       1,
+		ExecutionGasLimit:    200000,
+		CcipReceiveGasLimit:  100000,
+		Finality:             protocol.NewFinality().WithBlockDepth(2000),
+		CcvAndExecutorHash:   [32]byte{},
+		OnRampAddress:        gethcommon.LeftPadBytes(gethcommon.HexToAddress("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd").Bytes(), 32),
+		OnRampAddressLength:  32,
+		OffRampAddress:       offRampAddress.InstanceAddress().Bytes(),
+		OffRampAddressLength: 32,
+		Sender:               gethcommon.HexToAddress("0000000000000000000000000000000000000003").Bytes(),
+		SenderLength:         20,
+		Receiver:             contracts.HashedPartyFromString(partyReceiver).Bytes(),
+		ReceiverLength:       32,
+		DestBlob:             nil,
+		DestBlobLength:       0,
+		TokenTransfer:        tokenTransfer,
+		Data:                 nil,
+		DataLength:           0,
 	}
-	encodedMessage, err := EncodeMessageV1(msg)
+	encodedMessage, err := msg.Encode()
 	require.NoError(t, err)
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
 	messageHash := crypto.Keccak256(encodedMessage)
@@ -676,16 +683,16 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	tokenPoolDisclosure, err := edsTesthelpers.GetTokenPoolExecuteDisclosure(t.Context(), tokenPoolAPIClient, encodedMessageHex, tokenPoolAddressEDS.InstanceAddress())
 	require.NoError(t, err)
 
-	executeArgs := ccipreceiver.Execute{
+	executeArgs := receiver.Execute{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
-		TokenTransfer: &ccipreceiver.TokenTransferInput{
+		TokenTransfer: &receiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(partyReceiver),
 			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
 		},
-		CcvInputs: []ccipreceiver.CCVInput{
+		CcvInputs: []receiver.CCVInput{
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),

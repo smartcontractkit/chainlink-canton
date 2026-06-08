@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "8a0a34af96f47b02d20c4fb0c4d30102237151a50f667bfd2148b78116b80a16"
+	PackageID   = "e89320df31ce1ad984f46f35bf98533ff1a1405f61f610163c482e6f064a03f2"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1700,7 +1700,7 @@ func (t *ConsumeReceiveTicketMCMSParams) UnmarshalHex(data string) error {
 
 // Curse is a Record type
 type Curse struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts Curse to a map for DAML arguments
@@ -1840,7 +1840,7 @@ func (t *CurseGlobal) UnmarshalHex(data string) error {
 
 // CurseMultiple is a Record type
 type CurseMultiple struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts CurseMultiple to a map for DAML arguments
@@ -1882,7 +1882,7 @@ func (t *CurseMultiple) UnmarshalHex(data string) error {
 
 // CurseMultipleParams is a Record type
 type CurseMultipleParams struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts CurseMultipleParams to a map for DAML arguments
@@ -1924,7 +1924,7 @@ func (t *CurseMultipleParams) UnmarshalHex(data string) error {
 
 // CurseParams is a Record type
 type CurseParams struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts CurseParams to a map for DAML arguments
@@ -2003,7 +2003,7 @@ type DestChainConfig struct {
 	AddressBytesLength        types.INT64                       `json:"addressBytesLength"`
 	TokenReceiverAllowed      types.BOOL                        `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64                       `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT                        `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                        `json:"offRampAddress" hex:"bytes"`
 	DefaultExecutor           *chainlinkapi.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
@@ -2089,7 +2089,7 @@ type DestChainConfigArgs struct {
 	AddressBytesLength        types.INT64                       `json:"addressBytesLength"`
 	TokenReceiverAllowed      types.BOOL                        `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64                       `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT                        `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                        `json:"offRampAddress" hex:"bytes"`
 	DefaultExecutor           *chainlinkapi.RawInstanceAddress  `json:"defaultExecutor" hex:"optional"`
 	LaneMandatedCCVs          []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
@@ -5343,7 +5343,7 @@ type MessageV1 struct {
 	Finality            DecodedFinality  `json:"finality"`
 	CcvAndExecutorHash  types.TEXT       `json:"ccvAndExecutorHash"`
 	OnRampAddress       types.TEXT       `json:"onRampAddress"`
-	OffRampAddress      types.TEXT       `json:"offRampAddress"`
+	OffRampAddress      types.TEXT       `json:"offRampAddress" hex:"bytes"`
 	Sender              types.TEXT       `json:"sender"`
 	Receiver            types.TEXT       `json:"receiver"`
 	DestBlob            types.TEXT       `json:"destBlob"`
@@ -5787,7 +5787,7 @@ type RMNRemote struct {
 	RmnOwner        types.PARTY   `json:"rmnOwner"`
 	CcipOwner       types.PARTY   `json:"ccipOwner"`
 	CustomObservers []types.PARTY `json:"customObservers"`
-	CursedSubjects  []types.TEXT  `json:"cursedSubjects"`
+	CursedSubjects  []types.TEXT  `json:"cursedSubjects" hex:"[]bytes"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -6963,6 +6963,7 @@ type SendingMessageV1 struct {
 	CcipOwner                 types.PARTY                               `json:"ccipOwner"`
 	Sender                    types.PARTY                               `json:"sender"`
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
+	DestAddressBytesLength    types.INT64                               `json:"destAddressBytesLength"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
 	DestDefaultCCVs           []chainlinkapi.RawInstanceAddress         `json:"destDefaultCCVs"`
 	RequiredCCVs              []chainlinkapi.RawInstanceAddress         `json:"requiredCCVs"`
@@ -6977,7 +6978,7 @@ type SendingMessageV1 struct {
 	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
 	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
 	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
-	OffRampAddress            types.TEXT                                `json:"offRampAddress"`
+	OffRampAddress            types.TEXT                                `json:"offRampAddress" hex:"bytes"`
 	TokenReceiver             types.TEXT                                `json:"tokenReceiver"`
 	TokenArgs                 types.TEXT                                `json:"tokenArgs"`
 	FeeToken                  splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
@@ -7030,6 +7031,9 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	if t.DestChainSelector != "" {
 		args["destChainSelector"] = t.DestChainSelector
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["destAddressBytesLength"] = int64(t.DestAddressBytesLength)
 
 	if t.SequenceNumber != "" {
 		args["sequenceNumber"] = t.SequenceNumber
@@ -7291,6 +7295,9 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	if t.DestChainSelector != "" {
 		args["destChainSelector"] = t.DestChainSelector
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["destAddressBytesLength"] = int64(t.DestAddressBytesLength)
 
 	if t.SequenceNumber != "" {
 		args["sequenceNumber"] = t.SequenceNumber
@@ -7560,6 +7567,27 @@ func (t *SendingMessageV1) UnmarshalHex(data string) error {
 
 // Choice methods for SendingMessageV1
 
+// AddTokenSend exercises the AddTokenSend choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) AddTokenSend(contractID string, args AddTokenSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddTokenSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddTokenSendWithPackageID exercises the AddTokenSend choice using the provided package ID instead of package name
+func (t SendingMessageV1) AddTokenSendWithPackageID(contractID string, packageID string, args AddTokenSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddTokenSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
 func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
@@ -7598,27 +7626,6 @@ func (t SendingMessageV1) AddCCVFeeWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "AddCCVFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// AddTokenSend exercises the AddTokenSend choice on this SendingMessageV1 contract
-// This method uses the package name in the template ID
-func (t SendingMessageV1) AddTokenSend(contractID string, args AddTokenSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddTokenSend",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// AddTokenSendWithPackageID exercises the AddTokenSend choice using the provided package ID instead of package name
-func (t SendingMessageV1) AddTokenSendWithPackageID(contractID string, packageID string, args AddTokenSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddTokenSend",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -8298,7 +8305,7 @@ func (t *SetTransferFactoryParams) UnmarshalHex(data string) error {
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
 	IsEnabled        types.BOOL                        `json:"isEnabled"`
-	OnRampAddresses  []types.TEXT                      `json:"onRampAddresses"`
+	OnRampAddresses  []types.TEXT                      `json:"onRampAddresses" hex:"[]bytes"`
 	DefaultCCVs      []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
 	LaneMandatedCCVs []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
@@ -8362,7 +8369,7 @@ func (t *SourceChainConfig) UnmarshalHex(data string) error {
 type SourceChainConfigArgs struct {
 	SourceChainSelector types.NUMERIC                     `json:"sourceChainSelector"`
 	IsEnabled           types.BOOL                        `json:"isEnabled"`
-	OnRampAddresses     []types.TEXT                      `json:"onRampAddresses"`
+	OnRampAddresses     []types.TEXT                      `json:"onRampAddresses" hex:"[]bytes"`
 	DefaultCCVs         []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
 	LaneMandatedCCVs    []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
@@ -10121,7 +10128,7 @@ func (t *TransferAdminRoleMCMSParams) UnmarshalHex(data string) error {
 
 // Uncurse is a Record type
 type Uncurse struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts Uncurse to a map for DAML arguments
@@ -10261,7 +10268,7 @@ func (t *UncurseGlobal) UnmarshalHex(data string) error {
 
 // UncurseMultiple is a Record type
 type UncurseMultiple struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts UncurseMultiple to a map for DAML arguments
@@ -10303,7 +10310,7 @@ func (t *UncurseMultiple) UnmarshalHex(data string) error {
 
 // UncurseMultipleParams is a Record type
 type UncurseMultipleParams struct {
-	Subjects []types.TEXT `json:"subjects"`
+	Subjects []types.TEXT `json:"subjects" hex:"[]bytes"`
 }
 
 // ToMap converts UncurseMultipleParams to a map for DAML arguments
@@ -10345,7 +10352,7 @@ func (t *UncurseMultipleParams) UnmarshalHex(data string) error {
 
 // UncurseParams is a Record type
 type UncurseParams struct {
-	Subject types.TEXT `json:"subject"`
+	Subject types.TEXT `json:"subject" hex:"bytes"`
 }
 
 // ToMap converts UncurseParams to a map for DAML arguments

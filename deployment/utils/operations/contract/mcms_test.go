@@ -44,7 +44,6 @@ func TestNewCantonTransaction(t *testing.T) {
 	require.NoError(t, json.Unmarshal(tx.AdditionalFields, &af))
 	assert.Equal(t, rawAddr, af.TargetInstanceAddress, "TargetInstanceAddress should be raw instanceId@partyId format")
 	assert.Equal(t, "ApplyDestChainConfigUpdates", af.FunctionName)
-	assert.Equal(t, "abcdef0123456789", af.OperationData)
 	assert.Equal(t, templateID, af.TargetTemplateID, "TargetTemplateID should be set for dynamic CID resolution")
 }
 
@@ -156,7 +155,6 @@ func TestValidateCantonAdditionalFields(t *testing.T) {
 		af := cantonsdk.AdditionalFields{
 			TargetInstanceAddress: "globalconfig-abc12@party::somehash",
 			FunctionName:          "SetConfig",
-			OperationData:         "abcdef",
 		}
 		raw, _ := json.Marshal(af)
 		require.NoError(t, ValidateCantonAdditionalFields(raw))
@@ -165,8 +163,7 @@ func TestValidateCantonAdditionalFields(t *testing.T) {
 	t.Run("missing target instance address", func(t *testing.T) {
 		t.Parallel()
 		af := cantonsdk.AdditionalFields{
-			FunctionName:  "SetConfig",
-			OperationData: "abcdef",
+			FunctionName: "SetConfig",
 		}
 		raw, _ := json.Marshal(af)
 		err := ValidateCantonAdditionalFields(raw)
@@ -178,24 +175,11 @@ func TestValidateCantonAdditionalFields(t *testing.T) {
 		t.Parallel()
 		af := cantonsdk.AdditionalFields{
 			TargetInstanceAddress: "globalconfig-abc12@party::somehash",
-			OperationData:         "abcdef",
 		}
 		raw, _ := json.Marshal(af)
 		err := ValidateCantonAdditionalFields(raw)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "functionName")
-	})
-
-	t.Run("missing operation data", func(t *testing.T) {
-		t.Parallel()
-		af := cantonsdk.AdditionalFields{
-			TargetInstanceAddress: "globalconfig-abc12@party::somehash",
-			FunctionName:          "SetConfig",
-		}
-		raw, _ := json.Marshal(af)
-		err := ValidateCantonAdditionalFields(raw)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "operationData")
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {

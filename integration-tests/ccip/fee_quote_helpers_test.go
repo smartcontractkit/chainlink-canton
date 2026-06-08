@@ -5,17 +5,18 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 )
 
 // getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
 // Send.ToMap() for every field the GetFee choice accepts (GetFee has no feeTokenInput).
-func getFeeChoiceArgumentMap(sendArgs ccipsender.Send) map[string]any {
+func getFeeChoiceArgumentMap(sendArgs sender.Send) map[string]any {
 	m := sendArgs.ToMap()
 	delete(m, "feeTokenInput")
 
@@ -31,9 +32,9 @@ func quoteCCIPSenderFee(
 	participant canton.Participant,
 	partySender string,
 	ccipSenderCid string,
-	sendArgs ccipsender.Send,
+	sendArgs sender.Send,
 	disclosures []*apiv2.DisclosedContract,
-) ccipsender.GetFeeResult {
+) sender.GetFeeResult {
 	t.Helper()
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -78,7 +79,7 @@ func quoteCCIPSenderFee(
 	fields := resultRecord.GetFields()
 	require.NotEmpty(t, fields, "GetFee should return fee fields")
 
-	quote := ccipsender.GetFeeResult{
+	quote := sender.GetFeeResult{
 		FeeTokenAmount: types.NUMERIC(fields[0].GetValue().GetNumeric()),
 	}
 	if len(fields) > 1 {

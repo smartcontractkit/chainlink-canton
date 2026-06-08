@@ -18,7 +18,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/http"
 	"os"
 	"slices"
@@ -28,6 +27,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
@@ -38,6 +38,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -47,12 +48,11 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipreceiver"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -78,82 +78,6 @@ import (
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
-// MessageV1 matches the Daml CCIP.MessageCodecV1.MessageV1 structure.
-type MessageV1 struct {
-	SourceChainSelector uint64
-	DestChainSelector   uint64
-	SequenceNumber      uint64
-	ExecutionGasLimit   uint32
-	CCIPReceiveGasLimit uint32
-	Finality            [4]byte
-	CCVAndExecutorHash  [32]byte
-	OnRampAddress       []byte
-	OffRampAddress      []byte
-	Sender              []byte
-	Receiver            []byte
-	DestBlob            []byte
-	TokenTransfer       *TokenTransferV1
-	MessageData         []byte
-}
-
-// TokenTransferV1 matches the Daml CCIP.MessageCodecV1.TokenTransferV1 structure.
-type TokenTransferV1 struct {
-	Amount             *big.Int
-	SourcePoolAddress  []byte
-	SourceTokenAddress []byte
-	DestTokenAddress   []byte
-	TokenReceiver      []byte
-	ExtraData          []byte
-}
-
-// EncodeMessageV1 encodes a MessageV1 to bytes matching the Daml MessageCodecV1.encodeMessageV1 format.
-func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
-	var buf bytes.Buffer
-
-	buf.WriteByte(0x01) // Version
-	_ = binary.Write(&buf, binary.BigEndian, msg.SourceChainSelector)
-	_ = binary.Write(&buf, binary.BigEndian, msg.DestChainSelector)
-	_ = binary.Write(&buf, binary.BigEndian, msg.SequenceNumber)
-	_ = binary.Write(&buf, binary.BigEndian, msg.ExecutionGasLimit)
-	_ = binary.Write(&buf, binary.BigEndian, msg.CCIPReceiveGasLimit)
-	buf.Write(msg.Finality[:])
-	buf.Write(msg.CCVAndExecutorHash[:])
-
-	// Length-prefixed fields (1-byte length)
-	buf.WriteByte(uint8(len(msg.OnRampAddress)))
-	buf.Write(msg.OnRampAddress)
-	buf.WriteByte(uint8(len(msg.OffRampAddress)))
-	buf.Write(msg.OffRampAddress)
-	buf.WriteByte(uint8(len(msg.Sender)))
-	buf.Write(msg.Sender)
-	buf.WriteByte(uint8(len(msg.Receiver)))
-	buf.Write(msg.Receiver)
-
-	// 2-byte length prefixed fields
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob)))
-	buf.Write(msg.DestBlob)
-
-	if msg.TokenTransfer != nil {
-		tokenBytes := encodeTokenTransferV1(msg.TokenTransfer)
-		_ = binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes)))
-		buf.Write(tokenBytes)
-	} else {
-		_ = binary.Write(&buf, binary.BigEndian, uint16(0))
-	}
-
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData)))
-	buf.Write(msg.MessageData)
-
-	return buf.Bytes(), nil
-}
-
-func finalityConfigFromBlockConfirmations(blockConfirmations uint16) [4]byte {
-	var config [4]byte
-	binary.BigEndian.PutUint16(config[2:], blockConfirmations)
-
-	return config
-}
-
 func finalityConfigValueFromBlockConfirmations(blockConfirmations uint16) *apiv2.Value {
 	if blockConfirmations == 0 {
 		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
@@ -168,37 +92,11 @@ func finalityConfigValueFromBlockConfirmations(blockConfirmations uint16) *apiv2
 	}}}
 }
 
-func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
-	var buf bytes.Buffer
-
-	buf.WriteByte(0x01) // Version
-
-	amountBytes := make([]byte, 32)
-	if tt.Amount != nil {
-		tt.Amount.FillBytes(amountBytes)
-	}
-	buf.Write(amountBytes)
-
-	buf.WriteByte(uint8(len(tt.SourcePoolAddress)))
-	buf.Write(tt.SourcePoolAddress)
-	buf.WriteByte(uint8(len(tt.SourceTokenAddress)))
-	buf.Write(tt.SourceTokenAddress)
-	buf.WriteByte(uint8(len(tt.DestTokenAddress)))
-	buf.Write(tt.DestTokenAddress)
-	buf.WriteByte(uint8(len(tt.TokenReceiver)))
-	buf.Write(tt.TokenReceiver)
-
-	_ = binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData)))
-	buf.Write(tt.ExtraData)
-
-	return buf.Bytes()
-}
-
 // GenerateVerifierResults generates the verifierResults blob for CommitteeVerifier.
 // Format: versionTag (4 bytes) || signatureLength (2 bytes) || signatures (64 bytes each)
 // Matches EVM: signers sign keccak256(versionTag || messageId) where messageId = keccak256(encodedMessage).
 func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.PrivateKey) ([]byte, error) {
-	versionTag, _ := hex.DecodeString("e9a05a20")
+	versionTag := gethcommon.FromHex(string(committeeverifier.VersionTagV200))
 
 	messageId := crypto.Keccak256(encodedMessage)
 	msgHash := crypto.Keccak256(append(versionTag, messageId...))
@@ -218,16 +116,6 @@ func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.Private
 	result.Write(signatures)
 
 	return result.Bytes(), nil
-}
-
-// hexToBytes decodes a hex string to raw bytes. Panics on invalid hex.
-func hexToBytes(s string) []byte {
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		panic("invalid hex: " + s)
-	}
-
-	return b
 }
 
 // TestCCIPExecuteE2E tests the full execute flow without token transfers.
@@ -344,7 +232,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
-						Template: ccvs.CommitteeVerifier{
+						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
 							VersionTag:                   types.TEXT(versionTag),
@@ -352,7 +240,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
-							Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
+							Deps:                         committeeverifier.CommitteeVerifierDeps{}, // Set by sequence
 						},
 					},
 				},
@@ -364,7 +252,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -372,13 +260,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					},
 				},
 				GlobalConfig: sequences.GlobalConfigParams{
-					Template: common.GlobalConfig{
+					Template: core.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10)),
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{
-					Template: rmn.RMNRemote{
+					Template: core.RMNRemote{
 						CcipOwner:      "", // Populated by the sequence
 						RmnOwner:       types.PARTY(partyCCIP),
 						CursedSubjects: nil,
@@ -558,10 +446,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
-					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
+					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
 						PartyOwner: types.PARTY(partyReceiver),
 						InstanceId: "router-receiver",
 					}),
@@ -586,23 +474,30 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Build message (no token transfer, just payload data)
 	testPayload := []byte("Hello CCIP - this is a test message payload!")
-	msg := &MessageV1{
-		SourceChainSelector: remoteSelector,
-		DestChainSelector:   env.Chain.ChainSelector(),
-		SequenceNumber:      1,
-		ExecutionGasLimit:   200000,
-		CCIPReceiveGasLimit: 100000,
-		Finality:            finalityConfigFromBlockConfirmations(2000),
-		CCVAndExecutorHash:  [32]byte{},
-		OnRampAddress:       hexToBytes("000000000000000000000000f6eced5e96fff2de4f0ecd722beb57556fc443fd"), // left-padded to 32 bytes
-		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
-		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
-		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
-		DestBlob:            []byte{},
-		TokenTransfer:       nil, // No token transfer
-		MessageData:         testPayload,
+	msg := protocol.Message{
+		Version:              1,
+		SourceChainSelector:  protocol.ChainSelector(remoteSelector),
+		DestChainSelector:    protocol.ChainSelector(env.Chain.ChainSelector()),
+		SequenceNumber:       1,
+		ExecutionGasLimit:    200000,
+		CcipReceiveGasLimit:  100000,
+		Finality:             protocol.NewFinality().WithBlockDepth(2000),
+		CcvAndExecutorHash:   [32]byte{},
+		OnRampAddress:        gethcommon.LeftPadBytes(gethcommon.HexToAddress("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd").Bytes(), 32), // left-padded to 32 bytes
+		OnRampAddressLength:  32,
+		OffRampAddress:       offRampAddress.InstanceAddress().Bytes(),
+		OffRampAddressLength: 32,
+		Sender:               gethcommon.HexToAddress("0000000000000000000000000000000000000003").Bytes(),
+		SenderLength:         20,
+		Receiver:             contracts.HashedPartyFromString(partyReceiver).Bytes(),
+		ReceiverLength:       32,
+		DestBlob:             nil,
+		DestBlobLength:       0,
+		TokenTransfer:        nil, // No token transfer
+		Data:                 testPayload,
+		DataLength:           uint16(len(testPayload)),
 	}
-	encodedMessage, err := EncodeMessageV1(msg)
+	encodedMessage, err := msg.Encode()
 	require.NoError(t, err)
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
 	messageHash := crypto.Keccak256(encodedMessage)
@@ -646,12 +541,12 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress())
 	require.NoError(t, err)
 
-	executeArgs := ccipreceiver.Execute{
+	executeArgs := receiver.Execute{
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
 		TokenTransfer:  nil,
-		CcvInputs: []ccipreceiver.CCVInput{
+		CcvInputs: []receiver.CCVInput{
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),

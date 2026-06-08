@@ -14,10 +14,7 @@ import CCIP.GlobalConfigCodecGen (
     encodeApplyDestChainConfigUpdatesParams,
     encodeApplySourceChainConfigUpdatesParams,
     )
-import CCIP.GlobalConfigTypes (
-    ApplyDestChainConfigUpdatesParams(..),
-    ApplySourceChainConfigUpdatesParams(..),
-    )
+
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 
 cents : Decimal -> Numeric 0

@@ -70,6 +70,14 @@ func main() {
 			"root":                true, // Merkle root hash (32 bytes)
 			"newRoot":             true, // New merkle root hash (32 bytes)
 			"versionTag":          true, // CCV version tag is a 4-byte BytesHex field
+			"onRampAddresses":     true, // Daml [BytesHex] → hex:"[]bytes" on []types.TEXT
+			"signerKeys":          true, // Daml [BytesHex] → hex:"[]bytes" on []types.TEXT
+			"offRampAddress":      true, // Daml BytesHex scalar → hex:"bytes" on types.TEXT
+			"subject":             true, // Daml BytesHex scalar → hex:"bytes"; RMNRemote Curse/Uncurse subject (chain selector hash)
+			"remoteTokenAddress":  true, // Daml BytesHex scalar → hex:"bytes"; token pool remote token address on dest chain
+			"subjects":            true, // Daml [BytesHex] → hex:"[]bytes"; RMNRemote CurseMultiple/UncurseMultiple
+			"cursedSubjects":      true, // Daml [BytesHex] → hex:"[]bytes"; Factory DeployRMNRemote initial cursed subjects
+			"remotePools":         true, // Daml [BytesHex] → hex:"[]bytes"; token pool allowed remote pool addresses per chain
 		},
 		// hex:"bytes16" — fields that may exceed 255 bytes (uint16 length prefix)
 		BytesHexFields: map[string]bool{
@@ -101,6 +109,7 @@ func main() {
 		},
 		// Dispatcher operationData payloads decoded by MCMS.Main.ExecuteOp.
 		ChoiceParamEncoderNames: map[string]bool{
+			"SetConfig":            true,
 			"ScheduleBatch":        true,
 			"CancelBatch":          true,
 			"BypasserExecuteBatch": true,
@@ -130,9 +139,6 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Str("outputFile", outputFile).Msg("Failed to write generated bindings to file")
 		}
-	}
-	if err := writeCompatibilityPackages(*artifactsDir, *basePath); err != nil {
-		log.Fatal().Err(err).Msg("Failed to write compatibility binding packages")
 	}
 	log.Info().Msg("Successfully generated all bindings")
 }

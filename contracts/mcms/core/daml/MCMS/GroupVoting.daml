@@ -1,6 +1,6 @@
 module MCMS.GroupVoting where
 
-import DA.List ((!!) , sort)
+import DA.List ((!!) , sort, head)
 import DA.Map qualified as Map
 import DA.Foldable (forA_)
 import DA.Action (when, unless)
@@ -27,11 +27,11 @@ verifyGroupVoting signerAddrs config = do
   finalVotes <- processAllSignatures signerAddrs signerMap config
 
   -- Check root group met quorum
-  let rootQuorum = config.groupQuorums !! 0
+  let rootQuorum = head (DA.Internal.Record.getField @"groupQuorums" config)
   when (rootQuorum == 0) $
     Left "mcms.groupvoting: root group has no quorum configured"
 
-  let rootVotes = finalVotes !! 0
+  let rootVotes = head finalVotes
   when (rootVotes < rootQuorum) $
     Left $ "mcms.groupvoting: insufficient signers, root group needs " <> show rootQuorum <>
            " but got " <> show rootVotes
@@ -90,11 +90,11 @@ propagateVote config votes groupIdx = do
   let quorum = config.groupQuorums !! groupIdx
 
   -- Check if we just reached quorum (not exceeded - only propagate once)
-  if newCount /= quorum then
+  if
     -- Did not just reach quorum, no propagation
-    Right newVotes
-  else if groupIdx == 0 then
+    (newCount /= quorum)
     -- Root group reached quorum, we're done
+    || (groupIdx == 0) then
     Right newVotes
   else do
     -- Propagate vote to parent group

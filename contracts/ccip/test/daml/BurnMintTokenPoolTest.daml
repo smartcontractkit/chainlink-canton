@@ -9,6 +9,7 @@ import DA.TextMap qualified as TextMap
 
 import qualified CCIP.Context
 import CCIP.BurnMintTokenPool qualified as BurnMintTokenPool
+import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityConfig
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
@@ -30,6 +31,25 @@ emptyExtraArgs : MetadataV1.ExtraArgs
 emptyExtraArgs = MetadataV1.ExtraArgs with
   context = MetadataV1.emptyChoiceContext
   meta = MetadataV1.emptyMetadata
+
+finalityConfig n =
+    if n == 0
+    then FinalityConfig.WaitForFinality
+    else FinalityConfig.BlockDepth n
+
+rawFinalityConfig n =
+    if n == 0
+    then FinalityConfig.waitForFinalityFlag
+    else fromSome do
+        flagsHex <- MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)
+
+unsafeDecodeRequestedFinality fc =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (FinalityConfig.decodeRequestedFinality fc)
+
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
 mkPoolContext : ContractId RateLimiter.RateLimiter -> ContractId BurnMintV1.BurnMintFactory -> MetadataV1.ChoiceContext
 mkPoolContext rateLimiterCid burnMintFactoryCid = MetadataV1.ChoiceContext with
@@ -131,7 +151,7 @@ mintLink
   -> Decimal
   -> Script (ContractId HoldingV1.Holding)
 mintLink admin owner registryCid instrumentId amount = do
-  result <- submitMulti [admin, owner] [] do
+  result <- submit (actAs admin <> actAs owner) do
     exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid) BurnMintV1.BurnMintFactory_BurnMint with
       expectedAdmin = admin
       instrumentId
@@ -188,6 +208,7 @@ mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInsta
         tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
         feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
       destChainSelector
+      destAddressBytesLength = 20
       sequenceNumber = 1.0
       destDefaultCCVs = []
       requiredCCVs = []
@@ -345,7 +366,7 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   senderChangeHolding.holdingAmount === 3.0
   poolFeeHolding.holdingAmount === 0.35
 
-  tokenSendData <- pure (fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData)
+  let tokenSendData = fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData
   tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 66500000000.0)
   tokenSendData.instrumentId === instrumentId
   rateLimiters <- query @RateLimiter.RateLimiter poolOwner
@@ -1675,3 +1696,235 @@ testBurnMintTokenPool_RateLimiterPathIsolation = script do
         ]
 
   pure ()
+
+-- | VerifyInboundMessage succeeds when the message's sourceTokenAddress matches
+-- the configured remoteTokenAddress for the source chain.
+testBurnMintPoolVerifyInboundMessageAcceptsMatchingSourceToken : Script ()
+testBurnMintPoolVerifyInboundMessageAcceptsMatchingSourceToken = script do
+    ccipOwner <- allocateParty "ccip-owner-bm-verify"
+    poolOwner <- allocateParty "pool-owner-bm-verify"
+    receiver <- allocateParty "receiver-bm-verify"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+    let tokenAdminRegistryInstanceId = "test-tar-bm-verify"
+    let tokenPoolInstanceId = "test-bm-pool-verify"
+    let rmnInstanceId = "test-rmn-bm-verify"
+    let feeQuoterInstanceId = "test-fq-bm-verify"
+    let allowedSourcePool = "000000000000000000000000aaaaaaaaaaaaaaaa"
+    let configuredRemoteToken = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = poolOwner
+            id = "TestToken"
+
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistry
+        ccipOwner poolOwner tokenAdminRegistryInstanceId testInstrumentId tokenPoolInstanceId
+
+    let ccvAddr = RawInstanceAddress.make "test-ccv-bm-verify" ccipOwner
+    let existingConfig = BurnMintTokenPool.RemoteChainConfig with
+            remotePools = [allowedSourcePool]
+            remoteTokenAddress = configuredRemoteToken
+            inboundCCVs = [ccvAddr]
+            outboundCCVs = []
+            finalityConfig = finalityConfig 2000
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+    tokenPool <- submit poolOwner do
+        createCmd BurnMintTokenPool.BurnMintTokenPool with
+            poolOwner = poolOwner
+            ccipOwner = ccipOwner
+            instanceId = tokenPoolInstanceId
+            instrumentId = testInstrumentId
+            decimals = 10
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = BurnMintTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner ccipOwner
+
+    let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = messageFinality 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = Some MessageCodecV1.TokenTransferV1 with
+                amount = fromSome (MessageCodecV1.encodeUint256 5000000.0)
+                sourcePoolAddress = allowedSourcePool
+                sourceTokenAddress = configuredRemoteToken
+                destTokenAddress = destTokenAddr
+                tokenReceiver = MessageCodecV1.encodePartyAddress receiver
+                extraData = ""
+            messageData = ""
+
+    let offRampInstanceAddress = RawInstanceAddress.make "test-offramp-bm-verify" ccipOwner
+    let tarInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    executingMessageCid <- submit ccipOwner do
+        createCmd ExecutingMessageV1.ExecutingMessageV1 with
+            ccipOwner = ccipOwner
+            message = message
+            messageId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            receiver = receiver
+            tokenReceiver = Some receiver
+            executor = ccipOwner
+            observingParties = [receiver, ccipOwner, poolOwner]
+            ccvVerifications = []
+            ccvOwners = []
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverFinalityConfig = finalityConfig 2000
+            sourceDefaultCCVs = []
+            inboundPoolVerification = None
+            deps = ExecutingMessageV1.ExecutingMessageDeps with
+                offRamp = offRampInstanceAddress
+                globalConfig = RawInstanceAddress.make "test-globalconfig-bm-verify" ccipOwner
+                rmnRemote = RawInstanceAddress.make rmnInstanceId ccipOwner
+                tokenAdminRegistry = tarInstanceAddress
+            state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
+    disclosedEm <- fromSome <$> queryDisclosure ccipOwner executingMessageCid
+    newEmCid <- submit (actAs receiver
+                        <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedEm) do
+        exerciseCmd tokenPool BurnMintTokenPool.VerifyInboundMessage with
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            extraContext = MetadataV1.emptyChoiceContext
+            executingMessageCid = executingMessageCid
+            caller = receiver
+
+    newExecMsg <- queryContractId ccipOwner newEmCid
+    assertMsg "ExecutingMessageV1 should exist" (isSome newExecMsg)
+    let em = fromSome newExecMsg
+    em.inboundPoolVerification === Some (ExecutingMessageV1.InboundPoolVerification with
+        poolInstanceId = tokenPoolInstanceId
+        poolOwner = poolOwner
+        poolCCVs = [ccvAddr])
+
+    debug "testBurnMintPoolVerifyInboundMessageAcceptsMatchingSourceToken: PASSED"
+
+-- | VerifyInboundMessage fails when the message's sourceTokenAddress does not
+-- match the configured remoteTokenAddress for the source chain.
+testBurnMintPoolVerifyInboundMessageRejectsMismatchedSourceToken : Script ()
+testBurnMintPoolVerifyInboundMessageRejectsMismatchedSourceToken = script do
+    ccipOwner <- allocateParty "ccip-owner-bm-mismatch"
+    poolOwner <- allocateParty "pool-owner-bm-mismatch"
+    receiver <- allocateParty "receiver-bm-mismatch"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+    let tokenAdminRegistryInstanceId = "test-tar-bm-mismatch"
+    let tokenPoolInstanceId = "test-bm-pool-mismatch"
+    let rmnInstanceId = "test-rmn-bm-mismatch"
+    let feeQuoterInstanceId = "test-fq-bm-mismatch"
+    let allowedSourcePool = "000000000000000000000000aaaaaaaaaaaaaaaa"
+    let configuredRemoteToken = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+    let wrongSourceToken = "ffffffffffffffffffffffffffffffffffffffff"
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = poolOwner
+            id = "TestToken"
+
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistry
+        ccipOwner poolOwner tokenAdminRegistryInstanceId testInstrumentId tokenPoolInstanceId
+
+    let existingConfig = BurnMintTokenPool.RemoteChainConfig with
+            remotePools = [allowedSourcePool]
+            remoteTokenAddress = configuredRemoteToken
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = finalityConfig 2000
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+    tokenPool <- submit poolOwner do
+        createCmd BurnMintTokenPool.BurnMintTokenPool with
+            poolOwner = poolOwner
+            ccipOwner = ccipOwner
+            instanceId = tokenPoolInstanceId
+            instrumentId = testInstrumentId
+            decimals = 10
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = BurnMintTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner ccipOwner
+
+    let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = messageFinality 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = Some MessageCodecV1.TokenTransferV1 with
+                amount = fromSome (MessageCodecV1.encodeUint256 5000000.0)
+                sourcePoolAddress = allowedSourcePool
+                sourceTokenAddress = wrongSourceToken
+                destTokenAddress = destTokenAddr
+                tokenReceiver = MessageCodecV1.encodePartyAddress receiver
+                extraData = ""
+            messageData = ""
+
+    let offRampInstanceAddress = RawInstanceAddress.make "test-offramp-bm-mismatch" ccipOwner
+    let tarInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    executingMessageCid <- submit ccipOwner do
+        createCmd ExecutingMessageV1.ExecutingMessageV1 with
+            ccipOwner = ccipOwner
+            message = message
+            messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            receiver = receiver
+            tokenReceiver = Some receiver
+            executor = ccipOwner
+            observingParties = [receiver, ccipOwner, poolOwner]
+            ccvVerifications = []
+            ccvOwners = []
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverFinalityConfig = finalityConfig 2000
+            sourceDefaultCCVs = []
+            inboundPoolVerification = None
+            deps = ExecutingMessageV1.ExecutingMessageDeps with
+                offRamp = offRampInstanceAddress
+                globalConfig = RawInstanceAddress.make "test-globalconfig-bm-mismatch" ccipOwner
+                rmnRemote = RawInstanceAddress.make rmnInstanceId ccipOwner
+                tokenAdminRegistry = tarInstanceAddress
+            state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
+    disclosedEm <- fromSome <$> queryDisclosure ccipOwner executingMessageCid
+    submitMustFail (actAs receiver
+                    <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedEm) do
+        exerciseCmd tokenPool BurnMintTokenPool.VerifyInboundMessage with
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenConfigCid = tokenConfigCid
+            extraContext = MetadataV1.emptyChoiceContext
+            executingMessageCid = executingMessageCid
+            caller = receiver
+
+    debug "testBurnMintPoolVerifyInboundMessageRejectsMismatchedSourceToken: PASSED"

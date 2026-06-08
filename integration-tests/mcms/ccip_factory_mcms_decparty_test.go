@@ -14,11 +14,10 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	splice "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -149,7 +148,7 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 		VersionTag:                   "01020304",
 		AllowListAdmin:               nil,
 		MessageSentObservers:         []types.PARTY{types.PARTY(ccipOwner)},
-		RmnRemote:                    mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
+		RmnRemote:                    chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
 		StorageLocations:             []types.TEXT{},
 		StorageLocationsAdmin:        types.PARTY(ccipOwner),
 		PendingStorageLocationsAdmin: types.PARTY(ccipOwner),
@@ -160,9 +159,9 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	// 6. Deploy OffRamp (deps: GlobalConfig, RMNRemote, TAR)
 	offRampParams := factory.DeployOffRampParams{
 		InstanceId:         types.TEXT(offRampInstanceID),
-		GlobalConfig:       mcms.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
+		GlobalConfig:       chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
+		RmnRemote:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
+		TokenAdminRegistry: chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeployWithMCMSQueryParty(t, participant, mcmsEncoder, ccipOwner, decentralizedParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployOffRampParams", offRampParams)
 	t.Logf("OffRamp deployed: %s", offRampInstanceID)
@@ -170,11 +169,11 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	// 7. Deploy OnRamp (deps: GlobalConfig, RMNRemote, TAR, FeeQuoter, CCV)
 	onRampParams := factory.DeployOnRampParams{
 		InstanceId:         types.TEXT(onRampInstanceID),
-		GlobalConfig:       mcms.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		CcvRegistry:        mcms.RawInstanceAddress{Unpack: types.TEXT(ccvInstanceAddr)},
+		GlobalConfig:       chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
+		RmnRemote:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
+		TokenAdminRegistry: chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
+		FeeQuoter:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
+		CcvRegistry:        chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(ccvInstanceAddr)},
 		MaxUSDCentsPerMsg:  types.NUMERIC("100000"),
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeployWithMCMSQueryParty(t, participant, mcmsEncoder, ccipOwner, decentralizedParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployOnRampParams", onRampParams)
@@ -183,12 +182,12 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	// 8. Deploy PerPartyRouterFactory (deps: all)
 	pprParams := factory.DeployPerPartyRouterFactoryParams{
 		InstanceId:         types.TEXT(pprInstanceID),
-		OnRamp:             mcms.RawInstanceAddress{Unpack: types.TEXT(onRampInstanceAddr)},
-		OffRamp:            mcms.RawInstanceAddress{Unpack: types.TEXT(offRampInstanceAddr)},
-		GlobalConfig:       mcms.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
+		OnRamp:             chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(onRampInstanceAddr)},
+		OffRamp:            chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(offRampInstanceAddr)},
+		GlobalConfig:       chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(gcInstanceAddr)},
+		TokenAdminRegistry: chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
+		FeeQuoter:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
+		RmnRemote:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeployWithMCMSQueryParty(t, participant, mcmsEncoder, ccipOwner, decentralizedParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployPerPartyRouterFactoryParams", pprParams)
 	t.Logf("PerPartyRouterFactory deployed: %s", pprInstanceID)
@@ -210,9 +209,9 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 		InstrumentId:       splice.InstrumentId{Admin: types.PARTY(ccipOwner), Id: "test-token"},
 		Decimals:           types.INT64(18),
 		RateLimitAdmin:     nil,
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
+		TokenAdminRegistry: chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
+		FeeQuoter:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
+		RmnRemote:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
 		PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 		TransferTimeout:    lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT{})},
 	}
@@ -228,9 +227,9 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 		InstrumentId:       splice.InstrumentId{Admin: types.PARTY(ccipOwner), Id: "amulet-token"},
 		Decimals:           types.INT64(10),
 		RateLimitAdmin:     nil,
-		TokenAdminRegistry: mcms.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
-		FeeQuoter:          mcms.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		RmnRemote:          mcms.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
+		TokenAdminRegistry: chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
+		FeeQuoter:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
+		RmnRemote:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
 		PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
 		TransferTimeout:    lockreleasetokenpool.TransferTimeout{Indefinite: new(types.UNIT{})},
 	}
@@ -247,15 +246,15 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	require.NotEmpty(t, gcCid)
 
 	remoteChainSelector := types.NUMERIC("456")
-	gcEncoder := common.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.GlobalConfig", "GlobalConfig").Encoder()
+	gcEncoder := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.GlobalConfig", "GlobalConfig").Encoder()
 
-	sourceConfigArgs := common.ApplySourceChainConfigUpdates{
-		SourceChainConfigUpdates: []common.SourceChainConfigArgs{{
+	sourceConfigArgs := core.ApplySourceChainConfigUpdates{
+		SourceChainConfigUpdates: []core.SourceChainConfigArgs{{
 			SourceChainSelector: remoteChainSelector,
 			IsEnabled:           types.BOOL(true),
 			OnRampAddresses:     []types.TEXT{"0000000000000000000000000000000000000000000000000000000000abcdef"},
-			DefaultCCVs:         []mcms.RawInstanceAddress{{Unpack: types.TEXT(ccvInstanceAddr)}},
-			LaneMandatedCCVs:    []mcms.RawInstanceAddress{},
+			DefaultCCVs:         []chainlinkapi.RawInstanceAddress{{Unpack: types.TEXT(ccvInstanceAddr)}},
+			LaneMandatedCCVs:    []chainlinkapi.RawInstanceAddress{},
 		}},
 	}
 	sourceEncoded, err := gcEncoder.ApplySourceChainConfigUpdates(sourceConfigArgs)
@@ -265,8 +264,8 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	t.Logf("GlobalConfig: ApplySourceChainConfigUpdates applied via MCMS")
 
 	// GlobalConfig: ApplyDestChainConfigUpdates
-	destConfigArgs := common.ApplyDestChainConfigUpdates{
-		DestChainConfigUpdates: []common.DestChainConfigArgs{{
+	destConfigArgs := core.ApplyDestChainConfigUpdates{
+		DestChainConfigUpdates: []core.DestChainConfigArgs{{
 			DestChainSelector:         remoteChainSelector,
 			IsEnabled:                 types.BOOL(true),
 			AddressBytesLength:        types.INT64(64),
@@ -274,8 +273,8 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 			BaseExecutionGasCost:      types.INT64(200000),
 			OffRampAddress:            "0000000000000000000000000000000000000000000000000000000000fedcba",
 			DefaultExecutor:           nil,
-			LaneMandatedCCVs:          []mcms.RawInstanceAddress{},
-			DefaultCCVs:               []mcms.RawInstanceAddress{{Unpack: types.TEXT(ccvInstanceAddr)}},
+			LaneMandatedCCVs:          []chainlinkapi.RawInstanceAddress{},
+			DefaultCCVs:               []chainlinkapi.RawInstanceAddress{{Unpack: types.TEXT(ccvInstanceAddr)}},
 			MessageNetworkFeeUSDCents: types.NUMERIC("100"),
 			TokenNetworkFeeUSDCents:   types.NUMERIC("50"),
 		}},

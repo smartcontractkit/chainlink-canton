@@ -76,9 +76,7 @@ calculateLocalAmountFromDecimalTextChecked
     -> Optional LocalAmountConversionResult
 calculateLocalAmountFromDecimalTextChecked _label rawRemoteAmount remoteDecimals localDecimals = do
     remoteAmount <- normalizeDecimalText rawRemoteAmount
-    if decimalTextGreaterThan remoteAmount maxUint256DecimalText
-    then None
-    else if remoteDecimals < 0 || remoteDecimals > 255 || localDecimals < 0 || localDecimals > 255 then None
+    if decimalTextGreaterThan remoteAmount maxUint256DecimalText || (remoteDecimals < 0 || remoteDecimals > 255 || localDecimals < 0 || localDecimals > 255) then None
     else
         let diff = localDecimals - remoteDecimals
         in if diff == 0 then do

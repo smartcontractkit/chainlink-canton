@@ -18,8 +18,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
@@ -91,7 +90,7 @@ type ExerciseParams[ARGS any] struct {
 	Validate func(input ARGS) error
 
 	// Template is the binding struct of the target contract.
-	Template common.Template
+	Template core.Template
 	// Method is the bindings method to call the choice.
 	Method func(contractID string, args ARGS) *model.ExerciseCommand
 

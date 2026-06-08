@@ -6,8 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
@@ -17,13 +16,13 @@ var ContractType = deployment.ContractType("CantonGlobalConfig")
 
 var Version = semver.MustParse("0.1.0")
 
-var globalConfigEncoder = common.NewContract("", "CCIP.GlobalConfig", "GlobalConfig").Encoder()
+var globalConfigEncoder = core.NewContract("", "CCIP.GlobalConfig", "GlobalConfig").Encoder()
 
-var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
+var Deploy = contract.NewDeploy(contract.DeployParams[core.GlobalConfig]{
 	Name:           "canton/ccip/global_config/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
 	Description:    "Deploys a CCIP GlobalConfig contract on Canton",
-	Validate: func(template common.GlobalConfig) error {
+	Validate: func(template core.GlobalConfig) error {
 		if template.CcipOwner == "" {
 			return errors.New("ccip owner cannot be empty")
 		}
@@ -43,30 +42,30 @@ var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
 	Prefix:      "globalconfig",
 })
 
-var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[common.ApplyDestChainConfigUpdates]{
+var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[core.ApplyDestChainConfigUpdates]{
 	Name:         "canton/ccip/global_config/apply_dest_chain_config_updates",
 	Version:      Version,
 	Description:  "Updates the GlobalConfig's destination chain configuration",
 	ContractType: ContractType,
-	Validate: func(input common.ApplyDestChainConfigUpdates) error {
+	Validate: func(input core.ApplyDestChainConfigUpdates) error {
 		// TODO add validation
 		return nil
 	},
-	Template:     common.GlobalConfig{},
-	Method:       common.GlobalConfig{}.ApplyDestChainConfigUpdates,
+	Template:     core.GlobalConfig{},
+	Method:       core.GlobalConfig{}.ApplyDestChainConfigUpdates,
 	EncodeMethod: globalConfigEncoder.ApplyDestChainConfigUpdates,
 })
 
-var ApplySourceChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[common.ApplySourceChainConfigUpdates]{
+var ApplySourceChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[core.ApplySourceChainConfigUpdates]{
 	Name:         "canton/ccip/global_config/apply_source_chain_config_updates",
 	Version:      Version,
 	Description:  "Updates the GlobalConfig's source chain configuration",
 	ContractType: ContractType,
-	Validate: func(input common.ApplySourceChainConfigUpdates) error {
+	Validate: func(input core.ApplySourceChainConfigUpdates) error {
 		// TODO add validation
 		return nil
 	},
-	Template:     common.GlobalConfig{},
-	Method:       common.GlobalConfig{}.ApplySourceChainConfigUpdates,
+	Template:     core.GlobalConfig{},
+	Method:       core.GlobalConfig{}.ApplySourceChainConfigUpdates,
 	EncodeMethod: globalConfigEncoder.ApplySourceChainConfigUpdates,
 })

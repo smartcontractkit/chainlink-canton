@@ -45,11 +45,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
-	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
@@ -344,9 +342,9 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 	}
 
 	feeQuoterAddress := contracts.HexToInstanceAddress(feeQuoterRef.Address)
-	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[feequoter.ApplyPriceUpdatersUpdate]{
+	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[core.ApplyPriceUpdatersUpdate]{
 		InstanceAddress: feeQuoterAddress,
-		Args: feequoter.ApplyPriceUpdatersUpdate{
+		Args: core.ApplyPriceUpdatersUpdate{
 			AddedPriceUpdaters: []types.PARTY{types.PARTY(participant.PartyID)},
 		},
 	})
@@ -354,11 +352,11 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 		return nil, fmt.Errorf("apply fee quoter price updaters update: %w", err)
 	}
 
-	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.UpdatePrices, chain, contract.ChoiceInput[feequoter.UpdatePrices]{
+	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.UpdatePrices, chain, contract.ChoiceInput[core.UpdatePrices]{
 		InstanceAddress: feeQuoterAddress,
-		Args: feequoter.UpdatePrices{
-			PriceUpdates: feequoter.PriceUpdates{
-				TokenPriceUpdates: []feequoter.TokenPriceUpdate{{
+		Args: core.UpdatePrices{
+			PriceUpdates: core.PriceUpdates{
+				TokenPriceUpdates: []core.TokenPriceUpdate{{
 					InstrumentId: splice_api_token_holding_v1.InstrumentId{
 						Admin: types.PARTY(registryAdmin),
 						Id:    types.TEXT("Amulet"),
@@ -1146,7 +1144,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 	// TODO come up with a better way of doing this
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{party}, perpartyrouter.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
+	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{party}, ccipruntime.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}
@@ -1154,15 +1152,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	sendArgs := ccipsender.Send{
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(dest, 10)),
-		Message: ccipclient.Canton2AnyMessage{
+		Message: core.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
 			FeeToken: c.feeTokenInstrument,
-			ExtraArgs: ccipclient.ExtraArgs{
-				V3: &ccipclient.GenericExtraArgsV3{
+			ExtraArgs: core.ExtraArgs{
+				V3: &core.GenericExtraArgsV3{
 					GasLimit: types.INT64(opts.ExecutionGasLimit),
-					Executor: ccipclient.ExecutorExtraArg{
-						ExecutorUseDefault: &ccipclient.ExecutorUseDefault{},
+					Executor: core.ExecutorExtraArg{
+						ExecutorUseDefault: &core.ExecutorUseDefault{},
 					},
 				},
 			},
@@ -1198,7 +1196,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Token Pool Send disclosure for token pool at address %s: %w", tokenPoolAddress.String(), err)
 		}
-		sendArgs.Message.TokenTransfer = &ccipclient.TokenTransfer{
+		sendArgs.Message.TokenTransfer = &core.TokenTransfer{
 			Token: splice_api_token_holding_v1.InstrumentId{
 				Admin: types.PARTY(outgoingMessage.TokenTransfer.Token.Admin),
 				Id:    types.TEXT(outgoingMessage.TokenTransfer.Token.Id),
@@ -1243,7 +1241,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
 			CcvExtraContext: ccvSendDisclosure.ChoiceContext,
 		})
-		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, ccipclient.CCVExtraArg{
+		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, core.CCVExtraArg{
 			CcvAddress: ccvSendDisclosure.Address.Binding(),
 			CcvArgs:    "",
 		})
@@ -1300,7 +1298,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 								{
 									IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
 										TemplateFilter: &apiv2.TemplateFilter{
-											TemplateId:              contracts.TemplateIDFromBinding(ccipcore.CCIPMessageSent{}).ToLedgerIdentifier(),
+											TemplateId:              contracts.TemplateIDFromBinding(core.CCIPMessageSent{}).ToLedgerIdentifier(),
 											IncludeCreatedEventBlob: true,
 										},
 									},
@@ -1366,7 +1364,7 @@ type ccipMessageSentFromSendUpdate struct {
 // before this send; returned seqNo is either previousSeq+1 or the sequence from the encoded payload
 // when that path is present.
 func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSeq uint64) (ccipMessageSentFromSendUpdate, error) {
-	messageSentTemplateID := contracts.TemplateIDFromBinding(ccipcore.CCIPMessageSent{})
+	messageSentTemplateID := contracts.TemplateIDFromBinding(core.CCIPMessageSent{})
 
 	// Find CCIPMessageSent event in the events
 	var created *apiv2.CreatedEvent
@@ -1387,7 +1385,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
 	}
 
-	parsed, err := bindings.UnmarshalCreatedEvent[ccipcore.CCIPMessageSent](created)
+	parsed, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](created)
 	if err != nil {
 		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("unmarshal CCIPMessageSent created event: %w", err)
 	}

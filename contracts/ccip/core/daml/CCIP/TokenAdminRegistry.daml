@@ -3,7 +3,7 @@ module CCIP.TokenAdminRegistry where
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.List (dedup)
 import DA.Map qualified as Map
-import DA.Optional (fromSomeNote, isSome)
+import DA.Optional (fromSomeNote, isNone)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.BurnMintV1
@@ -397,7 +397,7 @@ template TokenAdminRegistry
                         assertTokenConfigForInstrument instanceId owner entryCount instrumentId config
                         assertMsg "ProposeAdministrator: managed token config can only be proposed by owner"
                             (not config.isCCIPManaged || isOwner)
-                        assertMsg "ProposeAdministrator: admin already set" (not (isSome config.admin))
+                        assertMsg "ProposeAdministrator: admin already set" (isNone config.admin)
 
                         archive configCid
                         newConfigCid <- create config with pendingAdmin = Some newAdmin

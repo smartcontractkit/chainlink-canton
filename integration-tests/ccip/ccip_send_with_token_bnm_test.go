@@ -36,16 +36,13 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipsender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_burn_mint_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
@@ -201,7 +198,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Qualifier: ccvQualifier,
-						Template: ccvs.CommitteeVerifier{
+						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
 							VersionTag:                   types.TEXT(versionTag),
@@ -209,7 +206,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 							StorageLocations:             []types.TEXT{"ipfs://test-send"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
-							Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
+							Deps:                         committeeverifier.CommitteeVerifierDeps{}, // Set by sequence
 						},
 					},
 				},
@@ -221,7 +218,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: common.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -229,20 +226,20 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 					},
 				},
 				GlobalConfig: sequences.GlobalConfigParams{
-					Template: common.GlobalConfig{
+					Template: core.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10)),
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{
-					Template: rmn.RMNRemote{
+					Template: core.RMNRemote{
 						CcipOwner:      "", // Populated by the sequence
 						RmnOwner:       types.PARTY(partyCCIP),
 						CursedSubjects: nil,
 					},
 				},
 				FeeQuoterConfig: sequences.FeeQuoterParams{
-					Template: feequoter.FeeQuoter{
+					Template: core.FeeQuoter{
 						PriceUpdaters: []types.PARTY{types.PARTY(partyCCIP)},
 					},
 
@@ -383,14 +380,14 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 
 	// Setup token pool for outbound token transfer in Send.
 	poolInstanceID := "test-pool-send"
-	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[common.RateLimiter]{
+	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[core.RateLimiter]{
 		OwnerParty: types.PARTY(partyCCIP),
-		Template: common.RateLimiter{
+		Template: core.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceID),
 			PoolOwner:           types.PARTY(partyCCIP),
 			RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-			Direction:           common.RateLimitDirectionRateLimitDirection_Outbound,
-			Mode:                common.RateLimitModeRateLimitMode_DefaultFinality,
+			Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
+			Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
 			IsEnabled:           true,
 			Capacity:            types.NUMERIC("10000000000"),
 			Rate:                types.NUMERIC("10000000000"),
@@ -424,9 +421,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): burnminttokenpool.RemoteChainConfig{
 					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
 					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
-					InboundCCVs:        []mcms.RawInstanceAddress{},
-					OutboundCCVs:       []mcms.RawInstanceAddress{},
-					FinalityConfig:     common.FinalityConfig{WaitForFinality: &types.UNIT{}},
+					InboundCCVs:        []chainlinkapi.RawInstanceAddress{},
+					OutboundCCVs:       []chainlinkapi.RawInstanceAddress{},
+					FinalityConfig:     core.FinalityConfig{WaitForFinality: &types.UNIT{}},
 					InboundRateLimiter: outboundRateLimiterAddr.Binding(),
 					InboundCustomBlockConfirmationsRateLimiter: outboundRateLimiterAddr.Binding(),
 					OutboundRateLimiter:                        outboundRateLimiterAddr.Binding(),
@@ -605,7 +602,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + perpartyrouter.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -879,29 +876,29 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
 	// after 5% pool fee the bridged amount should be 9,500.
-	sendArgs := ccipsender.Send{
+	sendArgs := sender.Send{
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Message: ccipclient.Canton2AnyMessage{
+		Message: core.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			TokenTransfer: &ccipclient.TokenTransfer{
+			TokenTransfer: &core.TokenTransfer{
 				Token:  linkInstrumentId,
 				Amount: types.NUMERIC(tokenTransferAmountDecimal),
 			},
 			FeeToken: nativeInstrumentId,
-			ExtraArgs: ccipclient.ExtraArgs{
-				V3: &ccipclient.GenericExtraArgsV3{
+			ExtraArgs: core.ExtraArgs{
+				V3: &core.GenericExtraArgsV3{
 					GasLimit: 0,
-					Ccvs: []ccipclient.CCVExtraArg{
+					Ccvs: []core.CCVExtraArg{
 						{
 							CcvAddress: committeeVerifierAddress.Binding(),
 							CcvArgs:    types.TEXT(""),
 						},
 					},
-					Executor: ccipclient.ExecutorExtraArg{
-						ExecutorWithAddress: &ccipclient.ExecutorWithAddress{
+					Executor: core.ExecutorExtraArg{
+						ExecutorWithAddress: &core.ExecutorWithAddress{
 							ExecutorAddress: executorAddress.Binding(),
 							ExecutorArgs:    types.TEXT(""),
 						},
@@ -911,9 +908,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 		},
-		FeeTokenInput: ccipsender.FeeTokenInput{
+		FeeTokenInput: sender.FeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-			FeeTokenConfigCid:       contractID(ccipSendDisclosure.FeeTokenConfigCid),
+			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
 			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{
@@ -924,19 +921,19 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 		},
-		CcvSendInputs: []ccipsender.CCVSendInput{
+		CcvSendInputs: []sender.CCVSendInput{
 			{
 				CcvAddress:      ccvSendDisclosure.Address.Binding(),
 				CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
 				CcvExtraContext: ccvSendDisclosure.ChoiceContext,
 			},
 		},
-		TokenTransferInput: &ccipsender.TokenTransferInput{
+		TokenTransferInput: &sender.TokenTransferInput{
 			SenderInputCids:  senderHoldingCids,
 			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
 			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
 		},
-		ExecutorInput: &ccipsender.ExecutorInput{
+		ExecutorInput: &sender.ExecutorInput{
 			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
 			ExecutorExtraContext: executorSendDisclosure.ChoiceContext,
 		},
@@ -971,7 +968,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	executorSendDisclosure, err = edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
-	sendArgs.FeeTokenInput.FeeTokenConfigCid = contractID(ccipSendDisclosure.FeeTokenConfigCid)
+	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
 	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
 	sendArgs.CcvSendInputs[0].CcvExtraContext = ccvSendDisclosure.ChoiceContext
 	sendArgs.TokenTransferInput.TokenPoolCid = types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId)

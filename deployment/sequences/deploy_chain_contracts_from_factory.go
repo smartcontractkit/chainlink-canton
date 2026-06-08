@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -12,17 +13,12 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	ccvsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
-	offrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/offramp"
-	onrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/onramp"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -72,7 +68,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure GlobalConfig instance ID: %w", err)
 		}
-		globalConfigTemplate := common.GlobalConfig{
+		globalConfigTemplate := core.GlobalConfig{
 			InstanceId:         types.TEXT(globalConfigInstanceID),
 			CcipOwner:          ccipOwnerParty,
 			ChainSelector:      input.GlobalConfig.Template.ChainSelector,
@@ -91,7 +87,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure TokenAdminRegistry instance ID: %w", err)
 		}
-		tokenAdminRegistryTemplate := tokenadminregistry.TokenAdminRegistry{
+		tokenAdminRegistryTemplate := core.TokenAdminRegistry{
 			InstanceId: types.TEXT(tokenAdminRegistryInstanceID),
 			Owner:      ccipOwnerParty,
 			EntryCount: 0,
@@ -116,7 +112,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 				Id:    types.TEXT("link-token"),
 			}
 		}
-		feeQuoterTemplate := feequoter.FeeQuoter{
+		feeQuoterTemplate := core.FeeQuoter{
 			InstanceId:                       types.TEXT(feeQuoterInstanceID),
 			Owner:                            ownerParty,
 			FeeTokens:                        types.SET{},
@@ -135,7 +131,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		feeQuoterRawInstanceAddress := feeQuoterInstanceID.RawInstanceAddress(ownerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), feeQuoterRawInstanceAddress, fee_quoter.ContractType, fee_quoter.Version, ""))
 
-		var firstCommitteeVerifierBinding mcms.RawInstanceAddress
+		var firstCommitteeVerifierBinding chainlinkapi.RawInstanceAddress
 		if len(input.CommitteeVerifiers) == 0 {
 			if input.CcvRegistryBinding.Unpack == "" {
 				return sequences.OnChainOutput{}, fmt.Errorf("CcvRegistryBinding is required when CommitteeVerifiers is empty")
@@ -156,7 +152,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure CommitteeVerifier #%d instance ID: %w", i, err)
 			}
-			committeeVerifierTemplate := ccvsbindings.CommitteeVerifier{
+			committeeVerifierTemplate := committeeverifier.CommitteeVerifier{
 				InstanceId:                   types.TEXT(committeeVerifierInstanceID),
 				Owner:                        committeeVerifierOwner,
 				CcipOwner:                    ccipOwnerParty,
@@ -168,7 +164,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 				PendingStorageLocationsAdmin: committeeVerifierParams.Template.PendingStorageLocationsAdmin,
 				RemoteChainConfigs:           committeeVerifierParams.Template.RemoteChainConfigs,
 				SignerConfigs:                committeeVerifierParams.Template.SignerConfigs,
-				Deps: ccvsbindings.CommitteeVerifierDeps{
+				Deps: committeeverifier.CommitteeVerifierDeps{
 					RmnRemote: rmnRemoteRawInstanceAddress.Binding(),
 				},
 			}
@@ -188,10 +184,10 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure OffRamp instance ID: %w", err)
 		}
-		offRampTemplate := offrampBinding.OffRamp{
+		offRampTemplate := ccipruntime.OffRamp{
 			InstanceId: types.TEXT(offRampInstanceID),
 			CcipOwner:  ccipOwnerParty,
-			Deps: offrampBinding.OffRampDeps{
+			Deps: ccipruntime.OffRampDeps{
 				GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
 				RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
 				TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
@@ -209,11 +205,11 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure OnRamp instance ID: %w", err)
 		}
-		onRampTemplate := onrampBinding.OnRamp{
+		onRampTemplate := ccipruntime.OnRamp{
 			InstanceId:        types.TEXT(onRampInstanceID),
 			CcipOwner:         ccipOwnerParty,
 			MaxUSDCentsPerMsg: types.NUMERIC("100000000"),
-			Deps: onrampBinding.OnRampDeps{
+			Deps: ccipruntime.OnRampDeps{
 				GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
 				RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
 				TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
@@ -233,10 +229,10 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure PerPartyRouterFactory instance ID: %w", err)
 		}
-		perPartyRouterFactoryTemplate := perpartyrouter.PerPartyRouterFactory{
+		perPartyRouterFactoryTemplate := ccipruntime.PerPartyRouterFactory{
 			InstanceId: types.TEXT(perPartyRouterFactoryInstanceID),
 			CcipOwner:  ccipOwnerParty,
-			Deps: perpartyrouter.PerPartyRouterDeps{
+			Deps: ccipruntime.PerPartyRouterDeps{
 				OnRamp:             onRampRawInstanceAddress.Binding(),
 				OffRamp:            offRampRawInstanceAddress.Binding(),
 				GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
@@ -385,7 +381,7 @@ var DeployCCVFromFactory = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure CommitteeVerifier #%d instance ID: %w", i, err)
 			}
-			committeeVerifierTemplate := ccvsbindings.CommitteeVerifier{
+			committeeVerifierTemplate := committeeverifier.CommitteeVerifier{
 				InstanceId:                   types.TEXT(committeeVerifierInstanceID),
 				Owner:                        committeeVerifierOwner,
 				CcipOwner:                    ccipOwnerParty,
@@ -397,7 +393,7 @@ var DeployCCVFromFactory = operations.NewSequence(
 				PendingStorageLocationsAdmin: committeeVerifierParams.Template.PendingStorageLocationsAdmin,
 				RemoteChainConfigs:           committeeVerifierParams.Template.RemoteChainConfigs,
 				SignerConfigs:                committeeVerifierParams.Template.SignerConfigs,
-				Deps: ccvsbindings.CommitteeVerifierDeps{
+				Deps: committeeverifier.CommitteeVerifierDeps{
 					RmnRemote: input.RmnRemoteRawInstanceAddress.Binding(),
 				},
 			}
@@ -503,7 +499,7 @@ func deployRMNRemoteFromFactory(
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to ensure RMNRemote instance ID: %w", err)
 	}
-	rmnTemplate := rmn.RMNRemote{
+	rmnTemplate := core.RMNRemote{
 		InstanceId:      types.TEXT(rmnInstanceID),
 		RmnOwner:        rmnOwnerParty,
 		CcipOwner:       ccipOwnerParty,

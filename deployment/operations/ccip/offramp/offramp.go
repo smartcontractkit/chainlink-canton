@@ -6,8 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/offramp"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -16,11 +15,11 @@ var ContractType = deployment.ContractType("OffRamp")
 
 var Version = semver.MustParse("2.0.0")
 
-var Deploy = contract.NewDeploy(contract.DeployParams[offramp.OffRamp]{
+var Deploy = contract.NewDeploy(contract.DeployParams[ccipruntime.OffRamp]{
 	Name:           "canton/ccip/offramp/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
 	Description:    "Deploys the CCIP OffRamp contract on Canton",
-	Validate: func(template offramp.OffRamp) error {
+	Validate: func(template ccipruntime.OffRamp) error {
 		if template.CcipOwner == "" {
 			return errors.New("CcipOwner cannot be empty")
 		}

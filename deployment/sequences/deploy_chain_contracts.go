@@ -6,35 +6,28 @@ import (
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feequoter"
-	offrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/offramp"
-	onrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/onramp"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/rmn"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/tokenadminregistry"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
-
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -42,7 +35,7 @@ import (
 type CommitteeVerifierParams struct {
 	// Qualifier distinguishes between multiple deployments of the committee verifier on the same chain.
 	Qualifier string
-	Template  ccvs.CommitteeVerifier
+	Template  committeeverifier.CommitteeVerifier
 }
 
 type ExecutorParams struct {
@@ -51,15 +44,15 @@ type ExecutorParams struct {
 }
 
 type RMNRemoteParams struct {
-	Template rmn.RMNRemote
+	Template core.RMNRemote
 }
 
 type GlobalConfigParams struct {
-	Template common.GlobalConfig
+	Template core.GlobalConfig
 }
 
 type FeeQuoterParams struct {
-	Template feequoter.FeeQuoter
+	Template core.FeeQuoter
 	// The price of the native token to be set on the FeeQuoter.
 	// If not-nil, native will be added as a fee token and the price will be set.
 	USDPerNative *big.Int
@@ -86,7 +79,7 @@ type DeployChainContractsParams struct {
 	// ProposalDriven enables MCMS proposal generation for factory-backed deploys.
 	ProposalDriven bool
 	// CcvRegistryBinding is required for OnRamp deps when CommitteeVerifiers is empty (CCV deployed separately).
-	CcvRegistryBinding mcms.RawInstanceAddress
+	CcvRegistryBinding chainlinkapi.RawInstanceAddress
 	// RmnRemoteRawInstanceAddress is required for production split deploy paths.
 	RmnRemoteRawInstanceAddress contracts.RawInstanceAddress
 	// DevenvBundledDeploy runs RMN+CV+core in one sequence (devenv adapter only). Mutually exclusive with RmnRemoteRawInstanceAddress.
@@ -108,8 +101,8 @@ var DeployChainContracts = operations.NewSequence(
 		}
 
 		// Deploy RMNRemote
-		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[rmn.RMNRemote]{
-			Template: rmn.RMNRemote{
+		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[core.RMNRemote]{
+			Template: core.RMNRemote{
 				RmnOwner:        rmnOwnerParty,
 				CcipOwner:       types.PARTY(input.CCIPOwnerParty),
 				CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
@@ -128,7 +121,7 @@ var DeployChainContracts = operations.NewSequence(
 
 		// Deploy Global Config
 		input.GlobalConfig.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
-		deployGlobalConfigReport, err := operations.ExecuteOperation(b, global_config.Deploy, deps, contract.DeployInput[common.GlobalConfig]{
+		deployGlobalConfigReport, err := operations.ExecuteOperation(b, global_config.Deploy, deps, contract.DeployInput[core.GlobalConfig]{
 			Template:   input.GlobalConfig.Template,
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
@@ -142,8 +135,8 @@ var DeployChainContracts = operations.NewSequence(
 		}
 
 		// Deploy Token Admin Registry
-		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, token_admin_registry.Deploy, deps, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
-			Template: tokenadminregistry.TokenAdminRegistry{
+		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, token_admin_registry.Deploy, deps, contract.DeployInput[core.TokenAdminRegistry]{
+			Template: core.TokenAdminRegistry{
 				Owner:      types.PARTY(input.CCIPOwnerParty),
 				EntryCount: 0,
 			},
@@ -167,8 +160,8 @@ var DeployChainContracts = operations.NewSequence(
 				Id:    types.TEXT("link-token"),
 			}
 		}
-		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
-			Template: feequoter.FeeQuoter{
+		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[core.FeeQuoter]{
+			Template: core.FeeQuoter{
 				Owner:                            types.PARTY(input.CCIPOwnerParty),
 				FeeTokens:                        types.SET{},
 				DestChainConfigs:                 nil,
@@ -192,11 +185,11 @@ var DeployChainContracts = operations.NewSequence(
 		// Any token with a price is treated as a fee token, so pushing the native
 		// token price is sufficient to register it as usable for fees.
 		if input.FeeQuoterConfig.USDPerNative != nil {
-			_, err = operations.ExecuteOperation(b, fee_quoter.UpdatePrices, deps, contract.ChoiceInput[feequoter.UpdatePrices]{
+			_, err = operations.ExecuteOperation(b, fee_quoter.UpdatePrices, deps, contract.ChoiceInput[core.UpdatePrices]{
 				InstanceAddress: feeQuoterRawInstanceAddress.InstanceAddress(),
-				Args: feequoter.UpdatePrices{
-					PriceUpdates: feequoter.PriceUpdates{
-						TokenPriceUpdates: []feequoter.TokenPriceUpdate{
+				Args: core.UpdatePrices{
+					PriceUpdates: core.PriceUpdates{
+						TokenPriceUpdates: []core.TokenPriceUpdate{
 							{
 								InstrumentId: input.NativeInstrumentId,
 								UsdPerToken:  types.NUMERIC(input.FeeQuoterConfig.USDPerNative.String()),
@@ -222,10 +215,10 @@ var DeployChainContracts = operations.NewSequence(
 		}
 
 		// Deploy OffRamp
-		deployOffRampReport, err := operations.ExecuteOperation(b, offramp.Deploy, deps, contract.DeployInput[offrampBinding.OffRamp]{
-			Template: offrampBinding.OffRamp{
+		deployOffRampReport, err := operations.ExecuteOperation(b, offramp.Deploy, deps, contract.DeployInput[ccipruntime.OffRamp]{
+			Template: ccipruntime.OffRamp{
 				CcipOwner: types.PARTY(input.CCIPOwnerParty),
-				Deps: offrampBinding.OffRampDeps{
+				Deps: ccipruntime.OffRampDeps{
 					GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
 					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
 					TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
@@ -243,16 +236,16 @@ var DeployChainContracts = operations.NewSequence(
 		}
 
 		// Deploy OnRamp
-		deployOnRampReport, err := operations.ExecuteOperation(b, onramp.Deploy, deps, contract.DeployInput[onrampBinding.OnRamp]{
-			Template: onrampBinding.OnRamp{
+		deployOnRampReport, err := operations.ExecuteOperation(b, onramp.Deploy, deps, contract.DeployInput[ccipruntime.OnRamp]{
+			Template: ccipruntime.OnRamp{
 				CcipOwner:         types.PARTY(input.CCIPOwnerParty),
 				MaxUSDCentsPerMsg: types.NUMERIC("100000000"),
-				Deps: onrampBinding.OnRampDeps{
+				Deps: ccipruntime.OnRampDeps{
 					GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
 					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
 					TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
 					FeeQuoter:          feeQuoterRawInstanceAddress.Binding(),
-					CcvRegistry:        mcms.RawInstanceAddress{},
+					CcvRegistry:        chainlinkapi.RawInstanceAddress{},
 				},
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
@@ -267,10 +260,10 @@ var DeployChainContracts = operations.NewSequence(
 		}
 
 		// Deploy PerPartyRouterFactory
-		deployPerPartyRouterFactoryReport, err := operations.ExecuteOperation(b, per_party_router_factory.Deploy, deps, contract.DeployInput[perpartyrouter.PerPartyRouterFactory]{
-			Template: perpartyrouter.PerPartyRouterFactory{
+		deployPerPartyRouterFactoryReport, err := operations.ExecuteOperation(b, per_party_router_factory.Deploy, deps, contract.DeployInput[ccipruntime.PerPartyRouterFactory]{
+			Template: ccipruntime.PerPartyRouterFactory{
 				CcipOwner: types.PARTY(input.CCIPOwnerParty),
-				Deps: perpartyrouter.PerPartyRouterDeps{
+				Deps: ccipruntime.PerPartyRouterDeps{
 					OnRamp:             onRampRawInstanceAddress.Binding(),
 					OffRamp:            offRampRawInstanceAddress.Binding(),
 					GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
@@ -290,8 +283,8 @@ var DeployChainContracts = operations.NewSequence(
 		// Deploy Committee Verifiers
 		for i, committeeVerifier := range input.CommitteeVerifiers {
 			committeeVerifier.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
-			deployCommitteeVerifierReport, err := operations.ExecuteOperation(b, committee_verifier.Deploy, deps, contract.DeployInput[ccvs.CommitteeVerifier]{
-				Template: ccvs.CommitteeVerifier{
+			deployCommitteeVerifierReport, err := operations.ExecuteOperation(b, committee_verifier.Deploy, deps, contract.DeployInput[committeeverifier.CommitteeVerifier]{
+				Template: committeeverifier.CommitteeVerifier{
 					Owner:                        committeeVerifier.Template.Owner,
 					CcipOwner:                    types.PARTY(input.CCIPOwnerParty),
 					VersionTag:                   committeeVerifier.Template.VersionTag,
@@ -301,7 +294,7 @@ var DeployChainContracts = operations.NewSequence(
 					PendingStorageLocationsAdmin: committeeVerifier.Template.PendingStorageLocationsAdmin,
 					RemoteChainConfigs:           committeeVerifier.Template.RemoteChainConfigs,
 					SignerConfigs:                committeeVerifier.Template.SignerConfigs,
-					Deps: ccvs.CommitteeVerifierDeps{
+					Deps: committeeverifier.CommitteeVerifierDeps{
 						RmnRemote: rmnRemoteRawInstanceAddress.Binding()},
 				},
 				OwnerParty: committeeVerifier.Template.Owner,
@@ -353,9 +346,9 @@ func ensureNativeFeeTokenConfig(
 		return nil
 	}
 
-	_, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.ProposeAdministrator]{
+	_, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[core.ProposeAdministrator]{
 		InstanceAddress: tokenAdminRegistryAddress,
-		Args: tokenadminregistry.ProposeAdministrator{
+		Args: core.ProposeAdministrator{
 			TokenConfigCid: nil,
 			InstrumentId:   instrumentId,
 			NewAdmin:       types.PARTY(ccipOwnerParty),
@@ -374,9 +367,9 @@ func ensureNativeFeeTokenConfig(
 		return fmt.Errorf("native fee token config not found after propose")
 	}
 
-	_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.AcceptAdminRole]{
+	_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[core.AcceptAdminRole]{
 		InstanceAddress: tokenAdminRegistryAddress,
-		Args: tokenadminregistry.AcceptAdminRole{
+		Args: core.AcceptAdminRole{
 			TokenConfigCid: tokenConfigCid,
 			InstrumentId:   instrumentId,
 			Caller:         types.PARTY(ccipOwnerParty),

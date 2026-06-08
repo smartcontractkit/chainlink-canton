@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms-api"
-	PackageID   = "674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240"
+	PackageID   = "71ae0fe9f6cf1fcc23a1936caa1dda070e724636dd7aaa54bee3b49eee4ac4ce"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1033,6 +1033,7 @@ type MCMSEncoder interface {
 	BypasserExecuteBatch(args BypasserExecuteBatchParams) (*bind.EncodedChoice, error)
 	CancelBatch(args CancelBatchParams) (*bind.EncodedChoice, error)
 	ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error)
+	SetConfig(args SetConfigParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1075,6 +1076,11 @@ func (e *encoder) CancelBatch(args CancelBatchParams) (*bind.EncodedChoice, erro
 // ScheduleBatch encodes parameters for the ScheduleBatch choice.
 func (e *encoder) ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ScheduleBatch", args)
+}
+
+// SetConfig encodes parameters for the SetConfig choice.
+func (e *encoder) SetConfig(args SetConfigParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetConfig", args)
 }
 
 // Verify MCMSEncoder interface implementation
