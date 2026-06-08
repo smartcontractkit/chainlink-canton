@@ -17,7 +17,7 @@ import (
 type DARLoader func(packageName, version string) ([]byte, error)
 
 // releaseDir must stay in sync with contracts.ReleaseDir in the parent module.
-const releaseDir = "v1_0_0"
+const releaseDir = "v2_0_0"
 
 func darVersionDir(version string) string {
 	if version == "current" {

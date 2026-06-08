@@ -74,7 +74,7 @@ jobs:
           if ! git diff --quiet HEAD -- bindings/generated/latest/; then
             echo "### Dev bindings are out of date!" >> $GITHUB_STEP_SUMMARY
             echo "The bindings under \`bindings/generated/latest/\` do not match \`make generate-bindings\`." >> $GITHUB_STEP_SUMMARY
-            echo "Do not rewrite \`bindings/generated/v1_0_0/\` in normal PRs — use \`make freeze-release\` on a release PR (label \`release-artifacts\`)." >> $GITHUB_STEP_SUMMARY
+            echo "Do not rewrite legacy \`bindings/generated/v1_0_0/\` in normal PRs. New releases freeze DARs only (\`make freeze-release\`, label \`release-artifacts\`)." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "#### To fix:" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY

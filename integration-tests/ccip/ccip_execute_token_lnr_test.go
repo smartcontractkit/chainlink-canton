@@ -21,10 +21,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -34,7 +36,6 @@ import (
 	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
@@ -622,26 +623,33 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	// Build Message
 	// Build token transfer (5 AMT in Splice Decimal format)
-	encodedTokenTransfer := buildTokenTransferV1(tc.tokenAmount, remotePoolAddress, remoteTokenAddress, hashedInstrumentId, partyReceiver, tc.sourcePoolData)
+	tokenTransfer := buildTokenTransferV1(tc.tokenAmount, remotePoolAddress, remoteTokenAddress, hashedInstrumentId, partyReceiver, tc.sourcePoolData)
 
 	// Build message
-	msg := &MessageV1{
-		SourceChainSelector: remoteSelector,
-		DestChainSelector:   env.Chain.ChainSelector(),
-		SequenceNumber:      1,
-		ExecutionGasLimit:   200000,
-		CCIPReceiveGasLimit: 100000,
-		Finality:            finalityConfigFromBlockConfirmations(2000),
-		CCVAndExecutorHash:  [32]byte{},
-		OnRampAddress:       gethcommon.LeftPadBytes(hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"), 32),
-		OffRampAddress:      offRampAddress.InstanceAddress().Bytes(),
-		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
-		Receiver:            contracts.HashedPartyFromString(partyReceiver).Bytes(),
-		DestBlob:            []byte{},
-		TokenTransfer:       encodedTokenTransfer,
-		MessageData:         []byte{},
+	msg := protocol.Message{
+		Version:              1,
+		SourceChainSelector:  protocol.ChainSelector(remoteSelector),
+		DestChainSelector:    protocol.ChainSelector(env.Chain.ChainSelector()),
+		SequenceNumber:       1,
+		ExecutionGasLimit:    200000,
+		CcipReceiveGasLimit:  100000,
+		Finality:             protocol.NewFinality().WithBlockDepth(2000),
+		CcvAndExecutorHash:   [32]byte{},
+		OnRampAddress:        gethcommon.LeftPadBytes(gethcommon.HexToAddress("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd").Bytes(), 32),
+		OnRampAddressLength:  32,
+		OffRampAddress:       offRampAddress.InstanceAddress().Bytes(),
+		OffRampAddressLength: 32,
+		Sender:               gethcommon.HexToAddress("0000000000000000000000000000000000000003").Bytes(),
+		SenderLength:         20,
+		Receiver:             contracts.HashedPartyFromString(partyReceiver).Bytes(),
+		ReceiverLength:       32,
+		DestBlob:             nil,
+		DestBlobLength:       0,
+		TokenTransfer:        tokenTransfer,
+		Data:                 nil,
+		DataLength:           0,
 	}
-	encodedMessage, err := EncodeMessageV1(msg)
+	encodedMessage, err := msg.Encode()
 	require.NoError(t, err)
 	encodedMessageHex := hex.EncodeToString(encodedMessage)
 	messageHash := crypto.Keccak256(encodedMessage)
@@ -799,14 +807,20 @@ func buildTokenTransferV1(
 	destTokenAddress contracts.EncodedInstrumentID,
 	tokenReceiverParty string,
 	extraData []byte,
-) *TokenTransferV1 {
-	return &TokenTransferV1{
-		Amount:             amount,
-		SourcePoolAddress:  sourcePoolAddress,
-		SourceTokenAddress: sourceTokenAddress,
-		DestTokenAddress:   destTokenAddress.Bytes(),
-		TokenReceiver:      contracts.HashedPartyFromString(tokenReceiverParty).Bytes(),
-		ExtraData:          extraData,
+) *protocol.TokenTransfer {
+	return &protocol.TokenTransfer{
+		Version:                  1,
+		Amount:                   amount,
+		SourcePoolAddress:        sourcePoolAddress,
+		SourcePoolAddressLength:  uint8(len(sourcePoolAddress)),
+		SourceTokenAddress:       sourceTokenAddress,
+		SourceTokenAddressLength: uint8(len(sourceTokenAddress)),
+		DestTokenAddress:         destTokenAddress.Bytes(),
+		DestTokenAddressLength:   32,
+		TokenReceiver:            contracts.HashedPartyFromString(tokenReceiverParty).Bytes(),
+		TokenReceiverLength:      32,
+		ExtraData:                extraData,
+		ExtraDataLength:          uint16(len(extraData)),
 	}
 }
 
