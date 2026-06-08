@@ -65,8 +65,8 @@ const CurrentVersion = "current"
 const ReleaseDir = "v2_0_0"
 
 var Versions map[Package][]string = map[Package][]string{
-	Coin:     []string{CurrentVersion},
-	Link:     []string{"2.0.0", CurrentVersion},
+	Coin:         []string{CurrentVersion},
+	Link:         []string{"2.0.0", CurrentVersion},
 	ChainlinkAPI: []string{"2.0.0", CurrentVersion},
 	MCMSAPI:      []string{"2.0.0", CurrentVersion},
 	MCMSCore:     []string{"2.0.0", CurrentVersion},
