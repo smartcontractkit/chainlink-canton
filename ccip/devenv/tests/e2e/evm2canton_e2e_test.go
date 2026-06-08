@@ -13,9 +13,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	ccldf "github.com/smartcontractkit/chainlink-ccv/build/devenv/cldf"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -61,7 +61,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 	srcSelector := srcChain.ChainSelector()
 	dstSelector := dstChain.ChainSelector()
-	_, opsEnv, err := ccv.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
+	_, opsEnv, err := ccldf.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	require.NoError(t, err)
 	var receiverParticipant canton.Participant
 	if chains := opsEnv.BlockChains.CantonChains(); len(chains[dstSelector].Participants) > 0 {
@@ -74,25 +74,20 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 	ds, err := lib.DataStore()
 	require.NoError(t, err)
-	ccvAddr, err := tcapi.GetContractAddress(
-		ds,
-		srcSelector,
+	ccvAddr := devenvtests.GetContractAddress(
+		t, ds, srcSelector,
 		datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
 		versioned_verifier_resolver.Version.String(),
 		common.DefaultCommitteeVerifierQualifier,
 		"source committee verifier",
 	)
-	require.NoError(t, err)
-
-	executorAddress, err := tcapi.GetContractAddress(
-		ds,
-		srcSelector,
+	executorAddress := devenvtests.GetContractAddress(
+		t, ds, srcSelector,
 		datastore.ContractType(sequences.ExecutorProxyType),
 		proxy.Deploy.Version(),
 		common.DefaultExecutorQualifier,
 		"source executor",
 	)
-	require.NoError(t, err)
 
 	t.Run("message transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
