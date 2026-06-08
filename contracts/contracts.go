@@ -58,33 +58,33 @@ const (
 
 const CurrentVersion = "current"
 
-// ReleaseDir is the frozen production DAR snapshot (e.g. v1_0_0).
+// ReleaseDir is the frozen production DAR snapshot (e.g. v2_0_0).
 // Individual packages keep their own semver in the filename; multiple package
 // versions (e.g. globalconfig-1.0.0 and globalconfig-2.0.0) live in the same
 // release directory.
-const ReleaseDir = "v1_0_0"
+const ReleaseDir = "v2_0_0"
 
 var Versions map[Package][]string = map[Package][]string{
 	Coin: []string{"0.0.1", CurrentVersion},
 	Link: []string{"0.0.1", CurrentVersion},
 
 	ChainlinkAPI: []string{"1.0.0", CurrentVersion},
-	MCMSAPI:      []string{"1.0.0", CurrentVersion},
-	MCMSCore:     []string{"1.0.0", CurrentVersion},
-	MCMSTest:     []string{"1.0.0", CurrentVersion},
+	MCMSAPI:      []string{"2.0.0", CurrentVersion},
+	MCMSCore:     []string{"2.0.0", CurrentVersion},
+	MCMSTest:     []string{"2.0.0", CurrentVersion},
 	GlobalConfig: []string{"1.0.0", "2.0.0", CurrentVersion},
 
-	CCIPCore:                 []string{"1.0.0", CurrentVersion},
-	CCIPExtensionAPI:         []string{"1.0.0", CurrentVersion},
-	CCIPRuntime:              []string{"1.0.0", CurrentVersion},
-	CCIPSender:               []string{"1.0.0", CurrentVersion},
-	CCIPReceiver:             []string{"1.0.0", CurrentVersion},
-	CCIPCommitteeVerifier:    []string{"1.0.0", CurrentVersion},
-	CCIPExecutor:             []string{"1.0.0", CurrentVersion},
-	CCIPLockReleaseTokenPool: []string{"1.0.0", CurrentVersion},
-	CCIPBurnMintTokenPool:    []string{"1.0.0", CurrentVersion},
-	CCIPFactory:              []string{"1.0.0", CurrentVersion},
-	CCIPTest:                 []string{"1.0.0", CurrentVersion},
+	CCIPCore:                 []string{"2.0.0", CurrentVersion},
+	CCIPExtensionAPI:         []string{"2.0.0", CurrentVersion},
+	CCIPRuntime:              []string{"2.0.0", CurrentVersion},
+	CCIPSender:               []string{"2.0.0", CurrentVersion},
+	CCIPReceiver:             []string{"2.0.0", CurrentVersion},
+	CCIPCommitteeVerifier:    []string{"2.0.0", CurrentVersion},
+	CCIPExecutor:             []string{"2.0.0", CurrentVersion},
+	CCIPLockReleaseTokenPool: []string{"2.0.0", CurrentVersion},
+	CCIPBurnMintTokenPool:    []string{"2.0.0", CurrentVersion},
+	CCIPFactory:              []string{"2.0.0", CurrentVersion},
+	CCIPTest:                 []string{"2.0.0", CurrentVersion},
 
 	SpliceApiTokenBurnMintV1:            []string{"1.0.0"},
 	SpliceApiTokenHoldingV1:             []string{"1.0.0"},

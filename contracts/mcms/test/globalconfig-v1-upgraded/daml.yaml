@@ -7,7 +7,7 @@ dependencies:
   - daml-stdlib
   - daml-script
   - ../../../chainlink/api/.daml/dist/chainlink-api-1.0.0.dar
-  - ../../api/.daml/dist/mcms-api-1.0.0.dar
+  - ../../api/.daml/dist/mcms-api-2.0.0.dar
 upgrades: ../globalconfig-v1/.daml/dist/globalconfig-1.0.0.dar
 build-options:
   - -Wno-upgrade-interfaces

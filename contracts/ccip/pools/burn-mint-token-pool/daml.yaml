@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: ccip-burn-mint-token-pool
 source: daml
-version: 1.0.0
+version: 2.0.0
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
@@ -14,6 +14,6 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - ../../../chainlink/api/.daml/dist/chainlink-api-1.0.0.dar
-  - ../../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
-  - ../../core/.daml/dist/ccip-core-1.0.0.dar
-  - ../../extension-api/.daml/dist/ccip-extension-api-1.0.0.dar
+  - ../../../mcms/api/.daml/dist/mcms-api-2.0.0.dar
+  - ../../core/.daml/dist/ccip-core-2.0.0.dar
+  - ../../extension-api/.daml/dist/ccip-extension-api-2.0.0.dar

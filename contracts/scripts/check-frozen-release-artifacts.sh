@@ -4,13 +4,15 @@
 # should only touch dev outputs (contracts/dars/current/, bindings/generated/latest/).
 #
 # Allowed without the release-artifacts label:
-#   - Adding a new release snapshot tree (e.g. first v1_0_0/ layout or v1_1_0/)
+#   - Adding a new DAR release snapshot tree (e.g. contracts/dars/v2_0_0/)
 #   - Renaming/moving legacy flat DARs into contracts/dars/v*_*/
-#   - Syncing bindings/generated/mcms/mcms.go when bootstrapping v1_0_0/mcms/
+#   - Syncing bindings/generated/mcms/mcms.go when bootstrapping legacy mcms/
 #
 # Blocked:
 #   - Modifying or deleting a file that already exists on the base branch under
-#     a frozen path (contracts/dars/v*_*/, bindings/generated/v*_*/, mcms/)
+#     a frozen path (contracts/dars/v*_*/, legacy bindings/generated/v1_0_0/, mcms/)
+#
+# New releases freeze DARs only — do not add bindings/generated/v*_*/ trees.
 #
 # Bypass: FROZEN_ARTIFACT_CHANGES_OK=1 or PR label release-artifacts (see CI).
 #

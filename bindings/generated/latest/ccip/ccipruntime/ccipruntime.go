@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "226eaf64549749a83727d42eeff2fa5d773ff3c5804203b1b1f50ab90690f829"
+	PackageID   = "9a36dd933236932d34fc7575daf577156b3c0335d2e02c774c3a57ca17d8de0c"
 	SDKVersion  = "3.4.11"
 )
 
