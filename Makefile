@@ -13,12 +13,12 @@ generate-bindings:
 	go run ./contracts/cmd/bindings
 
 .PHONY: freeze-release
-freeze-release: ## Freeze DARs and bindings into a versioned snapshot. Usage: make freeze-release VERSION=1.0.0
+freeze-release: ## Freeze DARs into a versioned snapshot (bindings stay in latest/). Usage: make freeze-release VERSION=2.0.0
 	@test -n "$(VERSION)" || (echo "VERSION is required, e.g. make freeze-release VERSION=1.0.0" && exit 1)
 	@./contracts/scripts/freeze-release.sh $(VERSION)
 
 .PHONY: check-frozen-release-artifacts
-check-frozen-release-artifacts: ## Fail if the branch changes frozen release DARs/bindings (v1_* snapshots).
+check-frozen-release-artifacts: ## Fail if the branch changes frozen release DARs or legacy v1_* bindings.
 	@chmod +x ./contracts/scripts/check-frozen-release-artifacts.sh
 	@./contracts/scripts/check-frozen-release-artifacts.sh
 
