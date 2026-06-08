@@ -94,7 +94,7 @@ func (c *GRPCLedgerClient) PrepareSubmission(
 		Commands:       commands,
 		ActAs:          actAs,
 		ReadAs:         readAs,
-		SynchronizerId: synchronizerID,
+		SynchronizerId: LogicalSynchronizerID(synchronizerID),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("PrepareSubmission: %w", err)
