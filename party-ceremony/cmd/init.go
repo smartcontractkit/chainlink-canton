@@ -415,7 +415,7 @@ type contractProfile struct {
 // built-in template defaults. Add new entries here when new contract types are
 // supported.
 var knownContracts = map[string]contractProfile{
-	"mcms": {
+	"mcms-core": {
 		module:   "MCMS.Main",
 		entity:   "MCMS",
 		argsFile: "mcms-args.json",
@@ -429,7 +429,7 @@ var knownContracts = map[string]contractProfile{
 //	canton-party-ceremony init contract-deploy \
 //	  --decentralized-party-id "prefix::namespace" \
 //	  --synchronizer-id global \
-//	  --packages "mcms:current" \
+//	  --packages "mcms-core:1.0.0" \
 //	  --contract-args-file ./mcms-args.json \
 //	  --config ./participant-config.json
 var initContractDeployCmd = &cobra.Command{
@@ -440,7 +440,7 @@ sequence step. The contract-deploy ceremony uploads DARs to all participants,
 verifies the decentralized party, and prepares a contract creation transaction
 via InteractiveSubmissionService. Signing and execution are not yet implemented.
 
-For known contract packages (e.g. "mcms"), --template-module, --template-entity,
+For known contract packages (e.g. "mcms-core"), --template-module, --template-entity,
 and --contract-args-file are auto-populated with built-in defaults. For any other
 package, all three flags must be provided explicitly.`,
 	RunE: runInitContractDeploy,
@@ -451,7 +451,7 @@ func init() {
 
 	f.String("decentralized-party-id", "", "Full party ID in the format <prefix>::<namespace> (required)")
 	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
-	f.String("packages", "", "Comma-separated list of packages in name:version format, e.g. mcms:current,globalconfig:1.0.0 (required)")
+	f.String("packages", "", "Comma-separated list of packages in name:version format, e.g. mcms-core:1.0.0,globalconfig:1.0.0 (required)")
 	f.String("template-module", "", "Fully-qualified DAML module name, e.g. MCMS.Main")
 	f.String("template-entity", "", "DAML template entity name, e.g. MCMS")
 	f.String("contract-args-file", "", "Path to JSON file containing contract creation arguments")
@@ -561,7 +561,7 @@ func applyContractDefaults(
 
 // parsePackageRefs parses a comma-separated list of "name:version" entries
 // into a slice of [contractdeploy.PackageRef]s.
-// Example input: "mcms:current,globalconfig:1.0.0"
+// Example input: "mcms-core:1.0.0,globalconfig:1.0.0"
 func parsePackageRefs(raw string) ([]contractdeploy.PackageRef, error) {
 	parts := splitParticipants(raw) // reuses comma splitter
 	refs := make([]contractdeploy.PackageRef, 0, len(parts))

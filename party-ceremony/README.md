@@ -276,7 +276,7 @@ entity, and args file are auto-populated:
 
 | Package name | Module      | Entity | Args file        |
 | ------------ | ----------- | ------ | ---------------- |
-| `mcms`       | `MCMS.Main` | `MCMS` | `mcms-args.json` |
+| `mcms-core`  | `MCMS.Main` | `MCMS` | `mcms-args.json` |
 
 DARs are loaded from the `dars/` directory by default (relative to the working
 directory), under versioned subdirectories such as `dars/current/` (dev) or
@@ -469,7 +469,7 @@ canton-party-ceremony init contract-deploy \
 | -------------------------- | -------- | ------------------------------ | ---------------------------------------------------------- |
 | `--decentralized-party-id` | Yes      | —                              | Full party ID (`<prefix>::<namespace>`)                    |
 | `--synchronizer-id`        | Yes      | —                              | Canton synchronizer ID                                     |
-| `--packages`               | Yes      | —                              | Comma-separated `name:version` pairs (e.g. `mcms:current`) |
+| `--packages`               | Yes      | —                              | Comma-separated `name:version` pairs (e.g. `mcms-core:current`) |
 | `--template-module`        | No       | Auto-filled for known packages | Fully-qualified DAML module name (e.g. `MCMS.Main`)        |
 | `--template-entity`        | No       | Auto-filled for known packages | DAML template entity name (e.g. `MCMS`)                    |
 | `--contract-args-file`     | No       | Auto-filled for known packages | Path to JSON file with contract creation arguments         |

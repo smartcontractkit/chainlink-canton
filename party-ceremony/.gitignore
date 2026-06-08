@@ -3,4 +3,7 @@
 ceremonies/
 participant-config.json
 
+# Operator-local testnet node configs (JWTs from refresh-token.sh)
+config/testnet/nodes/
+
 /bin
