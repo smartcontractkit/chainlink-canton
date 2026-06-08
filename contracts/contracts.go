@@ -65,13 +65,12 @@ const CurrentVersion = "current"
 const ReleaseDir = "v2_0_0"
 
 var Versions map[Package][]string = map[Package][]string{
-	Coin: []string{"0.0.1", CurrentVersion},
-	Link: []string{"0.0.1", CurrentVersion},
-
-	ChainlinkAPI: []string{"1.0.0", CurrentVersion},
+	Coin:     []string{CurrentVersion},
+	Link:     []string{"2.0.0", CurrentVersion},
+	ChainlinkAPI: []string{"2.0.0", CurrentVersion},
 	MCMSAPI:      []string{"2.0.0", CurrentVersion},
 	MCMSCore:     []string{"2.0.0", CurrentVersion},
-	MCMSTest:     []string{"2.0.0", CurrentVersion},
+	MCMSTest:     []string{CurrentVersion},
 	GlobalConfig: []string{"1.0.0", "2.0.0", CurrentVersion},
 
 	CCIPCore:                 []string{"2.0.0", CurrentVersion},
@@ -84,7 +83,7 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPLockReleaseTokenPool: []string{"2.0.0", CurrentVersion},
 	CCIPBurnMintTokenPool:    []string{"2.0.0", CurrentVersion},
 	CCIPFactory:              []string{"2.0.0", CurrentVersion},
-	CCIPTest:                 []string{"2.0.0", CurrentVersion},
+	CCIPTest:                 []string{CurrentVersion},
 
 	SpliceApiTokenBurnMintV1:            []string{"1.0.0"},
 	SpliceApiTokenHoldingV1:             []string{"1.0.0"},

@@ -40,10 +40,17 @@ fi
 
 mkdir -p "$DARS_SNAPSHOT_DIR"
 
+# Dev/test-only packages: built to dars/current/ but not part of the production release snapshot.
+RELEASE_SKIP_PKGS="coin link-test mcms-test ccip-test test-proxy test-test test-receiver test-interfaces"
+
 dar_count=0
 while IFS= read -r -d '' damlYaml; do
   pkgVersion="$(grep '^version:' "$damlYaml" | awk '{print $2}')"
   pkgName="$(grep '^name:' "$damlYaml" | awk '{print $2}')"
+  if [[ " ${RELEASE_SKIP_PKGS} " == *" ${pkgName} "* ]]; then
+    echo "  skip: ${pkgName}-${pkgVersion}.dar (dev/test only)"
+    continue
+  fi
   src="$CURRENT_DARS_DIR/${pkgName}-current.dar"
   dst="$DARS_SNAPSHOT_DIR/${pkgName}-${pkgVersion}.dar"
   if [ ! -f "$src" ]; then

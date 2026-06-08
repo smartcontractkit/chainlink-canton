@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "chainlink-api"
-	PackageID   = "5a47b7339178469ed26257863f6756d96ce2b003ed49e0369e0430250cfbbf79"
+	PackageID   = "b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8"
 	SDKVersion  = "3.4.11"
 )
 
