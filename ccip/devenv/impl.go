@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"slices"
 	"os"
 	"strconv"
 	"strings"
@@ -93,10 +94,35 @@ var (
 	}
 )
 
+// evmDevenvPoolCapabilities limits canton-evm to the single BurnMint 2.0.0 pool on EVM.
+// Canton local is LockRelease 2.0.0; mixing in 1.6.1 combos breaks ccv batch grouping.
 var evmDevenvPoolCapabilities = []devenvcommon.PoolCapability{
-	{PoolType: devenvcommon.BurnMintTokenPoolType, PoolVersion: semver.MustParse("1.6.1")},
-	{PoolType: devenvcommon.BurnMintTokenPoolType, PoolVersion: semver.MustParse("2.0.0")},
-	{PoolType: devenvcommon.LockReleaseTokenPoolType, PoolVersion: semver.MustParse("2.0.0")},
+	{PoolType: devenvcommon.BurnMintTokenPoolType, PoolVersion: cantonTokenPoolVersion},
+}
+
+// selectCantonEVMTokenCombo picks LockRelease 2.0.0 (Canton) <-> BurnMint 2.0.0 (EVM).
+func selectCantonEVMTokenCombo(combos []devenvcommon.TokenCombination) (devenvcommon.TokenCombination, bool) {
+	defaultCCV := []string{devenvcommon.DefaultCommitteeVerifierQualifier}
+	for _, combo := range combos {
+		local := combo.LocalPoolAddressRef()
+		remote := combo.RemotePoolAddressRef()
+		if !isLockReleaseToBurnMint20Combo(local, remote) {
+			continue
+		}
+		if slices.Equal(combo.LocalPoolCCVQualifiers(), defaultCCV) &&
+			slices.Equal(combo.RemotePoolCCVQualifiers(), defaultCCV) {
+			return combo, true
+		}
+	}
+
+	return devenvcommon.TokenCombination{}, false
+}
+
+func isLockReleaseToBurnMint20Combo(local, remote datastore.AddressRef) bool {
+	return local.Type == datastore.ContractType(devenvcommon.LockReleaseTokenPoolType) &&
+		local.Version != nil && local.Version.Equal(cantonTokenPoolVersion) &&
+		remote.Type == datastore.ContractType(devenvcommon.BurnMintTokenPoolType) &&
+		remote.Version != nil && remote.Version.Equal(cantonTokenPoolVersion)
 }
 
 type ImplFactory struct{}
@@ -466,46 +492,31 @@ func (c *Chain) GetTokenExpansionConfigs(
 		return nil, fmt.Errorf("resolve registry admin for token expansion: %w", err)
 	}
 
-	// Mirror EVM: deploy only the local pool ref for combos this chain supports.
-	// Canton uses one Amulet token address for all pools, so dedupe by type+version
-	// rather than qualifier to avoid ambiguous datastore token lookups later.
-	supported := devenvcommon.BuildSupportedPoolsMap(c.GetSupportedPools())
-	seen := make(map[string]struct{})
-	var configs []tokenscore.TokenExpansionInputPerChain
-
-	for _, combo := range combos {
-		poolRef := combo.LocalPoolAddressRef()
-		if !devenvcommon.IsPoolSupported(supported, poolRef) {
-			continue
-		}
-
-		poolKey := devenvcommon.AddressRefPoolKey(poolRef)
-		if _, ok := seen[poolKey]; ok {
-			continue
-		}
-		seen[poolKey] = struct{}{}
-
-		tokenAddress := hex.EncodeToString(gethcrypto.Keccak256([]byte("Amulet@" + registryAdmin)))
-		configs = append(configs, tokenscore.TokenExpansionInputPerChain{
-			TokenPoolVersion: poolRef.Version,
-			DeployTokenPoolInput: &tokenscore.DeployTokenPoolInput{
-				TokenRef: &datastore.AddressRef{
-					Address:   tokenAddress,
-					Type:      datastore.ContractType("Token"),
-					Qualifier: "",
-					Labels: datastore.NewLabelSet(
-						"instrument-admin:"+registryAdmin,
-						"instrument-id:Amulet",
-					),
-				},
-				PoolType:              string(poolRef.Type),
-				TokenPoolQualifier:    poolRef.Qualifier,
-				AllowedFinalityConfig: finality.Config{WaitForFinality: true},
-			},
-		})
+	combo, ok := selectCantonEVMTokenCombo(combos)
+	if !ok {
+		return nil, nil
 	}
 
-	return configs, nil
+	poolRef := combo.LocalPoolAddressRef()
+	tokenAddress := hex.EncodeToString(gethcrypto.Keccak256([]byte("Amulet@" + registryAdmin)))
+
+	return []tokenscore.TokenExpansionInputPerChain{{
+		TokenPoolVersion: poolRef.Version,
+		DeployTokenPoolInput: &tokenscore.DeployTokenPoolInput{
+			TokenRef: &datastore.AddressRef{
+				Address:   tokenAddress,
+				Type:      datastore.ContractType("Token"),
+				Qualifier: "",
+				Labels: datastore.NewLabelSet(
+					"instrument-admin:"+registryAdmin,
+					"instrument-id:Amulet",
+				),
+			},
+			PoolType:              string(poolRef.Type),
+			TokenPoolQualifier:    poolRef.Qualifier,
+			AllowedFinalityConfig: finality.Config{WaitForFinality: true},
+		},
+	}}, nil
 }
 
 func (c *Chain) PostTokenDeploy(
@@ -613,32 +624,22 @@ func (c *Chain) GetTokenTransferConfigs(
 		allSelectors,
 	)
 
-	hasAddressRef := func(chainSelector uint64, ref datastore.AddressRef) bool {
-		_, getErr := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-			chainSelector,
-			ref.Type,
-			ref.Version,
-			ref.Qualifier,
-		))
-
-		return getErr == nil
+	combo, ok := selectCantonEVMTokenCombo(applicableCombos)
+	if !ok {
+		return nil, nil
 	}
 
+	remoteRef := combo.RemotePoolAddressRef()
 	remoteChains := make(map[uint64]tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef])
 
-	for _, combo := range applicableCombos {
-		localRef := combo.LocalPoolAddressRef()
-		if localRef.Type != datastore.ContractType(devenvcommon.LockReleaseTokenPoolType) {
+	for _, rs := range remoteSelectors {
+		family, famErr := chainsel.GetSelectorFamily(rs)
+		if famErr != nil || family != chainsel.FamilyEVM {
 			continue
 		}
-
-		eligibleRemoteSelectors := make([]uint64, 0, len(remoteSelectors))
-		for _, rs := range remoteSelectors {
-			if hasAddressRef(rs, combo.RemotePoolAddressRef()) {
-				eligibleRemoteSelectors = append(eligibleRemoteSelectors, rs)
-			}
-		}
-		if len(eligibleRemoteSelectors) == 0 {
+		if _, getErr := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+			rs, remoteRef.Type, remoteRef.Version, remoteRef.Qualifier,
+		)); getErr != nil {
 			continue
 		}
 
@@ -651,19 +652,10 @@ func (c *Chain) GetTokenTransferConfigs(
 			})
 		}
 
-		remoteRef := combo.RemotePoolAddressRef()
-		candidate := tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+		remoteChains[rs] = tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
 			RemotePool:   &remoteRef,
 			OutboundCCVs: ccvRefs,
 			InboundCCVs:  ccvRefs,
-		}
-		for _, rs := range eligibleRemoteSelectors {
-			existing, ok := remoteChains[rs]
-			if ok && existing.RemotePool != nil && existing.RemotePool.Version != nil &&
-				existing.RemotePool.Version.GreaterThan(remoteRef.Version) {
-				continue
-			}
-			remoteChains[rs] = candidate
 		}
 	}
 
