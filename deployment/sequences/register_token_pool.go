@@ -37,7 +37,7 @@ type RegisterTokenPoolInput struct {
 
 var RegisterTokenPool = operations.NewSequence(
 	"canton/ccip/register_token_pool",
-	semver.MustParse("1.0.0"),
+	semver.MustParse("2.0.0"),
 	"Registers a token pool with the TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool)",
 	registerTokenPool,
 )

@@ -14,7 +14,7 @@ import (
 var ContractTypeInbound = deployment.ContractType("CantonTokenPoolInboundRateLimiter")
 var ContractTypeOutbound = deployment.ContractType("CantonTokenPoolOutboundRateLimiter")
 
-var Version = semver.MustParse("1.0.0")
+var Version = semver.MustParse("2.0.0")
 
 var DeployInbound = contract.NewDeploy(contract.DeployParams[core.RateLimiter]{
 	Name:           "canton/ccip/token_pool_inbound_rate_limiter/deploy",

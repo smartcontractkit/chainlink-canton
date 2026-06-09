@@ -14,7 +14,7 @@ import (
 
 var ContractType = deployment.ContractType("Executor")
 
-var Version = semver.MustParse("0.1.0")
+var Version = semver.MustParse("2.0.0")
 
 var executorEncoder = executor.NewContract("", "CCIP.Executor", "Executor").Encoder()
 
