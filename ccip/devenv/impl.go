@@ -72,13 +72,16 @@ import (
 // and define a const for LINK instrument
 const AMTInstrument = types.TEXT("Amulet")
 
+var _ cciptestinterfaces.CCIP17 = &Chain{}
+
+var _ cciptestinterfaces.CCIP17Configuration = &Chain{}
+
+var _ chainreg.ImplFactory = &ImplFactory{}
+
 var (
-	_ cciptestinterfaces.CCIP17 = &Chain{}
-	_ cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_ chainreg.ImplFactory = &ImplFactory{}
-	cantonTokenPoolVersion = semver.MustParse("2.0.0")
+	cantonTokenPoolVersion        = semver.MustParse("2.0.0")
 	errLockReleasePoolNotDeployed = errors.New("lock release token pool not deployed")
-	cantonDeployDarPackages = []contracts.Package{
+	cantonDeployDarPackages       = []contracts.Package{
 		contracts.CCIPFactory,
 		contracts.CCIPCommon,
 		contracts.CCIPReceiver,
