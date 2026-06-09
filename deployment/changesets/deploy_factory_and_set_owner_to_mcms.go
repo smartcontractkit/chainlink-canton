@@ -57,6 +57,9 @@ func (d DeployFactoryAndSetOwnerToMCMS) VerifyPreconditions(e cldf.Environment, 
 	if _, err := dsutils.MCMSRawInstanceAddress(e.DataStore, config.ChainSelector, mcmsOwnerQualifier); err != nil {
 		return fmt.Errorf("MCMS contract not found in datastore (deploy MCMS first): %w", err)
 	}
+	if config.Config.MinDelay <= 0 {
+		return fmt.Errorf("minDelay must be greater than zero")
+	}
 
 	return nil
 }
@@ -66,17 +69,20 @@ func (d DeployFactoryAndSetOwnerToMCMS) Apply(e cldf.Environment, config CantonC
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 	cfg := config.Config
 
-	factoryRef, err := deployCCIPFactory(e.OperationsBundle, chain, DeployCCIPFactoryParams{
-		OwnerParty: cfg.OwnerParty,
-		MCMSParty:  cfg.MCMSParty,
-		InstanceID: cfg.InstanceID,
-		Qualifier:  cfg.Qualifier,
-	})
+	factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, cfg.Qualifier)
 	if err != nil {
-		return cldf.ChangesetOutput{}, err
-	}
-	if err := ds.AddressRefStore.Add(factoryRef); err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("store address ref: %w", err)
+		factoryRef, err = deployCCIPFactory(e.OperationsBundle, chain, DeployCCIPFactoryParams{
+			OwnerParty: cfg.OwnerParty,
+			MCMSParty:  cfg.MCMSParty,
+			InstanceID: cfg.InstanceID,
+			Qualifier:  cfg.Qualifier,
+		})
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
+		}
+		if err := ds.AddressRefStore.Add(factoryRef); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("store address ref: %w", err)
+		}
 	}
 
 	factoryRawAddr, err := dsutils.GetRawInstanceAddressFromAddressRef(factoryRef)

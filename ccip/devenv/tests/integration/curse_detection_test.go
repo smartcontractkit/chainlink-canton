@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/fastcurse"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
@@ -115,6 +116,8 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 	subject := fastcurse.GenericSelectorToSubject(evmChain.ChainSelector())
 
 	// fastcurse requires bidirectional lane curses so messages cannot get stuck on one side.
+	// Canton uses RMNRemote 2.0.0; EVM devenv still deploys RMNRemote 1.6.0 (not standalone RMN 2.0.0).
+	evmRMNRemoteVersion := semver.MustParse("1.6.0")
 	laneCurseActions := []fastcurse.CurseActionInput{
 		{
 			ChainSelector:        cantonChain.ChainSelector(),
@@ -124,7 +127,7 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 		{
 			ChainSelector:        evmChain.ChainSelector(),
 			SubjectChainSelector: cantonChain.ChainSelector(),
-			Version:              rmn_remote.Version,
+			Version:              evmRMNRemoteVersion,
 		},
 	}
 

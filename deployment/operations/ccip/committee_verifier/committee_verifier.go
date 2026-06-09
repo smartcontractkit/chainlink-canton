@@ -19,7 +19,7 @@ import (
 
 var ContractType = deployment.ContractType("CommitteeVerifier")
 
-var Version = semver.MustParse("0.1.0")
+var Version = semver.MustParse("2.0.0")
 
 var ccvsEncoder = committeeverifier.NewContract("", "CCIP.CommitteeVerifier", "CommitteeVerifier").Encoder()
 

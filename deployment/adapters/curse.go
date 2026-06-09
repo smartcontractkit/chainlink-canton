@@ -49,7 +49,7 @@ type CantonCurseAdapter struct {
 func (c *CantonCurseAdapter) Curse() *cldf_ops.Sequence[fastcurse.CurseInput, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"curse_rmn_remote",
-		semver.MustParse("1.0.0"),
+		semver.MustParse("2.0.0"),
 		"Cursing subjects with RMNRemote",
 		func(b cldf_ops.Bundle, chains chain.BlockChains, in fastcurse.CurseInput) (output sequences.OnChainOutput, err error) {
 			chain, ok := chains.CantonChains()[in.ChainSelector]
@@ -261,7 +261,7 @@ func (c *CantonCurseAdapter) SubjectToSelector(subject fastcurse.Subject) (uint6
 func (c *CantonCurseAdapter) Uncurse() *cldf_ops.Sequence[fastcurse.CurseInput, sequences.OnChainOutput, chain.BlockChains] {
 	return cldf_ops.NewSequence(
 		"uncurse_rmn_remote",
-		semver.MustParse("1.0.0"),
+		semver.MustParse("2.0.0"),
 		"Uncursing subjects with RMNRemote",
 		func(b cldf_ops.Bundle, chains chain.BlockChains, in fastcurse.CurseInput) (output sequences.OnChainOutput, err error) {
 			chain, ok := chains.CantonChains()[in.ChainSelector]
