@@ -113,7 +113,7 @@ func (d DeployFactoryAndSetOwnerToMCMS) Apply(e cldf.Environment, config CantonC
 	proposal, err := cantonmcms.GenerateTimelockProposal(
 		e.GetContext(),
 		participant.LedgerServices.State,
-		participant.PartyID,
+		opcontract.LedgerQueryParties(participant),
 		cantonmcms.ProposalConfig{
 			MCMSContract: cantonmcms.MCMSContractInfo{
 				RawInstanceAddress: mcmsRawAddr,
