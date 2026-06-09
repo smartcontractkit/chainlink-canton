@@ -14,7 +14,6 @@ import (
 	cldfchain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"k8s.io/utils/ptr"
 
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -373,14 +372,14 @@ func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(_, _ uint6
 		IsEnabled:                   new(defaults.IsEnabled),
 		MaxDataBytes:                new(defaults.MaxDataBytes),
 		MaxPerMsgGasLimit:           new(defaults.MaxPerMsgGasLimit),
-		DestGasOverhead:             ptr.To(defaults.DestGasOverhead),
-		DestGasPerPayloadByteBase:   ptr.To(defaults.DestGasPerPayloadByteBase),
+		DestGasOverhead:             new(defaults.DestGasOverhead),
+		DestGasPerPayloadByteBase:   new(defaults.DestGasPerPayloadByteBase),
 		ChainFamilySelector:         chainFamilySelector,
-		DefaultTokenFeeUSDCents:     ptr.To(defaults.DefaultTokenFeeUSDCents),
-		DefaultTokenDestGasOverhead: ptr.To(defaults.DefaultTokenDestGasOverhead),
-		DefaultTxGasLimit:           ptr.To(defaults.DefaultTxGasLimit),
-		NetworkFeeUSDCents:          ptr.To(defaults.NetworkFeeUSDCents),
-		LinkFeeMultiplierPercent:    ptr.To(linkFeeMultiplier),
+		DefaultTokenFeeUSDCents:     new(defaults.DefaultTokenFeeUSDCents),
+		DefaultTokenDestGasOverhead: new(defaults.DefaultTokenDestGasOverhead),
+		DefaultTxGasLimit:           new(defaults.DefaultTxGasLimit),
+		NetworkFeeUSDCents:          new(defaults.NetworkFeeUSDCents),
+		LinkFeeMultiplierPercent:    new(linkFeeMultiplier),
 		USDPerUnitGas:               usdPerUnitGas,
 	}
 }
@@ -484,7 +483,7 @@ func remoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteC
 		router = remoteCfg.OnRamps[0]
 	}
 
-	tokenReceiverAllowed := ptr.To(false)
+	tokenReceiverAllowed := new(false)
 	if remoteCfg.TokenReceiverAllowed != nil {
 		tokenReceiverAllowed = remoteCfg.TokenReceiverAllowed
 	}
