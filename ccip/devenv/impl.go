@@ -7,10 +7,11 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -76,6 +77,7 @@ var (
 	_                       cciptestinterfaces.CCIP17Configuration = &Chain{}
 	_                       chainreg.ImplFactory                   = &ImplFactory{}
 	cantonTokenPoolVersion                                         = semver.MustParse("2.0.0")
+	errLockReleasePoolNotDeployed                                  = errors.New("lock release token pool not deployed")
 	cantonDeployDarPackages                                        = []contracts.Package{
 		contracts.CCIPFactory,
 		contracts.CCIPCommon,
@@ -593,11 +595,11 @@ func (c *Chain) GetTokenTransferConfigs(
 	topology *ccipOffchain.EnvironmentTopology,
 ) ([]tokenscore.TokenTransferConfig, error) {
 	localPool, err := findDeployedCantonLockReleasePool(env.DataStore, selector)
+	if errors.Is(err, errLockReleasePoolNotDeployed) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
-	}
-	if localPool == nil {
-		return nil, nil
 	}
 
 	tokenRef, err := findDeployedCantonTokenRef(env.DataStore, selector)
@@ -684,7 +686,7 @@ func findDeployedCantonLockReleasePool(ds datastore.DataStore, selector uint64) 
 	)
 	switch len(refs) {
 	case 0:
-		return nil, nil
+		return nil, errLockReleasePoolNotDeployed
 	case 1:
 		ref := refs[0]
 		return &ref, nil

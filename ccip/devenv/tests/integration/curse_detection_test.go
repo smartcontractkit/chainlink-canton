@@ -114,15 +114,23 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 
 	subject := fastcurse.GenericSelectorToSubject(evmChain.ChainSelector())
 
+	// fastcurse requires bidirectional lane curses so messages cannot get stuck on one side.
+	laneCurseActions := []fastcurse.CurseActionInput{
+		{
+			ChainSelector:        cantonChain.ChainSelector(),
+			SubjectChainSelector: evmChain.ChainSelector(),
+			Version:              rmn_remote.Version,
+		},
+		{
+			ChainSelector:        evmChain.ChainSelector(),
+			SubjectChainSelector: cantonChain.ChainSelector(),
+			Version:              rmn_remote.Version,
+		},
+	}
+
 	curseCS := fastcurse.CurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 	_, err = curseCS.Apply(*cldfEnv, fastcurse.RMNCurseConfig{
-		CurseActions: []fastcurse.CurseActionInput{
-			{
-				ChainSelector:        cantonChain.ChainSelector(),
-				SubjectChainSelector: evmChain.ChainSelector(),
-				Version:              rmn_remote.Version,
-			},
-		},
+		CurseActions: laneCurseActions,
 	})
 	require.NoError(t, err)
 
@@ -133,13 +141,7 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 	// Uncurse the subject and verify that it is no longer cursed
 	uncurseCS := fastcurse.UncurseChangeset(fastcurse.GetCurseRegistry(), changesets.GetRegistry())
 	_, err = uncurseCS.Apply(*cldfEnv, fastcurse.RMNCurseConfig{
-		CurseActions: []fastcurse.CurseActionInput{
-			{
-				ChainSelector:        cantonChain.ChainSelector(),
-				SubjectChainSelector: evmChain.ChainSelector(),
-				Version:              rmn_remote.Version,
-			},
-		},
+		CurseActions: laneCurseActions,
 	})
 	require.NoError(t, err)
 

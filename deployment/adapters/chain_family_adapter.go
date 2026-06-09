@@ -370,9 +370,9 @@ func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(_, _ uint6
 	}
 
 	return ccipadapters.FeeQuoterDestChainConfigOverrides{
-		IsEnabled:                   ptr.To(defaults.IsEnabled),
-		MaxDataBytes:                ptr.To(defaults.MaxDataBytes),
-		MaxPerMsgGasLimit:           ptr.To(defaults.MaxPerMsgGasLimit),
+		IsEnabled:                   new(defaults.IsEnabled),
+		MaxDataBytes:                new(defaults.MaxDataBytes),
+		MaxPerMsgGasLimit:           new(defaults.MaxPerMsgGasLimit),
 		DestGasOverhead:             ptr.To(defaults.DestGasOverhead),
 		DestGasPerPayloadByteBase:   ptr.To(defaults.DestGasPerPayloadByteBase),
 		ChainFamilySelector:         chainFamilySelector,
