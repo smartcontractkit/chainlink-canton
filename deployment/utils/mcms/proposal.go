@@ -53,23 +53,26 @@ type ProposalConfig struct {
 func GenerateTimelockProposal(
 	ctx context.Context,
 	stateClient apiv2.StateServiceClient,
-	party string,
+	mcmsParties []string,
 	config ProposalConfig,
 	batchOps []mcms_types.BatchOperation,
 ) (*mcms.TimelockProposal, error) {
 	if len(batchOps) == 0 {
 		return nil, fmt.Errorf("at least one batch operation is required")
 	}
+	if len(mcmsParties) == 0 {
+		return nil, fmt.Errorf("at least one party is required for MCMS ledger queries")
+	}
 
 	mcmsAddrHex := config.MCMSContract.InstanceAddress.Hex()
 
-	inspector := cantonsdk.NewInspector(stateClient, []string{party}, config.Role)
+	inspector := cantonsdk.NewInspector(stateClient, mcmsParties, config.Role)
 	opCount, err := inspector.GetOpCount(ctx, mcmsAddrHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get op count: %w", err)
 	}
 
-	mcmsContract, err := cantonsdk.GetMCMSContract(ctx, stateClient, []string{party}, mcmsAddrHex)
+	mcmsContract, err := cantonsdk.GetMCMSContract(ctx, stateClient, mcmsParties, mcmsAddrHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get MCMS contract state: %w", err)
 	}
