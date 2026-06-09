@@ -7,7 +7,7 @@ inputs:
   ccv-ref:
     description: chainlink-ccv git ref (branch, tag, or SHA)
     required: false
-    default: 8eaeb5f036e177733b82983ab074eb8ca60d88c2
+    default: b1fb1b3117728afc0f8e228ddb82c2b38080ce96
   canton-ref:
     description: >-
       chainlink-canton git ref. Leave empty to use the ref that triggered the workflow.
@@ -94,7 +94,7 @@ runs:
       working-directory: ${{ inputs.ccv-path }}/build/devenv
       env:
         DOCKER_BUILDKIT: 1
-      run: just build-docker-dev-ci
+      run: just build-docker-ci
 
     - name: Build canton committee verifier docker image
       shell: bash

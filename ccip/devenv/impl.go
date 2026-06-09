@@ -7,10 +7,11 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"maps"
 	"math/big"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
-	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccipChangesets "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/changesets"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainreg"
@@ -52,7 +52,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	cantonchangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -73,12 +72,16 @@ import (
 // and define a const for LINK instrument
 const AMTInstrument = types.TEXT("Amulet")
 
+var _ cciptestinterfaces.CCIP17 = &Chain{}
+
+var _ cciptestinterfaces.CCIP17Configuration = &Chain{}
+
+var _ chainreg.ImplFactory = &ImplFactory{}
+
 var (
-	_                       cciptestinterfaces.CCIP17              = &Chain{}
-	_                       cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_                       chainreg.ImplFactory                   = &ImplFactory{}
-	cantonTokenPoolVersion                                         = semver.MustParse("2.0.0")
-	cantonDeployDarPackages                                        = []contracts.Package{
+	cantonTokenPoolVersion        = semver.MustParse("2.0.0")
+	errLockReleasePoolNotDeployed = errors.New("lock release token pool not deployed")
+	cantonDeployDarPackages       = []contracts.Package{
 		contracts.CCIPFactory,
 		contracts.CCIPCommon,
 		contracts.CCIPReceiver,
@@ -96,10 +99,35 @@ var (
 	}
 )
 
-type poolConfigKey struct {
-	poolType    datastore.ContractType
-	poolVersion string
-	qualifier   string
+// evmDevenvPoolCapabilities limits canton-evm to the single BurnMint 2.0.0 pool on EVM.
+// Canton local is LockRelease 2.0.0; mixing in 1.6.1 combos breaks ccv batch grouping.
+var evmDevenvPoolCapabilities = []devenvcommon.PoolCapability{
+	{PoolType: devenvcommon.BurnMintTokenPoolType, PoolVersion: cantonTokenPoolVersion},
+}
+
+// selectCantonEVMTokenCombo picks LockRelease 2.0.0 (Canton) <-> BurnMint 2.0.0 (EVM).
+func selectCantonEVMTokenCombo(combos []devenvcommon.TokenCombination) (devenvcommon.TokenCombination, bool) {
+	defaultCCV := []string{devenvcommon.DefaultCommitteeVerifierQualifier}
+	for _, combo := range combos {
+		local := combo.LocalPoolAddressRef()
+		remote := combo.RemotePoolAddressRef()
+		if !isLockReleaseToBurnMint20Combo(local, remote) {
+			continue
+		}
+		if slices.Equal(combo.LocalPoolCCVQualifiers(), defaultCCV) &&
+			slices.Equal(combo.RemotePoolCCVQualifiers(), defaultCCV) {
+			return combo, true
+		}
+	}
+
+	return devenvcommon.TokenCombination{}, false
+}
+
+func isLockReleaseToBurnMint20Combo(local, remote datastore.AddressRef) bool {
+	return local.Type == datastore.ContractType(devenvcommon.LockReleaseTokenPoolType) &&
+		local.Version != nil && local.Version.Equal(cantonTokenPoolVersion) &&
+		remote.Type == datastore.ContractType(devenvcommon.BurnMintTokenPoolType) &&
+		remote.Version != nil && remote.Version.Equal(cantonTokenPoolVersion)
 }
 
 type ImplFactory struct{}
@@ -313,9 +341,17 @@ func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector
 		return ccipChangesets.DeployChainContractsPerChainCfg{}, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
 
+	deployerContract := fmt.Sprintf("canton:%s", chain.Participants[0].PartyID)
+
 	return ccipChangesets.DeployChainContractsPerChainCfg{
-		DeployerContract: fmt.Sprintf("canton:%s", chain.Participants[0].PartyID),
+		DeployerContract: &deployerContract,
 		DeployerKeyOwned: true,
+	}, nil
+}
+
+func (c *Chain) GetChainLaneProfile(_ *deployment.Environment, _ uint64) (ccipChangesets.ChainOverrides, error) {
+	return ccipChangesets.ChainOverrides{
+		CommitteeVerifierFinalityConfig: &finality.Config{WaitForFinality: true},
 	}, nil
 }
 
@@ -434,56 +470,6 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	return chainDefinition, cvConfig, nil
 }
 
-func (c *Chain) GetChainLaneProfile(env *deployment.Environment, selector uint64) (cciptestinterfaces.ChainLaneProfile, error) {
-	defaultFeeQuoterCfg := cantonadapters.DefaultCantonFeeQuoterDestChainConfig()
-
-	baseExecutionGasCost := uint32(1)
-	tokenReceiverAllowed := false
-	gasForVerification := uint32(50_000)
-
-	return cciptestinterfaces.ChainLaneProfile{
-		BaseExecutionGasCost: &baseExecutionGasCost,
-		TokenReceiverAllowed: &tokenReceiverAllowed,
-		AllowedFinalityConfig: &finality.Config{
-			WaitForFinality: true,
-		},
-		FeeQuoterDestChainConfig: ccipChangesets.FeeQuoterDestChainConfigOverrides{
-			OverrideExistingConfig:      defaultFeeQuoterCfg.OverrideExistingConfig,
-			IsEnabled:                   &defaultFeeQuoterCfg.IsEnabled,
-			MaxDataBytes:                &defaultFeeQuoterCfg.MaxDataBytes,
-			MaxPerMsgGasLimit:           &defaultFeeQuoterCfg.MaxPerMsgGasLimit,
-			DestGasPerPayloadByteBase:   &defaultFeeQuoterCfg.DestGasPerPayloadByteBase,
-			DefaultTokenFeeUSDCents:     &defaultFeeQuoterCfg.DefaultTokenFeeUSDCents,
-			DefaultTokenDestGasOverhead: &defaultFeeQuoterCfg.DefaultTokenDestGasOverhead,
-			DefaultTxGasLimit:           &defaultFeeQuoterCfg.DefaultTxGasLimit,
-			NetworkFeeUSDCents:          &defaultFeeQuoterCfg.NetworkFeeUSDCents,
-			LinkFeeMultiplierPercent:    &defaultFeeQuoterCfg.V2Params.LinkFeeMultiplierPercent,
-			USDPerUnitGas:               defaultFeeQuoterCfg.V2Params.USDPerUnitGas,
-		},
-		ExecutorDestChainConfig: &ccipadapters.ExecutorDestChainConfig{
-			Enabled: true,
-		},
-		DefaultExecutorQualifier: devenvcommon.DefaultExecutorQualifier,
-		DefaultInboundCCVs: []datastore.AddressRef{
-			{
-				ChainSelector: selector,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       committee_verifier.Version,
-				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
-			},
-		},
-		DefaultOutboundCCVs: []datastore.AddressRef{
-			{
-				ChainSelector: selector,
-				Type:          datastore.ContractType(committee_verifier.ContractType),
-				Version:       committee_verifier.Version,
-				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
-			},
-		},
-		GasForVerification: &gasForVerification,
-	}, nil
-}
-
 func (c *Chain) PostConnect(env *deployment.Environment, selector uint64, remoteSelectors []uint64) error {
 	return nil
 }
@@ -511,45 +497,31 @@ func (c *Chain) GetTokenExpansionConfigs(
 		return nil, fmt.Errorf("resolve registry admin for token expansion: %w", err)
 	}
 
-	seen := make(map[poolConfigKey]struct{})
-	var configs []tokenscore.TokenExpansionInputPerChain
-
-	for _, combo := range combos {
-		for _, poolRef := range []datastore.AddressRef{combo.LocalPoolAddressRef(), combo.RemotePoolAddressRef()} {
-			if poolRef.Type != datastore.ContractType(devenvcommon.LockReleaseTokenPoolType) {
-				continue
-			}
-			key := poolConfigKey{
-				poolType:    poolRef.Type,
-				poolVersion: poolRef.Version.String(),
-				qualifier:   poolRef.Qualifier,
-			}
-			if _, ok := seen[key]; ok {
-				continue
-			}
-			seen[key] = struct{}{}
-
-			tokenAddress := hex.EncodeToString(gethcrypto.Keccak256([]byte("Amulet@" + registryAdmin)))
-			configs = append(configs, tokenscore.TokenExpansionInputPerChain{
-				TokenPoolVersion: poolRef.Version,
-				DeployTokenPoolInput: &tokenscore.DeployTokenPoolInput{
-					TokenRef: &datastore.AddressRef{
-						Address:   tokenAddress,
-						Type:      datastore.ContractType("Token"),
-						Qualifier: poolRef.Qualifier,
-						Labels: datastore.NewLabelSet(
-							"instrument-admin:"+registryAdmin,
-							"instrument-id:Amulet",
-						),
-					},
-					PoolType:           string(poolRef.Type),
-					TokenPoolQualifier: poolRef.Qualifier,
-				},
-			})
-		}
+	combo, ok := selectCantonEVMTokenCombo(combos)
+	if !ok {
+		return nil, nil
 	}
 
-	return configs, nil
+	poolRef := combo.LocalPoolAddressRef()
+	tokenAddress := hex.EncodeToString(gethcrypto.Keccak256([]byte("Amulet@" + registryAdmin)))
+
+	return []tokenscore.TokenExpansionInputPerChain{{
+		TokenPoolVersion: poolRef.Version,
+		DeployTokenPoolInput: &tokenscore.DeployTokenPoolInput{
+			TokenRef: &datastore.AddressRef{
+				Address:   tokenAddress,
+				Type:      datastore.ContractType("Token"),
+				Qualifier: "",
+				Labels: datastore.NewLabelSet(
+					"instrument-admin:"+registryAdmin,
+					"instrument-id:Amulet",
+				),
+			},
+			PoolType:              string(poolRef.Type),
+			TokenPoolQualifier:    poolRef.Qualifier,
+			AllowedFinalityConfig: finality.Config{WaitForFinality: true},
+		},
+	}}, nil
 }
 
 func (c *Chain) PostTokenDeploy(
@@ -625,109 +597,126 @@ func (c *Chain) GetTokenTransferConfigs(
 	remoteSelectors []uint64,
 	topology *ccipOffchain.EnvironmentTopology,
 ) ([]tokenscore.TokenTransferConfig, error) {
-	applicableCombos := devenvcommon.FilterTokenCombinations(
-		devenvcommon.AllTokenCombinations(), topology, env.DataStore, append([]uint64{selector}, remoteSelectors...),
-	)
-	hasAddressRef := func(chainSelector uint64, ref datastore.AddressRef) bool {
-		_, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-			chainSelector,
-			ref.Type,
-			ref.Version,
-			ref.Qualifier,
-		))
-
-		return err == nil
+	localPool, err := findDeployedCantonLockReleasePool(env.DataStore, selector)
+	if errors.Is(err, errLockReleasePoolNotDeployed) {
+		return nil, nil
 	}
-	merged := make(map[poolConfigKey]tokenscore.TokenTransferConfig)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, combo := range applicableCombos {
-		for _, pair := range []struct {
-			local, remote datastore.AddressRef
-			ccvQuals      []string
-		}{
-			{combo.LocalPoolAddressRef(), combo.RemotePoolAddressRef(), combo.LocalPoolCCVQualifiers()},
-			{combo.RemotePoolAddressRef(), combo.LocalPoolAddressRef(), combo.RemotePoolCCVQualifiers()},
-		} {
-			if pair.local.Type != datastore.ContractType(devenvcommon.LockReleaseTokenPoolType) {
-				continue
-			}
-			if !hasAddressRef(selector, pair.local) {
-				continue
-			}
+	tokenRef, err := findDeployedCantonTokenRef(env.DataStore, selector)
+	if err != nil {
+		return nil, err
+	}
 
-			remoteChains := make(map[uint64]tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef])
-			for _, rs := range remoteSelectors {
-				family, err := chainsel.GetSelectorFamily(rs)
-				if err != nil || family != chainsel.FamilyEVM {
-					continue
-				}
-				if !hasAddressRef(rs, pair.remote) {
-					continue
-				}
+	capabilities := map[uint64][]devenvcommon.PoolCapability{
+		selector: c.GetSupportedPools(),
+	}
+	for _, rs := range remoteSelectors {
+		family, famErr := chainsel.GetSelectorFamily(rs)
+		if famErr != nil || family != chainsel.FamilyEVM {
+			continue
+		}
+		capabilities[rs] = evmDevenvPoolCapabilities
+	}
 
-				ccvRefs := make([]datastore.AddressRef, 0, len(pair.ccvQuals))
-				for _, qualifier := range pair.ccvQuals {
-					ccvRefs = append(ccvRefs, datastore.AddressRef{
-						Type:      datastore.ContractType(committee_verifier.ContractType),
-						Version:   committee_verifier.Version,
-						Qualifier: qualifier,
-					})
-				}
+	allSelectors := append([]uint64{selector}, remoteSelectors...)
+	applicableCombos := devenvcommon.FilterTokenCombinations(
+		devenvcommon.ComputeTokenCombinations(capabilities, topology),
+		topology,
+		env.DataStore,
+		allSelectors,
+	)
 
-				remoteChains[rs] = tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
-					RemotePool:                &pair.remote,
-					InboundRateLimiterConfig:  nil,
-					OutboundRateLimiterConfig: nil,
-					OutboundCCVs:              ccvRefs,
-					InboundCCVs:               ccvRefs,
-					// TODO: what to set for these?
-					// RemoteToken: nil,
-					// RemoteDecimals: 0,
-					// OutboundCCVsToAddAboveThreshold: nil,
-					// InboundCCVsToAddAboveThreshold: nil,
-					// TokenTransferFeeConfig: tokenscore.TokenTransferFeeConfig{},
-				}
-			}
-			if len(remoteChains) == 0 {
-				continue
-			}
+	combo, ok := selectCantonEVMTokenCombo(applicableCombos)
+	if !ok {
+		return nil, nil
+	}
 
-			cfg := tokenscore.TokenTransferConfig{
-				ChainSelector: selector,
-				TokenPoolRef:  pair.local,
-				TokenRef: datastore.AddressRef{
-					Type:      datastore.ContractType("Token"),
-					Qualifier: pair.local.Qualifier,
-				},
-				RegistryRef: datastore.AddressRef{
-					Type:    datastore.ContractType(token_admin_registry.ContractType),
-					Version: token_admin_registry.Version,
-				},
-				RemoteChains:          remoteChains,
-				AllowedFinalityConfig: finality.Config{WaitForFinality: true},
-			}
+	remoteRef := combo.RemotePoolAddressRef()
+	remoteChains := make(map[uint64]tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef])
 
-			key := poolConfigKey{
-				poolType:    cfg.TokenPoolRef.Type,
-				poolVersion: cfg.TokenPoolRef.Version.String(),
-				qualifier:   cfg.TokenPoolRef.Qualifier,
-			}
+	for _, rs := range remoteSelectors {
+		family, famErr := chainsel.GetSelectorFamily(rs)
+		if famErr != nil || family != chainsel.FamilyEVM {
+			continue
+		}
+		if _, getErr := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+			rs, remoteRef.Type, remoteRef.Version, remoteRef.Qualifier,
+		)); getErr != nil {
+			continue
+		}
 
-			if existing, ok := merged[key]; ok {
-				maps.Copy(existing.RemoteChains, cfg.RemoteChains)
-				merged[key] = existing
-			} else {
-				merged[key] = cfg
-			}
+		ccvRefs := make([]datastore.AddressRef, 0, len(combo.LocalPoolCCVQualifiers()))
+		for _, qualifier := range combo.LocalPoolCCVQualifiers() {
+			ccvRefs = append(ccvRefs, datastore.AddressRef{
+				Type:      datastore.ContractType(committee_verifier.ContractType),
+				Version:   committee_verifier.Version,
+				Qualifier: qualifier,
+			})
+		}
+
+		remoteChains[rs] = tokenscore.RemoteChainConfig[*datastore.AddressRef, datastore.AddressRef]{
+			RemotePool:   &remoteRef,
+			OutboundCCVs: ccvRefs,
+			InboundCCVs:  ccvRefs,
 		}
 	}
 
-	configs := make([]tokenscore.TokenTransferConfig, 0, len(merged))
-	for _, cfg := range merged {
-		configs = append(configs, cfg)
+	if len(remoteChains) == 0 {
+		return nil, nil
 	}
 
-	return configs, nil
+	return []tokenscore.TokenTransferConfig{{
+		ChainSelector: selector,
+		TokenPoolRef:  *localPool,
+		TokenRef:      *tokenRef,
+		RegistryRef: datastore.AddressRef{
+			Type:    datastore.ContractType(token_admin_registry.ContractType),
+			Version: token_admin_registry.Version,
+		},
+		RemoteChains:          remoteChains,
+		AllowedFinalityConfig: finality.Config{WaitForFinality: true},
+	}}, nil
+}
+
+func findDeployedCantonLockReleasePool(ds datastore.DataStore, selector uint64) (*datastore.AddressRef, error) {
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(datastore.ContractType(devenvcommon.LockReleaseTokenPoolType)),
+		datastore.AddressRefByVersion(cantonTokenPoolVersion),
+	)
+	switch len(refs) {
+	case 0:
+		return nil, errLockReleasePoolNotDeployed
+	case 1:
+		ref := refs[0]
+		return &ref, nil
+	default:
+		return nil, fmt.Errorf(
+			"canton chain %d: expected one LockReleaseTokenPool %s, found %d",
+			selector,
+			cantonTokenPoolVersion,
+			len(refs),
+		)
+	}
+}
+
+func findDeployedCantonTokenRef(ds datastore.DataStore, selector uint64) (*datastore.AddressRef, error) {
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(datastore.ContractType("Token")),
+	)
+	switch len(refs) {
+	case 0:
+		return nil, fmt.Errorf("canton chain %d: token ref not found in datastore", selector)
+	case 1:
+		ref := refs[0]
+		return &ref, nil
+	default:
+		return nil, fmt.Errorf("canton chain %d: expected one token ref, found %d", selector, len(refs))
+	}
 }
 
 // DeployLocalNetwork implements cciptestinterfaces.CCIP17Configuration.

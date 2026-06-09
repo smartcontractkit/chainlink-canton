@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	ccvload "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/load"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -184,25 +183,20 @@ func resolveCantonSourceAddrs(t *testing.T, lib ccv.Lib, cantonSelector uint64) 
 	ds, err := lib.DataStore()
 	require.NoError(t, err)
 
-	ccvAddr, err := tcapi.GetContractAddress(
-		ds,
-		cantonSelector,
+	ccvAddr := devenvtests.GetContractAddress(
+		t, ds, cantonSelector,
 		datastore.ContractType(canton_committee_verifier.ContractType),
 		canton_committee_verifier.Version.String(),
 		common.DefaultCommitteeVerifierQualifier,
 		"canton committee verifier",
 	)
-	require.NoError(t, err)
-
-	executorAddr, err := tcapi.GetContractAddress(
-		ds,
-		cantonSelector,
+	executorAddr := devenvtests.GetContractAddress(
+		t, ds, cantonSelector,
 		datastore.ContractType(executor.ContractType),
 		executor.Version.String(),
 		common.DefaultExecutorQualifier,
 		"source executor",
 	)
-	require.NoError(t, err)
 
 	return ccvAddr, executorAddr
 }
@@ -213,25 +207,20 @@ func resolveEVMSourceAddrs(t *testing.T, lib ccv.Lib, evmSelector uint64) (proto
 	ds, err := lib.DataStore()
 	require.NoError(t, err)
 
-	ccvAddr, err := tcapi.GetContractAddress(
-		ds,
-		evmSelector,
+	ccvAddr := devenvtests.GetContractAddress(
+		t, ds, evmSelector,
 		datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
 		versioned_verifier_resolver.Version.String(),
 		common.DefaultCommitteeVerifierQualifier,
 		"source committee verifier",
 	)
-	require.NoError(t, err)
-
-	executorAddr, err := tcapi.GetContractAddress(
-		ds,
-		evmSelector,
+	executorAddr := devenvtests.GetContractAddress(
+		t, ds, evmSelector,
 		datastore.ContractType(sequences.ExecutorProxyType),
 		proxy.Deploy.Version(),
 		common.DefaultExecutorQualifier,
 		"source executor",
 	)
-	require.NoError(t, err)
 
 	return ccvAddr, executorAddr
 }

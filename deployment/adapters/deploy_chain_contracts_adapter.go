@@ -15,6 +15,7 @@ import (
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -30,6 +31,39 @@ import (
 var _ ccipadapters.DeployChainContractsAdapter = (*CantonDeployChainContractsAdapter)(nil)
 
 type CantonDeployChainContractsAdapter struct{}
+
+func (c *CantonDeployChainContractsAdapter) GetDefaultDeployContractParams(_ uint64) ccipadapters.DeployContractParams {
+	return ccipadapters.DeployContractParams{
+		Executors: []ccipadapters.ExecutorDeployParams{defaultExecutorDeployParams()},
+	}
+}
+
+func (c *CantonDeployChainContractsAdapter) ResolveDeployAddresses(
+	_ deployment.Environment,
+	_ uint64,
+) (ccipadapters.DeployChainResolvedAddresses, error) {
+	// Canton uses the participant party as deployer; no prerequisite contracts to resolve.
+	return ccipadapters.DeployChainResolvedAddresses{}, nil
+}
+
+func (c *CantonDeployChainContractsAdapter) BuildDeployContractParams(
+	input ccipadapters.BuildDeployContractParamsInput,
+) (ccipadapters.DeployContractParams, error) {
+	if len(input.CommitteeVerifiers) == 0 {
+		return ccipadapters.DeployContractParams{}, fmt.Errorf("chain %d: at least one committee verifier is required", input.ChainSelector)
+	}
+
+	params := input.Defaults
+	params.CommitteeVerifiers = input.CommitteeVerifiers
+
+	if len(params.Executors) == 0 {
+		exec := defaultExecutorDeployParams()
+		exec.DynamicConfig.FeeAggregator = input.CommitteeVerifiers[0].FeeAggregator
+		params.Executors = []ccipadapters.ExecutorDeployParams{exec}
+	}
+
+	return ccipadapters.ApplyDeployContractParamsOverrides(params, input.Overrides), nil
+}
 
 func (c *CantonDeployChainContractsAdapter) SetContractParamsFromImportedConfig() *cldf_ops.Sequence[ccipadapters.DeployChainConfigCreatorInput, ccipadapters.DeployContractParams, cldf_chain.BlockChains] {
 	return cldf_ops.NewSequence(
@@ -238,6 +272,17 @@ func executorParams(
 	}
 
 	return params
+}
+
+func defaultExecutorDeployParams() ccipadapters.ExecutorDeployParams {
+	return ccipadapters.ExecutorDeployParams{
+		Qualifier:     devenvcommon.DefaultExecutorQualifier,
+		MaxCCVsPerMsg: 10,
+		DynamicConfig: ccipadapters.ExecutorDynamicDeployConfig{
+			AllowedFinalityConfig: finality.Config{WaitForFinality: true},
+			CcvAllowlistEnabled:   false,
+		},
+	}
 }
 
 func defaultExecutorParams(ownerParty string) sequences.ExecutorParams {

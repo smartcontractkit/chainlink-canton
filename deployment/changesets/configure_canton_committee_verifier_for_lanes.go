@@ -3,6 +3,7 @@ package changesets
 import (
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccipchangesets "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	ccipseq "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
@@ -27,6 +28,24 @@ func (w *committeeVerifierLaneChainFamily) ConfigureChainForLanes() *cldfops.Seq
 	return w.cv.ConfigureCommitteeVerifierForLanes()
 }
 
+// noopConfigureLanesChainFamily skips lane configure on non-Canton chains during Run 2.
+// Lane expansion still produces partial configs for remote families; this avoids
+// configuring CCIP core contracts on those chains in the CV-only pass.
+type noopConfigureLanesChainFamily struct {
+	ccipadapters.ChainFamily
+}
+
+func (n *noopConfigureLanesChainFamily) ConfigureChainForLanes() *cldfops.Sequence[ccipadapters.ConfigureChainForLanesInput, ccipseq.OnChainOutput, cldfchain.BlockChains] {
+	return cldfops.NewSequence(
+		"canton/noop-configure-chain-for-lanes",
+		semver.MustParse("2.0.0"),
+		"No-op lane configure for non-Canton chains during CommitteeVerifier-only pass",
+		func(_ cldfops.Bundle, _ cldfchain.BlockChains, _ ccipadapters.ConfigureChainForLanesInput) (ccipseq.OnChainOutput, error) {
+			return ccipseq.OnChainOutput{}, nil
+		},
+	)
+}
+
 // ConfigureCantonCommitteeVerifierForLanesFromTopology is Run 2: Canton CommitteeVerifier lane
 // configure only. Emits mcms-ccv timelock proposals; does not configure CCIP core contracts.
 func ConfigureCantonCommitteeVerifierForLanesFromTopology(
@@ -42,19 +61,9 @@ func ConfigureCantonCommitteeVerifierForLanesFromTopology(
 		if !hasCantonChainsInConfig(cfg) {
 			return fmt.Errorf("at least one Canton chain is required")
 		}
-		for _, chainCfg := range cfg.Chains {
-			family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
-			if err != nil {
-				return fmt.Errorf("chain %d: %w", chainCfg.ChainSelector, err)
-			}
-			if family != chainsel.FamilyCanton {
-				continue
-			}
-			if err := requireTripleMCMSRefs(e, chainCfg.ChainSelector); err != nil {
+		for _, sel := range cantonChainSelectorsInLanes(cfg.Lanes) {
+			if err := requireTripleMCMSRefs(e, sel); err != nil {
 				return err
-			}
-			if len(chainCfg.CommitteeVerifiers) == 0 {
-				return fmt.Errorf("chain %d: committeeverifiers required for CV lane configure", chainCfg.ChainSelector)
 			}
 		}
 
@@ -79,12 +88,25 @@ func ConfigureCantonCommitteeVerifierForLanesFromTopology(
 }
 
 func hasCantonChainsInConfig(cfg v2cs.ConfigureChainsForLanesFromTopologyConfig) bool {
-	for _, chainCfg := range cfg.Chains {
-		family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
-		if err != nil {
-			continue
+	return len(cantonChainSelectorsInLanes(cfg.Lanes)) > 0
+}
+
+func cantonOnlyConfigureLanesConfig(cfg v2cs.ConfigureChainsForLanesFromTopologyConfig) v2cs.ConfigureChainsForLanesFromTopologyConfig {
+	cfgCopy := cfg
+	cfgCopy.Lanes = nil
+	for _, lane := range cfg.Lanes {
+		if laneInvolvesCanton(lane) {
+			cfgCopy.Lanes = append(cfgCopy.Lanes, lane)
 		}
-		if family == chainsel.FamilyCanton {
+	}
+
+	return cfgCopy
+}
+
+func laneInvolvesCanton(lane v2cs.CrossFamilyLanePair) bool {
+	for _, sel := range []uint64{lane.ChainA, lane.ChainB} {
+		family, err := chainsel.GetSelectorFamily(sel)
+		if err == nil && family == chainsel.FamilyCanton {
 			return true
 		}
 	}
@@ -92,18 +114,24 @@ func hasCantonChainsInConfig(cfg v2cs.ConfigureChainsForLanesFromTopologyConfig)
 	return false
 }
 
-func cantonOnlyConfigureLanesConfig(cfg v2cs.ConfigureChainsForLanesFromTopologyConfig) v2cs.ConfigureChainsForLanesFromTopologyConfig {
-	cfgCopy := cfg
-	cfgCopy.Chains = nil
-	for _, chainCfg := range cfg.Chains {
-		family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector)
-		if err != nil || family != chainsel.FamilyCanton {
-			continue
+func cantonChainSelectorsInLanes(lanes []v2cs.CrossFamilyLanePair) []uint64 {
+	seen := make(map[uint64]struct{})
+	var selectors []uint64
+	for _, lane := range lanes {
+		for _, sel := range []uint64{lane.ChainA, lane.ChainB} {
+			if _, ok := seen[sel]; ok {
+				continue
+			}
+			family, err := chainsel.GetSelectorFamily(sel)
+			if err != nil || family != chainsel.FamilyCanton {
+				continue
+			}
+			seen[sel] = struct{}{}
+			selectors = append(selectors, sel)
 		}
-		cfgCopy.Chains = append(cfgCopy.Chains, chainCfg)
 	}
 
-	return cfgCopy
+	return selectors
 }
 
 func chainFamilyRegistryForCommitteeVerifierOnly(
@@ -126,7 +154,7 @@ func chainFamilyRegistryForCommitteeVerifierOnly(
 
 			continue
 		}
-		reg.RegisterChainFamily(family, adapter)
+		reg.RegisterChainFamily(family, &noopConfigureLanesChainFamily{ChainFamily: adapter})
 	}
 
 	return reg, nil
@@ -134,19 +162,9 @@ func chainFamilyRegistryForCommitteeVerifierOnly(
 
 func familiesInConfigureLanesConfig(cfg v2cs.ConfigureChainsForLanesFromTopologyConfig) map[string]struct{} {
 	families := make(map[string]struct{})
-	for _, chainCfg := range cfg.Chains {
-		if family, err := chainsel.GetSelectorFamily(chainCfg.ChainSelector); err == nil {
-			families[family] = struct{}{}
-		}
-		for _, cv := range chainCfg.CommitteeVerifiers {
-			for remoteSelector := range cv.RemoteChains {
-				if family, err := chainsel.GetSelectorFamily(remoteSelector); err == nil {
-					families[family] = struct{}{}
-				}
-			}
-		}
-		for remoteSelector := range chainCfg.RemoteChains {
-			if family, err := chainsel.GetSelectorFamily(remoteSelector); err == nil {
+	for _, lane := range cfg.Lanes {
+		for _, sel := range []uint64{lane.ChainA, lane.ChainB} {
+			if family, err := chainsel.GetSelectorFamily(sel); err == nil {
 				families[family] = struct{}{}
 			}
 		}
