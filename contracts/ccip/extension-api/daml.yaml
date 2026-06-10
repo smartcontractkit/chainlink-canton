@@ -14,5 +14,5 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
-  - ../../mcms/api/.daml/dist/mcms-api-2.0.0.dar
+  - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
   - ../core/.daml/dist/ccip-core-2.0.0.dar
