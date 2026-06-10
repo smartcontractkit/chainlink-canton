@@ -408,6 +408,9 @@ template TokenAdminRegistry
                             index = config.index
 
                     None -> do
+                        -- Token admins may not create arbitrary new registry entries.
+                        assertMsg "ProposeAdministrator: new token config can only be created by registry owner"
+                            isOwner
                         let newConfigIndex = entryCount
                         archive self
                         newTarCid <- create this with entryCount = entryCount + 1

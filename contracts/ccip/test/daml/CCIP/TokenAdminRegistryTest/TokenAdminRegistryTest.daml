@@ -102,6 +102,42 @@ testTransferAdminRoleRejectsSameAdmin = script do
 
   pure ()
 
+-- Token admins cannot create arbitrary new registry entries.
+testProposeAdministratorRejectsArbitraryCreation : Script ()
+testProposeAdministratorRejectsArbitraryCreation = script do
+  owner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "TokenAdmin"
+  newAdmin <- allocateParty "NewAdmin"
+
+  let instanceId = "tar-propose-arbitrary-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+
+  tarCid <- submit owner do
+    createCmd TokenAdminRegistry with
+      instanceId
+      owner
+      entryCount = 0
+
+  disclosedTar <- fromSome <$> queryDisclosure owner tarCid
+  submitMustFail (actAs tokenAdmin <> disclose disclosedTar) do
+    exerciseCmd tarCid ProposeAdministrator with
+      tokenConfigCid = None
+      instrumentId
+      newAdmin
+      caller = tokenAdmin
+
+  result <- submit owner do
+    exerciseCmd tarCid ProposeAdministrator with
+      tokenConfigCid = None
+      instrumentId
+      newAdmin
+      caller = owner
+
+  Some config <- queryContractId owner result.tokenConfigCid
+  config.pendingAdmin === Some newAdmin
+
+  pure ()
+
 testSetTransferFactoryStoresAndClearsFactory : Script ()
 testSetTransferFactoryStoresAndClearsFactory = script do
   owner <- allocateParty "ccip_owner"
