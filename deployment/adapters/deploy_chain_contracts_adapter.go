@@ -136,8 +136,7 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		},
 		RMNRemote: sequences.RMNRemoteParams{
 			Template: core.RMNRemote{
-				CursedSubjects:  nil,
-				CustomObservers: []types.PARTY{types.PARTY(ownerParty)},
+				CursedSubjects: nil,
 			},
 		},
 		Executors: executorParams(ownerParty, input.ContractParams.Executors),
