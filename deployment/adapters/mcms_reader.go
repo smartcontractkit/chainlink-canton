@@ -11,6 +11,8 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
+
+	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 var _ ccipchangesets.MCMSReader = (*CantonMCMSReader)(nil)
@@ -40,7 +42,7 @@ func (r *CantonMCMSReader) GetChainMetadata(
 
 	inspector := cantonsdk.NewInspector(
 		participant.LedgerServices.State,
-		[]string{participant.PartyID},
+		opcontract.LedgerQueryParties(participant),
 		timelockRoleForAction(input.TimelockAction),
 	)
 
