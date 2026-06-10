@@ -65,6 +65,9 @@ template RMNRemote
         signatory rmnOwner
         observer ccipOwner, customObservers
         ensure assertValidInstanceId instanceId
+            && length customObservers == length (dedup customObservers)
+            && rmnOwner `notElem` customObservers
+            && ccipOwner `notElem` customObservers
 
         nonconsuming choice Get : RMNRemote
             with

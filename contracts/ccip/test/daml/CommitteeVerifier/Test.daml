@@ -27,6 +27,44 @@ finalityConfig n =
     then FinalityCodec.WaitForFinality
     else FinalityCodec.BlockDepth n
 
+-- Verifier message-sent observer lists stay unique on create/update.
+testCommitteeVerifier_RejectsDuplicateMessageSentObservers : Script ()
+testCommitteeVerifier_RejectsDuplicateMessageSentObservers = script do
+    owner <- allocateParty "ccv-observer-owner"
+    observer <- allocateParty "ccv-message-observer"
+
+    let signerConfig = CommitteeVerifier.SignatureConfig with
+            sourceChainSelector = 123.0
+            threshold = 1
+            signerKeys = [head PayloadBuilder.pubkeys]
+        deps = CommitteeVerifier.CommitteeVerifierDeps with
+            rmnRemote = RawInstanceAddress.make "ccv-observer-rmn" owner
+        createVerifier instanceId messageSentObservers = createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId
+            owner
+            ccipOwner = owner
+            versionTag = CommitteeVerifier.versionTagV2_0_0
+            allowListAdmin = None
+            messageSentObservers
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.fromList [(123.0, signerConfig)]
+            deps
+
+    submitMustFail owner do
+        createVerifier "ccv-duplicate-message-observer" [observer, observer]
+
+    ccv <- submit owner do
+        createVerifier "ccv-valid-message-observer" [observer]
+
+    submitMustFail owner do
+        exerciseCmd ccv CommitteeVerifier.SetDynamicConfig with
+            dynamicConfig = CommitteeVerifier.DynamicConfig with
+                allowListAdmin = None
+                messageSentObservers = [observer, observer]
+
 -- | Helper to create a fresh ExecutingMessageV1 for each test.
 -- AddCCVVerification is a consuming choice, so each successful verify
 -- consumes the contract.

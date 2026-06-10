@@ -6,6 +6,37 @@ import DA.Assert ((===))
 
 import CCIP.RMNRemote
 
+-- RMN creation rejects redundant custom observers.
+testRMNRemote_RejectsRedundantCustomObservers : Script ()
+testRMNRemote_RejectsRedundantCustomObservers = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  observer <- allocateParty "observer"
+
+  submitMustFail rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-dup-observer-test"
+      rmnOwner
+      ccipOwner
+      customObservers = [observer, observer]
+      cursedSubjects = []
+
+  submitMustFail rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-owner-observer-test"
+      rmnOwner
+      ccipOwner
+      customObservers = [rmnOwner]
+      cursedSubjects = []
+
+  submitMustFail rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-ccip-observer-test"
+      rmnOwner
+      ccipOwner
+      customObservers = [ccipOwner]
+      cursedSubjects = []
+
 -- ===========================================================================
 -- UNCURSE MULTIPLE VALIDATION TESTS
 -- ===========================================================================

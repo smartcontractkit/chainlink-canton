@@ -6,7 +6,7 @@ module CCIP.CommitteeVerifier (
 import qualified DA.Action
 import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1WithEcdsaOnly)
 import DA.Foldable (forA_)
-import DA.List (dedup, (\\))
+import DA.List (dedup, unique, (\\))
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote)
 
@@ -102,7 +102,9 @@ template CommitteeVerifier
         -- proof limit, no duplicate signer keys, and that map keys match the embedded
         -- sourceChainSelector in each config.
         ensure assertValidInstanceId instanceId
-          && versionTag /= "" && all (\(k, config) -> k == config.sourceChainSelector && isValidSignatureConfig config) (Map.toList signerConfigs)
+          && versionTag /= ""
+          && unique messageSentObservers
+          && all (\(k, config) -> k == config.sourceChainSelector && isValidSignatureConfig config) (Map.toList signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
@@ -157,6 +159,8 @@ template CommitteeVerifier
                 dynamicConfig : DynamicConfig
             controller owner
             do
+                assertMsg "SetDynamicConfig: duplicate message sent observers"
+                    (unique dynamicConfig.messageSentObservers)
                 create this with 
                     allowListAdmin = dynamicConfig.allowListAdmin
                     messageSentObservers = dynamicConfig.messageSentObservers
