@@ -309,7 +309,7 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	semver.MustParse("2.0.0"),
 	"Configures a lane lad as dest on CCIP 2.0.0",
 	func(b operations.Bundle, deps chain.BlockChains, input lanes.UpdateLanesInput) (output sequences.OnChainOutput, err error) {
-		b.Logger.Infof("Canton Configuring lane leg as source. src: %+v, dest: %+v", input.Source, input.Dest)
+		b.Logger.Infof("Canton Configuring lane leg as dest. src: %+v, dest: %+v", input.Source, input.Dest)
 
 		chain, ok := deps.CantonChains()[input.Dest.Selector]
 		if !ok {
