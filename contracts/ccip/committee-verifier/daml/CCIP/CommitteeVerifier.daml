@@ -72,7 +72,8 @@ template CommitteeVerifier
         owner : Party
 
         ccipOwner : Party
-        versionTag : BytesHex -- Version tag for this CCV (e.g., "e9a05a20")
+        -- | Must equal `versionTagV2_0_0` (bytes4(keccak256("CommitteeVerifier 2.0.0")))).
+        versionTag : BytesHex
         
         -- | Dynamic config
         -- Party capable of adding or removing allowed senders
@@ -98,11 +99,12 @@ template CommitteeVerifier
         signatory owner
         observer storageLocationsAdmin :: pendingStorageLocationsAdmin :: optional [] pure allowListAdmin
 
-        -- Ensure signer configs have a positive threshold within the verifierResults
-        -- proof limit, no duplicate signer keys, and that map keys match the embedded
-        -- sourceChainSelector in each config.
+        -- Valid instance id; canonical CCV version tag; signer configs with
+        -- positive threshold within the verifierResults proof limit, no duplicate
+        -- signer keys, and map keys matching embedded sourceChainSelector.
         ensure assertValidInstanceId instanceId
-          && versionTag /= "" && all (\(k, config) -> k == config.sourceChainSelector && isValidSignatureConfig config) (Map.toList signerConfigs)
+          && versionTag == versionTagV2_0_0
+          && all (\(k, config) -> k == config.sourceChainSelector && isValidSignatureConfig config) (Map.toList signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with

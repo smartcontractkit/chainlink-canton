@@ -435,6 +435,22 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [head PayloadBuilder.pubkeys, head PayloadBuilder.pubkeys])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
+    -- Non-canonical verifier version tags are rejected.
+    submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv10b-version"
+            owner = owner
+            ccipOwner = owner
+            versionTag = "01020304"
+            allowListAdmin = None
+            messageSentObservers = [owner]
+            storageLocations = []
+            storageLocationsAdmin = owner
+            pendingStorageLocationsAdmin = owner
+            remoteChainConfigs = Map.empty
+            signerConfigs = Map.empty
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+
     -- duplicate signer keys should be rejected on config updates as well
     ccv10b <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
