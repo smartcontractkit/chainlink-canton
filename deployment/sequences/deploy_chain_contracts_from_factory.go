@@ -44,7 +44,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		var addresses []datastore.AddressRef
 		var proposalOutputs []contract.ExerciseOutput
 
-		ccipOwnerParty, err := requireOwnerParties(input)
+		ccipOwnerParty, err := requireCCIPOwnerParty(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -357,7 +357,7 @@ var DeployCCVFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("RmnRemoteRawInstanceAddress is required for CCV factory deploy")
 		}
 
-		ccipOwnerParty, err := requireOwnerParties(input)
+		ccipOwnerParty, err := requireCCIPOwnerParty(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -420,17 +420,6 @@ var DeployCCVFromFactory = operations.NewSequence(
 		return out, nil
 	},
 )
-
-func requireOwnerParties(input DeployChainContractsParams) (types.PARTY, error) {
-	if input.OwnerParty == "" {
-		return "", fmt.Errorf("OwnerParty is required")
-	}
-	if input.CCIPOwnerParty == "" {
-		return "", fmt.Errorf("CCIPOwnerParty is required")
-	}
-
-	return types.PARTY(input.CCIPOwnerParty), nil
-}
 
 func requireCCIPOwnerParty(input DeployChainContractsParams) (types.PARTY, error) {
 	if input.CCIPOwnerParty == "" {
