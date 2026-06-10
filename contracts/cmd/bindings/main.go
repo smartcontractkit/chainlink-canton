@@ -106,6 +106,12 @@ func main() {
 				"Indefinite":    0x00,
 				"RelativeHours": 0x01,
 			},
+			// Tags must match encodeRequestedFinality/decodeRequestedFinalityAt in CCIP/Codec.daml.
+			"CCIP.FinalityConfig.FinalityConfig": {
+				"WaitForFinality": 0x00,
+				"WaitForSafe":     0x01,
+				"BlockDepth":      0x02,
+			},
 		},
 		// Dispatcher operationData payloads decoded by MCMS.Main.ExecuteOp.
 		ChoiceParamEncoderNames: map[string]bool{
