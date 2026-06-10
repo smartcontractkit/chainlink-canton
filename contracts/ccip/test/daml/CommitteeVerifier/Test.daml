@@ -342,6 +342,17 @@ testCommitteeVerifier = script do
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data
             caller = owner
+    -- Trailing partial signature bytes are rejected.
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
+        exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
+            rmnRemoteCid = rmnRemote
+            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            executingMessageCid = executingMessageCid
+            verifierResults =
+                CommitteeVerifier.versionTagV2_0_0 <> -- version tag
+                "0001" <>     -- signature length is one byte, matching payload length
+                "de"          -- partial signature payload must not be silently ignored
+            caller = owner
 
     debug ("===== Passed Test9 =====")
 

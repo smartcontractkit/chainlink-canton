@@ -343,6 +343,7 @@ template CommitteeVerifier
 
                 let signatureLength = fromSomeNote "Failed to extract signature length" (CCIP.MessageCodecV1.decodeUint16 (fromSomeNote "Failed to extract signature length bytes" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag) 2)))
                 assertMsg "Invalid verifierResults" ((byteCount verifierResults) == ((byteCount versionTag) + 2 + signatureLength))
+                assertMsg "Invalid verifierResults: signature length must be a multiple of signature size" (signatureLength % signature_length == 0)
                 let numberOfSignatures = signatureLength / signature_length
                 assertMsg "Insufficient signatures provided" (numberOfSignatures >= signerConfig.threshold)
                 let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag + 2) signatureLength)
