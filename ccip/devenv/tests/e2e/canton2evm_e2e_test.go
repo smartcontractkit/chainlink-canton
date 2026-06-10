@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -64,24 +63,20 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
-		ccvAddr, err := tcapi.GetContractAddress(
-			ds,
-			cantonChain.ChainSelector(),
+		ccvAddr := devenvtests.GetContractAddress(
+			t, ds, cantonChain.ChainSelector(),
 			datastore.ContractType(canton_committee_verifier.ContractType),
 			canton_committee_verifier.Version.String(),
 			devenvcommon.DefaultCommitteeVerifierQualifier,
 			"canton committee verifier",
 		)
-		require.NoError(t, err)
-		executorAddr, err := tcapi.GetContractAddress(
-			ds,
-			cantonChain.ChainSelector(),
+		executorAddr := devenvtests.GetContractAddress(
+			t, ds, cantonChain.ChainSelector(),
 			datastore.ContractType(executor.ContractType),
 			executor.Version.String(),
 			devenvcommon.DefaultExecutorQualifier,
 			"source executor",
 		)
-		require.NoError(t, err)
 		t.Logf(
 			"Resolved contracts: receiver=%x cantonCCV=%x cantonExecutor=%x srcSelector=%d dstSelector=%d",
 			receiver,
@@ -163,18 +158,15 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
-		ccvAddr, err := tcapi.GetContractAddress(
-			ds,
-			cantonChain.ChainSelector(),
+		ccvAddr := devenvtests.GetContractAddress(
+			t, ds, cantonChain.ChainSelector(),
 			datastore.ContractType(canton_committee_verifier.ContractType),
 			canton_committee_verifier.Version.String(),
 			devenvcommon.DefaultCommitteeVerifierQualifier,
 			"canton committee verifier",
 		)
-		require.NoError(t, err)
-		executorAddr, err := tcapi.GetContractAddress(
-			ds,
-			cantonChain.ChainSelector(),
+		executorAddr := devenvtests.GetContractAddress(
+			t, ds, cantonChain.ChainSelector(),
 			datastore.ContractType(executor.ContractType),
 			executor.Version.String(),
 			devenvcommon.DefaultExecutorQualifier,

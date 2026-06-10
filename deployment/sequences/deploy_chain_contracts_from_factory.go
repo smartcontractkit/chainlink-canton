@@ -287,7 +287,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 // DeployRMNFromFactory deploys RMNRemote via the rmn-qualified CCIPFactory.
 var DeployRMNFromFactory = operations.NewSequence(
 	"canton/ccip/deploy_rmn_from_factory",
-	semver.MustParse("0.1.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys RMNRemote on Canton through the ccip CCIPFactory",
 	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
 		ccipOwnerParty, err := requireCCIPOwnerParty(input)
@@ -347,7 +347,7 @@ var DeployCCIPChainContractsFromFactory = operations.NewSequence(
 // DeployCCVFromFactory deploys CommitteeVerifier contracts via a CCV-qualified CCIPFactory.
 var DeployCCVFromFactory = operations.NewSequence(
 	"canton/ccip/deploy_ccv_from_factory",
-	semver.MustParse("0.1.0"),
+	semver.MustParse("2.0.0"),
 	"Deploys CommitteeVerifier contracts on Canton through CCIPFactory",
 	func(b operations.Bundle, deps canton.Chain, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
 		if len(input.CommitteeVerifiers) == 0 {

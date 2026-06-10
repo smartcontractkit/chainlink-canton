@@ -106,7 +106,7 @@ func (d ConfigureGlobalConfig) Apply(e cldf.Environment, config CantonCSDeps[Con
 		proposal, err := cantonmcms.GenerateTimelockProposal(
 			e.GetContext(),
 			participant.LedgerServices.State,
-			participant.PartyID,
+			opcontract.LedgerQueryParties(participant),
 			cantonmcms.ProposalConfig{
 				MCMSContract:         tlCfg.MCMSContract,
 				ChainSelector:        mcms_types.ChainSelector(config.ChainSelector),

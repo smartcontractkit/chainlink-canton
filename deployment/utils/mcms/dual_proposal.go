@@ -16,6 +16,7 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
+	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 const (
@@ -243,7 +244,7 @@ func BuildTimelockProposalForOwner(
 	return GenerateTimelockProposal(
 		ctx,
 		participant.LedgerServices.State,
-		participant.PartyID,
+		opcontract.LedgerQueryParties(participant),
 		ProposalConfig{
 			MCMSContract: MCMSContractInfo{
 				RawInstanceAddress: raw,

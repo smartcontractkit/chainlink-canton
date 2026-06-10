@@ -36,28 +36,28 @@ func (c CantonTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte,
 	return contracts.HexToInstanceAddress(ref.Address).Bytes(), nil
 }
 
-func (c CantonTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) ([]byte, error) {
+func (c CantonTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef) (string, error) {
 	tokenRefs := e.DataStore.Addresses().Filter(
 		datastore.AddressRefByChainSelector(chainSelector),
 		datastore.AddressRefByType(datastore.ContractType("Token")),
 		datastore.AddressRefByQualifier(poolRef.Qualifier),
 	)
 	if len(tokenRefs) != 1 {
-		return nil, fmt.Errorf("expected exactly one precomputed token ref for qualifier %q, got %d", poolRef.Qualifier, len(tokenRefs))
+		return "", fmt.Errorf("expected exactly one precomputed token ref for qualifier %q, got %d", poolRef.Qualifier, len(tokenRefs))
 	}
 	addr := strings.TrimSpace(tokenRefs[0].Address)
 	if addr == "" {
-		return nil, fmt.Errorf("precomputed token ref for qualifier %q has empty address", poolRef.Qualifier)
+		return "", fmt.Errorf("precomputed token ref for qualifier %q has empty address", poolRef.Qualifier)
 	}
 	if rawAddr, rawErr := contracts.RawInstanceAddressFromString(addr); rawErr == nil {
-		return rawAddr.InstanceAddress().Bytes(), nil
+		return rawAddr.String(), nil
 	}
 	addrBytes, err := hex.DecodeString(strings.TrimPrefix(addr, "0x"))
 	if err != nil || len(addrBytes) == 0 {
-		return nil, fmt.Errorf("invalid precomputed token address %q for qualifier %q", addr, poolRef.Qualifier)
+		return "", fmt.Errorf("invalid precomputed token address %q for qualifier %q", addr, poolRef.Qualifier)
 	}
 
-	return addrBytes, nil
+	return addr, nil
 }
 
 func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainSelector uint64, poolRef datastore.AddressRef, token []byte) (uint8, error) {

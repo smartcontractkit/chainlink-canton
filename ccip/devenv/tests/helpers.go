@@ -5,16 +5,40 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 )
+
+func GetContractAddress(
+	t *testing.T,
+	ds datastore.DataStore,
+	chainSelector uint64,
+	contractType datastore.ContractType,
+	version, qualifier, contractName string,
+) protocol.UnknownAddress {
+	t.Helper()
+
+	ref, err := ds.Addresses().Get(
+		datastore.NewAddressRefKey(chainSelector, contractType, semver.MustParse(version), qualifier),
+	)
+	require.NoErrorf(t, err, "failed to get %s address for chain selector %d, ContractType: %s, ContractVersion: %s",
+		contractName, chainSelector, contractType, version)
+
+	addr, err := protocol.NewUnknownAddressFromHex(ref.Address)
+	require.NoError(t, err)
+
+	return addr
+}
 
 func GetChain(t *testing.T, chainType string, cfg *ccv.Cfg, lib ccv.Lib) cciptestinterfaces.CCIP17 {
 	chainMap, err := lib.ChainsMap(t.Context())

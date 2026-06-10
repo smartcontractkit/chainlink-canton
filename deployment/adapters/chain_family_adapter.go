@@ -357,21 +357,30 @@ func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig(
 }
 
 // GetDefaultFeeQuoterDestChainConfig implements [adapters.ChainFamily].
-func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig() ccipadapters.FeeQuoterDestChainConfig {
-	return ccipadapters.FeeQuoterDestChainConfig{
-		OverrideExistingConfig:      false,
-		IsEnabled:                   true,
-		MaxDataBytes:                30_000,
-		MaxPerMsgGasLimit:           3_000_000,
-		DestGasOverhead:             300_000,
-		DestGasPerPayloadByteBase:   16,
-		ChainFamilySelector:         CantonFamilySelector,
-		DefaultTokenFeeUSDCents:     25,
-		DefaultTokenDestGasOverhead: 90_000,
-		DefaultTxGasLimit:           200_000,
-		NetworkFeeUSDCents:          10,
-		LinkFeeMultiplierPercent:    0,
-		USDPerUnitGas:               big.NewInt(0),
+func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(_, _ uint64, chainFamilySelector [4]byte) ccipadapters.FeeQuoterDestChainConfigOverrides {
+	defaults := DefaultCantonFeeQuoterDestChainConfig()
+	linkFeeMultiplier := uint8(0)
+	if defaults.V2Params != nil {
+		linkFeeMultiplier = defaults.V2Params.LinkFeeMultiplierPercent
+	}
+	usdPerUnitGas := big.NewInt(0)
+	if defaults.V2Params != nil && defaults.V2Params.USDPerUnitGas != nil {
+		usdPerUnitGas = defaults.V2Params.USDPerUnitGas
+	}
+
+	return ccipadapters.FeeQuoterDestChainConfigOverrides{
+		IsEnabled:                   new(defaults.IsEnabled),
+		MaxDataBytes:                new(defaults.MaxDataBytes),
+		MaxPerMsgGasLimit:           new(defaults.MaxPerMsgGasLimit),
+		DestGasOverhead:             new(defaults.DestGasOverhead),
+		DestGasPerPayloadByteBase:   new(defaults.DestGasPerPayloadByteBase),
+		ChainFamilySelector:         chainFamilySelector,
+		DefaultTokenFeeUSDCents:     new(defaults.DefaultTokenFeeUSDCents),
+		DefaultTokenDestGasOverhead: new(defaults.DefaultTokenDestGasOverhead),
+		DefaultTxGasLimit:           new(defaults.DefaultTxGasLimit),
+		NetworkFeeUSDCents:          new(defaults.NetworkFeeUSDCents),
+		LinkFeeMultiplierPercent:    new(linkFeeMultiplier),
+		USDPerUnitGas:               usdPerUnitGas,
 	}
 }
 
@@ -383,7 +392,7 @@ func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 }
 
 // GetDefaultRemoteChainConfig implements [adapters.ChainFamily].
-func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig() ccipadapters.RemoteChainDefaults {
+func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, _ uint64) ccipadapters.RemoteChainDefaults {
 	return ccipadapters.RemoteChainDefaults{
 		AllowTrafficFrom: true, // TODO: check what this does?
 		ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
@@ -474,35 +483,70 @@ func remoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteC
 		router = remoteCfg.OnRamps[0]
 	}
 
+	tokenReceiverAllowed := new(false)
+	if remoteCfg.TokenReceiverAllowed != nil {
+		tokenReceiverAllowed = remoteCfg.TokenReceiverAllowed
+	}
+
 	return &lanes.ChainDefinition{
 		Selector:                  remoteSelector,
 		ExecutorDestChainConfig:   lanes.ExecutorDestChainConfig(remoteCfg.ExecutorDestChainConfig),
 		AddressBytesLength:        remoteCfg.AddressBytesLength,
 		BaseExecutionGasCost:      remoteCfg.BaseExecutionGasCost,
-		TokenReceiverAllowed:      remoteCfg.TokenReceiverAllowed,
+		TokenReceiverAllowed:      tokenReceiverAllowed,
 		MessageNetworkFeeUSDCents: remoteCfg.MessageNetworkFeeUSDCents,
 		TokenNetworkFeeUSDCents:   remoteCfg.TokenNetworkFeeUSDCents,
 		OnRamp:                    remoteCfg.OnRamps[0],
 		OffRamp:                   remoteCfg.OffRamp,
 		Router:                    router,
-		FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
-			OverrideExistingConfig:      remoteCfg.FeeQuoterDestChainConfig.OverrideExistingConfig,
-			IsEnabled:                   remoteCfg.FeeQuoterDestChainConfig.IsEnabled,
-			MaxDataBytes:                remoteCfg.FeeQuoterDestChainConfig.MaxDataBytes,
-			MaxPerMsgGasLimit:           remoteCfg.FeeQuoterDestChainConfig.MaxPerMsgGasLimit,
-			DestGasOverhead:             remoteCfg.FeeQuoterDestChainConfig.DestGasOverhead,
-			DestGasPerPayloadByteBase:   remoteCfg.FeeQuoterDestChainConfig.DestGasPerPayloadByteBase,
-			ChainFamilySelector:         binary.BigEndian.Uint32(remoteCfg.FeeQuoterDestChainConfig.ChainFamilySelector[:]),
-			DefaultTokenFeeUSDCents:     remoteCfg.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents,
-			DefaultTokenDestGasOverhead: remoteCfg.FeeQuoterDestChainConfig.DefaultTokenDestGasOverhead,
-			DefaultTxGasLimit:           remoteCfg.FeeQuoterDestChainConfig.DefaultTxGasLimit,
-			NetworkFeeUSDCents:          remoteCfg.FeeQuoterDestChainConfig.NetworkFeeUSDCents,
-			V2Params: &lanes.FeeQuoterV2Params{
-				LinkFeeMultiplierPercent: remoteCfg.FeeQuoterDestChainConfig.LinkFeeMultiplierPercent,
-				USDPerUnitGas:            remoteCfg.FeeQuoterDestChainConfig.USDPerUnitGas,
-			},
-		},
+		FeeQuoterDestChainConfig:  feeQuoterDestChainConfigFromOverrides(remoteCfg.FeeQuoterDestChainConfig),
 	}, nil
+}
+
+func feeQuoterDestChainConfigFromOverrides(cfg ccipadapters.FeeQuoterDestChainConfigOverrides) lanes.FeeQuoterDestChainConfig {
+	out := DefaultCantonFeeQuoterDestChainConfig()
+	out.OverrideExistingConfig = cfg.OverrideExistingConfig
+	if cfg.IsEnabled != nil {
+		out.IsEnabled = *cfg.IsEnabled
+	}
+	if cfg.MaxDataBytes != nil {
+		out.MaxDataBytes = *cfg.MaxDataBytes
+	}
+	if cfg.MaxPerMsgGasLimit != nil {
+		out.MaxPerMsgGasLimit = *cfg.MaxPerMsgGasLimit
+	}
+	if cfg.DestGasOverhead != nil {
+		out.DestGasOverhead = *cfg.DestGasOverhead
+	}
+	if cfg.DestGasPerPayloadByteBase != nil {
+		out.DestGasPerPayloadByteBase = *cfg.DestGasPerPayloadByteBase
+	}
+	if cfg.ChainFamilySelector != [4]byte{} {
+		out.ChainFamilySelector = binary.BigEndian.Uint32(cfg.ChainFamilySelector[:])
+	}
+	if cfg.DefaultTokenFeeUSDCents != nil {
+		out.DefaultTokenFeeUSDCents = *cfg.DefaultTokenFeeUSDCents
+	}
+	if cfg.DefaultTokenDestGasOverhead != nil {
+		out.DefaultTokenDestGasOverhead = *cfg.DefaultTokenDestGasOverhead
+	}
+	if cfg.DefaultTxGasLimit != nil {
+		out.DefaultTxGasLimit = *cfg.DefaultTxGasLimit
+	}
+	if cfg.NetworkFeeUSDCents != nil {
+		out.NetworkFeeUSDCents = *cfg.NetworkFeeUSDCents
+	}
+	if out.V2Params == nil {
+		out.V2Params = &lanes.FeeQuoterV2Params{}
+	}
+	if cfg.LinkFeeMultiplierPercent != nil {
+		out.V2Params.LinkFeeMultiplierPercent = *cfg.LinkFeeMultiplierPercent
+	}
+	if cfg.USDPerUnitGas != nil {
+		out.V2Params.USDPerUnitGas = cfg.USDPerUnitGas
+	}
+
+	return out
 }
 
 func dataStoreFromConfigureChainForLanesInput(input ccipadapters.ConfigureChainForLanesInput) (datastore.DataStore, error) {

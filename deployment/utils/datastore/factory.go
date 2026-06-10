@@ -43,11 +43,23 @@ func FactoryAddressRef(ds datastore.DataStore, chainSelector uint64, qualifier s
 		factoryops.Version,
 		qualifier,
 	))
-	if err != nil {
-		return datastore.AddressRef{}, fmt.Errorf("CCIPFactory ref for chain %d qualifier %q: %w", chainSelector, qualifier, err)
+	if err == nil {
+		return validateFactoryAddressRef(ref)
 	}
 
-	return validateFactoryAddressRef(ref)
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType(factoryops.ContractType)),
+		datastore.AddressRefByQualifier(qualifier),
+	)
+	switch len(refs) {
+	case 1:
+		return validateFactoryAddressRef(refs[0])
+	case 0:
+		return datastore.AddressRef{}, fmt.Errorf("CCIPFactory ref for chain %d qualifier %q: %w", chainSelector, qualifier, err)
+	default:
+		return datastore.AddressRef{}, fmt.Errorf("multiple CCIPFactory refs for chain %d qualifier %q", chainSelector, qualifier)
+	}
 }
 
 // FirstCommitteeVerifierRawAddress returns the raw instance address label of any CommitteeVerifier on the chain.
