@@ -43,8 +43,19 @@ type ExecutorParams struct {
 	Template  executorBinding.Executor
 }
 
+// RMNRemoteParams configures RMNRemote deploy. Set Template.CustomObservers (typically ccvOwner)
+// so NOP verifiers can poll curse state via sourcereader.
 type RMNRemoteParams struct {
 	Template core.RMNRemote
+}
+
+func rmnRemoteDeployTemplate(rmnOwner, ccipOwner types.PARTY, params RMNRemoteParams) core.RMNRemote {
+	return core.RMNRemote{
+		RmnOwner:        rmnOwner,
+		CcipOwner:       ccipOwner,
+		CursedSubjects:  params.Template.CursedSubjects,
+		CustomObservers: params.Template.CustomObservers,
+	}
 }
 
 type GlobalConfigParams struct {
@@ -102,12 +113,7 @@ var DeployChainContracts = operations.NewSequence(
 
 		// Deploy RMNRemote
 		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[core.RMNRemote]{
-			Template: core.RMNRemote{
-				RmnOwner:        rmnOwnerParty,
-				CcipOwner:       types.PARTY(input.CCIPOwnerParty),
-				CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
-				CustomObservers: input.RMNRemote.Template.CustomObservers,
-			},
+			Template:   rmnRemoteDeployTemplate(rmnOwnerParty, types.PARTY(input.CCIPOwnerParty), input.RMNRemote),
 			OwnerParty: rmnOwnerParty,
 		})
 		if err != nil {

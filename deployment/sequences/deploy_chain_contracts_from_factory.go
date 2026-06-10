@@ -499,13 +499,8 @@ func deployRMNRemoteFromFactory(
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to ensure RMNRemote instance ID: %w", err)
 	}
-	rmnTemplate := core.RMNRemote{
-		InstanceId:      types.TEXT(rmnInstanceID),
-		RmnOwner:        rmnOwnerParty,
-		CcipOwner:       ccipOwnerParty,
-		CustomObservers: input.RMNRemote.Template.CustomObservers,
-		CursedSubjects:  input.RMNRemote.Template.CursedSubjects,
-	}
+	rmnTemplate := rmnRemoteDeployTemplate(rmnOwnerParty, ccipOwnerParty, input.RMNRemote)
+	rmnTemplate.InstanceId = types.TEXT(rmnInstanceID)
 	deployRMNRemoteReport, err := operations.ExecuteOperation(b, factoryops.DeployRMNRemote, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployRMNRemote{Contract: rmnTemplate}, input.ProposalDriven))
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to deploy RMNRemote from factory: %w", err)
