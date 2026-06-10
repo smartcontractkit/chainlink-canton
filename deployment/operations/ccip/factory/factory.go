@@ -1,19 +1,13 @@
 package factory
 
 import (
-	"bytes"
-	"encoding/binary"
-	"encoding/hex"
 	"errors"
-	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -318,57 +312,11 @@ func encodeDeployRateLimiter(args factorybindings.DeployRateLimiter) (*bind.Enco
 }
 
 func encodeDeployExecutor(args factorybindings.DeployExecutor) (*bind.EncodedChoice, error) {
-	var payload bytes.Buffer
-
-	writeLenPrefixedText(&payload, args.Contract.InstanceId)
-	writeLenPrefixedText(&payload, types.TEXT(args.Contract.Owner))
-	writeInt64(&payload, args.Contract.MaxCCVsPerMsg)
-	if err := writeRequestedFinality(&payload, args.Contract.DynamicConfig.AllowedFinalityConfig); err != nil {
-		return nil, err
-	}
-	writeBool(&payload, args.Contract.DynamicConfig.CcvAllowlistEnabled)
-
-	return &bind.EncodedChoice{
-		Choice:        "DeployExecutor",
-		OperationData: hex.EncodeToString(payload.Bytes()),
-	}, nil
-}
-
-func writeLenPrefixedText(buf *bytes.Buffer, value types.TEXT) {
-	writeUvarint(buf, uint64(len(value)))
-	buf.WriteString(string(value))
-}
-
-func writeUvarint(buf *bytes.Buffer, value uint64) {
-	var scratch [binary.MaxVarintLen64]byte
-	n := binary.PutUvarint(scratch[:], value)
-	buf.Write(scratch[:n])
-}
-
-func writeInt64(buf *bytes.Buffer, value types.INT64) {
-	_ = binary.Write(buf, binary.BigEndian, int64(value))
-}
-
-func writeBool(buf *bytes.Buffer, value types.BOOL) {
-	if value {
-		buf.WriteByte(0x01)
-		return
-	}
-	buf.WriteByte(0x00)
-}
-
-func writeRequestedFinality(buf *bytes.Buffer, finality core.FinalityConfig) error {
-	switch {
-	case finality.WaitForFinality != nil:
-		buf.WriteByte(0x00)
-	case finality.WaitForSafe != nil:
-		buf.WriteByte(0x01)
-	case finality.BlockDepth != nil:
-		buf.WriteByte(0x02)
-		writeInt64(buf, *finality.BlockDepth)
-	default:
-		return fmt.Errorf("unsupported executor finality config: %+v", finality)
-	}
-
-	return nil
+	return factoryEncoder.DeployExecutorParams(factorybindings.DeployExecutorParams{
+		InstanceId:            args.Contract.InstanceId,
+		Owner:                 args.Contract.Owner,
+		MaxCCVsPerMsg:         args.Contract.MaxCCVsPerMsg,
+		AllowedFinalityConfig: args.Contract.DynamicConfig.AllowedFinalityConfig,
+		CcvAllowlistEnabled:   args.Contract.DynamicConfig.CcvAllowlistEnabled,
+	})
 }

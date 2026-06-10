@@ -3812,6 +3812,26 @@ func (v FinalityConfig) GetVariantValue() any {
 
 var _ types.VARIANT = (*FinalityConfig)(nil)
 
+// GetVariantTagByte implements types.VariantWithTagByte interface for MCMS numeric tag encoding
+func (v FinalityConfig) GetVariantTagByte() byte {
+
+	if v.WaitForFinality != nil {
+		return 0
+	}
+
+	if v.WaitForSafe != nil {
+		return 1
+	}
+
+	if v.BlockDepth != nil {
+		return 2
+	}
+
+	return 0xFF // Invalid/unknown variant
+}
+
+var _ types.VariantWithTagByte = (*FinalityConfig)(nil)
+
 // FinalizeExecute is a Record type
 type FinalizeExecute struct {
 	TokenAdminRegistryInstanceId types.TEXT                                `json:"tokenAdminRegistryInstanceId"`
