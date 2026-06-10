@@ -1078,6 +1078,12 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 
+	sendLog := c.logger.Info().Str("NextFeeCID", c.nextFeeCID)
+	if hasTokenTransfer {
+		sendLog = sendLog.Str("NextTransferCID", c.nextTransferCID)
+	}
+	sendLog.Bool("HasTokenTransfer", hasTokenTransfer).Msg("Sending CCIP message with holdings")
+
 	feeFactoryChoice, err := testhelpers.GetTransferFactoryV2(
 		ctx,
 		c.validatorAPIClients.transferClient,
@@ -1433,10 +1439,19 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Int) error {
 	party := c.chain.Participants[0].PartyID
 
+	previousFeeCID := c.nextFeeCID
+	previousTransferCID := c.nextTransferCID
+	c.logger.Info().
+		Str("PreviousNextFeeCID", previousFeeCID).
+		Str("PreviousNextTransferCID", previousTransferCID).
+		Bool("HasTokenTransfer", hasTokenTransfer).
+		Msg("Refreshing next holdings from send update")
+
 	spentCIDs := []string{c.nextFeeCID}
 	if hasTokenTransfer && c.nextTransferCID != "" {
 		spentCIDs = append(spentCIDs, c.nextTransferCID)
 	}
+	c.logger.Debug().Strs("SpentCIDs", spentCIDs).Msg("Holding rotation spent CIDs")
 	refreshFilters := []testhelpers.Filter{
 		testhelpers.WithHoldingOwner(party),
 		testhelpers.WithUnlockedHoldingsOnly(),
@@ -1487,6 +1502,13 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 	}
 	c.nextTransferCID = pickedTransfer[0].ContractID
 	c.logger.Info().Str("NextTransferCID", c.nextTransferCID).Msg("Selected next transfer holding")
+	if payload, err := json.MarshalIndent(freshTransferHoldings, "", "  "); err != nil {
+		c.logger.Warn().Err(err).Msg("marshal freshTransferHoldings for log")
+	} else {
+		c.logger.Debug().
+			RawJSON("freshTransferHoldings", payload).
+			Msg("Fresh transfer holdings parsed from send update")
+	}
 
 	return nil
 }

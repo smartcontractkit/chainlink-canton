@@ -1,7 +1,9 @@
 package load
 
 import (
+	"context"
 	"fmt"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -20,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/stretchr/testify/require"
 
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -67,8 +70,19 @@ func loadSchedule(t *testing.T) scheduleConfig {
 	}
 }
 
-func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig) {
+func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig, scenario string) {
 	t.Helper()
+
+	labels := map[string]string{
+		"go_test_name":  genName,
+		"branch":        "test",
+		"commit":        "test",
+		"message_rate":  sched.messageRate,
+		"load_duration": sched.duration.String(),
+	}
+	if scenario != "" {
+		labels["scenario"] = scenario
+	}
 
 	p := wasp.NewProfile().Add(wasp.NewGenerator(&wasp.Config{
 		T:        t,
@@ -79,14 +93,8 @@ func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfi
 		),
 		RateLimitUnitDuration: sched.rateUnit,
 		Gun:                   gun,
-		Labels: map[string]string{
-			"go_test_name":  genName,
-			"branch":        "test",
-			"commit":        "test",
-			"message_rate":  sched.messageRate,
-			"load_duration": sched.duration.String(),
-		},
-		LokiConfig: nil,
+		Labels:                labels,
+		LokiConfig:            nil,
 	}))
 
 	_, err := p.Run(true)
@@ -125,6 +133,91 @@ func discoverEVMDestinations(t *testing.T, in *ccv.Cfg, chainMap map[uint64]ccip
 	return dests
 }
 
+// discoverEVMTokenSelectors returns the chain selectors of every EVM chain in the
+// env file. Callers resolve the token lane over these selectors before building
+// destinations.
+func discoverEVMTokenSelectors(t *testing.T, in *ccv.Cfg) []uint64 {
+	t.Helper()
+
+	selectors := make([]uint64, 0)
+	seen := make(map[uint64]struct{})
+	for _, bc := range in.Blockchains {
+		if bc.Type != blockchain.TypeAnvil {
+			continue
+		}
+		details, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, chainsel.FamilyEVM)
+		require.NoError(t, err, "resolve chain selector for chainID=%s", bc.ChainID)
+		if _, dup := seen[details.ChainSelector]; dup {
+			continue
+		}
+		selectors = append(selectors, details.ChainSelector)
+		seen[details.ChainSelector] = struct{}{}
+	}
+
+	return selectors
+}
+
+func discoverEVMTokenDestinations(
+	t *testing.T,
+	in *ccv.Cfg,
+	chainMap map[uint64]cciptestinterfaces.CCIP17,
+	lane devenvtests.TokenLane,
+) []Destination {
+	t.Helper()
+
+	selectors := discoverEVMTokenSelectors(t, in)
+	dests := make([]Destination, 0, len(selectors))
+	for _, selector := range selectors {
+		chain, ok := chainMap[selector]
+		require.True(t, ok, "EVM chain %d not in harness chain map", selector)
+
+		receiver, err := chain.GetEOAReceiverAddress()
+		require.NoError(t, err)
+
+		dests = append(dests, evmTokenLoadDestination(chain, receiver, lane))
+	}
+
+	return dests
+}
+
+func estimateMessages(sched scheduleConfig) uint64 {
+	// rate and rateUnit are validated positive in loadSchedule.
+	if sched.rate <= 0 {
+		return 1
+	}
+	estimated := uint64(sched.rate) * uint64(sched.duration/sched.rateUnit) //nolint:gosec // rate > 0
+	if estimated == 0 {
+		return 1
+	}
+
+	return estimated
+}
+
+// setupCantonTokenLoadHoldings pre-mints two separate Amulet holdings (fee + transfer) and
+// calls SetupSend once, matching the e2e canton2evm token transfer pattern.
+func setupCantonTokenLoadHoldings(
+	t *testing.T,
+	ctx context.Context,
+	cantonImpl *cantondevenv.Chain,
+	sched scheduleConfig,
+	lane devenvtests.TokenLane,
+) {
+	t.Helper()
+
+	estimated := estimateMessages(sched)
+	feeMint := estimated * uint64(devenvtests.CantonToEVMFeeAmount)
+	transferMint := estimated * lane.TransferAmount.Uint64()
+	t.Logf("Pre-mint: estimatedMessages=%d feeMint=%d transferMint=%d",
+		estimated, feeMint, transferMint)
+	require.NoError(t, cantonImpl.MintTokens(ctx, feeMint))
+	require.NoError(t, cantonImpl.MintTokens(ctx, transferMint))
+	require.NoError(t, cantonImpl.SetupSend(
+		ctx,
+		uint64(devenvtests.CantonToEVMFeeAmount),
+		lane.TransferAmount.Uint64(),
+	))
+}
+
 func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress) Destination {
 	destSelector := chain.ChainSelector()
 	return Destination{
@@ -137,6 +230,32 @@ func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.Unkno
 				}, cciptestinterfaces.MessageOptions{
 					ExecutionGasLimit: 200_000,
 					FinalityConfig:    1,
+					Executor:          executorAddr,
+					CCVs: []protocol.CCV{
+						{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
+					},
+				}, nil
+		},
+	}
+}
+
+func evmTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress, lane devenvtests.TokenLane) Destination {
+	destSelector := chain.ChainSelector()
+	laneCopy := lane
+	return Destination{
+		Chain:     chain,
+		Receiver:  receiver,
+		TokenLane: &laneCopy,
+		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
+			return cciptestinterfaces.MessageFields{
+					Receiver: receiver,
+					Data:     fmt.Appendf(nil, "canton2evm token load n=%d dest=%d", callNum, destSelector),
+					TokenAmount: cciptestinterfaces.TokenAmount{
+						Amount: new(big.Int).Set(lane.TransferAmount),
+					},
+				}, cciptestinterfaces.MessageOptions{
+					ExecutionGasLimit: lane.ExecutionGasLimit,
+					FinalityConfig:    lane.FinalityConfig,
 					Executor:          executorAddr,
 					CCVs: []protocol.CCV{
 						{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
@@ -168,6 +287,33 @@ func cantonLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.Un
 				}, cciptestinterfaces.MessageOptions{
 					ExecutionGasLimit: 200_000,
 					FinalityConfig:    0,
+					Executor:          executorAddr,
+					CCVs: []protocol.CCV{
+						{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
+					},
+				}, nil
+		},
+	}
+}
+
+func cantonTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress, lane devenvtests.TokenLane) Destination {
+	destSelector := chain.ChainSelector()
+	laneCopy := lane
+	return Destination{
+		Chain:     chain,
+		Receiver:  receiver,
+		TokenLane: &laneCopy,
+		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
+			return cciptestinterfaces.MessageFields{
+					Receiver: receiver,
+					Data:     fmt.Appendf(nil, "evm2canton token load n=%d dest=%d", callNum, destSelector),
+					TokenAmount: cciptestinterfaces.TokenAmount{
+						Amount:       new(big.Int).Set(lane.TransferAmount),
+						TokenAddress: lane.SrcToken,
+					},
+				}, cciptestinterfaces.MessageOptions{
+					ExecutionGasLimit: lane.ExecutionGasLimit,
+					FinalityConfig:    lane.FinalityConfig,
 					Executor:          executorAddr,
 					CCVs: []protocol.CCV{
 						{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
