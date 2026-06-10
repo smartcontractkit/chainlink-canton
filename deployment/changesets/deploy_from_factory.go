@@ -239,6 +239,7 @@ func (d DeployCCVFromFactory) Apply(e cldf.Environment, config CantonCSDeps[Depl
 }
 
 // --- SetFactoryOwnerToMCMS ---
+// Encodes an MCMS proposal for SetOwnerToMCMS (controller = mcmsParty only).
 
 type SetFactoryOwnerToMCMSConfig struct {
 	FactoryQualifier string        `json:"factoryQualifier" yaml:"factoryQualifier"`

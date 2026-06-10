@@ -74,25 +74,20 @@ testFactoryCreate = script do
 
   pure ()
 
--- | Test successful ownership transfer to MCMS
--- Note: SetOwnerToMCMS requires the mcmsParty to authorize the new contract creation.
--- In Daml, when a choice creates a contract with a new signatory, that party must authorize.
--- For test purposes, we use the same party as both bootstrap and mcms to demonstrate the flow.
+-- | Test SetOwnerToMCMS rejection when owner == mcmsParty.
+-- Cross-party happy path is covered in integration tests (ccip_factory_mcms_test.go).
 testSetOwnerToMCMS : Script ()
 testSetOwnerToMCMS = script do
-  -- Use the same party for both roles to test the ownership transfer logic
-  -- The key assertion (owner /= mcmsParty) will fail, so we test the happy path differently
   bootstrapOwner <- allocateParty "bootstrap_owner"
 
   let instanceId = "factory-mcms-transfer"
 
-  -- Create factory with bootstrapOwner as owner and also as mcmsParty
-  -- This allows us to test the SetOwnerToMCMS choice without cross-party auth issues
+  -- owner == mcmsParty exercises only the assertion guard (owner /= mcmsParty)
   factoryCid <- submit bootstrapOwner do
     createCmd CCIPFactory with
       instanceId
       owner = bootstrapOwner
-      mcmsParty = bootstrapOwner  -- Same party to avoid authorization issues
+      mcmsParty = bootstrapOwner
       usedInstanceIds = Map.empty
       deployedContracts = Map.empty
       perPartyRouterFactoryDeployed = False

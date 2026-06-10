@@ -59,7 +59,7 @@ import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
 -- Security/flow constraints:
 -- 1. Contract may be created by an arbitrary bootstrap party.
 -- 2. No deployment is possible until ownership is handed over to `mcmsParty`
---    (owner == mcmsParty).
+--    (owner == mcmsParty) via `SetOwnerToMCMS` (controller `mcmsParty`).
 -- 3. Every deployed component instanceId is tracked in `usedInstanceIds` and
 --    cannot be reused.
 -- 4. All deploy choices are consuming; each recreates CCIPFactory with
@@ -205,10 +205,7 @@ template CCIPFactory
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
-        -- | One-time ownership handover from bootstrap owner to MCMS party.
-        -- This is consuming because signatory changes.
-        -- Both owner and mcmsParty must authorize: owner gives up ownership,
-        -- mcmsParty consents to become the new signatory.
+        -- | One-time ownership transfer: recreates the factory with owner = mcmsParty.
         choice SetOwnerToMCMS : ContractId CCIPFactory
             controller mcmsParty
             do

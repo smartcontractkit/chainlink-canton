@@ -293,16 +293,16 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 
 // TestCCIP_MCMSFactoryDeploy_FullGovernance validates the complete MCMS governance lifecycle:
 // 1. Bootstrap party deploys CCIPFactory (owner != mcmsParty)
-// 2. Bootstrap party calls SetOwnerToMCMS to transfer ownership to MCMS party
+// 2. mcmsParty exercises SetOwnerToMCMS to transfer factory ownership
 // 3. All CCIP components deployed through MCMS Bypasser operations targeting the factory
 // 4. Factory state verified to contain all deployed contracts
 //
 // This tests the realistic scenario where an arbitrary party bootstraps the infrastructure
-// and then hands over governance to a multi-sig MCMS system.
+// and MCMS takes over governance via the mcmsParty-controlled handover choice.
 func TestCCIP_MCMSFactoryDeploy_FullGovernance(t *testing.T) {
 	t.Parallel()
 
-	// Use environment with two parties on the same participant for multi-party submissions
+	// Use environment with two parties on the same participant (bootstrap + MCMS).
 	env := GetSharedCCIPMCMSTwoParticipantEnvironment(t)
 	participant := env.Participant
 	mcmsEncoder := env.McmsEncoder
@@ -337,9 +337,7 @@ func TestCCIP_MCMSFactoryDeploy_FullGovernance(t *testing.T) {
 	require.Equal(t, mcmsParty, initialFields["mcmsParty"], "initial factory mcmsParty should be mcmsParty")
 	t.Logf("Verified initial state: owner=%s, mcmsParty=%s (different parties)", initialFields["owner"], initialFields["mcmsParty"])
 
-	// --- Step 3: Bootstrap party calls SetOwnerToMCMS to transfer ownership ---
-	// This requires both parties to authorize: owner (controller) and mcmsParty (new signatory).
-	// We submit from participant with ActAs containing both parties.
+	// --- Step 3: mcmsParty exercises SetOwnerToMCMS (controller = mcmsParty only) ---
 	factoryCid = setFactoryOwnerToMCMS(t, participant, mcmsParty, factoryCid)
 	t.Logf("SetOwnerToMCMS executed: new factory CID=%s", factoryCid)
 
@@ -638,7 +636,7 @@ func createCCIPFactory(
 
 // createCCIPFactoryWithMCMS creates a CCIPFactory contract with separate owner and mcmsParty.
 // This allows testing the full governance flow where a bootstrap party deploys the factory
-// and then hands over ownership to MCMS via SetOwnerToMCMS.
+// and mcmsParty takes ownership via SetOwnerToMCMS.
 func createCCIPFactoryWithMCMS(
 	t *testing.T,
 	participant canton.Participant,
@@ -680,10 +678,7 @@ func createCCIPFactoryWithMCMS(
 // transferring ownership from the current owner to mcmsParty.
 // Returns the new factory contract ID.
 //
-// NOTE: This requires both owner and mcmsParty to authorize because:
-// - owner is the controller of the SetOwnerToMCMS choice
-// - mcmsParty becomes the signatory of the new factory contract
-// The submission must include both parties in ActAs.
+// SetOwnerToMCMS is controller mcmsParty; submit with ActAs = mcmsParty.
 func setFactoryOwnerToMCMS(
 	t *testing.T,
 	participant canton.Participant,

@@ -43,8 +43,8 @@ type SharedCCIPMCMSEnvironment struct {
 
 // SharedCCIPMCMSTwoParticipantEnvironment extends SharedCCIPMCMSEnvironment with a second party.
 // Used for tests that validate full MCMS governance flow where a bootstrap party deploys the factory
-// and then hands over ownership to MCMS party.
-// Both parties are on the same participant to enable multi-party submissions.
+// and mcmsParty takes ownership via SetOwnerToMCMS.
+// Both parties are on the same participant for factory creation and handover submissions.
 type SharedCCIPMCMSTwoParticipantEnvironment struct {
 	SharedCCIPMCMSEnvironment
 	BootstrapParty string // Second party on the same participant
@@ -263,8 +263,8 @@ func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
 
 // GetSharedCCIPMCMSTwoParticipantEnvironment initializes a shared environment with two parties
 // on the same participant and all CCIP and MCMS packages. Used for tests that validate full MCMS
-// governance flow where a bootstrap party deploys the factory and then hands over ownership to MCMS party.
-// Both parties are on the same participant to enable multi-party submissions (ActAs with both parties).
+// governance flow where a bootstrap party deploys the factory and mcmsParty exercises SetOwnerToMCMS.
+// Both parties share one participant so each can submit with its own ActAs.
 func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwoParticipantEnvironment {
 	t.Helper()
 

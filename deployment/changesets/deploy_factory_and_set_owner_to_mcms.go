@@ -19,7 +19,8 @@ import (
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
-// DeployFactoryAndSetOwnerToMCMS deploys a CCIPFactory and returns an MCMS proposal to transfer ownership.
+// DeployFactoryAndSetOwnerToMCMS deploys a CCIPFactory and returns an MCMS proposal to transfer
+// ownership via SetOwnerToMCMS (controller = mcmsParty).
 type DeployFactoryAndSetOwnerToMCMSConfig struct {
 	OwnerParty string        `json:"ownerParty" yaml:"ownerParty"`
 	MCMSParty  string        `json:"mcmsParty" yaml:"mcmsParty"`
