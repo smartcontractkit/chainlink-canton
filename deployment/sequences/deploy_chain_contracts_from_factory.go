@@ -44,7 +44,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		var addresses []datastore.AddressRef
 		var proposalOutputs []contract.ExerciseOutput
 
-		ownerParty, ccipOwnerParty, err := requireOwnerParties(input)
+		ccipOwnerParty, err := requireCCIPOwnerParty(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -80,7 +80,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy GlobalConfig from factory: %w", err)
 		}
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployGlobalConfigReport.Output, input.ProposalDriven)
-		globalConfigRawInstanceAddress := globalConfigInstanceID.RawInstanceAddress(ownerParty)
+		globalConfigRawInstanceAddress := globalConfigInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), globalConfigRawInstanceAddress, global_config.ContractType, global_config.Version, ""))
 
 		tokenAdminRegistryInstanceID, err := ensureInstanceID("", "tokenadminregistry")
@@ -97,7 +97,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TokenAdminRegistry from factory: %w", err)
 		}
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployTokenAdminRegistryReport.Output, input.ProposalDriven)
-		tokenAdminRegistryRawInstanceAddress := tokenAdminRegistryInstanceID.RawInstanceAddress(ownerParty)
+		tokenAdminRegistryRawInstanceAddress := tokenAdminRegistryInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), tokenAdminRegistryRawInstanceAddress, token_admin_registry.ContractType, token_admin_registry.Version, ""))
 
 		feeQuoterInstanceID, err := ensureInstanceID(input.FeeQuoterConfig.Template.InstanceId, "feequoter")
@@ -108,13 +108,13 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		linkTokenID := input.FeeQuoterConfig.Template.LinkTokenInstrumentId
 		if linkTokenID.Admin == "" {
 			linkTokenID = splice_api_token_holding_v1.InstrumentId{
-				Admin: ownerParty,
+				Admin: ccipOwnerParty,
 				Id:    types.TEXT("link-token"),
 			}
 		}
 		feeQuoterTemplate := core.FeeQuoter{
 			InstanceId:                       types.TEXT(feeQuoterInstanceID),
-			Owner:                            ownerParty,
+			Owner:                            ccipOwnerParty,
 			FeeTokens:                        types.SET{},
 			DestChainConfigs:                 nil,
 			TokenTransferFeeConfigs:          nil,
@@ -128,7 +128,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy FeeQuoter from factory: %w", err)
 		}
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployFeeQuoterReport.Output, input.ProposalDriven)
-		feeQuoterRawInstanceAddress := feeQuoterInstanceID.RawInstanceAddress(ownerParty)
+		feeQuoterRawInstanceAddress := feeQuoterInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), feeQuoterRawInstanceAddress, fee_quoter.ContractType, fee_quoter.Version, ""))
 
 		var firstCommitteeVerifierBinding chainlinkapi.RawInstanceAddress
@@ -198,7 +198,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OffRamp from factory: %w", err)
 		}
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployOffRampReport.Output, input.ProposalDriven)
-		offRampRawInstanceAddress := offRampInstanceID.RawInstanceAddress(ownerParty)
+		offRampRawInstanceAddress := offRampInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), offRampRawInstanceAddress, offramp.ContractType, offramp.Version, ""))
 
 		onRampInstanceID, err := ensureInstanceID("", "onramp")
@@ -222,7 +222,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OnRamp from factory: %w", err)
 		}
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployOnRampReport.Output, input.ProposalDriven)
-		onRampRawInstanceAddress := onRampInstanceID.RawInstanceAddress(ownerParty)
+		onRampRawInstanceAddress := onRampInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), onRampRawInstanceAddress, onramp.ContractType, onramp.Version, ""))
 
 		perPartyRouterFactoryInstanceID, err := ensureInstanceID("", "perpartyrouterfactory")
@@ -247,7 +247,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy PerPartyRouterFactory from factory: %w", err)
 		}
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployPerPartyRouterFactoryReport.Output, input.ProposalDriven)
-		perPartyRouterFactoryRawInstanceAddress := perPartyRouterFactoryInstanceID.RawInstanceAddress(ownerParty)
+		perPartyRouterFactoryRawInstanceAddress := perPartyRouterFactoryInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), perPartyRouterFactoryRawInstanceAddress, per_party_router_factory.ContractType, per_party_router_factory.Version, ""))
 
 		for i, params := range input.Executors {
@@ -357,7 +357,7 @@ var DeployCCVFromFactory = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("RmnRemoteRawInstanceAddress is required for CCV factory deploy")
 		}
 
-		_, ccipOwnerParty, err := requireOwnerParties(input)
+		ccipOwnerParty, err := requireCCIPOwnerParty(input)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
@@ -420,17 +420,6 @@ var DeployCCVFromFactory = operations.NewSequence(
 		return out, nil
 	},
 )
-
-func requireOwnerParties(input DeployChainContractsParams) (types.PARTY, types.PARTY, error) {
-	if input.OwnerParty == "" {
-		return "", "", fmt.Errorf("OwnerParty is required")
-	}
-	if input.CCIPOwnerParty == "" {
-		return "", "", fmt.Errorf("CCIPOwnerParty is required")
-	}
-
-	return types.PARTY(input.OwnerParty), types.PARTY(input.CCIPOwnerParty), nil
-}
 
 func requireCCIPOwnerParty(input DeployChainContractsParams) (types.PARTY, error) {
 	if input.CCIPOwnerParty == "" {
