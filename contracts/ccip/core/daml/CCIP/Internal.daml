@@ -16,6 +16,9 @@ data MessageExecutionState
 useDefaultCCVs : RawInstanceAddress
 useDefaultCCVs = RawInstanceAddress "default-ccvs"
 
+testAddition : Text
+testAddition = "upgrade-compatible-change"
+
 -- EVM GenericExtraArgsV3 encodes the user CCV count in one byte. Keep Canton
 -- bounded to the same absolute protocol ceiling; executors may enforce lower
 -- deployment-specific caps.
