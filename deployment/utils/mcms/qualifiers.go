@@ -12,6 +12,10 @@ package mcms
 const (
 	QualifierCCIPOwner = "CLLCCIP"
 	QualifierCCVOwner  = "ccvOwner"
-	// QualifierRMNOwner is the MCMS instance for RMNRemote deploy and curse operations.
-	QualifierRMNOwner = "rmnOwner"
+	// QualifierRMNOwner uses "RMNMCMS" (not the Canton owner party name "rmnOwner") so Canton
+	// and EVM chains share the same MCMS lookup key in address_refs.json. Future cross-family RMN
+	// proposals (e.g. Curse) require one mcms.qualifier across all chains in the batch; EVM prod
+	// uses RMNMCMS. The on-ledger signatory remains the rmnOwner:: party — only the datastore
+	// label changes.
+	QualifierRMNOwner = "RMNMCMS"
 )
