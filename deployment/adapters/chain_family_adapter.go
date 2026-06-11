@@ -400,7 +400,7 @@ func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, _ uint64) ccip
 			Enabled:     true,
 		},
 		BaseExecutionGasCost:      50_000,
-		TokenReceiverAllowed:      false, // TODO: check what this does?
+		TokenReceiverAllowed:      true,
 		MessageNetworkFeeUSDCents: 0,
 		TokenNetworkFeeUSDCents:   0,
 	}
