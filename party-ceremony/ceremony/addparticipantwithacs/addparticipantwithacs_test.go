@@ -70,6 +70,10 @@ func (m *mockReplicationClient) RegisterKmsSigningKey(context.Context, string, s
 	return nil, errNotImplemented
 }
 
+func (m *mockReplicationClient) LookupKmsSigningKey(context.Context, string, []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	return nil, errNotImplemented
+}
+
 func (m *mockReplicationClient) GetNamespaceFingerprint(context.Context, string, string, []string) (string, error) {
 	return "", nil
 }
