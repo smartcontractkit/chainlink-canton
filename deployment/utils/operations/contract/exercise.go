@@ -73,6 +73,9 @@ type ChoiceInput[ARGS any] struct {
 	Args               ARGS   `json:"args"`
 	MCMSEnabled        bool   `json:"mcmsEnabled,omitempty"`
 	DisclosedContracts []DisclosedContract
+	// ParticipantIndex selects which participant on the chain submits the exercise command.
+	// Zero value defaults to the first participant.
+	ParticipantIndex int `json:"participantIndex,omitempty"`
 }
 
 type ExerciseParams[ARGS any] struct {
@@ -143,7 +146,10 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			}
 
 			// Direct execution path
-			participant := deps.Participants[0]
+			participant, err := ParticipantAt(deps, input.ParticipantIndex)
+			if err != nil {
+				return ExerciseOutput{}, fmt.Errorf("resolve participant: %w", err)
+			}
 
 			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, LedgerQueryParties(participant), params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {

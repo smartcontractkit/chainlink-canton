@@ -65,6 +65,7 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 	ds := datastore.NewMemoryDataStore()
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
+	participantIndex := config.Participant
 	cfg := config.Config
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
@@ -87,7 +88,8 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 		qualifier = nil
 	}
 	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, burn_mint_token_pool.Deploy, chain, contract.DeployInput[burnminttokenpool.BurnMintTokenPool]{
-		Qualifier: qualifier,
+		Qualifier:        qualifier,
+		ParticipantIndex: participantIndex,
 		Template: burnminttokenpool.BurnMintTokenPool{
 			CcipOwner:               types.PARTY(cfg.CcipOwner),
 			PoolOwner:               types.PARTY(cfg.PoolOwner),
@@ -138,6 +140,7 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 			CcipParty:                            cfg.CcipOwner,
 			PoolOwnerParty:                       cfg.PoolOwner,
 			PoolInstanceID:                       rawPoolAddr.InstanceID(),
+			ParticipantIndex:                     participantIndex,
 		}
 		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {

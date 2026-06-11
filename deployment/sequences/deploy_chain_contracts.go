@@ -346,7 +346,7 @@ func ensureNativeFeeTokenConfig(
 		RawInstanceAddress(types.PARTY(ccipOwnerParty)).
 		InstanceAddress()
 
-	if _, found, err := findTokenConfigCid(b, deps, tokenConfigAddress); err != nil {
+	if _, found, err := findTokenConfigCid(b, deps, 0, tokenConfigAddress); err != nil {
 		return fmt.Errorf("failed to lookup native fee token config: %w", err)
 	} else if found {
 		return nil
@@ -365,7 +365,7 @@ func ensureNativeFeeTokenConfig(
 		return fmt.Errorf("failed to propose native fee token admin: %w", err)
 	}
 
-	tokenConfigCid, found, err := findTokenConfigCid(b, deps, tokenConfigAddress)
+	tokenConfigCid, found, err := findTokenConfigCid(b, deps, 0, tokenConfigAddress)
 	if err != nil {
 		return fmt.Errorf("failed to lookup native fee token config after propose: %w", err)
 	}
