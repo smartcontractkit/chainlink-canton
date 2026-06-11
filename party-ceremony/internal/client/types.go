@@ -41,6 +41,15 @@ type P2PSigningKeysInfo struct {
 	Threshold uint32
 }
 
+// SynchronizerInfo holds the alias and ID of a connected synchronizer.
+type SynchronizerInfo struct {
+	// Alias is the human-readable synchronizer alias (e.g. "global").
+	Alias string
+
+	// SynchronizerID is the Canton synchronizer fingerprint identifier.
+	SynchronizerID string
+}
+
 // P2PState holds the current state of a PartyToParticipant topology mapping
 // as read from Canton's topology store.
 type P2PState struct {

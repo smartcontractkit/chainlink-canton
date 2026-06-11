@@ -109,6 +109,21 @@ func (m *mockAdminClient) UploadDar(_ context.Context, darBytes []byte) (string,
 	id := hex.EncodeToString(darBytes[:min(8, len(darBytes))])
 	return "pkg-" + id, nil
 }
+func (m *mockAdminClient) ExportAcs(_ context.Context, _ []string, _ string, _ int64) ([]byte, error) {
+	return nil, nil
+}
+func (m *mockAdminClient) ImportAcs(_ context.Context, _ []byte, _ string) error    { return nil }
+func (m *mockAdminClient) DisconnectSynchronizer(_ context.Context, _ string) error { return nil }
+func (m *mockAdminClient) ReconnectSynchronizer(_ context.Context, _ string) error  { return nil }
+func (m *mockAdminClient) ListConnectedSynchronizers(_ context.Context) ([]client.SynchronizerInfo, error) {
+	return nil, nil
+}
+func (m *mockAdminClient) ClearPartyOnboardingFlag(_ context.Context, _ string, _ string, _ int64) (bool, error) {
+	return true, nil
+}
+func (m *mockAdminClient) LookupOffsetByTime(_ context.Context, _ int64) (int64, error) {
+	return 0, nil
+}
 
 // ── Mock Ledger client ──────────────────────────────────────────────────────
 
@@ -142,6 +157,11 @@ func (m *mockLedgerClient) ExecuteSubmission(
 }
 
 func (m *mockLedgerClient) GetActiveContractsByTemplate(
+	_ context.Context, _ string, _ string, _ string, _ string,
+) ([]*apiv2.CreatedEvent, error) {
+	return []*apiv2.CreatedEvent{{ContractId: "fake-contract-0xdeadbeef"}}, nil
+}
+func (m *mockLedgerClient) GetActiveContractsByTemplateForParty(
 	_ context.Context, _ string, _ string, _ string, _ string,
 ) ([]*apiv2.CreatedEvent, error) {
 	return []*apiv2.CreatedEvent{{ContractId: "fake-contract-0xdeadbeef"}}, nil

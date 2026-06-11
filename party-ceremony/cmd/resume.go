@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
@@ -131,9 +132,17 @@ func runResume(cmd *cobra.Command, args []string) error {
 
 		return executeKeyRotationSequence(cmd.Context(), cfg, state.Input, stateDir, workflowId, confirmerFromFlags(cmd))
 
+	case ceremony.WorkflowTypeAddParticipantWithAcs:
+		state, err := ceremony.LoadWorkflow[addparticipantwithacs.AddParticipantWithAcsInput](ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("ceremony %q: loading workflow: %w", workflowId, err)
+		}
+
+		return executeAddParticipantWithAcsSequence(cmd.Context(), cfg, state.Input, stateDir, workflowId, confirmerFromFlags(cmd))
+
 	default:
-		return fmt.Errorf("ceremony %q: unknown workflow type %q; supported types: %s, %s, %s, %s, %s, %s",
+		return fmt.Errorf("ceremony %q: unknown workflow type %q; supported types: %s, %s, %s, %s, %s, %s, %s",
 			workflowId, workflowType,
-			ceremony.WorkflowTypeOnboarding, ceremony.WorkflowTypeExample, ceremony.WorkflowTypeKick, ceremony.WorkflowTypeContractDeploy, ceremony.WorkflowTypeAddParticipant, ceremony.WorkflowTypeKeyRotation)
+			ceremony.WorkflowTypeOnboarding, ceremony.WorkflowTypeExample, ceremony.WorkflowTypeKick, ceremony.WorkflowTypeContractDeploy, ceremony.WorkflowTypeAddParticipant, ceremony.WorkflowTypeKeyRotation, ceremony.WorkflowTypeAddParticipantWithAcs)
 	}
 }

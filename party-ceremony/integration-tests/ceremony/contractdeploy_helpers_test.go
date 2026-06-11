@@ -15,6 +15,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
+// disclosedTargetPackageName is the Daml package name used in contract deploy
+// ceremonies (see PackageRef in contract deploy input).
+const disclosedTargetPackageName = "test-test"
+
 func (s *CeremonyTestSuite) runContractDeployFlow(
 	t *testing.T,
 	partyID string,

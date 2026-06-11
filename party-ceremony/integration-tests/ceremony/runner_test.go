@@ -75,6 +75,22 @@ func runCeremonySuites(t *testing.T, chain *canton.Chain, kms *integrationtests.
 		suite.Run(t, s)
 	})
 
+	t.Run("CantonAddParticipantWithAcsFlowTestSuite", func(t *testing.T) {
+		s := new(AddParticipantWithAcsFlowTestSuite)
+		s.chain = chain
+		s.KMS = kms
+		s.KMSRunName = runNamePrefix + "add-participant-with-acs"
+		suite.Run(t, s)
+	})
+
+	t.Run("CantonAddParticipantWithAcsResyncFlowTestSuite", func(t *testing.T) {
+		s := new(AddParticipantWithAcsResyncFlowTestSuite)
+		s.chain = chain
+		s.KMS = kms
+		s.KMSRunName = runNamePrefix + "add-participant-with-acs-resync"
+		suite.Run(t, s)
+	})
+
 	t.Run("CantonKeyRotationFlowTestSuite", func(t *testing.T) {
 		s := new(KeyRotationFlowTestSuite)
 		s.chain = chain
