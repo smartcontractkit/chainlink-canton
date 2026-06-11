@@ -347,6 +347,34 @@ Key rotation only requires the key ID for the key type being rotated.
 Contract deploy uses `kms_protocol_key_id` to sign prepared transaction hashes
 through AWS KMS; when it is empty, it signs with the participant vault.
 
+#### Reusing KMS keys across ceremonies
+
+A KMS key can only be registered once in a participant's vault. If the same
+AWS KMS ARN was already registered under a different vault name (e.g. during a
+prior onboarding as `ccip-owner-mainnet`), attempting to register it again
+under a new ceremony name (e.g. `ccv-owner-mainnet`) returns:
+
+```
+Existing public key for … is different than inserted key
+```
+
+Party-ceremony handles this automatically:
+
+1. Try `RegisterKmsSigningKey` with the ceremony namespace name (or an optional
+   override — see [`--kms-vault-name`](#init-onboarding) below).
+2. On that conflict, call `LookupKmsSigningKey` to find the key already bound
+   to the same KMS ARN in `participant-config.json`.
+3. Reuse the existing public key and continue the ceremony.
+
+This lets one KMS key pair participate in multiple namespace ceremonies (e.g.
+ccipOwner and ccvOwner on the same Chainlink node). **No extra flags are
+required on `resume`** — the lookup fallback runs whenever register fails.
+The optional `--kms-vault-name` on `init` only changes the name used on the
+*first* register attempt (cleaner logs; not required for correctness).
+
+**Example:** Chainlink CV1 reuses ccipOwner KMS ARNs for ccvOwner onboarding.
+Run `resume` with the same ARNs in config; no `--kms-vault-name` needed.
+
 **Example with AWS KMS keys:**
 
 ```json
@@ -379,6 +407,7 @@ canton-party-ceremony init onboarding \
   --synchronizer-id <id> \
   [--coordinator <id>] \
   [--threshold <n>] \
+  [--kms-vault-name <name>] \
   [--config <path>] \
   [--state-dir <dir>]
 ```
@@ -391,6 +420,7 @@ canton-party-ceremony init onboarding \
 | `--synchronizer-id`    | Yes      | —                         | Canton synchronizer ID                                            |
 | `--coordinator`        | No       | —                         | Coordinator participant ID                                        |
 | `--threshold`          | No       | `0`                       | Minimum signatures required. `0` = strict majority `floor(n/2)+1` |
+| `--kms-vault-name`     | No       | (same as namespace name)  | KMS vault registration name when reusing keys from another ceremony. Stored in `workflow.json`. Optional — [conflict lookup](#reusing-kms-keys-across-ceremonies) works without it. |
 | `--config`             | No       | `participant-config.json` | Path to participant config JSON                                   |
 | `--state-dir`          | No       | `ceremonies`              | Root directory for ceremony state                                 |
 
@@ -499,6 +529,11 @@ canton-party-ceremony resume <ceremony-id> \
 loads `reports.json` to seed the reporter cache. All previously completed
 operations are served from cache; only the current participant's pending
 operations execute.
+
+For onboarding with KMS keys, `resume` does **not** accept `--kms-vault-name`.
+KMS reuse is handled inside `CreateMemberKeyOp`: register under the namespace
+name from `workflow.json`, then look up by ARN from `participant-config.json`
+if Canton reports a public-key conflict (see [Reusing KMS keys across ceremonies](#reusing-kms-keys-across-ceremonies)).
 
 **Exit behavior:**
 
