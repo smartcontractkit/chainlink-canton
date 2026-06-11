@@ -24,7 +24,7 @@ func obtainSigningKey(
 		if client.IsKmsPublicKeyConflict(err) {
 			existing, lookupErr := c.LookupKmsSigningKey(ctx, kmsKeyID, usage)
 			if lookupErr != nil {
-				return nil, fmt.Errorf("register KMS key %q as %q: %w; lookup existing key: %v", kmsKeyID, name, err, lookupErr)
+				return nil, fmt.Errorf("register KMS key %q as %q: %w; lookup existing key: %w", kmsKeyID, name, err, lookupErr)
 			}
 
 			return existing, nil
