@@ -112,18 +112,18 @@ template CommitteeVerifier
                 storageLocations = storageLocations
 
             crossChainVerifier_verifyMessageImpl self arg = do
-                exercise (fromInterfaceContractId @CommitteeVerifier self) VerifyMessage
+                coerceContractId <$> exercise (fromInterfaceContractId @CommitteeVerifier self) VerifyMessage
                     with
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        executingMessageCid = arg.executingMessageCid
+                        executingMessageCid = coerceContractId arg.executingMessageCid
                         verifierResults = arg.verifierResults
                         caller = arg.caller
 
             crossChainVerifier_calculateFeeImpl self arg = do
-                exercise (fromInterfaceContractId @CommitteeVerifier self) CalculateFee
+                coerceContractId <$> exercise (fromInterfaceContractId @CommitteeVerifier self) CalculateFee
                     with
-                        sendingMessageCid = arg.sendingMessageCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
                         extraContext = arg.extraContext
                         caller = arg.caller
 
@@ -134,11 +134,11 @@ template CommitteeVerifier
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
-                exercise (fromInterfaceContractId @CommitteeVerifier self) ForwardToVerifier
+                coerceContractId <$> exercise (fromInterfaceContractId @CommitteeVerifier self) ForwardToVerifier
                     with
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = arg.sendingMessageCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
 

@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
@@ -27,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-extension-api"
-	PackageID   = "ee0ce484b84662844791067b50f89f98959b9259841bb00b7a70d60a768ff351"
+	PackageID   = "abf82ef630cd2f176e69385616004d4a5012a1d1ed2a4d5552560acc2351d21b"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1008,12 +1007,12 @@ func (t *TokenPoolGetFee) UnmarshalHex(data string) error {
 
 // TokenPoolGetRequiredCCVs is a Record type
 type TokenPoolGetRequiredCCVs struct {
-	RemoteChainSelector types.NUMERIC       `json:"remoteChainSelector"`
-	SourceAmount        types.TEXT          `json:"sourceAmount"`
-	Finality            core.FinalityConfig `json:"finality"`
-	ExtraData           types.TEXT          `json:"extraData"`
-	Direction           TransferDirection   `json:"direction"`
-	Caller              types.PARTY         `json:"caller"`
+	RemoteChainSelector types.NUMERIC     `json:"remoteChainSelector"`
+	SourceAmount        types.TEXT        `json:"sourceAmount"`
+	Finality            types.TEXT        `json:"finality"`
+	ExtraData           types.TEXT        `json:"extraData"`
+	Direction           TransferDirection `json:"direction"`
+	Caller              types.PARTY       `json:"caller"`
 }
 
 // ToMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
@@ -1024,7 +1023,7 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
 
 	m["sourceAmount"] = string(t.SourceAmount)
 
-	m["finality"] = model.NestedToDAMLValue(t.Finality)
+	m["finality"] = string(t.Finality)
 
 	m["extraData"] = string(t.ExtraData)
 

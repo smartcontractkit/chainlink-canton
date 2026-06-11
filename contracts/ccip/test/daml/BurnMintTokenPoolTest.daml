@@ -8,6 +8,7 @@ import DA.Optional (fromSome, fromSomeNote, isSome)
 import DA.TextMap qualified as TextMap
 
 import qualified CCIP.Context
+import qualified CCIP.Events
 import CCIP.BurnMintTokenPool qualified as BurnMintTokenPool
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityConfig
@@ -346,11 +347,11 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
 
   result <- submit (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
+      rmnRemoteCid = coerceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId registryCid)
-      sendingMessageCid = sendingMessageCid
+      sendingMessageCid = coerceContractId sendingMessageCid
       senderInputCids = [senderHoldingCid]
       amount = 7.0
       caller = sender
@@ -361,7 +362,7 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   Some senderChangeHolding <- queryContractId sender (fromInterfaceContractId @Link.LinkHolding senderChangeCid)
   Some poolFeeHolding <- queryContractId poolOwner (fromInterfaceContractId @Link.LinkHolding poolFeeCid)
   None <- queryContractId sender (fromInterfaceContractId @Link.LinkHolding senderHoldingCid)
-  Some updatedSendingMessage <- queryContractId ccipOwner result.sendingMessageCid
+  Some updatedSendingMessage <- queryContractId ccipOwner (coerceContractId result.sendingMessageCid : ContractId SendingMessageV1.SendingMessageV1)
 
   senderChangeHolding.holdingAmount === 3.0
   poolFeeHolding.holdingAmount === 0.35
@@ -883,7 +884,7 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
       receiverHolding.holdingAmount === 1.0
     _ -> abort "expected completed release result"
 
-  Some claimedEvent <- queryContractId receiver result.claimedEventCid
+  Some claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.Events.TokenReceiveTicketClaimed)
   claimedEvent.event.sourceAmount === sourceAmount
   claimedEvent.event.localAmount === 10000000000.0
 

@@ -87,7 +87,7 @@ template CCIPReceiver
                             CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = message.sourceChainSelector
                                 sourceAmount = tt.amount
-                                finality = message.finality.requested
+                                finality = message.finality.raw
                                 extraData = tokenExtraData
                                 direction = CCIP.Interfaces.TokenPool.Inbound
                                 caller = owner
@@ -135,7 +135,7 @@ template CCIPReceiver
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1
-                emCid <- exercise routerCid CCIP.PerPartyRouter.PrepareExecute with
+                emCid <- coerceContractId <$> exercise routerCid CCIP.PerPartyRouter.PrepareExecute with
                     context = context
                     encodedMessage = encodedMessage
                     receiverParty = owner
@@ -151,21 +151,21 @@ template CCIPReceiver
                     None -> pure emCid
                     Some tt -> do
                         tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
-                        exercise tt.tokenPoolCid
+                        coerceContractId <$> exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
-                                tokenAdminRegistryCid = tokenAdminRegistryCid
-                                tokenConfigCid = tokenConfigCid
+                                tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+                                tokenConfigCid = coerceContractId tokenConfigCid
                                 extraContext = tt.poolExtraContext
-                                executingMessageCid = emCid
+                                executingMessageCid = coerceContractId emCid
                                 caller = owner
 
                 -- CCV verification: thread executingMessageCid through each CCV
                 emCid <- foldlA (\cid input ->
-                    exercise input.ccvCid
+                    coerceContractId <$> exercise input.ccvCid
                         CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
-                            rmnRemoteCid = rmnRemoteCid
+                            rmnRemoteCid = coerceContractId rmnRemoteCid
                             extraContext = input.ccvExtraContext
-                            executingMessageCid = cid
+                            executingMessageCid = coerceContractId cid
                             verifierResults = input.verifierResults
                             caller = owner
                     ) emCid ccvInputs
@@ -176,13 +176,13 @@ template CCIPReceiver
                     executingMessageCid = emCid
 
                 -- Token release
-                tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of
+                tokenReleaseResult <- case (tokenTransfer, coerceContractId <$> result.tokenReceiveTicket) of
                     (Some tt, Some ticketCid) -> do
                         tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
                         releaseResult <- exercise tt.tokenPoolCid CCIP.Interfaces.TokenPool.TokenPool_ReleaseFromTicket with
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            tokenConfigCid = tokenConfigCid
-                            rmnRemoteCid = rmnRemoteCid
+                            tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+                            tokenConfigCid = coerceContractId tokenConfigCid
+                            rmnRemoteCid = coerceContractId rmnRemoteCid
                             extraContext = tt.poolExtraContext
                             tokenReceiveTicketCid = ticketCid
                             caller = owner

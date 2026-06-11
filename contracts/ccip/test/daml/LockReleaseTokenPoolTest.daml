@@ -451,7 +451,7 @@ testLockOrBurn = script do
     senderC.amount === 5.0
     senderC.owner === sender
 
-    Some updatedSendingMessage <- queryContractId ccipOwner result.sendingMessageCid
+    Some updatedSendingMessage <- queryContractId ccipOwner (coerceContractId result.sendingMessageCid : ContractId SendingMessageV1.SendingMessageV1)
     let tokenSendData = fromSome updatedSendingMessage.tokenSendData
     tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 50000000000.0)
 
@@ -648,7 +648,7 @@ testLockOrBurnValidatesExistingPoolHoldingsAndPreservesThem = script do
     let existingPoolH = fromSome existingPoolHoldingFetched
     existingPoolH.amount === 3.0
 
-    Some updatedSendingMessage <- queryContractId ccipOwner result.sendingMessageCid
+    Some updatedSendingMessage <- queryContractId ccipOwner (coerceContractId result.sendingMessageCid : ContractId SendingMessageV1.SendingMessageV1)
     let tokenSendData = fromSome updatedSendingMessage.tokenSendData
     tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 50000000000.0)
 
@@ -825,7 +825,7 @@ testLockOrBurnDeductsFeeBps = script do
             extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
-    Some sm <- queryContractId ccipOwner result.sendingMessageCid
+    Some sm <- queryContractId ccipOwner (coerceContractId result.sendingMessageCid : ContractId SendingMessageV1.SendingMessageV1)
     let tokenSendData = fromSome sm.tokenSendData
     -- 5% feeBps deducted from bridged amount.
     tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 47500000000.0)
@@ -974,7 +974,7 @@ testReleaseFromTicket = script do
             receiverH.owner === receiver
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver result.claimedEventCid
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
     assertMsg "Claimed event should exist" (isSome claimedEvent)
     let claimed = fromSome claimedEvent
     claimed.tokenReceiveTicketCid === tokenReceiveTicket
@@ -1631,7 +1631,7 @@ testReleaseFromTicketDecimalConversion = script do
             receiverH.amount === 1.2345678901
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver result.claimedEventCid
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
     let claimed = fromSome claimedEvent
     claimed.event.messageId === "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     case claimed.event.output of
@@ -1775,7 +1775,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
             receiverH.amount === 1.0
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver result.claimedEventCid
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
     let claimed = fromSome claimedEvent
     claimed.event.sourceAmount === sourceAmount
     claimed.event.localAmount === 10000000000.0
@@ -3484,15 +3484,15 @@ testCalculateFeeFallsBackToFeeQuoter = script do
     sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedFq) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
-                tokenAdminRegistryCid = tokenAdminRegistry
-                tokenConfigCid = tokenConfigCid
+                tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
+                tokenConfigCid = coerceContractId tokenConfigCid
                 extraContext = MetadataV1.emptyChoiceContext
-                sendingMessageCid = sendingMessageCid
-                feeQuoterCid = feeQuoter
+                sendingMessageCid = coerceContractId sendingMessageCid
+                feeQuoterCid = coerceContractId feeQuoter
                 tokenInstrumentId = testInstrumentId
                 caller = sender
 
-    Some sm <- queryContractId ccipOwner sendingMessageCid
+    Some sm <- queryContractId ccipOwner (coerceContractId sendingMessageCid : ContractId SendingMessageV1.SendingMessageV1)
     let tokenSendFee = fromSome sm.tokenSendFee
     tokenSendFee.feeUSDCents === usdToCents 3.0
     tokenSendFee.destGasOverhead === 70000
@@ -3638,15 +3638,15 @@ testCalculateFeePrefersPoolOverride = script do
     sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedFq <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
-                tokenAdminRegistryCid = tokenAdminRegistry
-                tokenConfigCid = tokenConfigCid
+                tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
+                tokenConfigCid = coerceContractId tokenConfigCid
                 extraContext = MetadataV1.emptyChoiceContext
-                sendingMessageCid = sendingMessageCid
-                feeQuoterCid = feeQuoter
+                sendingMessageCid = coerceContractId sendingMessageCid
+                feeQuoterCid = coerceContractId feeQuoter
                 tokenInstrumentId = testInstrumentId
                 caller = sender
 
-    Some sm <- queryContractId ccipOwner sendingMessageCid
+    Some sm <- queryContractId ccipOwner (coerceContractId sendingMessageCid : ContractId SendingMessageV1.SendingMessageV1)
     let tokenSendFee = fromSome sm.tokenSendFee
     tokenSendFee.feeUSDCents === cents 2.0
     tokenSendFee.destGasOverhead === 50000
@@ -3791,15 +3791,15 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
     sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedFq <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
-                tokenAdminRegistryCid = tokenAdminRegistry
-                tokenConfigCid = tokenConfigCid
+                tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
+                tokenConfigCid = coerceContractId tokenConfigCid
                 extraContext = MetadataV1.emptyChoiceContext
-                sendingMessageCid = sendingMessageCid
-                feeQuoterCid = feeQuoter
+                sendingMessageCid = coerceContractId sendingMessageCid
+                feeQuoterCid = coerceContractId feeQuoter
                 tokenInstrumentId = testInstrumentId
                 caller = sender
 
-    Some sm <- queryContractId ccipOwner sendingMessageCid
+    Some sm <- queryContractId ccipOwner (coerceContractId sendingMessageCid : ContractId SendingMessageV1.SendingMessageV1)
     let tokenSendFee = fromSome sm.tokenSendFee
     tokenSendFee.feeUSDCents === usdToCents 4.0
     tokenSendFee.destGasOverhead === 71000

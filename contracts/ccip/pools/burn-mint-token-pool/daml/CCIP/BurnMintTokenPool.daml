@@ -325,71 +325,72 @@ template BurnMintTokenPool
                 instrumentId = instrumentId
 
             tokenPool_getRequiredCCVsImpl self arg = do
+                let finality = fromSomeNote "Invalid finality" (CCIP.FinalityConfig.decodeRequestedFinality arg.finality)
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) GetRequiredCCVs
                     with
                         remoteChainSelector = arg.remoteChainSelector
                         sourceAmount = arg.sourceAmount
-                        finality = arg.finality
+                        finality = finality.requested
                         extraData = arg.extraData
                         direction = arg.direction
                         caller = arg.caller
 
             tokenPool_verifyInboundMessageImpl self arg = do
-                exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyInboundMessage
+                coerceContractId <$>exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyInboundMessage
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        executingMessageCid = arg.executingMessageCid
+                        executingMessageCid = coerceContractId arg.executingMessageCid
                         caller = arg.caller
 
             tokenPool_verifyOutboundCCVsImpl self arg = do
-                exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyOutboundCCVs
+                coerceContractId <$> exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyOutboundCCVs
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = arg.sendingMessageCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
                         amount = arg.amount
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) ReleaseFromTicket
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
+                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        tokenReceiveTicketCid = arg.tokenReceiveTicketCid
+                        tokenReceiveTicketCid = coerceContractId arg.tokenReceiveTicketCid
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) LockOrBurn
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
+                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = arg.sendingMessageCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
                         senderInputCids = arg.senderInputCids
                         amount = arg.amount
                         caller = arg.caller
 
             tokenPool_calculateFeeImpl self arg = do
-                exercise (fromInterfaceContractId @BurnMintTokenPool self) CalculateFee
+                coerceContractId <$> exercise (fromInterfaceContractId @BurnMintTokenPool self) CalculateFee
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = arg.sendingMessageCid
-                        feeQuoterCid = arg.feeQuoterCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
+                        feeQuoterCid = coerceContractId arg.feeQuoterCid
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
 
             tokenPool_getFeeImpl self arg = do
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) GetFee
                     with
-                        feeQuoterCid = arg.feeQuoterCid
+                        feeQuoterCid = coerceContractId arg.feeQuoterCid
                         destChainSelector = arg.destChainSelector
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
@@ -892,7 +893,7 @@ template BurnMintTokenPool
                 pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
                     output
                     poolChangeCids = []
-                    claimedEventCid
+                    claimedEventCid = coerceContractId claimedEventCid
 
         -- Calculate fee for outbound token transfer (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
@@ -1130,7 +1131,7 @@ template BurnMintTokenPool
                 pure CCIP.Interfaces.TokenPool.LockOrBurnResult with
                     poolChangeCids = poolChangeCids
                     senderChangeCids = senderChangeCids
-                    sendingMessageCid = newSendingMessageCid
+                    sendingMessageCid = coerceContractId newSendingMessageCid
 
         interface instance MCMSReceiver for BurnMintTokenPool where
           view = MCMSReceiverView with

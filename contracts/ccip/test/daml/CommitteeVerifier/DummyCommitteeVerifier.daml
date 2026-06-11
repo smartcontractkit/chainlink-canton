@@ -36,13 +36,13 @@ template DummyCommitteeVerifier
                     "01" -> error "DummyCommitteeVerifier: Simulated verification failure"
                     _ -> do
                         debug "DummyCommitteeVerifier: Simulated successful verification"
-                        exercise arg.executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+                        coerceContractId <$> exercise (coerceContractId arg.executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1) CCIP.ExecutingMessageV1.AddCCVVerification with
                             ccvInstanceId = instanceId
                             versionTag = versionTag
                             caller = owner
 
             crossChainVerifier_calculateFeeImpl _self arg = do
-                exercise arg.sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                coerceContractId <$>exercise (coerceContractId arg.sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1) CCIP.SendingMessageV1.AddCCVFee with
                     ccvInstanceId = instanceId
                     feeUSDCents = feeUSDCents
                     destGasLimit = destGasLimit
@@ -58,9 +58,9 @@ template DummyCommitteeVerifier
                     payloadSizeBytes = destBytesOverhead
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
-                exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
+                coerceContractId <$> exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
                     ForwardToVerifier with
-                        sendingMessageCid = arg.sendingMessageCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
                         caller = arg.caller
 
         nonconsuming choice ForwardToVerifier

@@ -300,71 +300,72 @@ template LockReleaseTokenPool
                 instrumentId = instrumentId
 
             tokenPool_getRequiredCCVsImpl self arg = do
+                let finality = fromSomeNote "Invalid finality" (CCIP.FinalityConfig.decodeRequestedFinality arg.finality)
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) GetRequiredCCVs
                     with
                         remoteChainSelector = arg.remoteChainSelector
                         sourceAmount = arg.sourceAmount
-                        finality = arg.finality
+                        finality = finality.requested
                         extraData = arg.extraData
                         direction = arg.direction
                         caller = arg.caller
 
             tokenPool_verifyInboundMessageImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) VerifyInboundMessage
+                coerceContractId <$> exercise (fromInterfaceContractId @LockReleaseTokenPool self) VerifyInboundMessage
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        executingMessageCid = arg.executingMessageCid
+                        executingMessageCid = coerceContractId arg.executingMessageCid
                         caller = arg.caller
 
             tokenPool_verifyOutboundCCVsImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) VerifyOutboundCCVs
+                coerceContractId <$> exercise (fromInterfaceContractId @LockReleaseTokenPool self) VerifyOutboundCCVs
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = arg.sendingMessageCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
                         amount = arg.amount
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) ReleaseFromTicket
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
+                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        tokenReceiveTicketCid = arg.tokenReceiveTicketCid
+                        tokenReceiveTicketCid = coerceContractId arg.tokenReceiveTicketCid
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockOrBurn
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
+                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = arg.sendingMessageCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
                         senderInputCids = arg.senderInputCids
                         amount = arg.amount
                         caller = arg.caller
 
             tokenPool_calculateFeeImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) CalculateFee
+                coerceContractId <$> exercise (fromInterfaceContractId @LockReleaseTokenPool self) CalculateFee
                     with
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        tokenConfigCid = arg.tokenConfigCid
+                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
+                        tokenConfigCid = coerceContractId arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = arg.sendingMessageCid
-                        feeQuoterCid = arg.feeQuoterCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
+                        feeQuoterCid = coerceContractId arg.feeQuoterCid
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
 
             tokenPool_getFeeImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) GetFee
                     with
-                        feeQuoterCid = arg.feeQuoterCid
+                        feeQuoterCid = coerceContractId arg.feeQuoterCid
                         destChainSelector = arg.destChainSelector
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
@@ -885,7 +886,7 @@ template LockReleaseTokenPool
                         pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
                             output
                             poolChangeCids = transferResult.senderChangeCids
-                            claimedEventCid
+                            claimedEventCid = coerceContractId claimedEventCid
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
                         assertTransferInstructionMatches
                             "ReleaseFromTicket"
@@ -920,7 +921,7 @@ template LockReleaseTokenPool
                         pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
                             output
                             poolChangeCids = transferResult.senderChangeCids
-                            claimedEventCid
+                            claimedEventCid = coerceContractId claimedEventCid
                     _ -> abort "ReleaseFromTicket: unexpected failed transfer"
 
         -- Calculate fee for outbound token transfer (USD cents only).
@@ -1165,7 +1166,7 @@ template LockReleaseTokenPool
                 pure CCIP.Interfaces.TokenPool.LockOrBurnResult with
                     poolChangeCids = receiverCids ++ tokenPoolHoldings
                     senderChangeCids = transferResult.senderChangeCids
-                    sendingMessageCid = newSendingMessageCid
+                    sendingMessageCid = coerceContractId newSendingMessageCid
 
         interface instance MCMSReceiver for LockReleaseTokenPool where
           view = MCMSReceiverView with

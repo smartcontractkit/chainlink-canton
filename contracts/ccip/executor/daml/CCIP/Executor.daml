@@ -41,9 +41,9 @@ template Executor
                 owner = owner
 
             executor_calculateFeeImpl self arg = do
-                exercise (fromInterfaceContractId @Executor self) CalculateFee with
+                coerceContractId <$> exercise (fromInterfaceContractId @Executor self) CalculateFee with
                     expectedExecutor = arg.expectedExecutor
-                    sendingMessageCid = arg.sendingMessageCid
+                    sendingMessageCid = coerceContractId arg.sendingMessageCid
                     executorArgs = arg.executorArgs
                     extraContext = arg.extraContext
                     caller = arg.caller

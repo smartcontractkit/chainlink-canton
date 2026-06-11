@@ -4,27 +4,20 @@ import DA.Crypto.Text (BytesHex)
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
-import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.Internal
-import qualified CCIP.RMNRemote
-import qualified CCIP.SendingMessageV1
-
-useDefaultCCVs = CCIP.Internal.useDefaultCCVs
-
 interface ICrossChainVerifier where
     viewtype CrossChainVerifierView
 
-    crossChainVerifier_verifyMessageImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_VerifyMessage -> Update (ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1)
-    crossChainVerifier_calculateFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_CalculateFee -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
+    crossChainVerifier_verifyMessageImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_VerifyMessage -> Update (ContractId ())
+    crossChainVerifier_calculateFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_CalculateFee -> Update (ContractId ())
     crossChainVerifier_getFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_GetFee -> Update CrossChainVerifierFeeQuote
-    crossChainVerifier_forwardToVerifierImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_ForwardToVerifier -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
+    crossChainVerifier_forwardToVerifierImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_ForwardToVerifier -> Update (ContractId ())
 
     -- Verify an inbound message and append a CCV verification to ExecutingMessageV1.
-    nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+    nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId ()
         with
-            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+            rmnRemoteCid : ContractId ()
             extraContext : ChoiceContext
-            executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+            executingMessageCid : ContractId ()
             verifierResults : BytesHex
             caller : Party
         controller caller
@@ -32,9 +25,9 @@ interface ICrossChainVerifier where
 
     -- Calculate fee for outbound message (USD cents only).
     nonconsuming choice CrossChainVerifier_CalculateFee
-            : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            : ContractId ()
         with
-            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            sendingMessageCid : ContractId ()
             extraContext : ChoiceContext
             caller : Party
         controller caller
@@ -51,11 +44,11 @@ interface ICrossChainVerifier where
     -- Forward message for verification and append verifier data to
     -- SendingMessageV1.
     nonconsuming choice CrossChainVerifier_ForwardToVerifier
-            : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            : ContractId ()
         with
-            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+            rmnRemoteCid : ContractId ()
             extraContext : ChoiceContext
-            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            sendingMessageCid : ContractId ()
             verifierArgs : BytesHex
             caller : Party
         controller caller

@@ -387,7 +387,7 @@ testCCIPSendAllFeePayouts = script do
     -- ccvOwner is not yet a stakeholder; use disclosure from ccipOwner (signatory).
     disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+        coerceContractId <$> exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
             ccvInstanceId = ccvInstanceId
             feeUSDCents = cents 100.0
             destGasLimit = 0
@@ -395,11 +395,11 @@ testCCIPSendAllFeePayouts = script do
             caller = ccvOwner
 
     -- AddCCVFee made ccvOwner a signatory; refresh disclosure for the updated SM.
-    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner (coerceContractId sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1)
     -- caller must be a stakeholder of SendingMessageV1 (ccipOwner is signatory).
     -- executorOwner stays in actAs so the nested AddExecutorFee (controller = executorOwner) succeeds.
     sendingMessageCid <- submit (actAs ccipOwner <> actAs executorOwner <> disclose disclosedSm) do
-        exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
             CCIP.Interfaces.Executor.Executor_CalculateFee with
                 expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid
@@ -686,7 +686,7 @@ testCCIPSend = script do
 
     -- PrepareSend: create SendingMessageV1 (message deferred to executor)
     sendingMessageCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
-        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+        coerceContractId <$> exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = Splice.Api.Token.MetadataV1.ChoiceContext with
                 values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
                  (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
@@ -705,9 +705,9 @@ testCCIPSend = script do
                     ""
 
     -- Executor fee calculation (must happen before FinalizeFee)
-    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner (coerceContractId sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1)
     sendingMessageCid <- submit (actAs ccipOwner <> disclose disclosedSm) do
-        exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
             CCIP.Interfaces.Executor.Executor_CalculateFee with
                 expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid
@@ -756,7 +756,7 @@ testCCIPSend = script do
 
     -- Send another message, sequence number should be 2
     sendingMessageCid2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
-        exerciseCmd newRouter CCIP.PerPartyRouter.PrepareSend with
+        coerceContractId <$> exerciseCmd newRouter CCIP.PerPartyRouter.PrepareSend with
             context = Splice.Api.Token.MetadataV1.ChoiceContext with
                 values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
                  (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
@@ -775,9 +775,9 @@ testCCIPSend = script do
                     ""
 
     -- Executor fee for second message (must happen before FinalizeFee)
-    disclosedSm2 <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid2
+    disclosedSm2 <- fromSome <$> queryDisclosure ccipOwner (coerceContractId sendingMessageCid2 : ContractId CCIP.SendingMessageV1.SendingMessageV1)
     sendingMessageCid2 <- submit (actAs ccipOwner <> disclose disclosedSm2) do
-        exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
             CCIP.Interfaces.Executor.Executor_CalculateFee with
                 expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid2

@@ -4,7 +4,6 @@ import DA.Crypto.Text (BytesHex)
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
-import qualified CCIP.SendingMessageV1
 import Chainlink.InstanceAddress (RawInstanceAddress)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
@@ -14,16 +13,16 @@ interface IExecutor where
     executor_calculateFeeImpl :
         ContractId IExecutor ->
         Executor_CalculateFee ->
-        Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
+        Update (ContractId ())
     executor_getFeeImpl :
         ContractId IExecutor ->
         Executor_GetFee ->
         Update ExecutorFeeQuote
 
-    nonconsuming choice Executor_CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+    nonconsuming choice Executor_CalculateFee : ContractId ()
         with
             expectedExecutor : RawInstanceAddress
-            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            sendingMessageCid : ContractId ()
             executorArgs : BytesHex
             extraContext : ChoiceContext
             caller : Party
