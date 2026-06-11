@@ -390,6 +390,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	tokenTransferFeeUSDCents := 10
 	tokenTransferFeeBps := 500 // 5%
 
+	testhelpers.GrantCanReadAs(t, senderParticipant, partyCCIP)
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
 	out, err = changesets.DeployLockReleaseTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployLockReleaseTokenPoolConfig]{
@@ -397,7 +398,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		Participant:   1,
 		Config: changesets.DeployLockReleaseTokenPoolConfig{
 			CcipOwner:    partyCCIP,
-			PoolOwner:    partyCCIP,
+			PoolOwner:    partySender,
 			InstrumentId: nativeInstrumentId,
 			Decimals:     10,
 			InstanceID:   poolInstanceID,
