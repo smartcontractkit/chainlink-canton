@@ -199,6 +199,11 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, err
 		}
+		tokenPrices, err := resolveTokenPricesForRemoteDest(ds, input, remoteSelector)
+		if err != nil {
+			return out, fmt.Errorf("resolve token prices for remote chain %d: %w", remoteSelector, err)
+		}
+		remoteChain.TokenPrices = tokenPrices
 
 		out, err = ccipseq.RunAndMergeSequence(
 			b,
