@@ -38,6 +38,10 @@ func (m *p2pMockClient) RegisterKmsSigningKey(context.Context, string, string, [
 	return nil, errors.New("not implemented")
 }
 
+func (m *p2pMockClient) LookupKmsSigningKey(context.Context, string, []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (m *p2pMockClient) GetNamespaceFingerprint(context.Context, string, string, []string) (string, error) {
 	return "", errors.New("not implemented")
 }

@@ -56,6 +56,7 @@ func init() {
 	f.String("new-party-name", "", "Party ID prefix used to derive the final party identifier (required)")
 	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
 	f.Int("threshold", 0, "Minimum signatures required before submission. 0 = strict majority (floor(n/2)+1)")
+	f.String("kms-vault-name", "", "Optional KMS vault registration name (defaults to --new-namespace-name). Use to reuse keys registered under another ceremony name.")
 	f.String("config", "participant-config.json", "Path to participant config JSON file")
 	f.String("state-dir", "ceremonies", "Root directory under which ceremony state is stored")
 
@@ -76,6 +77,7 @@ func runInitOnboarding(cmd *cobra.Command, _ []string) error {
 	partyName, _ := f.GetString("new-party-name")
 	synchronizerID, _ := f.GetString("synchronizer-id")
 	threshold, _ := f.GetInt("threshold")
+	kmsVaultName, _ := f.GetString("kms-vault-name")
 	configPath, _ := f.GetString("config")
 	stateDir, _ := f.GetString("state-dir")
 
@@ -92,6 +94,7 @@ func runInitOnboarding(cmd *cobra.Command, _ []string) error {
 
 	input := onboarding.OnboardingInput{
 		NamespaceName:  namespaceName,
+		KmsVaultName:   kmsVaultName,
 		PartyPrefix:    partyName,
 		Participants:   participants,
 		SynchronizerID: synchronizerID,
