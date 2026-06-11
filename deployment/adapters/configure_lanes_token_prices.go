@@ -9,6 +9,7 @@ import (
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 )
 
@@ -30,6 +31,9 @@ const defaultLinkTokenInstrumentID = "link-token"
 // defaultLinkUsdPerTokenDollars is the nominal LINK/USD spot used when FamilyExtras omit a price.
 const defaultLinkUsdPerTokenDollars int64 = 10
 
+// defaultNativeUsdPerTokenDollars is the nominal Amulet/USD spot used when FamilyExtras omit a price.
+const defaultNativeUsdPerTokenDollars int64 = 1
+
 // cantonUsdPerTokenScale is the internal fixed-point scale (USD * 1e8) before formatting to Decimal.
 const cantonUsdPerTokenScale int64 = 100_000_000
 
@@ -37,21 +41,30 @@ func resolveTokenPricesForRemoteDest(
 	ds datastore.DataStore,
 	input ccipadapters.ConfigureChainForLanesInput,
 	remoteSelector uint64,
+	nativeInstrument *splice_api_token_holding_v1.InstrumentId,
 ) (map[string]*big.Int, error) {
-	if prices, err := tokenPricesFromFamilyExtras(input.FamilyExtras, remoteSelector); err != nil {
-		return nil, err
-	} else if len(prices) > 0 {
-		return prices, nil
-	}
-
 	ccipOwner, err := resolveCcipOwnerParty(ds, input.ChainSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	return map[string]*big.Int{
+	prices := map[string]*big.Int{
 		fmt.Sprintf("%s:%s", ccipOwner, defaultLinkTokenInstrumentID): usdPerTokenToScaled(defaultLinkUsdPerTokenDollars),
-	}, nil
+	}
+	if nativeInstrument != nil && nativeInstrument.Admin != "" && nativeInstrument.Id != "" {
+		key := instrumentPriceKey(nativeInstrument.Admin, nativeInstrument.Id)
+		prices[key] = usdPerTokenToScaled(defaultNativeUsdPerTokenDollars)
+	}
+
+	extras, err := tokenPricesFromFamilyExtras(input.FamilyExtras, remoteSelector)
+	if err != nil {
+		return nil, err
+	}
+	for instrument, price := range extras {
+		prices[instrument] = price
+	}
+
+	return prices, nil
 }
 
 func usdPerTokenToScaled(usdDollars int64) *big.Int {

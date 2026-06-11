@@ -442,6 +442,21 @@ func resolveCcipOwnerPartyFromFeeQuoterRef(feeQuoterRef datastore.AddressRef) (s
 	return "", fmt.Errorf("ccipOwner party not found in FeeQuoter labels")
 }
 
+func parseInstrumentPriceKey(instrument string) (admin, id string, err error) {
+	instrument = strings.TrimSpace(instrument)
+	lastColon := strings.LastIndex(instrument, ":")
+	if lastColon <= 0 || lastColon+1 >= len(instrument) {
+		return "", "", fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+	}
+	admin = strings.TrimSpace(instrument[:lastColon])
+	id = strings.TrimSpace(instrument[lastColon+1:])
+	if admin == "" || id == "" {
+		return "", "", fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+	}
+
+	return admin, id, nil
+}
+
 func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]core.TokenPriceUpdate, error) {
 	if len(tokenPrices) == 0 {
 		return nil, nil
@@ -451,14 +466,14 @@ func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]core.TokenP
 		if price == nil {
 			continue
 		}
-		parts := strings.SplitN(instrument, ":", 2)
-		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-			return nil, fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+		admin, id, err := parseInstrumentPriceKey(instrument)
+		if err != nil {
+			return nil, err
 		}
 		updates = append(updates, core.TokenPriceUpdate{
 			InstrumentId: splice_api_token_holding_v1.InstrumentId{
-				Admin: types.PARTY(strings.TrimSpace(parts[0])),
-				Id:    types.TEXT(strings.TrimSpace(parts[1])),
+				Admin: types.PARTY(admin),
+				Id:    types.TEXT(id),
 			},
 			UsdPerToken: cantonFeeQuoterUsdPerToken(price),
 		})
