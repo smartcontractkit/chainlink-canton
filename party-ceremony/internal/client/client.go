@@ -34,6 +34,10 @@ type CantonClient interface {
 	// Returns the public key proto for the registered key.
 	RegisterKmsSigningKey(ctx context.Context, kmsKeyID string, name string, usage []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error)
 
+	// LookupKmsSigningKey returns the public key for a KMS key already
+	// registered in the participant vault. usage filters vault keys by purpose.
+	LookupKmsSigningKey(ctx context.Context, kmsKeyID string, usage []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error)
+
 	// GetNamespaceFingerprint returns the namespace fingerprint for a named
 	// key by cross-referencing the vault (ListMyKeys) with namespace
 	// delegations (ListNamespaceDelegation).

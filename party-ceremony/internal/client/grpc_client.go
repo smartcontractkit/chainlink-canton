@@ -212,6 +212,35 @@ func (c *GRPCCantonClient) RegisterKmsSigningKey(
 	return resp.GetPublicKey(), nil
 }
 
+func (c *GRPCCantonClient) LookupKmsSigningKey(
+	ctx context.Context,
+	kmsKeyID string,
+	usage []cryptov30.SigningKeyUsage,
+) (*cryptov30.SigningPublicKey, error) {
+	vaultResp, err := c.vault.ListMyKeys(ctx, &cryptoadminv30.ListMyKeysRequest{
+		Filters: &cryptoadminv30.ListKeysFilters{
+			Usage: usage,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ListMyKeys: %w", err)
+	}
+
+	for _, km := range vaultResp.GetPrivateKeysMetadata() {
+		if km.GetKmsKeyId() != kmsKeyID {
+			continue
+		}
+		spk := km.GetPublicKeyWithName().GetPublicKey().GetSigningPublicKey()
+		if spk == nil || len(spk.GetPublicKey()) == 0 {
+			continue
+		}
+
+		return spk, nil
+	}
+
+	return nil, fmt.Errorf("no registered KMS signing key %q found in vault", kmsKeyID)
+}
+
 func (c *GRPCCantonClient) GetNamespaceFingerprint(ctx context.Context, keyName string, synchronizerID string, knownOwners []string) (string, error) {
 	// Step 1: find ALL keys named keyName in the vault.
 	vaultResp, err := c.vault.ListMyKeys(ctx, &cryptoadminv30.ListMyKeysRequest{
