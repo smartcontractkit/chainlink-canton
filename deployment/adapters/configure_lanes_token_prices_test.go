@@ -92,4 +92,3 @@ func TestPartyFromDeployLabels(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551", party)
 }
-

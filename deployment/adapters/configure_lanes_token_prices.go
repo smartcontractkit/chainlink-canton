@@ -2,6 +2,8 @@ package adapters
 
 import (
 	"fmt"
+	"maps"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -60,9 +62,7 @@ func resolveTokenPricesForRemoteDest(
 	if err != nil {
 		return nil, err
 	}
-	for instrument, price := range extras {
-		prices[instrument] = price
-	}
+	maps.Copy(prices, extras)
 
 	return prices, nil
 }
@@ -73,11 +73,11 @@ func usdPerTokenToScaled(usdDollars int64) *big.Int {
 
 func tokenPricesFromFamilyExtras(extras map[string]any, remoteSelector uint64) (map[string]*big.Int, error) {
 	if extras == nil {
-		return nil, nil
+		return map[string]*big.Int{}, nil
 	}
 	raw, ok := extras[CantonRemoteTokenPricesFamilyExtraKey]
 	if !ok || raw == nil {
-		return nil, nil
+		return map[string]*big.Int{}, nil
 	}
 
 	byRemote, ok := raw.(map[string]any)
@@ -88,7 +88,7 @@ func tokenPricesFromFamilyExtras(extras map[string]any, remoteSelector uint64) (
 	remoteKey := strconv.FormatUint(remoteSelector, 10)
 	instruments, ok := byRemote[remoteKey]
 	if !ok {
-		return nil, nil
+		return map[string]*big.Int{}, nil
 	}
 
 	instrumentMap, ok := instruments.(map[string]any)
@@ -116,21 +116,28 @@ func parseUsdPerTokenPrice(raw any) (*big.Int, error) {
 		if v <= 0 {
 			return nil, fmt.Errorf("price must be positive")
 		}
+
 		return usdPerTokenToScaled(int64(v)), nil
 	case int64:
 		if v <= 0 {
 			return nil, fmt.Errorf("price must be positive")
 		}
+
 		return usdPerTokenToScaled(v), nil
 	case uint64:
 		if v == 0 {
 			return nil, fmt.Errorf("price must be positive")
 		}
+		if v > math.MaxInt64 {
+			return nil, fmt.Errorf("price exceeds supported range")
+		}
+
 		return usdPerTokenToScaled(int64(v)), nil
 	case float64:
 		if v <= 0 {
 			return nil, fmt.Errorf("price must be positive")
 		}
+
 		return parseUsdPerTokenPriceString(strconv.FormatFloat(v, 'f', -1, 64))
 	default:
 		return nil, fmt.Errorf("unsupported price type %T", raw)
