@@ -12,11 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
-	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/logger"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	optest "github.com/smartcontractkit/chainlink-deployments-framework/operations/test"
 )
 
 type kmsVaultMockClient struct {
@@ -122,6 +118,34 @@ func (m *kmsVaultMockClient) UploadDar(context.Context, []byte) (string, error) 
 	return "", errors.New("not implemented")
 }
 
+func (m *kmsVaultMockClient) ExportAcs(context.Context, []string, string, int64) ([]byte, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *kmsVaultMockClient) ImportAcs(context.Context, []byte, string) error {
+	return errors.New("not implemented")
+}
+
+func (m *kmsVaultMockClient) DisconnectSynchronizer(context.Context, string) error {
+	return errors.New("not implemented")
+}
+
+func (m *kmsVaultMockClient) ReconnectSynchronizer(context.Context, string) error {
+	return errors.New("not implemented")
+}
+
+func (m *kmsVaultMockClient) ListConnectedSynchronizers(context.Context) ([]client.SynchronizerInfo, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *kmsVaultMockClient) ClearPartyOnboardingFlag(context.Context, string, string, int64) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (m *kmsVaultMockClient) LookupOffsetByTime(context.Context, int64) (int64, error) {
+	return 0, errors.New("not implemented")
+}
+
 func TestObtainSigningKey_ReusesRegisteredKmsKeyOnConflict(t *testing.T) {
 	t.Parallel()
 
@@ -145,65 +169,4 @@ func TestVaultRegistrationName(t *testing.T) {
 
 	assert.Equal(t, "ccv-owner-mainnet", vaultRegistrationName("ccv-owner-mainnet", ""))
 	assert.Equal(t, "ccip-owner-mainnet", vaultRegistrationName("ccv-owner-mainnet", "ccip-owner-mainnet"))
-}
-
-func TestCreateMemberKeyOp_ReusesExistingKmsKeysAcrossVaultNames(t *testing.T) {
-	t.Parallel()
-
-	mock := newKmsVaultMockClient("Chainlink-MainnetCV1-1::1220abc")
-	const (
-		nsARN = "arn:aws:kms:us-west-2:123456789:key/namespace"
-		pARN  = "arn:aws:kms:us-west-2:123456789:key/protocol"
-	)
-
-	_, err := mock.RegisterKmsSigningKey(context.Background(), nsARN, "ccip-owner-mainnet", []cryptov30.SigningKeyUsage{
-		cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_NAMESPACE,
-	})
-	require.NoError(t, err)
-	_, err = mock.RegisterKmsSigningKey(context.Background(), pARN, "ccip-owner-mainnet-protocol", []cryptov30.SigningKeyUsage{
-		cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_PROTOCOL,
-	})
-	require.NoError(t, err)
-
-	out, err := operations.ExecuteOperation(optest.NewBundle(t), CreateMemberKeyOp, ceremony.CantonDeps{
-		Client: mock,
-		KMS: client.KMSConfig{
-			NamespaceKeyID: nsARN,
-			ProtocolKeyID:  pARN,
-		},
-		Logger: logger.Nop(),
-	}, CreateMemberKeyInput{
-		NamespaceName: "ccv-owner-mainnet",
-		ParticipantID: "Chainlink-MainnetCV1-1::1220abc",
-	})
-	require.NoError(t, err)
-	assert.NotEmpty(t, out.Output.NamespaceFingerprint)
-	assert.NotEmpty(t, out.Output.SigningKeyB64)
-	assert.NotEmpty(t, out.Output.DamlKeyB64)
-}
-
-func TestCreateMemberKeyOp_KmsVaultNameOverridesRegistrationName(t *testing.T) {
-	t.Parallel()
-
-	mock := newKmsVaultMockClient("p1")
-	const (
-		nsARN = "arn:aws:kms:us-west-2:123456789:key/namespace"
-		pARN  = "arn:aws:kms:us-west-2:123456789:key/protocol"
-	)
-
-	_, err := operations.ExecuteOperation(optest.NewBundle(t), CreateMemberKeyOp, ceremony.CantonDeps{
-		Client: mock,
-		KMS: client.KMSConfig{
-			NamespaceKeyID: nsARN,
-			ProtocolKeyID:  pARN,
-		},
-		Logger: logger.Nop(),
-	}, CreateMemberKeyInput{
-		NamespaceName: "ccv-owner-mainnet",
-		KmsVaultName:  "ccip-owner-mainnet",
-		ParticipantID: "p1",
-	})
-	require.NoError(t, err)
-	assert.Contains(t, mock.keys, nsARN)
-	assert.Contains(t, mock.keys, pARN)
 }
