@@ -195,5 +195,6 @@ func partyFromDeployLabels(labels datastore.LabelSet) (string, bool) {
 			return party, true
 		}
 	}
+
 	return "", false
 }
