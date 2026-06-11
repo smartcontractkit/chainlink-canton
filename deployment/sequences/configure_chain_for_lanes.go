@@ -122,6 +122,11 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		}
 		defaultOutboundCCVs = append(defaultOutboundCCVs, outboundCCV.Binding())
 	}
+	// Default to false if not specified
+	tokenReceiverAllowed := false
+	if destChain.TokenReceiverAllowed != nil {
+		tokenReceiverAllowed = *destChain.TokenReceiverAllowed
+	}
 	destChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[core.ApplyDestChainConfigUpdates]{
 		InstanceAddress:    globalConfigRaw.InstanceAddress(),
 		RawInstanceAddress: globalConfigRaw.String(),
@@ -132,7 +137,7 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 					DestChainSelector:         types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
 					IsEnabled:                 types.BOOL(isEnabled),
 					AddressBytesLength:        types.INT64(destChain.AddressBytesLength),
-					TokenReceiverAllowed:      true, // TODO: missing from input
+					TokenReceiverAllowed:      types.BOOL(tokenReceiverAllowed),
 					BaseExecutionGasCost:      types.INT64(destChain.BaseExecutionGasCost),
 					OffRampAddress:            types.TEXT(hex.EncodeToString(destChain.OffRamp)),
 					DefaultExecutor:           new(defaultExecutor.Binding()),
