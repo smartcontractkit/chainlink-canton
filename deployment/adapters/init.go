@@ -26,6 +26,7 @@ func init() {
 	ccipdeploy.GetTransferOwnershipRegistry().RegisterAdapter(chainsel.FamilyCanton, ccipdeploy.MCMSVersion, &CantonTransferOwnershipAdapter{})
 
 	// Register the offchain adapters
+	ccipadapters.GetExecutorConfigRegistry().Register(chainsel.FamilyCanton, &CantonCCIPExecutorConfigAdapter{})
 	ccvadapters.GetRegistry().Register(chainsel.FamilyCanton, ccvadapters.ChainAdapters{
 		Aggregator:               &CantonAggregatorConfigAdapter{},
 		Executor:                 &CantonExecutorConfigAdapter{},
