@@ -1,9 +1,11 @@
-
-# Ceremony state and reports
+# Ceremony state — commit via chainlink-canton-ceremonies, not chainlink-canton
 ceremonies/
+**/workflow.json
+**/reports.json
 participant-config.json
 
-# Operator-local testnet node configs (JWTs from refresh-token.sh)
+# Operator-local node configs (JWTs, KMS ARNs — refresh before each run)
 config/testnet/nodes/
+config/mainnet/nodes/
 
 /bin
