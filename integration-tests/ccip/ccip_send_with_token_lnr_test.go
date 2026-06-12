@@ -391,6 +391,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	tokenTransferFeeBps := 500 // 5%
 
 	testhelpers.GrantCanReadAs(t, senderParticipant, partyCCIP)
+	env.Chain.Participants[1].ReadAsPartyIDs = append(env.Chain.Participants[1].ReadAsPartyIDs, partyCCIP)
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
 	out, err = changesets.DeployLockReleaseTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployLockReleaseTokenPoolConfig]{
@@ -433,14 +434,24 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 				RmnRemote:          rmnRemoteAddress.Binding(),
 				FeeQuoter:          feeQuoterAddress.Binding(),
 			},
-			// By setting the TAR address, the CS will automatically register the newly deployed pool with the TAR
-			TokenAdminRegistryInstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 		},
 	})
 	require.NoError(t, err, "failed to deploy lock release token pool via changeset")
 	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
 	cldfEnv.DataStore = out.DataStore.Seal()
+	_, err = changesets.RegisterTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.RegisterTokenPoolConfig]{
+		ChainSelector: env.Chain.ChainSelector(),
+		Participant:   0,
+		Config: changesets.RegisterTokenPoolConfig{
+			CcipOwner:       partyCCIP,
+			PoolOwner:       partySender,
+			InstrumentId:    nativeInstrumentId,
+			PoolInstanceID:  poolInstanceID,
+			PoolParticipant: 1,
+		},
+	})
+	require.NoError(t, err, "failed to register lock release token pool with TAR")
 	_, tokenPoolAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), lock_release_token_pool.ContractType, lock_release_token_pool.Version, "")
 	require.NoError(t, err, "failed to get Token Pool address")
 
@@ -527,7 +538,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 							PartyID:         partyCCIP,
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
-						PoolOwner: partyCCIP,
+						PoolOwner: partySender,
 						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
 						TransferFactory: &config.TransferFactory{
 							Type:             config.FactoryTypeURL,

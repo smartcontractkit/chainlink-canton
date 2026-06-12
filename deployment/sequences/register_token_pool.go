@@ -33,9 +33,12 @@ type RegisterTokenPoolInput struct {
 	CcipParty string
 	// PoolOwnerParty is the token pool owner party (acts on AcceptAdminRole and SetPool).
 	PoolOwnerParty string
-	// ParticipantIndex selects which participant submits registration commands.
+	// CcipParticipantIndex selects which participant submits ProposeAdministrator.
 	// Zero value defaults to the first participant.
-	ParticipantIndex int `json:"participantIndex,omitempty"`
+	CcipParticipantIndex int `json:"ccipParticipantIndex,omitempty"`
+	// PoolParticipantIndex selects which participant submits AcceptAdminRole and SetPool.
+	// Zero value defaults to CcipParticipantIndex.
+	PoolParticipantIndex int `json:"poolParticipantIndex,omitempty"`
 }
 
 var RegisterTokenPool = operations.NewSequence(
@@ -46,13 +49,23 @@ var RegisterTokenPool = operations.NewSequence(
 )
 
 func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTokenPoolInput) (sequences.OnChainOutput, error) {
-	participant, err := contract.ParticipantAt(deps, input.ParticipantIndex)
-	if err != nil {
-		return sequences.OnChainOutput{}, fmt.Errorf("resolve participant: %w", err)
+	ccipParticipantIndex := input.CcipParticipantIndex
+	poolParticipantIndex := input.PoolParticipantIndex
+	if poolParticipantIndex == 0 {
+		poolParticipantIndex = ccipParticipantIndex
 	}
-	// ReadAsPartyIDs are CanReadAs rights for parties the operator cannot ActAs (e.g. ccip owner).
-	// When present, exercises must be encoded as MCMS proposals instead of submitted directly.
-	mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
+
+	ccipParticipant, err := contract.ParticipantAt(deps, ccipParticipantIndex)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("resolve ccip participant: %w", err)
+	}
+	poolParticipant, err := contract.ParticipantAt(deps, poolParticipantIndex)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("resolve pool participant: %w", err)
+	}
+	ccipMcmsEnabled := len(ccipParticipant.ReadAsPartyIDs) > 0
+	poolMcmsEnabled := len(poolParticipant.ReadAsPartyIDs) > 0
+	mcmsEnabled := ccipMcmsEnabled || poolMcmsEnabled
 
 	instrumentId := input.InstrumentId
 	ccipParty := input.CcipParty
@@ -61,7 +74,7 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 
 	var proposalOutputs []contract.ExerciseOutput
 
-	existingTokenConfigCid, tokenConfigFound, err := findTokenConfigCid(b, deps, input.ParticipantIndex, tokenConfigAddress)
+	existingTokenConfigCid, tokenConfigFound, err := findTokenConfigCid(b, deps, ccipParticipantIndex, tokenConfigAddress)
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config: %w", err)
 	}
@@ -79,8 +92,8 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	proposeReport, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[core.ProposeAdministrator]{
 		InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
 		RawInstanceAddress: tarRaw,
-		MCMSEnabled:        mcmsEnabled,
-		ParticipantIndex:   input.ParticipantIndex,
+		MCMSEnabled:        ccipMcmsEnabled,
+		ParticipantIndex:   ccipParticipantIndex,
 		Args: core.ProposeAdministrator{
 			TokenConfigCid: tokenConfigCidArg,
 			InstrumentId:   instrumentId,
@@ -95,12 +108,12 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to propose administrator: %w", err)
 		}
 	}
-	if err == nil && mcmsEnabled && !proposeReport.Output.Executed() {
+	if err == nil && ccipMcmsEnabled && !proposeReport.Output.Executed() {
 		proposalOutputs = append(proposalOutputs, proposeReport.Output)
 	}
 
-	if !mcmsEnabled && err == nil {
-		tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, input.ParticipantIndex, tokenConfigAddress)
+	if !ccipMcmsEnabled && err == nil {
+		tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, ccipParticipantIndex, tokenConfigAddress)
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config after propose: %w", err)
 		}
@@ -114,8 +127,8 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 		acceptReport, err := operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[core.AcceptAdminRole]{
 			InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
 			RawInstanceAddress: tarRaw,
-			MCMSEnabled:        mcmsEnabled,
-			ParticipantIndex:   input.ParticipantIndex,
+			MCMSEnabled:        poolMcmsEnabled,
+			ParticipantIndex:   poolParticipantIndex,
 			Args: core.AcceptAdminRole{
 				TokenConfigCid: tokenConfigCid,
 				InstrumentId:   instrumentId,
@@ -125,11 +138,11 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to accept admin role: %w", err)
 		}
-		if mcmsEnabled && !acceptReport.Output.Executed() {
+		if poolMcmsEnabled && !acceptReport.Output.Executed() {
 			proposalOutputs = append(proposalOutputs, acceptReport.Output)
 		}
-		if !mcmsEnabled {
-			tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, input.ParticipantIndex, tokenConfigAddress)
+		if !poolMcmsEnabled {
+			tokenConfigCid, tokenConfigFound, err = findTokenConfigCid(b, deps, ccipParticipantIndex, tokenConfigAddress)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config after accept admin role: %w", err)
 			}
@@ -139,13 +152,12 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 		}
 	}
 
-	// Step 3: SetPool (pool owner acts)
 	poolOwnerPartyTyped := types.PARTY(poolOwnerParty)
 	setPoolReport, err := operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[core.SetPool]{
 		InstanceAddress:    input.TokenAdminRegistryInstanceAddress,
 		RawInstanceAddress: tarRaw,
-		MCMSEnabled:        mcmsEnabled,
-		ParticipantIndex:   input.ParticipantIndex,
+		MCMSEnabled:        poolMcmsEnabled,
+		ParticipantIndex:   poolParticipantIndex,
 		Args: core.SetPool{
 			TokenConfigCid: tokenConfigCid,
 			InstrumentId:   instrumentId,
@@ -159,7 +171,7 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to set pool: %w", err)
 	}
-	if mcmsEnabled && !setPoolReport.Output.Executed() {
+	if poolMcmsEnabled && !setPoolReport.Output.Executed() {
 		proposalOutputs = append(proposalOutputs, setPoolReport.Output)
 	}
 

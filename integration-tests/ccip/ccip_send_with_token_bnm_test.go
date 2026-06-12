@@ -384,7 +384,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		OwnerParty: types.PARTY(partyCCIP),
 		Template: core.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceID),
-			PoolOwner:           types.PARTY(partyCCIP),
+			PoolOwner:           types.PARTY(partySender),
 			RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 			Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
 			Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
@@ -408,12 +408,14 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
+	testhelpers.GrantCanReadAs(t, senderParticipant, partyCCIP)
+	env.Chain.Participants[1].ReadAsPartyIDs = append(env.Chain.Participants[1].ReadAsPartyIDs, partyCCIP)
 	out, err = changesets.DeployBurnMintTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployBurnMintTokenPoolConfig]{
 		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   1,
 		Config: changesets.DeployBurnMintTokenPoolConfig{
 			CcipOwner:    partyCCIP,
-			PoolOwner:    partyCCIP,
+			PoolOwner:    partySender,
 			InstrumentId: linkInstrumentId,
 			Decimals:     10,
 			InstanceID:   poolInstanceID,
@@ -448,14 +450,24 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				RmnRemote:          rmnRemoteAddress.Binding(),
 				FeeQuoter:          feeQuoterAddress.Binding(),
 			},
-			// By setting the TAR address, the CS will automatically register the newly deployed pool with the TAR
-			TokenAdminRegistryInstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 		},
 	})
 	require.NoError(t, err, "failed to deploy burn mint token pool via changeset")
 	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
 	cldfEnv.DataStore = out.DataStore.Seal()
+	_, err = changesets.RegisterTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.RegisterTokenPoolConfig]{
+		ChainSelector: env.Chain.ChainSelector(),
+		Participant:   0,
+		Config: changesets.RegisterTokenPoolConfig{
+			CcipOwner:       partyCCIP,
+			PoolOwner:       partySender,
+			InstrumentId:    linkInstrumentId,
+			PoolInstanceID:  poolInstanceID,
+			PoolParticipant: 1,
+		},
+	})
+	require.NoError(t, err, "failed to register burn mint token pool with TAR")
 	_, tokenPoolAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), burn_mint_token_pool.ContractType, burn_mint_token_pool.Version, "")
 	require.NoError(t, err, "failed to get Token Pool address")
 
@@ -542,7 +554,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 							PartyID:         partyCCIP,
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
-						PoolOwner: partyCCIP,
+						PoolOwner: partySender,
 						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
 						BurnMintFactory: &config.BurnMintFactory{
 							Type:            config.FactoryTypeAddress,
