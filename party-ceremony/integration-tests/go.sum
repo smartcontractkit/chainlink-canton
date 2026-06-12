@@ -35,8 +35,8 @@ github.com/awalterschulze/gographviz v2.0.3+incompatible h1:9sVEXJBJLwGX7EQVhLm2
 github.com/awalterschulze/gographviz v2.0.3+incompatible/go.mod h1:GEV5wmg4YquNw7v1kkyoX9etIk8yVmXj+AkDHuuETHs=
 github.com/aws/aws-sdk-go v1.55.8 h1:JRmEUbU52aJQZ2AjX4q4Wu7t4uZjOu71uyNmaWlUkJQ=
 github.com/aws/aws-sdk-go v1.55.8/go.mod h1:ZkViS9AqA6otK+JBBNH2++sx1sgxrPKcSzPPvQkUtXk=
-github.com/aws/aws-sdk-go-v2 v1.41.12 h1:DIKX2c31ekm9RA2D9FBj1EWXx++9AdAqRw+e78Tq2Ck=
-github.com/aws/aws-sdk-go-v2 v1.41.12/go.mod h1:27+ACypSLljLAEKsCYOmrjKh83vuTRkuAe9Uv/3A4bg=
+github.com/aws/aws-sdk-go-v2 v1.42.0 h1:XvXMJTkFQtpBKIWZnmr9ZEOc2InWM2yldjXEJ/bymhA=
+github.com/aws/aws-sdk-go-v2 v1.42.0/go.mod h1:27+ACypSLljLAEKsCYOmrjKh83vuTRkuAe9Uv/3A4bg=
 github.com/aws/aws-sdk-go-v2/credentials v1.19.22 h1:SHfH6wyPsEgG7fVsi5rQxWEt7tuIcN2PGhb1mTFv6tE=
 github.com/aws/aws-sdk-go-v2/credentials v1.19.22/go.mod h1:54nO8lKD4aQPOntM/VTWjnR+DYzTwx0YkSMZMhAgewQ=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.28 h1:Xf2j7NdVcUKomlZ4iihOP4AZ3Fzlr8h4yKpXeP+OFPg=
