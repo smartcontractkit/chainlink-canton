@@ -15,15 +15,13 @@ import (
 )
 
 // RegisterTokenPoolConfig registers an already-deployed token pool with the TokenAdminRegistry.
-// CantonCSDeps.Participant selects the CCIP owner participant (ProposeAdministrator).
-// PoolParticipant selects the pool owner participant (AcceptAdminRole, SetPool); defaults to the CCIP participant when zero.
+// CantonCSDeps.Participant selects the CCIP owner participant for all TAR registration steps.
+// PoolOwner is recorded in PoolRegistration; ccipOwner is TokenConfig admin.
 type RegisterTokenPoolConfig struct {
 	CcipOwner      string
 	PoolOwner      string
 	InstrumentId   splice_api_token_holding_v1.InstrumentId
 	PoolInstanceID string
-	// PoolParticipant is the participant index for pool-owner steps. When zero, CantonCSDeps.Participant is used.
-	PoolParticipant int
 }
 
 var _ cldf.ChangeSetV2[CantonCSDeps[RegisterTokenPoolConfig]] = RegisterTokenPool{}
@@ -37,10 +35,6 @@ func (r RegisterTokenPool) VerifyPreconditions(e cldf.Environment, config Canton
 	}
 	if config.Participant < 0 || config.Participant >= len(chain.Participants) {
 		return fmt.Errorf("participant index %d out of range for canton chain %d with %d participants", config.Participant, config.ChainSelector, len(chain.Participants))
-	}
-	poolParticipant := poolParticipantIndex(config)
-	if poolParticipant < 0 || poolParticipant >= len(chain.Participants) {
-		return fmt.Errorf("pool participant index %d out of range for canton chain %d with %d participants", poolParticipant, config.ChainSelector, len(chain.Participants))
 	}
 	if config.Config.PoolInstanceID == "" {
 		return fmt.Errorf("PoolInstanceID is required")
@@ -81,7 +75,6 @@ func (r RegisterTokenPool) Apply(e cldf.Environment, config CantonCSDeps[Registe
 		PoolOwnerParty:                       cfg.PoolOwner,
 		PoolInstanceID:                       cfg.PoolInstanceID,
 		CcipParticipantIndex:                 config.Participant,
-		PoolParticipantIndex:                 poolParticipantIndex(config),
 	})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("register token pool with TAR: %w", err)
@@ -90,12 +83,4 @@ func (r RegisterTokenPool) Apply(e cldf.Environment, config CantonCSDeps[Registe
 	return cldf.ChangesetOutput{
 		Reports: []cld_ops.Report[any, any]{},
 	}, nil
-}
-
-func poolParticipantIndex(config CantonCSDeps[RegisterTokenPoolConfig]) int {
-	if config.Config.PoolParticipant != 0 {
-		return config.Config.PoolParticipant
-	}
-
-	return config.Participant
 }

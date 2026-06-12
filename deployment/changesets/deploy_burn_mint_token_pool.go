@@ -140,8 +140,7 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 			CcipParty:                            cfg.CcipOwner,
 			PoolOwnerParty:                       cfg.PoolOwner,
 			PoolInstanceID:                       rawPoolAddr.InstanceID(),
-			CcipParticipantIndex:                 participantIndex,
-			PoolParticipantIndex:                 participantIndex,
+			CcipParticipantIndex: participantIndex,
 		}
 		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {

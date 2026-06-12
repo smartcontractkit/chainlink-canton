@@ -210,6 +210,13 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 	)
 }
 
+// ProposalDrivenForCaller reports whether a choice should be MCMS-encoded instead of submitted
+// directly. Proposal mode is required when the submitting participant cannot ActAs the choice
+// caller party. ReadAsPartyIDs alone does not imply proposal mode—they only widen ACS visibility.
+func ProposalDrivenForCaller(participant canton.Participant, callerParty string) bool {
+	return participant.PartyID != callerParty
+}
+
 // LedgerQueryParties builds the party list for ledger ACS reads (GetActiveContracts, etc.).
 //
 // The operator participant may ActAs one party while holding CanReadAs for others (for example
