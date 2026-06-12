@@ -1,7 +1,9 @@
 name: Build and publish Docker images
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - sish/publish-eds
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -9,6 +11,7 @@ concurrency:
 jobs:
   build-committeeverifier:
     name: Build and publish committee verifier image
+    if: github.ref == 'refs/heads/main'
     permissions:
       id-token: write
       contents: read
