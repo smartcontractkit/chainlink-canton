@@ -66,6 +66,7 @@ jobs:
           role-to-assume: ${{ secrets.CANTON_IAM_ROLE_PROD }}
           aws-region: us-west-2
           registry-type: private
+          registries: "804282218731"
       - name: Build and push image to ECR
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
@@ -74,4 +75,4 @@ jobs:
           push: true
           tags: |
             ${{ secrets.ECR_REGISTRY }}/${{ secrets.EDS_ECR_REPOSITORY }}:${{ github.sha }}
-            809128755817.dkr.ecr.us-west-2.amazonaws.com/chainlink-canton-eds:${{ github.sha }}
+            804282218731.dkr.ecr.us-west-2.amazonaws.com/chainlink-canton-eds:${{ github.sha }}
