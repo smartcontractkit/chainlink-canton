@@ -113,6 +113,20 @@ func main() {
 				"BlockDepth":      0x02,
 			},
 		},
+		// EnumTagByteMap: enums decoded as a single uint8 ordinal byte by the Daml MCMS codec.
+		// Tags must match the decodeXxxAt case statement in the corresponding Daml contract.
+		EnumTagByteMap: map[string]map[string]byte{
+			// Tags match decodeRateLimitDirectionAt in contracts/ccip/factory/daml/CCIP/Factory.daml.
+			"CCIP.RateLimiter.RateLimitDirection": {
+				"RateLimitDirection_Outbound": 0x00,
+				"RateLimitDirection_Inbound":  0x01,
+			},
+			// Tags match decodeRateLimitModeAt in contracts/ccip/factory/daml/CCIP/Factory.daml.
+			"CCIP.RateLimiter.RateLimitMode": {
+				"RateLimitMode_DefaultFinality": 0x00,
+				"RateLimitMode_CustomFinality":  0x01,
+			},
+		},
 		// Dispatcher operationData payloads decoded by MCMS.Main.ExecuteOp.
 		ChoiceParamEncoderNames: map[string]bool{
 			"SetConfig":            true,
