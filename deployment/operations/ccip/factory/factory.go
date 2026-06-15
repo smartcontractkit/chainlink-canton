@@ -296,21 +296,6 @@ func encodeDeployBurnMintTokenPool(args factorybindings.DeployBurnMintTokenPool)
 	})
 }
 
-func encodeDeployRateLimiter(args factorybindings.DeployRateLimiter) (*bind.EncodedChoice, error) {
-	c := args.Contract
-	return factoryEncoder.DeployRateLimiterParams(factorybindings.DeployRateLimiterParams{
-		InstanceId:          c.InstanceId,
-		PoolInstanceId:      c.PoolInstanceId,
-		PoolOwner:           c.PoolOwner,
-		RemoteChainSelector: c.RemoteChainSelector,
-		Direction:           c.Direction,
-		Mode:                c.Mode,
-		IsEnabled:           c.IsEnabled,
-		Capacity:            c.Capacity,
-		Rate:                c.Rate,
-	})
-}
-
 func encodeDeployExecutor(args factorybindings.DeployExecutor) (*bind.EncodedChoice, error) {
 	return factoryEncoder.DeployExecutorParams(factorybindings.DeployExecutorParams{
 		InstanceId:            args.Contract.InstanceId,
