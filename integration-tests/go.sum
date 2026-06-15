@@ -710,6 +710,8 @@ github.com/smartcontractkit/chain-selectors v1.0.102 h1:qYP4+72HfvogCHR5ymwRFee3
 github.com/smartcontractkit/chain-selectors v1.0.102/go.mod h1:qy7whtgG5g+7z0jt0nRyii9bLND9m15NZTzuQPkMZ5w=
 github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc h1:Um9FBcf0JNSFuGbxgccDG1vM3cNrMGy0SdJ7r6VbX0o=
 github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc/go.mod h1:zfE2R7887kiwXkGTHKPe5NBgwhFwIC3pnA2uAxrbvig=
+github.com/smartcontractkit/chainlink-ccip v0.0.0-20260522154405-d601419f87a1 h1:2pz3JBA/EkWSimO6iKrZgZKWvsM2hY3mDNwYPtYPafs=
+github.com/smartcontractkit/chainlink-ccip v0.0.0-20260522154405-d601419f87a1/go.mod h1:eDAlF6WNzOc7O2nqG3hpDG+0J1kcV/7Q1zKuc9cOBKA=
 github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260608180601-efa81bfdfda9 h1:rLU5tQ/1BaQOjnYj9WWNlbqXCqd61oqasOXJ7upaKaM=
 github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260608180601-efa81bfdfda9/go.mod h1:TfYlPkIj2wa35qqWLrk5//HkLoee5jzokxZ7PhK0tgk=
 github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 h1:jkChf04hhdiMBApbb+lLDxHMY62Md6UeM7v++GSw3K8=
@@ -776,8 +778,8 @@ github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12i
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20260304194147-a03701e2c02e h1:poXTj5cFVM6XfC4HICIDYkDVc/A6OYB0eeID0wU2JQE=
 github.com/smartcontractkit/libocr v0.0.0-20260304194147-a03701e2c02e/go.mod h1:PLdNK6GlqfxIWXzziPkU7dCAVlVFeYkyyW7AQY0R+4Q=
-github.com/smartcontractkit/mcms v0.47.1-0.20260610155329-856384f2ce70 h1:SBtw4WjSxS7AvFoFdWxLGju1GRIqi7ic2rgFXBUbwmo=
-github.com/smartcontractkit/mcms v0.47.1-0.20260610155329-856384f2ce70/go.mod h1:7ZPOnN9CeoiiZkGQSPsyk23X+XFEtxQYpIx7kKy2ZP0=
+github.com/smartcontractkit/mcms v0.48.0 h1:eAHim6RkHgQCrkc/74NUxw82cuq0WqhH1Y2REDiz7hs=
+github.com/smartcontractkit/mcms v0.48.0/go.mod h1:qyDpiJC7Yo2FouVBQL3rc3wB4VB/8tw8xAcypOb4FT8=
 github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 h1:zxcODLrFytOKmAd8ty8S/XK6WcIEJEgRBaL7sY/7l4Y=
 github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945/go.mod h1:m3pdp17i4bD50XgktkzWetcV5yaLsi7Gunbv4ZgN6qg=
 github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 h1:+jumHNA0Wrelhe64i8F6HNlS8pkoyMv5sreGx2Ry5Rw=
