@@ -120,6 +120,12 @@ func main() {
 			"CancelBatch":          true,
 			"BypasserExecuteBatch": true,
 		},
+		// TokenAdminRegistry mcmsEntrypoint decodes Params records whose names do not match choice names.
+		ChoiceOperationDataParams: map[string]string{
+			"ProposeAdministrator": "ProposeAdminParams",
+			"AcceptAdminRole":      "AcceptAdminParams",
+			"TransferAdminRole":    "TransferAdminParams",
+		},
 	}
 
 	// Generate bindings for each package
