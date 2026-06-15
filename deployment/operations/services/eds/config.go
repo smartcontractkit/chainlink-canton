@@ -177,6 +177,10 @@ var BuildConfig = operations.NewOperation(
 					TokenStandardURL:        tokenStandardURL,
 					TokenStandardAuthConfig: tokenStandardAuthConfig,
 				}
+				pool.TransferPreapproval = &edsConfig.TransferPreapproval{
+					ContextKey: "transfer-preapproval",
+					TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
+				}
 			}
 			tokenPools[instanceAddress.Hex()] = pool
 		}

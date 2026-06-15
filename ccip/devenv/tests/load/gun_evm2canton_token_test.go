@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -49,6 +50,9 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 
 	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
 	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
+	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
+	require.True(t, ok, "Canton dest chain must be *devenv.Chain")
+	require.NoError(t, cantonImpl.SetupReceive(ctx))
 
 	lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, evmChain.ChainSelector(), []uint64{cantonChain.ChainSelector()})
 	t.Logf("Token lane: pool=%s transfer=%s srcToken=%x",
@@ -59,8 +63,10 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 	_, opsEnv, err := cldf.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	require.NoError(t, err)
 	var receiverParticipant canton.Participant
-	if chains := opsEnv.BlockChains.CantonChains(); len(chains[cantonChain.ChainSelector()].Participants) > 0 {
-		receiverParticipant = chains[cantonChain.ChainSelector()].Participants[0]
+	if chains := opsEnv.BlockChains.CantonChains(); len(chains[cantonChain.ChainSelector()].Participants) > devenvtests.ClientParticipantIndex {
+		receiverParticipant = chains[cantonChain.ChainSelector()].Participants[devenvtests.ClientParticipantIndex]
+	} else if len(chains[cantonChain.ChainSelector()].Participants) > 0 {
+		receiverParticipant = chains[cantonChain.ChainSelector()].Participants[devenvtests.OwnerParticipantIndex]
 	}
 	require.NotEmpty(t, receiverParticipant.PartyID)
 

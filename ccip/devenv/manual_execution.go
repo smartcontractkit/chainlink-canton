@@ -29,40 +29,72 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
+const perPartyRouterInstanceID = "test-router"
+
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
-// It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
-func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Participant, partyId string) (routerAddress contracts.InstanceAddress, err error) {
-	// Create PerPartyRouter (ignore error if it exists already)
-	perPartyRouterFactoryDisclosure, err := c.GetPerPartyRouterFactoryDisclosure(ctx, partyId)
+// partyOwner (client participant) exercises CreateRouter with factory disclosures from EDS.
+// It returns the instance address of the router. If a router already exists for the party, it returns the existing address.
+func (c *Chain) DeployPerPartyRouter(ctx context.Context, clientParticipant canton.Participant, partyOwner string) (routerAddress contracts.InstanceAddress, err error) {
+	perPartyRouterFactoryDisclosure, err := c.GetPerPartyRouterFactoryDisclosure(ctx, partyOwner)
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to get canton per party router factory disclosure: %w", err)
 	}
-	c.logger.Debug().Str("ContractId", perPartyRouterFactoryDisclosure.ContractId).Msg("Resolved per-party router factory address")
+	c.logger.Debug().Str("ContractId", perPartyRouterFactoryDisclosure.ContractId).Msg("Resolved per-party router factory disclosure")
 
-	// Fixed instance ID for the router, this makes the InstanceAddress deterministic.
-	routerInstanceID := contracts.InstanceID("test-router")
-	// Ignore errors, since the router might already exist if this function is called multiple times for the same party. In that case we just want to return the existing router's address.
-	_, _ = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, c.chain, contract.ChoiceInput[ccipruntime.CreateRouter]{
-		InstanceAddress: perPartyRouterFactoryDisclosure.Address.InstanceAddress(),
-		Args: ccipruntime.CreateRouter{
-			PartyOwner: types.PARTY(partyId),
-			InstanceId: types.TEXT(routerInstanceID.String()),
+	routerInstanceID := contracts.InstanceID(perPartyRouterInstanceID)
+	ccipOwner := perPartyRouterFactoryDisclosure.Address.Owner()
+	routerAddress = routerInstanceID.RawInstanceAddress(types.PARTY(ccipOwner)).InstanceAddress()
+
+	// Return early only if the router already exists at the expected instance address.
+	_, err = contract.FindActiveContractIDByInstanceAddress(
+		ctx,
+		clientParticipant.LedgerServices.State,
+		[]string{partyOwner},
+		ccipruntime.PerPartyRouter{}.GetTemplateID(),
+		routerAddress,
+	)
+	if err == nil {
+		return routerAddress, nil
+	}
+
+	_, err = operations.ExecuteOperation(
+		c.e.OperationsBundle,
+		per_party_router_factory.CreateRouter,
+		c.chain,
+		contract.ChoiceInput[ccipruntime.CreateRouter]{
+			InstanceAddress:    perPartyRouterFactoryDisclosure.Address.InstanceAddress(),
+			ContractID:         perPartyRouterFactoryDisclosure.ContractId,
+			ParticipantIndex:   c.clientParticipantIndex(),
+			DisclosedContracts: contract.DisclosedContractsFromProto(perPartyRouterFactoryDisclosure.DisclosedContracts),
+			Args: ccipruntime.CreateRouter{
+				PartyOwner: types.PARTY(partyOwner),
+				InstanceId: types.TEXT(routerInstanceID.String()),
+			},
 		},
-	})
-	routerAddress = routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
-
-	// Try to get the PerPartyRouter, to ensure that is actually exists
-	_, err = testhelpers.GetDisclosedContractByTemplateId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
-	})
+		operations.WithForceExecute[contract.ChoiceInput[ccipruntime.CreateRouter], canton.Chain](),
+	)
 	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to find per-party router: %w", err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to create per-party router: %w", err)
+	}
+
+	_, err = contract.FindActiveContractIDByInstanceAddress(
+		ctx,
+		clientParticipant.LedgerServices.State,
+		[]string{partyOwner},
+		ccipruntime.PerPartyRouter{}.GetTemplateID(),
+		routerAddress,
+	)
+	if err != nil {
+		return contracts.InstanceAddress{}, fmt.Errorf(
+			"per-party router not found at %s for party %s after CreateRouter: %w",
+			routerAddress, partyOwner, err,
+		)
 	}
 
 	return routerAddress, nil
 }
 
-func (c *Chain) DeployCCIPReceiver(partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
+func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Participant, partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {
 	finalityConfig, err := encodeReceiverFinalityConfig(receiverFinality)
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to encode receiver finality config: %w", err)
@@ -70,7 +102,8 @@ func (c *Chain) DeployCCIPReceiver(partyId string, receiverFinality int64) (cont
 
 	// Deploy receiver contract
 	out, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Deploy, c.chain, contract.DeployInput[ccipreceiver.CCIPReceiver]{
-		Qualifier: nil,
+		Qualifier:        nil,
+		ParticipantIndex: c.clientParticipantIndex(),
 		Template: ccipreceiver.CCIPReceiver{
 			Owner:                  types.PARTY(partyId),
 			RequiredCCVs:           nil,
@@ -90,8 +123,10 @@ func (c *Chain) DeployCCIPReceiver(partyId string, receiverFinality int64) (cont
 
 // ManuallyExecuteMessage implements cciptestinterfaces.CCIP17.
 func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Message, gasLimit uint64, verifiers []protocol.UnknownAddress, verifierResults [][]byte) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	// Use only a single participant for now
-	participant := c.chain.Participants[0]
+	participant, clientIdx, err := c.clientParticipant()
+	if err != nil {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no canton participants configured: %w", err)
+	}
 
 	// Ensure that the message receiver is the party we're executing with
 	executingParty := participant.PartyID
@@ -99,15 +134,15 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("message receiver %s does not match executing party %s (%s)", hex.EncodeToString(message.Receiver), contracts.HashedPartyFromString(executingParty).String(), executingParty)
 	}
 
-	// Deploy PerPartyRouter for the receiver party
-	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, executingParty)
-	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
+	routerAddress := c.routerAddress
+	if routerAddress == (contracts.InstanceAddress{}) {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf(
+			"per-party router not deployed; call SetupReceive or SetupSend on the client participant before executing messages",
+		)
 	}
-	c.logger.Debug().Str("RouterAddress", routerAddress.String()).Msg("Deployed PerPartyRouter")
 
 	// Deploy CCIPReceiver contract
-	receiverAddress, err := c.DeployCCIPReceiver(executingParty, int64(message.Finality))
+	receiverAddress, err := c.DeployCCIPReceiver(ctx, participant, executingParty, int64(message.Finality))
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy CCIPReceiver contract: %w", err)
 	}
@@ -125,7 +160,10 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{participant.PartyID}, ccipruntime.PerPartyRouter{}.GetTemplateID(), routerAddress)
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get router contract ID: %w", err)
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf(
+			"per-party router not found for party %s at %s; call SetupReceive or SetupSend on the client participant before executing messages: %w",
+			executingParty, routerAddress, err,
+		)
 	}
 	c.logger.Debug().Str("InstanceAddress", routerAddress.String()).Str("ContractId", routerCid).Msg("Resolved PerPartyRouter contract")
 
@@ -193,6 +231,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 	executeReport, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Execute, c.chain, contract.ChoiceInput[ccipreceiver.Execute]{
 		InstanceAddress:    receiverAddress,
+		ParticipantIndex:   clientIdx,
 		Args:               executeArgs,
 		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),
 	})
@@ -354,10 +393,10 @@ func (c *Chain) lockForParty(party string) func() {
 func (c *Chain) findExistingExecutionState(
 	ctx context.Context, sourceChainSelector, seqNo uint64, messageID protocol.Bytes32,
 ) (cciptestinterfaces.ExecutionStateChangedEvent, bool, error) {
-	if len(c.chain.Participants) == 0 {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: no participants on chain")
+	participant, _, err := c.clientParticipant()
+	if err != nil {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: %w", err)
 	}
-	participant := c.chain.Participants[0]
 
 	templateID := contracts.TemplateIDFromBinding(core.ExecutionStateChanged{}).ToLedgerIdentifier()
 	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, templateID)

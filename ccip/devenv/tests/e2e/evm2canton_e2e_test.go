@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton ImplFactory
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -46,6 +47,9 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 	srcChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
 	dstChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
+	cantonDest, ok := dstChain.(*cantondevenv.Chain)
+	require.True(t, ok, "Canton dest chain must be *devenv.Chain")
+	require.NoError(t, cantonDest.SetupReceive(ccv.Plog.WithContext(t.Context())))
 
 	t.Cleanup(func() {
 		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
@@ -57,12 +61,14 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	_, opsEnv, err := ccldf.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
 	require.NoError(t, err)
 	var receiverParticipant canton.Participant
-	if chains := opsEnv.BlockChains.CantonChains(); len(chains[dstSelector].Participants) > 0 {
-		receiverParticipant = chains[dstSelector].Participants[0]
+	if chains := opsEnv.BlockChains.CantonChains(); len(chains[dstSelector].Participants) > devenvtests.ClientParticipantIndex {
+		receiverParticipant = chains[dstSelector].Participants[devenvtests.ClientParticipantIndex]
+	} else if len(chains[dstSelector].Participants) > 0 {
+		receiverParticipant = chains[dstSelector].Participants[devenvtests.OwnerParticipantIndex]
 	}
 	require.NotEmpty(t, receiverParticipant.PartyID)
 
-	receiver, err := dstChain.GetEOAReceiverAddress()
+	receiver, err := cantonDest.GetEOAReceiverAddress()
 	require.NoError(t, err)
 
 	ds, err := lib.DataStore()
@@ -111,13 +117,13 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.Nil(t, sentEvent.Message.TokenTransfer)
 
 		execKey := cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}
-		executionStateChangedEvent, err := dstChain.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
+		executionStateChangedEvent, err := cantonDest.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
 		// testing idempotency of ConfirmExecOnDest: a second call
 		// must return the same event without re-executing.
-		idempotentEvent, err := dstChain.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
+		idempotentEvent, err := cantonDest.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, executionStateChangedEvent.State, idempotentEvent.State)
 		require.Equal(t, executionStateChangedEvent.MessageNumber, idempotentEvent.MessageNumber)
@@ -173,7 +179,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.Positive(t, vr.Message.TokenTransfer.Amount.Cmp(big.NewInt(0)), "token transfer amount must be positive")
 
 		execKey := cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}
-		executionStateChangedEvent, err := dstChain.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
+		executionStateChangedEvent, err := cantonDest.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
@@ -185,7 +191,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		srcBalanceAfter, err := srcChain.GetTokenBalance(subtestCtx, srcSender, srcToken)
 		require.NoError(t, err)
 		require.NotNil(t, srcBalanceAfter)
-		dstBalanceAfter, err := dstChain.GetTokenBalance(subtestCtx, receiver, nil)
+		dstBalanceAfter, err := cantonDest.GetTokenBalance(subtestCtx, receiver, nil)
 		require.NoError(t, err)
 		require.NotNil(t, dstBalanceAfter)
 		t.Logf("Token balances after execute: evm_sender=%s canton_receiver=%s", srcBalanceAfter.String(), dstBalanceAfter.String())
