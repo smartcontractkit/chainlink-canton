@@ -30,7 +30,7 @@ import (
 )
 
 // cantonFeeQuoterUSDPerUnitGas formats V2Params.USDPerUnitGas for Canton FeeQuoter UpdatePrices.
-// DAML stores this as Decimal (CCIP.FeeQuoterTypes.GasPriceUpdate). chainlink-ccip models it as *big.Int
+// DAML stores usdPerUnitGas as Decimal (e.g. 0.0000000038). chainlink-ccip models it as *big.Int
 // for cross-family tooling; on Canton that integer is scaled by 1e10 USD per gas unit (integration
 // parity: 38 -> 0.0000000038, matching historical ApplyFeeTokenUpdates+UpdatePrices tests).
 func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
@@ -40,6 +40,23 @@ func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
 	const scale int64 = 10_000_000_000 // 1e10
 	r := new(big.Rat).SetFrac(new(big.Int).Set(v), big.NewInt(scale))
 	s := strings.TrimRight(strings.TrimRight(r.FloatString(20), "0"), ".")
+	if s == "" || s == "-" {
+		return types.NUMERIC("0")
+	}
+
+	return types.NUMERIC(s)
+}
+
+// cantonFeeQuoterUsdPerToken formats lane TokenPrices for Canton FeeQuoter UpdatePrices.
+// DAML stores usdPerToken as Decimal USD per whole token (FeeQuoter.daml tests use 20.0 for $20/LINK).
+// Lane params carry USD*1e8; divide by 1e8 before encoding (e.g. 1_000_000_000 -> "10").
+func cantonFeeQuoterUsdPerToken(v *big.Int) types.NUMERIC {
+	if v == nil || v.Sign() <= 0 {
+		return types.NUMERIC("0")
+	}
+	const scale int64 = 100_000_000 // 1e8
+	r := new(big.Rat).SetFrac(new(big.Int).Set(v), big.NewInt(scale))
+	s := strings.TrimRight(strings.TrimRight(r.FloatString(8), "0"), ".")
 	if s == "" || s == "-" {
 		return types.NUMERIC("0")
 	}
@@ -216,12 +233,17 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		proposalOutputs = append(proposalOutputs, feeQuoterDestConfigReport.Output)
 	}
 
+	ccipOwnerParty, err := resolveCcipOwnerPartyFromFeeQuoterRef(feeQuoterRef)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("resolve ccipOwner for fee quoter price updates: %w", err)
+	}
+
 	priceUpdatersReport, err := operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[core.ApplyPriceUpdatersUpdate]{
 		InstanceAddress:    feeQuoterRaw.InstanceAddress(),
 		RawInstanceAddress: feeQuoterRaw.String(),
 		MCMSEnabled:        mcmsEnabled,
 		Args: core.ApplyPriceUpdatersUpdate{
-			AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
+			AddedPriceUpdaters:   []types.PARTY{types.PARTY(ccipOwnerParty)},
 			RemovedPriceUpdaters: nil,
 		},
 	})
@@ -253,6 +275,7 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 					},
 				},
 			},
+			Caller: types.PARTY(ccipOwnerParty),
 		},
 	})
 	if err != nil {
@@ -409,6 +432,36 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	},
 )
 
+func resolveCcipOwnerPartyFromFeeQuoterRef(feeQuoterRef datastore.AddressRef) (string, error) {
+	for _, label := range feeQuoterRef.Labels.List() {
+		at := strings.LastIndex(label, "@")
+		if at < 0 || at+1 >= len(label) {
+			continue
+		}
+		party := label[at+1:]
+		if strings.Contains(party, "::") {
+			return party, nil
+		}
+	}
+
+	return "", fmt.Errorf("ccipOwner party not found in FeeQuoter labels")
+}
+
+func parseInstrumentPriceKey(instrument string) (admin, id string, err error) {
+	instrument = strings.TrimSpace(instrument)
+	lastColon := strings.LastIndex(instrument, ":")
+	if lastColon <= 0 || lastColon+1 >= len(instrument) {
+		return "", "", fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+	}
+	admin = strings.TrimSpace(instrument[:lastColon])
+	id = strings.TrimSpace(instrument[lastColon+1:])
+	if admin == "" || id == "" {
+		return "", "", fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+	}
+
+	return admin, id, nil
+}
+
 func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]core.TokenPriceUpdate, error) {
 	if len(tokenPrices) == 0 {
 		return nil, nil
@@ -418,16 +471,16 @@ func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]core.TokenP
 		if price == nil {
 			continue
 		}
-		parts := strings.SplitN(instrument, ":", 2)
-		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-			return nil, fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+		admin, id, err := parseInstrumentPriceKey(instrument)
+		if err != nil {
+			return nil, err
 		}
 		updates = append(updates, core.TokenPriceUpdate{
 			InstrumentId: splice_api_token_holding_v1.InstrumentId{
-				Admin: types.PARTY(strings.TrimSpace(parts[0])),
-				Id:    types.TEXT(strings.TrimSpace(parts[1])),
+				Admin: types.PARTY(admin),
+				Id:    types.TEXT(id),
 			},
-			UsdPerToken: types.NUMERIC(price.String()),
+			UsdPerToken: cantonFeeQuoterUsdPerToken(price),
 		})
 	}
 

@@ -102,6 +102,7 @@ var ConfigureCommitteeVerifierAsSource = operations.NewSequence(
 				MCMSEnabled:        input.MCMSEnabled,
 				Args: committeeverifier.ApplyAllowListUpdates{
 					AllowListConfigArgsItems: allowListArgs,
+					Caller:                   types.PARTY(raw.Owner()),
 				},
 			})
 			if err != nil {

@@ -126,6 +126,15 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 	localCommitteeVerifiers := convertCommitteeVerifierConfigs(input.CommitteeVerifiers)
 	var out ccipseq.OnChainOutput
 
+	chain, ok := chains.CantonChains()[input.ChainSelector]
+	if !ok || len(chain.Participants) == 0 {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("canton chain %d not found or has no participants", input.ChainSelector)
+	}
+	nativeInstrument, err := lookupNativeInstrumentID(b.GetContext(), chain.Participants[0])
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve Canton native fee token instrument: %w", err)
+	}
+
 	for remoteSelector, remoteCfg := range input.RemoteChains {
 		localExecutor, err := resolveContractRefByAddress(
 			ds,
@@ -199,6 +208,11 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, err
 		}
+		tokenPrices, err := resolveTokenPricesForRemoteDest(ds, input, remoteSelector, &nativeInstrument)
+		if err != nil {
+			return out, fmt.Errorf("resolve token prices for remote chain %d: %w", remoteSelector, err)
+		}
+		remoteChain.TokenPrices = tokenPrices
 
 		out, err = ccipseq.RunAndMergeSequence(
 			b,
