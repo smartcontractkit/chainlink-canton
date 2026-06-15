@@ -105,33 +105,6 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			return ccipsequences.OnChainOutput{}, err
 		}
 
-		registryRef, err := input.ExistingDataStore.Addresses().Get(datastore.NewAddressRefKey(
-			input.ChainSelector,
-			datastore.ContractType(token_admin_registry.ContractType),
-			token_admin_registry.Version,
-			"",
-		))
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("resolve token admin registry: %w", err)
-		}
-		tarRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(registryRef)
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("resolve token admin registry raw address: %w", err)
-		}
-		regOut, err := operations.ExecuteSequence(b, RegisterTokenPool, cantonChain, RegisterTokenPoolInput{
-			TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(registryRef.Address),
-			TokenAdminRegistryRawInstanceAddress: tarRaw,
-			InstrumentId:                         parsedPool.InstrumentId,
-			PoolInstanceID:                       string(parsedPool.InstanceId),
-			CcipParty:                            string(parsedPool.CcipOwner),
-			PoolOwnerParty:                       string(parsedPool.PoolOwner),
-			PoolAdminParty:                       string(parsedPool.CcipOwner),
-		})
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("register token pool with token admin registry: %w", err)
-		}
-		batchOps = append(batchOps, regOut.Output.BatchOps...)
-
 		factoryRefs := input.ExistingDataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(factoryops.ContractType)),
@@ -640,12 +613,12 @@ var DeployTokenPoolForToken = operations.NewSequence(
 
 func toCantonFinalityConfig(cfg tokenadaptersfinality.Config) core.FinalityConfig {
 	switch {
-	case cfg.WaitForFinality:
-		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}
-	case cfg.WaitForSafe:
-		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}
 	case cfg.BlockDepth > 0:
 		return core.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
+	case cfg.WaitForSafe:
+		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}
+	case cfg.WaitForFinality:
+		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}
 	default:
 		return core.FinalityConfig{}
 	}
