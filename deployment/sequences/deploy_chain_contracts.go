@@ -1,7 +1,6 @@
 package sequences
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/big"
 
