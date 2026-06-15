@@ -16,10 +16,11 @@ import (
 
 // RegisterTokenPoolConfig registers an already-deployed token pool with the TokenAdminRegistry.
 // CantonCSDeps.Participant selects the CCIP owner participant for all TAR registration steps.
-// PoolOwner is recorded in PoolRegistration; ccipOwner is TokenConfig admin.
+// PoolAdmin is TokenConfig admin; PoolOwner is recorded in PoolRegistration.
 type RegisterTokenPoolConfig struct {
 	CcipOwner      string
 	PoolOwner      string
+	PoolAdmin      string
 	InstrumentId   splice_api_token_holding_v1.InstrumentId
 	PoolInstanceID string
 }
@@ -44,6 +45,9 @@ func (r RegisterTokenPool) VerifyPreconditions(e cldf.Environment, config Canton
 	}
 	if config.Config.PoolOwner == "" {
 		return fmt.Errorf("PoolOwner is required")
+	}
+	if config.Config.PoolAdmin == "" {
+		return fmt.Errorf("PoolAdmin is required")
 	}
 
 	return nil
@@ -73,6 +77,7 @@ func (r RegisterTokenPool) Apply(e cldf.Environment, config CantonCSDeps[Registe
 		InstrumentId:                         cfg.InstrumentId,
 		CcipParty:                            cfg.CcipOwner,
 		PoolOwnerParty:                       cfg.PoolOwner,
+		PoolAdminParty:                       cfg.PoolAdmin,
 		PoolInstanceID:                       cfg.PoolInstanceID,
 		CcipParticipantIndex:                 config.Participant,
 	})

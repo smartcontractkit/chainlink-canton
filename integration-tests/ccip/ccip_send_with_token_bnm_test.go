@@ -462,6 +462,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		Config: changesets.RegisterTokenPoolConfig{
 			CcipOwner:      partyCCIP,
 			PoolOwner:      partySender,
+			PoolAdmin:      partyCCIP,
 			InstrumentId:   linkInstrumentId,
 			PoolInstanceID: poolInstanceID,
 		},
@@ -1059,7 +1060,8 @@ func waitForEDSListening(t *testing.T, ports ...int) {
 	for time.Now().Before(deadline) {
 		allReady := true
 		for _, port := range ports {
-			conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 200*time.Millisecond)
+			d := net.Dialer{Timeout: 200 * time.Millisecond}
+			conn, err := d.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 			if err != nil {
 				allReady = false
 

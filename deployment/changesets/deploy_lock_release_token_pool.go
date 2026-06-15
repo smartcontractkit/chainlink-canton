@@ -206,8 +206,9 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 			InstrumentId:                         cfg.InstrumentId,
 			CcipParty:                            cfg.CcipOwner,
 			PoolOwnerParty:                       cfg.PoolOwner,
+			PoolAdminParty:                       cfg.CcipOwner,
 			PoolInstanceID:                       rawPoolAddr.InstanceID(),
-			CcipParticipantIndex: participantIndex,
+			CcipParticipantIndex:                 participantIndex,
 		}
 		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {

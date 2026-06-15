@@ -447,6 +447,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		Config: changesets.RegisterTokenPoolConfig{
 			CcipOwner:      partyCCIP,
 			PoolOwner:      partySender,
+			PoolAdmin:      partyCCIP,
 			InstrumentId:   nativeInstrumentId,
 			PoolInstanceID: poolInstanceID,
 		},
