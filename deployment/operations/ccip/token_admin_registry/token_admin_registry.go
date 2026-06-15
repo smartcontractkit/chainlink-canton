@@ -44,10 +44,9 @@ var ProposeAdministrator = contract.NewExercise(contract.ExerciseParams[core.Pro
 	Template: core.TokenAdminRegistry{},
 	Method:   core.TokenAdminRegistry{}.ProposeAdministrator,
 	EncodeMethod: func(args core.ProposeAdministrator) (*bind.EncodedChoice, error) {
-		return tarEncoder.ProposeAdministratorMCMSParams(core.ProposeAdministratorMCMSParams{
-			TokenConfigCid: args.TokenConfigCid,
-			InstrumentId:   args.InstrumentId,
-			NewAdmin:       args.NewAdmin,
+		return tarEncoder.ProposeAdministrator(core.ProposeAdminParams{
+			InstrumentId: args.InstrumentId,
+			NewAdmin:     args.NewAdmin,
 		})
 	},
 })
@@ -63,9 +62,8 @@ var AcceptAdminRole = contract.NewExercise(contract.ExerciseParams[core.AcceptAd
 	Template: core.TokenAdminRegistry{},
 	Method:   core.TokenAdminRegistry{}.AcceptAdminRole,
 	EncodeMethod: func(args core.AcceptAdminRole) (*bind.EncodedChoice, error) {
-		return tarEncoder.AcceptAdminRoleMCMSParams(core.AcceptAdminRoleMCMSParams{
-			TokenConfigCid: args.TokenConfigCid,
-			InstrumentId:   args.InstrumentId,
+		return tarEncoder.AcceptAdminRole(core.AcceptAdminParams{
+			InstrumentId: args.InstrumentId,
 		})
 	},
 })
@@ -81,10 +79,9 @@ var SetPool = contract.NewExercise(contract.ExerciseParams[core.SetPool]{
 	Template: core.TokenAdminRegistry{},
 	Method:   core.TokenAdminRegistry{}.SetPool,
 	EncodeMethod: func(args core.SetPool) (*bind.EncodedChoice, error) {
-		return tarEncoder.SetPoolMCMSParams(core.SetPoolMCMSParams{
-			TokenConfigCid: args.TokenConfigCid,
-			InstrumentId:   args.InstrumentId,
-			TokenPool:      args.TokenPool,
+		return tarEncoder.SetPoolParams(core.SetPoolParams{
+			InstrumentId: args.InstrumentId,
+			TokenPool:    args.TokenPool,
 		})
 	},
 })

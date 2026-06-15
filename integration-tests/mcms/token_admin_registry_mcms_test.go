@@ -255,7 +255,7 @@ func TestTokenAdminRegistry_ProposeAdminViaMCMS(t *testing.T) {
 	// Propose a new admin via MCMS
 	newAdmin := types.PARTY(ccipOwner) // For simplicity, propose self as admin
 	encodedPropose, err := tarContract.Encoder().ProposeAdministrator(
-		core.ProposeAdministrator{
+		core.ProposeAdminParams{
 			InstrumentId: testInstrumentId,
 			NewAdmin:     newAdmin,
 		},
