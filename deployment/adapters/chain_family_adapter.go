@@ -563,6 +563,22 @@ func feeQuoterDestChainConfigFromOverrides(cfg ccipadapters.FeeQuoterDestChainCo
 	return out
 }
 
+// minProductionCantonChainNOPs is the minimum unique NOP count for Canton chains in production.
+const minProductionCantonChainNOPs = 9
+
+func (a *CantonChainFamilyAdapter) ValidateNOPsTopology(chainSelector string, nopCount int) error {
+	if nopCount < minProductionCantonChainNOPs {
+		return fmt.Errorf(
+			"chain %q requires at least %d unique NOPs for production environments, got %d",
+			chainSelector,
+			minProductionCantonChainNOPs,
+			nopCount,
+		)
+	}
+
+	return nil
+}
+
 func dataStoreFromConfigureChainForLanesInput(input ccipadapters.ConfigureChainForLanesInput) (datastore.DataStore, error) {
 	if input.FamilyExtras != nil {
 		if ds, ok := input.FamilyExtras[ConfigureLanesDataStoreFamilyExtraKey].(datastore.DataStore); ok && ds != nil {
