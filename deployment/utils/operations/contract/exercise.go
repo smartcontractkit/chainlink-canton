@@ -73,6 +73,9 @@ type ChoiceInput[ARGS any] struct {
 	Args               ARGS   `json:"args"`
 	MCMSEnabled        bool   `json:"mcmsEnabled,omitempty"`
 	DisclosedContracts []DisclosedContract
+	// ParticipantIndex selects which participant on the chain submits the exercise command.
+	// Zero value defaults to the first participant.
+	ParticipantIndex int `json:"participantIndex,omitempty"`
 }
 
 type ExerciseParams[ARGS any] struct {
@@ -143,7 +146,10 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			}
 
 			// Direct execution path
-			participant := deps.Participants[0]
+			participant, err := ParticipantAt(deps, input.ParticipantIndex)
+			if err != nil {
+				return ExerciseOutput{}, fmt.Errorf("resolve participant: %w", err)
+			}
 
 			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, LedgerQueryParties(participant), params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {
@@ -202,6 +208,13 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			}, nil
 		},
 	)
+}
+
+// ProposalDrivenForCaller reports whether a choice should be MCMS-encoded instead of submitted
+// directly. Proposal mode is required when the submitting participant cannot ActAs the choice
+// caller party. ReadAsPartyIDs alone does not imply proposal mode—they only widen ACS visibility.
+func ProposalDrivenForCaller(participant canton.Participant, callerParty string) bool {
+	return participant.PartyID != callerParty
 }
 
 // LedgerQueryParties builds the party list for ledger ACS reads (GetActiveContracts, etc.).

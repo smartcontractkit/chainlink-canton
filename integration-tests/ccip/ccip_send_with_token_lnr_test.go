@@ -66,6 +66,7 @@ import (
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
@@ -357,10 +358,11 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	// Setup token pool for outbound token transfer in Send.
 	poolInstanceID := "test-pool-send"
 	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[core.RateLimiter]{
-		OwnerParty: types.PARTY(partyCCIP),
+		ParticipantIndex: 1,
+		OwnerParty:       types.PARTY(partySender),
 		Template: core.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceID),
-			PoolOwner:           types.PARTY(partyCCIP),
+			PoolOwner:           types.PARTY(partySender),
 			RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 			Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
 			Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
@@ -376,13 +378,13 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	outboundRateLimiterAddr, err := contracts.RawInstanceAddressFromString(outboundRateLimiterRawAddr)
 	require.NoError(t, err, "failed to parse outbound rate limiter raw address")
 
-	// Create TransferPreapproval to be set in the pool's PoolReceiveContext
-	ccipOwnerHoldingCid, err := testhelpers.MintAMT(t.Context(), ccipParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partyCCIP, "100")
-	require.NoError(t, err, "failed to mint AMT for CCIP owner")
-	t.Logf("Minted 100 Amulet to ccipOwner, Holding CID: %s", ccipOwnerHoldingCid)
-	preapprovalCid, err := testhelpers.CreateTransferPreapproval(t.Context(), ccipParticipant, scanProxyClient, partyCCIP, ccipOwnerHoldingCid)
+	// Pool EDS looks up TransferPreapproval for PoolOwner on the pool participant's ledger.
+	poolOwnerHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100")
+	require.NoError(t, err, "failed to mint AMT for pool owner")
+	t.Logf("Minted 100 Amulet to poolOwner, Holding CID: %s", poolOwnerHoldingCid)
+	preapprovalCid, err := testhelpers.CreateTransferPreapproval(t.Context(), senderParticipant, scanProxyClient, partySender, poolOwnerHoldingCid)
 	require.NoError(t, err, "failed to create preapproval")
-	t.Log("Created Amulet Preapproval, Cid: ", preapprovalCid)
+	t.Log("Created Amulet Preapproval for poolOwner, Cid: ", preapprovalCid)
 
 	// Pool transfer amounts use the token's smallest units; with Amulet's 10 token
 	// decimals, a transfer amount of 100 means 100 local units and a 5% bps fee
@@ -397,7 +399,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		Participant:   1,
 		Config: changesets.DeployLockReleaseTokenPoolConfig{
 			CcipOwner:    partyCCIP,
-			PoolOwner:    partyCCIP,
+			PoolOwner:    partySender,
 			InstrumentId: nativeInstrumentId,
 			Decimals:     10,
 			InstanceID:   poolInstanceID,
@@ -432,35 +434,50 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 				RmnRemote:          rmnRemoteAddress.Binding(),
 				FeeQuoter:          feeQuoterAddress.Binding(),
 			},
-			// By setting the TAR address, the CS will automatically register the newly deployed pool with the TAR
-			TokenAdminRegistryInstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 		},
 	})
 	require.NoError(t, err, "failed to deploy lock release token pool via changeset")
 	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
 	cldfEnv.DataStore = out.DataStore.Seal()
+
+	_, err = changesets.RegisterTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.RegisterTokenPoolConfig]{
+		ChainSelector: env.Chain.ChainSelector(),
+		Participant:   0,
+		Config: changesets.RegisterTokenPoolConfig{
+			CcipOwner:      partyCCIP,
+			PoolOwner:      partySender,
+			PoolAdmin:      partyCCIP,
+			InstrumentId:   nativeInstrumentId,
+			PoolInstanceID: poolInstanceID,
+		},
+	})
+	require.NoError(t, err, "failed to register lock release token pool with TAR")
+
 	_, tokenPoolAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), lock_release_token_pool.ContractType, lock_release_token_pool.Version, "")
 	require.NoError(t, err, "failed to get Token Pool address")
 
-	// Run EDS
-	edsParticipant := env.Chain.Participants[0]
-	edsToken, _ := edsParticipant.TokenSource.Token()
-	edsPort := freeport.GetOne(t)
+	// Run dual EDS: CCIP contracts on P0 (ccipOwner), token pool on P1 (poolOwner).
+	edsCCIPPort := freeport.GetOne(t)
+	edsPoolPort := freeport.GetOne(t)
+
+	ccipEDSToken, _ := ccipParticipant.TokenSource.Token()
+	edsCCIPCtx, edsCCIPCancel := context.WithCancel(t.Context())
+	t.Cleanup(edsCCIPCancel)
 	go func() {
-		log.Info().Msg("Running EDS...")
-		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
+		log.Info().Int("port", edsCCIPPort).Msg("Running EDS-ccip...")
+		err := service.RunEDS(edsCCIPCtx, log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
 			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
 			Server: config.ServerConfig{
 				Host: "0.0.0.0",
-				Port: uint16(edsPort),
+				Port: uint16(edsCCIPPort),
 			},
 			Node: config.NodeConfig{
-				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
+				URL: ccipParticipant.Endpoints.GRPCLedgerAPIURL,
 				AuthConfig: commonconfig.AuthConfig{
 					Type:   commonconfig.AuthTypeInsecureStatic,
-					UserID: edsParticipant.UserID,
-					JWT:    edsToken.AccessToken,
+					UserID: ccipParticipant.UserID,
+					JWT:    ccipEDSToken.AccessToken,
 				},
 				MaxRetries: 0,
 			},
@@ -518,25 +535,65 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
+				Enabled: false,
+			},
+			TokenStandardAPIConfig: config.TokenStandardAPIConfig{
+				Enabled: false,
+			},
+		})
+		log.Info().Err(err).Msg("EDS-ccip terminated")
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("EDS-ccip server exited with error: %v", err)
+		}
+	}()
+
+	poolEDSToken, _ := senderParticipant.TokenSource.Token()
+	edsPoolCtx, edsPoolCancel := context.WithCancel(t.Context())
+	t.Cleanup(edsPoolCancel)
+	go func() {
+		log.Info().Int("port", edsPoolPort).Msg("Running EDS-pool...")
+		err := service.RunEDS(edsPoolCtx, log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
+			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
+			Server: config.ServerConfig{
+				Host: "0.0.0.0",
+				Port: uint16(edsPoolPort),
+			},
+			Node: config.NodeConfig{
+				URL: senderParticipant.Endpoints.GRPCLedgerAPIURL,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   commonconfig.AuthTypeInsecureStatic,
+					UserID: senderParticipant.UserID,
+					JWT:    poolEDSToken.AccessToken,
+				},
+				MaxRetries: 0,
+			},
+			CCIPAPIConfig: config.CCIPAPIConfig{
+				Enabled: false,
+			},
+			CCVAPIConfig: config.CCVAPIConfig{
+				Enabled: false,
+			},
+			ExecutorAPIConfig: config.ExecutorAPIConfig{
+				Enabled: false,
+			},
+			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
 				Enabled: true,
 				TokenPools: map[string]config.TokenPool{
 					tokenPoolAddress.InstanceAddress().Hex(): {
 						Type: config.TokenPoolTypeLockRelease,
 						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         partyCCIP,
+							PartyID:         partySender,
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
-						PoolOwner: partyCCIP,
-						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
+						PoolOwner: partySender,
 						TransferFactory: &config.TransferFactory{
 							Type:             config.FactoryTypeURL,
 							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
 							TokenStandardAuthConfig: &commonconfig.AuthConfig{
 								Type: commonconfig.AuthTypeInsecureStatic,
-								JWT:  edsToken.AccessToken,
+								JWT:  ccipEDSToken.AccessToken,
 							},
 						},
-						// By setting the TransferPreapproval, the Token Pool API will return it as part of its transfer context.
 						TransferPreapproval: &config.TransferPreapproval{
 							ContextKey: "transfer-preapproval",
 							TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
@@ -544,27 +601,29 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 					},
 				},
 			},
+			TokenStandardAPIConfig: config.TokenStandardAPIConfig{
+				Enabled: false,
+			},
 		})
-		log.Info().Err(err).Msg("EDS terminated")
+		log.Info().Err(err).Msg("EDS-pool terminated")
 		if !errors.Is(err, context.Canceled) {
-			log.Error().Err(err).Msg("EDS server exited with error")
-			t.Fail()
-			return
+			t.Errorf("EDS-pool server exited with error: %v", err)
 		}
 	}()
 
-	// Create EDS clients
-	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	// Create EDS clients — CCIP global/CCV/executor on P0; token pool on P1.
+	globalAPIClient, err := oapiGlobal.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsCCIPPort))
+	require.NoError(t, err, "Failed to create GlobalConfig API client")
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsCCIPPort))
 	require.NoError(t, err, "Failed to create CCIP API client")
-	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsCCIPPort))
 	require.NoError(t, err, "Failed to create CCV API client")
-	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
-	require.NoError(t, err, "Failed to create Token Pool API client")
-	executorAPIClient, err := oapiExecutor.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	executorAPIClient, err := oapiExecutor.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsCCIPPort))
 	require.NoError(t, err, "Failed to create Executor API client")
+	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPoolPort))
+	require.NoError(t, err, "Failed to create Token Pool API client")
 
-	// wait for EDS to start up
-	time.Sleep(1 * time.Second)
+	waitForEDSListening(t, edsCCIPPort, edsPoolPort)
 
 	// Create PerPartyRouter for sender via EDS
 	perPartyRouterFactoryDisclosure, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosure(t.Context(), ccipAPIClient, partySender)
@@ -640,8 +699,6 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
-	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
-	require.NoError(t, err)
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
 	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
@@ -728,6 +785,21 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	executorSendDisclosure, err := edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
+
+	// Sanity check - CCIP global batch covers P0 contracts only (token pool lives on pool EDS).
+	disclosedContracts, err := edsTesthelpers.GetGlobalDisclosureBatch(t.Context(), globalAPIClient, []contracts.InstanceAddress{
+		perPartyRouterFactoryAddress.InstanceAddress(),
+		globalConfigAddress.InstanceAddress(),
+		feeQuoterAddress.InstanceAddress(),
+		onRampAddress.InstanceAddress(),
+		offRampAddress.InstanceAddress(),
+		tokenAdminRegistryAddress.InstanceAddress(),
+		rmnRemoteAddress.InstanceAddress(),
+		committeeVerifierAddress.InstanceAddress(),
+		executorAddress.InstanceAddress(),
+	})
+	require.NoError(t, err)
+	require.Lenf(t, disclosedContracts, 9, "expected to retrieve disclosures for all CCIP global addresses")
 
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
@@ -839,6 +911,12 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		executorSendDisclosure.DisclosedContracts,
 	)...)
 
+	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
+	require.NoError(t, err)
+
+	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
+	require.True(t, ok, "quoted fee should parse as a decimal value")
+
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction.
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -888,24 +966,16 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	// Verify pool feeBps haircut: 10,000 smallest units with 5% feeBps => 9,500 bridged.
 	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
 
-	senderBalanceAfter, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
-	require.NoError(t, err)
-	senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
+	// LnR LockOrBurn transfers gross to poolOwner; when poolOwner==sender, party Amulet total only drops by CCIP fee.
+	require.Eventually(t, func() bool {
+		senderBalanceAfter, balanceErr := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
+		if balanceErr != nil {
+			return false
+		}
+		senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
 
-	t.Logf(
-		"Sender balance: before=%s after=%s deducted=%s",
-		senderBalanceBefore,
-		senderBalanceAfter,
-		senderDelta,
-	)
-	require.Positive(t, senderDelta.Sign(), "sender balance should decrease after send")
-
-	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
-	require.True(t, ok, "quoted fee should parse as a decimal value")
-	tokenTransferAmount, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
-	require.True(t, ok, "token transfer amount should parse as a decimal value")
-	expectedSenderDelta := new(big.Rat).Add(tokenTransferAmount, quotedFeeAmount)
-	require.Zero(t, senderDelta.Cmp(expectedSenderDelta), "sender deduction should equal token amount plus quoted fee")
+		return senderDelta.Cmp(quotedFeeAmount) == 0
+	}, 15*time.Second, 200*time.Millisecond, "sender Amulet deduction should equal GetFee feeTokenAmount only")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)

@@ -20,6 +20,28 @@ import (
 // TestFindActiveContractByInstanceAddress_multiPartyVisibility verifies that when several
 // parties each own a distinct contract, a single ACS query spanning ActAs + ReadAs parties
 // can resolve the correct contract for each instance address.
+func TestProposalDrivenForCaller(t *testing.T) {
+	t.Parallel()
+
+	const operator = "operator"
+	const ccipOwner = "ccip-owner"
+
+	require.False(t, ProposalDrivenForCaller(canton.Participant{
+		PartyID:        ccipOwner,
+		ReadAsPartyIDs: []string{"other-party"},
+	}, ccipOwner), "ActAs matches caller → direct submit even with ReadAs")
+
+	require.True(t, ProposalDrivenForCaller(canton.Participant{
+		PartyID:        operator,
+		ReadAsPartyIDs: []string{ccipOwner},
+	}, ccipOwner), "operator ActAs with ccip caller → proposal mode")
+
+	require.False(t, ProposalDrivenForCaller(canton.Participant{
+		PartyID:        operator,
+		ReadAsPartyIDs: []string{ccipOwner},
+	}, operator), "ActAs matches caller → direct submit")
+}
+
 func TestFindActiveContractByInstanceAddress_multiPartyVisibility(t *testing.T) {
 	t.Parallel()
 

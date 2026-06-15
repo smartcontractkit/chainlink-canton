@@ -71,13 +71,13 @@ type GlobalAPIConfig struct {
 type CCIPAPIConfig struct {
 	Enabled bool `toml:"enabled"`
 
-	PerPartyRouterFactory ContractIdentifier `toml:"per_party_router_factory" validate:"required_if=Enabled true"`
-	OnRamp                ContractIdentifier `toml:"on_ramp" validate:"required_if=Enabled true"`
-	OffRamp               ContractIdentifier `toml:"off_ramp" validate:"required_if=Enabled true"`
-	GlobalConfig          ContractIdentifier `toml:"global_config" validate:"required_if=Enabled true"`
-	TokenAdminRegistry    ContractIdentifier `toml:"token_admin_registry" validate:"required_if=Enabled true"`
-	RMNRemote             ContractIdentifier `toml:"rmn_remote" validate:"required_if=Enabled true"`
-	FeeQuoter             ContractIdentifier `toml:"fee_quoter" validate:"required_if=Enabled true"`
+	PerPartyRouterFactory ContractIdentifier `toml:"per_party_router_factory" validate:"required_if=Enabled true,omitempty"`
+	OnRamp                ContractIdentifier `toml:"on_ramp" validate:"required_if=Enabled true,omitempty"`
+	OffRamp               ContractIdentifier `toml:"off_ramp" validate:"required_if=Enabled true,omitempty"`
+	GlobalConfig          ContractIdentifier `toml:"global_config" validate:"required_if=Enabled true,omitempty"`
+	TokenAdminRegistry    ContractIdentifier `toml:"token_admin_registry" validate:"required_if=Enabled true,omitempty"`
+	RMNRemote             ContractIdentifier `toml:"rmn_remote" validate:"required_if=Enabled true,omitempty"`
+	FeeQuoter             ContractIdentifier `toml:"fee_quoter" validate:"required_if=Enabled true,omitempty"`
 }
 
 // CCV API
@@ -88,7 +88,7 @@ type CCV struct {
 
 type CCVAPIConfig struct {
 	Enabled bool  `toml:"enabled"`
-	CCVs    []CCV `toml:"ccvs" validate:"required,dive"`
+	CCVs    []CCV `toml:"ccvs" validate:"required_if=Enabled true,dive"`
 }
 
 // Executor API

@@ -125,6 +125,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			PoolInstanceID:                       string(parsedPool.InstanceId),
 			CcipParty:                            string(parsedPool.CcipOwner),
 			PoolOwnerParty:                       string(parsedPool.PoolOwner),
+			PoolAdminParty:                       string(parsedPool.CcipOwner),
 		})
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("register token pool with token admin registry: %w", err)
@@ -552,6 +553,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			PoolInstanceID:                       rawPoolAddr.InstanceID(),
 			CcipParty:                            participant.PartyID,
 			PoolOwnerParty:                       participant.PartyID,
+			PoolAdminParty:                       participant.PartyID,
 		})
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("register Canton token pool: %w", err)
