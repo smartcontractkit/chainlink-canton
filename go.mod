@@ -41,7 +41,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.110.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.5
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
-	github.com/smartcontractkit/go-daml v0.0.0-20260610225315-f38fea9a45b0
+	github.com/smartcontractkit/go-daml v0.0.0-20260615231356-88c6ee9b5774
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
 	go.opentelemetry.io/otel v1.44.0

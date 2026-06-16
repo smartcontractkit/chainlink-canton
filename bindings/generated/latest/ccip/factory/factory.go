@@ -1859,7 +1859,7 @@ func (t *GetFactoryState) UnmarshalHex(data string) error {
 }
 
 // GetFactoryStateMCMSParams is GetFactoryState without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFactoryStateMCMSParams struct {
 }
 
