@@ -123,7 +123,7 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 
 // ManuallyExecuteMessage implements cciptestinterfaces.CCIP17.
 func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Message, gasLimit uint64, verifiers []protocol.UnknownAddress, verifierResults [][]byte) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	participant, clientIdx, err := c.clientParticipant()
+	participant, clientIdx, err := c.ClientParticipant()
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no canton participants configured: %w", err)
 	}
@@ -393,7 +393,7 @@ func (c *Chain) lockForParty(party string) func() {
 func (c *Chain) findExistingExecutionState(
 	ctx context.Context, sourceChainSelector, seqNo uint64, messageID protocol.Bytes32,
 ) (cciptestinterfaces.ExecutionStateChangedEvent, bool, error) {
-	participant, _, err := c.clientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: %w", err)
 	}

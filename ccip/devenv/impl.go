@@ -67,64 +67,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
-const (
-	// OwnerParticipantIndex is Participants[0]: deploy, EDS, verifiers, fee aggregator.
-	OwnerParticipantIndex = 0
-	// ClientParticipantIndex is Participants[1]: send, receive, execute, token holdings.
-	ClientParticipantIndex = 1
-)
-
 // TODO: move this to share between devenv and integration tests
 // and define a const for LINK instrument
 const AMTInstrument = types.TEXT("Amulet")
-
 const amuletTransferPreapprovalTemplateID = "#splice-amulet:Splice.AmuletRules:TransferPreapproval"
-
-// cantonChainFromEnv resolves a Canton chain from the deployment environment.
-func cantonChainFromEnv(env *deployment.Environment, selector uint64) (canton.Chain, error) {
-	chain, ok := env.BlockChains.CantonChains()[selector]
-	if !ok || len(chain.Participants) == 0 {
-		return canton.Chain{}, fmt.Errorf("canton chain %d not found or has no participants", selector)
-	}
-
-	return chain, nil
-}
-
-// clientParticipantIndex returns ClientParticipantIndex when available, else OwnerParticipantIndex.
-func clientParticipantIndex(participants []canton.Participant) int {
-	if len(participants) > ClientParticipantIndex {
-		return ClientParticipantIndex
-	}
-
-	return OwnerParticipantIndex
-}
-
-// clientParticipantFromChain returns the client participant and its index, or an error if none exist.
-func clientParticipantFromChain(chain canton.Chain) (canton.Participant, int, error) {
-	if len(chain.Participants) == 0 {
-		return canton.Participant{}, 0, fmt.Errorf("canton chain has no participants")
-	}
-	idx := clientParticipantIndex(chain.Participants)
-
-	return chain.Participants[idx], idx, nil
-}
-
-// ownerParticipantFromChain returns the owner participant (index 0), or an error if none exist.
-func ownerParticipantFromChain(chain canton.Chain) (canton.Participant, error) {
-	if len(chain.Participants) == 0 {
-		return canton.Participant{}, fmt.Errorf("canton chain has no participants")
-	}
-
-	return chain.Participants[OwnerParticipantIndex], nil
-}
-
-func (c *Chain) clientParticipantIndex() int {
-	return clientParticipantIndex(c.chain.Participants)
-}
-
-func (c *Chain) clientParticipant() (canton.Participant, int, error) {
-	return clientParticipantFromChain(c.chain)
-}
 
 var _ cciptestinterfaces.CCIP17 = &Chain{}
 
@@ -212,11 +158,12 @@ func (i *ImplFactory) DefaultSignerKey(keys ccvservices.BootstrapKeys) string {
 }
 
 func (i *ImplFactory) DefaultFeeAggregator(env *deployment.Environment, chainSelector uint64) string {
-	chain, err := cantonChainFromEnv(env, chainSelector)
-	if err != nil {
+	chain, ok := env.BlockChains.CantonChains()[chainSelector]
+	if !ok || len(chain.Participants) == 0 {
 		return ""
 	}
-	owner, err := ownerParticipantFromChain(chain)
+
+	owner, err := ownerParticipantFromBlockchain(chain)
 	if err != nil {
 		return ""
 	}
@@ -354,12 +301,12 @@ func uploadAndVetDar(ctx context.Context, participant canton.Participant, pkg co
 }
 
 func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
-	chain, err := cantonChainFromEnv(env, selector)
-	if err != nil {
-		return nil, err
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return nil, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
 
-	participant, err := ownerParticipantFromChain(chain)
+	participant, err := ownerParticipantFromBlockchain(chain)
 	if err != nil {
 		return nil, err
 	}
@@ -399,12 +346,12 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 }
 
 func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (ccipChangesets.DeployChainContractsPerChainCfg, error) {
-	chain, err := cantonChainFromEnv(env, selector)
-	if err != nil {
-		return ccipChangesets.DeployChainContractsPerChainCfg{}, err
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return ccipChangesets.DeployChainContractsPerChainCfg{}, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
 
-	owner, err := ownerParticipantFromChain(chain)
+	owner, err := ownerParticipantFromBlockchain(chain)
 	if err != nil {
 		return ccipChangesets.DeployChainContractsPerChainCfg{}, err
 	}
@@ -424,9 +371,9 @@ func (c *Chain) GetChainLaneProfile(_ *deployment.Environment, _ uint64) (ccipCh
 }
 
 func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, _ *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
-	chain, err := cantonChainFromEnv(env, selector)
-	if err != nil {
-		return nil, err
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return nil, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
 
 	feeQuoterRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
@@ -439,7 +386,7 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 		return nil, fmt.Errorf("resolve FeeQuoter for chain %d: %w", selector, err)
 	}
 
-	owner, err := ownerParticipantFromChain(chain)
+	owner, err := ownerParticipantFromBlockchain(chain)
 	if err != nil {
 		return nil, err
 	}
@@ -494,11 +441,11 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	}
 	c.logger.Debug().Str("GlobalConfig", globalConfig.Address).Msg("Resolved GlobalConfig")
 
-	chain, err := cantonChainFromEnv(env, selector)
-	if err != nil {
-		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, err
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
-	owner, err := ownerParticipantFromChain(chain)
+	owner, err := ownerParticipantFromBlockchain(chain)
 	if err != nil {
 		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, err
 	}
@@ -569,13 +516,13 @@ func (c *Chain) GetTokenExpansionConfigs(
 	selector uint64,
 	combos []devenvcommon.TokenCombination,
 ) ([]tokenscore.TokenExpansionInputPerChain, error) {
-	chain, err := cantonChainFromEnv(env, selector)
-	if err != nil {
-		return nil, err
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return nil, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
-	owner, err := ownerParticipantFromChain(chain)
+	owner, err := ownerParticipantFromBlockchain(chain)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("owner participant not found: %w", err)
 	}
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), owner)
 	if err != nil {
@@ -629,11 +576,13 @@ func (c *Chain) PostTokenDeploy(
 	if env.GetContext != nil {
 		ctx = env.GetContext()
 	}
-	chain, err := cantonChainFromEnv(env, selector)
-	if err != nil {
-		return err
+	chain := env.BlockChains.CantonChains()[selector]
+	if len(chain.Participants) == 0 {
+		return fmt.Errorf("canton chain %d has no participants", selector)
 	}
-	clientParticipant, _, err := clientParticipantFromChain(chain)
+	// gently hydrating the Chain impl from env here, because it's not populated by caller
+	c.chain = chain
+	clientParticipant, _, err := c.ClientParticipant()
 	if err != nil {
 		return err
 	}
@@ -641,7 +590,7 @@ func (c *Chain) PostTokenDeploy(
 		return fmt.Errorf("seed AMT liquidity: %w", err)
 	}
 
-	ownerParticipant, err := ownerParticipantFromChain(chain)
+	ownerParticipant, err := c.OwnerParticipant()
 	if err != nil {
 		return err
 	}
@@ -883,7 +832,7 @@ func (c *Chain) ExposeMetrics(ctx context.Context, source, dest uint64) ([]strin
 
 // GetEOAReceiverAddress implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetEOAReceiverAddress() (protocol.UnknownAddress, error) {
-	participant, _, err := c.clientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return nil, fmt.Errorf("no canton participants configured: %w", err)
 	}
@@ -910,7 +859,7 @@ func (c *Chain) GetSenderAddress() (protocol.UnknownAddress, error) {
 
 // GetTokenBalance implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetTokenBalance(ctx context.Context, address, tokenAddress protocol.UnknownAddress) (*big.Int, error) {
-	participant, _, err := c.clientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return nil, fmt.Errorf("no canton participants configured: %w", err)
 	}
@@ -1006,7 +955,7 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 	if !c.verifierObs.wired() {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("verifier observation not wired (test runner must call WireVerifierObservationFromLib)")
 	}
-	participant, _, err := c.clientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no participants on chain: %w", err)
 	}
@@ -1049,7 +998,7 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 // SetupReceive deploys the client party's PerPartyRouter before inbound messages arrive.
 // Call this when Canton is the destination (e.g. EVM→Canton) instead of SetupSend.
 func (c *Chain) SetupReceive(ctx context.Context) error {
-	participant, _, err := c.clientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
 	}
@@ -1071,7 +1020,7 @@ func (c *Chain) SetupSend(
 	feeAmountPerMessage uint64,
 	transferAmountPerMessage uint64,
 ) error {
-	participant, clientIdx, err := c.clientParticipant()
+	participant, clientIdx, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
 	}
@@ -1172,7 +1121,7 @@ func (c *Chain) SetupSend(
 // this method won't work in staging/prod tests
 // TODO: add support for LINK instrument
 func (c *Chain) MintTokens(ctx context.Context, amount uint64) error {
-	participant, _, err := c.clientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
 	}
@@ -1217,7 +1166,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	hasTokenTransfer := c.transferTokenInstrument != nil && fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 
-	participant, clientIdx, err := c.clientParticipant()
+	participant, clientIdx, err := c.ClientParticipant()
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no canton participants configured: %w", err)
 	}
@@ -1603,7 +1552,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 // events, the corresponding next CID is cleared (empty means no next holding available);
 // the current send already succeeded and a future SendMessage will fail its holding checks.
 func (c *Chain) setNextHoldings(ctx context.Context, events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Int) error {
-	participant, _, err := c.clientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
 	}
@@ -1717,7 +1666,7 @@ func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, tim
 // getValidatorAPIClients gets validator API clients from Chain struct cache or
 // creates them if they are not already created.
 func (c *Chain) getValidatorAPIClients() (validatorAPIClients, error) {
-	participant, _, err := c.clientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return validatorAPIClients{}, fmt.Errorf("no canton participants configured: %w", err)
 	}

@@ -8,10 +8,8 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
-	cldf "github.com/smartcontractkit/chainlink-ccv/build/devenv/cldf"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
@@ -60,14 +58,8 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 		lane.TransferAmount.String(),
 		lane.SrcToken)
 
-	_, opsEnv, err := cldf.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
+	receiverParticipant, _, err := cantonImpl.ClientParticipant()
 	require.NoError(t, err)
-	var receiverParticipant canton.Participant
-	if chains := opsEnv.BlockChains.CantonChains(); len(chains[cantonChain.ChainSelector()].Participants) > devenvtests.ClientParticipantIndex {
-		receiverParticipant = chains[cantonChain.ChainSelector()].Participants[devenvtests.ClientParticipantIndex]
-	} else if len(chains[cantonChain.ChainSelector()].Participants) > 0 {
-		receiverParticipant = chains[cantonChain.ChainSelector()].Participants[devenvtests.OwnerParticipantIndex]
-	}
 	require.NotEmpty(t, receiverParticipant.PartyID)
 
 	receiver, err := cantonChain.GetEOAReceiverAddress()

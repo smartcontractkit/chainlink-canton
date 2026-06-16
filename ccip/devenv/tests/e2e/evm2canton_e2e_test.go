@@ -11,12 +11,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	ccldf "github.com/smartcontractkit/chainlink-ccv/build/devenv/cldf"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -58,14 +56,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 	srcSelector := srcChain.ChainSelector()
 	dstSelector := dstChain.ChainSelector()
-	_, opsEnv, err := ccldf.NewCLDFOperationsEnvironment(in.Blockchains, in.CLDF.DataStore)
+	receiverParticipant, _, err := cantonDest.ClientParticipant()
 	require.NoError(t, err)
-	var receiverParticipant canton.Participant
-	if chains := opsEnv.BlockChains.CantonChains(); len(chains[dstSelector].Participants) > devenvtests.ClientParticipantIndex {
-		receiverParticipant = chains[dstSelector].Participants[devenvtests.ClientParticipantIndex]
-	} else if len(chains[dstSelector].Participants) > 0 {
-		receiverParticipant = chains[dstSelector].Participants[devenvtests.OwnerParticipantIndex]
-	}
 	require.NotEmpty(t, receiverParticipant.PartyID)
 
 	receiver, err := cantonDest.GetEOAReceiverAddress()
