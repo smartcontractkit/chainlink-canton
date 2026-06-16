@@ -634,6 +634,7 @@ func ensurePoolOwnerTransferPreapproval(ctx context.Context, ownerParticipant ca
 	}
 
 	log.Info().Str("party", poolOwner).Msg("Created TransferPreapproval for pool owner")
+
 	return nil
 }
 
@@ -1432,7 +1433,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	// Set next holdings
-	err = c.setNextHoldings(ctx, update.GetTransaction().GetEvents(), hasTokenTransfer, fields.TokenAmount.Amount)
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, fields.TokenAmount.Amount)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
 	}
@@ -1551,7 +1552,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 // Created events from the send transaction. When no qualifying holding appears in those
 // events, the corresponding next CID is cleared (empty means no next holding available);
 // the current send already succeeded and a future SendMessage will fail its holding checks.
-func (c *Chain) setNextHoldings(ctx context.Context, events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Int) error {
+func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Int) error {
 	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
@@ -1577,20 +1578,21 @@ func (c *Chain) setNextHoldings(ctx context.Context, events []*apiv2.Event, hasT
 		testhelpers.ExcludeCIDs(spentCIDs),
 	}
 
-	nextFeeCID, err := pickNextHolding(
+	nextFeeCID, exhaustion, err := pickNextHolding(
 		events,
 		c.feeTokenInstrument,
 		big.NewRat(0, 1), // TODO: we'll have to consider real fee here once we go load tests
 		refreshFilters...,
 	)
-	if err != nil {
+	if err != nil && !exhaustion {
 		return fmt.Errorf("refresh next fee holding from update: %w", err)
 	}
-	c.nextFeeCID = nextFeeCID
-	if nextFeeCID == "" {
-		c.logger.Info().Msg("No next fee holding available after send; clearing for future sends")
-	} else {
+	if !exhaustion {
+		c.nextFeeCID = nextFeeCID
 		c.logger.Info().Str("NextFeeCID", c.nextFeeCID).Msg("Selected next fee holding")
+	} else {
+		c.nextFeeCID = ""
+		c.logger.Info().Msg("No next fee holding available after send; clearing for future sends")
 	}
 
 	if !hasTokenTransfer {
@@ -1602,20 +1604,21 @@ func (c *Chain) setNextHoldings(ctx context.Context, events []*apiv2.Event, hasT
 		testhelpers.ExcludeCIDs(append(spentCIDs, c.nextFeeCID)),
 	)
 	transferValue := new(big.Rat).SetInt(tokenAmount)
-	nextTransferCID, err := pickNextHolding(
+	nextTransferCID, exhaustion, err := pickNextHolding(
 		events,
 		*c.transferTokenInstrument,
 		transferValue,
 		transferFilters...,
 	)
-	if err != nil {
+	if err != nil && !exhaustion {
 		return fmt.Errorf("refresh next transfer holding from update: %w", err)
 	}
-	c.nextTransferCID = nextTransferCID
-	if nextTransferCID == "" {
-		c.logger.Info().Msg("No next transfer holding available after send; clearing for future sends")
-	} else {
+	if !exhaustion {
+		c.nextTransferCID = nextTransferCID
 		c.logger.Info().Str("NextTransferCID", c.nextTransferCID).Msg("Selected next transfer holding")
+	} else {
+		c.nextTransferCID = ""
+		c.logger.Info().Msg("No next transfer holding available after send; clearing for future sends")
 	}
 
 	return nil
@@ -1628,19 +1631,22 @@ func pickNextHolding(
 	instrument splice_api_token_holding_v1.InstrumentId,
 	minAmount *big.Rat,
 	filters ...testhelpers.Filter,
-) (string, error) {
+) (string, bool, error) {
 	minAmounts := []*big.Rat{minAmount}
 
 	fromEvents, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(events, instrument, filters...)
 	if err != nil {
-		return "", err
+		return "", false, err
+	}
+	if len(fromEvents) == 0 {
+		return "", true, nil // no qualifying Created events → exhaustion, next send will fail
 	}
 	picked, err := testhelpers.SelectHoldingsForInstrument(fromEvents, minAmounts)
 	if err != nil || len(picked) == 0 {
-		return "", nil
+		return "", true, fmt.Errorf("refresh next fee holding from update: %w", err)
 	}
 
-	return picked[0].ContractID, nil
+	return picked[0].ContractID, false, nil
 }
 
 func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
