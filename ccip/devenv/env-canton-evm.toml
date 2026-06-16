@@ -233,6 +233,10 @@ execution_interval = 15_000_000_000
   trace_sample_ratio = 1.0
   trace_batch_timeout = 10
 
+[generic_services.8706591216959472610.input.eds_config.lock_release_transfer_preapproval]
+  context_key = 'transfer-preapproval'
+  template_id = '#splice-amulet:Splice.AmuletRules:TransferPreapproval'
+
 [[executor]]
   image = "executor:latest"
   container_name = "default-executor-1"

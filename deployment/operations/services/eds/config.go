@@ -28,6 +28,8 @@ import (
 type GenerateEDSConfigInput struct {
 	ChainSelector uint64 `json:"chain_selector"`
 	Participant   int    `json:"participant"`
+	// LockReleaseTransferPreapproval is applied to every discovered lockRelease token pool when set.
+	LockReleaseTransferPreapproval *edsConfig.TransferPreapproval `json:"lock_release_transfer_preapproval,omitempty"`
 }
 
 type GenerateEDSConfigOutput struct {
@@ -177,9 +179,8 @@ var BuildConfig = operations.NewOperation(
 					TokenStandardURL:        tokenStandardURL,
 					TokenStandardAuthConfig: tokenStandardAuthConfig,
 				}
-				pool.TransferPreapproval = &edsConfig.TransferPreapproval{
-					ContextKey: "transfer-preapproval",
-					TemplateId: "#splice-amulet:Splice.AmuletRules:TransferPreapproval",
+				if input.LockReleaseTransferPreapproval != nil {
+					pool.TransferPreapproval = input.LockReleaseTransferPreapproval
 				}
 			}
 			tokenPools[instanceAddress.Hex()] = pool
