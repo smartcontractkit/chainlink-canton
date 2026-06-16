@@ -15,5 +15,19 @@ go.work.sum
 logs/
 
 vendor/
+# CCIP script secrets (never commit .env files)
 scripts/staging/.env
+scripts/staging/.env.*
+scripts/prod_testnet/.env
+scripts/prod_testnet/.env.*
+scripts/prod_testnet/.env.local
+scripts/prod_testnet/secrets/
+scripts/prod_testnet/*.secrets
+scripts/prod_testnet/*.secrets.*
+
+# Local EDS / Canton operator config (may contain credentials)
 eds/staging_testnet_canton.local.toml
+eds/prod_testnet_canton.local.toml
+eds/prod_testnet_canton.local.secrets.toml
+eds/*.local.secrets.toml
+eds/*.secrets.toml
