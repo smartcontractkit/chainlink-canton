@@ -764,11 +764,6 @@ func (c *Chain) GetExpectedNextSequenceNumber(ctx context.Context, to uint64) (u
 	return c.nextSeq + 1, nil
 }
 
-// GetMaxDataBytes implements cciptestinterfaces.CCIP17.
-func (c *Chain) GetMaxDataBytes(ctx context.Context, remoteChainSelector uint64) (uint32, error) {
-	return 0, nil // TODO: implement
-}
-
 // GetSenderAddress implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetSenderAddress() (protocol.UnknownAddress, error) {
 	return protocol.UnknownAddress{}, nil // TODO: implement
@@ -1055,6 +1050,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		)
 	}
 
+	if c.transferTokenInstrument != nil && fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() == 0 {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage: token transfer amount must be positive")
+	}
+
 	hasTokenTransfer := c.transferTokenInstrument != nil && fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 
 	participant := c.chain.Participants[0]
@@ -1076,6 +1075,19 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				"canton SendMessage: fee and transfer holding CIDs must be different contracts",
 			)
 		}
+	}
+
+	maxDataBytes, err := c.GetMaxDataBytes(ctx, dest)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+			"canton SendMessage: resolve max data bytes for destination %d: %w", dest, err,
+		)
+	}
+	if len(fields.Data) > int(maxDataBytes) {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+			"canton SendMessage: payload exceeds destination maxDataBytes (%d > %d)",
+			len(fields.Data), maxDataBytes,
+		)
 	}
 
 	sendLog := c.logger.Info().Str("NextFeeCID", c.nextFeeCID)
