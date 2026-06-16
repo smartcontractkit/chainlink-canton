@@ -3,6 +3,7 @@ package devenv
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -99,6 +100,9 @@ func (c *Chain) GetMaxDataBytes(ctx context.Context, remoteChainSelector uint64)
 	if cfg.MaxDataBytes < 0 {
 		return 0, fmt.Errorf("negative maxDataBytes: %d", cfg.MaxDataBytes)
 	}
+	if cfg.MaxDataBytes > math.MaxUint32 {
+		return 0, fmt.Errorf("maxDataBytes overflows uint32: %d", cfg.MaxDataBytes)
+	}
 
 	return uint32(cfg.MaxDataBytes), nil
 }
@@ -111,6 +115,9 @@ func (c *Chain) GetMaxPerMsgGasLimit(ctx context.Context, remoteChainSelector ui
 	}
 	if cfg.MaxPerMsgGasLimit < 0 {
 		return 0, fmt.Errorf("negative maxPerMsgGasLimit: %d", cfg.MaxPerMsgGasLimit)
+	}
+	if cfg.MaxPerMsgGasLimit > math.MaxUint32 {
+		return 0, fmt.Errorf("maxPerMsgGasLimit overflows uint32: %d", cfg.MaxPerMsgGasLimit)
 	}
 
 	return uint32(cfg.MaxPerMsgGasLimit), nil
