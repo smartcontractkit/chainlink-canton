@@ -24,7 +24,7 @@ type RegisterNativeFeeTokenInTARConfig struct {
 	CCIPOwnerParty string                                   `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
 	MinDelay       time.Duration                            `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
 	Description    string                                   `json:"description,omitempty" yaml:"description,omitempty"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId,omitempty" yaml:"instrumentId,omitempty"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId,omitzero" yaml:"instrumentId,omitzero"`
 	TokenQualifier string                                   `json:"tokenQualifier,omitempty" yaml:"tokenQualifier,omitempty"`
 }
 
