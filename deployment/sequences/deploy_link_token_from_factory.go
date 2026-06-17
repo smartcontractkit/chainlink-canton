@@ -31,7 +31,7 @@ type DeployLinkTokenFromFactoryParams struct {
 	FactoryAddressRef   datastore.AddressRef
 	ProposalDriven      bool                                     `json:"proposalDriven,omitempty" yaml:"proposalDriven,omitempty"`
 	LinkTokenInstanceID types.TEXT                               `json:"linkTokenInstanceId,omitempty" yaml:"linkTokenInstanceId,omitempty"`
-	InstrumentID        splice_api_token_holding_v1.InstrumentId `json:"instrumentId,omitzero" yaml:"instrumentId,omitzero"`
+	InstrumentID        splice_api_token_holding_v1.InstrumentId `json:"instrumentId,omitzero" yaml:"instrumentId,omitempty"`
 	TokenQualifier      string                                   `json:"tokenQualifier,omitempty" yaml:"tokenQualifier,omitempty"`
 }
 
