@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -13,19 +13,19 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-canton/deployment/utils/nativeinstrument"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/nativeinstrument"
 )
 
 // RegisterNativeFeeTokenInTARConfig registers the Canton native fee token (Amulet) in TAR.
 // Creates TokenConfig only — no token pool. InstrumentId is resolved from the validator
 // scan-proxy when admin/id are empty (requires ledger access at pipeline run time).
 type RegisterNativeFeeTokenInTARConfig struct {
-	CCIPOwnerParty string        `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
-	MinDelay       time.Duration `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
-	Description    string        `json:"description,omitempty" yaml:"description,omitempty"`
+	CCIPOwnerParty string                                   `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
+	MinDelay       time.Duration                            `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
+	Description    string                                   `json:"description,omitempty" yaml:"description,omitempty"`
 	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId,omitempty" yaml:"instrumentId,omitempty"`
-	TokenQualifier string        `json:"tokenQualifier,omitempty" yaml:"tokenQualifier,omitempty"`
+	TokenQualifier string                                   `json:"tokenQualifier,omitempty" yaml:"tokenQualifier,omitempty"`
 }
 
 type RegisterNativeFeeTokenInTAR struct{}

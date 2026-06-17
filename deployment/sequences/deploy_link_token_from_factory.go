@@ -29,10 +29,10 @@ const defaultCantonLinkTokenInstrumentID = "link-token"
 type DeployLinkTokenFromFactoryParams struct {
 	CCIPOwnerParty      string `json:"ccipOwnerParty,omitempty" yaml:"ccipOwnerParty,omitempty"`
 	FactoryAddressRef   datastore.AddressRef
-	ProposalDriven      bool `json:"proposalDriven,omitempty" yaml:"proposalDriven,omitempty"`
-	LinkTokenInstanceID types.TEXT `json:"linkTokenInstanceId,omitempty" yaml:"linkTokenInstanceId,omitempty"`
+	ProposalDriven      bool                                     `json:"proposalDriven,omitempty" yaml:"proposalDriven,omitempty"`
+	LinkTokenInstanceID types.TEXT                               `json:"linkTokenInstanceId,omitempty" yaml:"linkTokenInstanceId,omitempty"`
 	InstrumentID        splice_api_token_holding_v1.InstrumentId `json:"instrumentId,omitempty" yaml:"instrumentId,omitempty"`
-	TokenQualifier      string `json:"tokenQualifier,omitempty" yaml:"tokenQualifier,omitempty"`
+	TokenQualifier      string                                   `json:"tokenQualifier,omitempty" yaml:"tokenQualifier,omitempty"`
 }
 
 // DeployLinkTokenFromFactory emits an MCMS batch for DeployLinkToken when ProposalDriven is true.
@@ -119,5 +119,6 @@ func stringsTrimOrDefault(value, fallback string) string {
 	if strings.TrimSpace(value) == "" {
 		return fallback
 	}
+
 	return strings.TrimSpace(value)
 }
