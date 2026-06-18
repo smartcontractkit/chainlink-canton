@@ -2,10 +2,15 @@ package tests
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
@@ -13,11 +18,103 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 )
+
+// E2EBootstrap holds shared CCIP e2e setup for a selected environment.
+type E2EBootstrap struct {
+	Env      CCIPEnv
+	Cfg      *ccv.Cfg
+	Lib      ccv.Lib
+	ChainMap map[uint64]cciptestinterfaces.CCIP17
+	Canton   *cantondevenv.Chain
+	EVM      cciptestinterfaces.CCIP17
+}
+
+// BootstrapE2E loads config, wires verifier observation, and resolves Canton + EVM chains.
+func BootstrapE2E(t *testing.T, env CCIPEnv) E2EBootstrap {
+	t.Helper()
+
+	if env.IsRemote() && os.Getenv("CANTON_GRPC_URL") == "" {
+		t.Skip("CANTON_GRPC_URL unset: not configured for remote Canton")
+	}
+
+	configPath := filepath.Join("..", "..", env.ConfigPath())
+	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
+	require.NoError(t, err)
+
+	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath)
+	require.NoError(t, err)
+
+	ctx := t.Context()
+	chainMap, err := lib.ChainsMap(ctx)
+	require.NoError(t, err)
+	require.NoError(t, WireVerifierObservationFromLib(lib, chainMap))
+
+	evmChain := GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
+	cantonChain := GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
+	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
+	require.True(t, ok, "Canton chain must be *devenv.Chain")
+
+	if !env.IsRemote() {
+		t.Cleanup(func() {
+			_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
+			require.NoError(t, err)
+		})
+	}
+
+	return E2EBootstrap{
+		Env:      env,
+		Cfg:      in,
+		Lib:      lib,
+		ChainMap: chainMap,
+		Canton:   cantonImpl,
+		EVM:      evmChain,
+	}
+}
+
+// SetupCantonSend prepares Canton for send in both envs.
+// devenv mints fee Amulet before SetupSend; prod-testnet assumes the party is already funded.
+func (b E2EBootstrap) SetupCantonSend(t *testing.T, ctx context.Context, transferAmount uint64) {
+	t.Helper()
+
+	fee := uint64(CantonToEVMFeeAmount)
+	if !b.Env.IsRemote() {
+		require.NoError(t, b.Canton.MintTokens(ctx, fee))
+	}
+	require.NoError(t, b.Canton.SetupSend(ctx, fee, transferAmount))
+}
+
+// ResolveEVMReceiver returns the EVM-side message receiver for Canton→EVM sends.
+func (b E2EBootstrap) ResolveEVMReceiver(t *testing.T) protocol.UnknownAddress {
+	t.Helper()
+
+	if b.Env.IsRemote() {
+		pkHex := strings.TrimSpace(os.Getenv("PRIVATE_KEY"))
+		require.NotEmpty(t, pkHex, "PRIVATE_KEY required for prod-testnet EVM receiver")
+		pkHex = strings.TrimPrefix(pkHex, "0x")
+		pk, err := gethcrypto.HexToECDSA(pkHex)
+		require.NoError(t, err)
+		addr := gethcrypto.PubkeyToAddress(pk.PublicKey)
+		return protocol.UnknownAddress(addr.Bytes())
+	}
+
+	receiver, err := b.EVM.GetEOAReceiverAddress()
+	require.NoError(t, err)
+	return receiver
+}
+
+// SkipIfRemote skips token subtests that are not supported on prod-testnet.
+func (b E2EBootstrap) SkipIfRemote(t *testing.T, reason string) {
+	t.Helper()
+	if b.Env.IsRemote() {
+		t.Skip(reason)
+	}
+}
 
 func GetContractAddress(
 	t *testing.T,

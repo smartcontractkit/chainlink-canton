@@ -44,7 +44,6 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -216,6 +215,7 @@ type Chain struct {
 	// Send setup prerequisites
 	routerAddress       contracts.InstanceAddress
 	senderAddress       contracts.InstanceAddress
+	receiverAddress     contracts.InstanceAddress
 	registryAdmin       string
 	validatorAPIClients validatorAPIClients
 
@@ -1034,21 +1034,10 @@ func (c *Chain) SetupSend(
 		return fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
 
-	// Deploy a sender-owned CCIPSender contract.
-	senderInstanceID := contracts.MustNewInstanceID("devenv-ccipsender")
-	out, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Deploy, c.chain, contract.DeployInput[ccipsender.CCIPSender]{
-		Qualifier:        nil,
-		ParticipantIndex: clientIdx,
-		Template: ccipsender.CCIPSender{
-			InstanceId: types.TEXT(senderInstanceID),
-			Owner:      types.PARTY(party),
-		},
-		OwnerParty: types.PARTY(party),
-	})
+	senderAddress, err := c.DeployCCIPSender(ctx, participant, party)
 	if err != nil {
 		return fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
-	senderAddress := contracts.HexToInstanceAddress(out.Output.Address)
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
 	if err != nil {
 		return fmt.Errorf("resolve registry admin: %w", err)
@@ -1246,7 +1235,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 	// TODO come up with a better way of doing this
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{party}, ccipruntime.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
+	routerCid, err := c.findPerPartyRouterCidByParty(ctx, participant, party)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}

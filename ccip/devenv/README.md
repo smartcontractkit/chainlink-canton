@@ -30,6 +30,45 @@ After the environment is spun up, you can run a test like:
 make run-e2e-tests
 ```
 
+### E2E environment selection (`-ccip-env` / `CCIP_ENV`)
+
+Message e2e tests run against **local devenv** by default or **Canton TestNet + Sepolia** when prod-testnet is selected. Set the environment by name (not TOML path):
+
+| Value | Config file | Remote |
+|---|---|---|
+| `devenv` (default) | [`env-canton-evm-out.toml`](./env-canton-evm-out.toml) | no |
+| `prod-testnet` | [`env-prod-testnet-out.toml`](./env-prod-testnet-out.toml) | yes |
+
+Use the `-ccip-env` flag or `CCIP_ENV` env var (flag wins if both are set):
+
+```bash
+# Local devenv (default)
+cd ccip/devenv/tests/e2e && go test -v -run 'TestCanton2EVM_Basic/EOA' -count=1
+
+# Prod testnet
+CCIP_ENV=prod-testnet \
+  CANTON_GRPC_URL=... CANTON_PARTY_ID=... CANTON_AUTH_*=... \
+  PRIVATE_KEY=... \
+  go test -timeout 8m -v -count=1 -ccip-env=prod-testnet \
+  -run 'TestEVM2Canton_Basic/message|TestCanton2EVM_Basic/EOA'
+```
+
+**Prod prerequisites**
+
+- Canton party wallet funded with at least **50 Amulet units** (message fee)
+- Canton auth env vars (`CANTON_GRPC_URL`, `CANTON_PARTY_ID`, `CANTON_AUTH_*`) — see [Prod testnet connection smoke test](#prod-testnet-connection-smoke-test)
+- Sepolia gas via `PRIVATE_KEY` (EVM sender / receiver for prod runs)
+
+**Optional instance ID overrides** (defaults: `test-router`, `e2e-ccipsender`, `e2e-receiver`):
+
+| Env var | Default |
+|---|---|
+| `CANTON_ROUTER_INSTANCE_ID` | `test-router` |
+| `CANTON_SENDER_INSTANCE_ID` | `e2e-ccipsender` |
+| `CANTON_RECEIVER_INSTANCE_ID` | `e2e-receiver` |
+
+Token e2e subtests are skipped on prod-testnet. A second prod run reuses existing router/sender/receiver contracts on ledger when instance IDs match.
+
 ## Load tests
 
 Load tests live in `ccip/devenv/tests/load`. They use [WASP](https://pkg.go.dev/github.com/smartcontractkit/chainlink-testing-framework/wasp) and run sequentially (RPS=1) because Canton holdings are single-flight.
@@ -180,7 +219,7 @@ make build-run-e2e-tests
 
 ## Prod testnet connection smoke test
 
-Minimal Canton-only connectivity check against real testnet infrastructure. Uses [`env-prod-testnet-out.toml`](./env-prod-testnet-out.toml) for public endpoint URLs; auth secrets and party identity come from environment variables.
+Minimal Canton-only connectivity check against real testnet infrastructure. Uses [`env-prod-testnet-out.toml`](./env-prod-testnet-out.toml) (Canton TestNet ↔ Sepolia message lane: contract refs, indexer URLs, EDS URL, verifier issuers); auth secrets and party identity come from environment variables.
 
 The test is opt-in: it skips unless `CANTON_GRPC_URL` is set (even though the TOML file includes default URLs). This keeps CI green while allowing manual or workflow-triggered runs.
 
@@ -226,10 +265,6 @@ export CANTON_USER_ID='...'
 cd ccip/devenv/tests/integration && go test -v -run TestIntegration_CantonProdTestnet_Connection -count=1
 ```
 
-Use `-canton-env-out` to point at a different CCV env output TOML (default `../../env-prod-testnet-out.toml`; local devenv uses `../../env-canton-evm-out.toml`):
-
-```bash
-cd ccip/devenv/tests/integration && go test -v -run TestIntegration_CantonProdTestnet_Connection -count=1 -canton-env-out=../../env-canton-evm-out.toml
-```
+Use `-ccip-env=prod-testnet` (or `CCIP_ENV=prod-testnet`) so the test loads `env-prod-testnet-out.toml`; default devenv config is `env-canton-evm-out.toml` via `-ccip-env=devenv`.
 
 The test connects via `NewCLDF`, asserts `PartyID` is set, and lists holdings for the party (empty balance is OK).

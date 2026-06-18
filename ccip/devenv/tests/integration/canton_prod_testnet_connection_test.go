@@ -3,6 +3,7 @@ package integration
 import (
 	"flag"
 	"os"
+	"path/filepath"
 	"testing"
 
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
@@ -13,15 +14,9 @@ import (
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register canton impl factory
+	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
-
-const (
-	EnvCantonEvmOutToml    = "../../env-canton-evm-out.toml"
-	EnvProdTestnetOutToml  = "../../env-prod-testnet-out.toml"
-)
-
-var cantonEnvOut = flag.String("canton-env-out", EnvProdTestnetOutToml, "path to CCV env output TOML")
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -36,7 +31,8 @@ func TestIntegration_CantonProdTestnet_Connection(t *testing.T) {
 		t.Skip("CANTON_GRPC_URL unset: not configured for real Canton testnet")
 	}
 
-	configPath := *cantonEnvOut
+	env := devenvtests.ParseEnvFromFlag(t)
+	configPath := filepath.Join("../..", env.ConfigPath())
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 

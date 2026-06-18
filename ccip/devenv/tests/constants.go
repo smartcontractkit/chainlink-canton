@@ -4,7 +4,7 @@ package tests
 
 const (
 	// CantonToEVMFeeAmount is the Canton CCIP send fee in Amulet units.
-	CantonToEVMFeeAmount int64 = 2_000
+	CantonToEVMFeeAmount int64 = 50
 
 	// EVMDecimalsScale converts Canton token amounts to EVM 18-decimal balance units.
 	EVMDecimalsScale int64 = 1_000_000_000_000_000_000
