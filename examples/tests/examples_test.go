@@ -1,8 +1,10 @@
+//nolint:paralleltest
 package tests
 
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -39,6 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/authentication/authorizationcode"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
@@ -102,8 +105,6 @@ func TestMulti(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, token)
 
-	fmt.Println(token.AccessToken)
-
 	rpcProviderConfig := provider.RPCChainProviderConfig{
 		Participants: []provider.ParticipantConfig{
 			{
@@ -126,7 +127,22 @@ func TestMulti(t *testing.T) {
 	cantonChain := chain.(*canton.Chain)
 	participant := cantonChain.Participants[0]
 
-	_, _, transferInstructionClient, err := testhelpers.NewValidatorAPIClients(participant)
+	// Create HTTP clients
+	_, _, amuletTransferInstructionClient, err := testhelpers.NewValidatorAPIClients(participant)
+	require.NoError(t, err)
+
+	ccipEdsClient, err := oapiCCIP.NewClientWithResponses(edsURL)
+	require.NoError(t, err)
+	ccvEdsClient, err := oapiCCV.NewClientWithResponses(edsURL)
+	require.NoError(t, err)
+	executorEdsClient, err := oapiExecutor.NewClientWithResponses(edsURL)
+	require.NoError(t, err)
+	tokenPoolEdsClient, err := oapiTokenPool.NewClientWithResponses(edsURL)
+	require.NoError(t, err)
+	// transferInstructionEdsClient, err := oapiTransferInstruction.NewClientWithResponses(edsURL)
+	require.NoError(t, err)
+
+	indexerClient, err := indexerclient.NewIndexerClient(indexerURL, &http.Client{Timeout: 15 * time.Second})
 	require.NoError(t, err)
 
 	t.Run("GetVersion", func(t *testing.T) {
@@ -139,24 +155,24 @@ func TestMulti(t *testing.T) {
 	t.Run("AcceptIncomingTransferInstruction", func(t *testing.T) {
 		transferInstructionCid := ""
 
-		contextResp, err := transferInstructionClient.GetTransferInstructionAcceptContextWithResponse(t.Context(), transferInstructionCid, oapiTransferInstruction.GetTransferInstructionAcceptContextJSONRequestBody{
+		contextResp, err := amuletTransferInstructionClient.GetTransferInstructionAcceptContextWithResponse(t.Context(), transferInstructionCid, oapiTransferInstruction.GetTransferInstructionAcceptContextJSONRequestBody{
 			Meta: nil,
 		})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, contextResp.StatusCode(), "Unexpected status code, response: %v", string(contextResp.Body))
 
-		var disclosedContracts []*apiv2.DisclosedContract
-		for _, contract := range contextResp.JSON200.DisclosedContracts {
+		disclosedContracts := make([]*apiv2.DisclosedContract, len(contextResp.JSON200.DisclosedContracts))
+		for i, contract := range contextResp.JSON200.DisclosedContracts {
 			id, err := testhelpers.TemplateIdFromString(contract.TemplateId)
 			require.NoError(t, err)
 			createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
 			require.NoError(t, err)
-			disclosedContracts = append(disclosedContracts, &apiv2.DisclosedContract{
+			disclosedContracts[i] = &apiv2.DisclosedContract{
 				TemplateId:       id,
 				ContractId:       contract.ContractId,
 				CreatedEventBlob: createdEventBlob,
 				SynchronizerId:   contract.SynchronizerId,
-			})
+			}
 		}
 
 		acceptContext, err := testhelpers.ChoiceContextFromData(contextResp.JSON200.ChoiceContextData)
@@ -193,11 +209,29 @@ func TestMulti(t *testing.T) {
 		fmt.Println("Accepted in update: ", resp.GetTransaction().GetUpdateId())
 	})
 
-	t.Run("FilterContracts", func(t *testing.T) {
+	t.Run("List CCIPMessageSent", func(t *testing.T) {
 		activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{PackageId: "#ccip-core", ModuleName: "CCIP.Events", EntityName: "CCIPMessageSent"})
 		require.NoError(t, err)
 		for i, contract := range activeContracts {
-			fmt.Printf("Active contract %d: ID=%s, CreateArguments=%s\n", i, contract.GetCreatedEvent().GetContractId(), contract.GetCreatedEvent().CreateArguments)
+			messageSentEvent, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](contract.GetCreatedEvent())
+			require.NoError(t, err)
+			data, err := json.MarshalIndent(messageSentEvent, "", "\t")
+			require.NoError(t, err)
+			fmt.Printf(" ---------- Active contract %d: Contract ID=%s ----------\n", i, contract.GetCreatedEvent().GetContractId())
+			fmt.Println(string(data))
+		}
+	})
+
+	t.Run("List ExecutionStateChanged", func(t *testing.T) {
+		activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{PackageId: "#ccip-core", ModuleName: "CCIP.Events", EntityName: "ExecutionStateChanged"})
+		require.NoError(t, err)
+		for i, contract := range activeContracts {
+			messageSentEvent, err := bindings.UnmarshalCreatedEvent[core.ExecutionStateChanged](contract.GetCreatedEvent())
+			require.NoError(t, err)
+			data, err := json.MarshalIndent(messageSentEvent, "", "\t")
+			require.NoError(t, err)
+			fmt.Printf(" ---------- Active contract %d: Contract ID=%s ----------\n", i, contract.GetCreatedEvent().GetContractId())
+			fmt.Println(string(data))
 		}
 	})
 
@@ -219,9 +253,6 @@ func TestMulti(t *testing.T) {
 	})
 
 	t.Run("Create PerPartyRouter", func(t *testing.T) {
-		ccipEdsClient, err := oapiCCIP.NewClientWithResponses(edsURL)
-		require.NoError(t, err)
-
 		routerCid := getRouter(t, participant, ccipEdsClient)
 		fmt.Println("PerPartyRouter Contract ID: ", routerCid)
 	})
@@ -246,7 +277,7 @@ func TestMulti(t *testing.T) {
 		receiverParty := participant.PartyID
 
 		// Message
-		tokenAmount := big.NewInt(1e18)
+		tokenAmount := big.NewInt(5e18)
 
 		chainIdString, err := chainsel.GetChainIDFromSelector(ethSelector)
 		require.NoError(t, err)
@@ -304,6 +335,7 @@ func TestMulti(t *testing.T) {
 			messageSentEvent, err := onRamp.ParseCCIPMessageSent(*lg)
 			require.NoError(t, err)
 			sentEvent = messageSentEvent
+
 			break
 		}
 		require.NotNil(t, sentEvent, "Sent event not found in transaction logs")
@@ -311,25 +343,16 @@ func TestMulti(t *testing.T) {
 	})
 
 	t.Run("Execute: Canton (Token Transfer)", func(t *testing.T) {
-		messageId := common.HexToHash("3bb03d186c6adb90baab2004d683dca394804e721c9bda207d4a72ba3d86a351")
-		timeout := time.Minute
-
-		indexer, err := indexerclient.NewIndexerClient(indexerURL, &http.Client{Timeout: 15 * time.Second})
-		require.NoError(t, err)
-		ccipEdsClient, err := oapiCCIP.NewClientWithResponses(edsURL)
-		require.NoError(t, err)
-		ccvEdsClient, err := oapiCCV.NewClientWithResponses(edsURL)
-		require.NoError(t, err)
-		tokenPoolEdsClient, err := oapiTokenPool.NewClientWithResponses(edsURL)
-		require.NoError(t, err)
+		messageId := common.HexToHash("1a5650e2fc6e8f874274b836122c8ccf99a52c96786cd0264669454b0aa145de")
+		timeout := time.Minute * 15
 
 		start := time.Now()
 		var response v1.VerifierResultsByMessageIDResponse
 		for {
-			if time.Now().Sub(start) > timeout {
+			if time.Since(start) > timeout {
 				t.Fatal("Timed out waiting for message to be processed by indexer")
 			}
-			status, resp, err := indexer.VerifierResultsByMessageID(t.Context(), v1.VerifierResultsByMessageIDInput{MessageID: messageId.Hex()})
+			status, resp, err := indexerClient.VerifierResultsByMessageID(t.Context(), v1.VerifierResultsByMessageIDInput{MessageID: messageId.Hex()})
 			if err != nil {
 				t.Logf("Error querying indexer: %v", err)
 				time.Sleep(5 * time.Second)
@@ -341,6 +364,7 @@ func TestMulti(t *testing.T) {
 			}
 
 			response = resp
+
 			break
 		}
 		require.NotEmptyf(t, response.Results, "Expected at least one verifier result for message ID %s", messageId.Hex())
@@ -419,21 +443,26 @@ func TestMulti(t *testing.T) {
 
 	t.Run("Send: Canton->EVM (Message Only, Native)", func(t *testing.T) {
 		messageReceiver := ccipReceiverContract
+		feeToken := amuletInstrumentID
 
-		ccipEdsClient, err := oapiCCIP.NewClientWithResponses(edsURL)
-		require.NoError(t, err)
-		ccvEdsClient, err := oapiCCV.NewClientWithResponses(edsURL)
-		require.NoError(t, err)
-		executorEdsClient, err := oapiExecutor.NewClientWithResponses(edsURL)
-		require.NoError(t, err)
-
-		// Get Fee Input holding
+		// Get fee token input holdings
 		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, amuletInstrumentID)
 		require.NoError(t, err)
+		feeTokenInputCids := make([]types.CONTRACT_ID, len(feeTokenHoldings))
+		for i, holding := range feeTokenHoldings {
+			feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
+		}
 
-		transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, string(amuletInstrumentID.Admin), participant.PartyID, ccipOwnerPartyID)
+		transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), amuletTransferInstructionClient, string(feeToken.Admin), splice_api_token_transfer_instruction_v1.Transfer{
+			Sender:           types.PARTY(participant.PartyID),
+			Receiver:         ccipOwnerPartyID,
+			Amount:           "1.0",
+			InstrumentId:     *feeToken,
+			InputHoldingCids: feeTokenInputCids,
+			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+		})
 		require.NoError(t, err)
-		choiceContext, err := contracts.ChoiceContextFromData(choiceContextRaw)
+		choiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
 		require.NoError(t, err)
 
 		// Get PerPartyRouter
@@ -473,11 +502,6 @@ func TestMulti(t *testing.T) {
 		executorSendDisclosure, err := eds.GetExecutorSendDisclosure(t.Context(), executorEdsClient, msg, defaultExecutorAddress.InstanceAddress(), ccipSendDisclosure.CCVs)
 		require.NoError(t, err)
 
-		feeTokenInputCids := make([]types.CONTRACT_ID, len(feeTokenHoldings))
-		for i, holding := range feeTokenHoldings {
-			feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
-		}
-
 		sendArgs := sender.Send{
 			DestinationChainSelector: types.NUMERIC(msg.DestinationChainSelector),
 			Message: core.Canton2AnyMessage{
@@ -502,7 +526,7 @@ func TestMulti(t *testing.T) {
 			FeeTokenInput: sender.FeeTokenInput{
 				SenderInputCids:         feeTokenInputCids,
 				FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-				FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+				FeeTokenTransferFactory: types.CONTRACT_ID(transferFactory.FactoryID),
 				FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 					Context: choiceContext,
 					Meta: splice_api_token_metadata_v1.Metadata{
@@ -524,7 +548,7 @@ func TestMulti(t *testing.T) {
 			},
 		}
 		allDisclosures := slices.Concat(
-			transferFactoryDisclosures,
+			transferFactory.DisclosedContracts,
 			ccipSendDisclosure.DisclosedContracts,
 			ccvSendDisclosure.DisclosedContracts,
 			executorSendDisclosure.DisclosedContracts,
@@ -547,46 +571,42 @@ func TestMulti(t *testing.T) {
 		require.NoError(t, err)
 		fmt.Println("Message sent in Update: ", resp.GetTransaction().GetUpdateId())
 
-		var returnedMessageId string
-		for _, event := range resp.GetTransaction().GetEvents() {
-			if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-				if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
-					ccipMessageSent, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](e.Created)
-					require.NoError(t, err)
-					returnedMessageId = string(ccipMessageSent.Event.MessageId)
-					break
-				}
-			}
-		}
-		require.NotEmpty(t, returnedMessageId)
-		fmt.Println("Message sent with MessageID: ", returnedMessageId)
+		messageId := getMessageIdFromTransaction(t, resp.GetTransaction())
+		fmt.Println("Message sent with MessageID: ", messageId)
 	})
 
 	t.Run("Send: Canton->EVM (Token Only, Native)", func(t *testing.T) {
 		// The address that will receive the tokens
 		messageReceiver := common.HexToAddress("0x90392A1E8A941098a3C75E0BDB172cFdE7E4f1f4")
+		feeToken := amuletInstrumentID
 
-		ccipEdsClient, err := oapiCCIP.NewClientWithResponses(edsURL)
+		// Get fee token input holdings
+		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, feeToken)
 		require.NoError(t, err)
-		ccvEdsClient, err := oapiCCV.NewClientWithResponses(edsURL)
+		feeTokenInputCids := make([]types.CONTRACT_ID, len(feeTokenHoldings))
+		for i, holding := range feeTokenHoldings {
+			feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
+		}
+
+		transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), amuletTransferInstructionClient, string(feeToken.Admin), splice_api_token_transfer_instruction_v1.Transfer{
+			Sender:           types.PARTY(participant.PartyID),
+			Receiver:         ccipOwnerPartyID,
+			Amount:           "1.0",
+			InstrumentId:     *feeToken,
+			InputHoldingCids: feeTokenInputCids,
+			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+		})
 		require.NoError(t, err)
-		executorEdsClient, err := oapiExecutor.NewClientWithResponses(edsURL)
-		require.NoError(t, err)
-		tokenPoolEdsClient, err := oapiTokenPool.NewClientWithResponses(edsURL)
+		choiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
 		require.NoError(t, err)
 
-		// Get Fee Input holding
-		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, amuletInstrumentID)
-		require.NoError(t, err)
-
-		transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, string(amuletInstrumentID.Admin), participant.PartyID, ccipOwnerPartyID)
-		require.NoError(t, err)
-		choiceContext, err := contracts.ChoiceContextFromData(choiceContextRaw)
-		require.NoError(t, err)
-
-		// Get Token input holding
+		// Get token transfer input holdings
 		tokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, linkInstrumentId)
 		require.NoError(t, err)
+		tokenTransferInputCids := make([]types.CONTRACT_ID, len(tokenHoldings))
+		for i, holding := range tokenHoldings {
+			tokenTransferInputCids[i] = types.CONTRACT_ID(holding.ContractID)
+		}
 
 		// Get PerPartyRouter
 		routerCid := getRouter(t, participant, ccipEdsClient)
@@ -603,8 +623,8 @@ func TestMulti(t *testing.T) {
 				Type: oapiCommon.Empty,
 			},
 			FeeToken: oapiCommon.InstrumentId{
-				Admin: oapiCommon.PartyId(amuletInstrumentID.Admin),
-				Id:    string(amuletInstrumentID.Id),
+				Admin: oapiCommon.PartyId(feeToken.Admin),
+				Id:    string(feeToken.Id),
 			},
 			GasLimit: 0,
 			Payload:  "",
@@ -635,15 +655,6 @@ func TestMulti(t *testing.T) {
 		executorSendDisclosure, err := eds.GetExecutorSendDisclosure(t.Context(), executorEdsClient, msg, defaultExecutorAddress.InstanceAddress(), ccipSendDisclosure.CCVs)
 		require.NoError(t, err)
 
-		feeTokenInputCids := make([]types.CONTRACT_ID, len(feeTokenHoldings))
-		for i, holding := range feeTokenHoldings {
-			feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
-		}
-		tokenTransferInputCids := make([]types.CONTRACT_ID, len(tokenHoldings))
-		for i, holding := range tokenHoldings {
-			tokenTransferInputCids[i] = types.CONTRACT_ID(holding.ContractID)
-		}
-
 		sendArgs := sender.Send{
 			DestinationChainSelector: types.NUMERIC(msg.DestinationChainSelector),
 			Message: core.Canton2AnyMessage{
@@ -671,7 +682,7 @@ func TestMulti(t *testing.T) {
 			FeeTokenInput: sender.FeeTokenInput{
 				SenderInputCids:         feeTokenInputCids,
 				FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-				FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+				FeeTokenTransferFactory: types.CONTRACT_ID(transferFactory.FactoryID),
 				FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 					Context: choiceContext,
 					Meta: splice_api_token_metadata_v1.Metadata{
@@ -697,7 +708,7 @@ func TestMulti(t *testing.T) {
 			},
 		}
 		allDisclosures := slices.Concat(
-			transferFactoryDisclosures,
+			transferFactory.DisclosedContracts,
 			tokenPoolSendDisclosure.DisclosedContracts,
 			ccipSendDisclosure.DisclosedContracts,
 			ccvSendDisclosure.DisclosedContracts,
@@ -721,19 +732,8 @@ func TestMulti(t *testing.T) {
 		require.NoError(t, err)
 		fmt.Println("Message sent in Update: ", resp.GetTransaction().GetUpdateId())
 
-		var returnedMessageId string
-		for _, event := range resp.GetTransaction().GetEvents() {
-			if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-				if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
-					ccipMessageSent, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](e.Created)
-					require.NoError(t, err)
-					returnedMessageId = string(ccipMessageSent.Event.MessageId)
-					break
-				}
-			}
-		}
-		require.NotEmpty(t, returnedMessageId)
-		fmt.Println("Message sent with MessageID: ", returnedMessageId)
+		messageId := getMessageIdFromTransaction(t, resp.GetTransaction())
+		fmt.Println("Message sent with MessageID: ", messageId)
 	})
 }
 
@@ -760,7 +760,7 @@ func getRouter(t *testing.T, participant canton.Participant, ccipEdsClient oapiC
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
 						PartyOwner: types.PARTY(participant.PartyID),
-						InstanceId: "default-router",
+						InstanceId: types.TEXT(fmt.Sprintf("router-%s", participant.PartyID)),
 					}),
 				}},
 			}},
@@ -771,6 +771,7 @@ func getRouter(t *testing.T, participant canton.Participant, ccipEdsClient oapiC
 	require.NoError(t, err)
 	t.Logf("Created PerPartyRouter in update: %v", resp.GetTransaction().GetUpdateId())
 
+	time.Sleep(5 * time.Second) // Wait for propagation
 	activeContracts, err = testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{PackageId: "#ccip-runtime", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"})
 	require.NoError(t, err)
 	require.NotEmptyf(t, activeContracts, "Expected to find active PerPartyRouter after creation for party %s", participant.PartyID)
@@ -804,6 +805,7 @@ func getSender(t *testing.T, participant canton.Participant) string {
 	require.NoError(t, err)
 	t.Logf("Created CCIPSender in update: %v", resp.GetTransaction().GetUpdateId())
 
+	time.Sleep(5 * time.Second) // Wait for propagation
 	activeContracts, err = testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"})
 	require.NoError(t, err)
 	require.NotEmptyf(t, activeContracts, "Expected to find active CCIPSender after creation for party %s", participant.PartyID)
@@ -844,9 +846,26 @@ func getReceiver(t *testing.T, participant canton.Participant) string {
 	require.NoError(t, err)
 	t.Logf("Created CCIPReceiver in update: %v", resp.GetTransaction().GetUpdateId())
 
+	time.Sleep(5 * time.Second) // Wait for propagation
 	activeContracts, err = testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"})
 	require.NoError(t, err)
 	require.NotEmptyf(t, activeContracts, "Expected to find active CCIPReceiver after creation for party %s", participant.PartyID)
 
 	return activeContracts[0].GetCreatedEvent().GetContractId()
+}
+
+func getMessageIdFromTransaction(t *testing.T, tx *apiv2.Transaction) string {
+	for _, event := range tx.GetEvents() {
+		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
+				ccipMessageSent, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](e.Created)
+				require.NoError(t, err)
+				return string(ccipMessageSent.Event.MessageId)
+			}
+		}
+	}
+
+	t.Fatal("CCIPMessageSent event not found in transaction events")
+
+	return ""
 }
