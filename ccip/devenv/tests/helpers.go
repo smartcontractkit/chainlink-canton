@@ -89,6 +89,13 @@ func (b E2EBootstrap) SetupCantonSend(t *testing.T, ctx context.Context, transfe
 	require.NoError(t, b.Canton.SetupSend(ctx, fee, transferAmount))
 }
 
+// SetupCantonReceive deploys the client party's PerPartyRouter before inbound messages
+// are executed on Canton (e.g. EVM→Canton).
+func (b E2EBootstrap) SetupCantonReceive(t *testing.T, ctx context.Context) {
+	t.Helper()
+	require.NoError(t, b.Canton.SetupReceive(ctx))
+}
+
 // ResolveEVMReceiver returns the EVM-side message receiver for Canton→EVM sends.
 func (b E2EBootstrap) ResolveEVMReceiver(t *testing.T) protocol.UnknownAddress {
 	t.Helper()

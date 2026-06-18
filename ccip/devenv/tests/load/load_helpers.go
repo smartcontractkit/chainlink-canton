@@ -205,7 +205,8 @@ func setupCantonTokenLoadHoldings(
 	t.Helper()
 
 	estimated := estimateMessages(sched)
-	feeMint := estimated * uint64(devenvtests.CantonToEVMFeeAmount)
+	tokenFeePerSend := uint64(devenvtests.CantonToEVMTokenTransferFeeAmount)
+	feeMint := estimated * tokenFeePerSend
 	transferMint := estimated * lane.TransferAmount.Uint64()
 	t.Logf("Pre-mint: estimatedMessages=%d feeMint=%d transferMint=%d",
 		estimated, feeMint, transferMint)
@@ -213,7 +214,7 @@ func setupCantonTokenLoadHoldings(
 	require.NoError(t, cantonImpl.MintTokens(ctx, transferMint))
 	require.NoError(t, cantonImpl.SetupSend(
 		ctx,
-		uint64(devenvtests.CantonToEVMFeeAmount),
+		tokenFeePerSend,
 		lane.TransferAmount.Uint64(),
 	))
 }

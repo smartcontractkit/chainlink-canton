@@ -124,17 +124,17 @@ func (c *Chain) findPerPartyRouterByParty(
 		if created == nil {
 			continue
 		}
-		router, err := bindings.UnmarshalCreatedEvent[ccipruntime.PerPartyRouter](created)
-		if err != nil {
-			c.logger.Debug().Err(err).Msg("Skipping unparseable PerPartyRouter active contract")
+		instanceId, partyOwner, ok := perPartyRouterFieldsFromCreated(created)
+		if !ok {
+			c.logger.Debug().Msg("Skipping PerPartyRouter active contract missing instanceId or partyOwner")
 			continue
 		}
-		if string(router.PartyOwner) != partyId {
+		if partyOwner != partyId {
 			continue
 		}
-		addr := contracts.InstanceID(router.InstanceId).RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
+		addr := contracts.InstanceID(instanceId).RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
 		cid := created.GetContractId()
-		if contracts.InstanceID(router.InstanceId) == preferredInstanceID {
+		if contracts.InstanceID(instanceId) == preferredInstanceID {
 			return addr, cid, true, nil
 		}
 		if !hasFallback {
@@ -148,6 +148,18 @@ func (c *Chain) findPerPartyRouterByParty(
 	}
 
 	return contracts.InstanceAddress{}, "", false, nil
+}
+
+func perPartyRouterFieldsFromCreated(created *apiv2.CreatedEvent) (instanceId, partyOwner string, ok bool) {
+	for _, field := range created.GetCreateArguments().GetFields() {
+		switch field.GetLabel() {
+		case "instanceId":
+			instanceId = field.GetValue().GetText()
+		case "partyOwner":
+			partyOwner = field.GetValue().GetParty()
+		}
+	}
+	return instanceId, partyOwner, instanceId != "" && partyOwner != ""
 }
 
 // findPerPartyRouterCidByParty resolves the ledger contract ID for a PerPartyRouter owned by partyId.

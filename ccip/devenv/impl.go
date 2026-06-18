@@ -1021,7 +1021,7 @@ func (c *Chain) SetupSend(
 	feeAmountPerMessage uint64,
 	transferAmountPerMessage uint64,
 ) error {
-	participant, clientIdx, err := c.ClientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
 	}

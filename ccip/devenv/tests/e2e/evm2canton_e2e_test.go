@@ -31,6 +31,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	}
 
 	boot := devenvtests.BootstrapE2E(t, devenvtests.ParseEnvFromFlag(t))
+	ctx := ccv.Plog.WithContext(t.Context())
+	boot.SetupCantonReceive(t, ctx)
 
 	srcSelector := boot.EVM.ChainSelector()
 	dstSelector := boot.Canton.ChainSelector()

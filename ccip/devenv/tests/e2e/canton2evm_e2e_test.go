@@ -116,13 +116,14 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		lane := devenvtests.ResolveTokenLane(t, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), []uint64{boot.EVM.ChainSelector()})
 		tokenTransferAmount := lane.TransferAmount.Uint64()
 
+		tokenFeePerSend := uint64(devenvtests.CantonToEVMTokenTransferFeeAmount)
 		require.NoError(t, boot.Canton.MintTokens(ctx,
-			devenvtests.CantonToEVMTokenSequentialSends*uint64(devenvtests.CantonToEVMFeeAmount),
+			devenvtests.CantonToEVMTokenSequentialSends*tokenFeePerSend,
 		))
 		require.NoError(t, boot.Canton.MintTokens(ctx,
 			devenvtests.CantonToEVMTokenSequentialSends*tokenTransferAmount,
 		))
-		require.NoError(t, boot.Canton.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
+		require.NoError(t, boot.Canton.SetupSend(ctx, tokenFeePerSend, tokenTransferAmount))
 
 		receiver := boot.ResolveEVMReceiver(t)
 
