@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"google.golang.org/grpc"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_canton_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
+
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 )
 
 func NewCLDF(ctx context.Context, b *blockchain.Input) (cldf_chain.BlockChain, uint64, error) {
@@ -24,46 +24,80 @@ func NewCLDF(ctx context.Context, b *blockchain.Input) (cldf_chain.BlockChain, u
 		Participants: make([]cldf_canton_provider.ParticipantConfig, len(b.Out.NetworkSpecificData.CantonData.ExternalEndpoints.Participants)),
 	}
 
+	presetPartyID := resolvePartyID()
+	internalParticipants := b.Out.NetworkSpecificData.CantonData.InternalEndpoints.Participants
+
 	for i, config := range b.Out.NetworkSpecificData.CantonData.ExternalEndpoints.Participants {
-		authProvider := authentication.NewInsecureStaticProvider(config.JWT)
-		// Get Primary Party for user
-		ledgerApiConn, err := grpc.NewClient(
-			config.GRPCLedgerAPIURL,
-			grpc.WithTransportCredentials(authProvider.TransportCredentials()),
-			grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
-		)
+		authCfg := resolveAuthConfig(config.JWT, config.UserID)
+		authProvider, err := newAuthProvider(ctx, authCfg)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to create gRPC connection to Ledger API for Canton participant %d: %w", i+1, err)
+			return nil, 0, fmt.Errorf("create auth provider for Canton participant %d: %w", i+1, err)
 		}
-		userResp, err := adminv2.NewUserManagementServiceClient(ledgerApiConn).GetUser(context.Background(), &adminv2.GetUserRequest{UserId: config.UserID})
+
+		userID := resolveUserID(config.UserID)
+		if userID == "" && authCfg.Type == commonconfig.AuthTypeAuthorizationCode {
+			userID, err = userIDFromToken(ctx, authProvider)
+			if err != nil {
+				return nil, 0, fmt.Errorf("resolve user id for Canton participant %d: %w", i+1, err)
+			}
+		}
+
+		grpcURL := resolveGRPCLedgerURL(config.GRPCLedgerAPIURL)
+		party, err := func() (string, error) {
+			conn, err := grpc.NewClient(
+				grpcURL,
+				grpc.WithTransportCredentials(authProvider.TransportCredentials()),
+				grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
+			)
+			if err != nil {
+				return "", fmt.Errorf("create gRPC connection to Ledger API for Canton participant %d: %w", i+1, err)
+			}
+			defer conn.Close()
+
+			party, err := resolveParticipantParty(ctx, conn, userID, presetPartyID)
+			if err != nil {
+				return "", fmt.Errorf("resolve party for Canton participant %d: %w", i+1, err)
+			}
+
+			return party, nil
+		}()
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get user info for user %s for Canton participant %d: %w", config.UserID, i+1, err)
+			return nil, 0, err
 		}
-		party := userResp.GetUser().GetPrimaryParty()
-		if party == "" {
-			return nil, 0, fmt.Errorf("no primary party found for user %s for Canton participant %d", config.UserID, i+1)
+
+		var internalEndpoints *cldf_canton_provider.Endpoints
+		if i < len(internalParticipants) {
+			internal := internalParticipants[i]
+			if endpointsNonEmpty(
+				internal.JSONLedgerAPIURL,
+				internal.GRPCLedgerAPIURL,
+				internal.AdminAPIURL,
+				internal.ValidatorAPIURL,
+			) {
+				internalEndpoints = &cldf_canton_provider.Endpoints{
+					JSONLedgerAPIURL: internal.JSONLedgerAPIURL,
+					GRPCLedgerAPIURL: internal.GRPCLedgerAPIURL,
+					AdminAPIURL:      internal.AdminAPIURL,
+					ValidatorAPIURL:  internal.ValidatorAPIURL,
+				}
+			}
 		}
-		_ = ledgerApiConn.Close()
 
 		providerConfig.Participants[i] = cldf_canton_provider.ParticipantConfig{
 			Endpoints: cldf_canton_provider.Endpoints{
 				JSONLedgerAPIURL: config.JSONLedgerAPIURL,
-				GRPCLedgerAPIURL: config.GRPCLedgerAPIURL,
+				GRPCLedgerAPIURL: grpcURL,
 				AdminAPIURL:      config.AdminAPIURL,
-				ValidatorAPIURL:  config.ValidatorAPIURL,
+				ValidatorAPIURL:  resolveValidatorAPIURL(config.ValidatorAPIURL),
 			},
-			InternalEndpoints: &cldf_canton_provider.Endpoints{
-				JSONLedgerAPIURL: b.Out.NetworkSpecificData.CantonData.InternalEndpoints.Participants[i].JSONLedgerAPIURL,
-				GRPCLedgerAPIURL: b.Out.NetworkSpecificData.CantonData.InternalEndpoints.Participants[i].GRPCLedgerAPIURL,
-				AdminAPIURL:      b.Out.NetworkSpecificData.CantonData.InternalEndpoints.Participants[i].AdminAPIURL,
-				ValidatorAPIURL:  b.Out.NetworkSpecificData.CantonData.InternalEndpoints.Participants[i].ValidatorAPIURL,
-			},
-			UserID:       config.UserID,
-			PartyID:      party,
-			AuthProvider: authProvider,
+			InternalEndpoints: internalEndpoints,
+			UserID:            userID,
+			PartyID:           party,
+			AuthProvider:      authProvider,
 		}
 	}
-	p, err := cldf_canton_provider.NewRPCChainProvider(d.ChainSelector, providerConfig).Initialize(context.TODO())
+
+	p, err := cldf_canton_provider.NewRPCChainProvider(d.ChainSelector, providerConfig).Initialize(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

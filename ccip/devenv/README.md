@@ -177,3 +177,59 @@ If you want to build docker images, spin up a new env, and run the test in a sin
 # From repo root
 make build-run-e2e-tests
 ```
+
+## Prod testnet connection smoke test
+
+Minimal Canton-only connectivity check against real testnet infrastructure. Uses [`env-prod-testnet-out.toml`](./env-prod-testnet-out.toml) for public endpoint URLs; auth secrets and party identity come from environment variables.
+
+The test is opt-in: it skips unless `CANTON_GRPC_URL` is set (even though the TOML file includes default URLs). This keeps CI green while allowing manual or workflow-triggered runs.
+
+### Environment variables
+
+| Variable | Required | Notes |
+|---|---|---|
+| `CANTON_PARTY_ID` | yes | Ledger party to query; skips `GetUser` when set |
+| `CANTON_AUTH_URL` | yes | OIDC issuer |
+| `CANTON_CLIENT_ID` | yes | OAuth2 client ID |
+| `CANTON_AUTH_TYPE` | no | `authorizationCode` (local), `clientCredentials` (CI), `static`, `insecureStatic` |
+| `CANTON_USER_ID` | no | Required for `clientCredentials`; optional for `authorizationCode` (extracted from token `sub` after login) |
+| `CANTON_CLIENT_SECRET` | CI only | Required when `CANTON_AUTH_TYPE=clientCredentials` |
+| `CANTON_JWT` | static only | For `static` / `insecureStatic` auth |
+| `CANTON_GRPC_URL` | opt-in signal | Must be set to run the test; overrides TOML gRPC URL |
+| `CANTON_VALIDATOR_API_URL` | no | Overrides TOML validator API URL |
+
+**Local (browser Okta login):**
+
+```bash
+export CANTON_GRPC_URL='testnet.cv1.bcy-v.metalhosts.com:443'
+export CANTON_PARTY_ID='u_0e0328cbbcb7::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7'
+export CANTON_AUTH_URL='https://smartcontract.okta.com/oauth2/austsuml9q2WhPBMM5d7'
+export CANTON_CLIENT_ID='0oau1l22b1Jv3dcih5d7'
+export CANTON_AUTH_TYPE='authorizationCode'
+```
+
+**CI (`clientCredentials`, no browser):**
+
+```bash
+export CANTON_GRPC_URL='testnet.cv1.bcy-v.metalhosts.com:443'
+export CANTON_PARTY_ID='...'
+export CANTON_AUTH_URL='https://smartcontract.okta.com/oauth2/austsuml9q2WhPBMM5d7'
+export CANTON_CLIENT_ID='0oau1l22b1Jv3dcih5d7'
+export CANTON_AUTH_TYPE='clientCredentials'
+export CANTON_CLIENT_SECRET='...'
+export CANTON_USER_ID='...'
+```
+
+### Run command
+
+```bash
+cd ccip/devenv/tests/integration && go test -v -run TestIntegration_CantonProdTestnet_Connection -count=1
+```
+
+Use `-canton-env-out` to point at a different CCV env output TOML (default `../../env-prod-testnet-out.toml`; local devenv uses `../../env-canton-evm-out.toml`):
+
+```bash
+cd ccip/devenv/tests/integration && go test -v -run TestIntegration_CantonProdTestnet_Connection -count=1 -canton-env-out=../../env-canton-evm-out.toml
+```
+
+The test connects via `NewCLDF`, asserts `PartyID` is set, and lists holdings for the party (empty balance is OK).
