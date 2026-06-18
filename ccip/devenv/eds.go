@@ -210,7 +210,7 @@ func NewLauncher() *launcher {
 }
 
 type input struct {
-	EDSConfig edsConfig.Config `toml:"eds_config"`
+	EDSConfig cantonChangesets.GenerateEDSConfigConfig `toml:"eds_config"`
 }
 
 type output struct {
@@ -244,7 +244,7 @@ func (l *launcher) Launch(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse input: %w", err)
 	}
-	out, err := cantonChangesets.GenerateEDSConfig{}.Apply(*env, cantonChangesets.CantonCSDeps[edsConfig.Config]{
+	out, err := cantonChangesets.GenerateEDSConfig{}.Apply(*env, cantonChangesets.CantonCSDeps[cantonChangesets.GenerateEDSConfigConfig]{
 		ChainSelector: chainDetails.ChainSelector,
 		Participant:   0,
 		Config:        in.EDSConfig,

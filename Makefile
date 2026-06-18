@@ -90,7 +90,7 @@ build-eds:
 ## Assuming chainlink-ccv is checked out in ../chainlink-ccv.
 .PHONY: build-ccv-images
 build-ccv-images:
-	cd ../chainlink-ccv/build/devenv && just build-docker-dev
+	cd ../chainlink-ccv/build/devenv && just build-docker
 
 .PHONY: start-devenv
 start-devenv: build-ccv-images build-committeeverifier build-eds
