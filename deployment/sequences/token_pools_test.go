@@ -3,9 +3,12 @@ package sequences
 import (
 	"testing"
 
+	tokenadaptersfinality "github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 )
 
@@ -63,4 +66,57 @@ func TestParseInstrumentIDFromTokenRefLabels(t *testing.T) {
 		_, _, err := parseInstrumentIDFromTokenRefLabels(datastore.AddressRef{})
 		require.Error(t, err)
 	})
+}
+
+func TestToCantonFinalityConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  tokenadaptersfinality.Config
+		want func(t *testing.T, got core.FinalityConfig)
+	}{
+		{
+			name: "block depth takes precedence over wait for finality",
+			cfg: tokenadaptersfinality.Config{
+				WaitForFinality: true,
+				BlockDepth:      1,
+			},
+			want: func(t *testing.T, got core.FinalityConfig) {
+				t.Helper()
+				require.NotNil(t, got.BlockDepth)
+				require.Equal(t, types.INT64(1), *got.BlockDepth)
+				require.Nil(t, got.WaitForFinality)
+			},
+		},
+		{
+			name: "wait for safe when no block depth",
+			cfg: tokenadaptersfinality.Config{
+				WaitForSafe: true,
+			},
+			want: func(t *testing.T, got core.FinalityConfig) {
+				t.Helper()
+				require.NotNil(t, got.WaitForSafe)
+			},
+		},
+		{
+			name: "wait for finality when no block depth or safe",
+			cfg: tokenadaptersfinality.Config{
+				WaitForFinality: true,
+			},
+			want: func(t *testing.T, got core.FinalityConfig) {
+				t.Helper()
+				require.NotNil(t, got.WaitForFinality)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := toCantonFinalityConfig(tt.cfg)
+			tt.want(t, got)
+		})
+	}
 }
