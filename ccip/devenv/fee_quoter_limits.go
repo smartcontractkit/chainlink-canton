@@ -17,37 +17,36 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
-func destChainConfigFromFeeQuoterCreateArgs(createArgs *apiv2.Record, remoteChainSelector uint64) (core.FeeQuoterDestChainConfig, error) {
-	selectorKey := strconv.FormatUint(remoteChainSelector, 10)
-	for _, field := range createArgs.GetFields() {
-		if field.GetLabel() != "destChainConfigs" {
-			continue
-		}
-		genMap := field.GetValue().GetGenMap()
-		if genMap == nil {
-			return core.FeeQuoterDestChainConfig{}, fmt.Errorf("destChainConfigs is not a GenMap")
-		}
-		for _, entry := range genMap.GetEntries() {
-			key := strings.TrimSuffix(entry.GetKey().GetNumeric(), ".")
-			if key != selectorKey {
-				continue
-			}
-			record := entry.GetValue().GetRecord()
-			if record == nil {
-				return core.FeeQuoterDestChainConfig{}, fmt.Errorf("dest chain config value is not a record")
-			}
-			var cfg core.FeeQuoterDestChainConfig
-			if err := ledger.RecordToStruct(record, &cfg); err != nil {
-				return core.FeeQuoterDestChainConfig{}, fmt.Errorf("parse dest chain config record: %w", err)
-			}
-
-			return cfg, nil
-		}
-
-		return core.FeeQuoterDestChainConfig{}, fmt.Errorf("no FeeQuoter dest config for chain selector %d", remoteChainSelector)
+// GetMaxDataBytes implements cciptestinterfaces.CCIP17.
+func (c *Chain) GetMaxDataBytes(ctx context.Context, remoteChainSelector uint64) (uint32, error) {
+	cfg, err := c.feeQuoterDestConfig(ctx, remoteChainSelector)
+	if err != nil {
+		return 0, err
+	}
+	if cfg.MaxDataBytes < 0 {
+		return 0, fmt.Errorf("negative maxDataBytes: %d", cfg.MaxDataBytes)
+	}
+	if cfg.MaxDataBytes > math.MaxUint32 {
+		return 0, fmt.Errorf("maxDataBytes overflows uint32: %d", cfg.MaxDataBytes)
 	}
 
-	return core.FeeQuoterDestChainConfig{}, fmt.Errorf("destChainConfigs field not found on FeeQuoter")
+	return uint32(cfg.MaxDataBytes), nil
+}
+
+// GetMaxPerMsgGasLimit returns the FeeQuoter maxPerMsgGasLimit for a destination chain.
+func (c *Chain) GetMaxPerMsgGasLimit(ctx context.Context, remoteChainSelector uint64) (uint32, error) {
+	cfg, err := c.feeQuoterDestConfig(ctx, remoteChainSelector)
+	if err != nil {
+		return 0, err
+	}
+	if cfg.MaxPerMsgGasLimit < 0 {
+		return 0, fmt.Errorf("negative maxPerMsgGasLimit: %d", cfg.MaxPerMsgGasLimit)
+	}
+	if cfg.MaxPerMsgGasLimit > math.MaxUint32 {
+		return 0, fmt.Errorf("maxPerMsgGasLimit overflows uint32: %d", cfg.MaxPerMsgGasLimit)
+	}
+
+	return uint32(cfg.MaxPerMsgGasLimit), nil
 }
 
 func (c *Chain) feeQuoterDestConfig(ctx context.Context, remoteChainSelector uint64) (core.FeeQuoterDestChainConfig, error) {
@@ -91,34 +90,35 @@ func (c *Chain) feeQuoterDestConfig(ctx context.Context, remoteChainSelector uin
 	return destChainConfigFromFeeQuoterCreateArgs(createArgs, remoteChainSelector)
 }
 
-// GetMaxDataBytes implements cciptestinterfaces.CCIP17.
-func (c *Chain) GetMaxDataBytes(ctx context.Context, remoteChainSelector uint64) (uint32, error) {
-	cfg, err := c.feeQuoterDestConfig(ctx, remoteChainSelector)
-	if err != nil {
-		return 0, err
-	}
-	if cfg.MaxDataBytes < 0 {
-		return 0, fmt.Errorf("negative maxDataBytes: %d", cfg.MaxDataBytes)
-	}
-	if cfg.MaxDataBytes > math.MaxUint32 {
-		return 0, fmt.Errorf("maxDataBytes overflows uint32: %d", cfg.MaxDataBytes)
+func destChainConfigFromFeeQuoterCreateArgs(createArgs *apiv2.Record, remoteChainSelector uint64) (core.FeeQuoterDestChainConfig, error) {
+	selectorKey := strconv.FormatUint(remoteChainSelector, 10)
+	for _, field := range createArgs.GetFields() {
+		if field.GetLabel() != "destChainConfigs" {
+			continue
+		}
+		genMap := field.GetValue().GetGenMap()
+		if genMap == nil {
+			return core.FeeQuoterDestChainConfig{}, fmt.Errorf("destChainConfigs is not a GenMap")
+		}
+		for _, entry := range genMap.GetEntries() {
+			key := strings.TrimSuffix(entry.GetKey().GetNumeric(), ".")
+			if key != selectorKey {
+				continue
+			}
+			record := entry.GetValue().GetRecord()
+			if record == nil {
+				return core.FeeQuoterDestChainConfig{}, fmt.Errorf("dest chain config value is not a record")
+			}
+			var cfg core.FeeQuoterDestChainConfig
+			if err := ledger.RecordToStruct(record, &cfg); err != nil {
+				return core.FeeQuoterDestChainConfig{}, fmt.Errorf("parse dest chain config record: %w", err)
+			}
+
+			return cfg, nil
+		}
+
+		return core.FeeQuoterDestChainConfig{}, fmt.Errorf("no FeeQuoter dest config for chain selector %d", remoteChainSelector)
 	}
 
-	return uint32(cfg.MaxDataBytes), nil
-}
-
-// GetMaxPerMsgGasLimit returns the FeeQuoter maxPerMsgGasLimit for a destination chain.
-func (c *Chain) GetMaxPerMsgGasLimit(ctx context.Context, remoteChainSelector uint64) (uint32, error) {
-	cfg, err := c.feeQuoterDestConfig(ctx, remoteChainSelector)
-	if err != nil {
-		return 0, err
-	}
-	if cfg.MaxPerMsgGasLimit < 0 {
-		return 0, fmt.Errorf("negative maxPerMsgGasLimit: %d", cfg.MaxPerMsgGasLimit)
-	}
-	if cfg.MaxPerMsgGasLimit > math.MaxUint32 {
-		return 0, fmt.Errorf("maxPerMsgGasLimit overflows uint32: %d", cfg.MaxPerMsgGasLimit)
-	}
-
-	return uint32(cfg.MaxPerMsgGasLimit), nil
+	return core.FeeQuoterDestChainConfig{}, fmt.Errorf("destChainConfigs field not found on FeeQuoter")
 }
