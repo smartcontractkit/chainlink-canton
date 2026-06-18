@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -64,6 +65,18 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	tokenConfigAddress := contracts.InstanceID(hex.EncodeToString(contracts.EncodeInstrumentID(instrumentId).Bytes())).RawInstanceAddress(types.PARTY(ccipParty)).InstanceAddress()
 
 	var proposalOutputs []contract.ExerciseOutput
+
+	if registered, err := tokenPoolAlreadyRegisteredWithTAR(b, deps, ccipParticipantIndex, tokenConfigAddress, input); err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("check existing token pool registration: %w", err)
+	} else if registered {
+		b.Logger.Infof(
+			"token pool %s already registered in TAR for instrument %s; skipping ProposeAdministrator/AcceptAdminRole/SetPool",
+			input.PoolInstanceID,
+			instrumentId.Id,
+		)
+
+		return sequences.OnChainOutput{}, nil
+	}
 
 	existingTokenConfigCid, tokenConfigFound, err := findTokenConfigCid(b, deps, ccipParticipantIndex, tokenConfigAddress)
 	if err != nil {
@@ -210,4 +223,51 @@ func findTokenConfigCid(b operations.Bundle, deps canton.Chain, participantIndex
 	}
 
 	return types.CONTRACT_ID(contractID), true, nil
+}
+
+func tokenPoolAlreadyRegisteredWithTAR(
+	b operations.Bundle,
+	deps canton.Chain,
+	participantIndex int,
+	tokenConfigAddress contracts.InstanceAddress,
+	input RegisterTokenPoolInput,
+) (bool, error) {
+	participant, err := contract.ParticipantAt(deps, participantIndex)
+	if err != nil {
+		return false, fmt.Errorf("resolve participant: %w", err)
+	}
+
+	activeConfig, err := contract.FindActiveContractByInstanceAddress(
+		b.GetContext(),
+		participant.LedgerServices.State,
+		contract.LedgerQueryParties(participant),
+		core.TokenConfig{}.GetTemplateID(),
+		tokenConfigAddress,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "no active contract found") {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	config, err := bindings.UnmarshalCreatedEvent[core.TokenConfig](activeConfig.GetCreatedEvent())
+	if err != nil {
+		return false, fmt.Errorf("parse token config: %w", err)
+	}
+	if config.Admin == nil || config.TokenPool == nil {
+		return false, nil
+	}
+	if string(*config.Admin) != input.PoolAdminParty {
+		return false, nil
+	}
+	if string(config.TokenPool.PoolOwner) != input.PoolOwnerParty {
+		return false, nil
+	}
+	if string(config.TokenPool.PoolInstanceId) != input.PoolInstanceID {
+		return false, nil
+	}
+
+	return true, nil
 }

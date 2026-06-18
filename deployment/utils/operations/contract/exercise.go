@@ -65,8 +65,12 @@ func DisclosedContractsFromProto(dcs []*apiv2.DisclosedContract) []DisclosedCont
 }
 
 type ChoiceInput[ARGS any] struct {
-	// The InstanceAddress this operation is targeting. Will be resolved to an active contract.
+	// The InstanceAddress this operation is targeting. Will be resolved to an active contract
+	// unless ContractID is set.
 	InstanceAddress contracts.InstanceAddress `json:"instanceAddress"`
+	// ContractID optionally pins the target contract. When set, ACS lookup by InstanceAddress
+	// is skipped (e.g. factory contracts only visible via EDS disclosure).
+	ContractID string `json:"contractId,omitempty"`
 	// RawInstanceAddress is the "instanceId@partyId" format required by the Canton MCMS SDK
 	// for AdditionalFields.TargetInstanceAddress. Must be set when MCMSEnabled is true.
 	RawInstanceAddress string `json:"rawInstanceAddress,omitempty"`
@@ -151,9 +155,15 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 				return ExerciseOutput{}, fmt.Errorf("resolve participant: %w", err)
 			}
 
-			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, LedgerQueryParties(participant), params.Template.GetTemplateID(), input.InstanceAddress)
-			if err != nil {
-				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
+			var contractID string
+			if input.ContractID != "" {
+				contractID = input.ContractID
+			} else {
+				var err error
+				contractID, err = FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, LedgerQueryParties(participant), params.Template.GetTemplateID(), input.InstanceAddress)
+				if err != nil {
+					return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
+				}
 			}
 
 			exerciseCommand := params.Method(contractID, input.Args)

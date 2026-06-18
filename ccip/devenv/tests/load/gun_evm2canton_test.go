@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
 
@@ -45,6 +46,10 @@ func TestEVM2Canton_Load(t *testing.T) {
 	require.NoError(t, devenvtests.WireVerifierObservationFromLib(lib, chainMap))
 
 	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
+	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
+	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
+	require.True(t, ok, "Canton dest chain must be *devenv.Chain")
+	require.NoError(t, cantonImpl.SetupReceive(ctx))
 	cantonDest := discoverCantonDest(t, in, chainMap)
 	t.Logf("EVM→Canton load: source=%d dest=%d receiver=%x",
 		evmChain.ChainSelector(), cantonDest.Chain.ChainSelector(), cantonDest.Receiver)
