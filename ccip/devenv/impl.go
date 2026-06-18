@@ -225,7 +225,7 @@ type Chain struct {
 	nextTransferCID         string // holding CID to be used as transfer on next message send
 
 	// verifierObs is injected post-construction by test runners (see SetVerifierObservation).
-	// Required by ConfirmExecOnDest to fetch verifier results from aggregator/indexer.
+	// Required by ConfirmExecOnDest to fetch verifier results from indexer (aggregator optional).
 	verifierObs VerifierObservation
 
 	// partyMutexes serializes manual execution per receiver party so that
@@ -941,9 +941,9 @@ func (c *Chain) ConfirmSendOnSource(ctx context.Context, to uint64, key cciptest
 //  1. Lock per receiver party (PerPartyRouter CID is consumed on every Execute).
 //  2. Idempotency: if an ExecutionStateChanged for (from, seqNo, messageID) already
 //     exists on the ledger, parse and return it without re-executing.
-//  3. Otherwise fetch the verifier result via verifier observation (aggregator +
-//     indexer), translate the verifier dest address to its hashed instance address,
-//     and call ManuallyExecuteMessage.
+//  3. Otherwise fetch the verifier result via verifier observation (indexer;
+//     aggregator optional), translate the verifier dest address to its hashed
+//     instance address, and call ManuallyExecuteMessage.
 //
 // Both SeqNum AND MessageID must be set on key: they key the idempotency lookup and
 // the verifier-result fetch respectively. EVM-side ConfirmExecOnDest is permissive

@@ -440,8 +440,8 @@ func verifierAssertTimeout(timeout time.Duration) time.Duration {
 	return timeout
 }
 
-// fetchVerifierResult queries the aggregator + indexer for the verifier output for
-// messageID. Caller must have wired [VerifierObservation] on the chain first.
+// fetchVerifierResult queries the indexer (aggregator optional) for the verifier
+// output for messageID. Caller must have wired [VerifierObservation] on the chain first.
 func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Bytes32, timeout time.Duration) (verifierResult, error) {
 	if !c.verifierObs.wired() {
 		return verifierResult{}, fmt.Errorf("verifier observation not wired")
@@ -456,9 +456,6 @@ func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Byte
 	})
 	if err != nil {
 		return verifierResult{}, fmt.Errorf("assertMessage: %w", err)
-	}
-	if res.AggregatedResult == nil {
-		return verifierResult{}, fmt.Errorf("aggregated verifier result missing")
 	}
 	if len(res.IndexedVerifications.Results) != 1 {
 		return verifierResult{}, fmt.Errorf("expected 1 indexed verifier result, got %d", len(res.IndexedVerifications.Results))

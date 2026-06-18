@@ -135,7 +135,6 @@ func AssertSingleVerifierResult(
 		AssertExecutorLogs:      false,
 	})
 	require.NoError(t, err)
-	require.NotNil(t, result.AggregatedResult)
 	require.Len(t, result.IndexedVerifications.Results, 1)
 
 	return result
