@@ -1,0 +1,52 @@
+version = 0
+indexer_endpoints = [
+  "https://indexer-1.testnet.ccip.chain.link",
+  "https://indexer-2.testnet.ccip.chain.link",
+]
+
+[cldf]
+addresses = [
+  '[{"address":"0x181Ac7dC295f1C8C87342d07CFaBA90bC477DB5d","chainSelector":16015286601757825753,"labels":[],"qualifier":"","type":"OnRamp","version":"2.0.0"},{"address":"0xc6A246A9AcdAaE651708706494720F79C3E5d0A1","chainSelector":16015286601757825753,"labels":[],"qualifier":"","type":"OffRamp","version":"2.0.0"},{"address":"0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59","chainSelector":16015286601757825753,"labels":[],"qualifier":"0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59-Router","type":"Router","version":"1.2.0"},{"address":"0x8632C3025FAFdD85A299211FD5838b5fBE2df816","chainSelector":16015286601757825753,"labels":[],"qualifier":"","type":"FeeQuoter","version":"2.0.0"},{"address":"0x8f3ee3c77D2B27c32306a89D367654F959Db223D","chainSelector":16015286601757825753,"labels":[],"qualifier":"default","type":"CommitteeVerifierResolver","version":"2.0.0"},{"address":"0x66f9E0738a4a6fe54aE62DEd00Ca1F72bDecc092","chainSelector":16015286601757825753,"labels":[],"qualifier":"default","type":"ExecutorProxy","version":"2.0.0"},{"address":"0x78874Df86F55b207d5584093C17B59220E8c6B15","chainSelector":16015286601757825753,"labels":[],"qualifier":"default","type":"Executor","version":"2.0.0"},{"address":"0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534","chainSelector":16015286601757825753,"labels":[],"qualifier":"","type":"WETH9","version":"1.0.0"},{"address":"0x779877A7B0D9E8603169DdbD7836e478b4624789","chainSelector":16015286601757825753,"labels":[],"qualifier":"","type":"LinkToken","version":"1.0.0"},{"address":"0x5185b41F1588FC8C541360709C992794925D484C","chainSelector":16015286601757825753,"labels":[],"qualifier":"TEST","type":"BurnMintTokenPool","version":"2.0.0"},{"address":"0xeEe6675b20fE5950eb51361b93021D076289F612","chainSelector":16015286601757825753,"labels":[],"qualifier":"TEST","type":"BurnMintERC20WithDrip","version":"1.5.0"},{"address":"0xA0a507CE0709D3D40F71166c730a860aa29f3491","chainSelector":16015286601757825753,"labels":[],"qualifier":"TEST","type":"AdvancedPoolHooks","version":"2.0.0"}]',
+  '[{"address":"0x03519eac48d545c4d0ecdc3e3022e443d9e878867827eecb37d5e5a60ae0c989","chainSelector":9268731218649498074,"labels":[],"qualifier":"","type":"OnRamp","version":"2.0.0"},{"address":"0xd03375cb15a7179bfbfa7cfb843250a6b26e4ddc7a4c30e7bc1777cf3afbf580","chainSelector":9268731218649498074,"labels":[],"qualifier":"","type":"OffRamp","version":"2.0.0"},{"address":"0x18a00775f6781bfe3032d1b9ceeee225416fb36143218969818df860cb1e29c6","chainSelector":9268731218649498074,"labels":[],"qualifier":"","type":"FeeQuoter","version":"2.0.0"},{"address":"0x45f673fb23aa33fdaa07e7ae7ea0d37218bcff8e63575a5582a2356cbfaa8883","chainSelector":9268731218649498074,"labels":[],"qualifier":"","type":"CantonGlobalConfig","version":"2.0.0"},{"address":"0x665cfb57b33b2b74383e99af880ff7d967ad85ef5966ac912f9a3cd4faaee5f9","chainSelector":9268731218649498074,"labels":[],"qualifier":"","type":"CantonPerPartyRouterFactory","version":"2.0.0"},{"address":"0xe8df5a00cc82df74bae0ca2a032e4d5a7fb5424c1194c4036caabe5fd9f40f81","chainSelector":9268731218649498074,"labels":[],"qualifier":"","type":"TokenAdminRegistry","version":"2.0.0"},{"address":"0xd4678dbaa95efbf0631162b4fbbae08bf42bbde19038692fec94b6f6b5528fec","chainSelector":9268731218649498074,"labels":[],"qualifier":"","type":"RMNRemote","version":"2.0.0"},{"address":"0xec1e288bcf8bbf034ac2d31b67f9b15a3f1f828d086c5b9d8fc2866129cd02fe","chainSelector":9268731218649498074,"labels":[],"qualifier":"default","type":"CommitteeVerifier","version":"2.0.0"},{"address":"0x4b19a247edd769630a136840ef703bd55ca3eda382317ce4384f2aadd47ddbaa","chainSelector":9268731218649498074,"labels":[],"qualifier":"default","type":"Executor","version":"2.0.0"},{"address":"0x6ac67a53d53ac425440550d27afeb1da16f6d41c224dcd1ed8e9ab1ae20f7ace","chainSelector":9268731218649498074,"labels":["burnminttokenpool-LINK@ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551"],"qualifier":"LINK","type":"BurnMintTokenPool","version":"2.0.0"},{"address":"0x6ac67a53d53ac425440550d27afeb1da16f6d41c224dcd1ed8e9ab1ae20f7ace","chainSelector":9268731218649498074,"labels":["burnminttokenpool-LINK@ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551"],"qualifier":"LINK","type":"CantonBurnMintTokenPool","version":"2.0.0"},{"address":"39c6212f2291365bed155b2533abbd7ddf340498ccbbb358cee07b83106986ad","chainSelector":9268731218649498074,"labels":[],"qualifier":"LINK","type":"Token","version":"2.0.0"},{"address":"0x576182aab988a0804a1aa13081902c076ed6108c1162a04b3e971e871a608527","chainSelector":9268731218649498074,"labels":["linkregistry@ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551"],"qualifier":"","type":"LinkRegistry","version":"2.0.0"}]',
+]
+env_metadata = "{\"metadata\":{\"cantonConfigs\":{\"eds_url\":\"https://eds.testnet.ccip.chain.link\"},\"offchainConfigs\":{\"indexers\":{\"indexer-1\":{\"verifiers\":[{\"issuerAddresses\":[\"0x8f3ee3c77D2B27c32306a89D367654F959Db223D\",\"0xec1e288bcf8bbf034ac2d31b67f9b15a3f1f828d086c5b9d8fc2866129cd02fe\"],\"name\":\"default-verifier\"}]}}}}}"
+
+[[blockchains]]
+container_name = "ethereum-testnet-sepolia"
+chain_id = "11155111"
+type = "anvil"
+out.type = "anvil"
+out.use_cache = true
+out.chain_id = "11155111"
+out.family = "evm"
+out.container_name = "ethereum-testnet-sepolia"
+out.nodes = [
+  { http_url = "https://rpcs.cldev.sh/16015286601757825753", internal_http_url = "https://rpcs.cldev.sh/16015286601757825753", internal_ws_url = "wss://rpcs.cldev.sh/16015286601757825753", ws_url = "wss://rpcs.cldev.sh/16015286601757825753" },
+]
+
+[[blockchains]]
+container_name = "canton-testnet"
+chain_id = "TestNet"
+type = "canton"
+out.type = "canton"
+out.use_cache = true
+out.chain_id = "TestNet"
+out.family = "canton"
+out.container_name = "canton-testnet"
+out.nodes = []
+
+[blockchains.out.network_specific_data.canton_data.external_endpoints]
+
+[[blockchains.out.network_specific_data.canton_data.external_endpoints.participants]]
+grpc_ledger_api_url = "testnet.cv1.bcy-v.metalhosts.com:443"
+json_ledger_api_url = "https://canton-testnet.bcy-v.metalhosts.com/api/json/"
+validator_api_url = "https://canton-testnet.bcy-v.metalhosts.com/api/validator/"
+user_id = ""
+jwt = ""
+
+[[blockchains.out.network_specific_data.canton_data.internal_endpoints.participants]]
+grpc_ledger_api_url = "testnet.cv1.bcy-v.metalhosts.com:443"
+json_ledger_api_url = "https://canton-testnet.bcy-v.metalhosts.com/api/json/"
+validator_api_url = "https://canton-testnet.bcy-v.metalhosts.com/api/validator/"
+user_id = ""
+jwt = ""

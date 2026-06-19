@@ -12,8 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register canton impl factory
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -32,7 +32,7 @@ func TestIntegration_CantonProdTestnet_Connection(t *testing.T) {
 	}
 
 	env := devenvtests.ParseEnvFromFlag(t)
-	configPath := filepath.Join("../..", env.ConfigPath())
+	configPath := filepath.Join("..", "..", devenvtests.ResolveConfigPath(env))
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 

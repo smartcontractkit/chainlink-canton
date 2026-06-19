@@ -241,18 +241,74 @@ finality_config     = 1
 
 ### CI (on demand)
 
-The **CCIP Canton Load Tests** workflow (`ccip-load-tests.yml`) can be triggered manually from GitHub Actions
-(`workflow_dispatch`). It reuses the same devenv setup as the CCIP E2E workflow and runs one of the load tests depending on the `direction` input. Inputs:
+Load tests share one composite action (`.github/actions/ccip-load-test`) used by:
 
-| Input | Default | Maps to |
+- **CCIP Canton Load Tests** (`ccip-load-tests.yml`) — manual `workflow_dispatch`
+- **CCIP Load (ChatOps)** (`ccip-load-command.yml`) — PR comment `/ccip-load`
+
+#### Manual workflow (`workflow_dispatch`)
+
+| Input | Default (devenv) | Default (prod-testnet) | Maps to |
+|---|---|---|---|
+| `ccip_env` | `devenv` | select `prod-testnet` | `-ccip-env` |
+| `direction` | `canton2evm` | same | test `-run` regex |
+| `message_rate` | `1/1s` | `1/45s` (when left at devenv default) | `CANTON_LOAD_MESSAGE_RATE` |
+| `load_duration` | `90s` | `2m` (when left at devenv default) | `CANTON_LOAD_DURATION` |
+| `test_timeout` | `40m` | `30m` / `45m` for evm2canton | `go test -timeout` |
+| `config_file` | — | `env-prod-testnet.ci.toml` | `CCIP_CONFIG_FILE` |
+| `skip_exec_confirm` | — | `true` | `CANTON_LOAD_SKIP_EXEC_CONFIRM` |
+| `confirm_exec_timeout` | — | `10m` | `CANTON_CONFIRM_EXEC_TIMEOUT` |
+| `canton_ref` | workflow ref | devenv only | chainlink-canton checkout |
+
+**Devenv** spins up Docker via `setup-ccip-devenv` (same as CCIP E2E). **Prod-testnet** hits live Canton TestNet + Sepolia with no local devenv.
+
+#### ChatOps (PR comment)
+
+On an open PR, comment (all named args optional):
+
+```
+/ccip-load direction=canton2evm config_file=env-prod-testnet.ci.toml message_rate=1/45s load_duration=2m
+```
+
+| Named arg | Default | Notes |
 |---|---|---|
-| `direction` | `canton2evm` | `canton2evm` → `TestCanton2EVM_Load`; `evm2canton` → `TestEVM2Canton_Load`; `canton2evm-token` → `TestCanton2EVM_TokenLoad`; `evm2canton-token` → `TestEVM2Canton_TokenLoad` |
-| `message_rate` | `1/1s` | `CANTON_LOAD_MESSAGE_RATE` |
-| `load_duration` | `90s` | `CANTON_LOAD_DURATION` |
-| `test_timeout` | `40m` | `go test -timeout` |
-| `canton_ref` | workflow ref | chainlink-canton checkout |
+| `ccip_env` | `prod-testnet` | |
+| `direction` | `canton2evm` | `evm2canton`, `*-token` (token skips on prod) |
+| `config_file` | `env-prod-testnet.ci.toml` | basename under `ccip/devenv/`; sets `CCIP_CONFIG_FILE` |
+| `message_rate` | `1/45s` | |
+| `load_duration` | `2m` | |
+| `test_timeout` | `30m` / `45m` for evm2canton | |
+| `skip_exec_confirm` | `true` | required on prod for canton→evm |
+| `confirm_exec_timeout` | `10m` | |
+| `party_id` | ccip-app party (see composite action default) | |
+| `grpc_url` | `testnet.cv1.bcy-v.metalhosts.com:443` | |
+| `auth_type` | `clientCredentials` | CI only; local dev uses `authorizationCode` |
+| `auth_url`, `client_id` | from GitHub secrets | override secrets when set |
 
-chainlink-ccv is pinned in `.github/actions/setup-ccip-devenv` (same as CCIP E2E).
+Requires write access to the repo (same as `/auto-fix`).
+
+#### Prod-testnet config file
+
+`*-out.toml` files are gitignored (local devenv output). CI uses the committed snapshot [`env-prod-testnet.ci.toml`](./env-prod-testnet.ci.toml) instead. Override with `config_file=` or `CCIP_CONFIG_FILE` when running locally:
+
+```bash
+CCIP_CONFIG_FILE=env-prod-testnet.ci.toml CCIP_ENV=prod-testnet go test ...
+```
+
+#### GitHub secrets (prod-testnet CI)
+
+Workflows pass these secrets to `.github/actions/ccip-load-test` using the same names (1:1); the composite action maps them to test env vars:
+
+| Secret (input name) | Env var |
+|---|---|
+| `CANTON_OKTA_AUTHORIZER_TESTNET` | `CANTON_AUTH_URL` |
+| `CANTON_OKTA_CLIENT_ID_TESTNET` | `CANTON_CLIENT_ID` |
+| `CANTON_OKTA_CLIENT_SECRET_TESTNET` | `CANTON_CLIENT_SECRET` |
+| `CCIP_PROD_TESTNET_PRIVATE_KEY` | `PRIVATE_KEY` |
+
+Devenv secrets unchanged: `CCV_IAM_ROLE`, `JD_REGISTRY`, `JD_IMAGE`.
+
+chainlink-ccv is pinned in `.github/actions/setup-ccip-devenv` (devenv only).
 
 ## Shortcut
 
@@ -311,6 +367,6 @@ export CANTON_USER_ID='...'
 cd ccip/devenv/tests/integration && go test -v -run TestIntegration_CantonProdTestnet_Connection -count=1
 ```
 
-Use `-ccip-env=prod-testnet` (or `CCIP_ENV=prod-testnet`) so the test loads `env-prod-testnet-out.toml`; default devenv config is `env-canton-evm-out.toml` via `-ccip-env=devenv`.
+Use `-ccip-env=prod-testnet` (or `CCIP_ENV=prod-testnet`) so the test loads `env-prod-testnet-out.toml` locally, or `CCIP_CONFIG_FILE=env-prod-testnet.ci.toml` for the committed CI snapshot; default devenv config is `env-canton-evm-out.toml` via `-ccip-env=devenv`.
 
 The test connects via `NewCLDF`, asserts `PartyID` is set, and lists holdings for the party (empty balance is OK).

@@ -100,7 +100,7 @@ func BootstrapE2E(t *testing.T, env CCIPEnv) E2EBootstrap {
 		t.Skip("CANTON_GRPC_URL unset: not configured for remote Canton")
 	}
 
-	configPath := filepath.Join("..", "..", env.ConfigPath())
+	configPath := filepath.Join("..", "..", ResolveConfigPath(env))
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 

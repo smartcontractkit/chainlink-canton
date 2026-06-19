@@ -4,11 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+const envConfigFile = "CCIP_CONFIG_FILE"
 
 // CCIPEnv names a CCIP e2e target environment.
 type CCIPEnv string
@@ -55,6 +58,16 @@ func (e CCIPEnv) ConfigPath() string {
 	default:
 		return ""
 	}
+}
+
+// ResolveConfigPath returns the CCV env output TOML filename under ccip/devenv.
+// When CCIP_CONFIG_FILE is set, its basename is used instead of the default for env.
+func ResolveConfigPath(env CCIPEnv) string {
+	if override := strings.TrimSpace(os.Getenv(envConfigFile)); override != "" {
+		return filepath.Base(override)
+	}
+
+	return env.ConfigPath()
 }
 
 // IsRemote reports whether the environment targets live testnet infrastructure.
