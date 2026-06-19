@@ -1,27 +1,21 @@
 package load
 
 import (
-	"fmt"
 	"math/big"
-	"os"
 	"testing"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 // TestEVM2Canton_TokenLoad runs WASP RPS=1 against the EVM→Canton token transfer path.
 //
-// Requires a running devenv and ../../env-canton-evm-out.toml.
+// Requires a running devenv and env-canton-evm-out.toml (devenv only).
 //
 //nolint:paralleltest // single-flight exec on Canton dest; shares env with e2e.
 func TestEVM2Canton_TokenLoad(t *testing.T) {
@@ -29,47 +23,32 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 		t.Skip("skipping EVM→Canton token load test in short mode")
 	}
 
-	configPath := "../../env-canton-evm-out.toml"
-	if _, err := os.Stat(configPath); err != nil {
-		t.Skipf("skipping EVM→Canton token load test: %v (start devenv to generate %s)", err, configPath)
-	}
-
-	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
-	require.NoError(t, err)
+	env := devenvtests.ParseEnvFromFlag(t)
+	boot := devenvtests.BootstrapE2E(t, env)
+	boot.SkipIfRemote(t, "token load not on prod-testnet")
 
 	ctx := ccv.Plog.WithContext(t.Context())
-	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath, chainsel.FamilyEVM, chainsel.FamilyCanton)
-	require.NoError(t, err)
+	boot.SetupCantonReceive(t, ctx)
 
-	chainMap, err := lib.ChainsMap(ctx)
-	require.NoError(t, err)
-	require.NoError(t, devenvtests.WireVerifierObservationFromLib(lib, chainMap))
-
-	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
-	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
-	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
-	require.True(t, ok, "Canton dest chain must be *devenv.Chain")
-	require.NoError(t, cantonImpl.SetupReceive(ctx))
-
-	lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, evmChain.ChainSelector(), []uint64{cantonChain.ChainSelector()})
+	lane := devenvtests.ResolveTokenLane(t, boot.Cfg, boot.Lib, boot.ChainMap, boot.EVM.ChainSelector(), []uint64{boot.Canton.ChainSelector()})
 	t.Logf("Token lane: pool=%s transfer=%s srcToken=%x",
 		lane.PoolRef.Qualifier,
 		lane.TransferAmount.String(),
 		lane.SrcToken)
 
-	receiverParticipant, _, err := cantonImpl.ClientParticipant()
+	receiverParticipant, _, err := boot.Canton.ClientParticipant()
 	require.NoError(t, err)
 	require.NotEmpty(t, receiverParticipant.PartyID)
 
-	receiver, err := cantonChain.GetEOAReceiverAddress()
+	receiver, err := boot.Canton.GetEOAReceiverAddress()
 	require.NoError(t, err)
-	cantonDest := cantonTokenLoadDestination(cantonChain, receiver, lane)
+	cantonDest := cantonTokenLoadDestination(boot.Canton, receiver, lane)
 
 	sched := loadSchedule(t)
 	estimatedMessages := estimateMessages(sched)
-	evmSender, err := evmChain.GetEOAReceiverAddress()
+	evmSender, err := boot.EVM.GetEOAReceiverAddress()
 	require.NoError(t, err)
-	senderBalance, err := evmChain.GetTokenBalance(ctx, evmSender, lane.SrcToken)
+	senderBalance, err := boot.EVM.GetTokenBalance(ctx, evmSender, lane.SrcToken)
 	require.NoError(t, err)
 	requiredBalance := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(estimatedMessages)))
 	t.Logf("EVM sender token balance=%s requiredForRun=%s (estimatedMessages=%d; devenv pre-funds sender)",
@@ -78,19 +57,17 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 		t.Logf("warning: EVM sender balance may be insufficient for full run")
 	}
 
-	t.Cleanup(func() {
-		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
-		require.NoError(t, err)
-	})
-
-	ccvAddr, executorAddr := resolveEVMSourceAddrs(t, lib, evmChain.ChainSelector())
+	ccvAddr, executorAddr := resolveEVMSourceAddrs(t, boot.Lib, boot.EVM.ChainSelector())
 
 	gun, err := NewCCIPLoadGun(
-		evmChain,
+		boot.EVM,
 		[]Destination{cantonDest},
 		ccvAddr,
 		executorAddr,
-		devenvtests.ConfirmExecTimeout(t),
+		LoadGunOptions{
+			ConfirmSend:        EVMSourceConfirmSend(boot),
+			ConfirmExecTimeout: devenvtests.ConfirmExecTimeout(t),
+		},
 	)
 	require.NoError(t, err)
 

@@ -199,6 +199,24 @@ func (b E2EBootstrap) ConfirmEVMSendOnSource(
 	)
 }
 
+// ConfirmCantonSendOnSource confirms a Canton-side CCIP send after SendMessage.
+// Canton tracks the last sent event in memory and polls by sequence number when needed.
+func (b E2EBootstrap) ConfirmCantonSendOnSource(
+	t *testing.T,
+	ctx context.Context,
+	destSelector uint64,
+	seqNo uint64,
+) (cciptestinterfaces.MessageSentEvent, error) {
+	t.Helper()
+
+	return b.Canton.ConfirmSendOnSource(
+		ctx,
+		destSelector,
+		cciptestinterfaces.MessageEventKey{SeqNum: seqNo},
+		ConfirmSendTimeout(t, b.Env),
+	)
+}
+
 // SkipIfRemote skips token subtests that are not supported on prod-testnet.
 func (b E2EBootstrap) SkipIfRemote(t *testing.T, reason string) {
 	t.Helper()

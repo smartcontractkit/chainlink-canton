@@ -266,14 +266,39 @@ func evmTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.
 	}
 }
 
-func discoverCantonDest(t *testing.T, in *ccv.Cfg, chainMap map[uint64]cciptestinterfaces.CCIP17) Destination {
+func discoverCantonDestFromBoot(t *testing.T, boot devenvtests.E2EBootstrap) Destination {
 	t.Helper()
 
-	chain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
-	receiver, err := chain.GetEOAReceiverAddress()
+	receiver, err := boot.Canton.GetEOAReceiverAddress()
 	require.NoError(t, err)
 
-	return cantonLoadDestination(chain, receiver)
+	return cantonLoadDestination(boot.Canton, receiver)
+}
+
+// EVMSourceConfirmSend returns a ConfirmSendFunc that delegates to BootstrapE2E.ConfirmEVMSendOnSource.
+func EVMSourceConfirmSend(boot devenvtests.E2EBootstrap) ConfirmSendFunc {
+	return func(
+		t *testing.T,
+		ctx context.Context,
+		destSelector uint64,
+		seqNo uint64,
+		sendResult cciptestinterfaces.MessageSentEvent,
+	) (cciptestinterfaces.MessageSentEvent, error) {
+		return boot.ConfirmEVMSendOnSource(t, ctx, destSelector, seqNo, sendResult)
+	}
+}
+
+// CantonSourceConfirmSend returns a ConfirmSendFunc that delegates to BootstrapE2E.ConfirmCantonSendOnSource.
+func CantonSourceConfirmSend(boot devenvtests.E2EBootstrap) ConfirmSendFunc {
+	return func(
+		t *testing.T,
+		ctx context.Context,
+		destSelector uint64,
+		seqNo uint64,
+		_ cciptestinterfaces.MessageSentEvent,
+	) (cciptestinterfaces.MessageSentEvent, error) {
+		return boot.ConfirmCantonSendOnSource(t, ctx, destSelector, seqNo)
+	}
 }
 
 func cantonLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress) Destination {
@@ -283,9 +308,9 @@ func cantonLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.Un
 		Receiver: receiver,
 		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
 			return cciptestinterfaces.MessageFields{
-					Receiver: receiver,
-					Data:     fmt.Appendf(nil, "evm2canton load n=%d dest=%d", callNum, destSelector),
-				}, devenvtests.EVMToCantonMessageOptions(200_000, executorAddr, ccvAddr), nil
+				Receiver: receiver,
+				Data:     fmt.Appendf(nil, "evm2canton load n=%d dest=%d", callNum, destSelector),
+			}, devenvtests.EVMToCantonMessageOptions(200_000, executorAddr, ccvAddr), nil
 		},
 	}
 }

@@ -1,26 +1,21 @@
 package load
 
 import (
-	"fmt"
 	"math/big"
-	"os"
 	"testing"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
+	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
 
 // TestCanton2EVM_TokenLoad runs WASP RPS=1 against the Canton→EVM token transfer path.
 //
-// Requires a running devenv and ../../env-canton-evm-out.toml.
+// Requires a running devenv and env-canton-evm-out.toml (devenv only).
 //
 //nolint:paralleltest // Canton holdings must stay 1-wide; shares env with e2e.
 func TestCanton2EVM_TokenLoad(t *testing.T) {
@@ -28,32 +23,18 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 		t.Skip("skipping Canton→EVM token load test in short mode")
 	}
 
-	configPath := "../../env-canton-evm-out.toml"
-	if _, err := os.Stat(configPath); err != nil {
-		t.Skipf("skipping Canton→EVM token load test: %v (start devenv to generate %s)", err, configPath)
-	}
-
-	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
-	require.NoError(t, err)
+	env := devenvtests.ParseEnvFromFlag(t)
+	boot := devenvtests.BootstrapE2E(t, env)
+	boot.SkipIfRemote(t, "token load not on prod-testnet")
 
 	ctx := ccv.Plog.WithContext(t.Context())
-	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath, chainsel.FamilyEVM, chainsel.FamilyCanton)
-	require.NoError(t, err)
 
-	chainMap, err := lib.ChainsMap(ctx)
-	require.NoError(t, err)
-	require.NoError(t, devenvtests.WireVerifierObservationFromLib(lib, chainMap))
-
-	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
-	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
-	require.True(t, ok, "Canton chain must be *cantondevenv.Chain")
-
-	evmSelectors := discoverEVMTokenSelectors(t, in)
+	evmSelectors := discoverEVMTokenSelectors(t, boot.Cfg)
 	require.NotEmpty(t, evmSelectors, "need at least one EVM token destination in the env file")
-	lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), evmSelectors)
+	lane := devenvtests.ResolveTokenLane(t, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), evmSelectors)
 	t.Logf("Token lane: pool=%s transfer=%s", lane.PoolRef.Qualifier, lane.TransferAmount.String())
 
-	destinations := discoverEVMTokenDestinations(t, in, chainMap, lane)
+	destinations := discoverEVMTokenDestinations(t, boot.Cfg, boot.ChainMap, lane)
 	require.NotEmpty(t, destinations, "need at least one EVM token destination in the env file")
 	t.Logf("Canton→EVM token load destinations: %d EVM chain(s)", len(destinations))
 
@@ -63,22 +44,20 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, receiverBalanceBefore)
 
-	t.Cleanup(func() {
-		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
-		require.NoError(t, err)
-	})
-
-	ccvAddr, executorAddr := resolveCantonSourceAddrs(t, lib, cantonChain.ChainSelector())
+	ccvAddr, executorAddr := resolveCantonSourceAddrs(t, boot.Lib, boot.Canton.ChainSelector())
 	sched := loadSchedule(t)
 
-	setupCantonTokenLoadHoldings(t, ctx, cantonImpl, sched, lane)
+	setupCantonTokenLoadHoldings(t, ctx, boot.Canton, sched, lane)
 
 	gun, err := NewCCIPLoadGun(
-		cantonChain,
+		boot.Canton,
 		destinations,
 		ccvAddr,
 		executorAddr,
-		utilstests.WaitTimeout(t),
+		LoadGunOptions{
+			ConfirmSend:        CantonSourceConfirmSend(boot),
+			ConfirmExecTimeout: utilstests.WaitTimeout(t),
+		},
 	)
 	require.NoError(t, err)
 

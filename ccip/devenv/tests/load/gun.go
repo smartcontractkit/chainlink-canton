@@ -1,9 +1,11 @@
 package load
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +16,21 @@ import (
 
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
+
+// ConfirmSendFunc confirms a CCIP send on the source chain after SendMessage returns.
+type ConfirmSendFunc func(
+	t *testing.T,
+	ctx context.Context,
+	destSelector uint64,
+	seqNo uint64,
+	sendResult cciptestinterfaces.MessageSentEvent,
+) (cciptestinterfaces.MessageSentEvent, error)
+
+// LoadGunOptions configures send confirmation and exec timeout for CCIPLoadGun.
+type LoadGunOptions struct {
+	ConfirmSend        ConfirmSendFunc
+	ConfirmExecTimeout time.Duration
+}
 
 type loadMessageBuilder func(
 	source cciptestinterfaces.CCIP17,
@@ -63,7 +80,7 @@ type CCIPLoadGun struct {
 	ccvAddr      protocol.UnknownAddress
 	executorAddr protocol.UnknownAddress
 
-	confirmSendTimeout time.Duration
+	confirmSend        ConfirmSendFunc
 	confirmExecTimeout time.Duration
 }
 
@@ -72,10 +89,13 @@ func NewCCIPLoadGun(
 	source cciptestinterfaces.CCIP17,
 	destinations []Destination,
 	ccvAddr, executorAddr protocol.UnknownAddress,
-	confirmExecTimeout time.Duration,
+	opts LoadGunOptions,
 ) (*CCIPLoadGun, error) {
 	if source == nil {
 		return nil, fmt.Errorf("CCIPLoadGun: source is nil")
+	}
+	if opts.ConfirmSend == nil {
+		return nil, fmt.Errorf("CCIPLoadGun: ConfirmSend is nil")
 	}
 	if len(destinations) == 0 {
 		return nil, fmt.Errorf("CCIPLoadGun: at least one destination is required")
@@ -95,6 +115,7 @@ func NewCCIPLoadGun(
 			return nil, fmt.Errorf("CCIPLoadGun: destination[%d] mixes token and message-only destinations", i)
 		}
 	}
+	confirmExecTimeout := opts.ConfirmExecTimeout
 	if confirmExecTimeout <= 0 {
 		confirmExecTimeout = 5 * time.Minute
 	}
@@ -104,7 +125,7 @@ func NewCCIPLoadGun(
 		destinations:       destinations,
 		ccvAddr:            ccvAddr,
 		executorAddr:       executorAddr,
-		confirmSendTimeout: 30 * time.Second,
+		confirmSend:        opts.ConfirmSend,
 		confirmExecTimeout: confirmExecTimeout,
 	}, nil
 }
@@ -169,14 +190,9 @@ func (g *CCIPLoadGun) Call(gen *wasp.Generator) *wasp.Response {
 	}
 	seqNo := uint64(sendRes.Message.SequenceNumber)
 
-	sentEvent, err := g.source.ConfirmSendOnSource(
-		subtestCtx,
-		destSelector,
-		cciptestinterfaces.MessageEventKey{SeqNum: seqNo},
-		g.confirmSendTimeout,
-	)
+	sentEvent, err := g.confirmSend(t, subtestCtx, destSelector, seqNo, sendRes)
 	if err != nil {
-		return &wasp.Response{Failed: true, Error: fmt.Sprintf("ConfirmSendOnSource (dest=%d): %v", destSelector, err), Duration: time.Since(start)}
+		return &wasp.Response{Failed: true, Error: fmt.Sprintf("ConfirmSend (dest=%d): %v", destSelector, err), Duration: time.Since(start)}
 	}
 
 	ev, err := dest.Chain.ConfirmExecOnDest(
