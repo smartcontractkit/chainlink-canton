@@ -69,12 +69,14 @@ var (
 	partyID                     = ""
 
 	// Eth - Remote Chain
-	ethSelector      = chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
-	ethRpcURL        = ""
-	ethPrivateKeyHex = ""
-	ethRouterAddress = common.HexToAddress("0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59")
-	ethTokenAddress  = common.HexToAddress("0xeEe6675b20fE5950eb51361b93021D076289F612")
-	noExecutionTag   = common.HexToAddress("0xEBa517d200000000000000000000000000000000")
+	ethSelector         = chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
+	ethRpcURL           = ""
+	ethPrivateKeyHex    = ""
+	ethRouterAddress    = common.HexToAddress("0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59")
+	ethTokenAddress     = common.HexToAddress("0xeEe6675b20fE5950eb51361b93021D076289F612")
+	noExecutionTag      = common.HexToAddress("0xEBa517d200000000000000000000000000000000")
+	ethLinkTokenAddress = common.HexToAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789")
+	ethEmptyAddress     = common.HexToAddress("")
 
 	// Example Receiver contract that emits an event if a message is received
 	ccipReceiverContract = common.HexToAddress("0x1E340B34Cc732a71f5e59804da7E645a52e10E1B")
@@ -139,7 +141,7 @@ func TestMulti(t *testing.T) {
 	require.NoError(t, err)
 	tokenPoolEdsClient, err := oapiTokenPool.NewClientWithResponses(edsURL)
 	require.NoError(t, err)
-	// transferInstructionEdsClient, err := oapiTransferInstruction.NewClientWithResponses(edsURL)
+	transferInstructionEdsClient, err := oapiTransferInstruction.NewClientWithResponses(edsURL)
 	require.NoError(t, err)
 
 	indexerClient, err := indexerclient.NewIndexerClient(indexerURL, &http.Client{Timeout: 15 * time.Second})
@@ -247,9 +249,17 @@ func TestMulti(t *testing.T) {
 				var holdingView splice_api_token_holding_v1.HoldingView
 				err = ledger.RecordToStruct(view.GetViewValue(), &holdingView)
 				require.NoError(t, err)
-				fmt.Printf("InstrumentId: %v@%v Owner: %v Amount: %v \n", holdingView.InstrumentId.Id, holdingView.InstrumentId.Admin, holdingView.Owner, holdingView.Amount)
+				fmt.Printf("ContractId: %v InstrumentId: %v@%v Owner: %v Amount: %v \n", holding.GetCreatedEvent().GetContractId(), holdingView.InstrumentId.Id, holdingView.InstrumentId.Admin, holdingView.Owner, holdingView.Amount)
 			}
 		}
+	})
+
+	t.Run("CreateTransfer", func(t *testing.T) {
+		inputHoldingCids := []types.CONTRACT_ID{
+			"00d963cc68c3f3999a5cdcb43144cbdb356c7c3688f71f567dcc7b89425e7baee3ca1212208853dbc5e273f39e38d71281eeda96c15aaca39ef31839fad86c27bc46ac5361",
+		}
+		output, change := createSelfTransfer(t, participant, transferInstructionEdsClient, *linkInstrumentId, inputHoldingCids, "0.1")
+		fmt.Printf("Created Transfer, OutputCid: %v ChangeCid: %v\n", output, change)
 	})
 
 	t.Run("Create PerPartyRouter", func(t *testing.T) {
@@ -267,17 +277,18 @@ func TestMulti(t *testing.T) {
 		fmt.Println("CCIPSender Contract ID: ", senderCid)
 	})
 
-	t.Run("Send: EVM -> Canton (Token Transfer, Native)", func(t *testing.T) {
+	t.Run("Send: EVM -> Canton (Token Transfer)", func(t *testing.T) {
 		// Source
 		finality := protocol.FinalityWaitForFinality
 		execGasLimit := uint32(0)
 		executorAddress := noExecutionTag
+		feeToken := ethLinkTokenAddress
 
 		// Dest
 		receiverParty := participant.PartyID
 
 		// Message
-		tokenAmount := big.NewInt(5e18)
+		tokenAmount := big.NewInt(1e17)
 
 		chainIdString, err := chainsel.GetChainIDFromSelector(ethSelector)
 		require.NoError(t, err)
@@ -305,14 +316,16 @@ func TestMulti(t *testing.T) {
 				Token:  ethTokenAddress,
 				Amount: tokenAmount,
 			}},
-			FeeToken:  common.Address{}, // Native
+			FeeToken:  feeToken,
 			ExtraArgs: extraArgs,
 		}
 
 		fee, err := router.GetFee(&bind.CallOpts{Context: t.Context()}, cantonSelector, msg)
 		require.NoError(t, err)
 		fmt.Printf("Fee for sending message: %s\n", fee.String())
-		auth.Value = fee
+		if feeToken == ethEmptyAddress {
+			auth.Value = fee
+		}
 
 		tx, err := router.CcipSend(auth, cantonSelector, msg)
 		require.NoError(t, err)
@@ -343,7 +356,7 @@ func TestMulti(t *testing.T) {
 	})
 
 	t.Run("Execute: Canton (Token Transfer)", func(t *testing.T) {
-		messageId := common.HexToHash("1a5650e2fc6e8f874274b836122c8ccf99a52c96786cd0264669454b0aa145de")
+		messageId := common.HexToHash("0x67a7ef535faac33a130af67911a3d7f7c42a62ee3c0d4156e5f3c20720de89af")
 		timeout := time.Minute * 15
 
 		start := time.Now()
@@ -441,19 +454,21 @@ func TestMulti(t *testing.T) {
 		fmt.Println("Message executed in Update: ", resp.GetTransaction().GetUpdateId())
 	})
 
-	t.Run("Send: Canton->EVM (Message Only, Native)", func(t *testing.T) {
+	t.Run("Send: Canton->EVM (Message Only)", func(t *testing.T) {
 		messageReceiver := ccipReceiverContract
-		feeToken := amuletInstrumentID
+
+		feeToken := linkInstrumentId
+		feeTokenTransferInstructionClient := transferInstructionEdsClient
 
 		// Get fee token input holdings
-		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, amuletInstrumentID)
+		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, feeToken)
 		require.NoError(t, err)
 		feeTokenInputCids := make([]types.CONTRACT_ID, len(feeTokenHoldings))
 		for i, holding := range feeTokenHoldings {
 			feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
 		}
 
-		transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), amuletTransferInstructionClient, string(feeToken.Admin), splice_api_token_transfer_instruction_v1.Transfer{
+		transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), feeTokenTransferInstructionClient, string(feeToken.Admin), splice_api_token_transfer_instruction_v1.Transfer{
 			Sender:           types.PARTY(participant.PartyID),
 			Receiver:         ccipOwnerPartyID,
 			Amount:           "1.0",
@@ -480,8 +495,8 @@ func TestMulti(t *testing.T) {
 				Type: oapiCommon.Empty,
 			},
 			FeeToken: oapiCommon.InstrumentId{
-				Admin: oapiCommon.PartyId(amuletInstrumentID.Admin),
-				Id:    string(amuletInstrumentID.Id),
+				Admin: oapiCommon.PartyId(feeToken.Admin),
+				Id:    string(feeToken.Id),
 			},
 			GasLimit:      50_000,
 			Payload:       hex.EncodeToString([]byte("Hello, EVM from Canton!")),
@@ -508,7 +523,7 @@ func TestMulti(t *testing.T) {
 				Receiver:      types.TEXT(msg.Receiver),
 				Payload:       types.TEXT(msg.Payload),
 				TokenTransfer: nil,
-				FeeToken:      *amuletInstrumentID,
+				FeeToken:      *feeToken,
 				ExtraArgs: core.ExtraArgs{
 					V3: &core.GenericExtraArgsV3{
 						GasLimit: types.INT64(msg.GasLimit),
@@ -575,20 +590,36 @@ func TestMulti(t *testing.T) {
 		fmt.Println("Message sent with MessageID: ", messageId)
 	})
 
-	t.Run("Send: Canton->EVM (Token Only, Native)", func(t *testing.T) {
+	t.Run("Send: Canton->EVM (Token Only)", func(t *testing.T) {
 		// The address that will receive the tokens
 		messageReceiver := common.HexToAddress("0x90392A1E8A941098a3C75E0BDB172cFdE7E4f1f4")
-		feeToken := amuletInstrumentID
 
-		// Get fee token input holdings
-		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, feeToken)
-		require.NoError(t, err)
-		feeTokenInputCids := make([]types.CONTRACT_ID, len(feeTokenHoldings))
-		for i, holding := range feeTokenHoldings {
-			feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
+		feeToken := linkInstrumentId
+		feeTokenTransferInstructionClient := transferInstructionEdsClient
+
+		// Manually set fee token input holding Cids
+		// If empty, will automatically select all holdings
+		feeTokenInputCids := []types.CONTRACT_ID{
+			"00f99c215863a3bfa8326eaf83ceb10af1eb4cf2f550821f34f13b368881fce61aca1212207833cd9fb4cae5e9ebc600476f1160d3437233c7f52e1f12ab437124027558b4",
 		}
 
-		transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), amuletTransferInstructionClient, string(feeToken.Admin), splice_api_token_transfer_instruction_v1.Transfer{
+		// Manually set token transfer input holding Cids
+		// If empty, will automatically select all holdings
+		tokenTransferInputCids := []types.CONTRACT_ID{
+			"002382eab5e38f5e101685cde6e79be6f89fe930f20d6b6680adccbb7e27a7b160ca121220b4057ae7a4bc32a7c8091d359a013555c30abbe4d3e3233defc44166095d35ef",
+		}
+
+		// Get fee token input holdings, if not manually specified
+		if len(feeTokenInputCids) == 0 {
+			feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, feeToken)
+			require.NoError(t, err)
+			feeTokenInputCids = make([]types.CONTRACT_ID, len(feeTokenHoldings))
+			for i, holding := range feeTokenHoldings {
+				feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
+			}
+		}
+
+		transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), feeTokenTransferInstructionClient, string(feeToken.Admin), splice_api_token_transfer_instruction_v1.Transfer{
 			Sender:           types.PARTY(participant.PartyID),
 			Receiver:         ccipOwnerPartyID,
 			Amount:           "1.0",
@@ -600,12 +631,14 @@ func TestMulti(t *testing.T) {
 		choiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
 		require.NoError(t, err)
 
-		// Get token transfer input holdings
-		tokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, linkInstrumentId)
-		require.NoError(t, err)
-		tokenTransferInputCids := make([]types.CONTRACT_ID, len(tokenHoldings))
-		for i, holding := range tokenHoldings {
-			tokenTransferInputCids[i] = types.CONTRACT_ID(holding.ContractID)
+		// Get token transfer input holdings if not manually specified
+		if len(tokenTransferInputCids) == 0 {
+			tokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, linkInstrumentId)
+			require.NoError(t, err)
+			tokenTransferInputCids = make([]types.CONTRACT_ID, len(tokenHoldings))
+			for i, holding := range tokenHoldings {
+				tokenTransferInputCids[i] = types.CONTRACT_ID(holding.ContractID)
+			}
 		}
 
 		// Get PerPartyRouter
@@ -630,7 +663,7 @@ func TestMulti(t *testing.T) {
 			Payload:  "",
 			Receiver: hex.EncodeToString(messageReceiver.Bytes()),
 			TokenTransfer: &oapiCommon.TokenTransfer{
-				Amount: "0.5",
+				Amount: "0.1",
 				Token: oapiCommon.InstrumentId{
 					Admin: oapiCommon.PartyId(linkInstrumentId.Admin),
 					Id:    string(linkInstrumentId.Id),
@@ -664,7 +697,7 @@ func TestMulti(t *testing.T) {
 					Token:  *linkInstrumentId,
 					Amount: types.NUMERIC(msg.TokenTransfer.Amount),
 				},
-				FeeToken: *amuletInstrumentID,
+				FeeToken: *feeToken,
 				ExtraArgs: core.ExtraArgs{
 					V3: &core.GenericExtraArgsV3{
 						GasLimit: types.INT64(msg.GasLimit),
@@ -868,4 +901,73 @@ func getMessageIdFromTransaction(t *testing.T, tx *apiv2.Transaction) string {
 	t.Fatal("CCIPMessageSent event not found in transaction events")
 
 	return ""
+}
+
+func createSelfTransfer(t *testing.T, participant canton.Participant, transferInstructionClient oapiTransferInstruction.ClientWithResponsesInterface, instrumentId splice_api_token_holding_v1.InstrumentId, holdingCids []types.CONTRACT_ID, amount string) (string, string) {
+	transfer := splice_api_token_transfer_instruction_v1.Transfer{
+		Sender:           types.PARTY(participant.PartyID),
+		Receiver:         types.PARTY(participant.PartyID),
+		Amount:           types.NUMERIC(amount),
+		InstrumentId:     instrumentId,
+		RequestedAt:      types.TIMESTAMP(time.Now()),
+		ExecuteBefore:    types.TIMESTAMP(time.Now().Add(time.Hour * 24)),
+		InputHoldingCids: holdingCids,
+		Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+	}
+	transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), transferInstructionClient, string(instrumentId.Admin), transfer)
+	require.NoError(t, err)
+	choiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
+	require.NoError(t, err)
+
+	resp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.NewString(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferFactory"},
+					ContractId: transferFactory.FactoryID,
+					Choice:     "TransferFactory_Transfer",
+					ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferFactoryTransfer{
+						ExpectedAdmin: instrumentId.Admin,
+						Transfer:      transfer,
+						ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+							Context: choiceContext,
+						},
+					}),
+				}},
+			}},
+			ActAs:              []string{participant.PartyID},
+			DisclosedContracts: transferFactory.DisclosedContracts,
+		},
+		TransactionFormat: &apiv2.TransactionFormat{
+			EventFormat: &apiv2.EventFormat{
+				FiltersByParty: map[string]*apiv2.Filters{
+					participant.PartyID: {Cumulative: []*apiv2.CumulativeFilter{{IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{WildcardFilter: &apiv2.WildcardFilter{}}}}},
+				},
+				Verbose: true,
+			},
+			TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_LEDGER_EFFECTS,
+		},
+	})
+	require.NoError(t, err)
+
+	for i, event := range resp.GetTransaction().GetEvents() {
+		fmt.Println("Event ", i, ": ", event)
+		if e, ok := event.GetEvent().(*apiv2.Event_Exercised); ok {
+			if e.Exercised.GetInterfaceId().GetEntityName() == "TransferFactory" && e.Exercised.GetChoice() == "TransferFactory_Transfer" {
+				var transferResult splice_api_token_transfer_instruction_v1.TransferInstructionResult
+				err = ledger.RecordToStruct(e.Exercised.GetExerciseResult().GetRecord(), &transferResult)
+				require.NoError(t, err)
+
+				require.NotNil(t, transferResult.Output.TransferInstructionResultCompleted, "Expected self-transfer to complete immediately")
+				require.Len(t, transferResult.Output.TransferInstructionResultCompleted.ReceiverHoldingCids, 1, "Expected transfer to result in one holding")
+				require.Len(t, transferResult.SenderChangeCids, 1, "Expected sender change to result in one holding")
+
+				return string(transferResult.Output.TransferInstructionResultCompleted.ReceiverHoldingCids[0]), string(transferResult.SenderChangeCids[0])
+			}
+		}
+	}
+
+	t.Fatal("TransferFactory_Transfer result not found in transaction events")
+	return "", ""
 }
