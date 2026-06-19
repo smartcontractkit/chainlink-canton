@@ -1,8 +1,13 @@
 package tests
 
+import "github.com/smartcontractkit/chainlink-ccv/protocol"
+
 // Shared devenv test constants (message and token paths).
 
 const (
+	// EVMToCantonFinalityConfig is the minimum block-depth FTF (1 confirmation).
+	EVMToCantonFinalityConfig = protocol.Finality(1)
+
 	// CantonToEVMFeeAmount is the per-message CCIP fee budget in Amulet units for
 	// message-only sends (200k gas). Kept low for prod-testnet compatibility.
 	CantonToEVMFeeAmount int64 = 50

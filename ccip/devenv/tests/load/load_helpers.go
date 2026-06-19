@@ -285,14 +285,7 @@ func cantonLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.Un
 			return cciptestinterfaces.MessageFields{
 					Receiver: receiver,
 					Data:     fmt.Appendf(nil, "evm2canton load n=%d dest=%d", callNum, destSelector),
-				}, cciptestinterfaces.MessageOptions{
-					ExecutionGasLimit: 200_000,
-					FinalityConfig:    0,
-					Executor:          executorAddr,
-					CCVs: []protocol.CCV{
-						{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
-					},
-				}, nil
+				}, devenvtests.EVMToCantonMessageOptions(200_000, executorAddr, ccvAddr), nil
 		},
 	}
 }

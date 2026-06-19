@@ -8,7 +8,6 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
@@ -66,7 +65,7 @@ func TestEVM2Canton_Load(t *testing.T) {
 		[]Destination{cantonDest},
 		ccvAddr,
 		executorAddr,
-		utilstests.WaitTimeout(t),
+		devenvtests.ConfirmExecTimeout(t),
 	)
 	require.NoError(t, err)
 

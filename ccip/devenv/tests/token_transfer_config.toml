@@ -8,17 +8,18 @@
 # Override the file path with the CANTON_TOKEN_TEST_CONFIG env var.
 
 [evm_to_canton]
-pool_type      = "BurnMintTokenPool"
-pool_version   = "2.0.0"
+pool_type = "BurnMintTokenPool"
+pool_version = "2.0.0"
 pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::BurnMintTokenPool 2.0.0 [default]"
-transfer_amount     = "100000000000"
+transfer_amount = "100000000000"
 execution_gas_limit = 200000
-finality_config     = 0
+# Per-message FTF (1-block depth); requires Canton pool remoteChainCfg BlockDepth >= 1 (see impl.go).
+finality_config = 1
 
 [canton_to_evm]
-pool_type      = "LockReleaseTokenPool"
-pool_version   = "2.0.0"
+pool_type = "LockReleaseTokenPool"
+pool_version = "2.0.0"
 pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::LockReleaseTokenPool 2.0.0 [default]"
-transfer_amount     = "1000"
+transfer_amount = "1000"
 execution_gas_limit = 500000
-finality_config     = 1
+finality_config = 1

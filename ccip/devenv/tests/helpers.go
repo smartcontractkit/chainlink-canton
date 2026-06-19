@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
-	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -24,6 +23,38 @@ import (
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 )
+
+const (
+	envConfirmExecTimeout     = "CANTON_CONFIRM_EXEC_TIMEOUT"
+	defaultConfirmExecTimeout = 5 * time.Minute
+)
+
+// ConfirmExecTimeout returns the timeout for Canton ConfirmExecOnDest polling.
+// Default is 5 minutes; override with CANTON_CONFIRM_EXEC_TIMEOUT (e.g. "10m").
+func ConfirmExecTimeout(t *testing.T) time.Duration {
+	t.Helper()
+
+	timeout := defaultConfirmExecTimeout
+	if d := os.Getenv(envConfirmExecTimeout); d != "" {
+		parsed, err := time.ParseDuration(d)
+		require.NoError(t, err, "%s=%q invalid", envConfirmExecTimeout, d)
+		timeout = parsed
+	}
+
+	return timeout
+}
+
+// EVMToCantonMessageOptions returns standard message options for EVM→Canton sends with FTF.
+func EVMToCantonMessageOptions(gasLimit uint32, executor, ccvAddr protocol.UnknownAddress) cciptestinterfaces.MessageOptions {
+	return cciptestinterfaces.MessageOptions{
+		ExecutionGasLimit: gasLimit,
+		FinalityConfig:    EVMToCantonFinalityConfig,
+		Executor:          executor,
+		CCVs: []protocol.CCV{
+			{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
+		},
+	}
+}
 
 // E2EBootstrap holds shared CCIP e2e setup for a selected environment.
 type E2EBootstrap struct {
@@ -233,7 +264,7 @@ func AssertSingleVerifierResult(
 
 	result, err := cantondevenv.AssertMessageWithVerifierObservation(ctx, obs, messageID, tcapi.AssertMessageOptions{
 		TickInterval:            time.Second,
-		Timeout:                 utilstests.WaitTimeout(t),
+		Timeout:                 ConfirmExecTimeout(t),
 		ExpectedVerifierResults: 1,
 		AssertVerifierLogs:      false,
 		AssertExecutorLogs:      false,

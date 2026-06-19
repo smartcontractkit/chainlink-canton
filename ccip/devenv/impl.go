@@ -549,9 +549,10 @@ func (c *Chain) GetTokenExpansionConfigs(
 					"instrument-id:Amulet",
 				),
 			},
-			PoolType:              string(poolRef.Type),
-			TokenPoolQualifier:    poolRef.Qualifier,
-			AllowedFinalityConfig: finality.Config{WaitForFinality: true},
+			PoolType:           string(poolRef.Type),
+			TokenPoolQualifier: poolRef.Qualifier,
+			// BlockDepth 1: minimum FTF allowed by pool; messages may request finality>=1 via extra args.
+			AllowedFinalityConfig: finality.Config{BlockDepth: 1},
 		},
 	}}, nil
 }
@@ -759,8 +760,9 @@ func (c *Chain) GetTokenTransferConfigs(
 			Type:    datastore.ContractType(token_admin_registry.ContractType),
 			Version: token_admin_registry.Version,
 		},
-		RemoteChains:          remoteChains,
-		AllowedFinalityConfig: finality.Config{WaitForFinality: true},
+		RemoteChains: remoteChains,
+		// BlockDepth 1: pool must allow message FTF; WaitForFinality-only rejects BlockDepth requests.
+		AllowedFinalityConfig: finality.Config{BlockDepth: 1},
 	}}, nil
 }
 

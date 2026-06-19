@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
-	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
@@ -72,18 +71,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		sendMessageResult, err := boot.EVM.SendMessage(subtestCtx, dstSelector, cciptestinterfaces.MessageFields{
 			Receiver: receiver,
 			Data:     []byte("Hello message transfer from EVM!"),
-		}, cciptestinterfaces.MessageOptions{
-			ExecutionGasLimit: 200_000,
-			FinalityConfig:    0,
-			Executor:          executorAddress,
-			CCVs: []protocol.CCV{
-				{
-					CCVAddress: ccvAddr,
-					Args:       []byte{},
-					ArgsLen:    0,
-				},
-			},
-		}, 3)
+		}, devenvtests.EVMToCantonMessageOptions(200_000, executorAddress, ccvAddr), 3)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 
@@ -93,11 +81,11 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.Nil(t, sentEvent.Message.TokenTransfer)
 
 		execKey := cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}
-		executionStateChangedEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
+		executionStateChangedEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
-		idempotentEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
+		idempotentEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, executionStateChangedEvent.State, idempotentEvent.State)
 		require.Equal(t, executionStateChangedEvent.MessageNumber, idempotentEvent.MessageNumber)
@@ -151,7 +139,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.Positive(t, vr.Message.TokenTransfer.Amount.Cmp(big.NewInt(0)), "token transfer amount must be positive")
 
 		execKey := cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}
-		executionStateChangedEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, utilstests.WaitTimeout(t))
+		executionStateChangedEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
