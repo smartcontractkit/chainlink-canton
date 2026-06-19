@@ -30,6 +30,7 @@ type ConfirmSendFunc func(
 type LoadGunOptions struct {
 	ConfirmSend        ConfirmSendFunc
 	ConfirmExecTimeout time.Duration
+	SkipExecConfirm    bool
 }
 
 type loadMessageBuilder func(
@@ -82,6 +83,7 @@ type CCIPLoadGun struct {
 
 	confirmSend        ConfirmSendFunc
 	confirmExecTimeout time.Duration
+	skipExecConfirm    bool
 }
 
 // NewCCIPLoadGun wires a CCIP source with one or more destinations for load testing.
@@ -127,6 +129,7 @@ func NewCCIPLoadGun(
 		executorAddr:       executorAddr,
 		confirmSend:        opts.ConfirmSend,
 		confirmExecTimeout: confirmExecTimeout,
+		skipExecConfirm:    opts.SkipExecConfirm,
 	}, nil
 }
 
@@ -193,6 +196,14 @@ func (g *CCIPLoadGun) Call(gen *wasp.Generator) *wasp.Response {
 	sentEvent, err := g.confirmSend(t, subtestCtx, destSelector, seqNo, sendRes)
 	if err != nil {
 		return &wasp.Response{Failed: true, Error: fmt.Sprintf("ConfirmSend (dest=%d): %v", destSelector, err), Duration: time.Since(start)}
+	}
+
+	if g.skipExecConfirm {
+		return &wasp.Response{
+			Failed:     false,
+			StatusCode: "200",
+			Duration:   time.Since(start),
+		}
 	}
 
 	ev, err := dest.Chain.ConfirmExecOnDest(

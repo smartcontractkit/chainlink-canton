@@ -42,9 +42,10 @@ func TestEVM2Canton_Load(t *testing.T) {
 		LoadGunOptions{
 			ConfirmSend:        EVMSourceConfirmSend(boot),
 			ConfirmExecTimeout: devenvtests.ConfirmExecTimeout(t),
+			SkipExecConfirm:    false,
 		},
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-evm2canton", loadSchedule(t), "message_only")
+	runWASP(t, gun, "canton-load-evm2canton", loadSchedule(t), "message_only", false)
 }

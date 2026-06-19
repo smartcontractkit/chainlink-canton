@@ -73,9 +73,11 @@ Token e2e subtests are skipped on prod-testnet. A second prod run reuses existin
 
 Load tests live in `ccip/devenv/tests/load`. They use [WASP](https://pkg.go.dev/github.com/smartcontractkit/chainlink-testing-framework/wasp) and run sequentially (RPS=1) because Canton holdings are single-flight.
 
-### Canton → EVM load (requires devenv)
+### Canton → EVM load
 
-Sequential Canton→EVM messages round-robined across every EVM destination in the env file. Requires `make start-devenv` so `ccip/devenv/env-canton-evm-out.toml` exists.
+Sequential Canton→EVM messages round-robined across every EVM destination in the env file.
+
+**Devenv** (requires `make start-devenv` so `ccip/devenv/env-canton-evm-out.toml` exists): pre-mints fee holdings and calls `SetupSend` once before WASP starts. Full send + EVM exec confirmation per message.
 
 Schedule is configured via env vars (defaults are `1/1s` for 90s):
 
@@ -102,6 +104,27 @@ cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestCanton2
 ```
 
 If the out file is missing the test skips with a hint.
+
+**Prod-testnet** (Canton TestNet + Sepolia): send-only message load — Canton send + confirm send, no `ConfirmExecOnDest` on EVM (executor not available on prod). Set `CANTON_LOAD_SKIP_EXEC_CONFIRM=true`. Verify delivery via indexer/CCIP ops; the test does not assert EVM execution.
+
+Prerequisites: `CANTON_GRPC_URL`, `CANTON_PARTY_ID`, `CANTON_AUTH_*`, `PRIVATE_KEY` (EVM message receiver wallet), and a pre-funded Canton party (~50 Amulet per message at `CantonToEVMFeeAmount`).
+
+```bash
+CCIP_ENV=prod-testnet \
+CANTON_LOAD_SKIP_EXEC_CONFIRM=true \
+CANTON_GRPC_URL=... CANTON_PARTY_ID=... CANTON_AUTH_CLIENT_ID=... CANTON_AUTH_CLIENT_SECRET=... \
+PRIVATE_KEY=0x... \
+CANTON_LOAD_MESSAGE_RATE=1/10s \
+CANTON_LOAD_DURATION=5m \
+go test -timeout 30m -v -count=1 -ccip-env=prod-testnet \
+  -run '^TestCanton2EVM_Load$' ./ccip/devenv/tests/load/
+```
+
+Or from repo root:
+
+```bash
+make run-canton2evm-load-prod
+```
 
 ### Canton → EVM token load (requires devenv)
 
@@ -140,7 +163,7 @@ Equivalent:
 cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Canton_Load$'
 ```
 
-**Prod-testnet** (Canton TestNet + Sepolia): message-only load with full per-message confirmation (send → receipt on EVM → `ConfirmExecOnDest` on Canton). Use a conservative rate — each iteration is synchronous (~30–60s end-to-end on prod), so WASP RPS=1 is effectively bounded by confirm latency. Budget for Sepolia gas per send plus Canton execution fees. Token load and Canton→EVM load remain devenv-only.
+**Prod-testnet** (Canton TestNet + Sepolia): message-only load with full per-message confirmation (send → receipt on EVM → `ConfirmExecOnDest` on Canton). Use a conservative rate — each iteration is synchronous (~30–60s end-to-end on prod), so WASP RPS=1 is effectively bounded by confirm latency. Budget for Sepolia gas per send plus Canton execution fees. Token load remains devenv-only; Canton→EVM message-only prod load is supported send-only (see above).
 
 Prerequisites: `CANTON_GRPC_URL`, `CANTON_PARTY_ID`, `CANTON_AUTH_*`, `PRIVATE_KEY` (Sepolia sender/receiver wallet), and a pre-funded Canton party.
 

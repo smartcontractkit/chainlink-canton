@@ -112,6 +112,11 @@ run-evm2canton-load: ## EVM→Canton WASP load (requires running devenv + env-ca
 run-evm2canton-load-prod: ## EVM→Canton WASP load on prod-testnet (Canton TestNet + Sepolia; set CANTON_* and PRIVATE_KEY).
 	cd ccip/devenv/tests/load && go test -timeout 45m -v -count 1 -ccip-env=prod-testnet -run '^TestEVM2Canton_Load$$'
 
+.PHONY: run-canton2evm-load-prod
+run-canton2evm-load-prod: ## Canton→EVM WASP load on prod-testnet (send-only; set CANTON_* and PRIVATE_KEY).
+	cd ccip/devenv/tests/load && CANTON_LOAD_SKIP_EXEC_CONFIRM=true go test -timeout 30m -v -count=1 \
+	  -ccip-env=prod-testnet -run '^TestCanton2EVM_Load$$'
+
 .PHONY: run-canton2evm-token-load
 run-canton2evm-token-load: ## Canton→EVM token WASP load (requires running devenv + env-canton-evm-out.toml).
 	cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestCanton2EVM_TokenLoad$$'

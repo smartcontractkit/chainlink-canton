@@ -5,7 +5,6 @@ import (
 
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
@@ -22,11 +21,13 @@ const (
 // TestCanton2EVM_Load runs WASP RPS=1 against the real Canton→EVM path (message-only),
 // round-robining across every EVM destination found in the env file.
 //
-// Requires a running devenv and ../../env-canton-evm-out.toml (same as the basic e2e test).
+// Devenv: requires a running devenv and env-canton-evm-out.toml; pre-mints fee holdings
+// and calls SetupSend once before WASP starts.
 //
-// Devenv-specific: this test pre-mints fee holdings and calls SetupSend once before WASP
-// starts. The CCIPLoadGun itself is environment-agnostic so the same gun can be reused by
-// a future staging/prod runner that assumes pre-funded accounts.
+// Prod-testnet: send-only load (Canton send + confirm send, no ConfirmExecOnDest on EVM).
+// Set CANTON_GRPC_URL, CANTON_PARTY_ID, CANTON_AUTH_*, PRIVATE_KEY (EVM message receiver),
+// CANTON_LOAD_SKIP_EXEC_CONFIRM=true, and pre-fund the Canton party (~50 Amulet per message).
+// Verify delivery via indexer/CCIP ops — the test does not assert EVM execution on prod.
 //
 //nolint:paralleltest // Canton holdings must stay 1-wide; shares env with e2e.
 func TestCanton2EVM_Load(t *testing.T) {
@@ -38,7 +39,12 @@ func TestCanton2EVM_Load(t *testing.T) {
 	boot := devenvtests.BootstrapE2E(t, env)
 	ctx := ccv.Plog.WithContext(t.Context())
 
-	destinations := discoverEVMDestinations(t, boot.Cfg, boot.ChainMap)
+	skipExec := loadSkipExecConfirm(t)
+	if boot.Env.IsRemote() && !skipExec {
+		t.Skip("prod-testnet requires CANTON_LOAD_SKIP_EXEC_CONFIRM=true (EVM executor not available)")
+	}
+
+	destinations := discoverEVMDestinationsFromBoot(t, boot)
 	require.NotEmpty(t, destinations, "need at least one EVM destination in the env file")
 	t.Logf("Canton→EVM load destinations: %d EVM chain(s)", len(destinations))
 	for _, d := range destinations {
@@ -49,15 +55,15 @@ func TestCanton2EVM_Load(t *testing.T) {
 
 	sched := loadSchedule(t)
 
-	estimatedMessages := uint64(sched.rate) * uint64(sched.duration/sched.rateUnit)
-	if estimatedMessages == 0 {
-		estimatedMessages = 1
-	}
-	mintAmount := estimatedMessages * uint64(devenvtests.CantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
-	t.Logf("Pre-mint: estimatedMessages=%d feePerMessage=%d totalFeeMint=%d",
-		estimatedMessages, devenvtests.CantonToEVMFeeAmount, mintAmount)
-	if !boot.Env.IsRemote() {
-		require.NoError(t, boot.Canton.MintTokens(ctx, mintAmount))
+	estimatedMessages := estimateMessages(sched)
+	requiredAmulet := estimatedMessages * uint64(devenvtests.CantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
+	if boot.Env.IsRemote() {
+		t.Logf("Prod: ensure Canton party holds at least %d Amulet (estimatedMessages=%d feePerMessage=%d)",
+			requiredAmulet, estimatedMessages, devenvtests.CantonToEVMFeeAmount)
+	} else {
+		t.Logf("Pre-mint: estimatedMessages=%d feePerMessage=%d totalFeeMint=%d",
+			estimatedMessages, devenvtests.CantonToEVMFeeAmount, requiredAmulet)
+		require.NoError(t, boot.Canton.MintTokens(ctx, requiredAmulet))
 	}
 	require.NoError(t, boot.Canton.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), 0))
 
@@ -68,10 +74,11 @@ func TestCanton2EVM_Load(t *testing.T) {
 		executorAddr,
 		LoadGunOptions{
 			ConfirmSend:        CantonSourceConfirmSend(boot),
-			ConfirmExecTimeout: utilstests.WaitTimeout(t),
+			ConfirmExecTimeout: devenvtests.ConfirmExecTimeout(t),
+			SkipExecConfirm:    skipExec,
 		},
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-canton2evm", sched, "message_only")
+	runWASP(t, gun, "canton-load-canton2evm", sched, "message_only", skipExec)
 }

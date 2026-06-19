@@ -6,7 +6,6 @@ import (
 
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
@@ -56,12 +55,13 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 		executorAddr,
 		LoadGunOptions{
 			ConfirmSend:        CantonSourceConfirmSend(boot),
-			ConfirmExecTimeout: utilstests.WaitTimeout(t),
+			ConfirmExecTimeout: devenvtests.ConfirmExecTimeout(t),
+			SkipExecConfirm:    false,
 		},
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-canton2evm-token", sched, "token_transfer")
+	runWASP(t, gun, "canton-load-canton2evm-token", sched, "token_transfer", false)
 
 	receiverBalanceAfter, err := firstDest.Chain.GetTokenBalance(ctx, firstDest.Receiver, destToken)
 	require.NoError(t, err)

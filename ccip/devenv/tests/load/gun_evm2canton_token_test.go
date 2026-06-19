@@ -67,11 +67,12 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 		LoadGunOptions{
 			ConfirmSend:        EVMSourceConfirmSend(boot),
 			ConfirmExecTimeout: devenvtests.ConfirmExecTimeout(t),
+			SkipExecConfirm:    false,
 		},
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-evm2canton-token", sched, "token_transfer")
+	runWASP(t, gun, "canton-load-evm2canton-token", sched, "token_transfer", false)
 
 	totalHoldingsRat, err := testhelpers.GetHoldingsBalance(ctx, receiverParticipant, nil)
 	require.NoError(t, err)

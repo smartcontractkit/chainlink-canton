@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,10 +30,11 @@ import (
 )
 
 const (
-	envMessageRate      = "CANTON_LOAD_MESSAGE_RATE"
-	envLoadDuration     = "CANTON_LOAD_DURATION"
-	defaultMessageRate  = "1/1s"
-	defaultLoadDuration = 90 * time.Second
+	envMessageRate           = "CANTON_LOAD_MESSAGE_RATE"
+	envLoadDuration          = "CANTON_LOAD_DURATION"
+	envLoadSkipExecConfirm   = "CANTON_LOAD_SKIP_EXEC_CONFIRM"
+	defaultMessageRate       = "1/1s"
+	defaultLoadDuration      = 90 * time.Second
 )
 
 type scheduleConfig struct {
@@ -70,7 +72,19 @@ func loadSchedule(t *testing.T) scheduleConfig {
 	}
 }
 
-func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig, scenario string) {
+func loadSkipExecConfirm(t *testing.T) bool {
+	t.Helper()
+
+	v := strings.TrimSpace(os.Getenv(envLoadSkipExecConfirm))
+	switch strings.ToLower(v) {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
+}
+
+func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig, scenario string, skipExecConfirm bool) {
 	t.Helper()
 
 	labels := map[string]string{
@@ -82,6 +96,9 @@ func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfi
 	}
 	if scenario != "" {
 		labels["scenario"] = scenario
+	}
+	if skipExecConfirm {
+		labels["skip_exec_confirm"] = "true"
 	}
 
 	p := wasp.NewProfile().Add(wasp.NewGenerator(&wasp.Config{
@@ -125,6 +142,32 @@ func discoverEVMDestinations(t *testing.T, in *ccv.Cfg, chainMap map[uint64]ccip
 
 		receiver, err := chain.GetEOAReceiverAddress()
 		require.NoError(t, err)
+
+		dests = append(dests, evmLoadDestination(chain, receiver))
+		seen[details.ChainSelector] = struct{}{}
+	}
+
+	return dests
+}
+
+func discoverEVMDestinationsFromBoot(t *testing.T, boot devenvtests.E2EBootstrap) []Destination {
+	t.Helper()
+
+	receiver := boot.ResolveEVMReceiver(t)
+
+	dests := make([]Destination, 0)
+	seen := make(map[uint64]struct{})
+	for _, bc := range boot.Cfg.Blockchains {
+		if bc.Type != blockchain.TypeAnvil {
+			continue
+		}
+		details, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, chainsel.FamilyEVM)
+		require.NoError(t, err, "resolve chain selector for chainID=%s", bc.ChainID)
+		if _, dup := seen[details.ChainSelector]; dup {
+			continue
+		}
+		chain, ok := boot.ChainMap[details.ChainSelector]
+		require.True(t, ok, "EVM chain %d not in harness chain map", details.ChainSelector)
 
 		dests = append(dests, evmLoadDestination(chain, receiver))
 		seen[details.ChainSelector] = struct{}{}
