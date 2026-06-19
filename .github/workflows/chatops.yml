@@ -26,3 +26,6 @@ jobs:
           permission: write
           commands: |
             auto-fix
+            ccip-load
+          named-args: |
+            ccip-load

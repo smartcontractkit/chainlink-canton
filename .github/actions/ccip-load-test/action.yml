@@ -1,0 +1,168 @@
+name: Run CCIP load test
+description: >-
+  Shared setup and execution for CCIP WASP load tests against local devenv or
+  prod-testnet infrastructure.
+
+inputs:
+  ccip_env:
+    description: "Target environment: devenv or prod-testnet"
+    required: false
+    default: prod-testnet
+  direction:
+    description: "Load test direction"
+    required: false
+    default: canton2evm
+  message_rate:
+    description: "CANTON_LOAD_MESSAGE_RATE"
+    required: false
+    default: "1/45s"
+  load_duration:
+    description: "CANTON_LOAD_DURATION"
+    required: false
+    default: "2m"
+  test_timeout:
+    description: "go test -timeout value"
+    required: false
+    default: "30m"
+  config_file:
+    description: "CCIP_CONFIG_FILE basename under ccip/devenv (prod-testnet only)"
+    required: false
+    default: env-prod-testnet.ci.toml
+  canton_path:
+    description: "Checkout path for chainlink-canton (`.` for PR root, `chainlink-canton` for nested devenv checkout)"
+    required: false
+    default: .
+  canton_ref:
+    description: "chainlink-canton git ref for devenv setup (empty = workflow SHA)"
+    required: false
+    default: ""
+  skip_exec_confirm:
+    description: "CANTON_LOAD_SKIP_EXEC_CONFIRM"
+    required: false
+    default: "false"
+  confirm_exec_timeout:
+    description: "CANTON_CONFIRM_EXEC_TIMEOUT"
+    required: false
+    default: "10m"
+  party_id:
+    description: "CANTON_PARTY_ID"
+    required: false
+    default: "u_d53a15c42af6::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7"
+  grpc_url:
+    description: "CANTON_GRPC_URL"
+    required: false
+    default: "testnet.cv1.bcy-v.metalhosts.com:443"
+  auth_type:
+    description: "CANTON_AUTH_TYPE"
+    required: false
+    default: clientCredentials
+  auth_url:
+    description: "CANTON_AUTH_URL override (defaults to CANTON_OKTA_AUTHORIZER_TESTNET input)"
+    required: false
+    default: ""
+  client_id:
+    description: "CANTON_CLIENT_ID override (defaults to CANTON_OKTA_CLIENT_ID_TESTNET input)"
+    required: false
+    default: ""
+  CANTON_OKTA_AUTHORIZER_TESTNET:
+    description: "GitHub secret CANTON_OKTA_AUTHORIZER_TESTNET"
+    required: false
+  CANTON_OKTA_CLIENT_ID_TESTNET:
+    description: "GitHub secret CANTON_OKTA_CLIENT_ID_TESTNET"
+    required: false
+  CANTON_OKTA_CLIENT_SECRET_TESTNET:
+    description: "GitHub secret CANTON_OKTA_CLIENT_SECRET_TESTNET"
+    required: false
+  CCIP_PROD_TESTNET_PRIVATE_KEY:
+    description: "GitHub secret CCIP_PROD_TESTNET_PRIVATE_KEY"
+    required: false
+  ccv-iam-role:
+    description: "AWS IAM role for CCV ECR authentication (devenv only)"
+    required: false
+  jd-registry:
+    description: "JD private ECR registry ID (devenv only)"
+    required: false
+  jd-image:
+    description: "JD Docker image reference (devenv only)"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Setup CCIP devenv
+      if: inputs.ccip_env == 'devenv'
+      uses: ./.github/actions/setup-ccip-devenv
+      with:
+        canton-ref: ${{ inputs.canton_ref }}
+        canton-path: ${{ inputs.canton_path }}
+        ccv-iam-role: ${{ inputs.ccv-iam-role }}
+        jd-registry: ${{ inputs.jd-registry }}
+        jd-image: ${{ inputs.jd-image }}
+
+    - name: Install Go (prod-testnet)
+      if: inputs.ccip_env == 'prod-testnet'
+      uses: actions/setup-go@v6
+      with:
+        cache: true
+        go-version-file: ${{ inputs.canton_path }}/go.mod
+        cache-dependency-path: ${{ inputs.canton_path }}/go.sum
+
+    - name: Download Go dependencies (prod-testnet)
+      if: inputs.ccip_env == 'prod-testnet'
+      shell: bash
+      working-directory: ${{ inputs.canton_path }}
+      run: go mod download
+
+    - name: Run load tests (devenv)
+      if: inputs.ccip_env == 'devenv'
+      shell: bash
+      working-directory: ${{ inputs.canton_path }}/ccip/devenv/tests/load
+      env:
+        CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
+        CANTON_LOAD_DURATION: ${{ inputs.load_duration }}
+      run: |
+        case "${{ inputs.direction }}" in
+          canton2evm) TEST_RUN='^TestCanton2EVM_Load$' ;;
+          evm2canton) TEST_RUN='^TestEVM2Canton_Load$' ;;
+          canton2evm-token) TEST_RUN='^TestCanton2EVM_TokenLoad$' ;;
+          evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
+          *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
+        esac
+        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -ccip-env=devenv -run "$TEST_RUN"
+
+    - name: Run load tests (prod-testnet)
+      if: inputs.ccip_env == 'prod-testnet'
+      shell: bash
+      working-directory: ${{ inputs.canton_path }}/ccip/devenv/tests/load
+      env:
+        CCIP_ENV: prod-testnet
+        CCIP_CONFIG_FILE: ${{ inputs.config_file }}
+        CANTON_AUTH_TYPE: ${{ inputs.auth_type }}
+        CANTON_AUTH_URL: ${{ inputs.auth_url != '' && inputs.auth_url || inputs.CANTON_OKTA_AUTHORIZER_TESTNET }}
+        CANTON_CLIENT_ID: ${{ inputs.client_id != '' && inputs.client_id || inputs.CANTON_OKTA_CLIENT_ID_TESTNET }}
+        CANTON_CLIENT_SECRET: ${{ inputs.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
+        CANTON_PARTY_ID: ${{ inputs.party_id }}
+        CANTON_GRPC_URL: ${{ inputs.grpc_url }}
+        CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
+        CANTON_LOAD_DURATION: ${{ inputs.load_duration }}
+        CANTON_CONFIRM_EXEC_TIMEOUT: ${{ inputs.confirm_exec_timeout }}
+        CANTON_LOAD_SKIP_EXEC_CONFIRM: ${{ inputs.skip_exec_confirm }}
+        PRIVATE_KEY: ${{ inputs.CCIP_PROD_TESTNET_PRIVATE_KEY }}
+      run: |
+        case "${{ inputs.direction }}" in
+          canton2evm) TEST_RUN='^TestCanton2EVM_Load$' ;;
+          evm2canton) TEST_RUN='^TestEVM2Canton_Load$' ;;
+          canton2evm-token) TEST_RUN='^TestCanton2EVM_TokenLoad$' ;;
+          evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
+          *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
+        esac
+        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -ccip-env=prod-testnet -run "$TEST_RUN"
+
+    - name: Upload devenv logs
+      if: always() && inputs.ccip_env == 'devenv'
+      uses: ./.github/actions/upload-ccip-devenv-logs
+      with:
+        canton-path: ${{ inputs.canton_path }}
+        test-package-dir: load
+        log-dump-suffix: ccip-load-tests
+        artifact-name: container-logs-ccip-load-tests
