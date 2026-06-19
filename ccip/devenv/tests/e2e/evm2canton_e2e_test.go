@@ -3,7 +3,6 @@ package canton
 import (
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
@@ -75,7 +74,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 
-		sentEvent, err := boot.EVM.ConfirmSendOnSource(subtestCtx, dstSelector, cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 15*time.Second)
+		sentEvent, err := boot.ConfirmEVMSendOnSource(t, subtestCtx, dstSelector, seqNo, sendMessageResult)
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.Nil(t, sentEvent.Message.TokenTransfer)
@@ -126,7 +125,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NotNil(t, sendMessageResult.Message)
 		require.NotNil(t, sendMessageResult.Message.TokenTransfer)
 
-		sentEvent, err := boot.EVM.ConfirmSendOnSource(subtestCtx, dstSelector, cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 15*time.Second)
+		sentEvent, err := boot.ConfirmEVMSendOnSource(t, subtestCtx, dstSelector, seqNo, sendMessageResult)
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.NotNil(t, sentEvent.Message.TokenTransfer)

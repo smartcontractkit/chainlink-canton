@@ -645,17 +645,28 @@ func encodeReceiverFinalityConfig(finality int64) (core.FinalityConfig, error) {
 	}
 }
 
-// hashInstanceAddress decodes a verifier result's VerifierDestAddress on Canton.
-// On Canton the verifier result carries the raw instance address as a hex-encoded
-// string (bytes); to look up its disclosure from EDS we need the hashed instance
-// address. This helper is the non-test counterpart of getHashedInstanceAddress
-// previously kept in evm2canton_e2e_test.go.
-func hashInstanceAddress(rawInstanceAddressBytes protocol.UnknownAddress) (protocol.UnknownAddress, error) {
-	rawInstanceAddressStr := string(rawInstanceAddressBytes.Bytes())
-	rawInstanceAddress, err := contracts.RawInstanceAddressFromString(rawInstanceAddressStr)
-	if err != nil {
-		return nil, fmt.Errorf("hashInstanceAddress: %w", err)
+// hashInstanceAddress resolves a verifier result's VerifierDestAddress to the hashed
+// Canton instance address used for EDS disclosure lookup.
+//
+// The indexer may return either format depending on environment:
+//   - devenv: raw instance address string bytes ("instanceId@owner")
+//   - prod-testnet: already-hashed 32-byte InstanceAddress (from verifier config)
+func hashInstanceAddress(addr protocol.UnknownAddress) (protocol.UnknownAddress, error) {
+	if len(addr) == 0 {
+		return nil, fmt.Errorf("empty verifier dest address")
 	}
 
-	return protocol.UnknownAddress(rawInstanceAddress.InstanceAddress().Bytes()), nil
+	if raw, err := contracts.RawInstanceAddressFromString(string(addr)); err == nil {
+		return protocol.UnknownAddress(raw.InstanceAddress().Bytes()), nil
+	}
+
+	if len(addr) == contracts.InstanceAddressLength {
+		return addr, nil
+	}
+
+	if hexAddr, err := protocol.NewUnknownAddressFromHex(string(addr)); err == nil && len(hexAddr) == contracts.InstanceAddressLength {
+		return hexAddr, nil
+	}
+
+	return nil, fmt.Errorf("unrecognized verifier dest address format (len=%d)", len(addr))
 }

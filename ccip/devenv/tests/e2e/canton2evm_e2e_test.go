@@ -3,7 +3,6 @@ package canton
 import (
 	"math/big"
 	"testing"
-	"time"
 
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
@@ -89,7 +88,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		t.Logf("SendMessage accepted: seqNo=%d", seqNo)
 
 		t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", boot.Canton.ChainSelector(), boot.EVM.ChainSelector(), seqNo)
-		sentEvent, err := boot.Canton.ConfirmSendOnSource(subtestCtx, boot.EVM.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 30*time.Second)
+		sentEvent, err := boot.Canton.ConfirmSendOnSource(subtestCtx, boot.EVM.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, devenvtests.ConfirmSendTimeout(t, boot.Env))
 		require.NoError(t, err)
 
 		t.Logf("CCIPMessageSent event: %+v", sentEvent)
@@ -179,7 +178,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			require.NotNil(t, sendMessageResult.Message.TokenTransfer)
 			seqNo := uint64(sendMessageResult.Message.SequenceNumber)
 
-			sentEvent, err := boot.Canton.ConfirmSendOnSource(subtestCtx, boot.EVM.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+			sentEvent, err := boot.Canton.ConfirmSendOnSource(subtestCtx, boot.EVM.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, devenvtests.ConfirmSendTimeout(t, boot.Env))
 			require.NoError(t, err)
 			require.NotNil(t, sentEvent.Message)
 			require.NotNil(t, sentEvent.Message.TokenTransfer)

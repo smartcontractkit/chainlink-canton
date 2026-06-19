@@ -27,6 +27,8 @@ import (
 const (
 	envConfirmExecTimeout     = "CANTON_CONFIRM_EXEC_TIMEOUT"
 	defaultConfirmExecTimeout = 5 * time.Minute
+
+	envConfirmSendTimeout = "CANTON_CONFIRM_SEND_TIMEOUT"
 )
 
 // ConfirmExecTimeout returns the timeout for Canton ConfirmExecOnDest polling.
@@ -38,6 +40,30 @@ func ConfirmExecTimeout(t *testing.T) time.Duration {
 	if d := os.Getenv(envConfirmExecTimeout); d != "" {
 		parsed, err := time.ParseDuration(d)
 		require.NoError(t, err, "%s=%q invalid", envConfirmExecTimeout, d)
+		timeout = parsed
+	}
+
+	return timeout
+}
+
+// ConfirmSendTimeout returns the timeout for ConfirmSendOnSource polling.
+// Defaults: devenv 15s, prod-testnet 10m; override with CANTON_CONFIRM_SEND_TIMEOUT (e.g. "30s").
+func ConfirmSendTimeout(t *testing.T, env CCIPEnv) time.Duration {
+	t.Helper()
+
+	var timeout time.Duration
+	switch env {
+	case EnvDevenv:
+		timeout = 15 * time.Second
+	case EnvProdTestnet:
+		timeout = 10 * time.Minute
+	default:
+		timeout = 15 * time.Second
+	}
+
+	if d := os.Getenv(envConfirmSendTimeout); d != "" {
+		parsed, err := time.ParseDuration(d)
+		require.NoError(t, err, "%s=%q invalid", envConfirmSendTimeout, d)
 		timeout = parsed
 	}
 
@@ -144,6 +170,33 @@ func (b E2EBootstrap) ResolveEVMReceiver(t *testing.T) protocol.UnknownAddress {
 	receiver, err := b.EVM.GetEOAReceiverAddress()
 	require.NoError(t, err)
 	return receiver
+}
+
+// ConfirmEVMSendOnSource confirms an EVM-side CCIP send after SendMessage.
+//
+// On devenv we poll CCIPMessageSent via ConfirmSendOnSource (local Anvil, small block range).
+// On prod-testnet we use sendResult from SendMessage (tx receipt) only: ConfirmSendOnSource
+// should be used here but is broken in chainlink-ccv devenv — the event poller scans from
+// block 1 to latest on public RPCs and times out with 504 Gateway Timeout.
+func (b E2EBootstrap) ConfirmEVMSendOnSource(
+	t *testing.T,
+	ctx context.Context,
+	destSelector uint64,
+	seqNo uint64,
+	sendResult cciptestinterfaces.MessageSentEvent,
+) (cciptestinterfaces.MessageSentEvent, error) {
+	t.Helper()
+
+	if b.Env.IsRemote() {
+		return sendResult, nil
+	}
+
+	return b.EVM.ConfirmSendOnSource(
+		ctx,
+		destSelector,
+		cciptestinterfaces.MessageEventKey{SeqNum: seqNo},
+		ConfirmSendTimeout(t, b.Env),
+	)
 }
 
 // SkipIfRemote skips token subtests that are not supported on prod-testnet.
