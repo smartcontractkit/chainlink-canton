@@ -91,7 +91,7 @@ func (a *AuthConfig) NewProvider(ctx context.Context) (authentication.Provider, 
 		var options []static.ProviderOption
 		if a.InsecureSkipVerify {
 			options = append(options, static.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, //nolint:gosec // Intentionally disabling TLS verification opt-in
 			})))
 		}
 
@@ -105,7 +105,7 @@ func (a *AuthConfig) NewProvider(ctx context.Context) (authentication.Provider, 
 		var options []clientcredentials.ProviderOption
 		if a.InsecureSkipVerify {
 			options = append(options, clientcredentials.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, //nolint:gosec // Intentionally disabling TLS verification opt-in
 			})))
 		}
 
@@ -119,7 +119,7 @@ func (a *AuthConfig) NewProvider(ctx context.Context) (authentication.Provider, 
 		var options []authorizationcode.ProviderOption
 		if a.InsecureSkipVerify {
 			options = append(options, authorizationcode.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, //nolint:gosec // Intentionally disabling TLS verification opt-in
 			})))
 		}
 
