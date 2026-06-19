@@ -20,6 +20,9 @@ import (
 // RegisterNativeFeeTokenInTARConfig registers the Canton native fee token (Amulet) in TAR.
 // Creates TokenConfig only — no token pool. InstrumentId is resolved from the validator
 // scan-proxy when admin/id are empty (requires ledger access at pipeline run time).
+//
+// New environments: this is also emitted automatically during lane configure Run 1.
+// Keep this changeset for standalone registration or envs that ran lanes before that hook existed.
 type RegisterNativeFeeTokenInTARConfig struct {
 	CCIPOwnerParty string                                   `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
 	MinDelay       time.Duration                            `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`

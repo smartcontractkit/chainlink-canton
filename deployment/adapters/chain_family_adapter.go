@@ -15,12 +15,14 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutil "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
@@ -134,6 +136,43 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 	if err != nil {
 		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve Canton native fee token instrument: %w", err)
 	}
+
+	// Register native fee token (Amulet) TokenConfig in TAR once per lane configure run.
+	// Skipped when already on-ledger. Not inlined in proposal-driven core deploy because
+	// timelock-execute pre-resolves TAR before the deploy batch creates it.
+	tarRef, err := findContractRef(
+		ds,
+		input.ChainSelector,
+		datastore.ContractType(token_admin_registry.ContractType),
+		token_admin_registry.Version,
+		"",
+	)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve token admin registry: %w", err)
+	}
+	tarRaw, err := dsutil.GetRawInstanceAddressFromAddressRef(tarRef)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve token admin registry raw address: %w", err)
+	}
+	ccipOwnerParty, err := resolveCcipOwnerParty(ds, input.ChainSelector)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve ccipOwner party: %w", err)
+	}
+	mcmsEnabled := len(chain.Participants[0].ReadAsPartyIDs) > 0
+	tarReport, err := cldfops.ExecuteSequence(b, sequences.RegisterNativeFeeTokenInTAR, chain, sequences.RegisterNativeFeeTokenInTARInput{
+		TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(tarRef.Address),
+		TokenAdminRegistryRawInstanceAddress: tarRaw,
+		InstrumentId:                         nativeInstrument,
+		CcipOwnerParty:                       ccipOwnerParty,
+		TokenQualifier:                       string(nativeInstrument.Id),
+		ChainSelector:                        input.ChainSelector,
+		ProposalDriven:                       mcmsEnabled,
+	})
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("register native fee token in TAR: %w", err)
+	}
+	out.BatchOps = append(out.BatchOps, tarReport.Output.BatchOps...)
+	out.Addresses = append(out.Addresses, tarReport.Output.Addresses...)
 
 	for remoteSelector, remoteCfg := range input.RemoteChains {
 		localExecutor, err := resolveContractRefByAddress(
