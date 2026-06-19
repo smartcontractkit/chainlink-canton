@@ -72,7 +72,7 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-evm2canton-token", sched, "token_transfer", false)
+	runWASP(t, gun, "canton-load-evm2canton-token", sched, "token_transfer", false, boot.Cfg.IndexerEndpoints)
 
 	totalHoldingsRat, err := testhelpers.GetHoldingsBalance(ctx, receiverParticipant, nil)
 	require.NoError(t, err)

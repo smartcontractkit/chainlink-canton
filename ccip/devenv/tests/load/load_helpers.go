@@ -33,8 +33,11 @@ const (
 	envMessageRate           = "CANTON_LOAD_MESSAGE_RATE"
 	envLoadDuration          = "CANTON_LOAD_DURATION"
 	envLoadSkipExecConfirm   = "CANTON_LOAD_SKIP_EXEC_CONFIRM"
+	envLoadCallTimeout       = "CANTON_LOAD_CALL_TIMEOUT"
 	defaultMessageRate       = "1/1s"
 	defaultLoadDuration      = 90 * time.Second
+	defaultLoadCallPadding   = 2 * time.Minute
+	defaultSendOnlyCallBudget = 5 * time.Minute
 )
 
 type scheduleConfig struct {
@@ -84,8 +87,56 @@ func loadSkipExecConfirm(t *testing.T) bool {
 	}
 }
 
-func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig, scenario string, skipExecConfirm bool) {
+func waspCallTimeout(t *testing.T, gun *CCIPLoadGun, sched scheduleConfig, skipExecConfirm bool) time.Duration {
 	t.Helper()
+
+	if v := strings.TrimSpace(os.Getenv(envLoadCallTimeout)); v != "" {
+		parsed, err := time.ParseDuration(v)
+		require.NoError(t, err, "%s=%q invalid", envLoadCallTimeout, v)
+		return parsed
+	}
+	if skipExecConfirm {
+		return defaultSendOnlyCallBudget + sched.rateUnit
+	}
+
+	return gun.ConfirmExecTimeout() + sched.rateUnit + defaultLoadCallPadding
+}
+
+func logLoadMessageSummary(t *testing.T, gun *CCIPLoadGun, indexerEndpoints []string) {
+	t.Helper()
+
+	ids := gun.MessageIDs()
+	lggr := ccv.Plog
+	lggr.Info().Int("count", len(ids)).Msg("Load message summary")
+
+	var indexerBase string
+	if len(indexerEndpoints) > 0 {
+		indexerBase = strings.TrimSuffix(indexerEndpoints[0], "/")
+	}
+
+	for i, id := range ids {
+		msgID := id.String()
+		ev := lggr.Info().Int("index", i+1).Str("messageID", msgID)
+		if indexerBase != "" {
+			ev = ev.Str("indexer", fmt.Sprintf("%s/v1/verifierresults/%s", indexerBase, msgID))
+		}
+		ev.Msg("Load message sent")
+	}
+}
+
+func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig, scenario string, skipExecConfirm bool, indexerEndpoints []string) {
+	t.Helper()
+	defer logLoadMessageSummary(t, gun, indexerEndpoints)
+
+	callTimeout := waspCallTimeout(t, gun, sched, skipExecConfirm)
+	ccv.Plog.Info().
+		Str("messageRate", sched.messageRate).
+		Dur("rateUnit", sched.rateUnit).
+		Dur("loadDuration", sched.duration).
+		Dur("callTimeout", callTimeout).
+		Dur("confirmExecTimeout", gun.ConfirmExecTimeout()).
+		Bool("skipExecConfirm", skipExecConfirm).
+		Msg("WASP load schedule")
 
 	labels := map[string]string{
 		"go_test_name":  genName,
@@ -109,6 +160,7 @@ func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfi
 			wasp.Plain(sched.rate, sched.duration),
 		),
 		RateLimitUnitDuration: sched.rateUnit,
+		CallTimeout:           callTimeout,
 		Gun:                   gun,
 		Labels:                labels,
 		LokiConfig:            nil,
