@@ -52,18 +52,6 @@ inputs:
     description: "CANTON_GRPC_URL"
     required: false
     default: "testnet.cv1.bcy-v.metalhosts.com:443"
-  auth_type:
-    description: "CANTON_AUTH_TYPE"
-    required: false
-    default: clientCredentials
-  auth_url:
-    description: "CANTON_AUTH_URL override (defaults to CANTON_OKTA_AUTHORIZER_TESTNET input)"
-    required: false
-    default: ""
-  client_id:
-    description: "CANTON_CLIENT_ID override (defaults to CANTON_OKTA_CLIENT_ID_TESTNET input)"
-    required: false
-    default: ""
   CANTON_OKTA_AUTHORIZER_TESTNET:
     description: "GitHub secret CANTON_OKTA_AUTHORIZER_TESTNET"
     required: false
@@ -137,9 +125,9 @@ runs:
       env:
         CCIP_ENV: prod-testnet
         CCIP_CONFIG_FILE: ${{ inputs.config_file }}
-        CANTON_AUTH_TYPE: ${{ inputs.auth_type }}
-        CANTON_AUTH_URL: ${{ inputs.auth_url != '' && inputs.auth_url || inputs.CANTON_OKTA_AUTHORIZER_TESTNET }}
-        CANTON_CLIENT_ID: ${{ inputs.client_id != '' && inputs.client_id || inputs.CANTON_OKTA_CLIENT_ID_TESTNET }}
+        CANTON_AUTH_TYPE: clientCredentials
+        CANTON_AUTH_URL: ${{ inputs.CANTON_OKTA_AUTHORIZER_TESTNET }}
+        CANTON_CLIENT_ID: ${{ inputs.CANTON_OKTA_CLIENT_ID_TESTNET }}
         CANTON_CLIENT_SECRET: ${{ inputs.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
         CANTON_PARTY_ID: ${{ inputs.party_id }}
         CANTON_GRPC_URL: ${{ inputs.grpc_url }}

@@ -57,9 +57,6 @@ jobs:
           NAMED_CONFIRM_EXEC_TIMEOUT: ${{ github.event.client_payload.slash_command.args.named.confirm_exec_timeout }}
           NAMED_PARTY_ID: ${{ github.event.client_payload.slash_command.args.named.party_id }}
           NAMED_GRPC_URL: ${{ github.event.client_payload.slash_command.args.named.grpc_url }}
-          NAMED_AUTH_TYPE: ${{ github.event.client_payload.slash_command.args.named.auth_type }}
-          NAMED_AUTH_URL: ${{ github.event.client_payload.slash_command.args.named.auth_url }}
-          NAMED_CLIENT_ID: ${{ github.event.client_payload.slash_command.args.named.client_id }}
         run: |
           echo "ccip_env=${NAMED_CCIP_ENV:-prod-testnet}" >> "$GITHUB_OUTPUT"
           echo "direction=${NAMED_DIRECTION:-canton2evm}" >> "$GITHUB_OUTPUT"
@@ -70,9 +67,6 @@ jobs:
           echo "confirm_exec_timeout=${NAMED_CONFIRM_EXEC_TIMEOUT:-10m}" >> "$GITHUB_OUTPUT"
           echo "party_id=${NAMED_PARTY_ID:-u_d53a15c42af6::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7}" >> "$GITHUB_OUTPUT"
           echo "grpc_url=${NAMED_GRPC_URL:-testnet.cv1.bcy-v.metalhosts.com:443}" >> "$GITHUB_OUTPUT"
-          echo "auth_type=${NAMED_AUTH_TYPE:-clientCredentials}" >> "$GITHUB_OUTPUT"
-          echo "auth_url=${NAMED_AUTH_URL}" >> "$GITHUB_OUTPUT"
-          echo "client_id=${NAMED_CLIENT_ID}" >> "$GITHUB_OUTPUT"
 
           direction="${NAMED_DIRECTION:-canton2evm}"
           if [ -n "${NAMED_TEST_TIMEOUT}" ]; then
@@ -97,9 +91,6 @@ jobs:
           confirm_exec_timeout: ${{ steps.params.outputs.confirm_exec_timeout }}
           party_id: ${{ steps.params.outputs.party_id }}
           grpc_url: ${{ steps.params.outputs.grpc_url }}
-          auth_type: ${{ steps.params.outputs.auth_type }}
-          auth_url: ${{ steps.params.outputs.auth_url }}
-          client_id: ${{ steps.params.outputs.client_id }}
           CANTON_OKTA_AUTHORIZER_TESTNET: ${{ secrets.CANTON_OKTA_AUTHORIZER_TESTNET }}
           CANTON_OKTA_CLIENT_ID_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_ID_TESTNET }}
           CANTON_OKTA_CLIENT_SECRET_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
