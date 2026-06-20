@@ -71,6 +71,18 @@ var (
 	userID                      = ""
 	partyID                     = ""
 
+	dsoPartyID       = types.PARTY("DSO::1220f22a8b8f2d813c25b9a684dc4dd52b532a0174d8e73a13cdf2baabfff7518337")
+	ccipOwnerPartyID = types.PARTY("ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551")
+
+	amuletInstrumentID = &splice_api_token_holding_v1.InstrumentId{
+		Admin: dsoPartyID,
+		Id:    "Amulet",
+	}
+	linkInstrumentId = &splice_api_token_holding_v1.InstrumentId{
+		Admin: ccipOwnerPartyID,
+		Id:    "link-token",
+	}
+
 	// Eth - Remote Chain
 	ethSelector         = chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 	ethRpcURL           = ""
@@ -85,21 +97,6 @@ var (
 	ccipReceiverContract = common.HexToAddress("0x1E340B34Cc732a71f5e59804da7E645a52e10E1B")
 	receiverAddress      = common.HexToAddress("0x0")
 )
-
-const (
-	dsoPartyID       = "DSO::1220f22a8b8f2d813c25b9a684dc4dd52b532a0174d8e73a13cdf2baabfff7518337"
-	ccipOwnerPartyID = "ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551"
-)
-
-var amuletInstrumentID = &splice_api_token_holding_v1.InstrumentId{
-	Admin: dsoPartyID,
-	Id:    "Amulet",
-}
-
-var linkInstrumentId = &splice_api_token_holding_v1.InstrumentId{
-	Admin: ccipOwnerPartyID,
-	Id:    "link-token",
-}
 
 func TestCanton(t *testing.T) {
 	authProvider, err := authorizationcode.NewDiscoveryProvider(t.Context(), authorizationServerURL, authClientID)
@@ -280,6 +277,94 @@ func TestCanton(t *testing.T) {
 		fmt.Println("CCIPSender Contract ID: ", senderCid)
 	})
 
+	t.Run("Execute: Canton (Message Only)", func(t *testing.T) {
+		messageId := common.HexToHash("0xb52dac849de0a1901f8c935877f08d5890e64ec68f8d74ff4c6bfdd57978270a")
+		timeout := time.Minute * 15
+
+		start := time.Now()
+		var response v1.VerifierResultsByMessageIDResponse
+		for {
+			if time.Since(start) > timeout {
+				t.Fatal("Timed out waiting for message to be processed by indexer")
+			}
+			status, resp, err := indexerClient.VerifierResultsByMessageID(t.Context(), v1.VerifierResultsByMessageIDInput{MessageID: messageId.Hex()})
+			if err != nil {
+				t.Logf("Error querying indexer: %v", err)
+				time.Sleep(5 * time.Second)
+				continue
+			} else if status != http.StatusOK {
+				t.Logf("Unexpected status code from indexer: %d", status)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			response = resp
+
+			break
+		}
+		require.NotEmptyf(t, response.Results, "Expected at least one verifier result for message ID %s", messageId.Hex())
+		t.Logf("Received response from indexer: %+v", response)
+
+		verifierResult := response.Results[0].VerifierResult
+		message := verifierResult.Message
+		encodedMessage, err := message.Encode()
+		require.NoError(t, err)
+
+		ccvAddress := contracts.BytesToInstanceAddress(verifierResult.VerifierDestAddress)
+
+		ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(t.Context(), ccipEdsClient, hex.EncodeToString(encodedMessage))
+		require.NoError(t, err)
+		ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(t.Context(), ccvEdsClient, hex.EncodeToString(encodedMessage), ccvAddress)
+		require.NoError(t, err)
+
+		fmt.Println("CCIP Execute Disclosure:", ccipExecuteDisclosure)
+		fmt.Println("CCV Execute Disclosure:", ccvExecuteDisclosure)
+
+		// Get PerPartyRouter
+		routerCid := getRouter(t, participant, ccipEdsClient)
+
+		// Get CCIPReceiver
+		receiverCid := getReceiver(t, participant)
+
+		fmt.Println("PerPartyRouter CID:", routerCid)
+		fmt.Println("CCIPReceiver CID:", receiverCid)
+
+		executeArgs := receiver.Execute{
+			Context:        ccipExecuteDisclosure.ChoiceContext,
+			RouterCid:      types.CONTRACT_ID(routerCid),
+			EncodedMessage: types.TEXT(hex.EncodeToString(encodedMessage)),
+			TokenTransfer:  nil,
+			CcvInputs: []receiver.CCVInput{
+				{
+					CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
+					VerifierResults: types.TEXT(hex.EncodeToString(verifierResult.CCVData)),
+					CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+				},
+			},
+		}
+
+		resp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+			Commands: &apiv2.Commands{
+				CommandId: uuid.NewString(),
+				Commands: []*apiv2.Command{{
+					Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+						TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+						ContractId:     receiverCid,
+						Choice:         "Execute",
+						ChoiceArgument: ledger.MapToValue(executeArgs),
+					}},
+				}},
+				ActAs: []string{participant.PartyID},
+				DisclosedContracts: slices.Concat(
+					ccipExecuteDisclosure.DisclosedContracts,
+					ccvExecuteDisclosure.DisclosedContracts,
+				),
+			},
+		})
+		require.NoError(t, err)
+		fmt.Println("Message executed in Update: ", resp.GetTransaction().GetUpdateId())
+	})
+
 	t.Run("Execute: Canton (Token Transfer)", func(t *testing.T) {
 		messageId := common.HexToHash("0x20b01049ee0c69c8b814b616ae5758e8f1c43f194626833c07023b8484675c9b")
 		timeout := time.Minute * 15
@@ -382,8 +467,8 @@ func TestCanton(t *testing.T) {
 	t.Run("Send: Canton->EVM (Message Only)", func(t *testing.T) {
 		messageReceiver := ccipReceiverContract
 
-		feeToken := linkInstrumentId
-		feeTokenTransferInstructionClient := transferInstructionEdsClient
+		feeToken := amuletInstrumentID
+		feeTokenTransferInstructionClient := amuletTransferInstructionClient
 
 		// Get fee token input holdings
 		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, feeToken)
@@ -391,9 +476,6 @@ func TestCanton(t *testing.T) {
 		feeTokenInputCids := make([]types.CONTRACT_ID, len(feeTokenHoldings))
 		for i, holding := range feeTokenHoldings {
 			feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
-		}
-		feeTokenInputCids = []types.CONTRACT_ID{
-			"009201860ca740bf85a8bdea12031d004bd6366eddc68d7db2a389fa5cba54672bca121220b33626465b9e80654058caf00196fcdff9fad802edc7441a58421308decdb901",
 		}
 
 		transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), feeTokenTransferInstructionClient, string(feeToken.Admin), splice_api_token_transfer_instruction_v1.Transfer{
@@ -1060,6 +1142,81 @@ func TestCanton(t *testing.T) {
 func TestEVM(t *testing.T) {
 	indexerClient, err := indexerclient.NewIndexerClient(indexerURL, &http.Client{Timeout: 15 * time.Second})
 	require.NoError(t, err)
+
+	t.Run("Send: EVM -> Canton (Message Only)", func(t *testing.T) {
+		// Source
+		finality := protocol.FinalityWaitForFinality
+		execGasLimit := uint32(0)
+		executorAddress := noExecutionTag
+		feeToken := ethLinkTokenAddress
+
+		// Dest
+		receiverParty := partyID
+
+		// Message
+		payload := []byte("Hello, Canton!")
+
+		chainIdString, err := chainsel.GetChainIDFromSelector(ethSelector)
+		require.NoError(t, err)
+		sourceChainId, err := strconv.ParseUint(chainIdString, 10, 64)
+		require.NoError(t, err)
+		client, err := ethclient.DialContext(t.Context(), ethRpcURL)
+		require.NoError(t, err)
+		privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(ethPrivateKeyHex, "0x"))
+		require.NoError(t, err)
+		auth, err := bind.NewKeyedTransactorWithChainID(privateKey, new(big.Int).SetUint64(sourceChainId))
+		require.NoError(t, err)
+
+		router, err := routerwrapper.NewRouter(ethRouterAddress, client)
+		require.NoError(t, err)
+
+		receiverPartyHashed := contracts.HashedPartyFromString(receiverParty)
+
+		extraArgs, err := evm.NewV3ExtraArgs(finality, execGasLimit, executorAddress.Hex(), nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		msg := routerwrapper.ClientEVM2AnyMessage{
+			Receiver:     receiverPartyHashed.Bytes(),
+			Data:         payload,
+			TokenAmounts: nil,
+			FeeToken:     feeToken,
+			ExtraArgs:    extraArgs,
+		}
+
+		fee, err := router.GetFee(&bind.CallOpts{Context: t.Context()}, cantonSelector, msg)
+		require.NoError(t, err)
+		fmt.Printf("Fee for sending message: %s\n", fee.String())
+		if feeToken == ethEmptyAddress {
+			auth.Value = fee
+		}
+
+		tx, err := router.CcipSend(auth, cantonSelector, msg)
+		require.NoError(t, err)
+		fmt.Printf("Sent message with tx hash: %s\n", tx.Hash().Hex())
+
+		receipt, err := bind.WaitMined(t.Context(), client, tx)
+		require.NoError(t, err)
+		fmt.Printf("Transaction mined in block: %d\n", receipt.BlockNumber.Uint64())
+
+		var sentEvent *onramp.OnRampCCIPMessageSent
+		eventTopic := (onramp.OnRampCCIPMessageSent{}).Topic()
+		for _, lg := range receipt.Logs {
+			if len(lg.Topics) == 0 || lg.Topics[0] != eventTopic {
+				continue
+			}
+
+			onRamp, err := onramp.NewOnRamp(lg.Address, client)
+			require.NoError(t, err)
+
+			messageSentEvent, err := onRamp.ParseCCIPMessageSent(*lg)
+			require.NoError(t, err)
+			sentEvent = messageSentEvent
+
+			break
+		}
+		require.NotNil(t, sentEvent, "Sent event not found in transaction logs")
+		fmt.Printf("Message sent with ID: %s\n", common.Bytes2Hex(sentEvent.MessageId[:]))
+	})
 
 	t.Run("Send: EVM -> Canton (Token Transfer)", func(t *testing.T) {
 		// Source
