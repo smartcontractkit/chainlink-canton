@@ -10,6 +10,7 @@ import (
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldfcanton "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -83,7 +84,36 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 	}
 
 	poolAddress := contracts.HexToInstanceAddress(poolAddressRef.Address)
-	switch poolRef.Type {
+	decimals, err := c.deriveTokenPoolDecimalsFromLedger(ctx, participant, queryParties, poolRef.Type, poolAddress, poolAddressRef.Address)
+	if err == nil {
+		return decimals, nil
+	}
+	if !cantonsequences.IsCantonPoolNotOnLedgerErr(err) {
+		return 0, err
+	}
+
+	fallbackDecimals, fallbackErr := cantonsequences.CantonTokenPoolDecimalsFromDataStore(e.DataStore, chainSelector, poolAddressRef)
+	if fallbackErr != nil {
+		return 0, fmt.Errorf("%w (datastore fallback: %v)", err, fallbackErr)
+	}
+	e.Logger.Infof(
+		"token pool %s not active on Canton ledger; using address_refs decimals=%d",
+		poolAddressRef.Address,
+		fallbackDecimals,
+	)
+
+	return fallbackDecimals, nil
+}
+
+func (c CantonTokenAdapter) deriveTokenPoolDecimalsFromLedger(
+	ctx context.Context,
+	participant cldfcanton.Participant,
+	queryParties []string,
+	poolType datastore.ContractType,
+	poolAddress contracts.InstanceAddress,
+	poolAddressHex string,
+) (uint8, error) {
+	switch poolType {
 	case datastore.ContractType("LockReleaseTokenPool"):
 		activePool, err := opcontract.FindActiveContractByInstanceAddress(
 			ctx,
@@ -93,11 +123,11 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 			poolAddress,
 		)
 		if err != nil {
-			return 0, fmt.Errorf("find active lock/release pool %s: %w", poolAddressRef.Address, err)
+			return 0, fmt.Errorf("find active lock/release pool %s: %w", poolAddressHex, err)
 		}
 		parsedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
 		if err != nil {
-			return 0, fmt.Errorf("parse active lock/release pool %s: %w", poolAddressRef.Address, err)
+			return 0, fmt.Errorf("parse active lock/release pool %s: %w", poolAddressHex, err)
 		}
 
 		//nolint:gosec // Decimals should never exceed uint8
@@ -111,17 +141,17 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 			poolAddress,
 		)
 		if err != nil {
-			return 0, fmt.Errorf("find active burn/mint pool %s: %w", poolAddressRef.Address, err)
+			return 0, fmt.Errorf("find active burn/mint pool %s: %w", poolAddressHex, err)
 		}
 		parsedPool, err := bindings.UnmarshalCreatedEvent[burnminttokenpool.BurnMintTokenPool](activePool.GetCreatedEvent())
 		if err != nil {
-			return 0, fmt.Errorf("parse active burn/mint pool %s: %w", poolAddressRef.Address, err)
+			return 0, fmt.Errorf("parse active burn/mint pool %s: %w", poolAddressHex, err)
 		}
 
 		//nolint:gosec // Decimals should never exceed uint8
 		return uint8(parsedPool.Decimals), nil
 	default:
-		return 0, fmt.Errorf("unsupported Canton token pool type %q", poolRef.Type)
+		return 0, fmt.Errorf("unsupported Canton token pool type %q", poolType)
 	}
 }
 

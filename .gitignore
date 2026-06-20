@@ -20,3 +20,5 @@ scripts/prod_testnet/.env
 eds/staging_testnet_canton.local.toml
 eds/prod_testnet_canton.local.toml
 eds/prod_testnet_canton.local.secrets.toml
+scripts/prod_mainnet/.env
+scripts/prod_mainnet/.env.example
