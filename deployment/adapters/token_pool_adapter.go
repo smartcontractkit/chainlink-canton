@@ -94,7 +94,7 @@ func (c CantonTokenAdapter) DeriveTokenDecimals(e deployment.Environment, chainS
 
 	fallbackDecimals, fallbackErr := cantonsequences.CantonTokenPoolDecimalsFromDataStore(e.DataStore, chainSelector, poolAddressRef)
 	if fallbackErr != nil {
-		return 0, fmt.Errorf("%w (datastore fallback: %v)", err, fallbackErr)
+		return 0, fmt.Errorf("%w (datastore fallback: %w)", err, fallbackErr)
 	}
 	e.Logger.Infof(
 		"token pool %s not active on Canton ledger; using address_refs decimals=%d",

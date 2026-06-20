@@ -903,7 +903,7 @@ func loadConfiguredCantonTokenPool(
 
 	fallbackPool, fallbackErr := loadConfiguredCantonTokenPoolFromDataStore(ds, chainSelector, logicalPoolType, poolAddress)
 	if fallbackErr != nil {
-		return nil, fmt.Errorf("%w (datastore fallback: %v)", err, fallbackErr)
+		return nil, fmt.Errorf("%w (datastore fallback: %w)", err, fallbackErr)
 	}
 	if logger != nil {
 		logger.Infof(
