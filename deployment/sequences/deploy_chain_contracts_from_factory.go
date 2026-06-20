@@ -49,10 +49,6 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
-		nativeInstrumentID, err := resolveNativeInstrumentID(b, deps, input.NativeInstrumentId)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve native fee token instrument: %w", err)
-		}
 		factoryRawInstanceAddress, err := rawInstanceAddressFromAddressRef(input.FactoryAddressRef)
 		if err != nil {
 			return sequences.OnChainOutput{}, err
@@ -105,19 +101,28 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		tokenAdminRegistryRawInstanceAddress := tokenAdminRegistryInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), tokenAdminRegistryRawInstanceAddress, token_admin_registry.ContractType, token_admin_registry.Version, ""))
 
-		feeTokenConfigOutputs, err := ensureNativeFeeTokenConfig(
-			b,
-			deps,
-			tokenAdminRegistryRawInstanceAddress.InstanceAddress(),
-			tokenAdminRegistryRawInstanceAddress,
-			input.CCIPOwnerParty,
-			nativeInstrumentID,
-			input.ProposalDriven,
-		)
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure native fee token config: %w", err)
+		// Native fee token (Amulet) TAR registration is skipped in proposal-driven factory
+		// deploy: timelock-execute resolves TAR from ledger before the batch creates it.
+		// Registered during lane configure Run 1 (configureChainForLanes) after TAR exists.
+		if !input.ProposalDriven {
+			nativeInstrumentID, err := resolveNativeInstrumentID(b, deps, input.NativeInstrumentId)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve native fee token instrument: %w", err)
+			}
+			feeTokenConfigOutputs, err := ensureNativeFeeTokenConfig(
+				b,
+				deps,
+				tokenAdminRegistryRawInstanceAddress.InstanceAddress(),
+				tokenAdminRegistryRawInstanceAddress,
+				input.CCIPOwnerParty,
+				nativeInstrumentID,
+				input.ProposalDriven,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure native fee token config: %w", err)
+			}
+			proposalOutputs = append(proposalOutputs, feeTokenConfigOutputs...)
 		}
-		proposalOutputs = append(proposalOutputs, feeTokenConfigOutputs...)
 
 		feeQuoterInstanceID, err := ensureInstanceID(input.FeeQuoterConfig.Template.InstanceId, "feequoter")
 		if err != nil {
