@@ -57,13 +57,13 @@ send commands always use the `noExecution` tag in extraArgs.
 
 ### Canton → EVM
 
-| Command                                                                                                                                  | Description                                                                                                     |
-|------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| `canton send-message --receiver <0xhex> [--payload <text>] [--executor {default\|none}] [--fee-token {link\|native}]`                    | Send a message-only CCIP message from Canton to EVM.                                                            |
-| `canton send-token   --receiver <0xhex> --amount <decimal> [--payload <text>] [--executor {default\|none}] [--fee-token {link\|native}]` | Send a LINK token transfer CCIP message from Canton to EVM.                                                     |
-| `canton execute --message-id <0xhash> [--wait <duration>]`                                                                               | Execute on Canton a message sent from EVM.                                                                      |
-| `canton list-events --event {sent\|executed}`                                                                                            | List active `CCIPMessageSent` or `ExecutionStateChanged` contracts visible to the configured party.             |
-| `canton list-holdings [--cid]`                                                                                                           | List all holdings for the configured party. Specify `--cid` to include the holding's Contract ID in the output. |
+| Command                                                                                                               | Description                                                                                                     |
+|-----------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `canton send-message --receiver <0xhex> [--payload <text>] [--executor {default\|none}] [--fee-token {link\|native}]` | Send a message-only CCIP message from Canton to EVM.                                                            |
+| `canton send-token   --receiver <0xhex> --amount <decimal> [--payload <text>] [--executor {default\|none}]`           | Send a LINK token transfer CCIP message from Canton to EVM.                                                     |
+| `canton execute --message-id <0xhash> [--wait <duration>]`                                                            | Execute on Canton a message sent from EVM.                                                                      |
+| `canton list-events --event {sent\|executed}`                                                                         | List active `CCIPMessageSent` or `ExecutionStateChanged` contracts visible to the configured party.             |
+| `canton list-holdings [--cid]`                                                                                        | List all holdings for the configured party. Specify `--cid` to include the holding's Contract ID in the output. |
 
 `--executor none` skips automatic execution on the destination chain; you can
 then settle the message manually with `evm execute --message-id ...`.
