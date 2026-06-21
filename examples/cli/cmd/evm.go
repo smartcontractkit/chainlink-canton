@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
 	"github.com/spf13/cobra"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/offramp"
@@ -22,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
 )
 
 // parseAmount parses an amount string that may include exponents (e.g. "1e18")
@@ -35,6 +35,7 @@ func parseAmount(s string) (*big.Int, error) {
 	}
 	i := new(big.Int)
 	f.Int(i)
+
 	return i, nil
 }
 

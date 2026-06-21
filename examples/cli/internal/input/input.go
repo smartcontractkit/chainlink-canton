@@ -18,10 +18,11 @@ func Confirm() bool {
 			return false
 		} else if s == "y" {
 			break
-		} else {
-			_, _ = fmt.Fprintln(os.Stderr, "Please enter Y or N")
-			continue
 		}
+
+		_, _ = fmt.Fprintln(os.Stderr, "Please enter Y or N")
+
+		continue
 	}
 
 	return true

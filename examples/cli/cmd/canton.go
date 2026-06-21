@@ -14,8 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
-	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
+
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -31,7 +30,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
+	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 )
@@ -45,6 +46,7 @@ func parseDecimalAmount(s string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("invalid amount %q", s)
 	}
+
 	return f.String(), nil
 }
 
@@ -363,7 +365,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 			return cantonSend(ctx, b, msgReceiver, []byte(payload), "", executor, feeTokenInstrumentId, feeTokenTransferClient)
 		},
 	}
-	c.Flags().StringVar(&receiverHex, "receiver", "", fmt.Sprintf("destination EVM receiver address (0x-prefixed) (defaults to a CCIP Receiver contract)"))
+	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to a CCIP Receiver contract)")
 	c.Flags().StringVar(&payload, "payload", "Hello, EVM from Canton!", "message payload (text)")
 	c.Flags().StringVar(&executor, "executor", "default", "executor mode (default|none)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
