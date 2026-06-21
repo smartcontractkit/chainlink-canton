@@ -14,11 +14,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/spf13/cobra"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/spf13/cobra"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
@@ -61,6 +61,7 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	c.AddCommand(newCantonExecuteCmd(g))
 	c.AddCommand(newCantonListEventsCmd(g))
 	c.AddCommand(newCantonListHoldingsCmd(g))
+	c.AddCommand(newCantonCreateTransferCmd(g))
 
 	return c
 }
@@ -205,6 +206,118 @@ func newCantonListHoldingsCmd(g *Globals) *cobra.Command {
 	return c
 }
 
+// ---------------- canton create transfer ----------------
+func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
+	var (
+		tokenName        string
+		receiverParty    string
+		inputHoldingCids []string
+		amount           string
+	)
+	c := &cobra.Command{
+		Use:   "create-transfer",
+		Short: "Create an outgoing TransferInstruction",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			b, err := g.Resolve(ctx)
+			if err != nil {
+				return err
+			}
+
+			instrumentId, transferInstructionClient, err := resolveCantonFeeToken(b, tokenName)
+			if err != nil {
+				return err
+			}
+
+			if receiverParty == "" {
+				receiverParty = b.Participant.PartyID
+			}
+
+			// Resolve input holdings
+			var inputHoldings []types.CONTRACT_ID
+			if len(inputHoldingCids) > 0 {
+				for _, cid := range inputHoldingCids {
+					inputHoldings = append(inputHoldings, types.CONTRACT_ID(cid))
+				}
+			} else {
+				holdings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, instrumentId)
+				if err != nil {
+					return fmt.Errorf("list holdings: %w", err)
+				}
+				for _, holding := range holdings {
+					inputHoldings = append(inputHoldings, types.CONTRACT_ID(holding.ContractID))
+				}
+			}
+
+			// Get disclosures
+			transfer := splice_api_token_transfer_instruction_v1.Transfer{
+				Sender:           types.PARTY(b.Participant.PartyID),
+				Receiver:         types.PARTY(receiverParty),
+				Amount:           types.NUMERIC(amount),
+				InstrumentId:     *instrumentId,
+				RequestedAt:      types.TIMESTAMP(time.Now()),
+				ExecuteBefore:    types.TIMESTAMP(time.Now().Add(time.Hour * 24)),
+				InputHoldingCids: inputHoldings,
+				Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+			}
+			transferFactory, err := testhelpers.GetTransferFactoryV2(ctx, transferInstructionClient, string(instrumentId.Admin), transfer)
+			if err != nil {
+				return fmt.Errorf("get transfer factory: %w", err)
+			}
+			choiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
+			if err != nil {
+				return fmt.Errorf("unmarshal choice context: %w", err)
+			}
+
+			// Create Transfer
+			resp, err := b.Participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+				Commands: &apiv2.Commands{
+					CommandId: uuid.NewString(),
+					Commands: []*apiv2.Command{{
+						Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+							TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferFactory"},
+							ContractId: transferFactory.FactoryID,
+							Choice:     "TransferFactory_Transfer",
+							ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferFactoryTransfer{
+								ExpectedAdmin: instrumentId.Admin,
+								Transfer:      transfer,
+								ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+									Context: choiceContext,
+								},
+							}),
+						}},
+					}},
+					ActAs:              []string{b.Participant.PartyID},
+					DisclosedContracts: transferFactory.DisclosedContracts,
+				},
+				TransactionFormat: &apiv2.TransactionFormat{
+					EventFormat: &apiv2.EventFormat{
+						FiltersByParty: map[string]*apiv2.Filters{
+							b.Participant.PartyID: {Cumulative: []*apiv2.CumulativeFilter{{IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{WildcardFilter: &apiv2.WildcardFilter{}}}}},
+						},
+						Verbose: true,
+					},
+					TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_LEDGER_EFFECTS,
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("submit transfer: %w", err)
+			}
+			fmt.Printf("Submitted transfer in update: %s\n", resp.GetTransaction().GetUpdateId())
+			fmt.Println(b.CantonExplorerLink(resp.GetTransaction().GetUpdateId()))
+
+			return nil
+		},
+	}
+	c.Flags().StringVar(&tokenName, "token", "link", "token to transfer (link|native)")
+	c.Flags().StringVar(&receiverParty, "receiver", "", "party to receive the transfer (defaults to own party)")
+	c.Flags().StringArrayVar(&inputHoldingCids, "input", nil, "the holding(s) to be used as an input for the transfer. If unspecified, all current holdings will be used.")
+	c.Flags().StringVar(&amount, "amount", "", "the amount to transfer (required)")
+	_ = c.MarkFlagRequired("amount")
+
+	return c
+}
+
 // ---------------- canton execute ----------------
 
 func newCantonExecuteCmd(g *Globals) *cobra.Command {
@@ -340,6 +453,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 		payload      string
 		executor     string
 		feeTokenName string
+		feeInput     []string
 	)
 	c := &cobra.Command{
 		Use:   "send-message",
@@ -350,35 +464,42 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			if executor != "default" && executor != "none" {
 				return fmt.Errorf("invalid --executor %q (default|none)", executor)
 			}
+
 			feeTokenInstrumentId, feeTokenTransferClient, err := resolveCantonFeeToken(b, feeTokenName)
 			if err != nil {
 				return err
 			}
+
 			msgReceiver := common.HexToAddress(receiverHex)
 			if receiverHex == "" {
 				msgReceiver = b.Profile.CCIPReceiverContract
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), "", executor, feeTokenInstrumentId, feeTokenTransferClient)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to a CCIP Receiver contract)")
 	c.Flags().StringVar(&payload, "payload", "Hello, EVM from Canton!", "message payload (text)")
 	c.Flags().StringVar(&executor, "executor", "default", "executor mode (default|none)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
+	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
 
 	return c
 }
 
 func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 	var (
-		receiverHex string
-		amountStr   string
-		payload     string
-		executor    string
+		receiverHex  string
+		amountStr    string
+		payload      string
+		executor     string
+		feeTokenName string
+		feeInput     []string
+		tokenInput   []string
 	)
 	c := &cobra.Command{
 		Use:   "send-token",
@@ -389,8 +510,14 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
+
 			if executor != "default" && executor != "none" {
 				return fmt.Errorf("invalid --executor %q (default|none)", executor)
+			}
+
+			feeTokenInstrumentId, feeTokenTransferClient, err := resolveCantonFeeToken(b, feeTokenName)
+			if err != nil {
+				return err
 			}
 
 			msgReceiver := common.HexToAddress(receiverHex)
@@ -398,16 +525,16 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.ETHAddress
 			}
 
-			feeTokenInstrumentId := b.Profile.AmuletInstrumentID
-			feeTokenTransferInstructionClient := b.AmuletTransferClient
-
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), amountStr, executor, feeTokenInstrumentId, feeTokenTransferInstructionClient)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to own address)")
 	c.Flags().StringVar(&amountStr, "amount", "", "LINK token transfer amount as decimal (e.g. 0.12345, 1e-2); (required)")
 	c.Flags().StringVar(&payload, "payload", "", "optional message payload (text) to attach to the token transfer")
 	c.Flags().StringVar(&executor, "executor", "default", "executor mode (default|none)")
+	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
+	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
+	c.Flags().StringArrayVar(&tokenInput, "token-input", nil, "the holding(s) to be used as an input for the token transfer. If unspecified, all current holdings will be used.")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
@@ -421,9 +548,11 @@ func cantonSend(
 	receiver common.Address,
 	payload []byte,
 	amountStr string,
+	tokenInputHoldings []string,
 	executorMode string,
 	feeTokenInstrumentId *splice_api_token_holding_v1.InstrumentId,
 	feeTokenTransferInstructionClient oapiTransferInstruction.ClientWithResponsesInterface,
+	feeInputHoldings []string,
 ) error {
 	withToken := amountStr != ""
 
@@ -440,13 +569,19 @@ func cantonSend(
 	linkInstrumentId := b.Profile.LinkInstrumentID
 
 	// --- Resolve fee token holdings ---
-	feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, feeTokenInstrumentId)
-	if err != nil {
-		return fmt.Errorf("list fee token holdings: %w", err)
-	}
-	feeTokenInputCids := make([]types.CONTRACT_ID, len(feeTokenHoldings))
-	for i, h := range feeTokenHoldings {
-		feeTokenInputCids[i] = types.CONTRACT_ID(h.ContractID)
+	var feeTokenInputCids []types.CONTRACT_ID
+	if len(feeInputHoldings) > 0 {
+		for _, cid := range feeInputHoldings {
+			feeTokenInputCids = append(feeTokenInputCids, types.CONTRACT_ID(cid))
+		}
+	} else {
+		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, feeTokenInstrumentId)
+		if err != nil {
+			return fmt.Errorf("list fee token holdings: %w", err)
+		}
+		for _, h := range feeTokenHoldings {
+			feeTokenInputCids = append(feeTokenInputCids, types.CONTRACT_ID(h.ContractID))
+		}
 	}
 
 	// --- Build transfer factory for fee payment ---
@@ -469,13 +604,19 @@ func cantonSend(
 	// --- Resolve token transfer holdings ---
 	var tokenTransferInputCids []types.CONTRACT_ID
 	if withToken {
-		tokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, linkInstrumentId)
-		if err != nil {
-			return fmt.Errorf("list LINK holdings: %w", err)
-		}
-		tokenTransferInputCids = make([]types.CONTRACT_ID, len(tokenHoldings))
-		for i, h := range tokenHoldings {
-			tokenTransferInputCids[i] = types.CONTRACT_ID(h.ContractID)
+		if len(tokenInputHoldings) > 0 {
+			for _, holding := range tokenInputHoldings {
+				tokenTransferInputCids = append(tokenTransferInputCids, types.CONTRACT_ID(holding))
+			}
+		} else {
+			tokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, linkInstrumentId)
+			if err != nil {
+				return fmt.Errorf("list LINK holdings: %w", err)
+			}
+			tokenTransferInputCids = make([]types.CONTRACT_ID, len(tokenHoldings))
+			for _, h := range tokenHoldings {
+				tokenTransferInputCids = append(tokenTransferInputCids, types.CONTRACT_ID(h.ContractID))
+			}
 		}
 	}
 
@@ -656,9 +797,11 @@ func cantonSend(
 	tw.AppendRow(table.Row{"Receiver", "0x" + msg.Receiver})
 	tw.AppendRow(table.Row{"Data", "0x" + msg.Payload})
 	tw.AppendRow(table.Row{"Fee Token", fmt.Sprintf("%s@%s", msg.FeeToken.Id, msg.FeeToken.Admin)})
+	tw.AppendRow(table.Row{"Fee Input Holdings", feeTokenInputCids})
 	if msg.TokenTransfer != nil {
 		tw.AppendRow(table.Row{"Token Transfer - Token", fmt.Sprintf("%s@%s", msg.TokenTransfer.Token.Id, msg.TokenTransfer.Token.Admin)})
 		tw.AppendRow(table.Row{"Token Transfer - Amount", msg.TokenTransfer.Amount})
+		tw.AppendRow(table.Row{"Token Transfer - Input Holdings", tokenTransferInputCids})
 	}
 	fmt.Println(tw.Render())
 	fmt.Println("Confirm? (Y/N)")
