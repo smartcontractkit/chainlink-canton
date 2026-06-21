@@ -467,8 +467,8 @@ func TestCanton(t *testing.T) {
 	t.Run("Send: Canton->EVM (Message Only)", func(t *testing.T) {
 		messageReceiver := ccipReceiverContract
 
-		feeToken := amuletInstrumentID
-		feeTokenTransferInstructionClient := amuletTransferInstructionClient
+		feeToken := linkInstrumentId
+		feeTokenTransferInstructionClient := transferInstructionEdsClient
 
 		// Get fee token input holdings
 		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(t.Context(), participant, feeToken)
@@ -477,6 +477,7 @@ func TestCanton(t *testing.T) {
 		for i, holding := range feeTokenHoldings {
 			feeTokenInputCids[i] = types.CONTRACT_ID(holding.ContractID)
 		}
+		feeTokenInputCids = []types.CONTRACT_ID{"00a923ff750bde2770df24811836a28e4106b1d4087e52ddd995f196d70e90283cca12122083dc750c95db42fe29438e9ee2a6ac5ed85a7d19938e2d99a1c0032e2776acab"}
 
 		transferFactory, err := testhelpers.GetTransferFactoryV2(t.Context(), feeTokenTransferInstructionClient, string(feeToken.Admin), splice_api_token_transfer_instruction_v1.Transfer{
 			Sender:           types.PARTY(participant.PartyID),
@@ -605,16 +606,20 @@ func TestCanton(t *testing.T) {
 		messageReceiver := common.HexToAddress("0x90392A1E8A941098a3C75E0BDB172cFdE7E4f1f4")
 		transferAmount := "0.123456789"
 
-		feeToken := amuletInstrumentID
-		feeTokenTransferInstructionClient := amuletTransferInstructionClient
+		feeToken := linkInstrumentId
+		feeTokenTransferInstructionClient := transferInstructionEdsClient
 
 		// Manually set fee token input holding Cids
 		// If empty, will automatically select all holdings
-		feeTokenInputCids := []types.CONTRACT_ID{}
+		feeTokenInputCids := []types.CONTRACT_ID{
+			"00a923ff750bde2770df24811836a28e4106b1d4087e52ddd995f196d70e90283cca12122083dc750c95db42fe29438e9ee2a6ac5ed85a7d19938e2d99a1c0032e2776acab",
+		}
 
 		// Manually set token transfer input holding Cids
 		// If empty, will automatically select all holdings
-		tokenTransferInputCids := []types.CONTRACT_ID{}
+		tokenTransferInputCids := []types.CONTRACT_ID{
+			"00e4b346645763de5dd202f20b1fa89e96b82b45b1ca3ce836587f9d3c6893e7a7ca12122099eb432b785c0a10610ac25cb1be32df24ba876bcea043057b12cae90c793481",
+		}
 
 		// Get fee token input holdings, if not manually specified
 		if len(feeTokenInputCids) == 0 {
@@ -871,57 +876,59 @@ func TestCanton(t *testing.T) {
 		executorSendDisclosure, err := eds.GetExecutorSendDisclosure(t.Context(), executorEdsClient, msg, defaultExecutorAddress.InstanceAddress(), ccipSendDisclosure.CCVs)
 		require.NoError(t, err)
 
-		sendArgs := sender.Send{
-			DestinationChainSelector: types.NUMERIC(msg.DestinationChainSelector),
-			Message: core.Canton2AnyMessage{
-				Receiver: types.TEXT(msg.Receiver),
-				Payload:  types.TEXT(msg.Payload),
-				TokenTransfer: &core.TokenTransfer{
-					Token:  *linkInstrumentId,
-					Amount: types.NUMERIC(msg.TokenTransfer.Amount),
-				},
-				FeeToken: *feeToken,
-				ExtraArgs: core.ExtraArgs{
-					V3: &core.GenericExtraArgsV3{
-						GasLimit: types.INT64(msg.GasLimit),
-						Ccvs:     nil,
-						Executor: core.ExecutorExtraArg{
-							ExecutorUseDefault: &core.ExecutorUseDefault{ExecutorArgs: ""},
+		getSendArgs := func() sender.Send {
+			return sender.Send{
+				DestinationChainSelector: types.NUMERIC(msg.DestinationChainSelector),
+				Message: core.Canton2AnyMessage{
+					Receiver: types.TEXT(msg.Receiver),
+					Payload:  types.TEXT(msg.Payload),
+					TokenTransfer: &core.TokenTransfer{
+						Token:  *linkInstrumentId,
+						Amount: types.NUMERIC(msg.TokenTransfer.Amount),
+					},
+					FeeToken: *feeToken,
+					ExtraArgs: core.ExtraArgs{
+						V3: &core.GenericExtraArgsV3{
+							GasLimit: types.INT64(msg.GasLimit),
+							Ccvs:     nil,
+							Executor: core.ExecutorExtraArg{
+								ExecutorUseDefault: &core.ExecutorUseDefault{ExecutorArgs: ""},
+							},
+							TokenReceiver: "",
+							TokenArgs:     "",
 						},
-						TokenReceiver: "",
-						TokenArgs:     "",
 					},
 				},
-			},
-			Context:   ccipSendDisclosure.ChoiceContext,
-			RouterCid: types.CONTRACT_ID(routerCid),
-			FeeTokenInput: sender.FeeTokenInput{
-				SenderInputCids:         feeTokenInputCids,
-				FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-				FeeTokenTransferFactory: types.CONTRACT_ID(transferFactory.FactoryID),
-				FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: choiceContext,
-					Meta: splice_api_token_metadata_v1.Metadata{
-						Values: map[string]types.TEXT{},
+				Context:   ccipSendDisclosure.ChoiceContext,
+				RouterCid: types.CONTRACT_ID(routerCid),
+				FeeTokenInput: sender.FeeTokenInput{
+					SenderInputCids:         feeTokenInputCids,
+					FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
+					FeeTokenTransferFactory: types.CONTRACT_ID(transferFactory.FactoryID),
+					FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+						Context: choiceContext,
+						Meta: splice_api_token_metadata_v1.Metadata{
+							Values: map[string]types.TEXT{},
+						},
 					},
 				},
-			},
-			CcvSendInputs: []sender.CCVSendInput{
-				{
-					CcvAddress:      ccvSendDisclosure.Address.Binding(),
-					CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-					CcvExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+				CcvSendInputs: []sender.CCVSendInput{
+					{
+						CcvAddress:      ccvSendDisclosure.Address.Binding(),
+						CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+						CcvExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+					},
 				},
-			},
-			TokenTransferInput: &sender.TokenTransferInput{
-				SenderInputCids:  tokenTransferInputCids,
-				TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-				PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
-			},
-			ExecutorInput: &sender.ExecutorInput{
-				ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-				ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
-			},
+				TokenTransferInput: &sender.TokenTransferInput{
+					SenderInputCids:  tokenTransferInputCids,
+					TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+					PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+				},
+				ExecutorInput: &sender.ExecutorInput{
+					ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
+					ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+				},
+			}
 		}
 		allDisclosures := slices.Concat(
 			transferFactory.DisclosedContracts,
@@ -933,6 +940,7 @@ func TestCanton(t *testing.T) {
 
 		t.Run("Exceed max data size", func(t *testing.T) {
 			// Exceed the max of 32kb
+			sendArgs := getSendArgs()
 			sendArgs.Message.Payload = types.TEXT(hex.EncodeToString(bytes.Repeat([]byte("A"), 32_001)))
 
 			_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -956,6 +964,7 @@ func TestCanton(t *testing.T) {
 
 		t.Run("Exceed gas limit", func(t *testing.T) {
 			// Exceed the max of 15M
+			sendArgs := getSendArgs()
 			sendArgs.Message.ExtraArgs.V3.GasLimit = 15_000_001
 
 			_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -978,6 +987,7 @@ func TestCanton(t *testing.T) {
 		})
 
 		t.Run("Invalid extraArgs", func(t *testing.T) {
+			sendArgs := getSendArgs()
 			sendArgs.Message.ExtraArgs.V3 = nil
 
 			_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1000,6 +1010,7 @@ func TestCanton(t *testing.T) {
 		})
 
 		t.Run("Invalid dest chain selector", func(t *testing.T) {
+			sendArgs := getSendArgs()
 			sendArgs.DestinationChainSelector = types.NUMERIC("1234")
 
 			_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1022,6 +1033,7 @@ func TestCanton(t *testing.T) {
 		})
 
 		t.Run("Invalid fee token", func(t *testing.T) {
+			sendArgs := getSendArgs()
 			sendArgs.Message.FeeToken = splice_api_token_holding_v1.InstrumentId{
 				Admin: ccipOwnerPartyID,
 				Id:    "invalid-fee-token",
@@ -1047,6 +1059,7 @@ func TestCanton(t *testing.T) {
 		})
 
 		t.Run("No fee token holding", func(t *testing.T) {
+			sendArgs := getSendArgs()
 			sendArgs.FeeTokenInput.SenderInputCids = []types.CONTRACT_ID{}
 
 			_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1069,6 +1082,7 @@ func TestCanton(t *testing.T) {
 		})
 
 		t.Run("Invalid token transfer instrument", func(t *testing.T) {
+			sendArgs := getSendArgs()
 			sendArgs.Message.TokenTransfer.Token = splice_api_token_holding_v1.InstrumentId{
 				Admin: ccipOwnerPartyID,
 				Id:    "invalid-token-transfer",
@@ -1094,6 +1108,7 @@ func TestCanton(t *testing.T) {
 		})
 
 		t.Run("Zero transfer amount", func(t *testing.T) {
+			sendArgs := getSendArgs()
 			sendArgs.Message.TokenTransfer.Amount = "0.0"
 
 			_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1116,6 +1131,7 @@ func TestCanton(t *testing.T) {
 		})
 
 		t.Run("Empty receiver", func(t *testing.T) {
+			sendArgs := getSendArgs()
 			sendArgs.Message.Receiver = ""
 
 			_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1247,7 +1263,7 @@ func TestEVM(t *testing.T) {
 
 		receiverPartyHashed := contracts.HashedPartyFromString(receiverParty)
 
-		extraArgs, err := evm.NewV3ExtraArgs(finality, execGasLimit, executorAddress.Hex(), nil, nil, nil, nil)
+		extraArgs, err := evm.NewV3ExtraArgs(finality, execGasLimit, executorAddress.Hex(), nil, receiverPartyHashed.Bytes(), nil, nil)
 		require.NoError(t, err)
 
 		msg := routerwrapper.ClientEVM2AnyMessage{
