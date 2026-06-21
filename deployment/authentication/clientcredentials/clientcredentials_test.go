@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ type tokenResponse struct {
 	ExpiresIn   int    `json:"expires_in"`
 }
 
-func newTokenServer(t *testing.T, expectedScope string) *httptest.Server {
+func newTokenServer(t *testing.T, expectedScope string, expectedAudience string) *httptest.Server {
 	t.Helper()
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +51,17 @@ func newTokenServer(t *testing.T, expectedScope string) *httptest.Server {
 
 		if expectedScope != "" && values.Get("scope") != expectedScope {
 			t.Errorf("expected scope %q, got %q", expectedScope, values.Get("scope"))
+		}
+
+		gotAudiences := values["audience"]
+		if expectedAudience == "" {
+			if len(gotAudiences) != 0 {
+				t.Errorf("expected no audience parameter, got %v", gotAudiences)
+			}
+		} else {
+			if !reflect.DeepEqual(gotAudiences, []string{expectedAudience}) {
+				t.Errorf("expected audience %q, got %v", expectedAudience, gotAudiences)
+			}
 		}
 
 		response := tokenResponse{
@@ -114,7 +126,7 @@ func TestNewProvider_ValidatesInputs(t *testing.T) {
 func TestNewProvider_UsesOptionsAndTokenSource(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
-	server := newTokenServer(t, "scope-a scope-b")
+	server := newTokenServer(t, "scope-a scope-b", "")
 	t.Cleanup(server.Close)
 
 	customCreds := credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})
@@ -130,6 +142,47 @@ func TestNewProvider_UsesOptionsAndTokenSource(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Same(t, customCreds, provider.TransportCredentials())
+
+	token, err := provider.TokenSource().Token()
+	require.NoError(t, err)
+	require.Equal(t, "test-access-token", token.AccessToken)
+}
+
+// TestNewProvider_WithAudience verifies that an audience configured via WithAudience is sent
+// to the authorization server as an "audience" parameter in the token request body.
+func TestNewProvider_WithAudience(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	expectedAudience := "https://ledger.example.com"
+	server := newTokenServer(t, "daml_ledger_api", expectedAudience)
+	t.Cleanup(server.Close)
+
+	provider, err := NewProvider(
+		ctx,
+		server.URL,
+		"client-id",
+		"client-secret",
+		WithAudience(expectedAudience),
+	)
+	require.NoError(t, err)
+
+	token, err := provider.TokenSource().Token()
+	require.NoError(t, err)
+	require.Equal(t, "test-access-token", token.AccessToken)
+}
+
+// TestNewProvider_WithoutAudience verifies that no "audience" parameter is sent when
+// WithAudience is not used.
+func TestNewProvider_WithoutAudience(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	server := newTokenServer(t, "daml_ledger_api", "")
+	t.Cleanup(server.Close)
+
+	provider, err := NewProvider(ctx, server.URL, "client-id", "client-secret")
+	require.NoError(t, err)
 
 	token, err := provider.TokenSource().Token()
 	require.NoError(t, err)

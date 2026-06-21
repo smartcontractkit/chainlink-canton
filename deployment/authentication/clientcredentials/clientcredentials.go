@@ -32,12 +32,14 @@ type Provider struct {
 
 type clientCredentialsProviderConfig struct {
 	scopes               []string
+	audience             string
 	transportCredentials credentials.TransportCredentials
 }
 
 func defaultClientCredentialsProviderConfig() *clientCredentialsProviderConfig {
 	return &clientCredentialsProviderConfig{
-		scopes: []string{"daml_ledger_api"},
+		scopes:   []string{"daml_ledger_api"},
+		audience: "",
 		transportCredentials: credentials.NewTLS(
 			&tls.Config{
 				MinVersion: tls.VersionTLS12,
@@ -47,7 +49,7 @@ func defaultClientCredentialsProviderConfig() *clientCredentialsProviderConfig {
 }
 
 // ProviderOption configures the client credentials Provider using the functional options pattern.
-// Options allow customization of scopes and transport credentials without breaking API compatibility.
+// Options allow customization of scopes, audience, and transport credentials without breaking API compatibility.
 type ProviderOption func(*clientCredentialsProviderConfig)
 
 // WithScopes configures the Provider to request access tokens with the given scopes.
@@ -60,6 +62,43 @@ type ProviderOption func(*clientCredentialsProviderConfig)
 func WithScopes(scopes ...string) ProviderOption {
 	return func(config *clientCredentialsProviderConfig) {
 		config.scopes = scopes
+	}
+}
+
+// WithAudience configures the Provider to request access tokens with the given audience.
+// The audience identifies the intended recipient of the issued access token (typically
+// the resource server / API that will consume the token, e.g. the Canton ledger API).
+//
+// When configured, it is sent to the authorization server as an "audience" parameter in
+// the token request body. This is an Auth0-specific extension: Auth0 uses the "audience"
+// parameter to select which API (and therefore which value of the JWT's "aud" claim,
+// defined in RFC 7519 Section 4.1.3) the issued access token should target.
+//
+// NOTE: The "audience" parameter is NOT part of the OAuth2 specification, and most other
+// authorization servers do not honor it:
+//   - Okta binds the audience to the Authorization Server itself (one fixed value per AS) and
+//     explicitly does not support dynamic audience switching via a request parameter, nor
+//     RFC 8707 resource indicators. To use a different audience on Okta, point tokenURL at a
+//     different Authorization Server.
+//   - Keycloak determines the audience server-side via audience mappers on client scopes.
+//
+// This option therefore only has an effect with Auth0 (or an authorization server that
+// explicitly emulates Auth0's behavior).
+//
+// Note: Auth0's tenant-level "Resource Parameter Compatibility Profile" (which makes Auth0
+// honor the standardized RFC 8707 "resource" parameter as an alternative to "audience") does
+// NOT cover the client credentials grant — its supported flows are limited to the
+// authorization code flow, PAR, JAR, CIBA, and refresh token grants.
+//
+// If no audience is configured (the default), no "audience" parameter is sent and the
+// authorization server determines the audience based on its own policy / client configuration.
+//
+// Example:
+//
+//	WithAudience("https://ledger.example.com")
+func WithAudience(audience string) ProviderOption {
+	return func(config *clientCredentialsProviderConfig) {
+		config.audience = audience
 	}
 }
 
@@ -144,6 +183,13 @@ func NewProvider(ctx context.Context, tokenURL, clientID, clientSecret string, o
 		ClientSecret: clientSecret,
 		TokenURL:     tokenURL,
 		Scopes:       cfg.scopes,
+	}
+
+	// If an audience is set, add it to the token request parameters.
+	if cfg.audience != "" {
+		oauthCfg.EndpointParams = map[string][]string{
+			"audience": {cfg.audience},
+		}
 	}
 
 	refreshCtx := context.WithoutCancel(ctx)
