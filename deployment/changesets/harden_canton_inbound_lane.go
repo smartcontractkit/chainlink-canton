@@ -355,6 +355,7 @@ func (h HardenCantonInboundLane) Apply(e cldf.Environment, config CantonCSDeps[H
 	}
 
 	ds := datastore.NewMemoryDataStore()
+
 	return buildFactoryDeployChangesetOutput(
 		e, chain, config.ChainSelector, config.Participant, proposalDriven,
 		cantonmcms.QualifierCCIPOwner, cfg.MinDelay, cfg.Description, ds, out.Output.BatchOps,
