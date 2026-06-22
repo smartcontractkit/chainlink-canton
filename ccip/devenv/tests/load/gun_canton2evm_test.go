@@ -36,13 +36,14 @@ func TestCanton2EVM_Load(t *testing.T) {
 	}
 
 	env := devenvtests.ParseEnvFromFlag(t)
+	t.Logf("env: %s", env)
 	boot := devenvtests.BootstrapE2E(t, env)
 	ctx := ccv.Plog.WithContext(t.Context())
 
 	skipExec := loadSkipExecConfirm(t)
-	if boot.Env.IsRemote() && !skipExec {
-		t.Skip("prod-testnet requires CANTON_LOAD_SKIP_EXEC_CONFIRM=true (EVM executor not available)")
-	}
+	// if boot.Env.IsRemote() && !skipExec {
+	// 	t.Skip("prod-testnet requires CANTON_LOAD_SKIP_EXEC_CONFIRM=true (EVM executor not available)")
+	// }
 
 	destinations := discoverEVMDestinationsFromBoot(t, boot)
 	require.NotEmpty(t, destinations, "need at least one EVM destination in the env file")

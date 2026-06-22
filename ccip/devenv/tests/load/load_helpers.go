@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	ccvload "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/load"
+	ccvmetrics "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/metrics"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -102,6 +103,26 @@ func waspCallTimeout(t *testing.T, gun *CCIPLoadGun, sched scheduleConfig, skipE
 	return gun.ConfirmExecTimeout() + sched.rateUnit + defaultLoadCallPadding
 }
 
+func printLoadMetrics(t *testing.T, gun *CCIPLoadGun, skipExecConfirm bool) {
+	t.Helper()
+
+	records := gun.Metrics()
+	failures := gun.FailureCounts()
+	PrintPhaseMetricsSummary(t, records, failures, skipExecConfirm)
+
+	if !skipExecConfirm {
+		ccvMetrics := ToCCVMessageMetrics(records)
+		if len(ccvMetrics) > 0 {
+			totals := ccvmetrics.MessageTotals{
+				Sent:     len(ccvMetrics),
+				Received: len(ccvMetrics),
+			}
+			summary := ccvmetrics.CalculateMetricsSummary(ccvMetrics, totals)
+			ccvmetrics.PrintMetricsSummary(t, summary)
+		}
+	}
+}
+
 func logLoadMessageSummary(t *testing.T, gun *CCIPLoadGun, indexerEndpoints []string) {
 	t.Helper()
 
@@ -173,6 +194,8 @@ func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfi
 	require.Positive(t, gun.CallCount(), "gun should have completed at least one message")
 	require.LessOrEqual(t, gun.MaxConcurrentObserved(), int32(1),
 		"Gun.Call must not overlap (single-flight)")
+
+	printLoadMetrics(t, gun, skipExecConfirm)
 }
 
 func discoverEVMDestinations(t *testing.T, in *ccv.Cfg, chainMap map[uint64]cciptestinterfaces.CCIP17) []Destination {

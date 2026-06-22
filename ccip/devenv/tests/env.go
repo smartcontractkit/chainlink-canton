@@ -79,6 +79,11 @@ func (e CCIPEnv) IsRemote() bool {
 func ParseEnvFromFlag(t *testing.T) CCIPEnv {
 	t.Helper()
 
+	t.Logf("CCIP_ENV env=%q ccip-env flag=%q",
+		os.Getenv("CCIP_ENV"),
+		*ccipEnvFlag,
+	)
+
 	env, err := ParseCCIPEnv(*ccipEnvFlag)
 	require.NoError(t, err)
 

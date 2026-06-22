@@ -85,6 +85,8 @@ type CCIPLoadGun struct {
 	confirmSend        ConfirmSendFunc
 	confirmExecTimeout time.Duration
 	skipExecConfirm    bool
+
+	metricsCollector *LoadMetricsCollector
 }
 
 // NewCCIPLoadGun wires a CCIP source with one or more destinations for load testing.
@@ -131,6 +133,7 @@ func NewCCIPLoadGun(
 		confirmSend:        opts.ConfirmSend,
 		confirmExecTimeout: confirmExecTimeout,
 		skipExecConfirm:    opts.SkipExecConfirm,
+		metricsCollector:   &LoadMetricsCollector{},
 	}
 	g.flightReady.L = &g.mu
 
@@ -189,9 +192,11 @@ func (g *CCIPLoadGun) Call(gen *wasp.Generator) *wasp.Response {
 	callNum := g.calls.Load()
 	fields, opts, err := dest.BuildMessage(g.source, callNum, g.ccvAddr, g.executorAddr)
 	if err != nil {
+		g.metricsCollector.incrementSendFailure()
 		return &wasp.Response{Failed: true, Error: fmt.Sprintf("BuildMessage (dest=%d): %v", destSelector, err), Duration: time.Since(start)}
 	}
 
+	sentTime := time.Now()
 	sendRes, err := g.source.SendMessage(
 		subtestCtx,
 		destSelector,
@@ -199,16 +204,22 @@ func (g *CCIPLoadGun) Call(gen *wasp.Generator) *wasp.Response {
 		opts,
 		3,
 	)
+	sendDuration := time.Since(sentTime)
 	if err != nil {
+		g.metricsCollector.incrementSendFailure()
 		return &wasp.Response{Failed: true, Error: fmt.Sprintf("SendMessage (dest=%d): %v", destSelector, err), Duration: time.Since(start)}
 	}
 	if sendRes.Message == nil {
+		g.metricsCollector.incrementSendFailure()
 		return &wasp.Response{Failed: true, Error: "SendMessage returned nil message", Duration: time.Since(start)}
 	}
 	seqNo := uint64(sendRes.Message.SequenceNumber)
 
+	confirmSendStart := time.Now()
 	sentEvent, err := g.confirmSend(t, subtestCtx, destSelector, seqNo, sendRes)
+	confirmSendDuration := time.Since(confirmSendStart)
 	if err != nil {
+		g.metricsCollector.incrementConfirmSendFailure()
 		return &wasp.Response{Failed: true, Error: fmt.Sprintf("ConfirmSend (dest=%d): %v", destSelector, err), Duration: time.Since(start)}
 	}
 
@@ -222,7 +233,20 @@ func (g *CCIPLoadGun) Call(gen *wasp.Generator) *wasp.Response {
 		Uint64("destSelector", destSelector).
 		Msg("Load message confirmed on source")
 
+	sourceChain := g.source.ChainSelector()
+	record := LoadMessageRecord{
+		SeqNo:               seqNo,
+		SourceChain:         sourceChain,
+		DestChain:           destSelector,
+		MessageID:           sentEvent.MessageID,
+		SentTime:            sentTime,
+		SendDuration:        sendDuration,
+		ConfirmSendDuration: confirmSendDuration,
+	}
+
 	if g.skipExecConfirm {
+		record.TotalDuration = time.Since(sentTime)
+		g.metricsCollector.appendRecord(record)
 		return &wasp.Response{
 			Failed:     false,
 			StatusCode: "200",
@@ -230,16 +254,20 @@ func (g *CCIPLoadGun) Call(gen *wasp.Generator) *wasp.Response {
 		}
 	}
 
+	confirmExecStart := time.Now()
 	ev, err := dest.Chain.ConfirmExecOnDest(
 		subtestCtx,
 		g.source.ChainSelector(),
 		cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID},
 		g.confirmExecTimeout,
 	)
+	confirmExecDuration := time.Since(confirmExecStart)
 	if err != nil {
+		g.metricsCollector.incrementConfirmExecFailure()
 		return &wasp.Response{Failed: true, Error: fmt.Sprintf("ConfirmExecOnDest (dest=%d): %v", destSelector, err), Duration: time.Since(start)}
 	}
 	if ev.State != cciptestinterfaces.ExecutionStateSuccess {
+		g.metricsCollector.incrementConfirmExecFailure()
 		return &wasp.Response{
 			Failed:     true,
 			Error:      fmt.Sprintf("execution state=%s (dest=%d)", ev.State.String(), destSelector),
@@ -247,6 +275,11 @@ func (g *CCIPLoadGun) Call(gen *wasp.Generator) *wasp.Response {
 			StatusCode: "500",
 		}
 	}
+
+	record.ConfirmExecDuration = confirmExecDuration
+	record.ExecutedTime = time.Now()
+	record.TotalDuration = record.ExecutedTime.Sub(sentTime)
+	g.metricsCollector.appendRecord(record)
 
 	return &wasp.Response{
 		Failed:     false,
@@ -265,6 +298,18 @@ func (g *CCIPLoadGun) MaxConcurrentObserved() int32 {
 // CallCount returns how many times Call ran.
 func (g *CCIPLoadGun) CallCount() int64 {
 	return g.calls.Load()
+}
+
+// Metrics returns a copy of successful load message timing records.
+func (g *CCIPLoadGun) Metrics() []LoadMessageRecord {
+	records, _ := g.metricsCollector.snapshot()
+	return records
+}
+
+// FailureCounts returns phase failure counters from failed WASP calls.
+func (g *CCIPLoadGun) FailureCounts() LoadFailureCounts {
+	_, failures := g.metricsCollector.snapshot()
+	return failures
 }
 
 // MessageIDs returns a copy of message IDs collected after successful ConfirmSend.
