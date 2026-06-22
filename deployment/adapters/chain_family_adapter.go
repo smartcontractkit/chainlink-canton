@@ -132,7 +132,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 	if !ok || len(chain.Participants) == 0 {
 		return ccipseq.OnChainOutput{}, fmt.Errorf("canton chain %d not found or has no participants", input.ChainSelector)
 	}
-	nativeInstrument, err := lookupNativeInstrumentID(b.GetContext(), chain.Participants[0])
+	nativeInstrument, err := lookupNativeInstrumentID(b.GetContext(), chain.Participants[0], ds, input.ChainSelector)
 	if err != nil {
 		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve Canton native fee token instrument: %w", err)
 	}
