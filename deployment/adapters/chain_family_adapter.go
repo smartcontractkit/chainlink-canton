@@ -246,7 +246,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 			FeeQuoter: feeQuoter,
 		}
 
-		remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)
+		remoteChain, err := BuildRemoteChainDefinition(remoteSelector, remoteCfg)
 		if err != nil {
 			return out, err
 		}
@@ -529,7 +529,8 @@ func convertCommitteeVerifierConfigs(configs []ccipadapters.CommitteeVerifierCon
 	return out
 }
 
-func remoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteChainConfig[[]byte, string]) (*lanes.ChainDefinition, error) {
+// BuildRemoteChainDefinition maps a resolved remote chain config to a lane ChainDefinition.
+func BuildRemoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteChainConfig[[]byte, string]) (*lanes.ChainDefinition, error) {
 	if len(remoteCfg.OnRamps) == 0 {
 		return nil, fmt.Errorf("remote chain %d has no onramp address", remoteSelector)
 	}
@@ -555,11 +556,12 @@ func remoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteC
 		OnRamp:                    remoteCfg.OnRamps[0],
 		OffRamp:                   remoteCfg.OffRamp,
 		Router:                    router,
-		FeeQuoterDestChainConfig:  feeQuoterDestChainConfigFromOverrides(remoteCfg.FeeQuoterDestChainConfig),
+		FeeQuoterDestChainConfig:  BuildFeeQuoterDestChainConfig(remoteCfg.FeeQuoterDestChainConfig),
 	}, nil
 }
 
-func feeQuoterDestChainConfigFromOverrides(cfg ccipadapters.FeeQuoterDestChainConfigOverrides) lanes.FeeQuoterDestChainConfig {
+// BuildFeeQuoterDestChainConfig merges adapter overrides onto Canton FQ dest defaults.
+func BuildFeeQuoterDestChainConfig(cfg ccipadapters.FeeQuoterDestChainConfigOverrides) lanes.FeeQuoterDestChainConfig {
 	out := DefaultCantonFeeQuoterDestChainConfig()
 	out.OverrideExistingConfig = cfg.OverrideExistingConfig
 	if cfg.IsEnabled != nil {

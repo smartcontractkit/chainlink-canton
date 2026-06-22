@@ -25,7 +25,8 @@ import (
 )
 
 // HardenCantonInboundLaneInput carries pre-resolved contract refs and lane hardening params.
-// Emits exactly two MCMS operations: FeeQuoter::UpdatePrices then GlobalConfig::ApplySourceChainConfigUpdates.
+// Emits FeeQuoter::UpdatePrices + GlobalConfig::ApplySourceChainConfigUpdates, and optionally
+// Canton→remote outbound dest fee ops (GlobalConfig + FeeQuoter dest config).
 type HardenCantonInboundLaneInput struct {
 	CantonChainSelector       uint64
 	RemoteSourceChainSelector uint64
@@ -35,12 +36,13 @@ type HardenCantonInboundLaneInput struct {
 	RemoteOnRampAddress       gethcommon.Address
 	TokenPrices               map[string]*big.Int
 	USDPerUnitGas             *big.Int
+	OutboundDestFees          *CantonOutboundDestFeeInput
 }
 
 var HardenCantonInboundLane = operations.NewSequence(
 	"HardenCantonInboundLane",
 	semver.MustParse("2.0.0"),
-	"Applies Canton inbound lane hardening (fee quoter prices + invalid default inbound CCV)",
+	"Applies Canton inbound lane hardening (fee quoter prices + invalid default inbound CCV + optional outbound dest fees)",
 	hardenCantonInboundLane,
 )
 
@@ -135,6 +137,16 @@ func hardenCantonInboundLane(
 	}
 	if mcmsEnabled && !sourceChainConfigReport.Output.Executed() {
 		proposalOutputs = append(proposalOutputs, sourceChainConfigReport.Output)
+	}
+
+	if input.OutboundDestFees != nil {
+		outboundOutputs, err := appendCantonOutboundDestFeeProposalOutputs(
+			b, chain, mcmsEnabled, globalConfigRaw, feeQuoterRaw, *input.OutboundDestFees,
+		)
+		if err != nil {
+			return ccipseq.OnChainOutput{}, fmt.Errorf("applying outbound dest fee hardening: %w", err)
+		}
+		proposalOutputs = append(proposalOutputs, outboundOutputs...)
 	}
 
 	if !mcmsEnabled {

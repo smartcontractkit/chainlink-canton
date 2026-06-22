@@ -7,6 +7,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
@@ -22,8 +24,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/nativeinstrument"
 )
 
-// HardenCantonInboundLaneConfig applies inbound-only hardening on Canton for one remote EVM source.
-// Use instead of canton-build-lanes-cross-family when only UpdatePrices + invalid default inbound CCV are needed.
+// HardenCantonInboundLaneConfig applies Canton lane hardening for one remote EVM chain:
+// inbound (invalid default CCV + FQ prices) and optional outbound dest fee updates.
+// Use instead of canton-build-lanes-cross-family when only targeted hardening is needed.
 type HardenCantonInboundLaneConfig struct {
 	RemoteSourceChainSelector uint64 `json:"remoteSourceChainSelector" yaml:"remoteSourceChainSelector"`
 	// DefaultInboundCCVQualifiers resolves CommitteeVerifier refs from datastore (preferred).
@@ -31,10 +34,18 @@ type HardenCantonInboundLaneConfig struct {
 	// DefaultInboundCCVs optional inline refs; looked up in datastore when labels are missing.
 	DefaultInboundCCVs []datastore.AddressRef `json:"defaultInboundCCVs,omitempty" yaml:"defaultInboundCCVs,omitempty"`
 	USDPerUnitGas      int64                  `json:"usdPerUnitGas,omitempty" yaml:"usdPerUnitGas,omitempty"`
-	MinDelay                  time.Duration          `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
-	Description               string                 `json:"description,omitempty" yaml:"description,omitempty"`
+	MinDelay           time.Duration          `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
+	Description        string                 `json:"description,omitempty" yaml:"description,omitempty"`
 	// RemoteTokenPrices mirrors adapters.CantonRemoteTokenPricesFamilyExtraKey when non-default prices are needed.
 	RemoteTokenPrices map[string]any `json:"remoteTokenPrices,omitempty" yaml:"remoteTokenPrices,omitempty"`
+
+	// Outbound dest fee hardening (Canton → remote EVM). Omit remoteDestChainSelector to skip.
+	RemoteDestChainSelector           uint64   `json:"remoteDestChainSelector,omitempty" yaml:"remoteDestChainSelector,omitempty"`
+	OutboundMessageNetworkFeeUSDCents *uint16  `json:"outboundMessageNetworkFeeUSDCents,omitempty" yaml:"outboundMessageNetworkFeeUSDCents,omitempty"`
+	OutboundTokenNetworkFeeUSDCents   *uint16  `json:"outboundTokenNetworkFeeUSDCents,omitempty" yaml:"outboundTokenNetworkFeeUSDCents,omitempty"`
+	OutboundDefaultTokenFeeUSDCents   *uint16  `json:"outboundDefaultTokenFeeUSDCents,omitempty" yaml:"outboundDefaultTokenFeeUSDCents,omitempty"`
+	DefaultOutboundCCVQualifiers      []string `json:"defaultOutboundCCVQualifiers,omitempty" yaml:"defaultOutboundCCVQualifiers,omitempty"`
+	DefaultExecutorQualifier          string   `json:"defaultExecutorQualifier,omitempty" yaml:"defaultExecutorQualifier,omitempty"`
 }
 
 type HardenCantonInboundLane struct{}
@@ -103,6 +114,67 @@ func (h HardenCantonInboundLane) VerifyPreconditions(e cldf.Environment, config 
 		if len(ref.Labels.List()) == 0 {
 			return fmt.Errorf("default inbound CCV %q has no Canton deploy labels in datastore", ref.Qualifier)
 		}
+	}
+
+	if err := verifyOutboundDestFeePreconditions(e, config.ChainSelector, cfg); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func verifyOutboundDestFeePreconditions(e cldf.Environment, cantonSelector uint64, cfg HardenCantonInboundLaneConfig) error {
+	if cfg.RemoteDestChainSelector == 0 {
+		return nil
+	}
+	if cfg.OutboundMessageNetworkFeeUSDCents == nil {
+		return fmt.Errorf("outboundMessageNetworkFeeUSDCents is required when remoteDestChainSelector is set")
+	}
+	if cfg.OutboundTokenNetworkFeeUSDCents == nil {
+		return fmt.Errorf("outboundTokenNetworkFeeUSDCents is required when remoteDestChainSelector is set")
+	}
+	if cfg.OutboundDefaultTokenFeeUSDCents == nil {
+		return fmt.Errorf("outboundDefaultTokenFeeUSDCents is required when remoteDestChainSelector is set")
+	}
+
+	remoteFamily, err := chainsel.GetSelectorFamily(cfg.RemoteDestChainSelector)
+	if err != nil {
+		return fmt.Errorf("remote dest chain family: %w", err)
+	}
+	remoteAdapter, ok := ccipadapters.GetChainFamilyRegistry().GetChainFamily(remoteFamily)
+	if !ok {
+		return fmt.Errorf("no chain family adapter for remote dest %q", remoteFamily)
+	}
+	if _, err := remoteAdapter.GetOffRampAddress(e.DataStore, cfg.RemoteDestChainSelector); err != nil {
+		return fmt.Errorf("remote OffRamp for chain %d must exist: %w", cfg.RemoteDestChainSelector, err)
+	}
+
+	outboundQualifiers := cfg.DefaultOutboundCCVQualifiers
+	if len(outboundQualifiers) == 0 {
+		outboundQualifiers = []string{"default"}
+	}
+	for _, qualifier := range outboundQualifiers {
+		if _, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+			cantonSelector,
+			datastore.ContractType(committeeverifierop.ContractType),
+			committeeverifierop.Version,
+			qualifier,
+		)); err != nil {
+			return fmt.Errorf("default outbound CCV qualifier %q must exist on Canton: %w", qualifier, err)
+		}
+	}
+
+	executorQualifier := cfg.DefaultExecutorQualifier
+	if executorQualifier == "" {
+		executorQualifier = "default"
+	}
+	if _, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		cantonSelector,
+		datastore.ContractType(executorop.ContractType),
+		executorop.Version,
+		executorQualifier,
+	)); err != nil {
+		return fmt.Errorf("default executor qualifier %q must exist on Canton: %w", executorQualifier, err)
 	}
 
 	return nil
@@ -219,8 +291,8 @@ func (h HardenCantonInboundLane) Apply(e cldf.Environment, config CantonCSDeps[H
 	tokenPrices, err := adapters.ResolveTokenPricesForRemoteDest(
 		e.DataStore,
 		ccipadapters.ConfigureChainForLanesInput{
-			ChainSelector:  config.ChainSelector,
-			FamilyExtras:   familyExtras,
+			ChainSelector: config.ChainSelector,
+			FamilyExtras:  familyExtras,
 		},
 		cfg.RemoteSourceChainSelector,
 		&nativeInstrument,
@@ -239,6 +311,29 @@ func (h HardenCantonInboundLane) Apply(e cldf.Environment, config CantonCSDeps[H
 		return cldf.ChangesetOutput{}, err
 	}
 
+	var outboundDestFees *sequences.CantonOutboundDestFeeInput
+	if cfg.RemoteDestChainSelector != 0 {
+		sourceLane, destLane, err := adapters.ResolveCantonOutboundDestLane(
+			e.DataStore,
+			config.ChainSelector,
+			cfg.RemoteDestChainSelector,
+			adapters.OutboundDestFeeOverrides{
+				MessageNetworkFeeUSDCents: cfg.OutboundMessageNetworkFeeUSDCents,
+				TokenNetworkFeeUSDCents:   cfg.OutboundTokenNetworkFeeUSDCents,
+				DefaultTokenFeeUSDCents:   cfg.OutboundDefaultTokenFeeUSDCents,
+			},
+			cfg.DefaultOutboundCCVQualifiers,
+			cfg.DefaultExecutorQualifier,
+		)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("resolve outbound dest lane: %w", err)
+		}
+		outboundDestFees = &sequences.CantonOutboundDestFeeInput{
+			Source: sourceLane,
+			Dest:   destLane,
+		}
+	}
+
 	out, err := cld_ops.ExecuteSequence(e.OperationsBundle, sequences.HardenCantonInboundLane, e.BlockChains, sequences.HardenCantonInboundLaneInput{
 		CantonChainSelector:       config.ChainSelector,
 		RemoteSourceChainSelector: cfg.RemoteSourceChainSelector,
@@ -248,6 +343,7 @@ func (h HardenCantonInboundLane) Apply(e cldf.Environment, config CantonCSDeps[H
 		RemoteOnRampAddress:       gethcommon.HexToAddress(remoteOnRampRef.Address),
 		TokenPrices:               tokenPrices,
 		USDPerUnitGas:             usdPerUnitGas,
+		OutboundDestFees:          outboundDestFees,
 	})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("harden canton inbound lane: %w", err)
