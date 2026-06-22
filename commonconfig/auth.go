@@ -47,6 +47,17 @@ type AuthConfig struct {
 
 	// ClientSecret is the OAuth2 client secret. Required for clientCredentials only.
 	ClientSecret string `toml:"client_secret,omitempty" validate:"required_if=Type clientCredentials,excluded_unless=Type clientCredentials"`
+
+	// Audience is the OAuth2 "audience" request parameter, identifying the API the issued
+	// access token should target (its JWT "aud" claim). It is an Auth0-specific extension
+	// and is only honored by Auth0 (or servers that emulate Auth0). Other authorization
+	// servers (Okta, Keycloak, ...) determine the audience server-side and ignore this
+	// parameter; see the docs on clientcredentials.WithAudience / authorizationcode.WithAudience
+	// for details.
+	//
+	// Optional; only applicable to clientCredentials and authorizationCode. Leave unset to
+	// let the authorization server choose the audience.
+	Audience string `toml:"audience,omitempty" validate:"excluded_unless=Type clientCredentials|excluded_unless=Type authorizationCode"`
 }
 
 func (a *AuthConfig) Validate() error {
@@ -89,14 +100,24 @@ func (a *AuthConfig) NewProvider(ctx context.Context) (authentication.Provider, 
 			return nil, fmt.Errorf("clientCredentials auth requires auth_url, client_id, and client_secret")
 		}
 
-		return clientcredentials.NewDiscoveryProvider(ctx, a.AuthURL, a.ClientID, a.ClientSecret)
+		var opts []clientcredentials.ProviderOption
+		if a.Audience != "" {
+			opts = append(opts, clientcredentials.WithAudience(a.Audience))
+		}
+
+		return clientcredentials.NewDiscoveryProvider(ctx, a.AuthURL, a.ClientID, a.ClientSecret, opts...)
 
 	case AuthTypeAuthorizationCode:
 		if a.AuthURL == "" || a.ClientID == "" {
 			return nil, fmt.Errorf("authorizationCode auth requires auth_url and client_id")
 		}
 
-		return authorizationcode.NewDiscoveryProvider(ctx, a.AuthURL, a.ClientID)
+		var opts []authorizationcode.ProviderOption
+		if a.Audience != "" {
+			opts = append(opts, authorizationcode.WithAudience(a.Audience))
+		}
+
+		return authorizationcode.NewDiscoveryProvider(ctx, a.AuthURL, a.ClientID, opts...)
 
 	default:
 		return nil, fmt.Errorf("unsupported auth type: %q (expected static, insecureStatic, clientCredentials, or authorizationCode)", authType)
