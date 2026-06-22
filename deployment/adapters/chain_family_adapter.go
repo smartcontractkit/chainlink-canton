@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -14,6 +15,8 @@ import (
 	cldfchain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -603,9 +606,32 @@ func feeQuoterDestChainConfigFromOverrides(cfg ccipadapters.FeeQuoterDestChainCo
 }
 
 // minProductionCantonChainNOPs is the minimum unique NOP count for Canton chains in production.
-const minProductionCantonChainNOPs = 9
+const (
+	minProductionCantonChainNOPs = 9
+	minTestnetCantonChainNOPS    = 4
+)
 
 func (a *CantonChainFamilyAdapter) ValidateNOPsTopology(chainSelector string, nopCount int) error {
+	chainSelectorUint, err := strconv.ParseUint(chainSelector, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid chain selector %q: %w", chainSelector, err)
+	}
+	isTestnet, err := chainsel.IsTestnetChain(chainSelectorUint)
+	if err != nil {
+		return fmt.Errorf("failed to determine if chain selector %q is testnet: %w", chainSelector, err)
+	}
+	if isTestnet {
+		if nopCount < minTestnetCantonChainNOPS {
+			return fmt.Errorf(
+				"chain %q requires at least %d unique NOPs for testnet environments, got %d",
+				chainSelector,
+				minTestnetCantonChainNOPS,
+				nopCount,
+			)
+		}
+
+		return nil
+	}
 	if nopCount < minProductionCantonChainNOPs {
 		return fmt.Errorf(
 			"chain %q requires at least %d unique NOPs for production environments, got %d",
