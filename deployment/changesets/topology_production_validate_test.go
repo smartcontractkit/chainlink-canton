@@ -4,9 +4,12 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain"
 
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 const (
@@ -21,6 +24,7 @@ func TestWithCantonProductionMinNOPCheckBypassed_inflatesOnlyForValidation(t *te
 	cantonKey := selectorKey(cantonProdSelector)
 	originalCommittee := append([]string(nil), topology.NOPTopology.Committees["default"].ChainConfigs[cantonKey].NOPAliases...)
 	originalExecutorPool := append([]string(nil), topology.ExecutorPools["default"].ChainConfigs[cantonKey].NOPAliases...)
+	registry := adapters.GetChainFamilyRegistry()
 
 	err := WithCantonProductionMinNOPCheckBypassed(topology, func() error {
 		inflatedCommittee := topology.NOPTopology.Committees["default"].ChainConfigs[cantonKey].NOPAliases
@@ -28,7 +32,7 @@ func TestWithCantonProductionMinNOPCheckBypassed_inflatesOnlyForValidation(t *te
 
 		inflatedExecutorPool := topology.ExecutorPools["default"].ChainConfigs[cantonKey].NOPAliases
 		require.GreaterOrEqual(t, uniqueTopologyNOPCount(inflatedExecutorPool), minProductionChainNOPs)
-		require.NoError(t, topology.ValidateForEnvironment("prod_testnet"))
+		require.NoError(t, topology.ValidateForEnvironment("prod_testnet", registry))
 
 		return nil
 	})
@@ -38,7 +42,7 @@ func TestWithCantonProductionMinNOPCheckBypassed_inflatesOnlyForValidation(t *te
 	require.Equal(t, originalCommittee, restoredCommittee)
 	restoredExecutorPool := topology.ExecutorPools["default"].ChainConfigs[cantonKey].NOPAliases
 	require.Equal(t, originalExecutorPool, restoredExecutorPool)
-	require.ErrorContains(t, topology.ValidateForEnvironment("prod_testnet"), "requires at least 9 unique NOPs")
+	require.ErrorContains(t, topology.ValidateForEnvironment("prod_testnet", registry), "requires at least 9 unique NOPs")
 }
 
 func TestIsCantonCommitteeChainSelector(t *testing.T) {
