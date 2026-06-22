@@ -26,7 +26,7 @@ go run ./examples/cli --network testnet <command>
 
 ## Config file
 
-See [`config.example.yaml`](./config.example.yaml). All fields are required.
+See [`config.example.yaml`](./config.example.yaml). All `canton.*` and `evm.*` fields are required; the optional explorer URL fields can be left empty.
 
 ```yaml
 canton:
@@ -40,6 +40,10 @@ canton:
 evm:
   rpcURL: "https://eth-sepolia.example.com"
   privateKeyHex: "0xabc..."
+
+ccip_explorer_url: ""
+evm_explorer_url: ""
+canton_explorer_url: ""
 ```
 
 ## Commands
@@ -60,7 +64,7 @@ send commands always use the `noExecution` tag in extraArgs.
 | Command                                                                                                                                  | Description                                                                                                                                                                                        |
 |------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `canton send-message --receiver <0xhex> [--payload <text>] [--executor {default\|none}] [--fee-token {link\|native}]`                    | Send a message-only CCIP message from Canton to EVM.                                                                                                                                               |
-| `canton send-token   --receiver <0xhex> --amount <decimal> [--payload <text>] [--executor {default\|none}] [--fee-token {link\|native}]` | Send a LINK token transfer CCIP message from Canton to EVM. Note: when using LINK as the fee token, two sepoarate input holdings must be provided, one for the fee and one for the token transfer. |
+| `canton send-token   --receiver <0xhex> --amount <decimal> [--payload <text>] [--executor {default\|none}] [--fee-token {link\|native}]` | Send a LINK token transfer CCIP message from Canton to EVM. Note: when using LINK as the fee token, two separate input holdings must be provided, one for the fee and one for the token transfer. |
 | `canton execute --message-id <0xhash> [--wait <duration>]`                                                                               | Execute on Canton a message sent from EVM.                                                                                                                                                         |
 | `canton list-events --event {sent\|executed}`                                                                                            | List active `CCIPMessageSent` or `ExecutionStateChanged` contracts visible to the configured party.                                                                                                |
 | `canton list-holdings [--cid]`                                                                                                           | List all holdings for the configured party. Specify `--cid` to include the holding's Contract ID in the output.                                                                                    |

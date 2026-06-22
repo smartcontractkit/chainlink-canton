@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/evmops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
 )
 
@@ -182,9 +183,36 @@ func evmSend(
 	}
 	fmt.Printf("Fee for sending message: %s\n", fee.String())
 
+	requiredAllowances := make(map[common.Address]*big.Int)
+	for _, token := range tokens {
+		allowance := requiredAllowances[token.Token]
+		if allowance == nil {
+			allowance = big.NewInt(0)
+		}
+		allowance.Add(allowance, token.Amount)
+		requiredAllowances[token.Token] = allowance
+	}
+
 	auth := b.EthAuth
 	if feeToken == b.Profile.EthEmptyAddress {
 		auth.Value = fee
+	} else {
+		allowance := requiredAllowances[feeToken]
+		if allowance == nil {
+			allowance = big.NewInt(0)
+		}
+		allowance.Add(allowance, fee)
+		requiredAllowances[feeToken] = allowance
+	}
+
+	for address, requiredAllowance := range requiredAllowances {
+		if requiredAllowance.Cmp(big.NewInt(0)) > 0 {
+			fmt.Printf("Ensuring router has sufficient allowance on token %s: %s\n", address.Hex(), requiredAllowance.String())
+			err := evmops.EnsureERC20Allowance(ctx, b, address, b.Profile.EthRouterAddress, requiredAllowance)
+			if err != nil {
+				return fmt.Errorf("ensure ERC20 allowance: %w", err)
+			}
+		}
 	}
 
 	// Ask for confirmation

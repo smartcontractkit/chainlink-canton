@@ -37,6 +37,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 )
 
+const (
+	defaultGasLimit = 50_000
+)
+
 // parseDecimalAmount parses an amount string that may include exponents
 // (e.g. "1e-2") and returns it as a decimal string.
 func parseDecimalAmount(s string) (string, error) {
@@ -47,7 +51,8 @@ func parseDecimalAmount(s string) (string, error) {
 		return "", fmt.Errorf("invalid amount %q", s)
 	}
 
-	return f.String(), nil
+	out := f.Text('f', -1) // convert to decimal string without exponent
+	return out, nil
 }
 
 // NewCantonCmd returns the `canton` parent command.
@@ -450,6 +455,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 	var (
 		receiverHex  string
+		gasLimit     int
 		payload      string
 		executor     string
 		feeTokenName string
@@ -479,11 +485,12 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.Profile.CCIPReceiverContract
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to a CCIP Receiver contract)")
 	c.Flags().StringVar(&payload, "payload", "Hello, EVM from Canton!", "message payload (text)")
+	c.Flags().IntVar(&gasLimit, "gas-limit", -1, fmt.Sprintf("gas limit for EVM execution, defaults to %v for message transfers", defaultGasLimit))
 	c.Flags().StringVar(&executor, "executor", "default", "executor mode (default|none)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
 	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
@@ -494,6 +501,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 	var (
 		receiverHex  string
+		gasLimit     int
 		amountStr    string
 		payload      string
 		executor     string
@@ -525,14 +533,15 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.ETHAddress
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to own address)")
 	c.Flags().StringVar(&amountStr, "amount", "", "LINK token transfer amount as decimal (e.g. 0.12345, 1e-2); (required)")
 	c.Flags().StringVar(&payload, "payload", "", "optional message payload (text) to attach to the token transfer")
+	c.Flags().IntVar(&gasLimit, "gas-limit", -1, fmt.Sprintf("gas limit for EVM execution, defaults to %v for message transfers", defaultGasLimit))
 	c.Flags().StringVar(&executor, "executor", "default", "executor mode (default|none)")
-	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
+	c.Flags().StringVar(&feeTokenName, "fee-token", "native", "fee token (link|native)")
 	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
 	c.Flags().StringArrayVar(&tokenInput, "token-input", nil, "the holding(s) to be used as an input for the token transfer. If unspecified, all current holdings will be used.")
 	_ = c.MarkFlagRequired("amount")
@@ -547,6 +556,7 @@ func cantonSend(
 	b *clients.Bundle,
 	receiver common.Address,
 	payload []byte,
+	gasLimit int,
 	amountStr string,
 	tokenInputHoldings []string,
 	executorMode string,
@@ -613,7 +623,6 @@ func cantonSend(
 			if err != nil {
 				return fmt.Errorf("list LINK holdings: %w", err)
 			}
-			tokenTransferInputCids = make([]types.CONTRACT_ID, len(tokenHoldings))
 			for _, h := range tokenHoldings {
 				tokenTransferInputCids = append(tokenTransferInputCids, types.CONTRACT_ID(h.ContractID))
 			}
@@ -631,9 +640,12 @@ func cantonSend(
 	}
 
 	// --- Build the oapi Message for EDS lookups ---
-	gasLimit := 50_000
-	if withToken && len(payload) == 0 {
-		gasLimit = 0
+	if gasLimit < 0 {
+		// gas limit is negative/unspecified, default to defaultGasLimit, except for token-only transfers
+		gasLimit = defaultGasLimit
+		if withToken && len(payload) == 0 {
+			gasLimit = 0
+		}
 	}
 	executorType := oapiCommon.Empty
 	msg := oapiCommon.Message{
@@ -796,6 +808,7 @@ func cantonSend(
 	tw.AppendHeader(table.Row{"Field", "Value"})
 	tw.AppendRow(table.Row{"Receiver", "0x" + msg.Receiver})
 	tw.AppendRow(table.Row{"Data", "0x" + msg.Payload})
+	tw.AppendRow(table.Row{"Gas Limit", msg.GasLimit})
 	tw.AppendRow(table.Row{"Fee Token", fmt.Sprintf("%s@%s", msg.FeeToken.Id, msg.FeeToken.Admin)})
 	tw.AppendRow(table.Row{"Fee Input Holdings", feeTokenInputCids})
 	if msg.TokenTransfer != nil {
