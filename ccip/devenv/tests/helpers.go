@@ -153,7 +153,9 @@ func (b E2EBootstrap) SetupCantonReceive(t *testing.T, ctx context.Context) {
 	require.NoError(t, b.Canton.SetupReceive(ctx))
 }
 
-// ResolveEVMReceiver returns the EVM-side message receiver for Canton→EVM sends.
+// ResolveEVMReceiver returns the EVM wallet address derived from PRIVATE_KEY on prod-testnet,
+// or the devenv EOA otherwise. Used as the Canton→EVM message receiver, the EVM→Canton sender,
+// and in load tests for EVM-side balance checks.
 func (b E2EBootstrap) ResolveEVMReceiver(t *testing.T) protocol.UnknownAddress {
 	t.Helper()
 

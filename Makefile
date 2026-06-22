@@ -125,6 +125,12 @@ run-canton2evm-token-load: ## Canton→EVM token WASP load (requires running dev
 run-evm2canton-token-load: ## EVM→Canton token WASP load (requires running devenv + env-canton-evm-out.toml).
 	cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestEVM2Canton_TokenLoad$$'
 
+.PHONY: run-evm2canton-token-e2e-prod
+run-evm2canton-token-e2e-prod: ## EVM→Canton token e2e on prod-testnet.
+	cd ccip/devenv/tests/e2e && go test -timeout 15m -v -count=1 \
+	  -ccip-env=prod-testnet \
+	  -run '^TestEVM2Canton_Basic$/^token_transfer$$'
+
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests
 

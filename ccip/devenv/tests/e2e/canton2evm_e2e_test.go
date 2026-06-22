@@ -112,7 +112,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		lane := devenvtests.ResolveTokenLane(t, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), []uint64{boot.EVM.ChainSelector()})
+		lane := devenvtests.ResolveTokenLane(t, boot.Env, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), []uint64{boot.EVM.ChainSelector()})
 		tokenTransferAmount := lane.TransferAmount.Uint64()
 
 		tokenFeePerSend := uint64(devenvtests.CantonToEVMTokenTransferFeeAmount)

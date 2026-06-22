@@ -67,7 +67,7 @@ CCIP_ENV=prod-testnet \
 | `CANTON_SENDER_INSTANCE_ID` | `e2e-ccipsender` |
 | `CANTON_RECEIVER_INSTANCE_ID` | `e2e-receiver` |
 
-Token e2e subtests are skipped on prod-testnet. A second prod run reuses existing router/sender/receiver contracts on ledger when instance IDs match.
+Token e2e: **EVM→Canton token** is supported on prod-testnet (see [EVM→Canton token e2e (prod-testnet)](#evm→canton-token-e2e-prod-testnet)). Canton→EVM token subtests remain devenv-only. A second prod run reuses existing router/sender/receiver contracts on ledger when instance IDs match.
 
 ## Load tests
 
@@ -163,7 +163,7 @@ Equivalent:
 cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Canton_Load$'
 ```
 
-**Prod-testnet** (Canton TestNet + Sepolia): message-only load with full per-message confirmation (send → receipt on EVM → `ConfirmExecOnDest` on Canton). Use a conservative rate — each iteration is synchronous (~30–60s end-to-end on prod), so WASP RPS=1 is effectively bounded by confirm latency. Budget for Sepolia gas per send plus Canton execution fees. Token load remains devenv-only; Canton→EVM message-only prod load is supported send-only (see above).
+**Prod-testnet** (Canton TestNet + Sepolia): message-only load with full per-message confirmation (send → receipt on EVM → `ConfirmExecOnDest` on Canton). Use a conservative rate — each iteration is synchronous (~30–60s end-to-end on prod), so WASP RPS=1 is effectively bounded by confirm latency. Budget for Sepolia gas per send plus Canton execution fees. Token **load** remains devenv-only; EVM→Canton token **e2e** is supported on prod (see [EVM→Canton token e2e (prod-testnet)](#evm→canton-token-e2e-prod-testnet)). Canton→EVM message-only prod load is supported send-only (see above).
 
 Prerequisites: `CANTON_GRPC_URL`, `CANTON_PARTY_ID`, `CANTON_AUTH_*`, `PRIVATE_KEY` (Sepolia sender/receiver wallet), and a pre-funded Canton party.
 
@@ -198,17 +198,47 @@ Equivalent:
 cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestEVM2Canton_TokenLoad$'
 ```
 
+### EVM→Canton token e2e (prod-testnet)
+
+Single EVM→Canton token transfer end-to-end on Canton TestNet + Sepolia via `TestEVM2Canton_Basic/token_transfer`.
+
+**Prerequisites**
+
+- `CCIP_ENV=prod-testnet` and `CCIP_CONFIG_FILE=env-prod-testnet.ci.toml` (or local `env-prod-testnet-out.toml`)
+- Canton auth env vars (`CANTON_GRPC_URL`, `CANTON_PARTY_ID`, `CANTON_AUTH_*`) — see [Prod testnet connection smoke test](#prod-testnet-connection-smoke-test)
+- `PRIVATE_KEY` wallet funded with:
+  - **TEST** ERC-20 tokens on Sepolia (≥ `transfer_amount` from `[prod-testnet.evm_to_canton]` in `token_transfer_config.toml`, default `100000000000`)
+  - **Sepolia ETH** for send and possible router approve tx
+- Canton party wallet funded for execution fees
+
+```bash
+CCIP_ENV=prod-testnet \
+CCIP_CONFIG_FILE=env-prod-testnet.ci.toml \
+CANTON_GRPC_URL=... CANTON_PARTY_ID=... CANTON_AUTH_*=... \
+PRIVATE_KEY=0x... \
+CANTON_CONFIRM_EXEC_TIMEOUT=10m \
+make run-evm2canton-token-e2e-prod
+```
+
+Equivalent:
+
+```bash
+cd ccip/devenv/tests/e2e && go test -timeout 15m -v -count=1 \
+  -ccip-env=prod-testnet \
+  -run '^TestEVM2Canton_Basic$/^token_transfer$'
+```
+
 ### Token lane configuration
 
-Token transfer tests (both e2e and load) declare the token lane to send in [`tests/token_transfer_config.toml`](./tests/token_transfer_config.toml). The test resolves the declared **token pool identity** against the source chain's `GetTokenTransferConfigs`, then validates that every destination chain has that lane configured before running. The committed file holds the devenv defaults.
+Token transfer tests (both e2e and load) declare the token lane to send in [`tests/token_transfer_config.toml`](./tests/token_transfer_config.toml). The test resolves the declared **token pool identity** against the source chain's `GetTokenTransferConfigs`, then validates that every destination chain has that lane configured before running. On prod-testnet, when combo discovery fails (simple `TEST`/`LINK` qualifiers), the resolver falls back to direct datastore lookups using `remote_pool_*` fields.
 
-Override the file path with `CANTON_TOKEN_TEST_CONFIG`:
+Env selection follows `-ccip-env` / `CCIP_ENV` (same as the CCIP harness). Override the entire file path with `CANTON_TOKEN_TEST_CONFIG`:
 
 ```bash
 CANTON_TOKEN_TEST_CONFIG=/path/to/custom.toml make run-canton2evm-token-load
 ```
 
-The file has one block per direction (`[evm_to_canton]`, `[canton_to_evm]`):
+The file uses env-keyed sections (`[devenv.*]`, `[prod-testnet.*]`) with one block per direction (`evm_to_canton`, `canton_to_evm`):
 
 | Key | Required | Meaning |
 |---|---|---|
@@ -218,25 +248,31 @@ The file has one block per direction (`[evm_to_canton]`, `[canton_to_evm]`):
 | `transfer_amount` | no | per-message token amount (string integer); falls back to a per-direction default |
 | `execution_gas_limit` | no | per-message execution gas limit; falls back to a per-direction default |
 | `finality_config` | no | per-message finality config; falls back to a per-direction default |
+| `remote_pool_type` | prod EVM→Canton | Canton remote pool type for prod datastore fallback |
+| `remote_pool_version` | prod EVM→Canton | Canton remote pool version for prod datastore fallback |
+| `remote_pool_qualifier` | prod EVM→Canton | Canton remote pool qualifier for prod datastore fallback |
 
 Token **identity** (`pool_type` / `pool_version` / `pool_qualifier`) is always required and is never defaulted; only the numeric send params have code-level fallbacks. If the qualifier matches zero or multiple pools, or a destination lacks the lane, the test fails fast listing the available pool refs / selectors.
 
 ```toml
-[evm_to_canton]
+[devenv.evm_to_canton]
 pool_type      = "BurnMintTokenPool"
 pool_version   = "2.0.0"
 pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::BurnMintTokenPool 2.0.0 [default]"
 transfer_amount     = "100000000000"
 execution_gas_limit = 200000
-finality_config     = 0
-
-[canton_to_evm]
-pool_type      = "LockReleaseTokenPool"
-pool_version   = "2.0.0"
-pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::LockReleaseTokenPool 2.0.0 [default]"
-transfer_amount     = "1000"
-execution_gas_limit = 500000
 finality_config     = 1
+
+[prod-testnet.evm_to_canton]
+pool_type      = "BurnMintTokenPool"
+pool_version   = "2.0.0"
+pool_qualifier = "TEST"
+transfer_amount     = "100000000000"
+execution_gas_limit = 200000
+finality_config     = 1
+remote_pool_type      = "BurnMintTokenPool"
+remote_pool_version   = "2.0.0"
+remote_pool_qualifier = "LINK"
 ```
 
 ### CI (on demand)

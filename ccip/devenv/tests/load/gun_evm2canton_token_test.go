@@ -30,7 +30,7 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 	ctx := ccv.Plog.WithContext(t.Context())
 	boot.SetupCantonReceive(t, ctx)
 
-	lane := devenvtests.ResolveTokenLane(t, boot.Cfg, boot.Lib, boot.ChainMap, boot.EVM.ChainSelector(), []uint64{boot.Canton.ChainSelector()})
+	lane := devenvtests.ResolveTokenLane(t, boot.Env, boot.Cfg, boot.Lib, boot.ChainMap, boot.EVM.ChainSelector(), []uint64{boot.Canton.ChainSelector()})
 	t.Logf("Token lane: pool=%s transfer=%s srcToken=%x",
 		lane.PoolRef.Qualifier,
 		lane.TransferAmount.String(),
@@ -46,8 +46,7 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 
 	sched := loadSchedule(t)
 	estimatedMessages := estimateMessages(sched)
-	evmSender, err := boot.EVM.GetEOAReceiverAddress()
-	require.NoError(t, err)
+	evmSender := boot.ResolveEVMReceiver(t)
 	senderBalance, err := boot.EVM.GetTokenBalance(ctx, evmSender, lane.SrcToken)
 	require.NoError(t, err)
 	requiredBalance := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(estimatedMessages)))

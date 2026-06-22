@@ -30,7 +30,7 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 
 	evmSelectors := discoverEVMTokenSelectors(t, boot.Cfg)
 	require.NotEmpty(t, evmSelectors, "need at least one EVM token destination in the env file")
-	lane := devenvtests.ResolveTokenLane(t, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), evmSelectors)
+	lane := devenvtests.ResolveTokenLane(t, boot.Env, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), evmSelectors)
 	t.Logf("Token lane: pool=%s transfer=%s", lane.PoolRef.Qualifier, lane.TransferAmount.String())
 
 	destinations := discoverEVMTokenDestinations(t, boot.Cfg, boot.ChainMap, lane)

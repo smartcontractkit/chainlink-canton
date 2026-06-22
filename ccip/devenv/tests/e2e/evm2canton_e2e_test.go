@@ -92,14 +92,24 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	})
 
 	t.Run("token transfer", func(t *testing.T) {
-		boot.SkipIfRemote(t, "token e2e not on prod-testnet")
-
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		lane := devenvtests.ResolveTokenLane(t, boot.Cfg, boot.Lib, boot.ChainMap, srcSelector, []uint64{dstSelector})
+		lane := devenvtests.ResolveTokenLane(t, boot.Env, boot.Cfg, boot.Lib, boot.ChainMap, srcSelector, []uint64{dstSelector})
+		t.Logf("Token lane: pool=%s srcToken=%x transfer=%s",
+			lane.PoolRef.Qualifier, lane.SrcToken, lane.TransferAmount.String())
+
 		srcToken := lane.SrcToken
-		srcSender, err := boot.EVM.GetEOAReceiverAddress()
-		require.NoError(t, err)
+		srcSender := boot.ResolveEVMReceiver(t)
+
+		if boot.Env.IsRemote() {
+			senderBalance, err := boot.EVM.GetTokenBalance(subtestCtx, srcSender, srcToken)
+			require.NoError(t, err)
+			require.NotNil(t, senderBalance)
+			require.GreaterOrEqual(t, senderBalance.Cmp(lane.TransferAmount), 0,
+				"EVM sender token balance %s is below transfer amount %s; fund PRIVATE_KEY wallet with TEST tokens on Sepolia",
+				senderBalance.String(), lane.TransferAmount.String())
+			t.Log("prod-testnet: ensure PRIVATE_KEY wallet has Sepolia ETH for send and possible router approve tx")
+		}
 		seqNo, err := boot.EVM.GetExpectedNextSequenceNumber(subtestCtx, dstSelector)
 		require.NoError(t, err)
 		sendMessageResult, err := boot.EVM.SendMessage(subtestCtx, dstSelector, cciptestinterfaces.MessageFields{
