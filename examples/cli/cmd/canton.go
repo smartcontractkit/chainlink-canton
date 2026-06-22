@@ -52,6 +52,7 @@ func parseDecimalAmount(s string) (string, error) {
 	}
 
 	out := f.Text('f', -1) // convert to decimal string without exponent
+
 	return out, nil
 }
 
