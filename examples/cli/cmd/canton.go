@@ -68,6 +68,7 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	c.AddCommand(newCantonListEventsCmd(g))
 	c.AddCommand(newCantonListHoldingsCmd(g))
 	c.AddCommand(newCantonCreateTransferCmd(g))
+	c.AddCommand(newCantonAcceptTransferCmd(g))
 
 	return c
 }
@@ -320,6 +321,42 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	c.Flags().StringArrayVar(&inputHoldingCids, "input", nil, "the holding(s) to be used as an input for the transfer. If unspecified, all current holdings will be used.")
 	c.Flags().StringVar(&amount, "amount", "", "the amount to transfer (required)")
 	_ = c.MarkFlagRequired("amount")
+
+	return c
+}
+
+func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
+	var (
+		contractID string
+		tokenName  string
+	)
+	c := &cobra.Command{
+		Use:   "accept-transfer",
+		Short: "Accept an incoming TransferInstruction by contract ID",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			b, err := g.Resolve(ctx)
+			if err != nil {
+				return err
+			}
+
+			_, transferInstructionClient, err := resolveCantonFeeToken(b, tokenName)
+			if err != nil {
+				return err
+			}
+
+			return testhelpers.AcceptPendingTransferInstruction(
+				ctx,
+				b.Participant,
+				transferInstructionClient,
+				b.Participant.PartyID,
+				contractID,
+			)
+		},
+	}
+	c.Flags().StringVar(&contractID, "contract-id", "", "TransferInstruction contract ID to accept (required)")
+	c.Flags().StringVar(&tokenName, "token", "link", "token of the transfer instruction (link|native)")
+	_ = c.MarkFlagRequired("contract-id")
 
 	return c
 }

@@ -69,6 +69,7 @@ send commands always use the `noExecution` tag in extraArgs.
 | `canton list-events --event {sent\|executed}`                                                                                            | List active `CCIPMessageSent` or `ExecutionStateChanged` contracts visible to the configured party.                                                                                                |
 | `canton list-holdings [--cid]`                                                                                                           | List all holdings for the configured party. Specify `--cid` to include the holding's Contract ID in the output.                                                                                    |
 | `canton create-transfer --amount <decimal> [--token {link\|native}] [--receiver <party>] [--input <contractId>]`                         | Initiates a transfer of an given amount of an asset to another party/itself. Defaults to LINK, use `--token native` to switch to Amulet.                                                           |
+| `canton accept-transfer --contract-id <contractId> [--token {link\|native}]`                                                             | Accept an incoming `TransferInstruction` by contract ID. Defaults to LINK; use `--token native` for Amulet.                                                                                          |
 
 `--executor none` skips automatic execution on the destination chain; you can
 then settle the message manually with `evm execute --message-id ...`.
