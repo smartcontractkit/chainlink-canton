@@ -351,11 +351,12 @@ func (h HardenCantonInboundLane) Apply(e cldf.Environment, config CantonCSDeps[H
 
 	if proposalDriven && len(out.Output.BatchOps) == 0 {
 		e.Logger.Infof("Canton inbound hardening already applied for remote source %d; no MCMS proposal generated", cfg.RemoteSourceChainSelector)
-		return cldf.ChangesetOutput{}, nil
+		return cldf.ChangesetOutput{DataStore: datastore.NewMemoryDataStore()}, nil
 	}
 
+	ds := datastore.NewMemoryDataStore()
 	return buildFactoryDeployChangesetOutput(
 		e, chain, config.ChainSelector, config.Participant, proposalDriven,
-		cantonmcms.QualifierCCIPOwner, cfg.MinDelay, cfg.Description, nil, out.Output.BatchOps,
+		cantonmcms.QualifierCCIPOwner, cfg.MinDelay, cfg.Description, ds, out.Output.BatchOps,
 	)
 }

@@ -718,10 +718,10 @@ github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260
 github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139/go.mod h1:1WcontO9PeuKdUf5HXfs3nuICtzUvFNnyCmrHkTCF9Y=
 github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260619175934-4c098ad0f52e h1:hdtMBsSItOYl6P7Yl+OIgUZS++c3yo+Y5+LhJwu7J/8=
 github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260619175934-4c098ad0f52e/go.mod h1:xDXlDsou69NYOolOAj+KITRn9luER6Bg52NXelrLl+A=
-github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260608205628-b1fb1b311772 h1:mEcIAxlbE8pNljacOFCwKmLuhm/rUCAPQWFbL9eO4hg=
-github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260608205628-b1fb1b311772/go.mod h1:hhF1KVXQcx7bA0gJsBSGMpDK6wMYXZdrgAhICpcWgdA=
-github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260608205628-b1fb1b311772 h1:lHNBmODvZgGAX5vkdrT7QFSzkKJBvx2IvMLcuRasU34=
-github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260608205628-b1fb1b311772/go.mod h1:u9q1Ui4sQLxmpQDDZaL85r6YjsmKHWxwDcLCHyDLOFs=
+github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260616151800-9a3a31c4e194 h1:epApxkgHTBnX+TvmI2mSQeBquuAhaBX9q49B6IcSsVY=
+github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260616151800-9a3a31c4e194/go.mod h1:hhF1KVXQcx7bA0gJsBSGMpDK6wMYXZdrgAhICpcWgdA=
+github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260616151800-9a3a31c4e194 h1:wqOz3oPKnqA14Lodb1/NA5+trAgNdPsICU9+XmtBvv0=
+github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260616151800-9a3a31c4e194/go.mod h1:3uGR3sTRMnp0fsCmu3wNh9m2lpOq2RLe9CzES/tUFKc=
 github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260616151800-9a3a31c4e194 h1:QxZkbKtQyPtVLYP4eMwc+VbXY7M5ve1deSiLZ2pOA+Y=
 github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260616151800-9a3a31c4e194/go.mod h1:bNMFRxwWdgVFdSsFZRmsUUPoBUncU3RM765K99svIKM=
 github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89 h1:5z3LQ27MJmhiaeqp9S2TzbF5Wm4GGvUKAYOtE9AauR8=
