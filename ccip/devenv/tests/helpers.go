@@ -268,14 +268,6 @@ func (b E2EBootstrap) ConfirmCantonSendOnSource(
 	)
 }
 
-// SkipIfRemote skips token subtests that are not supported on prod-testnet.
-func (b E2EBootstrap) SkipIfRemote(t *testing.T, reason string) {
-	t.Helper()
-	if b.Env.IsRemote() {
-		t.Skip(reason)
-	}
-}
-
 func GetContractAddress(
 	t *testing.T,
 	ds datastore.DataStore,

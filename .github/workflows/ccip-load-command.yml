@@ -65,15 +65,21 @@ jobs:
           echo "message_rate=${NAMED_MESSAGE_RATE:-1/45s}" >> "$GITHUB_OUTPUT"
           echo "load_duration=${NAMED_LOAD_DURATION:-2m}" >> "$GITHUB_OUTPUT"
           echo "config_file=${NAMED_CONFIG_FILE:-env-prod-testnet.ci.toml}" >> "$GITHUB_OUTPUT"
-          echo "skip_exec_confirm=${NAMED_SKIP_EXEC_CONFIRM:-true}" >> "$GITHUB_OUTPUT"
           echo "confirm_exec_timeout=${NAMED_CONFIRM_EXEC_TIMEOUT:-10m}" >> "$GITHUB_OUTPUT"
           echo "party_id=${NAMED_PARTY_ID:-u_d53a15c42af6::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7}" >> "$GITHUB_OUTPUT"
           echo "grpc_url=${NAMED_GRPC_URL:-testnet.cv1.bcy-v.metalhosts.com:443}" >> "$GITHUB_OUTPUT"
 
           direction="${NAMED_DIRECTION:-canton2evm}"
+          if [ -n "${NAMED_SKIP_EXEC_CONFIRM}" ]; then
+            echo "skip_exec_confirm=${NAMED_SKIP_EXEC_CONFIRM}" >> "$GITHUB_OUTPUT"
+          elif [ "$direction" = "canton2evm" ]; then
+            echo "skip_exec_confirm=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_exec_confirm=false" >> "$GITHUB_OUTPUT"
+          fi
           if [ -n "${NAMED_TEST_TIMEOUT}" ]; then
             echo "test_timeout=${NAMED_TEST_TIMEOUT}" >> "$GITHUB_OUTPUT"
-          elif [ "$direction" = "evm2canton" ]; then
+          elif [ "$direction" = "evm2canton" ] || [ "$direction" = "evm2canton-token" ]; then
             echo "test_timeout=45m" >> "$GITHUB_OUTPUT"
           else
             echo "test_timeout=30m" >> "$GITHUB_OUTPUT"

@@ -3,7 +3,6 @@ package load
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"os"
 	"strings"
 	"testing"
@@ -24,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/stretchr/testify/require"
 
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -275,24 +273,27 @@ func discoverEVMTokenSelectors(t *testing.T, in *ccv.Cfg) []uint64 {
 	return selectors
 }
 
-func discoverEVMTokenDestinations(
-	t *testing.T,
-	in *ccv.Cfg,
-	chainMap map[uint64]cciptestinterfaces.CCIP17,
-	lane devenvtests.TokenLane,
-) []Destination {
+func discoverEVMTokenDestinationsFromBoot(t *testing.T, boot devenvtests.E2EBootstrap, lane devenvtests.TokenLane) []Destination {
 	t.Helper()
 
-	selectors := discoverEVMTokenSelectors(t, in)
-	dests := make([]Destination, 0, len(selectors))
-	for _, selector := range selectors {
-		chain, ok := chainMap[selector]
-		require.True(t, ok, "EVM chain %d not in harness chain map", selector)
+	receiver := boot.ResolveEVMReceiver(t)
 
-		receiver, err := chain.GetEOAReceiverAddress()
-		require.NoError(t, err)
+	dests := make([]Destination, 0)
+	seen := make(map[uint64]struct{})
+	for _, bc := range boot.Cfg.Blockchains {
+		if bc.Type != blockchain.TypeAnvil {
+			continue
+		}
+		details, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, chainsel.FamilyEVM)
+		require.NoError(t, err, "resolve chain selector for chainID=%s", bc.ChainID)
+		if _, dup := seen[details.ChainSelector]; dup {
+			continue
+		}
+		chain, ok := boot.ChainMap[details.ChainSelector]
+		require.True(t, ok, "EVM chain %d not in harness chain map", details.ChainSelector)
 
 		dests = append(dests, evmTokenLoadDestination(chain, receiver, lane))
+		seen[details.ChainSelector] = struct{}{}
 	}
 
 	return dests
@@ -309,40 +310,6 @@ func estimateMessages(sched scheduleConfig) uint64 {
 	}
 
 	return estimated
-}
-
-// setupCantonTokenLoadHoldings pre-mints two separate Amulet holdings (fee + transfer) and
-// calls SetupSend once, matching the e2e canton2evm token transfer pattern.
-func setupCantonTokenLoadHoldings(
-	t *testing.T,
-	ctx context.Context,
-	cantonImpl *cantondevenv.Chain,
-	sched scheduleConfig,
-	lane devenvtests.TokenLane,
-) {
-	t.Helper()
-
-	estimated := estimateMessages(sched)
-	tokenFeePerSend := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
-	feeMint := new(big.Rat).SetUint64(estimated * tokenFeePerSend)
-	transferMintFP := new(big.Int).Mul(lane.TransferAmount, new(big.Int).SetUint64(estimated))
-	transferMint := new(big.Rat).SetFrac(transferMintFP, big.NewInt(cantondevenv.CantonFixedPointScale))
-	transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
-	t.Logf("Pre-mint: estimatedMessages=%d feeMint=%s transferMint=%s",
-		estimated, feeMint.FloatString(10), transferMint.FloatString(10))
-	require.NoError(t, cantonImpl.MintTokens(ctx, feeMint))
-	require.NoError(t, cantonImpl.MintTokens(ctx, transferMint))
-
-	if lane.TransferInstrument.Admin != "" {
-		require.NoError(t, cantonImpl.SetupSend(
-			ctx,
-			tokenFeePerSend,
-			transferPerSend,
-			lane.TransferInstrument,
-		))
-	} else {
-		require.NoError(t, cantonImpl.SetupSend(ctx, tokenFeePerSend, transferPerSend))
-	}
 }
 
 func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress) Destination {

@@ -126,9 +126,11 @@ Or from repo root:
 make run-canton2evm-load-prod
 ```
 
-### Canton → EVM token load (requires devenv)
+### Canton → EVM token load
 
-Separate test from message-only load: `TestCanton2EVM_TokenLoad`. Resolves the token lane declared in [`token_transfer_config.toml`](./tests/token_transfer_config.toml) (see [Token lane configuration](#token-lane-configuration)) against the source chain's `GetTokenTransferConfigs`, validating every destination has the lane. Pre-mints Canton fee + transfer holdings, runs WASP, then asserts EVM receiver token balance delta.
+Separate test from message-only load: `TestCanton2EVM_TokenLoad`. Resolves the token lane declared in [`token_transfer_config.toml`](./tests/token_transfer_config.toml) (see [Token lane configuration](#token-lane-configuration)) against the source chain's `GetTokenTransferConfigs`, validating every destination has the lane. Runs WASP with full exec confirm; on devenv, asserts EVM receiver token balance delta.
+
+**Devenv** (requires running devenv + `env-canton-evm-out.toml`): pre-mints Canton fee + transfer holdings via `SetupCantonTokenSend`.
 
 ```bash
 make run-canton2evm-token-load
@@ -138,6 +140,30 @@ Equivalent:
 
 ```bash
 cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestCanton2EVM_TokenLoad$'
+```
+
+**Prod-testnet** (Canton TestNet + Sepolia): full per-message confirmation (send → receipt on EVM → `ConfirmExecOnDest`). Pre-fund the Canton party before the run:
+
+- **Amulet** for CCIP fees: `estimatedMessages × 130` (see `CantonToEVMTokenTransferFeeAmount`)
+- **LINK** (`link-token`): `estimatedMessages × 100` fixed-point per send (from `[prod-testnet.canton_to_evm]` `transfer_amount`)
+
+Also set `PRIVATE_KEY` to a Sepolia wallet with ETH for execution gas on the EVM receiver. The test logs EVM receiver balance before/after but does **not** assert balance on prod — verify delivery via indexer/CCIP ops.
+
+```bash
+CCIP_ENV=prod-testnet \
+CANTON_GRPC_URL=... CANTON_PARTY_ID=... CANTON_AUTH_CLIENT_ID=... CANTON_AUTH_CLIENT_SECRET=... \
+PRIVATE_KEY=0x... \
+CANTON_LOAD_MESSAGE_RATE=1/30s \
+CANTON_LOAD_DURATION=5m \
+CANTON_CONFIRM_EXEC_TIMEOUT=10m \
+go test -timeout 30m -v -count=1 -ccip-env=prod-testnet \
+  -run '^TestCanton2EVM_TokenLoad$' ./ccip/devenv/tests/load/
+```
+
+Or from repo root:
+
+```bash
+make run-canton2evm-token-load-prod
 ```
 
 ### EVM → Canton load
@@ -163,7 +189,7 @@ Equivalent:
 cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Canton_Load$'
 ```
 
-**Prod-testnet** (Canton TestNet + Sepolia): message-only load with full per-message confirmation (send → receipt on EVM → `ConfirmExecOnDest` on Canton). Use a conservative rate — each iteration is synchronous (~30–60s end-to-end on prod), so WASP RPS=1 is effectively bounded by confirm latency. Budget for Sepolia gas per send plus Canton execution fees. Token **load** remains devenv-only; EVM→Canton token **e2e** is supported on prod (see [EVM→Canton token e2e (prod-testnet)](#evm→canton-token-e2e-prod-testnet)). Canton→EVM message-only prod load is supported send-only (see above).
+**Prod-testnet** (Canton TestNet + Sepolia): message-only load with full per-message confirmation (send → receipt on EVM → `ConfirmExecOnDest` on Canton). Use a conservative rate — each iteration is synchronous (~30–60s end-to-end on prod), so WASP RPS=1 is effectively bounded by confirm latency. Budget for Sepolia gas per send plus Canton execution fees. Token load is also supported on prod (see [Canton → EVM token load](#canton--evm-token-load) and [EVM → Canton token load](#evm--canton-token-load)).
 
 Prerequisites: `CANTON_GRPC_URL`, `CANTON_PARTY_ID`, `CANTON_AUTH_*`, `PRIVATE_KEY` (Sepolia sender/receiver wallet), and a pre-funded Canton party.
 
@@ -184,9 +210,11 @@ Or from repo root:
 make run-evm2canton-load-prod
 ```
 
-### EVM → Canton token load (requires devenv)
+### EVM → Canton token load
 
-Separate test from message-only load: `TestEVM2Canton_TokenLoad`. Resolves the token lane declared in [`token_transfer_config.toml`](./tests/token_transfer_config.toml) (see [Token lane configuration](#token-lane-configuration)), logs EVM sender balance vs estimated transfer need (devenv pre-funds sender), runs WASP, logs Canton holdings post-run.
+Separate test from message-only load: `TestEVM2Canton_TokenLoad`. Resolves the token lane declared in [`token_transfer_config.toml`](./tests/token_transfer_config.toml) (see [Token lane configuration](#token-lane-configuration)), logs EVM sender balance vs estimated transfer need, runs WASP, logs Canton holdings post-run.
+
+**Devenv** (requires running devenv + `env-canton-evm-out.toml`): EVM sender is pre-funded by devenv.
 
 ```bash
 make run-evm2canton-token-load
@@ -198,6 +226,30 @@ Equivalent:
 cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestEVM2Canton_TokenLoad$'
 ```
 
+**Prod-testnet** (Canton TestNet + Sepolia): full per-message confirmation. Fund `PRIVATE_KEY` wallet with:
+
+- **TEST** ERC-20 tokens on Sepolia: `estimatedMessages × transfer_amount` from `[prod-testnet.evm_to_canton]` (default `1000000000000000000` wei per send)
+- **Sepolia ETH** for send and possible router approve tx
+
+Also ensure the Canton party is funded for execution fees.
+
+```bash
+CCIP_ENV=prod-testnet \
+CANTON_GRPC_URL=... CANTON_PARTY_ID=... CANTON_AUTH_CLIENT_ID=... CANTON_AUTH_CLIENT_SECRET=... \
+PRIVATE_KEY=0x... \
+CANTON_LOAD_MESSAGE_RATE=1/30s \
+CANTON_LOAD_DURATION=5m \
+CANTON_CONFIRM_EXEC_TIMEOUT=10m \
+go test -timeout 45m -v -count=1 -ccip-env=prod-testnet \
+  -run '^TestEVM2Canton_TokenLoad$' ./ccip/devenv/tests/load/
+```
+
+Or from repo root:
+
+```bash
+make run-evm2canton-token-load-prod
+```
+
 ### EVM→Canton token e2e (prod-testnet)
 
 Single EVM→Canton token transfer end-to-end on Canton TestNet + Sepolia via `TestEVM2Canton_Basic/token_transfer`.
@@ -207,7 +259,7 @@ Single EVM→Canton token transfer end-to-end on Canton TestNet + Sepolia via `T
 - `CCIP_ENV=prod-testnet` and `CCIP_CONFIG_FILE=env-prod-testnet.ci.toml` (or local `env-prod-testnet-out.toml`)
 - Canton auth env vars (`CANTON_GRPC_URL`, `CANTON_PARTY_ID`, `CANTON_AUTH_*`) — see [Prod testnet connection smoke test](#prod-testnet-connection-smoke-test)
 - `PRIVATE_KEY` wallet funded with:
-  - **TEST** ERC-20 tokens on Sepolia (≥ `transfer_amount` from `[prod-testnet.evm_to_canton]` in `token_transfer_config.toml`, default `100000000000`)
+  - **TEST** ERC-20 tokens on Sepolia (≥ `transfer_amount` from `[prod-testnet.evm_to_canton]` in `token_transfer_config.toml`, default `1000000000000000000`)
   - **Sepolia ETH** for send and possible router approve tx
 - Canton party wallet funded for execution fees
 
@@ -238,7 +290,7 @@ Two sequential Canton→EVM LINK transfers end-to-end on Canton TestNet + Sepoli
 - Canton auth env vars (`CANTON_GRPC_URL`, `CANTON_PARTY_ID`, `CANTON_AUTH_*`) — see [Prod testnet connection smoke test](#prod-testnet-connection-smoke-test)
 - Canton party wallet funded with:
   - **Amulet** for CCIP fees (≥ `260` for 2 sends at `CantonToEVMTokenTransferFeeAmount` = 130)
-  - **LINK** on Canton (≥ `2000` fixed-point for 2 sends at `transfer_amount` = `"1000"` from `[prod-testnet.canton_to_evm]`, i.e. `0.0000002` LINK)
+  - **LINK** on Canton (`link-token`, ≥ `200` fixed-point for 2 sends at `transfer_amount` = `"100"` from `[prod-testnet.canton_to_evm]`)
 - `PRIVATE_KEY` wallet on Sepolia with ETH for execution gas on the EVM receiver
 
 ```bash
@@ -258,7 +310,7 @@ cd ccip/devenv/tests/e2e && go test -timeout 15m -v -count=1 \
   -run '^TestCanton2EVM_Basic$/^EOA receiver and default committee verifier token transfer$'
 ```
 
-Expected EVM receiver token delta: `2 × 100000000000` wei TEST (= `2 × 0.0000001` LINK).
+Expected EVM receiver token delta: `2 × 100000000000` wei TEST (= `2 × 0.0000001` LINK at `transfer_amount` = `"100"` fixed-point).
 
 ### Token lane configuration
 
@@ -311,7 +363,7 @@ finality_config     = 1
 pool_type      = "BurnMintTokenPool"
 pool_version   = "2.0.0"
 pool_qualifier = "TEST"
-transfer_amount     = "100000000000"
+transfer_amount     = "1000000000000000000"
 execution_gas_limit = 200000
 finality_config     = 1
 remote_pool_type      = "BurnMintTokenPool"
@@ -322,13 +374,13 @@ remote_pool_qualifier = "LINK"
 pool_type      = "BurnMintTokenPool"
 pool_version   = "2.0.0"
 pool_qualifier = "LINK"
-transfer_amount     = "1000"
+transfer_amount     = "100"
 execution_gas_limit = 500000
 finality_config     = 1
 remote_pool_type      = "BurnMintTokenPool"
 remote_pool_version   = "2.0.0"
 remote_pool_qualifier = "TEST"
-transfer_instrument_id = "LINK"
+transfer_instrument_id = "link-token"
 ```
 
 ### CI (on demand)
@@ -346,9 +398,9 @@ Load tests share one composite action (`.github/actions/ccip-load-test`) used by
 | `direction` | `canton2evm` | same | test `-run` regex |
 | `message_rate` | `1/1s` | `1/45s` (when left at devenv default) | `CANTON_LOAD_MESSAGE_RATE` |
 | `load_duration` | `90s` | `2m` (when left at devenv default) | `CANTON_LOAD_DURATION` |
-| `test_timeout` | `40m` | `30m` / `45m` for evm2canton | `go test -timeout` |
+| `test_timeout` | `40m` | `30m` / `45m` for evm2canton or evm2canton-token | `go test -timeout` |
 | `config_file` | — | `env-prod-testnet.ci.toml` | `CCIP_CONFIG_FILE` |
-| `skip_exec_confirm` | — | `true` | `CANTON_LOAD_SKIP_EXEC_CONFIRM` |
+| `skip_exec_confirm` | — | `true` for canton2evm only; `false` for token + evm2canton | `CANTON_LOAD_SKIP_EXEC_CONFIRM` |
 | `confirm_exec_timeout` | — | `10m` | `CANTON_CONFIRM_EXEC_TIMEOUT` |
 | `canton_ref` | workflow ref | devenv only | chainlink-canton checkout |
 
@@ -365,12 +417,12 @@ On an open PR, comment (all named args optional):
 | Named arg | Default | Notes |
 |---|---|---|
 | `ccip_env` | `prod-testnet` | |
-| `direction` | `canton2evm` | `evm2canton`, `*-token` (token skips on prod) |
+| `direction` | `canton2evm` | `evm2canton`, `canton2evm-token`, `evm2canton-token` (token directions supported on prod) |
 | `config_file` | `env-prod-testnet.ci.toml` | basename under `ccip/devenv/`; sets `CCIP_CONFIG_FILE` |
 | `message_rate` | `1/45s` | |
 | `load_duration` | `2m` | |
-| `test_timeout` | `30m` / `45m` for evm2canton | |
-| `skip_exec_confirm` | `true` | required on prod for canton→evm |
+| `test_timeout` | `30m` / `45m` for evm2canton or evm2canton-token | |
+| `skip_exec_confirm` | `true` for canton2evm only | `false` for token directions and evm2canton |
 | `confirm_exec_timeout` | `10m` | |
 | `party_id` | ccip-app party (see composite action default) | |
 | `grpc_url` | `testnet.cv1.bcy-v.metalhosts.com:443` | |

@@ -15,7 +15,10 @@ import (
 
 // TestEVM2Canton_TokenLoad runs WASP RPS=1 against the EVM→Canton token transfer path.
 //
-// Requires a running devenv and env-canton-evm-out.toml (devenv only).
+// Devenv: requires a running devenv and env-canton-evm-out.toml; EVM sender is pre-funded.
+//
+// Prod-testnet: requires PRIVATE_KEY wallet with TEST tokens and Sepolia ETH on Sepolia,
+// plus a pre-funded Canton party for execution fees.
 //
 //nolint:paralleltest // single-flight exec on Canton dest; shares env with e2e.
 func TestEVM2Canton_TokenLoad(t *testing.T) {
@@ -25,7 +28,6 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 
 	env := devenvtests.ParseEnvFromFlag(t)
 	boot := devenvtests.BootstrapE2E(t, env)
-	boot.SkipIfRemote(t, "token load not on prod-testnet")
 
 	ctx := ccv.Plog.WithContext(t.Context())
 	boot.SetupCantonReceive(t, ctx)
@@ -52,7 +54,12 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 	requiredBalance := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(estimatedMessages)))
 	t.Logf("EVM sender token balance=%s requiredForRun=%s (estimatedMessages=%d; devenv pre-funds sender)",
 		senderBalance.String(), requiredBalance.String(), estimatedMessages)
-	if senderBalance.Cmp(requiredBalance) < 0 {
+	if boot.Env.IsRemote() {
+		require.GreaterOrEqual(t, senderBalance.Cmp(requiredBalance), 0,
+			"EVM sender token balance %s is below required %s; fund PRIVATE_KEY wallet with TEST tokens on Sepolia",
+			senderBalance.String(), requiredBalance.String())
+		t.Log("prod-testnet: ensure PRIVATE_KEY wallet has Sepolia ETH for send and possible router approve tx")
+	} else if senderBalance.Cmp(requiredBalance) < 0 {
 		t.Logf("warning: EVM sender balance may be insufficient for full run")
 	}
 

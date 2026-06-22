@@ -89,13 +89,19 @@ jobs:
               echo "load_duration=${{ inputs.load_duration }}" >> "$GITHUB_OUTPUT"
             fi
             if [ "${{ inputs.test_timeout }}" = "40m" ]; then
-              if [ "${{ inputs.direction }}" = "evm2canton" ]; then
+              if [ "${{ inputs.direction }}" = "evm2canton" ] || [ "${{ inputs.direction }}" = "evm2canton-token" ]; then
                 echo "test_timeout=45m" >> "$GITHUB_OUTPUT"
               else
                 echo "test_timeout=30m" >> "$GITHUB_OUTPUT"
               fi
             else
               echo "test_timeout=${{ inputs.test_timeout }}" >> "$GITHUB_OUTPUT"
+            fi
+            direction="${{ inputs.direction }}"
+            if [ "$direction" = "canton2evm" ]; then
+              echo "skip_exec_confirm=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "skip_exec_confirm=false" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "canton_path=chainlink-canton" >> "$GITHUB_OUTPUT"
@@ -115,7 +121,7 @@ jobs:
           config_file: ${{ inputs.config_file }}
           canton_path: ${{ steps.prod_defaults.outputs.canton_path }}
           canton_ref: ${{ inputs.canton_ref }}
-          skip_exec_confirm: ${{ inputs.skip_exec_confirm }}
+          skip_exec_confirm: ${{ inputs.ccip_env == 'prod-testnet' && steps.prod_defaults.outputs.skip_exec_confirm || inputs.skip_exec_confirm }}
           confirm_exec_timeout: ${{ inputs.confirm_exec_timeout }}
           CANTON_OKTA_AUTHORIZER_TESTNET: ${{ secrets.CANTON_OKTA_AUTHORIZER_TESTNET }}
           CANTON_OKTA_CLIENT_ID_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_ID_TESTNET }}
