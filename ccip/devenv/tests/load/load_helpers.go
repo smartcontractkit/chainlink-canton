@@ -31,13 +31,13 @@ import (
 )
 
 const (
-	envMessageRate           = "CANTON_LOAD_MESSAGE_RATE"
-	envLoadDuration          = "CANTON_LOAD_DURATION"
-	envLoadSkipExecConfirm   = "CANTON_LOAD_SKIP_EXEC_CONFIRM"
-	envLoadCallTimeout       = "CANTON_LOAD_CALL_TIMEOUT"
-	defaultMessageRate       = "1/1s"
-	defaultLoadDuration      = 90 * time.Second
-	defaultLoadCallPadding   = 2 * time.Minute
+	envMessageRate            = "CANTON_LOAD_MESSAGE_RATE"
+	envLoadDuration           = "CANTON_LOAD_DURATION"
+	envLoadSkipExecConfirm    = "CANTON_LOAD_SKIP_EXEC_CONFIRM"
+	envLoadCallTimeout        = "CANTON_LOAD_CALL_TIMEOUT"
+	defaultMessageRate        = "1/1s"
+	defaultLoadDuration       = 90 * time.Second
+	defaultLoadCallPadding    = 2 * time.Minute
 	defaultSendOnlyCallBudget = 5 * time.Minute
 )
 
@@ -323,18 +323,26 @@ func setupCantonTokenLoadHoldings(
 	t.Helper()
 
 	estimated := estimateMessages(sched)
-	tokenFeePerSend := uint64(devenvtests.CantonToEVMTokenTransferFeeAmount)
-	feeMint := estimated * tokenFeePerSend
-	transferMint := estimated * lane.TransferAmount.Uint64()
-	t.Logf("Pre-mint: estimatedMessages=%d feeMint=%d transferMint=%d",
-		estimated, feeMint, transferMint)
+	tokenFeePerSend := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
+	feeMint := new(big.Rat).SetUint64(estimated * tokenFeePerSend)
+	transferMintFP := new(big.Int).Mul(lane.TransferAmount, new(big.Int).SetUint64(estimated))
+	transferMint := new(big.Rat).SetFrac(transferMintFP, big.NewInt(cantondevenv.CantonFixedPointScale))
+	transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+	t.Logf("Pre-mint: estimatedMessages=%d feeMint=%s transferMint=%s",
+		estimated, feeMint.FloatString(10), transferMint.FloatString(10))
 	require.NoError(t, cantonImpl.MintTokens(ctx, feeMint))
 	require.NoError(t, cantonImpl.MintTokens(ctx, transferMint))
-	require.NoError(t, cantonImpl.SetupSend(
-		ctx,
-		tokenFeePerSend,
-		lane.TransferAmount.Uint64(),
-	))
+
+	if lane.TransferInstrument.Admin != "" {
+		require.NoError(t, cantonImpl.SetupSend(
+			ctx,
+			tokenFeePerSend,
+			transferPerSend,
+			lane.TransferInstrument,
+		))
+	} else {
+		require.NoError(t, cantonImpl.SetupSend(ctx, tokenFeePerSend, transferPerSend))
+	}
 }
 
 func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress) Destination {
@@ -370,7 +378,7 @@ func evmTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.
 					Receiver: receiver,
 					Data:     fmt.Appendf(nil, "canton2evm token load n=%d dest=%d", callNum, destSelector),
 					TokenAmount: cciptestinterfaces.TokenAmount{
-						Amount: new(big.Int).Set(lane.TransferAmount),
+						Amount: lane.TransferAmount,
 					},
 				}, cciptestinterfaces.MessageOptions{
 					ExecutionGasLimit: lane.ExecutionGasLimit,
@@ -445,7 +453,7 @@ func cantonTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protoc
 					Receiver: receiver,
 					Data:     fmt.Appendf(nil, "evm2canton token load n=%d dest=%d", callNum, destSelector),
 					TokenAmount: cciptestinterfaces.TokenAmount{
-						Amount:       new(big.Int).Set(lane.TransferAmount),
+						Amount:       lane.TransferAmount,
 						TokenAddress: lane.SrcToken,
 					},
 				}, cciptestinterfaces.MessageOptions{

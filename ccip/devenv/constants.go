@@ -1,4 +1,4 @@
-package tests
+package devenv
 
 import "github.com/smartcontractkit/chainlink-ccv/protocol"
 
@@ -17,8 +17,9 @@ const (
 	// token e2e/load tests; must cover one send and leave enough change for sequential sends.
 	CantonToEVMTokenTransferFeeAmount int64 = 130
 
-	// EVMDecimalsScale converts Canton token amounts to EVM 18-decimal balance units.
-	EVMDecimalsScale int64 = 1_000_000_000_000_000_000
+	// Canton token amounts use 10-decimal fixed point (e.g. 1_000_000_000 = 0.1).
+	CantonFixedPointScale      int64 = 10_000_000_000
+	CantonFixedPointToEVMScale int64 = 100_000_000 // fixedPoint * this = EVM wei
 
 	// CantonToEVMTokenSequentialSends is how many token transfers the Canton→EVM e2e subtest sends.
 	CantonToEVMTokenSequentialSends = 2

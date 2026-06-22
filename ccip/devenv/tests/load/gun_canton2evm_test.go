@@ -1,13 +1,14 @@
 package load
 
 import (
+	"math/big"
 	"testing"
 
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
+	"github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
 
@@ -57,16 +58,16 @@ func TestCanton2EVM_Load(t *testing.T) {
 	sched := loadSchedule(t)
 
 	estimatedMessages := estimateMessages(sched)
-	requiredAmulet := estimatedMessages * uint64(devenvtests.CantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
+	requiredAmulet := estimatedMessages * uint64(devenv.CantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
 	if boot.Env.IsRemote() {
 		t.Logf("Prod: ensure Canton party holds at least %d Amulet (estimatedMessages=%d feePerMessage=%d)",
-			requiredAmulet, estimatedMessages, devenvtests.CantonToEVMFeeAmount)
+			requiredAmulet, estimatedMessages, devenv.CantonToEVMFeeAmount)
 	} else {
 		t.Logf("Pre-mint: estimatedMessages=%d feePerMessage=%d totalFeeMint=%d",
-			estimatedMessages, devenvtests.CantonToEVMFeeAmount, requiredAmulet)
-		require.NoError(t, boot.Canton.MintTokens(ctx, requiredAmulet))
+			estimatedMessages, devenv.CantonToEVMFeeAmount, requiredAmulet)
+		require.NoError(t, boot.Canton.MintTokens(ctx, new(big.Rat).SetUint64(requiredAmulet)))
 	}
-	require.NoError(t, boot.Canton.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), 0))
+	require.NoError(t, boot.Canton.SetupSend(ctx, uint64(devenv.CantonToEVMFeeAmount), nil))
 
 	gun, err := NewCCIPLoadGun(
 		boot.Canton,

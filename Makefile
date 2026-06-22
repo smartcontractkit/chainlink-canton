@@ -131,6 +131,12 @@ run-evm2canton-token-e2e-prod: ## EVM→Canton token e2e on prod-testnet.
 	  -ccip-env=prod-testnet \
 	  -run '^TestEVM2Canton_Basic$/^token_transfer$$'
 
+.PHONY: run-canton2evm-token-e2e-prod
+run-canton2evm-token-e2e-prod: ## Canton→EVM token e2e on prod-testnet.
+	cd ccip/devenv/tests/e2e && go test -timeout 15m -v -count=1 \
+	  -ccip-env=prod-testnet \
+	  -run '^TestCanton2EVM_Basic$/^EOA receiver and default committee verifier token transfer$$'
+
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests
 

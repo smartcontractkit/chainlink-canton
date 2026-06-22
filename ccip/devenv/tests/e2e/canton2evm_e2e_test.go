@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton ImplFactory
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -108,21 +108,10 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	})
 
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
-		boot.SkipIfRemote(t, "token e2e not on prod-testnet")
-
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		lane := devenvtests.ResolveTokenLane(t, boot.Env, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), []uint64{boot.EVM.ChainSelector()})
-		tokenTransferAmount := lane.TransferAmount.Uint64()
-
-		tokenFeePerSend := uint64(devenvtests.CantonToEVMTokenTransferFeeAmount)
-		require.NoError(t, boot.Canton.MintTokens(ctx,
-			devenvtests.CantonToEVMTokenSequentialSends*tokenFeePerSend,
-		))
-		require.NoError(t, boot.Canton.MintTokens(ctx,
-			devenvtests.CantonToEVMTokenSequentialSends*tokenTransferAmount,
-		))
-		require.NoError(t, boot.Canton.SetupSend(ctx, tokenFeePerSend, tokenTransferAmount))
+		boot.SetupCantonTokenSend(t, ctx, lane, cantondevenv.CantonToEVMTokenSequentialSends)
 
 		receiver := boot.ResolveEVMReceiver(t)
 
@@ -147,8 +136,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)
 
-		for sendIdx := range devenvtests.CantonToEVMTokenSequentialSends {
-			t.Logf("Token transfer send %d/%d", sendIdx+1, devenvtests.CantonToEVMTokenSequentialSends)
+		for sendIdx := range cantondevenv.CantonToEVMTokenSequentialSends {
+			t.Logf("Token transfer send %d/%d", sendIdx+1, cantondevenv.CantonToEVMTokenSequentialSends)
 			sendMessageResult, err := boot.Canton.SendMessage(
 				subtestCtx,
 				boot.EVM.ChainSelector(),
@@ -183,6 +172,13 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			require.NotNil(t, sentEvent.Message)
 			require.NotNil(t, sentEvent.Message.TokenTransfer)
 
+			t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID[:])
+			result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, boot.Lib, sentEvent.MessageID)
+			t.Logf(
+				"Message assertion succeeded: aggregated=true indexerResults=%+v",
+				result.IndexedVerifications.Results,
+			)
+
 			ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 			require.NoError(t, err)
 			require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
@@ -192,8 +188,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
 
-		expectedTransferPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(devenvtests.EVMDecimalsScale))
-		totalExpectedTransfer := new(big.Int).Mul(expectedTransferPerMessage, big.NewInt(devenvtests.CantonToEVMTokenSequentialSends))
+		expectedTransferPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointToEVMScale))
+		totalExpectedTransfer := new(big.Int).Mul(expectedTransferPerMessage, big.NewInt(cantondevenv.CantonToEVMTokenSequentialSends))
 		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), totalExpectedTransfer)
 		t.Logf("EVM receiver token balance: before=%s after=%s totalExpectedTransfer=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String(), totalExpectedTransfer.String())
 		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter)

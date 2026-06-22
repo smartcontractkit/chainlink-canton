@@ -8,7 +8,7 @@ import (
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
+	"github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
 
@@ -67,7 +67,7 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, receiverBalanceAfter)
 
-	expectedPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(devenvtests.EVMDecimalsScale))
+	expectedPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(devenv.CantonFixedPointToEVMScale))
 	expectedDelta := new(big.Int).Mul(expectedPerMessage, big.NewInt(gun.CallCount()))
 	expectedBalance := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), expectedDelta)
 	t.Logf("EVM receiver token balance: before=%s after=%s expectedDelta=%s calls=%d",

@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 const (
@@ -74,7 +76,7 @@ func ConfirmSendTimeout(t *testing.T, env CCIPEnv) time.Duration {
 func EVMToCantonMessageOptions(gasLimit uint32, executor, ccvAddr protocol.UnknownAddress) cciptestinterfaces.MessageOptions {
 	return cciptestinterfaces.MessageOptions{
 		ExecutionGasLimit: gasLimit,
-		FinalityConfig:    EVMToCantonFinalityConfig,
+		FinalityConfig:    cantondevenv.EVMToCantonFinalityConfig,
 		Executor:          executor,
 		CCVs: []protocol.CCV{
 			{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
@@ -139,11 +141,58 @@ func BootstrapE2E(t *testing.T, env CCIPEnv) E2EBootstrap {
 func (b E2EBootstrap) SetupCantonSend(t *testing.T, ctx context.Context, transferAmount uint64) {
 	t.Helper()
 
-	fee := uint64(CantonToEVMFeeAmount)
+	fee := uint64(cantondevenv.CantonToEVMFeeAmount)
 	if !b.Env.IsRemote() {
-		require.NoError(t, b.Canton.MintTokens(ctx, fee))
+		require.NoError(t, b.Canton.MintTokens(ctx, new(big.Rat).SetUint64(fee)))
 	}
-	require.NoError(t, b.Canton.SetupSend(ctx, fee, transferAmount))
+	require.NoError(t, b.Canton.SetupSend(ctx, fee, new(big.Rat).SetUint64(transferAmount)))
+}
+
+// SetupCantonTokenSend prepares Canton for token sends (fee + transfer holdings).
+// Devenv mints Amulet; prod-testnet logs required Amulet and transfer instrument balances.
+func (b E2EBootstrap) SetupCantonTokenSend(t *testing.T, ctx context.Context, lane TokenLane, sends int) {
+	t.Helper()
+
+	fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
+	feeTotal := new(big.Rat).SetUint64(uint64(sends) * fee)
+	transferTotalFP := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(sends)))
+	transferTotal := new(big.Rat).SetFrac(transferTotalFP, big.NewInt(cantondevenv.CantonFixedPointScale))
+	transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+
+	if !b.Env.IsRemote() {
+		require.NoError(t, b.Canton.MintTokens(ctx, feeTotal))
+		require.NoError(t, b.Canton.MintTokens(ctx, transferTotal))
+	} else {
+		instrumentLabel := lane.TransferInstrumentID
+		if instrumentLabel == "" {
+			instrumentLabel = string(cantondevenv.AMTInstrument)
+		}
+		t.Logf("prod-testnet: ensure Canton party holds at least %s Amulet for fees (%d sends × %d)",
+			feeTotal.FloatString(10), sends, cantondevenv.CantonToEVMTokenTransferFeeAmount)
+		t.Logf("prod-testnet: ensure Canton party holds at least %s %s for transfers (%d sends × %s)",
+			transferTotal.FloatString(10), instrumentLabel, sends, transferPerSend.FloatString(10))
+		if lane.TransferInstrument.Admin != "" {
+			participant, _, err := b.Canton.ClientParticipant()
+			require.NoError(t, err)
+			inst := &lane.TransferInstrument
+			filters := []testhelpers.Filter{
+				testhelpers.WithHoldingOwner(participant.PartyID),
+				testhelpers.WithUnlockedHoldingsOnly(),
+			}
+			rows, err := testhelpers.ListHoldingsForInstrument(ctx, participant, inst, filters...)
+			require.NoError(t, err)
+			balance, err := testhelpers.GetHoldingsBalance(ctx, participant, inst, filters...)
+			require.NoError(t, err)
+			t.Logf("prod-testnet: unlocked holdings for instrument admin=%s id=%s: count=%d total=%s",
+				lane.TransferInstrument.Admin, lane.TransferInstrument.Id, len(rows), balance.FloatString(10))
+		}
+	}
+
+	if lane.TransferInstrument.Admin != "" {
+		require.NoError(t, b.Canton.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
+	} else {
+		require.NoError(t, b.Canton.SetupSend(ctx, fee, transferPerSend))
+	}
 }
 
 // SetupCantonReceive deploys the client party's PerPartyRouter before inbound messages
