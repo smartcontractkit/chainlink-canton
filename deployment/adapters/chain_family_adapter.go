@@ -247,7 +247,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, err
 		}
-		tokenPrices, err := resolveTokenPricesForRemoteDest(ds, input, remoteSelector, &nativeInstrument)
+		tokenPrices, err := ResolveTokenPricesForRemoteDest(ds, input, remoteSelector, &nativeInstrument)
 		if err != nil {
 			return out, fmt.Errorf("resolve token prices for remote chain %d: %w", remoteSelector, err)
 		}
