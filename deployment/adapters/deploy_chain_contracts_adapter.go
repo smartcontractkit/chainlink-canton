@@ -93,7 +93,7 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 	participant := chain.Participants[0]
 	ownerParty := deployerPartyID(input.DeployerContract, participant)
 
-	nativeInstrumentID, err := lookupNativeInstrumentID(ctx, participant)
+	nativeInstrumentID, err := lookupNativeInstrumentID(ctx, participant, nil, input.ChainSelector)
 	if err != nil {
 		return ccipadapters.DeployChainContractsOutput{}, err
 	}
