@@ -403,13 +403,16 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		return fmt.Errorf("encode message: %w", err)
 	}
 	encodedHex := hex.EncodeToString(encodedMessage)
-	ccvAddress := contracts.BytesToInstanceAddress(vr.VerifierDestAddress)
+	verifierRawAddress, err := contracts.RawInstanceAddressFromString(string(vr.VerifierDestAddress))
+	if err != nil {
+		return fmt.Errorf("parse VerifierDestAddress: %w", err)
+	}
 
 	ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(ctx, b.CCIPEDS, encodedHex)
 	if err != nil {
 		return fmt.Errorf("CCIP execute disclosure: %w", err)
 	}
-	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, b.CCVEDS, encodedHex, ccvAddress)
+	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, b.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress())
 	if err != nil {
 		return fmt.Errorf("CCV execute disclosure: %w", err)
 	}
