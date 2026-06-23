@@ -39,6 +39,7 @@ type Provider struct {
 
 type authorizationCodeProviderConfig struct {
 	scopes               []string
+	audience             string
 	transportCredentials credentials.TransportCredentials
 	callbackURL          string
 	openBrowser          bool
@@ -47,7 +48,8 @@ type authorizationCodeProviderConfig struct {
 
 func defaultAuthorizationCodeProviderConfig() *authorizationCodeProviderConfig {
 	return &authorizationCodeProviderConfig{
-		scopes: []string{"openid", "daml_ledger_api"},
+		scopes:   []string{"openid", "daml_ledger_api"},
+		audience: "",
 		transportCredentials: credentials.NewTLS(
 			&tls.Config{
 				MinVersion: tls.VersionTLS12,
@@ -59,7 +61,8 @@ func defaultAuthorizationCodeProviderConfig() *authorizationCodeProviderConfig {
 }
 
 // ProviderOption configures the authorization code Provider using the functional options pattern.
-// Options allow customization of scopes, transport credentials, callback URL, and browser behavior.
+// Options allow customization of scopes, audience, transport credentials, callback URL, browser
+// behavior, and overall flow timeout.
 type ProviderOption func(*authorizationCodeProviderConfig)
 
 // WithScopes configures the Provider to request access tokens with the given scopes.
@@ -72,6 +75,44 @@ type ProviderOption func(*authorizationCodeProviderConfig)
 func WithScopes(scopes ...string) ProviderOption {
 	return func(config *authorizationCodeProviderConfig) {
 		config.scopes = scopes
+	}
+}
+
+// WithAudience configures the Provider to request access tokens with the given audience.
+// The audience identifies the intended recipient of the issued access token (typically
+// the resource server / API that will consume the token, e.g. the Canton ledger API).
+//
+// When configured, it is appended to the authorization request as an "audience" query
+// parameter. This is an Auth0-specific extension: Auth0 uses the "audience" parameter to
+// select which API (and therefore which value of the JWT's "aud" claim, defined in RFC 7519
+// Section 4.1.3) the issued access token should target.
+//
+// NOTE: The "audience" parameter is NOT part of the OAuth2 specification, and most other
+// authorization servers do not honor it:
+//   - Okta binds the audience to the Authorization Server itself (one fixed value per AS) and
+//     explicitly does not support dynamic audience switching via a request parameter, nor
+//     RFC 8707 resource indicators. To use a different audience on Okta, point authURL/tokenURL
+//     at a different Authorization Server.
+//   - Keycloak determines the audience server-side via audience mappers on client scopes.
+//
+// This option therefore only has an effect with Auth0 (or an authorization server that
+// explicitly emulates Auth0's behavior).
+//
+// As of 2025, Auth0 also offers a tenant-level "Resource Parameter Compatibility Profile"
+// (Dashboard → Settings → Advanced) which, when enabled, makes Auth0 honor the standardized
+// RFC 8707 "resource" request parameter as an alternative way to set the token's audience for
+// the authorization code flow (and PAR/JAR/CIBA/refresh token grants). When both "resource"
+// and "audience" are sent, Auth0 still gives "audience" precedence.
+//
+// If no audience is configured (the default), no "audience" parameter is sent and the
+// authorization server determines the audience based on its own policy / client configuration.
+//
+// Example:
+//
+//	WithAudience("https://ledger.example.com")
+func WithAudience(audience string) ProviderOption {
+	return func(config *authorizationCodeProviderConfig) {
+		config.audience = audience
 	}
 }
 
@@ -195,7 +236,14 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 
 	// Use built-in S256ChallengeOption for PKCE
 	verifier := oauth2.GenerateVerifier()
-	authCodeURL := oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier))
+	authCodeOpts := []oauth2.AuthCodeOption{oauth2.S256ChallengeOption(verifier)}
+	// If an audience is configured, send it as an "audience" query parameter on the
+	// authorization request. This is an Auth0-specific extension; see the docs on
+	// WithAudience for details.
+	if cfg.audience != "" {
+		authCodeOpts = append(authCodeOpts, oauth2.SetAuthURLParam("audience", cfg.audience))
+	}
+	authCodeURL := oauthCfg.AuthCodeURL(state, authCodeOpts...)
 
 	callbackChan := make(chan *oauth2.Token)
 
