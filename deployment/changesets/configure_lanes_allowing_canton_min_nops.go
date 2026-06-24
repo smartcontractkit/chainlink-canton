@@ -9,8 +9,12 @@ import (
 )
 
 // ConfigureChainsForLanesFromTopologyAllowingCantonMinNOPs wraps chainlink-ccip's
-// ConfigureChainsForLanesFromTopology and skips the production minimum-15-NOP committee
-// rule for Canton-family chain selectors (Canton prod runs 4 NOPs).
+// ConfigureChainsForLanesFromTopology and bypasses production min-NOP validation via
+// WithCantonProductionMinNOPCheckBypassed during VerifyPreconditions only.
+//
+// Deprecated: Canton min-NOP is enforced by CantonChainFamilyAdapter.ValidateNOPsTopology
+// (9 mainnet / 4 testnet). Full prod topologies pass without this wrapper. See
+// docs/issues/deprecate-min-nop-bypass-wrappers.md. Remove once ccv uses generic changeset.
 func ConfigureChainsForLanesFromTopologyAllowingCantonMinNOPs(
 	committeeVerifierContractRegistry *adapters.CommitteeVerifierContractRegistry,
 	chainFamilyRegistry *adapters.ChainFamilyRegistry,

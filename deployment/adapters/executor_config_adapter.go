@@ -43,6 +43,12 @@ func (a *CantonExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, 
 	return chains
 }
 
+// RequiresNodeChainSupportInJD returns false: Canton destination blocks are pushed onto
+// existing EVM ccvexecutor jobs before Canton node chain configs exist in JD.
+func (a *CantonExecutorConfigAdapter) RequiresNodeChainSupportInJD() bool {
+	return false
+}
+
 func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, chainSelector uint64, qualifier string) (ccvexecutor.ChainConfiguration, error) {
 	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
 

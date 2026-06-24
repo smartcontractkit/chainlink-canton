@@ -25,8 +25,13 @@ type executorPoolChainConfigBackup struct {
 }
 
 // WithCantonProductionMinNOPCheckBypassed temporarily inflates Canton-family committee and
-// executor-pool chain_configs to satisfy chainlink-ccip's production minimum-NOP validation
-// during VerifyPreconditions only. The on-disk topology and Apply path keep the real membership.
+// executor-pool chain_configs during VerifyPreconditions only. The on-disk topology and Apply
+// path keep the real membership.
+//
+// Deprecated: generic validation now delegates to ChainFamily.ValidateNOPsTopology; Canton uses
+// 9 (mainnet) / 4 (testnet) via CantonChainFamilyAdapter — not the EVM 15-NOP rule. This bypass
+// remains for canary topologies with fewer NOPs than the adapter minimum. See
+// docs/issues/deprecate-min-nop-bypass-wrappers.md.
 func WithCantonProductionMinNOPCheckBypassed(topology *offchain.EnvironmentTopology, fn func() error) error {
 	if topology == nil || topology.NOPTopology == nil {
 		return fn()

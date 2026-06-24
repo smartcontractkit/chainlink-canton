@@ -35,12 +35,12 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.101
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260619175934-4c098ad0f52e
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260619175934-4c098ad0f52e
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260622154332-695181f87033
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260622154332-695181f87033
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260622154332-695181f87033
+	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260624220319-1556e0b0cf92
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260624220319-1556e0b0cf92
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260624220319-1556e0b0cf92
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.110.0
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.5
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260623160408-12abc7b173d8
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260615231356-88c6ee9b5774
 	github.com/spf13/viper v1.21.0
