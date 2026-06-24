@@ -16,12 +16,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v2_0_0/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/evm"
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/evmops"
+	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/finality"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
 )
 
@@ -71,6 +71,7 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 		receiverParty string
 		payload       string
 		feeTokenName  string
+		finalityName  string
 	)
 	c := &cobra.Command{
 		Use:   "send-message",
@@ -78,6 +79,10 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			b, err := g.Resolve(ctx)
+			if err != nil {
+				return err
+			}
+			fin, err := finality.Parse(finalityName)
 			if err != nil {
 				return err
 			}
@@ -90,12 +95,13 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 				receiverPartyHashed = contracts.HashedPartyFromString(b.Participant.PartyID)
 			}
 
-			return evmSend(ctx, b, receiverPartyHashed, []byte(payload), feeToken, nil)
+			return evmSend(ctx, b, receiverPartyHashed, []byte(payload), feeToken, nil, fin)
 		},
 	}
 	c.Flags().StringVar(&receiverParty, "receiver-party", "", "destination Canton party id (defaults to own party)")
 	c.Flags().StringVar(&payload, "payload", "Hello, Canton!", "message payload (text)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
+	c.Flags().StringVar(&finalityName, "finality", "finality", "source finality: finality (full), safe, or block depth 1-65535")
 
 	return c
 }
@@ -105,6 +111,7 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 		receiverParty string
 		amountStr     string
 		feeTokenName  string
+		finalityName  string
 	)
 	c := &cobra.Command{
 		Use:   "send-token",
@@ -112,6 +119,10 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			b, err := g.Resolve(ctx)
+			if err != nil {
+				return err
+			}
+			fin, err := finality.Parse(finalityName)
 			if err != nil {
 				return err
 			}
@@ -132,12 +143,13 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 				receiverPartyHashed = contracts.HashedPartyFromString(b.Participant.PartyID)
 			}
 
-			return evmSend(ctx, b, receiverPartyHashed, nil, feeToken, tokenAmounts)
+			return evmSend(ctx, b, receiverPartyHashed, nil, feeToken, tokenAmounts, fin)
 		},
 	}
 	c.Flags().StringVar(&receiverParty, "receiver-party", "", "destination Canton party id (defaults to own party)")
 	c.Flags().StringVar(&amountStr, "amount", "", "token amount in wei (required; supports exponents, e.g. 1e18)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
+	c.Flags().StringVar(&finalityName, "finality", "finality", "source finality: finality (full), safe, or block depth 1-65535")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
@@ -153,6 +165,7 @@ func evmSend(
 	payload []byte,
 	feeToken common.Address,
 	tokens []routerwrapper.ClientEVMTokenAmount,
+	fin finality.Parsed,
 ) error {
 	router, err := routerwrapper.NewRouter(b.Profile.EthRouterAddress, b.ETHClient)
 	if err != nil {
@@ -160,7 +173,7 @@ func evmSend(
 	}
 
 	extraArgs, err := evm.NewV3ExtraArgs(
-		protocol.FinalityWaitForFinality,
+		fin.EVM,
 		uint32(0),
 		b.Profile.NoExecutionTag.Hex(),
 		nil, nil, nil, nil,
@@ -222,6 +235,7 @@ func evmSend(
 	tw.AppendHeader(table.Row{"Field", "Value"})
 	tw.AppendRow(table.Row{"Receiver", "0x" + common.Bytes2Hex(msg.Receiver)})
 	tw.AppendRow(table.Row{"Data", "0x" + common.Bytes2Hex(msg.Data)})
+	tw.AppendRow(table.Row{"Finality", fin.Label})
 	tw.AppendRow(table.Row{"Fee Token", msg.FeeToken.Hex()})
 	tw.AppendRow(table.Row{"Tx Value", auth.Value.String()})
 	if len(msg.TokenAmounts) > 0 {
@@ -264,6 +278,9 @@ func evmSend(
 		}
 		fmt.Printf("✅ Message sent with ID: %s\n", common.BytesToHash(sent.MessageId[:]))
 		fmt.Println(b.CCIPExplorerLink(common.BytesToHash(sent.MessageId[:]).Hex()))
+		if fin.Label != "WaitForFinality" {
+			fmt.Println("Run canton execute with the same --finality value used for the send.")
+		}
 
 		return nil
 	}
