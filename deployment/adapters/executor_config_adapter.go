@@ -18,6 +18,7 @@ import (
 type CantonExecutorConfigAdapter struct{}
 
 var _ ccvadapters.ExecutorConfigAdapter = (*CantonExecutorConfigAdapter)(nil)
+var _ ccvadapters.ExecutorNodeChainJDSupport = (*CantonExecutorConfigAdapter)(nil)
 
 func (a *CantonExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, qualifier string) []uint64 {
 	if ds == nil {
