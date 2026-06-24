@@ -84,3 +84,14 @@ jobs:
             -H "Authorization: Bearer ${{ steps.okta.outputs.access_token }}" \
             -H "Content-Type: application/json" \
             "https://canton-${CANTON_ENV}.bcy-v.metalhosts.com/api/json/v2/parties/ccipOwner::122009b21cd8f52c55fc9854f7b1771837fa661f47529956ed40708bf656905b5721"
+            
+      - name: Verify RPC Proxy connectivity
+          curl -s -X POST "https://rpcs.cldev.sh/ethereum/sepolia" \
+            -H "Content-Type: application/json" \
+            --data '{
+              "jsonrpc":"2.0",
+              "method":"eth_blockNumber",
+              "params":[],
+              "id":1
+            }'
+            
