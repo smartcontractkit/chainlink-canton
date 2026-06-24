@@ -52,12 +52,21 @@ canton_explorer_url: ""
 
 | Command                                                                                 | Description                                                                           |
 |-----------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `evm send-message --receiver-party <p> [--payload <text>] [--fee-token {link\|native}]` | Send a message from EVM to Canton with no token transfer.                             |
-| `evm send-token   --receiver-party <p> --amount <wei> [--fee-token {link\|native}]`     | Send a token-only transfer (LINK) from EVM to Canton.                                 |
+| `evm send-message --receiver-party <p> [--payload <text>] [--fee-token {link\|native}] [--finality {finality\|safe\|N}]` | Send a message from EVM to Canton with no token transfer.                             |
+| `evm send-token   --receiver-party <p> --amount <wei> [--fee-token {link\|native}] [--finality {finality\|safe\|N}]`     | Send a token-only transfer (LINK) from EVM to Canton.                                 |
 | `evm execute      --message-id <0xhash> [--wait <duration>]`                            | Execute on EVM a message that was sent from Canton with the `noneExecution` executor. |
+| `canton execute   --message-id <0xhash> [--finality {finality\|safe\|N}] [--wait <duration>]` | Execute on Canton a message sent from EVM. Must use matching `--finality` if send used faster-than-finality. |
 
 Because no executor currently supports Canton as a destination, the EVM-side
 send commands always use the `noExecution` tag in extraArgs.
+
+**Finality (`--finality`):** defaults to `finality` (wait for full Sepolia
+finalization, slowest). Use `1` for one block confirmation (~12s), `safe` for
+Ethereum safe head, or any depth `1`–`65535`. When using faster finality, pass
+the same value to `canton execute`. The CLI selects (or creates) a
+`CCIPReceiver` whose finality config matches `--finality`, sets `requiredCCVs`
+from the indexer attestation (`verifier_dest_address`), and can keep separate
+receivers for full finality and faster-than-finality on the same party.
 
 ### Canton → EVM
 
@@ -65,7 +74,7 @@ send commands always use the `noExecution` tag in extraArgs.
 |------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `canton send-message --receiver <0xhex> [--payload <text>] [--executor {default\|none}] [--fee-token {link\|native}]`                    | Send a message-only CCIP message from Canton to EVM.                                                                                                                                               |
 | `canton send-token   --receiver <0xhex> --amount <decimal> [--payload <text>] [--executor {default\|none}] [--fee-token {link\|native}]` | Send a LINK token transfer CCIP message from Canton to EVM. Note: when using LINK as the fee token, two separate input holdings must be provided, one for the fee and one for the token transfer. |
-| `canton execute --message-id <0xhash> [--wait <duration>]`                                                                               | Execute on Canton a message sent from EVM.                                                                                                                                                         |
+| `canton execute --message-id <0xhash> [--wait <duration>]`                                                                               | Execute on Canton a message sent from EVM (see EVM → Canton section for `--finality`).                                                                                                             |
 | `canton list-events --event {sent\|executed}`                                                                                            | List active `CCIPMessageSent` or `ExecutionStateChanged` contracts visible to the configured party.                                                                                                |
 | `canton list-holdings [--cid]`                                                                                                           | List all holdings for the configured party. Specify `--cid` to include the holding's Contract ID in the output.                                                                                    |
 | `canton create-transfer --amount <decimal> [--token {link\|native}] [--receiver <party>] [--input <contractId>]`                         | Initiates a transfer of an given amount of an asset to another party/itself. Defaults to LINK, use `--token native` to switch to Amulet.                                                           |
