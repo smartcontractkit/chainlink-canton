@@ -490,6 +490,9 @@ func buildFactoryDeployChangesetOutput(
 	ds *datastore.MemoryDataStore,
 	batchOps []mcms_types.BatchOperation,
 ) (cldf.ChangesetOutput, error) {
+	if ds == nil {
+		ds = datastore.NewMemoryDataStore()
+	}
 	output := cldf.ChangesetOutput{
 		DataStore: ds,
 		Reports:   []operations.Report[any, any]{},

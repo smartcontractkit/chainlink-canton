@@ -18,6 +18,7 @@ import (
 type CantonExecutorConfigAdapter struct{}
 
 var _ ccvadapters.ExecutorConfigAdapter = (*CantonExecutorConfigAdapter)(nil)
+var _ ccvadapters.ExecutorNodeChainJDSupport = (*CantonExecutorConfigAdapter)(nil)
 
 func (a *CantonExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, qualifier string) []uint64 {
 	if ds == nil {
@@ -41,6 +42,12 @@ func (a *CantonExecutorConfigAdapter) GetDeployedChains(ds datastore.DataStore, 
 	}
 
 	return chains
+}
+
+// RequiresNodeChainSupportInJD returns false: Canton destination blocks are pushed onto
+// existing EVM ccvexecutor jobs before Canton node chain configs exist in JD.
+func (a *CantonExecutorConfigAdapter) RequiresNodeChainSupportInJD() bool {
+	return false
 }
 
 func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, chainSelector uint64, qualifier string) (ccvexecutor.ChainConfiguration, error) {
