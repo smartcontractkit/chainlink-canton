@@ -1,0 +1,54 @@
+module CCIP.API.EventEmitterV1 where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+interface EventEmitter where
+    viewtype EventEmitterView
+
+    eventEmitter_emitCCIPMessageSentEventImpl : ContractId EventEmitter -> EventEmitter_EmitCCIPMessageSentEvent -> Update (ContractId ())
+
+    nonconsuming choice EventEmitter_EmitCCIPMessageSentEvent : ContractId ()
+        with
+            destChainSelector : Numeric 0
+            sequenceNumber : Numeric 0
+            sender : Party
+            encodedMessage : BytesHex
+            feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+            tokenAmountBeforeTokenPoolFees : Decimal
+            receipts : [Receipt]
+            ccvOwners : [Party]
+            verifierBlobs : [BytesHex]
+            observers : [Party]
+            extraActors : [Party]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller (view this).ccipOwner :: (ccvOwners ++ extraActors)
+        do eventEmitter_emitCCIPMessageSentEventImpl this self arg
+
+
+data EventEmitterView = EventEmitterView
+    with
+        ccipOwner : Party
+        instanceId : Text
+
+-- | Issuer type for receipts.
+data IssuerType
+    = IssuerType_CCV      -- Cross-chain verifier
+    | IssuerType_Pool     -- Token pool
+    | IssuerType_Executor -- Executor
+    | IssuerType_Network  -- Network/protocol fee
+    deriving (Eq, Show)
+
+-- | Fee/gas accounting for a single entity (CCV, pool, executor, or network).
+data Receipt = Receipt
+    with
+        issuerType : IssuerType        -- Type of issuer
+        issuerAddress : BytesHex       -- 32-byte instance address
+        versionTag : Optional BytesHex -- 4-byte version tag for CCVs, None for pools/network
+        destGasLimit : Int             -- Gas allocated for dest chain execution
+        destBytesOverhead : Int        -- Data availability overhead in bytes
+        feeTokenAmount : Numeric 0     -- Fee amount in fee token units
+        extraArgs : BytesHex           -- Entity-specific arguments
+    deriving (Eq, Show)

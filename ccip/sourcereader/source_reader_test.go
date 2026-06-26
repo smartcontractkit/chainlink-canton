@@ -16,6 +16,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
+
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -209,7 +211,7 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 func TestReceiptsBindingToProtocol_numericBounds(t *testing.T) {
 	t.Parallel()
 	issuer := protocol.Keccak256([]byte("issuer"))
-	base := core.Receipt{
+	base := ccipapi.Receipt{
 		IssuerAddress:     types.TEXT(hex.EncodeToString(issuer[:])),
 		DestGasLimit:      1,
 		DestBytesOverhead: 1,
@@ -221,7 +223,7 @@ func TestReceiptsBindingToProtocol_numericBounds(t *testing.T) {
 		t.Parallel()
 		r := base
 		r.DestGasLimit = -1
-		_, err := receiptsBindingToProtocol([]core.Receipt{r})
+		_, err := receiptsBindingToProtocol([]ccipapi.Receipt{r})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "receipts[0]: dest gas limit must be non-negative")
 	})
@@ -230,7 +232,7 @@ func TestReceiptsBindingToProtocol_numericBounds(t *testing.T) {
 		t.Parallel()
 		r := base
 		r.DestBytesOverhead = -1
-		_, err := receiptsBindingToProtocol([]core.Receipt{r})
+		_, err := receiptsBindingToProtocol([]ccipapi.Receipt{r})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "receipts[0]: dest bytes overhead must be non-negative")
 	})
@@ -239,7 +241,7 @@ func TestReceiptsBindingToProtocol_numericBounds(t *testing.T) {
 		t.Parallel()
 		r := base
 		r.DestBytesOverhead = math.MaxUint32 + 1
-		_, err := receiptsBindingToProtocol([]core.Receipt{r})
+		_, err := receiptsBindingToProtocol([]ccipapi.Receipt{r})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "receipts[0]: dest bytes overhead overflows uint32")
 	})
@@ -248,7 +250,7 @@ func TestReceiptsBindingToProtocol_numericBounds(t *testing.T) {
 		t.Parallel()
 		r := base
 		r.DestBytesOverhead = math.MaxUint32
-		got, err := receiptsBindingToProtocol([]core.Receipt{r})
+		got, err := receiptsBindingToProtocol([]ccipapi.Receipt{r})
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 		require.Equal(t, uint32(math.MaxUint32), got[0].DestBytesOverhead)
@@ -896,7 +898,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		execIssuer := protocol.Keccak256([]byte("executor"))
 		networkIssuer := protocol.Keccak256([]byte("network"))
 
-		bindingReceipts := []core.Receipt{
+		bindingReceipts := []ccipapi.Receipt{
 			{IssuerAddress: types.TEXT(hex.EncodeToString(ccvIssuer[:])), DestGasLimit: 100000, DestBytesOverhead: 500, FeeTokenAmount: types.NUMERIC("1000000."), ExtraArgs: types.TEXT(extraArgsHex)},
 			{IssuerAddress: types.TEXT(hex.EncodeToString(execIssuer[:])), DestGasLimit: 0, DestBytesOverhead: 0, FeeTokenAmount: types.NUMERIC("500000."), ExtraArgs: types.TEXT("")},
 			{IssuerAddress: types.TEXT(hex.EncodeToString(networkIssuer[:])), DestGasLimit: 0, DestBytesOverhead: 0, FeeTokenAmount: types.NUMERIC("500000."), ExtraArgs: types.TEXT("")},

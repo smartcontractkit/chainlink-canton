@@ -1,7 +1,7 @@
 -- | OnRamp for CCIP message sending, called by PerPartyRouter.
 module CCIP.OnRamp where
 
-import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Crypto.Text (BytesHex, byteCount, keccak256)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
@@ -9,6 +9,8 @@ import DA.Optional (fromOptional, fromSomeNote, isNone, isSome)
 import DA.Text qualified as Text
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
+
+import qualified CCIP.API.EventEmitterV1
 
 import qualified CCIP.Client
 import qualified CCIP.Events
@@ -244,6 +246,27 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
         totalExecutionGasLimit = quote.totalGas
         premiumMultiplier = quote.premiumMultiplier
         feeTokenPrice = quote.feeTokenPrice
+
+template CCIPMessageSent
+    with
+        ccipOwner : Party
+        ccvOwners : [Party]
+        sender : Party
+        observers : [Party]
+        event : CCIPMessageSentEvent
+    where
+        signatory dedup (ccipOwner :: ccvOwners)
+        observer sender, observers
+
+data CCIPMessageSentEvent = CCIPMessageSentEvent
+    with
+        destChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        encodedMessage : BytesHex
+        verifierBlobs : [BytesHex]
+        receipts : [CCIP.API.EventEmitterV1.Receipt]
+    deriving (Eq, Show)
 
 template OnRamp
     with
@@ -831,18 +854,38 @@ template OnRamp
                 let receipts = assembleReceipts sendingMsg
                 let finalVerifierData = orderedVerifierData sendingMsg
                 finalizeResult <- exercise sendingMessageCid CCIP.SendingMessageV1.FinalizeSend with
+                    eventEmitter = toInterfaceContractId @CCIP.API.EventEmitterV1.EventEmitter self
                     messageSender = routerPartyOwner
                     messageSentObservers = concatMap (.messageSentObservers) finalVerifierData
                     verifierBlobs = map (.verifierBlob) finalVerifierData
                     receipts = receipts
 
                 pure CCIPSendFromRouterResult with
-                    ccipMessageSent = finalizeResult.ccipMessageSent
+                    ccipMessageSent = coerceContractId finalizeResult.ccipMessageSent
                     verifierBlobs =
                         map (.verifierBlob) finalVerifierData
                     messageSentObservers =
                         concatMap (.messageSentObservers) finalVerifierData
                     receipts
+
+        interface instance CCIP.API.EventEmitterV1.EventEmitter for OnRamp where
+            view = CCIP.API.EventEmitterV1.EventEmitterView with
+                ccipOwner = ccipOwner
+                instanceId
+
+            eventEmitter_emitCCIPMessageSentEventImpl self arg = do
+                coerceContractId <$> create CCIPMessageSent with
+                    ccipOwner = ccipOwner
+                    ccvOwners = arg.ccvOwners
+                    sender = arg.sender
+                    observers = arg.observers
+                    event = CCIPMessageSentEvent with
+                        destChainSelector = arg.destChainSelector
+                        sequenceNumber = arg.sequenceNumber
+                        messageId = keccak256 arg.encodedMessage
+                        encodedMessage = arg.encodedMessage
+                        verifierBlobs = arg.verifierBlobs
+                        receipts = arg.receipts
 
         interface instance MCMSReceiver for OnRamp where
           view = MCMSReceiverView with
@@ -869,10 +912,10 @@ template OnRamp
 
 data CCIPSendFromRouterResult = CCIPSendFromRouterResult
     with
-        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
+        ccipMessageSent : ContractId CCIPMessageSent
         verifierBlobs : [BytesHex]
         messageSentObservers : [Party]
-        receipts : [CCIP.Tickets.Receipt]
+        receipts : [CCIP.API.EventEmitterV1.Receipt]
     deriving (Eq, Show)
 
 orderedVerifierDataByCCVs
@@ -902,7 +945,7 @@ orderedVerifierData sendingMsg =
 -- | Assemble final receipts from the separated fee fields, verifier data,
 -- token send data, executor fee, and the network fee. Receipt order matches
 -- EVM: CCV receipts, pool receipt, executor receipt, network fee receipt.
-assembleReceipts : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.Tickets.Receipt]
+assembleReceipts : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.API.EventEmitterV1.Receipt]
 assembleReceipts sendingMsg =
     let
         finalVerifierData = orderedVerifierData sendingMsg
@@ -915,8 +958,8 @@ assembleReceipts sendingMsg =
             (Some tsd, Some fee) ->
                 let poolAddr = CCIP.MessageCodecV1.encodeInstanceAddress
                         tsd.poolInstanceId tsd.poolOwner
-                in [CCIP.Tickets.Receipt with
-                    issuerType = CCIP.Tickets.IssuerType_Pool
+                in [CCIP.API.EventEmitterV1.Receipt with
+                    issuerType = CCIP.API.EventEmitterV1.IssuerType_Pool
                     issuerAddress = poolAddr
                     versionTag = None
                     destGasLimit = fee.destGasOverhead
@@ -936,8 +979,8 @@ assembleReceipts sendingMsg =
                                 None -> error "missing executor fee"
                         CCIP.SendingMessageV1.ExecutionMode_NoExecutor ->
                             noExecutionAddressBytes
-                in [CCIP.Tickets.Receipt with
-                    issuerType = CCIP.Tickets.IssuerType_Executor
+                in [CCIP.API.EventEmitterV1.Receipt with
+                    issuerType = CCIP.API.EventEmitterV1.IssuerType_Executor
                     issuerAddress = execAddr
                     versionTag = None
                     destGasLimit = sendingMsg.executorDestGasLimit
@@ -945,8 +988,8 @@ assembleReceipts sendingMsg =
                     feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.executorFeeTokenAmount
                     extraArgs = sendingMsg.executorArgs]
 
-        networkReceipt = CCIP.Tickets.Receipt with
-            issuerType = CCIP.Tickets.IssuerType_Network
+        networkReceipt = CCIP.API.EventEmitterV1.Receipt with
+            issuerType = CCIP.API.EventEmitterV1.IssuerType_Network
             issuerAddress = ""
             versionTag = None
             destGasLimit = 0
@@ -958,14 +1001,14 @@ assembleReceipts sendingMsg =
 
 -- | Finds the matching ccvFee by (ccvInstanceId, ccvOwner) and looks up
 -- the corresponding feeTokenAmount from the parallel ccvFeeTokenAmounts list.
-assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> CCIP.SendingMessageV1.VerifierData -> CCIP.Tickets.Receipt
+assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> CCIP.SendingMessageV1.VerifierData -> CCIP.API.EventEmitterV1.Receipt
 assembleCCVReceipt ccvFees ccvFeeTokenAmounts vd =
     let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress vd.ccvInstanceId vd.ccvOwner
         (fee, feeTokenAmt) = findFeeWithAmount ccvFees ccvFeeTokenAmounts
             (\q -> q.ccvInstanceId == vd.ccvInstanceId
                 && q.ccvOwner == vd.ccvOwner)
-    in CCIP.Tickets.Receipt with
-        issuerType = CCIP.Tickets.IssuerType_CCV
+    in CCIP.API.EventEmitterV1.Receipt with
+        issuerType = CCIP.API.EventEmitterV1.IssuerType_CCV
         issuerAddress = ccvAddr
         versionTag = Some vd.versionTag
         destGasLimit = fee.destGasLimit

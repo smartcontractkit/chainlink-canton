@@ -11,7 +11,8 @@ import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome, fromSome, fromOptional)
 import DA.Text qualified as Text
 
-import qualified CCIP.Events
+import qualified CCIP.API.EventEmitterV1
+
 import qualified CCIP.FinalityConfig
 import qualified CCIP.Internal
 import qualified CCIP.Math
@@ -22,6 +23,7 @@ import qualified CCIP.Tickets
 import MCMS.Crypto (isValidHex)
 
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
 
 data CCVFee = CCVFee
     with
@@ -551,28 +553,31 @@ template SendingMessageV1
 
         choice FinalizeSend : FinalizeSendResult
             with
+                eventEmitter : ContractId CCIP.API.EventEmitterV1.EventEmitter
                 messageSender : Party
                 messageSentObservers : [Party]
                 verifierBlobs : [BytesHex]
-                receipts : [CCIP.Tickets.Receipt]
+                receipts : [CCIP.API.EventEmitterV1.Receipt]
             controller ccipOwner
             do
                 assertMsg "finalizeSend: only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
                 assertMsg "finalizeSend: message not yet constructed" (isSome message)
                 assertMsg "finalizeSend: sender mismatch" (messageSender == sender)
 
-                eventCid <- create CCIP.Events.CCIPMessageSent with
-                    ccipOwner = ccipOwner
-                    ccvOwners = ccvOwners
+                eventCid <- exercise eventEmitter CCIP.API.EventEmitterV1.EventEmitter_EmitCCIPMessageSentEvent with
+                    destChainSelector = destChainSelector
+                    sequenceNumber = sequenceNumber
                     sender = messageSender
+                    encodedMessage = encodedMessage
+                    feeToken = feeToken
+                    tokenAmountBeforeTokenPoolFees = 0.0
+                    receipts = receipts
+                    ccvOwners = ccvOwners
+                    verifierBlobs = verifierBlobs
                     observers = messageSentObservers
-                    event = CCIP.Events.CCIPMessageSentEvent with
-                        destChainSelector = destChainSelector
-                        sequenceNumber = sequenceNumber
-                        messageId = messageId
-                        encodedMessage = encodedMessage
-                        verifierBlobs = verifierBlobs
-                        receipts = receipts
+                    extraActors = []
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
                 pure FinalizeSendResult with
                     ccipMessageSent = eventCid
 
@@ -593,5 +598,5 @@ template SendingMessageV1
 
 data FinalizeSendResult = FinalizeSendResult
     with
-        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
+        ccipMessageSent : ContractId ()
     deriving (Eq, Show)

@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	ccipapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
@@ -29,7 +30,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "a7e313ec968c8d4987e62fbd87c45c118ddc167da53d09d6bdc654ff9821ab62"
+	PackageID   = "a56f22abace5597bdcf2528934e2a2fa02c4df51a7671109f162b2eaf0e5e651"
 	SDKVersion  = "3.4.11"
 )
 
@@ -284,6 +285,207 @@ func (t ArchivedExecutedMessages) ArchiveWithPackageID(contractID string, packag
 	}
 }
 
+// CCIPMessageSent is a Template type
+type CCIPMessageSent struct {
+	CcipOwner types.PARTY          `json:"ccipOwner"`
+	CcvOwners []types.PARTY        `json:"ccvOwners"`
+	Sender    types.PARTY          `json:"sender"`
+	Observers []types.PARTY        `json:"observers"`
+	Event     CCIPMessageSentEvent `json:"event"`
+}
+
+// GetTemplateID returns the template ID for this template using the package name
+func (t CCIPMessageSent) GetTemplateID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "CCIPMessageSent")
+}
+
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t CCIPMessageSent) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.OnRamp", "CCIPMessageSent")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t CCIPMessageSent) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccvOwners"] = func() []any {
+		res := make([]any, 0, len(t.CcvOwners))
+		for _, e := range t.CcvOwners {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sender"] = t.Sender.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["event"] = model.NestedToDAMLValue(t.Event)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t CCIPMessageSent) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccvOwners"] = func() []any {
+		res := make([]any, 0, len(t.CcvOwners))
+		for _, e := range t.CcvOwners {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sender"] = t.Sender.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["event"] = model.NestedToDAMLValue(t.Event)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
+func (t CCIPMessageSent) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CCIPMessageSent) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CCIPMessageSent to hex string (Canton MCMS format)
+func (t CCIPMessageSent) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPMessageSent from hex string (Canton MCMS format)
+func (t *CCIPMessageSent) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Choice methods for CCIPMessageSent
+
+// Archive exercises the Archive choice on this CCIPMessageSent contract
+// This method uses the package name in the template ID
+func (t CCIPMessageSent) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "CCIPMessageSent"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t CCIPMessageSent) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "CCIPMessageSent"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// CCIPMessageSentEvent is a Record type
+type CCIPMessageSentEvent struct {
+	DestChainSelector types.NUMERIC     `json:"destChainSelector"`
+	SequenceNumber    types.NUMERIC     `json:"sequenceNumber"`
+	MessageId         types.TEXT        `json:"messageId"`
+	EncodedMessage    types.TEXT        `json:"encodedMessage"`
+	VerifierBlobs     []types.TEXT      `json:"verifierBlobs"`
+	Receipts          []ccipapi.Receipt `json:"receipts"`
+}
+
+// ToMap converts CCIPMessageSentEvent to a map for DAML arguments
+func (t CCIPMessageSentEvent) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["sequenceNumber"] = t.SequenceNumber
+
+	m["messageId"] = string(t.MessageId)
+
+	m["encodedMessage"] = string(t.EncodedMessage)
+
+	m["verifierBlobs"] = func() []any {
+		res := make([]any, 0, len(t.VerifierBlobs))
+		for _, e := range t.VerifierBlobs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["receipts"] = func() []any {
+		res := make([]any, 0, len(t.Receipts))
+		for _, e := range t.Receipts {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t CCIPMessageSentEvent) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CCIPMessageSentEvent) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CCIPMessageSentEvent to hex string (Canton MCMS format)
+func (t CCIPMessageSentEvent) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPMessageSentEvent from hex string (Canton MCMS format)
+func (t *CCIPMessageSentEvent) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CCIPSend is a Record type
 type CCIPSend struct {
 	Context                 splice_api_token_metadata_v1.ChoiceContext `json:"context"`
@@ -413,7 +615,7 @@ type CCIPSendFromRouterResult struct {
 	CcipMessageSent      types.CONTRACT_ID `json:"ccipMessageSent"`
 	VerifierBlobs        []types.TEXT      `json:"verifierBlobs"`
 	MessageSentObservers []types.PARTY     `json:"messageSentObservers"`
-	Receipts             []core.Receipt    `json:"receipts"`
+	Receipts             []ccipapi.Receipt `json:"receipts"`
 }
 
 // ToMap converts CCIPSendFromRouterResult to a map for DAML arguments
@@ -2152,11 +2354,11 @@ func (t OnRamp) FinalizeFeeFromRouterWithPackageID(contractID string, packageID 
 	}
 }
 
-// Archive exercises the Archive choice on this OnRamp contract via the IMCMSReceiver interface
+// Archive exercises the Archive choice on this OnRamp contract via the IEventEmitter interface
 // This method uses the package name in the template ID
 func (t OnRamp) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "EventEmitter"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -2166,7 +2368,7 @@ func (t OnRamp) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "EventEmitter"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -2215,9 +2417,32 @@ func (t OnRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageID
 	}
 }
 
+// EventEmitterEmitCCIPMessageSentEvent exercises the EventEmitter_EmitCCIPMessageSentEvent choice on this OnRamp contract via the IEventEmitter interface
+// This method uses the package name in the template ID
+func (t OnRamp) EventEmitterEmitCCIPMessageSentEvent(contractID string, args ccipapi.EventEmitterEmitCCIPMessageSentEvent) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "EventEmitter"),
+		ContractID: contractID,
+		Choice:     "EventEmitter_EmitCCIPMessageSentEvent",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// EventEmitterEmitCCIPMessageSentEventWithPackageID exercises the EventEmitter_EmitCCIPMessageSentEvent choice using the provided package ID instead of package name
+func (t OnRamp) EventEmitterEmitCCIPMessageSentEventWithPackageID(contractID string, packageID string, args ccipapi.EventEmitterEmitCCIPMessageSentEvent) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "EventEmitter"),
+		ContractID: contractID,
+		Choice:     "EventEmitter_EmitCCIPMessageSentEvent",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Verify interface implementations for OnRamp
 
 var _ api.IMCMSReceiver = (*OnRamp)(nil)
+
+var _ ccipapi.IEventEmitter = (*OnRamp)(nil)
 
 // OnRampDeps is a Record type
 type OnRampDeps struct {
