@@ -10,6 +10,7 @@ import (
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
+	ccvshared "github.com/smartcontractkit/chainlink-ccv/deployment/shared"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 )
@@ -20,6 +21,11 @@ var tokenPoolVersions = []string{
 }
 
 func init() {
+	// Canonicalise canton committee signer addresses (raw secp256k1 pubkey ->
+	// derived 20-byte ECDSA address) so ccv state inference can match on-chain
+	// committee signers back to canton NOPs.
+	ccvshared.RegisterAddressNormalizer(chainsel.FamilyCanton, normalizeCantonSignerAddress)
+
 	// Register the onchain adapters
 	ccipadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyCanton, &CantonDeployChainContractsAdapter{})
 	ccipadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyCanton, &cantonChainFamilyWithDataStoreCache{})
