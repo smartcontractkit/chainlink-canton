@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/archivecontracts"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
@@ -709,4 +710,143 @@ func executeAddParticipantWithAcsSequence(
 	}
 
 	return nil
+}
+
+// executeArchiveContractsSequence runs the multiparty archive ceremony.
+func executeArchiveContractsSequence(
+	ctx context.Context,
+	cfg client.ClientConfig,
+	input archivecontracts.ArchiveContractsInput,
+	stateDir string,
+	workflowId string,
+	confirmer ceremony.Confirmer,
+) error {
+	lggr, err := newCLILogger()
+	if err != nil {
+		return fmt.Errorf("creating logger: %w", err)
+	}
+
+	var previousReports []operations.Report[any, any]
+	if workflowId != "" {
+		ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+		previousReports, err = ceremony.LoadReports(ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("loading previous reports: %w", err)
+		}
+	}
+	initialRun := workflowId == ""
+
+	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
+	bundle := operations.NewBundle(
+		func() context.Context { return ctx },
+		logger.Nop(),
+		reporter,
+	)
+
+	adminConn, err := client.Dial(cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to Canton admin API: %w", err)
+	}
+	defer adminConn.Close()
+
+	ledgerConn, err := client.DialLedger(cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to Canton ledger API: %w", err)
+	}
+	defer ledgerConn.Close()
+
+	adminClient := client.NewGRPCClient(adminConn)
+
+	resolvedSyncID, err := client.ResolvePhysicalSynchronizerID(ctx, adminClient, input.SynchronizerID)
+	if err != nil {
+		return fmt.Errorf("resolve synchronizer-id %q: %w", input.SynchronizerID, err)
+	}
+	input.SynchronizerID = resolvedSyncID
+
+	var kmsAPI client.AWSKMSAPI
+	if cfg.KmsProtocolKeyID != "" {
+		awsCfg, cfgErr := awsconfig.LoadDefaultConfig(ctx)
+		if cfgErr != nil {
+			return fmt.Errorf("loading AWS config for KMS signing: %w", cfgErr)
+		}
+		kmsAPI = awskms.NewFromConfig(awsCfg)
+	}
+
+	deps := ledger.ContractDeployDeps{
+		AdminClient:  adminClient,
+		LedgerClient: client.NewGRPCLedgerClient(ledgerConn),
+		SignerFactory: client.NewTransactionSignerFactory(
+			adminClient,
+			cryptoadminv30.NewVaultServiceClient(adminConn),
+			cfg.KMS(),
+			kmsAPI,
+		),
+		Logger:    lggr,
+		Confirmer: confirmer,
+		UserID:    cfg.UserID,
+	}
+
+	lggr.Infow("Running archive-contracts sequence",
+		"party", input.DecentralizedPartyID,
+		"participant", cfg.ParticipantID,
+		"templates", len(input.Templates),
+		"targets", len(input.Targets),
+		"dry_run", input.DryRun,
+	)
+
+	sr, seqErr := operations.ExecuteSequence(bundle, archivecontracts.ArchiveContractsSequence, deps, input)
+
+	if workflowId == "" {
+		workflowId = sr.ID
+	}
+	ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
+		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
+	}
+	allReports, reportErr := reporter.GetReports()
+	if reportErr != nil {
+		lggr.Errorw("Failed to collect reports", "err", reportErr)
+	}
+	if saveErr := ceremony.SaveReportUpdates(ceremonyDir, previousReports, allReports); saveErr != nil {
+		lggr.Errorw("Failed to save reports", "err", saveErr)
+	}
+
+	if initialRun {
+		state := ceremony.WorkflowState[archivecontracts.ArchiveContractsInput]{
+			CeremonyID: workflowId,
+			Type:       ceremony.WorkflowTypeArchiveContracts,
+			Input:      input,
+		}
+		if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+			lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+		}
+	}
+
+	if seqErr != nil {
+		if strings.Contains(seqErr.Error(), archivecontracts.ErrThresholdNotMet.Error()) {
+			fmt.Fprintf(os.Stderr, "archive-contracts ceremony not yet complete: %v\n", seqErr)
+			fmt.Fprintf(os.Stderr, "Ceremony ID: %s\n", workflowId)
+			fmt.Fprintln(os.Stderr, "Run `resume` on each hosting participant with the same --state-dir, then resume on the coordinator to execute.")
+			os.Exit(2) //nolint:gocritic // intentional early exit for UX
+		}
+
+		return seqErr
+	}
+
+	printArchiveSummary(sr.Output.ArchivedCount, sr.Output.State.TargetsDiscovered, len(sr.Output.Targets), input.DryRun, sr.Output.Targets, workflowId)
+
+	return nil
+}
+
+func printArchiveSummary(archived, discovered, targetCount int, dryRun bool, targets []ledger.ArchiveTarget, workflowId string) {
+	if dryRun && discovered > 0 {
+		fmt.Printf("Dry run: %d contracts matched (ceremony %s)\n", discovered, workflowId)
+		for _, t := range targets {
+			fmt.Printf("  %s:%s:%s  %s\n", t.PackageID, t.ModuleName, t.EntityName, t.ContractID)
+		}
+
+		return
+	}
+
+	fmt.Printf("Archived %d contracts (ceremony %s)\n", archived, workflowId)
 }

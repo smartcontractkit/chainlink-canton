@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/x509"
 	"fmt"
+	"strings"
 
 	v2crypto "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	cryptoadminv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/admin/v30"
@@ -44,6 +45,9 @@ func NewVaultSigner(ctx context.Context, vault cryptoadminv30.VaultServiceClient
 		ProtocolVersion: 34,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "does not support exporting") {
+			return nil, fmt.Errorf("ExportKeyPair %q: %w (participant keys are KMS-backed: set kms_protocol_key_id in participant-config.json and use AWS credentials with kms:Sign)", fingerprint, err)
+		}
 		return nil, fmt.Errorf("ExportKeyPair %q: %w", fingerprint, err)
 	}
 

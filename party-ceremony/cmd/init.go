@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
@@ -10,11 +11,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/archivecontracts"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
@@ -658,4 +661,101 @@ func runInitAddParticipantWithAcs(cmd *cobra.Command, _ []string) error {
 	}
 
 	return executeAddParticipantWithAcsSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
+}
+
+// initArchiveContractsCmd initialises a multiparty contract archive ceremony.
+//
+// Usage:
+//
+//	canton-party-ceremony init archive-contracts \
+//	  --decentralized-party-id "ccipOwner::1220..." \
+//	  --synchronizer-id global \
+//	  --template "#ccip-common:CCIP.GlobalConfig:GlobalConfig" \
+//	  --config ./cv1.participant-config.json \
+//	  --dry-run
+var initArchiveContractsCmd = &cobra.Command{
+	Use:   "archive-contracts",
+	Short: "Initialise a multiparty contract archive ceremony",
+	Long: `Archive active contracts owned by a decentralized party via InteractiveSubmission.
+
+Run init on the coordinator participant (cv1) with a JWT that has CanActAs the
+decentralized party. Each hosting participant must resume with the same
+ceremony ID and a shared --state-dir (copy reports.json between nodes if needed).
+
+Flow: discover ACS targets → prepare Archive batch → sign on every host → execute.
+
+Use --dry-run to list matching contracts without submitting. Archives run one
+contract per prepared transaction by default (Canton Interactive Submission
+limit); increase --batch-size only if your participant supports multi-command prepare.`,
+	RunE: runInitArchiveContracts,
+}
+
+func init() {
+	f := initArchiveContractsCmd.Flags()
+
+	f.String("decentralized-party-id", "", "Full party ID (required)")
+	f.String("synchronizer-id", "global", "Canton synchronizer ID")
+	f.StringArray("template", nil, "Template selector package:Module:Entity (#name for package name); repeat")
+	f.String("inventory-file", "", "JSON file with explicit archive targets [{package_id,module_name,entity_name,contract_id}, ...]")
+	f.Int("batch-size", 1, "Archives per prepared transaction (default 1; Canton interactive prepare supports one command)")
+	f.Bool("dry-run", false, "Discover and list targets without archiving")
+	f.String("config", "participant-config.json", "Path to participant config JSON file")
+	f.String("state-dir", "ceremonies", "Root directory under which ceremony state is stored")
+
+	_ = initArchiveContractsCmd.MarkFlagRequired("decentralized-party-id")
+
+	initCmd.AddCommand(initArchiveContractsCmd)
+}
+
+func runInitArchiveContracts(cmd *cobra.Command, _ []string) error {
+	f := cmd.Flags()
+
+	partyID, _ := f.GetString("decentralized-party-id")
+	synchronizerID, _ := f.GetString("synchronizer-id")
+	templateFlags, _ := f.GetStringArray("template")
+	inventoryFile, _ := f.GetString("inventory-file")
+	batchSize, _ := f.GetInt("batch-size")
+	dryRun, _ := f.GetBool("dry-run")
+	configPath, _ := f.GetString("config")
+	stateDir, _ := f.GetString("state-dir")
+
+	cfg, err := client.LoadConfig(configPath)
+	if err != nil {
+		return err
+	}
+
+	var templates []ledger.TemplateSelector
+	for _, raw := range templateFlags {
+		tpl, err := archivecontracts.ParseTemplateSelector(strings.TrimSpace(raw))
+		if err != nil {
+			return err
+		}
+		templates = append(templates, tpl)
+	}
+
+	var targets []ledger.ArchiveTarget
+	if inventoryFile != "" {
+		data, err := os.ReadFile(inventoryFile)
+		if err != nil {
+			return fmt.Errorf("reading inventory file %q: %w", inventoryFile, err)
+		}
+		if err := json.Unmarshal(data, &targets); err != nil {
+			return fmt.Errorf("parsing inventory file %q: %w", inventoryFile, err)
+		}
+	}
+
+	if len(templates) == 0 && len(targets) == 0 {
+		return fmt.Errorf("at least one --template or --inventory-file is required")
+	}
+
+	input := archivecontracts.ArchiveContractsInput{
+		DecentralizedPartyID: partyID,
+		SynchronizerID:       synchronizerID,
+		Templates:            templates,
+		Targets:              targets,
+		BatchSize:            batchSize,
+		DryRun:               dryRun,
+	}
+
+	return executeArchiveContractsSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
 }

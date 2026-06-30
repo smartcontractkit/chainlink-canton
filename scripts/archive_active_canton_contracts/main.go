@@ -42,6 +42,7 @@ type activeContractMatch struct {
 	Template   contracts.TemplateID
 	ContractID string
 	CreatedAt  time.Time
+	ActAsParty string // signatory used for Archive (may differ from ACS filter party)
 }
 
 func main() {
@@ -55,6 +56,7 @@ func main() {
 		insecure  bool
 		dryRun    bool
 		timeout   time.Duration
+		actAs     string
 
 		templates   multiFlag
 		contractIDs multiFlag
@@ -69,12 +71,14 @@ func main() {
 	flag.BoolVar(&insecure, "insecure", false, "Use insecureStatic auth instead of static auth")
 	flag.BoolVar(&dryRun, "dry-run", false, "List matching active contracts without archiving them")
 	flag.DurationVar(&timeout, "timeout", 30*time.Second, "Per-request timeout")
+	flag.StringVar(&actAs, "act-as", "", "Override submit party for all archives (e.g. rmnOwner when querying as ccipOwner observer)")
 	flag.Var(&templates, "template", "Template selector in packageId:Module:Entity form; repeat the flag for multiple templates")
 	flag.Var(&contractIDs, "contract-id", "Optional contract ID filter; repeat the flag for multiple IDs")
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n")
 		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "  go run ./scripts/archive_active_canton_contracts --grpc-url <host:port> --party <party> --template <pkg:Module:Entity> [--template ...] [--dry-run]\n\n")
-		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Archives every active contract matching the provided templates for a single Canton party.\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Archives every active contract matching the provided templates visible to --party.\n")
+		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Submissions use the contract signatory when --party is only an observer.\n")
 		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Use --dry-run first to inspect the ACS matches before archiving.\n\n")
 		flag.PrintDefaults()
 	}
@@ -149,6 +153,10 @@ func main() {
 	for _, template := range parsedTemplates {
 		matches, err := listActiveContracts(ctx, timeout, stateClient, party, template)
 		if err != nil {
+			if isPackageNotFound(err) {
+				fmt.Printf("\nTemplate %s\n  skipped (package not on this participant)\n", template.String())
+				continue
+			}
 			fatalf("list active contracts for %s: %v", template.String(), err)
 		}
 		if len(contractIDSet) > 0 {
@@ -163,16 +171,27 @@ func main() {
 		}
 
 		for _, match := range matches {
-			fmt.Printf("  %s created_at=%s\n", match.ContractID, match.CreatedAt.Format(time.RFC3339Nano))
+			submitParty := match.ActAsParty
+			if actAs != "" {
+				submitParty = actAs
+			}
+			line := fmt.Sprintf("  %s created_at=%s act_as=%s", match.ContractID, match.CreatedAt.Format(time.RFC3339Nano), submitParty)
+			if submitParty == party {
+				line += " (same as query party)"
+			}
+			fmt.Println(line)
 		}
 		if dryRun {
 			continue
 		}
 
 		for _, match := range matches {
-			updateID, err := archiveContract(ctx, timeout, commandClient, party, match)
+			if actAs != "" {
+				match.ActAsParty = actAs
+			}
+			updateID, err := archiveContract(ctx, timeout, commandClient, match)
 			if err != nil {
-				fatalf("archive %s (%s): %v", match.ContractID, match.Template.String(), err)
+				fatalf("archive %s (%s) act_as=%s: %v", match.ContractID, match.Template.String(), match.ActAsParty, err)
 			}
 			totalArchived++
 			fmt.Printf("  archived update_id=%s\n", updateID)
@@ -287,6 +306,7 @@ func listActiveContracts(ctx context.Context, timeout time.Duration, stateClient
 			},
 			ContractID: created.GetContractId(),
 			CreatedAt:  created.GetCreatedAt().AsTime(),
+			ActAsParty: resolveActAsParty(party, created),
 		})
 	}
 
@@ -308,7 +328,92 @@ func filterByContractID(matches []activeContractMatch, contractIDs map[string]st
 	return filtered
 }
 
-func archiveContract(ctx context.Context, timeout time.Duration, commandClient apiv2.CommandServiceClient, party string, match activeContractMatch) (string, error) {
+func resolveActAsParty(queryParty string, created *apiv2.CreatedEvent) string {
+	entity := created.GetTemplateId().GetEntityName()
+
+	// Query party may be observer-only; read signatory from payload before ACS signatories.
+	switch entity {
+	case "RMNRemote":
+		if p := partyField(created.GetCreateArguments(), "rmnOwner"); p != "" {
+			return p
+		}
+		for _, s := range created.GetSignatories() {
+			if s != "" && s != queryParty {
+				return s
+			}
+		}
+		if p := strings.TrimSpace(os.Getenv("STAGING_RMN_OWNER_PARTY")); p != "" {
+			return p
+		}
+	case "CommitteeVerifier":
+		if p := partyField(created.GetCreateArguments(), "owner"); p != "" {
+			return p
+		}
+	}
+
+	signatories := created.GetSignatories()
+	if len(signatories) > 0 {
+		if slices.Contains(signatories, queryParty) {
+			// Prefer a different signatory when the query party is only an observer
+			// but appears in ACS metadata (common when filtering by observer party).
+			for _, s := range signatories {
+				if s != queryParty {
+					return s
+				}
+			}
+			return queryParty
+		}
+		return signatories[0]
+	}
+	for _, label := range []string{"rmnOwner", "owner"} {
+		if p := partyField(created.GetCreateArguments(), label); p != "" {
+			return p
+		}
+	}
+	if entity == "RMNRemote" {
+		if p := strings.TrimSpace(os.Getenv("STAGING_RMN_OWNER_PARTY")); p != "" {
+			return p
+		}
+	}
+	return queryParty
+}
+
+func wrapSubmitError(actAs string, err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "NO_SYNCHRONIZER_ON_WHICH_ALL_SUBMITTERS_CAN_SUBMIT") {
+		return fmt.Errorf("%w\n\nYour JWT can read contracts for this party but cannot submit as %q (missing canActAs on this participant).\nAsk ops to grant actAs+readAs for the decentralized party to your ledger user on this node,\nor use credentials that include canActAs (party-ceremony GrantPartyRightsOp).", err, actAs)
+	}
+	return err
+}
+
+func partyField(rec *apiv2.Record, label string) string {
+	if rec == nil {
+		return ""
+	}
+	for _, f := range rec.GetFields() {
+		if f.GetLabel() != label {
+			continue
+		}
+		if p, ok := f.GetValue().GetSum().(*apiv2.Value_Party); ok {
+			return p.Party
+		}
+	}
+	return ""
+}
+
+func isPackageNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "PACKAGE_NAMES_NOT_FOUND") ||
+		strings.Contains(msg, "PACKAGES_NOT_FOUND")
+}
+
+func archiveContract(ctx context.Context, timeout time.Duration, commandClient apiv2.CommandServiceClient, match activeContractMatch) (string, error) {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -325,11 +430,11 @@ func archiveContract(ctx context.Context, timeout time.Duration, commandClient a
 					},
 				}},
 			}},
-			ActAs: []string{party},
+			ActAs: []string{match.ActAsParty},
 		},
 	})
 	if err != nil {
-		return "", err
+		return "", wrapSubmitError(match.ActAsParty, err)
 	}
 	if resp.GetTransaction() == nil {
 		return "", nil

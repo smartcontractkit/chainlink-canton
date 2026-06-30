@@ -134,3 +134,50 @@ type VerifyContractOutput struct {
 	Verified   bool   `json:"verified"`
 	ContractID string `json:"contract_id"`
 }
+
+// ── Archive contracts ────────────────────────────────────────────────────────
+
+// TemplateSelector identifies contracts to archive by template. PackageName uses
+// the Daml package name (e.g. "ccip-common") and is resolved via FiltersByParty
+// with a "#<name>" package reference. PackageID uses an exact package hash instead.
+type TemplateSelector struct {
+	PackageName string `json:"package_name,omitempty"`
+	PackageID   string `json:"package_id,omitempty"`
+	ModuleName  string `json:"module_name"`
+	EntityName  string `json:"entity_name"`
+}
+
+// ArchiveTarget is one active contract to archive.
+type ArchiveTarget struct {
+	PackageID  string `json:"package_id"`
+	ModuleName string `json:"module_name"`
+	EntityName string `json:"entity_name"`
+	ContractID string `json:"contract_id"`
+}
+
+// DiscoverArchiveTargetsInput is the input to [DiscoverArchiveTargetsOp].
+type DiscoverArchiveTargetsInput struct {
+	PartyID   string             `json:"party_id"`
+	Templates []TemplateSelector `json:"templates"`
+}
+
+// DiscoverArchiveTargetsOutput is the output of [DiscoverArchiveTargetsOp].
+type DiscoverArchiveTargetsOutput struct {
+	Targets []ArchiveTarget `json:"targets"`
+}
+
+// PrepareArchiveBatchInput is the input to [PrepareArchiveBatchOp].
+type PrepareArchiveBatchInput struct {
+	DecentralizedPartyID string          `json:"decentralized_party_id"`
+	SynchronizerID       string          `json:"synchronizer_id"`
+	BatchIndex           int             `json:"batch_index"`
+	Targets              []ArchiveTarget `json:"targets"`
+}
+
+// PrepareArchiveBatchOutput is the output of [PrepareArchiveBatchOp].
+type PrepareArchiveBatchOutput struct {
+	PreparedTransactionHash string `json:"prepared_transaction_hash"`
+	PreparedTxB64           string `json:"prepared_tx_b64"`
+	HashingSchemeVersion    int32  `json:"hashing_scheme_version"`
+	ArchiveCount            int    `json:"archive_count"`
+}

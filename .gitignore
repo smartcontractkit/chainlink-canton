@@ -23,3 +23,4 @@ eds/prod_testnet_canton.local.secrets.toml
 scripts/prod_mainnet/.env
 scripts/prod_mainnet/.env.example
 .env.prod-testnet.local
+.for-agents/

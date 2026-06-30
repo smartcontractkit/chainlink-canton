@@ -37,6 +37,9 @@ const (
 	// WorkflowTypeAddParticipantWithAcs identifies a combined add-participant
 	// + ACS replication ceremony.
 	WorkflowTypeAddParticipantWithAcs = "add-participant-with-acs"
+
+	// WorkflowTypeArchiveContracts identifies a multiparty contract archive ceremony.
+	WorkflowTypeArchiveContracts = "archive-contracts"
 )
 
 // WorkflowState is persisted to workflow.json inside the ceremony directory.
