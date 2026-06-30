@@ -7,7 +7,7 @@ import DA.Optional (fromSomeNote, isNone)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.BurnMintV1
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Context
@@ -29,6 +29,8 @@ import CCIP.TokenAdminRegistryTypes (
     TransferAdminParams(..),
     )
 
+import qualified CCIP.API.SendingMessageV1
+
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.SendingMessageV1
@@ -43,15 +45,15 @@ tokenAdminRegistryKey = "token-admin-registry"
 tokenConfigKey : Text
 tokenConfigKey = "token-config"
 
-lookupTokenAdminRegistryCid : ChoiceContext -> Update (ContractId TokenAdminRegistry)
+lookupTokenAdminRegistryCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId TokenAdminRegistry)
 lookupTokenAdminRegistryCid ctx =
     CCIP.Context.getFromContextU ctx tokenAdminRegistryKey
 
-lookupTokenConfigCid : ChoiceContext -> Update (ContractId TokenConfig)
+lookupTokenConfigCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId TokenConfig)
 lookupTokenConfigCid ctx =
     CCIP.Context.getFromContextU ctx tokenConfigKey
 
-lookupOptionalTokenConfigCid : ChoiceContext -> Update (Optional (ContractId TokenConfig))
+lookupOptionalTokenConfigCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (Optional (ContractId TokenConfig))
 lookupOptionalTokenConfigCid ctx =
     CCIP.Context.lookupFromContextU ctx tokenConfigKey
 
@@ -463,16 +465,16 @@ template TokenAdminRegistry
         -- | Record pool's outbound CCV requirements on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,
         -- then exercises SetOutboundPoolCCVs (authorized via TAR's signatory = ccipOwner).
-        nonconsuming choice SetOutboundPoolCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice SetOutboundPoolCCVs : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
                 tokenConfigCid : ContractId TokenConfig
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 poolInstanceId : Text
                 poolCCVs : [RawInstanceAddress]
                 caller : Party
             controller caller
             do
-                sm <- fetch sendingMessageCid
+                sm <- fetch (fromInterfaceContractId @CCIP.SendingMessageV1.SendingMessageV1 sendingMessageCid)
                 assertMsg "TAR outbound: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
                 RawInstanceAddress.assertEqual "TAR outbound: instance address mismatch"
                     instanceId owner sm.deps.tokenAdminRegistry
@@ -486,16 +488,16 @@ template TokenAdminRegistry
                 pool <- registeredPoolOrAbort "TAR outbound" config
                 assertRegisteredPoolCaller "TAR outbound" caller poolInstanceId pool
 
-                exercise sendingMessageCid CCIP.SendingMessageV1.SetOutboundPoolCCVs with
+                coerceContractId <$> exercise (fromInterfaceContractId @CCIP.SendingMessageV1.SendingMessageV1 sendingMessageCid) CCIP.SendingMessageV1.SetOutboundPoolCCVs with
                     poolCCVs
 
         -- | Record pool's outbound token-send fee on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,
         -- then exercises AddTokenSendFee under TAR/ccipOwner authority.
-        nonconsuming choice AddTokenSendFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice AddTokenSendFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
                 tokenConfigCid : ContractId TokenConfig
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 poolInstanceId : Text
                 feeUSDCents : Numeric 0
                 destGasOverhead : Int
@@ -503,7 +505,7 @@ template TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                sm <- fetch sendingMessageCid
+                sm <- fetch (fromInterfaceContractId @CCIP.SendingMessageV1.SendingMessageV1 sendingMessageCid)
                 assertMsg "TAR outbound fee: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
                 RawInstanceAddress.assertEqual "TAR outbound fee: instance address mismatch"
                     instanceId owner sm.deps.tokenAdminRegistry
@@ -517,20 +519,21 @@ template TokenAdminRegistry
                 pool <- registeredPoolOrAbort "TAR outbound fee" config
                 assertRegisteredPoolCaller "TAR outbound fee" caller poolInstanceId pool
 
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddTokenSendFee with
+                coerceContractId <$> exercise (fromInterfaceContractId @CCIP.SendingMessageV1.SendingMessageV1 sendingMessageCid) CCIP.SendingMessageV1.AddTokenSendFee with
                     poolInstanceId = poolInstanceId
                     poolOwner = caller
                     feeUSDCents = feeUSDCents
                     destGasOverhead = destGasOverhead
                     destBytesOverhead = destBytesOverhead
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         -- | Record pool's outbound token send data on a SendingMessageV1.
         -- Validates the caller is the registered pool for the expected token instrument,
         -- then exercises AddTokenSend under TAR/ccipOwner authority.
-        nonconsuming choice AddTokenSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice AddTokenSend : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
                 tokenConfigCid : ContractId TokenConfig
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 poolInstanceId : Text
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 amount : BytesHex
@@ -539,7 +542,7 @@ template TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                sm <- fetch sendingMessageCid
+                sm <- fetch (fromInterfaceContractId @CCIP.SendingMessageV1.SendingMessageV1 sendingMessageCid)
                 assertMsg "TAR outbound send: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
                 RawInstanceAddress.assertEqual "TAR outbound send: instance address mismatch"
                     instanceId owner sm.deps.tokenAdminRegistry
@@ -556,13 +559,14 @@ template TokenAdminRegistry
                 assertRegisteredPoolCaller "TAR outbound send" caller poolInstanceId pool
                 assertMsg "TAR outbound send: token amount must be 32 bytes" (byteCount amount == 32)
 
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddTokenSend with
+                coerceContractId <$> exercise (fromInterfaceContractId @CCIP.SendingMessageV1.SendingMessageV1 sendingMessageCid) CCIP.SendingMessageV1.AddTokenSend with
                     poolInstanceId = poolInstanceId
                     poolOwner = caller
                     instrumentId = instrumentId
                     amount = amount
                     destTokenAddress = destTokenAddress
                     extraData = extraData
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         -- | Record pool's inbound CCV requirements on an ExecutingMessageV1.
         -- Validates the caller is the registered pool for the token in the message,

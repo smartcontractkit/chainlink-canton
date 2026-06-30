@@ -392,6 +392,7 @@ testCCIPSendAllFeePayouts = script do
             feeUSDCents = cents 100.0
             destGasLimit = 0
             destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     -- AddCCVFee made ccvOwner a signatory; refresh disclosure for the updated SM.
@@ -425,6 +426,7 @@ testCCIPSendAllFeePayouts = script do
             versionTag = "00000001"
             verifierBlob = ""
             messageSentObservers = []
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     badTransferFactory <- submit ccipOwner do

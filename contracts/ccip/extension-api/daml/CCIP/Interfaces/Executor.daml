@@ -2,48 +2,41 @@ module CCIP.Interfaces.Executor where
 
 import DA.Crypto.Text (BytesHex)
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.MetadataV1
 
-import Chainlink.InstanceAddress (RawInstanceAddress)
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.API.SendingMessageV1
 
 interface IExecutor where
     viewtype ExecutorView
 
-    executor_calculateFeeImpl :
-        ContractId IExecutor ->
-        Executor_CalculateFee ->
-        Update (ContractId ())
-    executor_getFeeImpl :
-        ContractId IExecutor ->
-        Executor_GetFee ->
-        Update ExecutorFeeQuote
+    executor_calculateFeeImpl : ContractId IExecutor -> Executor_CalculateFee -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
+    executor_getFeeImpl : ContractId IExecutor -> Executor_GetFee -> Update ExecutorFeeQuote
 
-    nonconsuming choice Executor_CalculateFee : ContractId ()
+    nonconsuming choice Executor_CalculateFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
         with
-            expectedExecutor : RawInstanceAddress
-            sendingMessageCid : ContractId ()
+            expectedExecutor : Chainlink.InstanceAddress.RawInstanceAddress
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
             executorArgs : BytesHex
-            extraContext : ChoiceContext
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do
             let executorView = view this
-            RawInstanceAddress.assertEqual "executor: expected executor mismatch"
-                executorView.instanceId executorView.owner expectedExecutor
+            Chainlink.InstanceAddress.assertEqual "executor: expected executor mismatch" executorView.instanceId executorView.owner expectedExecutor
             executor_calculateFeeImpl this self arg
 
     nonconsuming choice Executor_GetFee : ExecutorFeeQuote
         with
-            expectedExecutor : RawInstanceAddress
+            expectedExecutor : Chainlink.InstanceAddress.RawInstanceAddress
             destChainSelector : Numeric 0
-            requiredCCVs : [RawInstanceAddress]
+            requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             caller : Party
         controller caller
         do
             let executorView = view this
-            RawInstanceAddress.assertEqual "executor: expected executor mismatch"
-                executorView.instanceId executorView.owner expectedExecutor
+            Chainlink.InstanceAddress.assertEqual "executor: expected executor mismatch" executorView.instanceId executorView.owner expectedExecutor
             executor_getFeeImpl this self arg
 
 data ExecutorView = ExecutorView

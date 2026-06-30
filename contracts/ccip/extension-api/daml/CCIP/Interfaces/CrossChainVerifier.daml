@@ -2,21 +2,23 @@ module CCIP.Interfaces.CrossChainVerifier where
 
 import DA.Crypto.Text (BytesHex)
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified CCIP.API.SendingMessageV1
 
 interface ICrossChainVerifier where
     viewtype CrossChainVerifierView
 
     crossChainVerifier_verifyMessageImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_VerifyMessage -> Update (ContractId ())
-    crossChainVerifier_calculateFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_CalculateFee -> Update (ContractId ())
+    crossChainVerifier_calculateFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_CalculateFee -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
     crossChainVerifier_getFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_GetFee -> Update CrossChainVerifierFeeQuote
-    crossChainVerifier_forwardToVerifierImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_ForwardToVerifier -> Update (ContractId ())
+    crossChainVerifier_forwardToVerifierImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_ForwardToVerifier -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
 
     -- Verify an inbound message and append a CCV verification to ExecutingMessageV1.
     nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId ()
         with
             rmnRemoteCid : ContractId ()
-            extraContext : ChoiceContext
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             executingMessageCid : ContractId ()
             verifierResults : BytesHex
             caller : Party
@@ -24,11 +26,10 @@ interface ICrossChainVerifier where
         do crossChainVerifier_verifyMessageImpl this self arg
 
     -- Calculate fee for outbound message (USD cents only).
-    nonconsuming choice CrossChainVerifier_CalculateFee
-            : ContractId ()
+    nonconsuming choice CrossChainVerifier_CalculateFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
         with
-            sendingMessageCid : ContractId ()
-            extraContext : ChoiceContext
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do crossChainVerifier_calculateFeeImpl this self arg
@@ -37,18 +38,18 @@ interface ICrossChainVerifier where
     nonconsuming choice CrossChainVerifier_GetFee : CrossChainVerifierFeeQuote
         with
             destChainSelector : Numeric 0
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do crossChainVerifier_getFeeImpl this self arg
 
     -- Forward message for verification and append verifier data to
     -- SendingMessageV1.
-    nonconsuming choice CrossChainVerifier_ForwardToVerifier
-            : ContractId ()
+    nonconsuming choice CrossChainVerifier_ForwardToVerifier : ContractId CCIP.API.SendingMessageV1.SendingMessage
         with
             rmnRemoteCid : ContractId ()
-            extraContext : ChoiceContext
-            sendingMessageCid : ContractId ()
+            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
             verifierArgs : BytesHex
             caller : Party
         controller caller

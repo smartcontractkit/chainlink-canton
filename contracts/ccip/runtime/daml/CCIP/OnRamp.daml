@@ -6,15 +6,21 @@ import DA.Foldable qualified as Foldable
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isNone, isSome)
-import DA.Text qualified as Text
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.MetadataV1
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Crypto (assertValidHex)
+
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (assertValidInstanceId)
+
+import qualified CCIP.Interfaces.CrossChainVerifier
 
 import qualified CCIP.Client
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
-import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
@@ -22,16 +28,13 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
 import qualified CCIP.Internal
 import qualified Splice.Api.Token.HoldingV1
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import Chainlink.InstanceAddress (assertValidInstanceId)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
+
 import CCIP.OnRampTypes (OnRampDeps(..), SetDepsParams(..))
 import CCIP.OnRampCodecGen (decodeSetDepsParamsAt)
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import MCMS.Crypto (assertValidHex)
 
 messageStaticSize : Int
 messageStaticSize = 69
@@ -69,7 +72,7 @@ noExecutionAddressBytes =
 onRampKey : Text
 onRampKey = "on-ramp"
 
-lookupOnRampCid : ChoiceContext -> Update (ContractId OnRamp)
+lookupOnRampCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId OnRamp)
 lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
 
 rawInstanceAddress : OnRamp -> RawInstanceAddress.RawInstanceAddress
@@ -348,8 +351,9 @@ template OnRamp
 
                 -- RMN curse check
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
-                    caller = ccipOwner
                     chainSelector = destChainSelector
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = ccipOwner
                 assertMsg "onramp: destination chain is cursed" (not isCursed)
 
                 destConfigOpt <- exercise globalConfigCid
@@ -501,7 +505,7 @@ template OnRamp
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 destChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                ccvFeeQuotes : [ICCV.CrossChainVerifierFeeQuote]
+                ccvFeeQuotes : [CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote]
                 tokenPoolFeeQuote : Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
                 executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller ccipOwner
@@ -766,8 +770,9 @@ template OnRamp
 
                 -- Authoritative RMN curse check
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
-                    caller = ccipOwner
                     chainSelector = sendingMsg.destChainSelector
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = ccipOwner
                 assertMsg "dest chain is cursed" (not isCursed)
 
                 destConfigOpt <- exercise globalConfigCid

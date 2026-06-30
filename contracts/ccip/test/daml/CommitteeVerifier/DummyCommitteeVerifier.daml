@@ -2,10 +2,14 @@ module CommitteeVerifier.DummyCommitteeVerifier where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.SendingMessageV1
-import CCIP.Interfaces.CrossChainVerifier
+import qualified Splice.Api.Token.MetadataV1
+
 import Chainlink.InstanceAddress (assertValidInstanceId)
+
+import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.API.SendingMessageV1
+
+import qualified CCIP.ExecutingMessageV1
 
 -- | Dummy version tag for testing
 dummyVersionTag : BytesHex
@@ -42,11 +46,12 @@ template DummyCommitteeVerifier
                             caller = owner
 
             crossChainVerifier_calculateFeeImpl _self arg = do
-                coerceContractId <$>exercise (coerceContractId arg.sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1) CCIP.SendingMessageV1.AddCCVFee with
+                exercise arg.sendingMessageCid CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
                     ccvInstanceId = instanceId
                     feeUSDCents = feeUSDCents
                     destGasLimit = destGasLimit
                     destBytesOverhead = destBytesOverhead
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = owner
 
             crossChainVerifier_getFeeImpl _self _arg = do
@@ -58,23 +63,23 @@ template DummyCommitteeVerifier
                     payloadSizeBytes = destBytesOverhead
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
+                exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
                     ForwardToVerifier with
                         sendingMessageCid = coerceContractId arg.sendingMessageCid
                         caller = arg.caller
 
-        nonconsuming choice ForwardToVerifier
-                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice ForwardToVerifier : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 caller : Party
             controller caller
             do
                 let verifierBlob = versionTag
 
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
+                exercise sendingMessageCid CCIP.API.SendingMessageV1.SendingMessage_AddVerifierData with
                     ccvInstanceId = instanceId
                     versionTag = versionTag
                     verifierBlob = verifierBlob
                     messageSentObservers = [owner]
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = owner

@@ -7,7 +7,12 @@ import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.MetadataV1
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
+import Chainlink.InstanceAddress (assertValidInstanceId)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
@@ -16,19 +21,17 @@ import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
-import Chainlink.InstanceAddress (assertValidInstanceId)
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
 import CCIP.OffRampTypes (OffRampDeps(..), SetDepsParams(..))
 import CCIP.OffRampCodecGen (decodeSetDepsParamsAt)
 
 offRampKey : Text
 offRampKey = "off-ramp"
 
-lookupOffRampCid : ChoiceContext -> Update (ContractId OffRamp)
+lookupOffRampCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId OffRamp)
 lookupOffRampCid ctx = CCIP.Context.getFromContextU ctx offRampKey
 
 rawInstanceAddress : OffRamp -> RawInstanceAddress.RawInstanceAddress
@@ -169,8 +172,9 @@ template OffRamp
                 RawInstanceAddress.assertEqual "prepareExecute: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
-                    caller = ccipOwner
                     chainSelector = message.sourceChainSelector
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = ccipOwner
                 assertMsg "prepareExecute: source chain is cursed" (not isCursed)
 
                 globalConfig <- fetch globalConfigCid
@@ -282,8 +286,9 @@ template OffRamp
                 RawInstanceAddress.assertEqual "offramp: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner execMsg.deps.rmnRemote
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
-                    caller = ccipOwner
                     chainSelector = message.sourceChainSelector
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = ccipOwner
                 assertMsg "offramp: source chain is cursed" (not isCursed)
 
                 -- Validate dependency instance addresses

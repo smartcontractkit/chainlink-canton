@@ -120,7 +120,7 @@ testCommitteeVerifier = script do
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv1 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults1
@@ -149,7 +149,7 @@ testCommitteeVerifier = script do
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv2 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults2
@@ -198,7 +198,7 @@ testCommitteeVerifier = script do
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv4 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults4
@@ -225,7 +225,7 @@ testCommitteeVerifier = script do
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv5 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults5
@@ -252,7 +252,7 @@ testCommitteeVerifier = script do
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv6 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults6
@@ -314,7 +314,7 @@ testCommitteeVerifier = script do
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults =
@@ -324,7 +324,7 @@ testCommitteeVerifier = script do
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults =
@@ -334,7 +334,7 @@ testCommitteeVerifier = script do
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults =
@@ -365,7 +365,7 @@ testCommitteeVerifier = script do
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2]
@@ -383,7 +383,7 @@ testCommitteeVerifier = script do
     executingMessageCid <- createExecMsg owner rmnOwner
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
@@ -396,7 +396,7 @@ testCommitteeVerifier = script do
     executingMessageCid <- createExecMsg owner rmnOwner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
@@ -879,7 +879,7 @@ testVerifyMessage_RejectsCrossDomainExecutingMessage = script do
 
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccvCid CommitteeVerifier.VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults
@@ -1080,9 +1080,9 @@ testForwardToVerifier_AllowlistChecksSender = script do
   -- Allowlisted party calls ForwardToVerifier for non-allowlisted sender's message → should FAIL
   submitMustFail (actAs allowlistedParty <> disclose disclosedCcv <> disclose disclosedRmn) do
     exerciseCmd ccvCid CommitteeVerifier.ForwardToVerifier with
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-      sendingMessageCid = nonAllowlistedMsgCid
+      sendingMessageCid = toInterfaceContractId nonAllowlistedMsgCid
       verifierArgs = ""
       caller = allowlistedParty
 
@@ -1093,9 +1093,9 @@ testForwardToVerifier_AllowlistChecksSender = script do
   -- Allowlisted sender's message via ForwardToVerifier → should SUCCEED
   submit (actAs allowlistedParty <> disclose disclosedCcv <> disclose disclosedRmn) do
     exerciseCmd ccvCid CommitteeVerifier.ForwardToVerifier with
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-      sendingMessageCid = allowlistedMsgCid
+      sendingMessageCid = toInterfaceContractId allowlistedMsgCid
       verifierArgs = ""
       caller = allowlistedParty
 

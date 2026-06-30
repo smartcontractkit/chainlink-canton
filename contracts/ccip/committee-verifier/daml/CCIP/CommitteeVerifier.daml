@@ -9,8 +9,21 @@ import DA.Foldable (forA_)
 import DA.List (dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote)
+import DA.Text qualified as Text
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.MetadataV1
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.API.RMNRemoteV1
+import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.Interfaces.CrossChainVerifier
+
+import qualified CCIP.Crypto.DerEncoding
+import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.MessageCodecV1
 
 import CCIP.CommitteeVerifierCodecGen (
     decodeApplySignatureConfigsParamsAt,
@@ -36,17 +49,6 @@ import CCIP.CommitteeVerifierTypes (
     TransferStorageLocationsAdminParams(..),
     UpdateStorageLocationsParams(..),
     )
-import DA.Text qualified as Text
-import qualified CCIP.Crypto.DerEncoding
-import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.MessageCodecV1
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import Chainlink.InstanceAddress (assertValidInstanceId)
-import qualified CCIP.RMNRemote
-import qualified CCIP.SendingMessageV1
-import qualified CCIP.Interfaces.CrossChainVerifier
-
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 -- The preimage is bytes4(keccak256("CommitteeVerifier 2.0.0"))
 versionTagV2_0_0 : BytesHex
@@ -101,7 +103,7 @@ template CommitteeVerifier
         -- Ensure signer configs have a positive threshold within the verifierResults
         -- proof limit, no duplicate signer keys, and that map keys match the embedded
         -- sourceChainSelector in each config.
-        ensure assertValidInstanceId instanceId
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
           && versionTag /= "" && all (\(k, config) -> k == config.sourceChainSelector && isValidSignatureConfig config) (Map.toList signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
@@ -121,9 +123,9 @@ template CommitteeVerifier
                         caller = arg.caller
 
             crossChainVerifier_calculateFeeImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @CommitteeVerifier self) CalculateFee
+                exercise (fromInterfaceContractId @CommitteeVerifier self) CalculateFee
                     with
-                        sendingMessageCid = coerceContractId arg.sendingMessageCid
+                        sendingMessageCid = arg.sendingMessageCid
                         extraContext = arg.extraContext
                         caller = arg.caller
 
@@ -131,14 +133,15 @@ template CommitteeVerifier
                 exercise (fromInterfaceContractId @CommitteeVerifier self) GetFee
                     with
                         destChainSelector = arg.destChainSelector
+                        context = arg.context
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @CommitteeVerifier self) ForwardToVerifier
+                exercise (fromInterfaceContractId @CommitteeVerifier self) ForwardToVerifier
                     with
                         rmnRemoteCid = coerceContractId arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = coerceContractId arg.sendingMessageCid
+                        sendingMessageCid = arg.sendingMessageCid
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
 
@@ -304,8 +307,8 @@ template CommitteeVerifier
         -- for signature verification (encoding is deterministic).
         nonconsuming choice VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                extraContext : ChoiceContext
+                rmnRemoteCid : ContractId CCIP.API.RMNRemoteV1.RMNRemote
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 verifierResults : BytesHex
                 caller : Party
@@ -327,14 +330,16 @@ template CommitteeVerifier
                         (Map.lookup message.sourceChainSelector signerConfigs)
 
                 -- Validate RMN instance and check source chain curse
-                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                RawInstanceAddress.assertEqual "verifier: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                rmnRemote <- fetch rmnRemoteCid
+                let rmnRemoteView = view rmnRemote
+                Chainlink.InstanceAddress.assertEqual "verifier: rmn mismatch"
+                    rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
                 assertMsg "verifier: executing message rmn mismatch"
                     (execMsg.deps.rmnRemote == deps.rmnRemote)
-                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
-                    caller = owner
+                isCursed <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_IsCursedForChain with
                     chainSelector = message.sourceChainSelector
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = owner
                 assertMsg "verifier: source chain is cursed" (not isCursed)
 
                 -- Verify version tag matches
@@ -377,32 +382,31 @@ template CommitteeVerifier
         -- | Calculate fee for outbound message (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
         -- fee config, appends fee via AddCCVFee.
-        nonconsuming choice CalculateFee
-                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice CalculateFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                extraContext : ChoiceContext
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
-                assertMsg "verifier: sending message ccipOwner mismatch"
-                    (sendingMsg.ccipOwner == ccipOwner)
-                let chainConfig = fromSomeNote "no fee config for dest chain"
-                        (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
+                let sendingMsgView = view sendingMsg
+                assertMsg "verifier: sending message ccipOwner mismatch" (sendingMsgView.ccipOwner == ccipOwner)
+                let chainConfig = fromSomeNote "no fee config for dest chain" (Map.lookup sendingMsgView.destChainSelector remoteChainConfigs)
 
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                exercise sendingMessageCid CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
                     ccvInstanceId = instanceId
                     feeUSDCents = chainConfig.feeUSDCents
                     destGasLimit = chainConfig.gasForVerification
                     destBytesOverhead = chainConfig.payloadSizeBytes
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = owner
 
         -- | Quote fee for outbound message (USD cents only).
-        nonconsuming choice GetFee
-                : CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote
+        nonconsuming choice GetFee : CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote
             with
                 destChainSelector : Numeric 0
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -418,43 +422,43 @@ template CommitteeVerifier
 
         -- | Forward message for verification. Exercises AddVerifierData
         -- directly on SendingMessageV1.
-        nonconsuming choice ForwardToVerifier
-                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice ForwardToVerifier : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                extraContext : ChoiceContext
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                rmnRemoteCid : ContractId CCIP.API.RMNRemoteV1.RMNRemote
+                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 verifierArgs : BytesHex
                 caller : Party
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
-                assertMsg "verifier: sending message ccipOwner mismatch"
-                    (sendingMsg.ccipOwner == ccipOwner)
+                let sendingMsgView = view sendingMsg
+                assertMsg "verifier: sending message ccipOwner mismatch" (sendingMsgView.ccipOwner == ccipOwner)
 
                 -- Validate RMN instance and check destination chain curse
-                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                RawInstanceAddress.assertEqual "verifier: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
-                assertMsg "verifier: sending message rmn mismatch"
-                    (sendingMsg.deps.rmnRemote == deps.rmnRemote)
-                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                rmnRemote <- fetch rmnRemoteCid
+                let rmnRemoteView = view rmnRemote
+                Chainlink.InstanceAddress.assertEqual "verifier: rmn mismatch" rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
+                assertMsg "verifier: sending message rmn mismatch" (sendingMsgView.rmnRemote == deps.rmnRemote)
+                isCursed <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_IsCursedForChain with
+                    chainSelector = sendingMsgView.destChainSelector
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = owner
-                    chainSelector = sendingMsg.destChainSelector
                 assertMsg "verifier: destination chain is cursed" (not isCursed)
 
                 -- Assert that the sender is allowed to send messages if allowlist is enabled for the destination chain
-                let destChainConfig = fromSomeNote "no config for dest chain" (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
+                let destChainConfig = fromSomeNote "no config for dest chain" (Map.lookup sendingMsgView.destChainSelector remoteChainConfigs)
                 DA.Action.when destChainConfig.allowListEnabled
-                    $ assertMsg "Sender not allowed to send messages to destination chain" (sendingMsg.sender `elem` destChainConfig.allowedSendersList)
+                    $ assertMsg "Sender not allowed to send messages to destination chain" (sendingMsgView.sender `elem` destChainConfig.allowedSendersList)
 
                 let verifierBlob = versionTag
 
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
+                exercise sendingMessageCid CCIP.API.SendingMessageV1.SendingMessage_AddVerifierData with
                     ccvInstanceId = instanceId
                     versionTag = versionTag
                     verifierBlob = verifierBlob
                     messageSentObservers = messageSentObservers
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = owner
 
         -- ==========================================

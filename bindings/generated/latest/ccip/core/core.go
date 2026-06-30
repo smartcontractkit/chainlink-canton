@@ -6,9 +6,11 @@ import (
 	"math/big"
 	"strings"
 
+	ccipapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "3c0d1879db1609b9905505a25500909a49f47918d7b4b121115f45a010e612f1"
+	PackageID   = "3c4e337f5b1e07260f01692ad7d1a53c6263902458b38767957002f0a714ad73"
 	SDKVersion  = "3.4.11"
 )
 
@@ -178,11 +180,12 @@ func (t *AcceptAdminRoleMCMSParams) UnmarshalHex(data string) error {
 
 // AddCCVFee is a Record type
 type AddCCVFee struct {
-	CcvInstanceId     types.TEXT    `json:"ccvInstanceId"`
-	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
-	DestGasLimit      types.INT64   `json:"destGasLimit"`
-	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
-	Caller            types.PARTY   `json:"caller"`
+	CcvInstanceId     types.TEXT                                 `json:"ccvInstanceId"`
+	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
+	DestGasLimit      types.INT64                                `json:"destGasLimit"`
+	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts AddCCVFee to a map for DAML arguments
@@ -196,6 +199,8 @@ func (t AddCCVFee) ToMap() map[string]any {
 	m["destGasLimit"] = int64(t.DestGasLimit)
 
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -227,10 +232,11 @@ func (t *AddCCVFee) UnmarshalHex(data string) error {
 // AddCCVFeeMCMSParams is AddCCVFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type AddCCVFeeMCMSParams struct {
-	CcvInstanceId     types.TEXT    `json:"ccvInstanceId"`
-	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
-	DestGasLimit      types.INT64   `json:"destGasLimit"`
-	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
+	CcvInstanceId     types.TEXT                                 `json:"ccvInstanceId"`
+	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
+	DestGasLimit      types.INT64                                `json:"destGasLimit"`
+	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes AddCCVFeeMCMSParams to hex string for MCMS operationData.
@@ -392,10 +398,11 @@ func (t *AddCustomObserversParams) UnmarshalHex(data string) error {
 
 // AddExecutorFee is a Record type
 type AddExecutorFee struct {
-	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
-	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
-	Caller             types.PARTY   `json:"caller"`
+	ExecutorInstanceId types.TEXT                                 `json:"executorInstanceId"`
+	ExecutorArgs       types.TEXT                                 `json:"executorArgs"`
+	FeeUSDCents        types.NUMERIC                              `json:"feeUSDCents"`
+	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller             types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts AddExecutorFee to a map for DAML arguments
@@ -407,6 +414,8 @@ func (t AddExecutorFee) ToMap() map[string]any {
 	m["executorArgs"] = string(t.ExecutorArgs)
 
 	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -438,9 +447,10 @@ func (t *AddExecutorFee) UnmarshalHex(data string) error {
 // AddExecutorFeeMCMSParams is AddExecutorFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type AddExecutorFeeMCMSParams struct {
-	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
-	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
+	ExecutorInstanceId types.TEXT                                 `json:"executorInstanceId"`
+	ExecutorArgs       types.TEXT                                 `json:"executorArgs"`
+	FeeUSDCents        types.NUMERIC                              `json:"feeUSDCents"`
+	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes AddExecutorFeeMCMSParams to hex string for MCMS operationData.
@@ -499,12 +509,13 @@ func (t *AddPriceUpdaters) UnmarshalHex(data string) error {
 
 // AddTokenSend is a Record type
 type AddTokenSend struct {
-	PoolInstanceId   types.TEXT                               `json:"poolInstanceId"`
-	PoolOwner        types.PARTY                              `json:"poolOwner"`
-	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount           types.TEXT                               `json:"amount"`
-	DestTokenAddress types.TEXT                               `json:"destTokenAddress"`
-	ExtraData        types.TEXT                               `json:"extraData"`
+	PoolInstanceId   types.TEXT                                 `json:"poolInstanceId"`
+	PoolOwner        types.PARTY                                `json:"poolOwner"`
+	InstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Amount           types.TEXT                                 `json:"amount"`
+	DestTokenAddress types.TEXT                                 `json:"destTokenAddress"`
+	ExtraData        types.TEXT                                 `json:"extraData"`
+	Context          splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts AddTokenSend to a map for DAML arguments
@@ -522,6 +533,8 @@ func (t AddTokenSend) ToMap() map[string]any {
 	m["destTokenAddress"] = string(t.DestTokenAddress)
 
 	m["extraData"] = string(t.ExtraData)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -550,11 +563,12 @@ func (t *AddTokenSend) UnmarshalHex(data string) error {
 
 // AddTokenSendFee is a Record type
 type AddTokenSendFee struct {
-	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
-	PoolOwner         types.PARTY   `json:"poolOwner"`
-	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
+	PoolInstanceId    types.TEXT                                 `json:"poolInstanceId"`
+	PoolOwner         types.PARTY                                `json:"poolOwner"`
+	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
+	DestGasOverhead   types.INT64                                `json:"destGasOverhead"`
+	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts AddTokenSendFee to a map for DAML arguments
@@ -570,6 +584,8 @@ func (t AddTokenSendFee) ToMap() map[string]any {
 	m["destGasOverhead"] = int64(t.DestGasOverhead)
 
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -598,11 +614,12 @@ func (t *AddTokenSendFee) UnmarshalHex(data string) error {
 
 // AddVerifierData is a Record type
 type AddVerifierData struct {
-	CcvInstanceId        types.TEXT    `json:"ccvInstanceId"`
-	VersionTag           types.TEXT    `json:"versionTag" hex:"bytes"`
-	VerifierBlob         types.TEXT    `json:"verifierBlob"`
-	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
-	Caller               types.PARTY   `json:"caller"`
+	CcvInstanceId        types.TEXT                                 `json:"ccvInstanceId"`
+	VersionTag           types.TEXT                                 `json:"versionTag" hex:"bytes"`
+	VerifierBlob         types.TEXT                                 `json:"verifierBlob"`
+	MessageSentObservers []types.PARTY                              `json:"messageSentObservers"`
+	Context              splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller               types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts AddVerifierData to a map for DAML arguments
@@ -622,6 +639,8 @@ func (t AddVerifierData) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -653,10 +672,11 @@ func (t *AddVerifierData) UnmarshalHex(data string) error {
 // AddVerifierDataMCMSParams is AddVerifierData without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type AddVerifierDataMCMSParams struct {
-	CcvInstanceId        types.TEXT    `json:"ccvInstanceId"`
-	VersionTag           types.TEXT    `json:"versionTag" hex:"bytes"`
-	VerifierBlob         types.TEXT    `json:"verifierBlob"`
-	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
+	CcvInstanceId        types.TEXT                                 `json:"ccvInstanceId"`
+	VersionTag           types.TEXT                                 `json:"versionTag" hex:"bytes"`
+	VerifierBlob         types.TEXT                                 `json:"verifierBlob"`
+	MessageSentObservers []types.PARTY                              `json:"messageSentObservers"`
+	Context              splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes AddVerifierDataMCMSParams to hex string for MCMS operationData.
@@ -1027,12 +1047,15 @@ func (t *ApplySourceChainConfigUpdatesParams) UnmarshalHex(data string) error {
 
 // BuildMessage is a Record type
 type BuildMessage struct {
-	Caller types.PARTY `json:"caller"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts BuildMessage to a map for DAML arguments
 func (t BuildMessage) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1064,6 +1087,7 @@ func (t *BuildMessage) UnmarshalHex(data string) error {
 // BuildMessageMCMSParams is BuildMessage without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type BuildMessageMCMSParams struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes BuildMessageMCMSParams to hex string for MCMS operationData.
@@ -4283,12 +4307,15 @@ func (t *GetMCMSParams) UnmarshalHex(data string) error {
 
 // GetCursedSubjects is a Record type
 type GetCursedSubjects struct {
-	Caller types.PARTY `json:"caller"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetCursedSubjects to a map for DAML arguments
 func (t GetCursedSubjects) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -4320,6 +4347,7 @@ func (t *GetCursedSubjects) UnmarshalHex(data string) error {
 // GetCursedSubjectsMCMSParams is GetCursedSubjects without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type GetCursedSubjectsMCMSParams struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetCursedSubjectsMCMSParams to hex string for MCMS operationData.
@@ -5107,12 +5135,15 @@ func (t *IsAdministratorMCMSParams) UnmarshalHex(data string) error {
 
 // IsCursed is a Record type
 type IsCursed struct {
-	Caller types.PARTY `json:"caller"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts IsCursed to a map for DAML arguments
 func (t IsCursed) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -5144,6 +5175,7 @@ func (t *IsCursed) UnmarshalHex(data string) error {
 // IsCursedMCMSParams is IsCursed without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type IsCursedMCMSParams struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes IsCursedMCMSParams to hex string for MCMS operationData.
@@ -5160,17 +5192,20 @@ func (t *IsCursedMCMSParams) UnmarshalHex(data string) error {
 
 // IsCursedForChain is a Record type
 type IsCursedForChain struct {
-	Caller        types.PARTY   `json:"caller"`
-	ChainSelector types.NUMERIC `json:"chainSelector"`
+	ChainSelector types.NUMERIC                              `json:"chainSelector"`
+	Context       splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller        types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts IsCursedForChain to a map for DAML arguments
 func (t IsCursedForChain) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["caller"] = t.Caller.ToMap()
-
 	m["chainSelector"] = t.ChainSelector
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -5200,7 +5235,8 @@ func (t *IsCursedForChain) UnmarshalHex(data string) error {
 // IsCursedForChainMCMSParams is IsCursedForChain without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type IsCursedForChainMCMSParams struct {
-	ChainSelector types.NUMERIC `json:"chainSelector"`
+	ChainSelector types.NUMERIC                              `json:"chainSelector"`
+	Context       splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes IsCursedForChainMCMSParams to hex string for MCMS operationData.
@@ -6128,11 +6164,11 @@ func (t RMNRemote) IsCursedWithPackageID(contractID string, packageID string, ar
 	}
 }
 
-// Archive exercises the Archive choice on this RMNRemote contract via the IMCMSReceiver interface
+// Archive exercises the Archive choice on this RMNRemote contract via the IRMNRemote interface
 // This method uses the package name in the template ID
 func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -6142,31 +6178,10 @@ func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
-	}
-}
-
-// Get exercises the Get choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) Get(contractID string, args Get) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "Get",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetWithPackageID exercises the Get choice using the provided package ID instead of package name
-func (t RMNRemote) GetWithPackageID(contractID string, packageID string, args Get) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "Get",
-		Arguments:  argsToMap(args),
 	}
 }
 
@@ -6275,9 +6290,74 @@ func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 	}
 }
 
+// RMNRemoteIsCursed exercises the RMNRemote_IsCursed choice on this RMNRemote contract via the IRMNRemote interface
+// This method uses the package name in the template ID
+func (t RMNRemote) RMNRemoteIsCursed(contractID string, args ccipapi.RMNRemoteIsCursed) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RMNRemote_IsCursed",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RMNRemoteIsCursedWithPackageID exercises the RMNRemote_IsCursed choice using the provided package ID instead of package name
+func (t RMNRemote) RMNRemoteIsCursedWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteIsCursed) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RMNRemote_IsCursed",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RMNRemoteIsCursedForChain exercises the RMNRemote_IsCursedForChain choice on this RMNRemote contract via the IRMNRemote interface
+// This method uses the package name in the template ID
+func (t RMNRemote) RMNRemoteIsCursedForChain(contractID string, args ccipapi.RMNRemoteIsCursedForChain) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RMNRemote_IsCursedForChain",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RMNRemoteIsCursedForChainWithPackageID exercises the RMNRemote_IsCursedForChain choice using the provided package ID instead of package name
+func (t RMNRemote) RMNRemoteIsCursedForChainWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteIsCursedForChain) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RMNRemote_IsCursedForChain",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RMNRemoteGetCursedSubjects exercises the RMNRemote_GetCursedSubjects choice on this RMNRemote contract via the IRMNRemote interface
+// This method uses the package name in the template ID
+func (t RMNRemote) RMNRemoteGetCursedSubjects(contractID string, args ccipapi.RMNRemoteGetCursedSubjects) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RMNRemote_GetCursedSubjects",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RMNRemoteGetCursedSubjectsWithPackageID exercises the RMNRemote_GetCursedSubjects choice using the provided package ID instead of package name
+func (t RMNRemote) RMNRemoteGetCursedSubjectsWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteGetCursedSubjects) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RMNRemote_GetCursedSubjects",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Verify interface implementations for RMNRemote
 
 var _ api.IMCMSReceiver = (*RMNRemote)(nil)
+
+var _ ccipapi.IRMNRemote = (*RMNRemote)(nil)
 
 // RateLimitDirection is an enum type
 type RateLimitDirection string
@@ -7797,11 +7877,11 @@ func (t SendingMessageV1) FeeTokenAmountWithPackageID(contractID string, package
 	}
 }
 
-// Archive exercises the Archive choice on this SendingMessageV1 contract
+// Archive exercises the Archive choice on this SendingMessageV1 contract via the ISendingMessage interface
 // This method uses the package name in the template ID
 func (t SendingMessageV1) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -7811,12 +7891,100 @@ func (t SendingMessageV1) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t SendingMessageV1) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
 	}
 }
+
+// SendingMessageAddCCVFee exercises the SendingMessage_AddCCVFee choice on this SendingMessageV1 contract via the ISendingMessage interface
+// This method uses the package name in the template ID
+func (t SendingMessageV1) SendingMessageAddCCVFee(contractID string, args ccipapi.SendingMessageAddCCVFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_AddCCVFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SendingMessageAddCCVFeeWithPackageID exercises the SendingMessage_AddCCVFee choice using the provided package ID instead of package name
+func (t SendingMessageV1) SendingMessageAddCCVFeeWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddCCVFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_AddCCVFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SendingMessageAddVerifierData exercises the SendingMessage_AddVerifierData choice on this SendingMessageV1 contract via the ISendingMessage interface
+// This method uses the package name in the template ID
+func (t SendingMessageV1) SendingMessageAddVerifierData(contractID string, args ccipapi.SendingMessageAddVerifierData) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_AddVerifierData",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SendingMessageAddVerifierDataWithPackageID exercises the SendingMessage_AddVerifierData choice using the provided package ID instead of package name
+func (t SendingMessageV1) SendingMessageAddVerifierDataWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddVerifierData) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_AddVerifierData",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SendingMessageAddExecutorFee exercises the SendingMessage_AddExecutorFee choice on this SendingMessageV1 contract via the ISendingMessage interface
+// This method uses the package name in the template ID
+func (t SendingMessageV1) SendingMessageAddExecutorFee(contractID string, args ccipapi.SendingMessageAddExecutorFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_AddExecutorFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SendingMessageAddExecutorFeeWithPackageID exercises the SendingMessage_AddExecutorFee choice using the provided package ID instead of package name
+func (t SendingMessageV1) SendingMessageAddExecutorFeeWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddExecutorFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_AddExecutorFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SendingMessageBuildMessage exercises the SendingMessage_BuildMessage choice on this SendingMessageV1 contract via the ISendingMessage interface
+// This method uses the package name in the template ID
+func (t SendingMessageV1) SendingMessageBuildMessage(contractID string, args ccipapi.SendingMessageBuildMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_BuildMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SendingMessageBuildMessageWithPackageID exercises the SendingMessage_BuildMessage choice using the provided package ID instead of package name
+func (t SendingMessageV1) SendingMessageBuildMessageWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageBuildMessage) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_BuildMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for SendingMessageV1
+
+var _ ccipapi.ISendingMessage = (*SendingMessageV1)(nil)
 
 // SetBurnMintFactory is a Record type
 type SetBurnMintFactory struct {

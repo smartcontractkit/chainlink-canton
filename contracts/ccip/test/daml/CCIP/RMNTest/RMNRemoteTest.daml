@@ -4,6 +4,8 @@ module CCIP.RMNTest.RMNRemoteTest where
 import Daml.Script
 import DA.Assert ((===))
 
+import qualified Splice.Api.Token.MetadataV1
+
 import CCIP.RMNRemote
 
 -- ===========================================================================
@@ -159,7 +161,8 @@ testRMNRemote_IsCursedForChainRejectsReservedSubjectMapping = script do
 
   submitMustFail rmnOwner do
     exerciseCmd rmnCid IsCursedForChain with
-      caller = rmnOwner
       chainSelector = chainSelectorAliasingGlobalSubject
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+      caller = rmnOwner
 
   pure ()

@@ -8,9 +8,15 @@ import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Optional (fromSomeNote)
 
-import CCIP.NumericHex qualified as NumericHex
-import Chainlink.InstanceAddress (assertValidInstanceId)
+import qualified Splice.Api.Token.MetadataV1
+
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.API.RMNRemoteV1
+import CCIP.NumericHex qualified as NumericHex
+
 import CCIP.RMNRemoteCodecGen (
     decodeCurseParamsAt,
     decodeUncurseParamsAt,
@@ -64,17 +70,37 @@ template RMNRemote
     where
         signatory rmnOwner
         observer ccipOwner, customObservers
-        ensure assertValidInstanceId instanceId
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
 
-        nonconsuming choice Get : RMNRemote
-            with
-                caller : Party
-            controller caller
-            do pure this
+        interface instance CCIP.API.RMNRemoteV1.RMNRemote for RMNRemote where
+            view = CCIP.API.RMNRemoteV1.RMNRemoteView with
+                ccipOwner
+                rmnOwner
+                instanceId
 
-        -- Check if globally cursed (party-as-parameter pattern for open access)
+            rmnRemote_isCursedImpl self arg = do
+                exercise (fromInterfaceContractId @RMNRemote self) IsCursed
+                    with
+                        context = arg.context
+                        caller = arg.caller
+
+            rmnRemote_isCursedForChainImpl self arg = do
+                exercise (fromInterfaceContractId @RMNRemote self) IsCursedForChain
+                    with
+                        chainSelector = arg.chainSelector
+                        context = arg.context
+                        caller = arg.caller
+
+            rmnRemote_getCursedSubjectsImpl self arg = do
+                exercise (fromInterfaceContractId @RMNRemote self) GetCursedSubjects
+                    with
+                        context = arg.context
+                        caller = arg.caller
+
+        -- Check if globally cursed
         nonconsuming choice IsCursed : Bool
             with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do pure (globalCurseSubject `elem` cursedSubjects)
@@ -82,8 +108,9 @@ template RMNRemote
         -- Check if cursed for specific chain (global OR chain-specific)
         nonconsuming choice IsCursedForChain : Bool
             with
-                caller : Party
                 chainSelector : Numeric 0
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                caller : Party
             controller caller
             do
                 let chainSubject = chainSelectorToSubject chainSelector
@@ -97,6 +124,7 @@ template RMNRemote
         -- Get all cursed subjects
         nonconsuming choice GetCursedSubjects : [BytesHex]
             with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do pure cursedSubjects

@@ -21,7 +21,31 @@ import DA.Date (date, Month(Dec))
 import DA.Time (time)
 import DA.Foldable (forA_)
 
+import qualified Splice.Api.Token.BurnMintV1
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
+import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.API.RMNRemoteV1
+
+import qualified CCIP.Context
+import qualified CCIP.Events
+import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FinalityConfig
+import qualified CCIP.FeeQuoter
+import qualified CCIP.Interfaces.TokenPool
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.Math
+import qualified CCIP.Uint256
+import qualified CCIP.RateLimiter
+import qualified CCIP.Tickets
+import qualified CCIP.TokenAdminRegistry
+import CCIP.ContextCodec (decodeAnyValueAt)
+
 import CCIP.BurnMintTokenPoolCodecGen (
     decodeSetDynamicConfigParamsAt,
     decodeApplyChainUpdatesParamsAt,
@@ -33,7 +57,6 @@ import CCIP.BurnMintTokenPoolCodecGen (
     decodeAddPoolReceiveContextContractValueParamsAt,
     decodeRemovePoolReceiveContextValueParamsAt,
     )
-import CCIP.ContextCodec (decodeAnyValueAt)
 import CCIP.BurnMintTokenPoolTypes (
     TokenTransferFeeConfig(..),
     RemoteChainConfig(..),
@@ -51,27 +74,6 @@ import CCIP.BurnMintTokenPoolTypes (
     AddPoolReceiveContextContractValueParams(..),
     RemovePoolReceiveContextValueParams(..),
     )
-
-import qualified Splice.Api.Token.BurnMintV1
-import qualified Splice.Api.Token.HoldingV1
-import qualified Splice.Api.Token.MetadataV1
-
-import qualified CCIP.Context
-import qualified CCIP.Events
-import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.FinalityConfig
-import qualified CCIP.FeeQuoter
-import qualified CCIP.Interfaces.TokenPool
-import qualified CCIP.MessageCodecV1
-import qualified CCIP.Math
-import qualified CCIP.Uint256
-import qualified CCIP.RateLimiter
-import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import qualified CCIP.RMNRemote
-import qualified CCIP.SendingMessageV1
-import qualified CCIP.Tickets
-import qualified CCIP.TokenAdminRegistry
 
 -- | Far-future time used as "never expires" for pending transfers.
 -- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
@@ -98,9 +100,9 @@ lookupBurnMintFactoryExtraArgsMetaValues ctx = fromOptional TextMap.empty <$> CC
 
 data BurnMintTokenPoolDeps = BurnMintTokenPoolDeps
     with
-        tokenAdminRegistry : RawInstanceAddress
-        rmnRemote : RawInstanceAddress
-        feeQuoter : RawInstanceAddress
+        tokenAdminRegistry : Chainlink.InstanceAddress.RawInstanceAddress
+        rmnRemote : Chainlink.InstanceAddress.RawInstanceAddress
+        feeQuoter : Chainlink.InstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 parseSourcePoolDecimals : Int -> BytesHex -> Int
@@ -215,7 +217,7 @@ validateLockOrBurnOutputs caller poolOwner instrumentId senderChangeAmount feeHo
             pure ([senderChangeCid], [poolFeeCid])
         _ -> abort "LockOrBurn: burn/mint output shape mismatch"
 
-remoteChainRateLimiterAddresses : Map.Map (Numeric 0) RemoteChainConfig -> [RawInstanceAddress.RawInstanceAddress]
+remoteChainRateLimiterAddresses : Map.Map (Numeric 0) RemoteChainConfig -> [Chainlink.InstanceAddress.RawInstanceAddress]
 remoteChainRateLimiterAddresses configs =
     concatMap
         (\(_, cfg) ->
@@ -244,11 +246,11 @@ assertRateLimiter
     -> Numeric 0
     -> CCIP.RateLimiter.RateLimitDirection
     -> CCIP.RateLimiter.RateLimitMode
-    -> RawInstanceAddress.RawInstanceAddress
+    -> Chainlink.InstanceAddress.RawInstanceAddress
     -> CCIP.RateLimiter.RateLimiter
     -> Update ()
 assertRateLimiter prefix poolInstanceId remoteChainSelector direction mode expected limiter = do
-    RawInstanceAddress.assertEqual (prefix <> ": instance address mismatch")
+    Chainlink.InstanceAddress.assertEqual (prefix <> ": instance address mismatch")
         limiter.instanceId
         limiter.poolOwner
         expected
@@ -304,7 +306,7 @@ template BurnMintTokenPool
         signatory poolOwner
         observer optional [] pure rateLimitAdmin
 
-        ensure assertValidInstanceId instanceId
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
             && instrumentId.admin == poolOwner
             && CCIP.Math.isValidTokenDecimals decimals
             && all
@@ -350,7 +352,7 @@ template BurnMintTokenPool
                         tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
                         tokenConfigCid = coerceContractId arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = coerceContractId arg.sendingMessageCid
+                        sendingMessageCid = arg.sendingMessageCid
                         amount = arg.amount
                         caller = arg.caller
 
@@ -371,7 +373,7 @@ template BurnMintTokenPool
                         tokenConfigCid = coerceContractId arg.tokenConfigCid
                         rmnRemoteCid = coerceContractId arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = coerceContractId arg.sendingMessageCid
+                        sendingMessageCid = arg.sendingMessageCid
                         senderInputCids = arg.senderInputCids
                         amount = arg.amount
                         caller = arg.caller
@@ -382,7 +384,7 @@ template BurnMintTokenPool
                         tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
                         tokenConfigCid = coerceContractId arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        sendingMessageCid = coerceContractId arg.sendingMessageCid
+                        sendingMessageCid = arg.sendingMessageCid
                         feeQuoterCid = coerceContractId arg.feeQuoterCid
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
@@ -618,7 +620,7 @@ template BurnMintTokenPool
             do create this with transferTimeout = newTransferTimeout
 
         -- Get required CCV raw instance addresses based on chain and direction.
-        nonconsuming choice GetRequiredCCVs : [RawInstanceAddress]
+        nonconsuming choice GetRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             with
                 remoteChainSelector : Numeric 0
                 sourceAmount : BytesHex
@@ -650,7 +652,7 @@ template BurnMintTokenPool
             do
                 execMsg <- fetch executingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: executing message tokenAdminRegistry mismatch"
                     (execMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
@@ -688,30 +690,31 @@ template BurnMintTokenPool
 
         -- Declare outbound CCV requirements on SendingMessageV1 via TAR.
         -- Looks up per-chain CCV requirements and records them on the sending message.
-        nonconsuming choice VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice VerifyOutboundCCVs : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 amount : Decimal
                 caller : Party
             controller caller
             do
                 assertMsg "pool: amount must be positive" (amount > 0.0)
 
-                sm <- fetch sendingMessageCid
+                sendingMsg <- fetch sendingMessageCid
+                let sendingMsgView = view sendingMsg
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: sending message ccipOwner mismatch"
-                    (sm.ccipOwner == tokenAdminRegistry.owner)
+                    (sendingMsgView.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
-                    (sm.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                    (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 assertMsg "pool: sending message rmnRemote mismatch"
-                    (sm.deps.rmnRemote == deps.rmnRemote)
+                    (sendingMsgView.rmnRemote == deps.rmnRemote)
 
-                poolCCVs <- case Map.lookup sm.destChainSelector remoteChainConfigs of
+                poolCCVs <- case Map.lookup sendingMsgView.destChainSelector remoteChainConfigs of
                         None -> abort "pool: unsupported dest chain"
                         Some cfg -> pure cfg.outboundCCVs
 
@@ -731,7 +734,7 @@ template BurnMintTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                rmnRemoteCid : ContractId CCIP.API.RMNRemoteV1.RMNRemote
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 caller : Party
@@ -739,7 +742,7 @@ template BurnMintTokenPool
             do
                 ticket <- fetch tokenReceiveTicketCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 config <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.GetTokenConfigByCid with
@@ -750,20 +753,22 @@ template BurnMintTokenPool
                     (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
                 assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
                     (ticket.ccipOwner == tokenAdminRegistry.owner)
-                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                RawInstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                rmnRemote <- fetch rmnRemoteCid
+                let rmnRemoteView = view rmnRemote
+                Chainlink.InstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
+                    rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
                 assertMsg "ReleaseFromTicket: ticket instrument must match pool instrument"
                     (ticket.instrumentId == instrumentId)
-                let poolAddress = RawInstanceAddress.make instanceId poolOwner
+                let poolAddress = Chainlink.InstanceAddress.make instanceId poolOwner
                 assertMsg "ReleaseFromTicket: ticket pool owner mismatch"
                     (ticket.poolOwner == poolOwner)
                 assertMsg "ReleaseFromTicket: ticket pool address mismatch"
                     (ticket.poolAddress == poolAddress)
 
-                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
-                    caller = poolOwner
+                isCursed <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_IsCursedForChain with
                     chainSelector = ticket.sourceChainSelector
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = poolOwner
                 assertMsg "ReleaseFromTicket: source chain is cursed" (not isCursed)
 
                 assertMsg "ReleaseFromTicket: caller must be tokenReceiver"
@@ -774,7 +779,7 @@ template BurnMintTokenPool
                 let ticketSignatories = signatory ticket
                 Foldable.forA_ ticket.verifiedCCVs $ \verifiedCCV ->
                     assertMsg ("ReleaseFromTicket: verified CCV owner is not a ticket signatory " <> show verifiedCCV)
-                        (RawInstanceAddress.ownerParty verifiedCCV `elem` ticketSignatories)
+                        (Chainlink.InstanceAddress.ownerParty verifiedCCV `elem` ticketSignatories)
 
                 -- Also check that the pool's owner is a signatory on the ticket
                 assertMsg "ReleaseFromTicket: pool owner is not a ticket signatory"
@@ -898,36 +903,36 @@ template BurnMintTokenPool
         -- Calculate fee for outbound token transfer (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
         -- fee config, appends fee directly to SendingMessageV1.
-        nonconsuming choice CalculateFee
-                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice CalculateFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
+                let sendingMsgView = view sendingMsg
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: sending message ccipOwner mismatch"
-                    (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
+                    (sendingMsgView.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
-                    (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                    (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 assertMsg "pool: tokenInstrumentId mismatch"
                     (tokenInstrumentId == instrumentId)
                 feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
-                RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
+                Chainlink.InstanceAddress.assertEqual "pool: feeQuoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
                 assertMsg "pool: sending message feeQuoter mismatch"
-                    (sendingMsg.deps.feeQuoter == deps.feeQuoter)
+                    (sendingMsgView.feeQuoter == deps.feeQuoter)
                 -- Check if fee config is enabled for the destination chain.
                 -- If no config is set/it's disabled, use the FeeQuoter defaults. If enabled, use the specified fee parameters.
-                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsgView.destChainSelector tokenTransferFeeConfigs of
                     Some feeConfig | feeConfig.isEnabled ->
                         pure
                             ( feeConfig.feeUSDCents
@@ -936,7 +941,7 @@ template BurnMintTokenPool
                             )
                     _ ->
                         exercise feeQuoterCid CCIP.FeeQuoter.GetTokenTransferFee with
-                            destChainSelector = sendingMsg.destChainSelector
+                            destChainSelector = sendingMsgView.destChainSelector
                             token = tokenInstrumentId
                             caller = poolOwner
 
@@ -964,7 +969,7 @@ template BurnMintTokenPool
                     (tokenInstrumentId == instrumentId)
 
                 feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
-                RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
+                Chainlink.InstanceAddress.assertEqual "pool: feeQuoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
                 case Map.lookup destChainSelector tokenTransferFeeConfigs of
@@ -999,9 +1004,9 @@ template BurnMintTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                rmnRemoteCid : ContractId CCIP.API.RMNRemoteV1.RMNRemote
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
                 amount : Decimal
                 caller : Party
@@ -1011,8 +1016,9 @@ template BurnMintTokenPool
                 let amountNumeric0 = CCIP.Math.decimalToNumeric0 amount
 
                 sendingMsg <- fetch sendingMessageCid
+                let sendingMsgView = view sendingMsg
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 config <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.GetTokenConfigByCid with
@@ -1020,28 +1026,30 @@ template BurnMintTokenPool
                         instrumentId
                         caller = poolOwner
                 assertMsg "LockOrBurn: sending message ccipOwner mismatch"
-                    (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
+                    (sendingMsgView.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
-                    (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
-                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                RawInstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                    (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
+                rmnRemote <- fetch rmnRemoteCid
+                let rmnRemoteView = view rmnRemote
+                Chainlink.InstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
+                    rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
                 assertMsg "LockOrBurn: sending message rmn mismatch"
-                    (sendingMsg.deps.rmnRemote == deps.rmnRemote)
+                    (sendingMsgView.rmnRemote == deps.rmnRemote)
 
-                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                isCursed <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_IsCursedForChain with
+                    chainSelector = sendingMsgView.destChainSelector
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = poolOwner
-                    chainSelector = sendingMsg.destChainSelector
                 assertMsg "LockOrBurn: dest chain is cursed" (not isCursed)
 
-                remoteChainCfg <- case Map.lookup sendingMsg.destChainSelector remoteChainConfigs of
+                remoteChainCfg <- case Map.lookup sendingMsgView.destChainSelector remoteChainConfigs of
                     None -> abort "pool: unsupported dest chain"
                     Some cfg -> pure cfg
 
                 let destTokenAddr = remoteChainCfg.remoteTokenAddress
 
                 let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
-                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                let tokenFeeBps = case Map.lookup sendingMsgView.destChainSelector tokenTransferFeeConfigs of
                         Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
                         _ -> 0.0
                 let feeAmount = calculateFeeFromBps amountNumeric0 tokenFeeBps
@@ -1053,7 +1061,7 @@ template BurnMintTokenPool
                 assertRateLimiter
                     "LockOrBurn: rateLimiter"
                     instanceId
-                    sendingMsg.destChainSelector
+                    sendingMsgView.destChainSelector
                     CCIP.RateLimiter.RateLimitDirection_Outbound
                     CCIP.RateLimiter.RateLimitMode_DefaultFinality
                     expectedRateLimiter
@@ -1187,7 +1195,7 @@ template BurnMintTokenPool
                             pool <- fetch selfCid
                             assertMsg "E_RATE_LIMITER_NOT_ON_POOL"
                                 (rateLimiterInstanceAddress `elem` remoteChainRateLimiterAddresses pool.remoteChainConfigs)
-                            let limiterAddr = RawInstanceAddress.toText rateLimiterInstanceAddress
+                            let limiterAddr = Chainlink.InstanceAddress.toText rateLimiterInstanceAddress
                             rateLimiterCid <- case Map.lookup limiterAddr contractIds of
                                 None -> abort ("E_RATE_LIMITER_NOT_IN_MAP: " <> limiterAddr)
                                 Some c -> pure (coerceContractId c : ContractId CCIP.RateLimiter.RateLimiter)
@@ -1214,7 +1222,7 @@ template BurnMintTokenPool
                         None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextContractValue"
                         Some (AddPoolReceiveContextContractValueParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextContractValue" (finalOffset == byteCount operationData)
-                            let refAddr = RawInstanceAddress.toText referentInstanceAddress
+                            let refAddr = Chainlink.InstanceAddress.toText referentInstanceAddress
                             referred <- case Map.lookup refAddr contractIds of
                                 None -> abort ("E_REFERENT_CONTRACT_NOT_IN_MAP: " <> refAddr)
                                 Some c -> pure c
