@@ -445,7 +445,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b // indirect
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9 // indirect
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.10.0 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20260610194843-349ea43d69ce // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20260629112219-46173e6021a7 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
 	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260514223130-48bc90aca745 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
@@ -454,7 +454,7 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20260304194147-a03701e2c02e // indirect
-	github.com/smartcontractkit/mcms v0.48.1-0.20260616002102-085d81f76b05
+	github.com/smartcontractkit/mcms v0.50.0
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/speakeasy-api/jsonpath v0.6.0 // indirect
