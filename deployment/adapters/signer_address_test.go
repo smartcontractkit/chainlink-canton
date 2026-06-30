@@ -15,6 +15,7 @@ import (
 // address normalizer must collapse both representations to the same canonical form
 // so ccv state inference can map on-chain committee signers back to canton NOPs.
 func TestNormalizeCantonSignerAddress_PubkeyAndAddressCollapse(t *testing.T) {
+	t.Parallel()
 	key, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
 
