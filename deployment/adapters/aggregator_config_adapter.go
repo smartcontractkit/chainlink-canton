@@ -271,5 +271,6 @@ func normalizeCantonSignerAddress(addr string) string {
 	if derived, err := signerKeyToAddress(addr); err == nil {
 		return strings.ToLower(derived)
 	}
+
 	return "0x" + strings.ToLower(strings.TrimPrefix(strings.TrimSpace(addr), "0x"))
 }
