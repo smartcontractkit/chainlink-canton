@@ -67,7 +67,11 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 	ds := datastore.NewMemoryDataStore()
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
-	participant := chain.Participants[config.Participant]
+	participantIndex := config.Participant
+	participant, err := contract.ParticipantAt(chain, participantIndex)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("resolve participant: %w", err)
+	}
 	mcmsEnabled := len(participant.ReadAsPartyIDs) > 0
 	cfg := config.Config
 	poolReceiveContext := cfg.PoolReceiveContext
@@ -114,6 +118,7 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 			InstanceAddress:    factoryRaw.InstanceAddress(),
 			RawInstanceAddress: factoryRaw.String(),
 			MCMSEnabled:        true,
+			ParticipantIndex:   participantIndex,
 			Args: factorybindings.DeployLockReleaseTokenPool{
 				Contract: lockreleasetokenpool.LockReleaseTokenPool{
 					InstanceId:              types.TEXT(poolInstanceID),
@@ -148,7 +153,8 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 			qualifier = nil
 		}
 		out, err := cld_ops.ExecuteOperation(e.OperationsBundle, lock_release_token_pool.Deploy, chain, contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
-			Qualifier: qualifier,
+			Qualifier:        qualifier,
+			ParticipantIndex: participantIndex,
 			Template: lockreleasetokenpool.LockReleaseTokenPool{
 				CcipOwner:               types.PARTY(cfg.CcipOwner),
 				PoolOwner:               types.PARTY(cfg.PoolOwner),
@@ -200,7 +206,9 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 			InstrumentId:                         cfg.InstrumentId,
 			CcipParty:                            cfg.CcipOwner,
 			PoolOwnerParty:                       cfg.PoolOwner,
+			PoolAdminParty:                       cfg.CcipOwner,
 			PoolInstanceID:                       rawPoolAddr.InstanceID(),
+			CcipParticipantIndex:                 participantIndex,
 		}
 		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, chain, regInput)
 		if err != nil {

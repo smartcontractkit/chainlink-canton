@@ -42,7 +42,8 @@ func (d DeployCoin) Apply(e cldf.Environment, config CantonCSDeps[DeployCoinConf
 
 	party := chain.Participants[config.Participant].PartyID
 	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, coin.Deploy, chain, contract.DeployInput[coinBinding.CoinRegistry]{
-		Qualifier: new(config.Config.Symbol),
+		Qualifier:        new(config.Config.Symbol),
+		ParticipantIndex: config.Participant,
 		Template: coinBinding.CoinRegistry{
 			Issuer: types.PARTY(party),
 			InstrumentId: splice_api_token_holding_v1.InstrumentId{

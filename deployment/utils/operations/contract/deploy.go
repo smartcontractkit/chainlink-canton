@@ -22,6 +22,9 @@ type DeployInput[TT core.Template] struct {
 	Qualifier  *string     `json:"qualifier,omitempty"`
 	Template   TT          `json:"createCommand"`
 	OwnerParty types.PARTY `json:"ownerParty"`
+	// ParticipantIndex selects which participant on the chain submits the create command.
+	// Zero value defaults to the first participant.
+	ParticipantIndex int `json:"participantIndex,omitempty"`
 }
 
 type DeployParams[ARGS any] struct {
@@ -62,7 +65,10 @@ func NewDeploy[TT core.Template](params DeployParams[TT]) *operations.Operation[
 				return datastore.AddressRef{}, fmt.Errorf("owner party must not be empty")
 			}
 
-			participant := deps.Participants[0]
+			participant, err := ParticipantAt(deps, input.ParticipantIndex)
+			if err != nil {
+				return datastore.AddressRef{}, fmt.Errorf("resolve participant: %w", err)
+			}
 
 			instanceID, err := getInstanceID(input.Template)
 			if err != nil {

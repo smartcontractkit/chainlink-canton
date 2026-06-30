@@ -511,7 +511,7 @@ Production lane configure avoids mixed batches by using **Run 1 + Run 2** (below
 
 | Run | What | MCMS | Entry |
 |---|---|---|---|
-| **Run 1** | CCIP core lanes (GlobalConfig, FeeQuoter, OnRamp/OffRamp, Executor) | `ccipOwner` | Generic `configure-chains-for-lanes-from-topology` → `adapters/chain_family_adapter.go` |
+| **Run 1** | CCIP core lanes (GlobalConfig, FeeQuoter, OnRamp/OffRamp, Executor) + native fee token TAR registration (Amulet) | `ccipOwner` | Generic `configure-chains-for-lanes-from-topology` → `adapters/chain_family_adapter.go` |
 | **Run 2** | CommitteeVerifier only (`ApplyRemoteChainConfigUpdates`, signatures, allowlist) | `ccvOwner` | `changesets/configure_canton_committee_verifier_for_lanes.go` |
 
 Run 1: omit CV from Canton chain input. Run 2: custom chain-family registry delegates only to `sequences/configure_committee_verifier_for_lanes.go`.

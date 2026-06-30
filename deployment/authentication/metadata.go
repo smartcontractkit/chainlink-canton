@@ -30,8 +30,7 @@ type AuthorizationServerMetadata struct {
 
 // GetAuthorizationServerMetadata retrieves the OAuth 2.0 authorization server's metadata from the well-known endpoint.
 func GetAuthorizationServerMetadata(ctx context.Context, authorizationServerURL string) (*AuthorizationServerMetadata, error) {
-	authorizationServerURL = strings.TrimSuffix(authorizationServerURL, "/")
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/.well-known/oauth-authorization-server", authorizationServerURL), nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/.well-known/oauth-authorization-server", strings.TrimSuffix(authorizationServerURL, "/")), nil)
 	if err != nil {
 		return nil, err
 	}

@@ -29,7 +29,7 @@ func TestResolveTokenPricesForRemoteDest_DefaultLinkToken(t *testing.T) {
 		Labels:        datastore.NewLabelSet("feequoter-scxln@" + ccipOwner),
 	}))
 
-	prices, err := resolveTokenPricesForRemoteDest(ds.Seal(), ccipadapters.ConfigureChainForLanesInput{
+	prices, err := ResolveTokenPricesForRemoteDest(ds.Seal(), ccipadapters.ConfigureChainForLanesInput{
 		ChainSelector: chainSelector,
 	}, 16015286601757825753, nil)
 	require.NoError(t, err)
@@ -59,13 +59,15 @@ func TestResolveTokenPricesForRemoteDest_IncludesNativeToken(t *testing.T) {
 		Admin: types.PARTY(dso),
 		Id:    types.TEXT("Amulet"),
 	}
-	prices, err := resolveTokenPricesForRemoteDest(ds.Seal(), ccipadapters.ConfigureChainForLanesInput{
+	prices, err := ResolveTokenPricesForRemoteDest(ds.Seal(), ccipadapters.ConfigureChainForLanesInput{
 		ChainSelector: chainSelector,
 	}, 16015286601757825753, &native)
 	require.NoError(t, err)
+	nativePrice, err := parseUsdPerTokenPriceString(defaultNativeUsdPerToken)
+	require.NoError(t, err)
 	require.Equal(t, map[string]*big.Int{
 		ccipOwner + ":link-token": usdPerTokenToScaled(defaultLinkUsdPerTokenDollars),
-		dso + ":Amulet":           usdPerTokenToScaled(defaultNativeUsdPerTokenDollars),
+		dso + ":Amulet":           nativePrice,
 	}, prices)
 }
 

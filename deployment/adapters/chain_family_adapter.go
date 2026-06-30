@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
@@ -15,12 +16,16 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldfops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutil "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
@@ -130,10 +135,47 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 	if !ok || len(chain.Participants) == 0 {
 		return ccipseq.OnChainOutput{}, fmt.Errorf("canton chain %d not found or has no participants", input.ChainSelector)
 	}
-	nativeInstrument, err := lookupNativeInstrumentID(b.GetContext(), chain.Participants[0])
+	nativeInstrument, err := lookupNativeInstrumentID(b.GetContext(), chain.Participants[0], ds, input.ChainSelector)
 	if err != nil {
 		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve Canton native fee token instrument: %w", err)
 	}
+
+	// Register native fee token (Amulet) TokenConfig in TAR once per lane configure run.
+	// Skipped when already on-ledger. Not inlined in proposal-driven core deploy because
+	// timelock-execute pre-resolves TAR before the deploy batch creates it.
+	tarRef, err := findContractRef(
+		ds,
+		input.ChainSelector,
+		datastore.ContractType(token_admin_registry.ContractType),
+		token_admin_registry.Version,
+		"",
+	)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve token admin registry: %w", err)
+	}
+	tarRaw, err := dsutil.GetRawInstanceAddressFromAddressRef(tarRef)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve token admin registry raw address: %w", err)
+	}
+	ccipOwnerParty, err := resolveCcipOwnerParty(ds, input.ChainSelector)
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("resolve ccipOwner party: %w", err)
+	}
+	mcmsEnabled := len(chain.Participants[0].ReadAsPartyIDs) > 0
+	tarReport, err := cldfops.ExecuteSequence(b, sequences.RegisterNativeFeeTokenInTAR, chain, sequences.RegisterNativeFeeTokenInTARInput{
+		TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(tarRef.Address),
+		TokenAdminRegistryRawInstanceAddress: tarRaw,
+		InstrumentId:                         nativeInstrument,
+		CcipOwnerParty:                       ccipOwnerParty,
+		TokenQualifier:                       string(nativeInstrument.Id),
+		ChainSelector:                        input.ChainSelector,
+		ProposalDriven:                       mcmsEnabled,
+	})
+	if err != nil {
+		return ccipseq.OnChainOutput{}, fmt.Errorf("register native fee token in TAR: %w", err)
+	}
+	out.BatchOps = append(out.BatchOps, tarReport.Output.BatchOps...)
+	out.Addresses = append(out.Addresses, tarReport.Output.Addresses...)
 
 	for remoteSelector, remoteCfg := range input.RemoteChains {
 		localExecutor, err := resolveContractRefByAddress(
@@ -204,11 +246,11 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 			FeeQuoter: feeQuoter,
 		}
 
-		remoteChain, err := remoteChainDefinition(remoteSelector, remoteCfg)
+		remoteChain, err := BuildRemoteChainDefinition(remoteSelector, remoteCfg)
 		if err != nil {
 			return out, err
 		}
-		tokenPrices, err := resolveTokenPricesForRemoteDest(ds, input, remoteSelector, &nativeInstrument)
+		tokenPrices, err := ResolveTokenPricesForRemoteDest(ds, input, remoteSelector, &nativeInstrument)
 		if err != nil {
 			return out, fmt.Errorf("resolve token prices for remote chain %d: %w", remoteSelector, err)
 		}
@@ -487,7 +529,8 @@ func convertCommitteeVerifierConfigs(configs []ccipadapters.CommitteeVerifierCon
 	return out
 }
 
-func remoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteChainConfig[[]byte, string]) (*lanes.ChainDefinition, error) {
+// BuildRemoteChainDefinition maps a resolved remote chain config to a lane ChainDefinition.
+func BuildRemoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteChainConfig[[]byte, string]) (*lanes.ChainDefinition, error) {
 	if len(remoteCfg.OnRamps) == 0 {
 		return nil, fmt.Errorf("remote chain %d has no onramp address", remoteSelector)
 	}
@@ -513,11 +556,12 @@ func remoteChainDefinition(remoteSelector uint64, remoteCfg ccipadapters.RemoteC
 		OnRamp:                    remoteCfg.OnRamps[0],
 		OffRamp:                   remoteCfg.OffRamp,
 		Router:                    router,
-		FeeQuoterDestChainConfig:  feeQuoterDestChainConfigFromOverrides(remoteCfg.FeeQuoterDestChainConfig),
+		FeeQuoterDestChainConfig:  BuildFeeQuoterDestChainConfig(remoteCfg.FeeQuoterDestChainConfig),
 	}, nil
 }
 
-func feeQuoterDestChainConfigFromOverrides(cfg ccipadapters.FeeQuoterDestChainConfigOverrides) lanes.FeeQuoterDestChainConfig {
+// BuildFeeQuoterDestChainConfig merges adapter overrides onto Canton FQ dest defaults.
+func BuildFeeQuoterDestChainConfig(cfg ccipadapters.FeeQuoterDestChainConfigOverrides) lanes.FeeQuoterDestChainConfig {
 	out := DefaultCantonFeeQuoterDestChainConfig()
 	out.OverrideExistingConfig = cfg.OverrideExistingConfig
 	if cfg.IsEnabled != nil {
@@ -561,6 +605,45 @@ func feeQuoterDestChainConfigFromOverrides(cfg ccipadapters.FeeQuoterDestChainCo
 	}
 
 	return out
+}
+
+// minProductionCantonChainNOPs is the minimum unique NOP count for Canton chains in production.
+const (
+	minProductionCantonChainNOPs = 9
+	minTestnetCantonChainNOPS    = 4
+)
+
+func (a *CantonChainFamilyAdapter) ValidateNOPsTopology(chainSelector string, nopCount int) error {
+	chainSelectorUint, err := strconv.ParseUint(chainSelector, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid chain selector %q: %w", chainSelector, err)
+	}
+	isTestnet, err := chainsel.IsTestnetChain(chainSelectorUint)
+	if err != nil {
+		return fmt.Errorf("failed to determine if chain selector %q is testnet: %w", chainSelector, err)
+	}
+	if isTestnet {
+		if nopCount < minTestnetCantonChainNOPS {
+			return fmt.Errorf(
+				"chain %q requires at least %d unique NOPs for testnet environments, got %d",
+				chainSelector,
+				minTestnetCantonChainNOPS,
+				nopCount,
+			)
+		}
+
+		return nil
+	}
+	if nopCount < minProductionCantonChainNOPs {
+		return fmt.Errorf(
+			"chain %q requires at least %d unique NOPs for production environments, got %d",
+			chainSelector,
+			minProductionCantonChainNOPs,
+			nopCount,
+		)
+	}
+
+	return nil
 }
 
 func dataStoreFromConfigureChainForLanesInput(input ccipadapters.ConfigureChainForLanesInput) (datastore.DataStore, error) {

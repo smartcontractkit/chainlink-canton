@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -22,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
@@ -317,6 +319,116 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 	}
 
 	return sequences.OnChainOutput{BatchOps: batchOps}, nil
+}
+
+// CantonOutboundDestFeeInput carries resolved lane legs for Canton→remote outbound dest fee hardening.
+type CantonOutboundDestFeeInput struct {
+	Source *lanes.ChainDefinition
+	Dest   *lanes.ChainDefinition
+}
+
+// appendCantonOutboundDestFeeProposalOutputs emits GlobalConfig and FeeQuoter dest updates only
+// (no Executor, price updater, or UpdatePrices ops).
+func appendCantonOutboundDestFeeProposalOutputs(
+	b operations.Bundle,
+	chain canton.Chain,
+	mcmsEnabled bool,
+	globalConfigRaw, feeQuoterRaw contracts.RawInstanceAddress,
+	input CantonOutboundDestFeeInput,
+) ([]contract.ExerciseOutput, error) {
+	if input.Source == nil || input.Dest == nil {
+		return nil, fmt.Errorf("source and dest chain definitions are required")
+	}
+	sourceChain := input.Source
+	destChain := input.Dest
+
+	var proposalOutputs []contract.ExerciseOutput
+
+	isEnabled := len(destChain.Router) > 0
+	defaultExecutor, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.DefaultExecutor)
+	if err != nil {
+		return nil, fmt.Errorf("getting default executor: %w", err)
+	}
+	laneMandatedOutboundCCVs := make([]chainlinkapi.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
+	for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
+		outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
+		if err != nil {
+			return nil, fmt.Errorf("getting lane mandated outbound CCV: %w", err)
+		}
+		laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, outboundCCV.Binding())
+	}
+	defaultOutboundCCVs := make([]chainlinkapi.RawInstanceAddress, 0, len(sourceChain.DefaultOutboundCCVs))
+	for _, ccv := range sourceChain.DefaultOutboundCCVs {
+		outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
+		if err != nil {
+			return nil, fmt.Errorf("getting default outbound CCV: %w", err)
+		}
+		defaultOutboundCCVs = append(defaultOutboundCCVs, outboundCCV.Binding())
+	}
+	tokenReceiverAllowed := false
+	if destChain.TokenReceiverAllowed != nil {
+		tokenReceiverAllowed = *destChain.TokenReceiverAllowed
+	}
+	destChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[core.ApplyDestChainConfigUpdates]{
+		InstanceAddress:    globalConfigRaw.InstanceAddress(),
+		RawInstanceAddress: globalConfigRaw.String(),
+		MCMSEnabled:        mcmsEnabled,
+		Args: core.ApplyDestChainConfigUpdates{
+			DestChainConfigUpdates: []core.DestChainConfigArgs{
+				{
+					DestChainSelector:         types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
+					IsEnabled:                 types.BOOL(isEnabled),
+					AddressBytesLength:        types.INT64(destChain.AddressBytesLength),
+					TokenReceiverAllowed:      types.BOOL(tokenReceiverAllowed),
+					BaseExecutionGasCost:      types.INT64(destChain.BaseExecutionGasCost),
+					OffRampAddress:            types.TEXT(hex.EncodeToString(destChain.OffRamp)),
+					DefaultExecutor:           new(defaultExecutor.Binding()),
+					LaneMandatedCCVs:          laneMandatedOutboundCCVs,
+					DefaultCCVs:               defaultOutboundCCVs,
+					MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatUint(uint64(destChain.MessageNetworkFeeUSDCents), 10)),
+					TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatUint(uint64(destChain.TokenNetworkFeeUSDCents), 10)),
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("applying dest chain config updates to global config: %w", err)
+	}
+	if mcmsEnabled && !destChainConfigReport.Output.Executed() {
+		proposalOutputs = append(proposalOutputs, destChainConfigReport.Output)
+	}
+
+	feeQuoterDestConfigReport, err := operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[core.ApplyFeeQuoterDestChainConfigUpdates]{
+		InstanceAddress:    feeQuoterRaw.InstanceAddress(),
+		RawInstanceAddress: feeQuoterRaw.String(),
+		MCMSEnabled:        mcmsEnabled,
+		Args: core.ApplyFeeQuoterDestChainConfigUpdates{
+			DestChainConfigArgs: []core.FeeQuoterDestChainConfigArgs{
+				{
+					DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
+					DestChainConfig: core.FeeQuoterDestChainConfig{
+						IsEnabled:                   types.BOOL(destChain.FeeQuoterDestChainConfig.IsEnabled),
+						MaxDataBytes:                types.INT64(destChain.FeeQuoterDestChainConfig.MaxDataBytes),
+						MaxPerMsgGasLimit:           types.INT64(destChain.FeeQuoterDestChainConfig.MaxPerMsgGasLimit),
+						DestGasOverhead:             types.INT64(destChain.FeeQuoterDestChainConfig.DestGasOverhead),
+						DestGasPerPayloadByteBase:   types.INT64(destChain.FeeQuoterDestChainConfig.DestGasPerPayloadByteBase),
+						DefaultTxGasLimit:           types.INT64(destChain.FeeQuoterDestChainConfig.DefaultTxGasLimit),
+						LinkFeeMultiplierPercent:    types.NUMERIC(strconv.FormatUint(uint64(destChain.FeeQuoterDestChainConfig.V2Params.LinkFeeMultiplierPercent), 10)),
+						DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatUint(uint64(destChain.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)),
+						DefaultTokenDestGasOverhead: types.INT64(destChain.FeeQuoterDestChainConfig.DefaultTokenDestGasOverhead),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("applying dest chain config updates to fee quoter: %w", err)
+	}
+	if mcmsEnabled && !feeQuoterDestConfigReport.Output.Executed() {
+		proposalOutputs = append(proposalOutputs, feeQuoterDestConfigReport.Output)
+	}
+
+	return proposalOutputs, nil
 }
 
 func resolveFeeQuoterRef(input ConfigureLaneLegInput, chainSelector uint64) (datastore.AddressRef, error) {
