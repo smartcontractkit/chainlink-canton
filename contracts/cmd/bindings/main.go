@@ -97,6 +97,11 @@ func main() {
 			"apGroupQuorums": true, // used in AdminParams.AP_SetConfig
 			"apGroupParents": true, // used in AdminParams.AP_SetConfig
 		},
+		// hex:"decimal" — Daml Decimal fields encoded via MCMS.Codec.encodeDecimal (sign byte + 10^10 shift).
+		DecimalFields: map[string]bool{
+			"usdPerUnitGas": true, // FeeQuoter gas price updates
+			"usdPerToken":   true, // FeeQuoter token price updates
+		},
 		VariantTagByteMap: map[string]map[string]byte{
 			"CCIP.LockReleaseTokenPoolTypes.TransferTimeout": {
 				"Indefinite":    0x00,

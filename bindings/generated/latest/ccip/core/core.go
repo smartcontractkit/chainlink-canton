@@ -4117,7 +4117,7 @@ func (t *FinalizeSendResult) UnmarshalHex(data string) error {
 // GasPriceUpdate is a Record type
 type GasPriceUpdate struct {
 	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-	UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas"`
+	UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas" hex:"decimal"`
 }
 
 // ToMap converts GasPriceUpdate to a map for DAML arguments
@@ -9193,7 +9193,7 @@ func (t TokenConfig) ArchiveWithPackageID(contractID string, packageID string) *
 // TokenPriceUpdate is a Record type
 type TokenPriceUpdate struct {
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	UsdPerToken  types.NUMERIC                            `json:"usdPerToken"`
+	UsdPerToken  types.NUMERIC                            `json:"usdPerToken" hex:"decimal"`
 }
 
 // ToMap converts TokenPriceUpdate to a map for DAML arguments
