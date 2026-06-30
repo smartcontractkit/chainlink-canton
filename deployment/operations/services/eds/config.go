@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
@@ -22,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/linkregistry"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
 )
 
@@ -181,6 +183,27 @@ var BuildConfig = operations.NewOperation(
 				}
 				if input.LockReleaseTransferPreapproval != nil {
 					pool.TransferPreapproval = input.LockReleaseTransferPreapproval
+				}
+			}
+			// BnM send needs burn-mint-factory in pool choice context; LinkRegistry implements BurnMintFactory.
+			if tokenPoolType == edsConfig.TokenPoolTypeBurnMint {
+				linkRegistryRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+					input.ChainSelector,
+					datastore.ContractType(linkregistry.ContractType),
+					linkregistry.Version,
+					"",
+				))
+				if err != nil {
+					return GenerateEDSConfigOutput{}, fmt.Errorf("failed to get LinkRegistry for burn-mint pool EDS config: %w", err)
+				}
+				templateID := link.LinkRegistry{}.GetTemplateID()
+				partyID := participant.PartyID
+				linkRegistryAddress := contracts.HexToInstanceAddress(linkRegistryRef.Address)
+				pool.BurnMintFactory = &edsConfig.BurnMintFactory{
+					Type:            edsConfig.FactoryTypeAddress,
+					TemplateId:      &templateID,
+					Party:           &partyID,
+					InstanceAddress: &linkRegistryAddress,
 				}
 			}
 			tokenPools[instanceAddress.Hex()] = pool

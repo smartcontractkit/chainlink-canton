@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/deployment/cciptokens"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 )
 
@@ -27,8 +28,6 @@ import (
 // Keys use "<adminParty>:<instrumentId>"; values are USD per whole token (e.g. "10" for $10 LINK).
 // Canton FeeQuoter stores usdPerToken as DAML Decimal (see FeeQuoter.daml tests: 20.0 = $20/LINK).
 const CantonRemoteTokenPricesFamilyExtraKey = "cantonRemoteTokenPrices"
-
-const defaultLinkTokenInstrumentID = "link-token"
 
 // defaultLinkUsdPerTokenDollars is the nominal LINK/USD spot used when FamilyExtras omit a price.
 const defaultLinkUsdPerTokenDollars int64 = 10
@@ -51,7 +50,7 @@ func ResolveTokenPricesForRemoteDest(
 	}
 
 	prices := map[string]*big.Int{
-		fmt.Sprintf("%s:%s", ccipOwner, defaultLinkTokenInstrumentID): usdPerTokenToScaled(defaultLinkUsdPerTokenDollars),
+		fmt.Sprintf("%s:%s", ccipOwner, cciptokens.LinkTokenInstrumentID): usdPerTokenToScaled(defaultLinkUsdPerTokenDollars),
 	}
 	if nativeInstrument != nil && nativeInstrument.Admin != "" && nativeInstrument.Id != "" {
 		key := instrumentPriceKey(nativeInstrument.Admin, nativeInstrument.Id)

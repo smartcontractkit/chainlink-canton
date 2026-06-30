@@ -2,6 +2,7 @@ package linkregistry
 
 import (
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/go-daml/pkg/model"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -34,7 +35,7 @@ var BurnMintFactory_BurnMint = contract.NewExercise(contract.ExerciseParams[spli
 	Description:  "Burns/Mints Holdings on Canton",
 	ContractType: ContractType,
 	Template:     link.LinkRegistry{},
-	Method:       link.LinkRegistry{}.BurnMintFactoryBurnMint,
+	Method:       exerciseLinkRegistryBurnMint,
 })
 
 var TransferFactory_Transfer = contract.NewExercise(contract.ExerciseParams[splice_api_token_transfer_instruction_v1.TransferFactoryTransfer]{
@@ -43,7 +44,7 @@ var TransferFactory_Transfer = contract.NewExercise(contract.ExerciseParams[spli
 	Description:  "Transfers Holdings on Canton",
 	ContractType: ContractType,
 	Template:     link.LinkRegistry{},
-	Method:       link.LinkRegistry{}.TransferFactoryTransfer,
+	Method:       exerciseLinkRegistryTransfer,
 })
 
 var CreateTransferPreapproval = contract.NewExercise(contract.ExerciseParams[link.CreateTransferPreapproval]{
@@ -54,3 +55,19 @@ var CreateTransferPreapproval = contract.NewExercise(contract.ExerciseParams[lin
 	Template:     link.LinkRegistry{},
 	Method:       link.LinkRegistry{}.CreateTransferPreapproval,
 })
+
+// Splice token interface choices must be exercised via the interface package on the ledger
+// (see integration-tests/ccip/ccip_send_with_token_bnm_test.go), not Link.Token's local view.
+func exerciseLinkRegistryBurnMint(contractID string, args splice_api_token_burn_mint_v1.BurnMintFactoryBurnMint) *model.ExerciseCommand {
+	cmd := link.LinkRegistry{}.BurnMintFactoryBurnMint(contractID, args)
+	cmd.TemplateID = splice_api_token_burn_mint_v1.IBurnMintFactoryInterfaceID()
+
+	return cmd
+}
+
+func exerciseLinkRegistryTransfer(contractID string, args splice_api_token_transfer_instruction_v1.TransferFactoryTransfer) *model.ExerciseCommand {
+	cmd := link.LinkRegistry{}.TransferFactoryTransfer(contractID, args)
+	cmd.TemplateID = splice_api_token_transfer_instruction_v1.ITransferFactoryInterfaceID()
+
+	return cmd
+}
