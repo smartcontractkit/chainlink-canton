@@ -7,7 +7,7 @@ environment that includes Canton.
 
 Make sure to checkout [chainlink-ccv](https://github.com/smartcontractkit/chainlink-ccv/) in a parallel directory,
 i.e. so that chainlink-canton and chainlink-ccv have the same parent directory. This is needed so that we can build
-needed docker images.
+needed docker images. Use ref **`695181f87033217a197386366e1ab563198f482e`** (matches `go.mod` and CI).
 
 ## Spin up an environment
 
@@ -452,7 +452,7 @@ Workflows pass these secrets to `.github/actions/ccip-load-test` using the same 
 
 Devenv secrets unchanged: `CCV_IAM_ROLE`, `JD_REGISTRY`, `JD_IMAGE`.
 
-chainlink-ccv is pinned in `.github/actions/setup-ccip-devenv` (devenv only).
+chainlink-ccv is pinned to **`695181f87033217a197386366e1ab563198f482e`** in `.github/actions/setup-ccip-devenv` and `go.mod` (same as CCIP E2E).
 
 ## Shortcut
 

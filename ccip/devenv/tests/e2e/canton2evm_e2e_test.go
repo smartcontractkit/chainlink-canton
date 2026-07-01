@@ -194,4 +194,114 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		t.Logf("EVM receiver token balance: before=%s after=%s totalExpectedTransfer=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String(), totalExpectedTransfer.String())
 		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter)
 	})
+
+	// Token transfer with default extraArgs (gasLimit=0, default executor/CCVs from lane) should succeed.
+	t.Run("token transfer with default extraArgs", func(t *testing.T) {
+		subtestCtx := ccv.Plog.WithContext(t.Context())
+
+		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
+		tokenTransferAmount := lane.TransferAmount.Uint64()
+
+		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)))
+		require.NoError(t, cantonImpl.MintTokens(ctx, tokenTransferAmount))
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
+
+		receiver, err := evmChain.GetEOAReceiverAddress()
+		require.NoError(t, err)
+
+		sendMessageResult, err := cantonChain.SendMessage(
+			subtestCtx,
+			evmChain.ChainSelector(),
+			cciptestinterfaces.MessageFields{
+				Receiver: receiver,
+				Data:     []byte("canton2evm token transfer default extraArgs"),
+				TokenAmount: cciptestinterfaces.TokenAmount{
+					Amount: lane.TransferAmount,
+				},
+			},
+			cciptestinterfaces.MessageOptions{
+				ExecutionGasLimit: 0,
+				FinalityConfig:    lane.FinalityConfig,
+			},
+			3,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, sendMessageResult.Message)
+		require.NotNil(t, sendMessageResult.Message.TokenTransfer)
+
+		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
+		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+		require.NoError(t, err)
+
+		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}, tests.WaitTimeout(t))
+		require.NoError(t, err)
+		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+	})
+
+	// Token transfer with gasLimit=0 should succeed — the EVM receiver gets the tokens
+	// even without gas for a callback since there is no receiver contract to call.
+	t.Run("token transfer with zero gas limit", func(t *testing.T) {
+		subtestCtx := ccv.Plog.WithContext(t.Context())
+
+		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
+		tokenTransferAmount := lane.TransferAmount.Uint64()
+
+		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)))
+		require.NoError(t, cantonImpl.MintTokens(ctx, tokenTransferAmount))
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
+
+		ds, err := lib.DataStore()
+		require.NoError(t, err)
+		receiver, err := evmChain.GetEOAReceiverAddress()
+		require.NoError(t, err)
+		ccvAddr := devenvtests.GetContractAddress(
+			t, ds, cantonChain.ChainSelector(),
+			datastore.ContractType(canton_committee_verifier.ContractType),
+			canton_committee_verifier.Version.String(),
+			devenvcommon.DefaultCommitteeVerifierQualifier,
+			"canton committee verifier",
+		)
+		executorAddr := devenvtests.GetContractAddress(
+			t, ds, cantonChain.ChainSelector(),
+			datastore.ContractType(executor.ContractType),
+			executor.Version.String(),
+			devenvcommon.DefaultExecutorQualifier,
+			"source executor",
+		)
+
+		sendMessageResult, err := cantonChain.SendMessage(
+			subtestCtx,
+			evmChain.ChainSelector(),
+			cciptestinterfaces.MessageFields{
+				Receiver: receiver,
+				Data:     []byte("canton2evm token transfer zero gas"),
+				TokenAmount: cciptestinterfaces.TokenAmount{
+					Amount: lane.TransferAmount,
+				},
+			},
+			cciptestinterfaces.MessageOptions{
+				ExecutionGasLimit: 0,
+				FinalityConfig:    lane.FinalityConfig,
+				Executor:          executorAddr,
+				CCVs: []protocol.CCV{
+					{
+						CCVAddress: ccvAddr,
+						Args:       []byte{},
+						ArgsLen:    0,
+					},
+				},
+			},
+			3,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, sendMessageResult.Message)
+
+		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
+		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+		require.NoError(t, err)
+
+		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}, tests.WaitTimeout(t))
+		require.NoError(t, err)
+		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+	})
 }
