@@ -33,11 +33,11 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/smartcontractkit/chain-selectors v1.0.104
-	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260629123053-9119c0d88425
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260629123053-9119c0d88425
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260630070014-13227c2d12d0
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260630070014-13227c2d12d0
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260630070014-13227c2d12d0
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260626191803-b2c751b7f789
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260626191803-b2c751b7f789
+	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260701162830-b85afc4a2ec5
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260701162830-b85afc4a2ec5
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260701162830-b85afc4a2ec5
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.114.2
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260623160408-12abc7b173d8
@@ -158,7 +158,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sercand/kuberesolver/v6 v6.0.0 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.0-20260630070014-13227c2d12d0 // indirect
+	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.0-20260701140628-aa6dcbdd5f9c // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20260423135514-5b1a7565a99c // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260423135514-5b1a7565a99c // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20260423135514-5b1a7565a99c // indirect
@@ -441,10 +441,10 @@ require (
 	github.com/smartcontractkit/chainlink-protos/chainlink-ccv/message-discovery v0.0.0-20251211142334-5c3421fe2c8d // indirect
 	github.com/smartcontractkit/chainlink-protos/chainlink-ccv/verifier v0.0.0-20251211142334-5c3421fe2c8d // indirect
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260505131349-78e491b80735 // indirect
-	github.com/smartcontractkit/chainlink-protos/job-distributor v0.19.0 // indirect
+	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b // indirect
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9 // indirect
-	github.com/smartcontractkit/chainlink-protos/orchestrator v0.10.0 // indirect
+	github.com/smartcontractkit/chainlink-protos/orchestrator v0.11.0 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260610194843-349ea43d69ce // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
 	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260514223130-48bc90aca745 // indirect
