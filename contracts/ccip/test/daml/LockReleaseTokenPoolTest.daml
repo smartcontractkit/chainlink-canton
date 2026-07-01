@@ -2291,9 +2291,8 @@ testExecutionGasLimitAggregation = script do
             executionCostUSDCents = 0.0
 
     sendingMessageCid <- submit ccipOwner do
-        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_BuildMessage with
+        exerciseCmd sendingMessageCid SendingMessageV1.BuildMessage with
             context = MetadataV1.emptyChoiceContext
-            caller = ccipOwner
 
     Some sm <- queryContractId ccipOwner sendingMessageCid
     sm.executionGasLimit === 285801

@@ -11,10 +11,7 @@ interface SendingMessage where
 
     sendingMessage_addCCVFeeImpl : ContractId SendingMessage -> SendingMessage_AddCCVFee -> Update (ContractId SendingMessage)
     sendingMessage_addVerifierDataImpl : ContractId SendingMessage -> SendingMessage_AddVerifierData -> Update (ContractId SendingMessage)
-
     sendingMessage_addExecutorFeeImpl : ContractId SendingMessage -> SendingMessage_AddExecutorFee -> Update (ContractId SendingMessage)
-
-    sendingMessage_buildMessageImpl : ContractId SendingMessage -> SendingMessage_BuildMessage -> Update (ContractId SendingMessage)
 
     -- CCVs
 
@@ -40,7 +37,7 @@ interface SendingMessage where
         controller caller
         do sendingMessage_addVerifierDataImpl this self arg
 
-    -- Executor
+    -- Executors
 
     nonconsuming choice SendingMessage_AddExecutorFee : ContractId SendingMessage
         with
@@ -51,16 +48,6 @@ interface SendingMessage where
             caller : Party
         controller caller
         do sendingMessage_addExecutorFeeImpl this self arg
-
-    -- CCIP
-
-    -- TODO: only called by PPR, should have controller ccipOwner?
-    nonconsuming choice SendingMessage_BuildMessage : ContractId SendingMessage
-        with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
-            caller : Party
-        controller caller
-        do sendingMessage_buildMessageImpl this self arg
 
 
 data SendingMessageView = SendingMessageView

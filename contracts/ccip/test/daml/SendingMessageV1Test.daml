@@ -81,7 +81,6 @@ testDistinctCcvOwnersWithSameInstanceId = script do
     sendingMessageCid <- submit ccipOwner do
         exerciseCmd sendingMessageCid CCIP.SendingMessageV1.BuildMessage with
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            caller = ccipOwner
 
     sendingMessageCid <- submit (actAs ccvOwnerA) do
         exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with

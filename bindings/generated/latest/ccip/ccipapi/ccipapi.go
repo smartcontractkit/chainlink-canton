@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-api"
-	PackageID   = "72ee20cc3bd6889791bfa7dc1cf7204b29fb1d801d8bed68dd86cbd486c19cb9"
+	PackageID   = "2e91966fb52200b347ce58a46656aacc9df69c590b4d857797dac65067a070b5"
 	SDKVersion  = "3.4.11"
 )
 
@@ -67,9 +67,6 @@ type ISendingMessage interface {
 
 	// SendingMessageAddExecutorFee executes the SendingMessage_AddExecutorFee choice
 	SendingMessageAddExecutorFee(contractID string, args SendingMessageAddExecutorFee) *model.ExerciseCommand
-
-	// SendingMessageBuildMessage executes the SendingMessage_BuildMessage choice
-	SendingMessageBuildMessage(contractID string, args SendingMessageBuildMessage) *model.ExerciseCommand
 }
 
 func argsToMap(args any) map[string]any {
@@ -529,45 +526,6 @@ func (t SendingMessageAddVerifierData) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SendingMessageAddVerifierData from hex string (Canton MCMS format)
 func (t *SendingMessageAddVerifierData) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// SendingMessageBuildMessage is a Record type
-type SendingMessageBuildMessage struct {
-	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller  types.PARTY                                `json:"caller"`
-}
-
-// ToMap converts SendingMessageBuildMessage to a map for DAML arguments
-func (t SendingMessageBuildMessage) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t SendingMessageBuildMessage) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *SendingMessageBuildMessage) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes SendingMessageBuildMessage to hex string (Canton MCMS format)
-func (t SendingMessageBuildMessage) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes SendingMessageBuildMessage from hex string (Canton MCMS format)
-func (t *SendingMessageBuildMessage) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

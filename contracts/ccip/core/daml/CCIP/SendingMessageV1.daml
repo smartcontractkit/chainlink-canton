@@ -337,11 +337,6 @@ template SendingMessageV1
                         context = arg.context
                         caller = arg.caller
 
-            sendingMessage_buildMessageImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @SendingMessageV1 self) BuildMessage with
-                    context = arg.context
-                    caller = arg.caller
-
         choice AddCCVFee : ContractId SendingMessageV1
             with
                 ccvInstanceId : Text
@@ -523,8 +518,7 @@ template SendingMessageV1
         choice BuildMessage : ContractId SendingMessageV1
             with
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
-                caller : Party
-            controller caller
+            controller ccipOwner
             do
                 assertMsg "sendingMessage: BuildMessage only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
                 assertMsg "sendingMessage: message already built" (isNone message)

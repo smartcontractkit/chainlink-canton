@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "7328d3687c1572c35a7e5e906107b130bcba1661343cb936370e149df20d0c3e"
+	PackageID   = "78669a275f92a3daad67ef946e890e7e1cbc32e302e659284277b7d606865156"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1048,7 +1048,6 @@ func (t *ApplySourceChainConfigUpdatesParams) UnmarshalHex(data string) error {
 // BuildMessage is a Record type
 type BuildMessage struct {
 	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller  types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts BuildMessage to a map for DAML arguments
@@ -1056,8 +1055,6 @@ func (t BuildMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["context"] = model.NestedToDAMLValue(t.Context)
-
-	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -1080,24 +1077,6 @@ func (t BuildMessage) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes BuildMessage from hex string (Canton MCMS format)
 func (t *BuildMessage) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// BuildMessageMCMSParams is BuildMessage without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type BuildMessageMCMSParams struct {
-	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-}
-
-// MarshalHex encodes BuildMessageMCMSParams to hex string for MCMS operationData.
-func (t BuildMessageMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes BuildMessageMCMSParams from hex string.
-func (t *BuildMessageMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -7982,27 +7961,6 @@ func (t SendingMessageV1) SendingMessageAddExecutorFeeWithPackageID(contractID s
 	}
 }
 
-// SendingMessageBuildMessage exercises the SendingMessage_BuildMessage choice on this SendingMessageV1 contract via the ISendingMessage interface
-// This method uses the package name in the template ID
-func (t SendingMessageV1) SendingMessageBuildMessage(contractID string, args ccipapi.SendingMessageBuildMessage) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
-		ContractID: contractID,
-		Choice:     "SendingMessage_BuildMessage",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SendingMessageBuildMessageWithPackageID exercises the SendingMessage_BuildMessage choice using the provided package ID instead of package name
-func (t SendingMessageV1) SendingMessageBuildMessageWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageBuildMessage) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
-		ContractID: contractID,
-		Choice:     "SendingMessage_BuildMessage",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // Verify interface implementations for SendingMessageV1
 
 var _ ccipapi.ISendingMessage = (*SendingMessageV1)(nil)
@@ -10808,7 +10766,6 @@ type MCMSEncoder interface {
 	ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error)
 	ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	BuildMessage(args BuildMessage) (*bind.EncodedChoice, error)
-	BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
 	CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.EncodedChoice, error)
 	Consume(args Consume) (*bind.EncodedChoice, error)
@@ -11031,11 +10988,6 @@ func (e *encoder) ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfi
 
 // BuildMessage encodes parameters for the BuildMessage choice.
 func (e *encoder) BuildMessage(args BuildMessage) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("BuildMessage", args)
-}
-
-// BuildMessageMCMSParams encodes MCMS parameters (without Caller) for the BuildMessage choice.
-func (e *encoder) BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("BuildMessage", args)
 }
 
