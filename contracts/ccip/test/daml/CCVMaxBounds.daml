@@ -164,7 +164,7 @@ setupOutboundFixture suffix = do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
@@ -454,7 +454,7 @@ setupExecuteFixture suffix sourceDefaultCCVs = do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do

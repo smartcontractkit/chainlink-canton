@@ -17,7 +17,7 @@ import qualified CCIP.Internal
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import qualified CCIP.Tickets
+import qualified CCIP.Receipts
 
 import MCMS.Crypto (isValidHex)
 
@@ -614,7 +614,7 @@ template SendingMessageV1
                 messageSender : Party
                 messageSentObservers : [Party]
                 verifierBlobs : [BytesHex]
-                receipts : [CCIP.Tickets.Receipt]
+                receipts : [CCIP.Receipts.Receipt]
             controller ccipOwner
             do
                 assertMsg "finalizeSend: only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)

@@ -28,6 +28,8 @@ const (
 	GlobalConfig = Package("globalconfig")
 
 	CCIPAPI                  = Package("ccip-api")
+	CCIPCodec                = Package("ccip-codec")
+	CCIPTickets              = Package("ccip-tickets")
 	CCIPCore                 = Package("ccip-core")
 	CCIPExtensionAPI         = Package("ccip-extension-api")
 	CCIPRuntime              = Package("ccip-runtime")
@@ -75,6 +77,8 @@ var Versions map[Package][]string = map[Package][]string{
 	GlobalConfig: []string{"1.0.0", "2.0.0", CurrentVersion},
 
 	CCIPAPI:                  []string{CurrentVersion},
+	CCIPCodec:                []string{CurrentVersion},
+	CCIPTickets:              []string{CurrentVersion},
 	CCIPCore:                 []string{"2.0.0", CurrentVersion},
 	CCIPExtensionAPI:         []string{"2.0.0", CurrentVersion},
 	CCIPRuntime:              []string{"2.0.0", CurrentVersion},
@@ -139,6 +143,8 @@ var OutputDirs = map[Package][]string{
 	MCMSTest:     []string{"mcms", "mcmstest"},
 
 	CCIPAPI:                  []string{"ccip", "ccipapi"},
+	CCIPCodec:                []string{"ccip", "ccipcodec"},
+	CCIPTickets:              []string{"ccip", "tickets"},
 	CCIPCore:                 []string{"ccip", "core"},
 	CCIPExtensionAPI:         []string{"ccip", "extensionapi"},
 	CCIPRuntime:              []string{"ccip", "ccipruntime"},

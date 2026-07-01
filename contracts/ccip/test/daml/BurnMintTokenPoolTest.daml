@@ -103,7 +103,7 @@ setupTokenAdminRegistry
 setupTokenAdminRegistry ccipOwner poolOwner tokenAdminRegistryInstanceId instrumentId tokenPoolInstanceId = do
     tokenAdminRegistry0 <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             instanceId = tokenAdminRegistryInstanceId
             entryCount = 0
 
@@ -336,8 +336,8 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
 
   submitMustFail (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedBadBurnMintFactory) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId badBurnMintFactoryCid)
       sendingMessageCid = toInterfaceContractId sendingMessageCid
@@ -487,8 +487,8 @@ testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
 
   submitMustFail (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId registryCid)
       sendingMessageCid = toInterfaceContractId sendingMessageCid
@@ -498,8 +498,8 @@ testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
 
   submitMustFail (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedBadPoolFeeInstrumentFactory) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId badPoolFeeInstrumentFactoryCid)
       sendingMessageCid = toInterfaceContractId sendingMessageCid
@@ -509,8 +509,8 @@ testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
 
   submitMustFail (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedBadExtraOutputFactory) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId badExtraOutputFactoryCid)
       sendingMessageCid = toInterfaceContractId sendingMessageCid
@@ -588,6 +588,7 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
       messageId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
   disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
@@ -598,11 +599,11 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
 
   result <- submit (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   case result.output of
@@ -730,6 +731,7 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
       messageId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
   disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
@@ -744,47 +746,47 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedBadWrongInstrumentFactory) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badWrongInstrumentFactoryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedBadWrongOwnerFactory) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badWrongOwnerFactoryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedBadWrongAmountFactory) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badWrongAmountFactoryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedBadExtraOutputFactory) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badExtraOutputFactoryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedBadNoOutputFactory) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badNoOutputFactoryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
 -- Release must accept raw uint256 source amounts above Canton's Numeric 0 range
@@ -860,6 +862,7 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
       messageId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
   disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
@@ -870,11 +873,11 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
 
   result <- submit (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   case result.output of
@@ -958,6 +961,7 @@ testBurnMintPoolReleaseFromTicketDecimalConversionTruncatesToZeroFails = script 
       messageId = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
   disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
@@ -968,11 +972,11 @@ testBurnMintPoolReleaseFromTicketDecimalConversionTruncatesToZeroFails = script 
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   receiverHoldings <- query @Link.LinkHolding receiver
@@ -1055,6 +1059,7 @@ testBurnMintPoolReleaseFromTicketDecimalConversionOverflowFails = script do
       messageId = "9999999999999999999999999999999999999999999999999999999999999999"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
   disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
@@ -1065,11 +1070,11 @@ testBurnMintPoolReleaseFromTicketDecimalConversionOverflowFails = script do
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   receiverHoldings <- query @Link.LinkHolding receiver
@@ -1160,6 +1165,7 @@ testBurnMintPoolReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
       messageId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   let driftUpdate = BurnMintTokenPool.ChainUpdate with
         remoteChainSelector = sourceChainSelector
@@ -1185,11 +1191,11 @@ testBurnMintPoolReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
 
   result <- submit (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
   case result.output of
@@ -1274,6 +1280,7 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
       messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   wrongPoolAddressTicketCid <- submit (actAs ccipOwner <> actAs poolOwner <> actAs ccvOwner) do
     createCmd Tickets.TokenReceiveTicket with
@@ -1292,6 +1299,7 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
       messageId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
   disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
@@ -1303,20 +1311,20 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedWrongPoolTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
-      tokenReceiveTicketCid = wrongPoolAddressTicketCid
+      tokenReceiveTicketCid = coerceContractId wrongPoolAddressTicketCid
       caller = receiver
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
 -- Release must reject verified CCV instances whose owner is not a ticket signatory.
@@ -1393,6 +1401,7 @@ testBurnMintPoolReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
       messageId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       sourceChainSelector = sourceChainSelector
       finality = FinalityConfig.WaitForFinality
+      context = MetadataV1.emptyChoiceContext
 
   disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
   disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
@@ -1403,11 +1412,11 @@ testBurnMintPoolReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
 
   submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
-      tokenReceiveTicketCid = tokenReceiveTicketCid
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
       caller = receiver
 
 testBurnMintPoolRejectsMissingBurnMintFactory : Script ()
@@ -1472,8 +1481,8 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
 
   submitMustFail (actAs sender <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
-      tokenAdminRegistryCid = tokenAdminRegistryCid
-      tokenConfigCid = tokenConfigCid
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = MetadataV1.ChoiceContext with
         values = TextMap.fromList
@@ -1802,16 +1811,14 @@ testBurnMintPoolVerifyInboundMessageAcceptsMatchingSourceToken = script do
     newEmCid <- submit (actAs receiver
                         <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedEm) do
         exerciseCmd tokenPool BurnMintTokenPool.VerifyInboundMessage with
-            tokenAdminRegistryCid = tokenAdminRegistry
-            tokenConfigCid = tokenConfigCid
+            tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
+            tokenConfigCid = coerceContractId tokenConfigCid
             extraContext = MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             caller = receiver
 
-    newExecMsg <- queryContractId ccipOwner newEmCid
-    assertMsg "ExecutingMessageV1 should exist" (isSome newExecMsg)
-    let em = fromSome newExecMsg
-    em.inboundPoolVerification === Some (ExecutingMessageV1.InboundPoolVerification with
+    Some newExecMsg <- queryContractId ccipOwner (coerceContractId @_ @ExecutingMessageV1.ExecutingMessageV1 newEmCid)
+    newExecMsg.inboundPoolVerification === Some (ExecutingMessageV1.InboundPoolVerification with
         poolInstanceId = tokenPoolInstanceId
         poolOwner = poolOwner
         poolCCVs = [ccvAddr])
@@ -1922,10 +1929,10 @@ testBurnMintPoolVerifyInboundMessageRejectsMismatchedSourceToken = script do
     submitMustFail (actAs receiver
                     <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedEm) do
         exerciseCmd tokenPool BurnMintTokenPool.VerifyInboundMessage with
-            tokenAdminRegistryCid = tokenAdminRegistry
-            tokenConfigCid = tokenConfigCid
+            tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
+            tokenConfigCid = coerceContractId tokenConfigCid
             extraContext = MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             caller = receiver
 
     debug "testBurnMintPoolVerifyInboundMessageRejectsMismatchedSourceToken: PASSED"

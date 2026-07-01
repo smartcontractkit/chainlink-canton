@@ -183,7 +183,7 @@ template OffRamp
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "prepareExecute: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 sourceConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetSourceChainConfig with
@@ -298,7 +298,7 @@ template OffRamp
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "offramp: tokenadminregistry instance address mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner execMsg.deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner execMsg.deps.tokenAdminRegistry
 
                 sourceConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetSourceChainConfig with

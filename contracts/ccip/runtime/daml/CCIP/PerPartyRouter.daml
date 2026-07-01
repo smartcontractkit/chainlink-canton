@@ -388,7 +388,7 @@ template PerPartyRouter
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 feeQuoter <- fetch feeQuoterCid
                 RawInstanceAddress.assertEqual "router: feequoter mismatch"
@@ -488,7 +488,7 @@ template PerPartyRouter
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
                 RawInstanceAddress.assertEqual "router: rmn mismatch"
@@ -700,7 +700,7 @@ template PerPartyRouter
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
                 RawInstanceAddress.assertEqual "router: rmn mismatch"
@@ -754,7 +754,7 @@ template PerPartyRouter
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
                 RawInstanceAddress.assertEqual "router: rmn mismatch"

@@ -8,14 +8,19 @@ import DA.Crypto.Text (BytesHex)
 import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome)
 
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+import Chainlink.InstanceAddress (RawInstanceAddress)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+import qualified CCIP.API.ExecutingMessageV1
+
 import qualified CCIP.Events
 import qualified CCIP.FinalityConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
-import Chainlink.InstanceAddress (RawInstanceAddress)
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.Tickets
-import qualified Splice.Api.Token.HoldingV1
 
 -- | Record of a CCV verification appended via AddCCVVerification.
 -- The ccvOwner is authenticated by Daml's controller mechanism.
@@ -91,6 +96,20 @@ template ExecutingMessageV1
                 Some verification -> [verification.poolOwner]
                 None -> [])
         observer observingParties
+
+        interface instance CCIP.API.ExecutingMessageV1.ExecutingMessage for ExecutingMessageV1 where
+            view = CCIP.API.ExecutingMessageV1.ExecutingMessageView with
+                ccipOwner = ccipOwner
+
+                message = message
+
+                offRamp = deps.offRamp
+                globalConfig = deps.globalConfig
+                rmnRemote = deps.rmnRemote
+                tokenAdminRegistry = deps.tokenAdminRegistry
+
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
 
         -- Cleanup choice for failed or abandoned flows. Not used for the success path
         -- (which goes through FinalizeExecute).
@@ -222,6 +241,7 @@ template ExecutingMessageV1
                             messageId = messageId
                             sourceChainSelector = message.sourceChainSelector
                             finality = message.finality.requested
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                         pure (Some ticketCid)
                     (None, None, None, None, None) ->
                         pure None

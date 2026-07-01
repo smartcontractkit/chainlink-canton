@@ -10,6 +10,7 @@ import qualified Chainlink.InstanceAddress
 
 import qualified CCIP.FinalityConfig
 import qualified CCIP.Internal
+import qualified CCIP.Receipts
 import qualified CCIP.Tickets
 
 template CCIPMessageSent
@@ -30,7 +31,7 @@ data CCIPMessageSentEvent = CCIPMessageSentEvent
         messageId : BytesHex
         encodedMessage : BytesHex
         verifierBlobs : [BytesHex]
-        receipts : [CCIP.Tickets.Receipt]
+        receipts : [CCIP.Receipts.Receipt]
     deriving (Eq, Show)
 
 template ExecutionStateChanged

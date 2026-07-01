@@ -1,0 +1,134 @@
+module CCIP.API.TokenAdminRegistryV1 where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.BurnMintV1
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.API.SendingMessageV1
+
+interface TokenAdminRegistry where
+    viewtype TokenAdminRegistryView
+
+    tokenAdminRegistry_publicFetchImpl : ContractId TokenAdminRegistry -> TokenAdminRegistry_PublicFetch -> Update TokenAdminRegistryView
+    tokenAdminRegistry_fetchTokenConfigImpl : ContractId TokenAdminRegistry -> TokenAdminRegistry_FetchTokenConfig -> Update TokenConfigView
+    tokenAdminRegistry_setInboundPoolCCVsImpl : ContractId TokenAdminRegistry -> TokenAdminRegistry_SetInboundPoolCCVs -> Update (ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage)
+    tokenAdminRegistry_setOutboundPoolCCVsImpl : ContractId TokenAdminRegistry -> TokenAdminRegistry_SetOutboundPoolCCVs -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
+    tokenAdminRegistry_addTokenSendImpl : ContractId TokenAdminRegistry -> TokenAdminRegistry_AddTokenSend -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
+    tokenAdminRegistry_addTokenSendFeeImpl : ContractId TokenAdminRegistry -> TokenAdminRegistry_AddTokenSendFee -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
+    tokenAdminRegistry_consumeReceiveTicketImpl : ContractId TokenAdminRegistry -> TokenAdminRegistry_ConsumeReceiveTicket -> Update ()
+
+    nonconsuming choice TokenAdminRegistry_PublicFetch : TokenAdminRegistryView
+        with
+            expectedAddress : Chainlink.InstanceAddress.RawInstanceAddress
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_publicFetchImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_FetchTokenConfig : TokenConfigView
+        with
+            tokenConfigCid : ContractId TokenConfig
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_fetchTokenConfigImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_SetInboundPoolCCVs : ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage
+        with
+            tokenConfigCid : ContractId TokenConfig
+            executingMessageCid : ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage
+            poolInstanceId : Text
+            poolCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_setInboundPoolCCVsImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_SetOutboundPoolCCVs : ContractId CCIP.API.SendingMessageV1.SendingMessage
+        with
+            tokenConfigCid : ContractId TokenConfig
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
+            poolInstanceId : Text
+            poolCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_setOutboundPoolCCVsImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_AddTokenSend : ContractId CCIP.API.SendingMessageV1.SendingMessage
+        with
+            tokenConfigCid : ContractId TokenConfig
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
+            poolInstanceId : Text
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            amount : BytesHex
+            destTokenAddress : BytesHex
+            extraData : BytesHex
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_addTokenSendImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_AddTokenSendFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
+        with
+            tokenConfigCid : ContractId TokenConfig
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
+            poolInstanceId : Text
+            feeUSDCents : Numeric 0
+            destGasOverhead : Int
+            destBytesOverhead : Int
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_addTokenSendFeeImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_ConsumeReceiveTicket : ()
+        with
+            tokenConfigCid : ContractId TokenConfig
+            tokenReceiveTicketCid : ContractId CCIP.API.ExecutingMessageV1.TokenReceiveTicket
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            poolInstanceId : Text
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_consumeReceiveTicketImpl this self arg
+   
+data TokenAdminRegistryView = TokenAdminRegistryView
+    with
+        ccipOwner : Party
+        instanceId : Text
+    deriving (Eq, Show)
+
+interface TokenConfig where
+    viewtype TokenConfigView
+
+    tokenConfig_publicFetchImpl : ContractId TokenConfig -> TokenConfig_PublicFetch -> Update TokenConfigView
+    tokenConfig_assertConfiguredTransferFactoryImpl : ContractId TokenConfig -> TokenConfig_AssertConfiguredTransferFactory -> Update ()
+    tokenConfig_assertConfiguredBurnMintFactoryImpl : ContractId TokenConfig -> TokenConfig_AssertConfiguredBurnMintFactory -> Update ()
+
+    nonconsuming choice TokenConfig_PublicFetch : TokenConfigView
+        with
+            expectedAddress : Chainlink.InstanceAddress.RawInstanceAddress
+            caller : Party
+        controller caller
+        do tokenConfig_publicFetchImpl this self arg
+
+    nonconsuming choice TokenConfig_AssertConfiguredTransferFactory : ()
+        with
+            suppliedFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+            caller : Party
+        controller caller
+        do tokenConfig_assertConfiguredTransferFactoryImpl this self arg
+
+    nonconsuming choice TokenConfig_AssertConfiguredBurnMintFactory : ()
+        with
+            suppliedFactory : ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory
+            caller : Party
+        controller caller
+        do tokenConfig_assertConfiguredBurnMintFactoryImpl this self arg
+
+data TokenConfigView = TokenConfigView
+    with
+        ccipOwner : Party
+        instanceId : Text
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+    deriving (Eq, Show)

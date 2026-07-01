@@ -247,7 +247,7 @@ testCCIPSendAllFeePayouts = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 1
 
     feeQuoter <- submit ccipOwner do
@@ -573,7 +573,7 @@ testCCIPSend = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 1
 
     -- Deploy FeeQuoter with fee token price
@@ -872,7 +872,7 @@ testCCIPExecute = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     -- Deploy OffRamp
@@ -1048,7 +1048,7 @@ testPrepareSendExtraArgs = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
@@ -1297,7 +1297,7 @@ testPrepareSendRejectsOversizedPayload = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
@@ -1515,7 +1515,7 @@ testExecuteRollsOverExecutedMessages = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do
@@ -1733,7 +1733,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
@@ -1890,7 +1890,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do

@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "d0d57f245f4d2e32e9ce5b296ec97b273e9df9d4a6ae5ff8c39ab0def0d4fb38"
+	PackageID   = "39c01ae7504adde662c313ca6a9b5b8641c6bb01e84af598a6e5c7bef168f5ec"
 	SDKVersion  = "3.4.11"
 )
 
@@ -337,9 +337,9 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 
 // DynamicConfig is a Record type
 type DynamicConfig struct {
-	FeeAggregator         *types.PARTY        `json:"feeAggregator" hex:"optional"`
-	AllowedFinalityConfig core.FinalityConfig `json:"allowedFinalityConfig"`
-	CcvAllowlistEnabled   types.BOOL          `json:"ccvAllowlistEnabled"`
+	FeeAggregator         *types.PARTY             `json:"feeAggregator" hex:"optional"`
+	AllowedFinalityConfig ccipcodec.FinalityConfig `json:"allowedFinalityConfig"`
+	CcvAllowlistEnabled   types.BOOL               `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts DynamicConfig to a map for DAML arguments

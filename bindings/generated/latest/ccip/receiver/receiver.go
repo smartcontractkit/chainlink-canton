@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "d3b343a531bbafb4e96ed44ef277f112957ade1592eb0e45de33f0ca1417a1d1"
+	PackageID   = "05c1904818168fd26ec1eb54e70bf24ddba9a412581747119b2d5dbccd6726e7"
 	SDKVersion  = "3.4.11"
 )
 
@@ -60,7 +60,7 @@ type CCIPMessageReceived struct {
 	Owner              types.PARTY                       `json:"owner"`
 	Router             types.CONTRACT_ID                 `json:"router"`
 	MessageId          types.TEXT                        `json:"messageId"`
-	Message            core.MessageV1                    `json:"message"`
+	Message            ccipcodec.MessageV1               `json:"message"`
 	TokenReleaseResult *extensionapi.ReleaseOrMintResult `json:"tokenReleaseResult" hex:"optional"`
 }
 
@@ -194,7 +194,7 @@ type CCIPReceiver struct {
 	RequiredCCVs           []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
 	OptionalCCVs           []chainlinkapi.RawInstanceAddress `json:"optionalCCVs"`
 	OptionalThreshold      types.INT64                       `json:"optionalThreshold"`
-	ReceiverFinalityConfig core.FinalityConfig               `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig ccipcodec.FinalityConfig          `json:"receiverFinalityConfig"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

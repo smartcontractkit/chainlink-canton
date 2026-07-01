@@ -59,7 +59,7 @@ setupTokenAdminRegistryWithPool ccipOwner poolOwner tokenAdminRegistryInstanceId
     tokenAdminRegistry0 <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     proposeResult <- submit ccipOwner do
@@ -148,7 +148,7 @@ testExecuteWithCCVVerification = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     -- Deploy OffRamp
@@ -588,7 +588,7 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     -- Deploy OffRamp
@@ -766,7 +766,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     -- Deploy OffRamp
@@ -949,7 +949,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     -- Deploy OffRamp
@@ -1135,7 +1135,7 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do
@@ -1259,7 +1259,7 @@ testPrepareExecuteAllowsSafeFinalityConfig = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do
@@ -1382,7 +1382,7 @@ testExecuteFailsMissingCCV = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     -- Deploy OffRamp
@@ -1517,7 +1517,7 @@ testExecuteWrongReceiver = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     -- Deploy OffRamp
@@ -1641,7 +1641,7 @@ testExecuteAllowsMultipleOnRamps = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do
@@ -1774,7 +1774,7 @@ testExecuteRejectsUnconfiguredOnRamp = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do
