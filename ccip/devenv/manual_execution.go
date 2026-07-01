@@ -36,6 +36,7 @@ func instanceIDFromEnv(key, defaultID string) contracts.InstanceID {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return contracts.InstanceID(v)
 	}
+
 	return contracts.InstanceID(defaultID)
 }
 
@@ -84,11 +85,12 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 	)
 	if err != nil {
 		if found, _, ok, findErr := c.findPerPartyRouterByParty(ctx, participant, partyId, routerInstanceID); findErr != nil {
-			return contracts.InstanceAddress{}, fmt.Errorf("create per-party router: %w (find after failure: %v)", err, findErr)
+			return contracts.InstanceAddress{}, fmt.Errorf("create per-party router: %w (find after failure: %w)", err, findErr)
 		} else if ok {
 			c.routerAddress = found
 			return found, nil
 		}
+
 		return contracts.InstanceAddress{}, fmt.Errorf("create per-party router: %w", err)
 	}
 
@@ -101,6 +103,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 	}
 
 	c.routerAddress = found
+
 	return found, nil
 }
 
@@ -159,6 +162,7 @@ func perPartyRouterFieldsFromCreated(created *apiv2.CreatedEvent) (instanceId, p
 			partyOwner = field.GetValue().GetParty()
 		}
 	}
+
 	return instanceId, partyOwner, instanceId != "" && partyOwner != ""
 }
 
@@ -173,6 +177,7 @@ func (c *Chain) findPerPartyRouterCidByParty(ctx context.Context, participant ca
 	if !ok {
 		return "", fmt.Errorf("no active PerPartyRouter found for party %s", partyId)
 	}
+
 	return cid, nil
 }
 
@@ -217,10 +222,12 @@ func (c *Chain) DeployCCIPSender(ctx context.Context, participant canton.Partici
 			c.senderAddress = senderAddress
 			return senderAddress, nil
 		}
+
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
 
 	c.senderAddress = senderAddress
+
 	return senderAddress, nil
 }
 
@@ -273,10 +280,12 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 			c.receiverAddress = receiverAddress
 			return receiverAddress, nil
 		}
+
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to deploy receiver contract: %w", err)
 	}
 
 	c.receiverAddress = receiverAddress
+
 	return receiverAddress, nil
 }
 

@@ -39,7 +39,7 @@ type loadMessageBuilder func(
 ) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error)
 
 // Destination identifies one load target chain, its receiver, and how to build load messages for it.
-// buildMessage is set by discoverEVMDestinations or discoverCantonDest.
+// buildMessage is set by discoverEVMDestinationsFromBoot or discoverCantonDest.
 type Destination struct {
 	Chain        cciptestinterfaces.CCIP17
 	Receiver     protocol.UnknownAddress
@@ -318,5 +318,6 @@ func (g *CCIPLoadGun) MessageIDs() []protocol.Bytes32 {
 	defer g.mu.Unlock()
 	out := make([]protocol.Bytes32, len(g.messageIDs))
 	copy(out, g.messageIDs)
+
 	return out
 }

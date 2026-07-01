@@ -196,33 +196,6 @@ func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfi
 	printLoadMetrics(t, gun, skipExecConfirm)
 }
 
-func discoverEVMDestinations(t *testing.T, in *ccv.Cfg, chainMap map[uint64]cciptestinterfaces.CCIP17) []Destination {
-	t.Helper()
-
-	dests := make([]Destination, 0)
-	seen := make(map[uint64]struct{})
-	for _, bc := range in.Blockchains {
-		if bc.Type != blockchain.TypeAnvil {
-			continue
-		}
-		details, err := chainsel.GetChainDetailsByChainIDAndFamily(bc.ChainID, chainsel.FamilyEVM)
-		require.NoError(t, err, "resolve chain selector for chainID=%s", bc.ChainID)
-		if _, dup := seen[details.ChainSelector]; dup {
-			continue
-		}
-		chain, ok := chainMap[details.ChainSelector]
-		require.True(t, ok, "EVM chain %d not in harness chain map", details.ChainSelector)
-
-		receiver, err := chain.GetEOAReceiverAddress()
-		require.NoError(t, err)
-
-		dests = append(dests, evmLoadDestination(chain, receiver))
-		seen[details.ChainSelector] = struct{}{}
-	}
-
-	return dests
-}
-
 func discoverEVMDestinationsFromBoot(t *testing.T, boot devenvtests.E2EBootstrap) []Destination {
 	t.Helper()
 

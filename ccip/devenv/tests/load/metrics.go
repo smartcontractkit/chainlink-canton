@@ -67,6 +67,7 @@ func (c *LoadMetricsCollector) snapshot() ([]LoadMessageRecord, LoadFailureCount
 	defer c.mu.Unlock()
 	out := make([]LoadMessageRecord, len(c.records))
 	copy(out, c.records)
+
 	return out, c.failures
 }
 
@@ -189,5 +190,6 @@ func ToCCVMessageMetrics(records []LoadMessageRecord) []ccvmetrics.MessageMetric
 			LatencyDuration: r.ExecutedTime.Sub(r.SentTime),
 		})
 	}
+
 	return out
 }

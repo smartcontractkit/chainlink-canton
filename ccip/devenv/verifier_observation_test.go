@@ -8,6 +8,8 @@ import (
 )
 
 func TestVerifierObservation_wired_indexerOnly(t *testing.T) {
+	t.Parallel()
+
 	obs := VerifierObservation{
 		IndexerMonitor: &ccv.IndexerMonitor{},
 	}
@@ -15,6 +17,8 @@ func TestVerifierObservation_wired_indexerOnly(t *testing.T) {
 }
 
 func TestVerifierObservation_wired_indexerNil(t *testing.T) {
+	t.Parallel()
+
 	obs := VerifierObservation{
 		AggregatorClient: &ccv.AggregatorClient{},
 	}

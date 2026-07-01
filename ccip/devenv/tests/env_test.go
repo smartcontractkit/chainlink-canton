@@ -20,6 +20,8 @@ func TestResolveConfigPath(t *testing.T) {
 }
 
 func TestParseCCIPEnv(t *testing.T) {
+	t.Parallel()
+
 	env, err := ParseCCIPEnv("devenv")
 	require.NoError(t, err)
 	require.Equal(t, EnvDevenv, env)

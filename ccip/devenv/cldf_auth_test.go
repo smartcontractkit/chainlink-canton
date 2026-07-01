@@ -36,7 +36,7 @@ func clearCantonEnv(t *testing.T) {
 func TestEnvTrim(t *testing.T) {
 	clearCantonEnv(t)
 
-	require.Equal(t, "", envTrim("CANTON_PARTY_ID"))
+	require.Empty(t, envTrim("CANTON_PARTY_ID"))
 
 	t.Setenv("CANTON_PARTY_ID", "party-1")
 	require.Equal(t, "party-1", envTrim("CANTON_PARTY_ID"))
@@ -130,7 +130,7 @@ func TestResolveUserID(t *testing.T) {
 func TestResolvePartyID(t *testing.T) {
 	clearCantonEnv(t)
 
-	require.Equal(t, "", resolvePartyID())
+	require.Empty(t, resolvePartyID())
 
 	t.Setenv("CANTON_PARTY_ID", "party::1220abc")
 	require.Equal(t, "party::1220abc", resolvePartyID())
@@ -163,6 +163,8 @@ func TestJWTSubject(t *testing.T) {
 }
 
 func TestUserIDFromToken(t *testing.T) {
+	t.Parallel()
+
 	userID, err := userIDFromToken(context.Background(), testAuthProvider{token: validJWT})
 	require.NoError(t, err)
 	require.Equal(t, "1234567890", userID)

@@ -153,8 +153,10 @@ func (b E2EBootstrap) SetupCantonSend(t *testing.T, ctx context.Context, transfe
 func (b E2EBootstrap) SetupCantonTokenSend(t *testing.T, ctx context.Context, lane TokenLane, sends int) {
 	t.Helper()
 
+	require.Positive(t, sends)
+
 	fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
-	feeTotal := new(big.Rat).SetUint64(uint64(sends) * fee)
+	feeTotal := new(big.Rat).SetInt64(int64(sends) * cantondevenv.CantonToEVMTokenTransferFeeAmount)
 	transferTotalFP := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(sends)))
 	transferTotal := new(big.Rat).SetFrac(transferTotalFP, big.NewInt(cantondevenv.CantonFixedPointScale))
 	transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
@@ -215,11 +217,13 @@ func (b E2EBootstrap) ResolveEVMReceiver(t *testing.T) protocol.UnknownAddress {
 		pk, err := gethcrypto.HexToECDSA(pkHex)
 		require.NoError(t, err)
 		addr := gethcrypto.PubkeyToAddress(pk.PublicKey)
+
 		return protocol.UnknownAddress(addr.Bytes())
 	}
 
 	receiver, err := b.EVM.GetEOAReceiverAddress()
 	require.NoError(t, err)
+
 	return receiver
 }
 
