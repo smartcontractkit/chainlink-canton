@@ -146,6 +146,7 @@ func (b E2EBootstrap) SetupCantonSend(t *testing.T, ctx context.Context, transfe
 		require.NoError(t, b.Canton.MintTokens(ctx, new(big.Rat).SetUint64(fee)))
 	}
 	require.NoError(t, b.Canton.SetupSend(ctx, fee, new(big.Rat).SetUint64(transferAmount)))
+	b.Canton.SetSequentialSends(1)
 }
 
 // SetupCantonTokenSend prepares Canton for token sends (fee + transfer holdings).
@@ -195,6 +196,7 @@ func (b E2EBootstrap) SetupCantonTokenSend(t *testing.T, ctx context.Context, la
 	} else {
 		require.NoError(t, b.Canton.SetupSend(ctx, fee, transferPerSend))
 	}
+	b.Canton.SetSequentialSends(sends)
 }
 
 // SetupCantonReceive deploys the client party's PerPartyRouter before inbound messages

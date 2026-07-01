@@ -225,6 +225,7 @@ type Chain struct {
 	nextFeeCID              string // holding CID to be used as fee on next message send
 	transferTokenInstrument *splice_api_token_holding_v1.InstrumentId
 	nextTransferCID         string // holding CID to be used as transfer on next message send
+	sendsLeft               uint64 // last on-chain seq in current setup batch; 0 = always rotate
 
 	// verifierObs is injected post-construction by test runners (see SetVerifierObservation).
 	// Required by ConfirmExecOnDest to fetch verifier results from indexer (aggregator optional).
@@ -1113,6 +1114,17 @@ func (c *Chain) SetupSend(
 	return nil
 }
 
+// SetSequentialSends limits holding rotation to the next sends messages in this setup batch.
+// After the send whose on-chain seq equals nextSeq+sends, setNextHoldings is skipped.
+// Pass 0 to always rotate (open-ended load).
+func (c *Chain) SetSequentialSends(sends int) {
+	if sends <= 0 {
+		c.sendsLeft = 0
+		return
+	}
+	c.sendsLeft = uint64(sends)
+}
+
 // MintTokens mint tokens for transfer and fees. To be used on devenv tests only.
 // this method won't work in staging/prod tests
 func (c *Chain) MintTokens(ctx context.Context, amount *big.Rat) error {
@@ -1451,12 +1463,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Uint64("seqNo", parsedSend.seqNo).
 		Msg("CCIP Send executed")
 
-	// Set next holdings
-	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, new(big.Rat).SetFrac(fields.TokenAmount.Amount, big.NewInt(CantonFixedPointScale)))
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
-	}
-
 	event := cciptestinterfaces.MessageSentEvent{
 		MessageID:      parsedSend.messageID,
 		ReceiptIssuers: nil, // TODO: add them later, not currently needed
@@ -1468,6 +1474,25 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	c.lastSentDest = dest
 	c.lastSentSeq = parsedSend.seqNo
 	c.lastSentEvent = event
+
+	// Case it's the last send
+	c.sendsLeft--
+	if c.sendsLeft == 0 {
+		c.logger.Info().
+			Uint64("sendsLeft", c.sendsLeft).
+			Msg("Skipping holding rotation after last planned send in batch")
+
+		return event, nil
+	}
+
+	var tokenAmount *big.Rat
+	if hasTokenTransfer {
+		tokenAmount = new(big.Rat).SetFrac(fields.TokenAmount.Amount, big.NewInt(CantonFixedPointScale))
+	}
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, tokenAmount)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
+	}
 
 	return event, nil
 }
