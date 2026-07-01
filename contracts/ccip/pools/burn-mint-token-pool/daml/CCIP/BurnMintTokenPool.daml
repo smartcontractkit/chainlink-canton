@@ -1,4 +1,4 @@
--- | Lock/release token pool for CCIP token transfers.
+-- | Burn/mint token pool for CCIP token transfers.
 --
 -- Supports Splice token standard patterns where TransferFactory implementations
 -- may look up preapproval from extraArgs.context (e.g., Amulet's ExternalPartyAmuletRules
@@ -753,8 +753,9 @@ template BurnMintTokenPool
                     (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
                 assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
                     (ticket.ccipOwner == tokenAdminRegistry.owner)
-                rmnRemote <- fetch rmnRemoteCid
-                let rmnRemoteView = view rmnRemote
+                rmnRemoteView <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_PublicFetch with
+                    expectedAddress = deps.rmnRemote
+                    caller = caller
                 Chainlink.InstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
                     rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
                 assertMsg "ReleaseFromTicket: ticket instrument must match pool instrument"
@@ -1029,8 +1030,9 @@ template BurnMintTokenPool
                     (sendingMsgView.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
                     (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
-                rmnRemote <- fetch rmnRemoteCid
-                let rmnRemoteView = view rmnRemote
+                rmnRemoteView <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_PublicFetch with
+                    expectedAddress = deps.rmnRemote
+                    caller = caller
                 Chainlink.InstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
                     rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
                 assertMsg "LockOrBurn: sending message rmn mismatch"

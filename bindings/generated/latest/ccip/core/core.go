@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "3c4e337f5b1e07260f01692ad7d1a53c6263902458b38767957002f0a714ad73"
+	PackageID   = "7328d3687c1572c35a7e5e906107b130bcba1661343cb936370e149df20d0c3e"
 	SDKVersion  = "3.4.11"
 )
 
@@ -6286,6 +6286,27 @@ func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RMNRemotePublicFetch exercises the RMNRemote_PublicFetch choice on this RMNRemote contract via the IRMNRemote interface
+// This method uses the package name in the template ID
+func (t RMNRemote) RMNRemotePublicFetch(contractID string, args ccipapi.RMNRemotePublicFetch) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RMNRemote_PublicFetch",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RMNRemotePublicFetchWithPackageID exercises the RMNRemote_PublicFetch choice using the provided package ID instead of package name
+func (t RMNRemote) RMNRemotePublicFetchWithPackageID(contractID string, packageID string, args ccipapi.RMNRemotePublicFetch) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RMNRemote_PublicFetch",
 		Arguments:  argsToMap(args),
 	}
 }

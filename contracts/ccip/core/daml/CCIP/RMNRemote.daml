@@ -78,6 +78,13 @@ template RMNRemote
                 rmnOwner
                 instanceId
 
+            rmnRemote_publicFetchImpl self arg = do
+                Chainlink.InstanceAddress.assertEqual "RMNRemote: expectedAddress mismatch" instanceId rmnOwner arg.expectedAddress
+                pure CCIP.API.RMNRemoteV1.RMNRemoteView with
+                    ccipOwner
+                    rmnOwner
+                    instanceId
+
             rmnRemote_isCursedImpl self arg = do
                 exercise (fromInterfaceContractId @RMNRemote self) IsCursed
                     with

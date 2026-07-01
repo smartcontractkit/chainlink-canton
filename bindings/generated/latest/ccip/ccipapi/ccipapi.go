@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-api"
-	PackageID   = "33db14c5f121ea80a05f47663c03a14bad793a97051afc7d80d1ce16028ba779"
+	PackageID   = "72ee20cc3bd6889791bfa7dc1cf7204b29fb1d801d8bed68dd86cbd486c19cb9"
 	SDKVersion  = "3.4.11"
 )
 
@@ -39,6 +39,9 @@ type IRMNRemote interface {
 
 	// Archive executes the Archive choice
 	Archive(contractID string) *model.ExerciseCommand
+
+	// RMNRemotePublicFetch executes the RMNRemote_PublicFetch choice
+	RMNRemotePublicFetch(contractID string, args RMNRemotePublicFetch) *model.ExerciseCommand
 
 	// RMNRemoteIsCursed executes the RMNRemote_IsCursed choice
 	RMNRemoteIsCursed(contractID string, args RMNRemoteIsCursed) *model.ExerciseCommand
@@ -246,6 +249,45 @@ func (t RMNRemoteIsCursedForChain) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes RMNRemoteIsCursedForChain from hex string (Canton MCMS format)
 func (t *RMNRemoteIsCursedForChain) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RMNRemotePublicFetch is a Record type
+type RMNRemotePublicFetch struct {
+	ExpectedAddress chainlinkapi.RawInstanceAddress `json:"expectedAddress"`
+	Caller          types.PARTY                     `json:"caller"`
+}
+
+// ToMap converts RMNRemotePublicFetch to a map for DAML arguments
+func (t RMNRemotePublicFetch) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["expectedAddress"] = model.NestedToDAMLValue(t.ExpectedAddress)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t RMNRemotePublicFetch) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RMNRemotePublicFetch) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RMNRemotePublicFetch to hex string (Canton MCMS format)
+func (t RMNRemotePublicFetch) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RMNRemotePublicFetch from hex string (Canton MCMS format)
+func (t *RMNRemotePublicFetch) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
