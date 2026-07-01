@@ -158,7 +158,7 @@ func (b E2EBootstrap) SetupCantonTokenSend(t *testing.T, ctx context.Context, la
 
 	fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
 	feeTotal := new(big.Rat).SetInt64(int64(sends) * cantondevenv.CantonToEVMTokenTransferFeeAmount)
-	transferTotalFP := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(sends)))
+	transferTotalFP := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(sends+1000))) // add a buffer to avoid flakyness
 	transferTotal := new(big.Rat).SetFrac(transferTotalFP, big.NewInt(cantondevenv.CantonFixedPointScale))
 	transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
 
