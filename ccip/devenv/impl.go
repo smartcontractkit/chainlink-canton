@@ -221,6 +221,7 @@ type Chain struct {
 	validatorAPIClients validatorAPIClients
 
 	feeTokenInstrument      splice_api_token_holding_v1.InstrumentId
+	feeAmountPerMessage     uint64 // per-message fee budget; used when rotating fee holdings after send
 	nextFeeCID              string // holding CID to be used as fee on next message send
 	transferTokenInstrument *splice_api_token_holding_v1.InstrumentId
 	nextTransferCID         string // holding CID to be used as transfer on next message send
@@ -1075,10 +1076,13 @@ func (c *Chain) SetupSend(
 	}
 
 	c.feeTokenInstrument = feeTokenInstrument
+	c.feeAmountPerMessage = feeAmountPerMessage
 	c.nextFeeCID = selectedFee[0].ContractID
 
 	// End setup, no transfer holdings needed
 	if transferAmountPerMessage == nil || transferAmountPerMessage.Sign() <= 0 {
+		c.transferTokenInstrument = nil
+		c.nextTransferCID = ""
 		return nil
 	}
 
@@ -1593,10 +1597,11 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 		testhelpers.ExcludeCIDs(spentCIDs),
 	}
 
+	feeMin := new(big.Rat).SetUint64(c.feeAmountPerMessage)
 	nextFeeCID, exhaustion, err := pickNextHolding(
 		events,
 		c.feeTokenInstrument,
-		big.NewRat(0, 1), // TODO: we'll have to consider real fee here once we go load tests
+		feeMin,
 		refreshFilters...,
 	)
 	if err != nil && !exhaustion {
@@ -1658,7 +1663,7 @@ func pickNextHolding(
 	}
 	picked, err := testhelpers.SelectHoldingsForInstrument(fromEvents, minAmounts)
 	if err != nil || len(picked) == 0 {
-		return "", true, fmt.Errorf("refresh next fee holding from update: %w", err)
+		return "", true, fmt.Errorf("select next holding from send events: %w", err)
 	}
 
 	return picked[0].ContractID, false, nil
