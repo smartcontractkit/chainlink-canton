@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "58eed00f28de17c78720498418a85c75299add5028d52786d9d5d2348b895fc8"
+	PackageID   = "3b16f01cfd31ecc348c91407c18f1a9ab3977d30033f5d04bf17adfa73386f6f"
 	SDKVersion  = "3.4.11"
 )
 
@@ -54,7 +54,6 @@ const (
 	RmnRemoteKey           = types.TEXT("rmn-remote")
 	FeeQuoterKey           = types.TEXT("fee-quoter")
 	GlobalConfigKey        = types.TEXT("global-config")
-	MaxCCVsPerMessage      = types.INT64(255)
 	RateLimiterKey         = types.TEXT("rate-limiter")
 )
 
@@ -2752,11 +2751,11 @@ func (t ExecutionStateChanged) ArchiveWithPackageID(contractID string, packageID
 
 // ExecutionStateChangedEvent is a Record type
 type ExecutionStateChangedEvent struct {
-	SourceChainSelector types.NUMERIC         `json:"sourceChainSelector"`
-	SequenceNumber      types.NUMERIC         `json:"sequenceNumber"`
-	MessageId           types.TEXT            `json:"messageId"`
-	State               MessageExecutionState `json:"state"`
-	ReturnData          types.TEXT            `json:"returnData"`
+	SourceChainSelector types.NUMERIC                 `json:"sourceChainSelector"`
+	SequenceNumber      types.NUMERIC                 `json:"sequenceNumber"`
+	MessageId           types.TEXT                    `json:"messageId"`
+	State               ccipapi.MessageExecutionState `json:"state"`
+	ReturnData          types.TEXT                    `json:"returnData"`
 }
 
 // ToMap converts ExecutionStateChangedEvent to a map for DAML arguments
@@ -5161,54 +5160,6 @@ func (t *LocalAmountConversionResult) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
-
-// MessageExecutionState is an enum type
-type MessageExecutionState string
-
-const (
-	MessageExecutionStateUNTOUCHED MessageExecutionState = "UNTOUCHED"
-
-	MessageExecutionStateIN_PROGRESS MessageExecutionState = "IN_PROGRESS"
-
-	MessageExecutionStateSUCCESS MessageExecutionState = "SUCCESS"
-
-	MessageExecutionStateFAILURE MessageExecutionState = "FAILURE"
-)
-
-func (e MessageExecutionState) GetEnumConstructor() string { return string(e) }
-
-func (e MessageExecutionState) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Internal", "MessageExecutionState")
-}
-
-// GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
-func (e MessageExecutionState) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Internal", "MessageExecutionState")
-}
-
-func (e MessageExecutionState) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(e)
-}
-
-func (e *MessageExecutionState) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, e)
-}
-
-// MarshalHex encodes MessageExecutionState to hex string (Canton MCMS format)
-func (e MessageExecutionState) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(e)
-}
-
-// UnmarshalHex decodes MessageExecutionState from hex string (Canton MCMS format)
-func (e *MessageExecutionState) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, e)
-}
-
-var _ types.ENUM = MessageExecutionState("")
 
 // PoolRegistration is a Record type
 type PoolRegistration struct {

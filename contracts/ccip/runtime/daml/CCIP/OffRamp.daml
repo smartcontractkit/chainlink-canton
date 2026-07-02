@@ -18,7 +18,7 @@ import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
 import qualified CCIP.RMNRemote
@@ -101,7 +101,7 @@ template OffRamp
                     Some c -> pure c
 
                 (baseRequiredCCVs, baseOptionalCCVs, baseOptionalCCVThreshold) <-
-                    CCIP.Internal.computeExecuteCCVs
+                    CCIP.CCVCodec.computeExecuteCCVs
                         sourceConfig.defaultCCVs
                         sourceConfig.laneMandatedCCVs
                         message
@@ -114,15 +114,15 @@ template OffRamp
                             (null tokenPoolRequiredCCVs)
                         pure baseRequiredCCVs
                     Some _ -> do
-                        CCIP.Internal.assertMaxCCVListLength "offramp: token pool required CCVs" tokenPoolRequiredCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "offramp: token pool required CCVs" tokenPoolRequiredCCVs
                         let (mergedRequiredCCVs, _, _) =
-                                CCIP.Internal.mergeInboundPoolCCVs
+                                CCIP.CCVCodec.mergeInboundPoolCCVs
                                     sourceConfig.defaultCCVs
                                     baseRequiredCCVs
                                     baseOptionalCCVs
                                     baseOptionalCCVThreshold
                                     tokenPoolRequiredCCVs
-                        CCIP.Internal.assertMaxCCVListLength "offramp: required CCVs" mergedRequiredCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "offramp: required CCVs" mergedRequiredCCVs
                         pure mergedRequiredCCVs
                 pure finalRequiredCCVs
 
@@ -205,7 +205,7 @@ template OffRamp
                             (CCIP.FinalityConfig.requestedFinalityAllowed message.finality.requested receiverFinalityConfig)
 
                 (baseRequiredCCVs, baseOptionalCCVs, baseOptionalCCVThreshold) <-
-                    CCIP.Internal.computeExecuteCCVs
+                    CCIP.CCVCodec.computeExecuteCCVs
                         sourceConfig.defaultCCVs
                         sourceConfig.laneMandatedCCVs
                         message

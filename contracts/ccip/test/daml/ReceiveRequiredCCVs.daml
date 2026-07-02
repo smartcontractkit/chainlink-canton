@@ -13,7 +13,7 @@ import qualified CCIP.CCIPReceiver
 import qualified CCIP.Context
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OffRamp
 import qualified CCIP.OffRampTypes
@@ -340,7 +340,7 @@ testMergeInboundPoolCCVsUsesDefaultsForEmpty = script do
     let required0 = [RawInstanceAddress.make "required-0" ownerA]
     let optional0 = [default1, RawInstanceAddress.make "optional-1" ownerB]
     let (required1, optional1, threshold1) =
-            CCIP.Internal.mergeInboundPoolCCVs
+            CCIP.CCVCodec.mergeInboundPoolCCVs
                 [default1, default2]
                 required0
                 optional0
@@ -358,12 +358,12 @@ testMergeInboundPoolCCVsExpandsSentinel = script do
     let explicitPool = RawInstanceAddress.make "pool-explicit" ownerB
     let required0 = [RawInstanceAddress.make "required-s-0" ownerA]
     let (required1, optional1, threshold1) =
-            CCIP.Internal.mergeInboundPoolCCVs
+            CCIP.CCVCodec.mergeInboundPoolCCVs
                 [default1]
                 required0
                 []
                 0
-                [CCIP.Internal.useDefaultCCVs, explicitPool]
+                [CCIP.CCVCodec.useDefaultCCVs, explicitPool]
     sort required1 === sort (required0 ++ [default1, explicitPool])
     optional1 === []
     threshold1 === 0

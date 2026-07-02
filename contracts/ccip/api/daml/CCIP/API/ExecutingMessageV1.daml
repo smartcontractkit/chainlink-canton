@@ -8,6 +8,13 @@ import qualified Chainlink.InstanceAddress
 
 import qualified CCIP.MessageCodecV1
 
+data MessageExecutionState
+  = UNTOUCHED
+  | IN_PROGRESS
+  | SUCCESS
+  | FAILURE
+  deriving (Eq, Show)
+
 interface ExecutingMessage where
     viewtype ExecutingMessageView
 

@@ -19,12 +19,13 @@ import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 
 import qualified CCIP.API.SendingMessageV1
 
+import qualified CCIP.CCVCodec
+
 import qualified CCIP.Context
 import CCIP.Events qualified as Events
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.FeeQuoter qualified as FeeQuoter
-import CCIP.Internal qualified as Internal
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
@@ -2667,7 +2668,7 @@ testSetOutboundPoolCCVsResolvesDefaults = script do
     smSentinelPool <- mkSendingMessage 2.0
     smSentinelPool <- submit ccipOwner do
         exerciseCmd smSentinelPool SendingMessageV1.SetOutboundPoolCCVs with
-            poolCCVs = [Internal.useDefaultCCVs, poolCCV]
+            poolCCVs = [CCIP.CCVCodec.useDefaultCCVs, poolCCV]
     Some smSentinelPoolData <- queryContractId ccipOwner smSentinelPool
     smSentinelPoolData.outboundPoolCCVs === Some [defaultCCV1, defaultCCV2, poolCCV]
     smSentinelPoolData.state === SendingMessageV1.SendingMessageState_Prepared

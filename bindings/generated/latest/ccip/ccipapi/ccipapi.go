@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-api"
-	PackageID   = "cd98b70f630d985eaa625ac08ea6931c1337a11315b689a2eac84d16642aabc7"
+	PackageID   = "78dcbd60e8aa4c6d967656ac8e23d587b2c0ea4cca4ab52391abc1733444856e"
 	SDKVersion  = "3.4.11"
 )
 
@@ -284,6 +284,54 @@ func (t *ExecutingMessageAddCCVVerification) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
+
+// MessageExecutionState is an enum type
+type MessageExecutionState string
+
+const (
+	MessageExecutionStateUNTOUCHED MessageExecutionState = "UNTOUCHED"
+
+	MessageExecutionStateIN_PROGRESS MessageExecutionState = "IN_PROGRESS"
+
+	MessageExecutionStateSUCCESS MessageExecutionState = "SUCCESS"
+
+	MessageExecutionStateFAILURE MessageExecutionState = "FAILURE"
+)
+
+func (e MessageExecutionState) GetEnumConstructor() string { return string(e) }
+
+func (e MessageExecutionState) GetEnumTypeID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.API.ExecutingMessageV1", "MessageExecutionState")
+}
+
+// GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
+func (e MessageExecutionState) GetEnumTypeIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.API.ExecutingMessageV1", "MessageExecutionState")
+}
+
+func (e MessageExecutionState) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(e)
+}
+
+func (e *MessageExecutionState) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, e)
+}
+
+// MarshalHex encodes MessageExecutionState to hex string (Canton MCMS format)
+func (e MessageExecutionState) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(e)
+}
+
+// UnmarshalHex decodes MessageExecutionState from hex string (Canton MCMS format)
+func (e *MessageExecutionState) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, e)
+}
+
+var _ types.ENUM = MessageExecutionState("")
 
 // RMNRemoteView is a Record type
 type RMNRemoteView struct {

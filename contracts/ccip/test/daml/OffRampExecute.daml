@@ -15,12 +15,13 @@ import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 import qualified CCIP.API.ExecutingMessageV1
 
+import qualified CCIP.CCVCodec
+
 import qualified CCIP.Context
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.GlobalConfig qualified as GlobalConfig
-import CCIP.Internal qualified as Internal
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.OffRamp qualified as OffRamp
 import CCIP.OffRampTypes qualified as OffRamp
@@ -250,7 +251,7 @@ testExecuteWithCCVVerification = script do
             executingMessageCid = executingMessageCid
 
     -- Verify SUCCESS
-    executeResult.state === Internal.SUCCESS
+    executeResult.state === CCIP.API.ExecutingMessageV1.SUCCESS
     debug ("Execute with CCV verification: SUCCESS")
     debug ("Message ID: " <> show executeResult.messageId)
 
@@ -710,7 +711,7 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
             executingMessageCid = executingMessageCid
 
     -- Verify SUCCESS
-    executeResult.state === Internal.SUCCESS
+    executeResult.state === CCIP.API.ExecutingMessageV1.SUCCESS
     debug ("Execute with CCV verification: SUCCESS")
     debug ("Message ID: " <> show executeResult.messageId)
     let router = executeResult.router
@@ -841,7 +842,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
-            receiverRequiredCCVs = [ccv1RawAddress, Internal.useDefaultCCVs, ccv3RawAddress]
+            receiverRequiredCCVs = [ccv1RawAddress, CCIP.CCVCodec.useDefaultCCVs, ccv3RawAddress]
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
@@ -894,7 +895,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
             executingMessageCid = executingMessageCid
 
     -- Verify SUCCESS
-    executeResult.state === Internal.SUCCESS
+    executeResult.state === CCIP.API.ExecutingMessageV1.SUCCESS
     debug ("Execute with CCV verification: SUCCESS")
     debug ("Message ID: " <> show executeResult.messageId)
     let router = executeResult.router
@@ -1095,7 +1096,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
             executingMessageCid = executingMessageCid
 
     -- Verify SUCCESS
-    executeResult.state === Internal.SUCCESS
+    executeResult.state === CCIP.API.ExecutingMessageV1.SUCCESS
     debug ("Execute with CCV verification: SUCCESS")
     debug ("Message ID: " <> show executeResult.messageId)
     let router = executeResult.router
@@ -1740,7 +1741,7 @@ testExecuteAllowsMultipleOnRamps = script do
                  (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
-    executeResult.state === Internal.SUCCESS
+    executeResult.state === CCIP.API.ExecutingMessageV1.SUCCESS
     debug ("Execute succeeds with alternate configured onramp: PASSED")
     pure ()
 

@@ -8,10 +8,10 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 
 import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.CCVCodec
 
 import CCIP.ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
-import CCIP.Internal qualified as Internal
 import qualified CCIP.MessageCodecV1
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
@@ -272,7 +272,7 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
             inboundPoolVerification = Some (InboundPoolVerification with
                 poolInstanceId = "snapshot-pool"
                 poolOwner = poolOwner
-                poolCCVs = [Internal.useDefaultCCVs, explicitCCV])
+                poolCCVs = [CCIP.CCVCodec.useDefaultCCVs, explicitCCV])
             deps = ExecutingMessageDeps with
                 offRamp = RawInstanceAddress.make "test-offramp-snapshot" ccipOwner
                 globalConfig = RawInstanceAddress.make "test-globalConfig-snapshot" ccipOwner

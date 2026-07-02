@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "ccip-codec"
-	PackageID   = "ca7d50de7bbd5e1072cf4401d8f2225d91d327a837c390906f6a5cdf3c1ed673"
+	PackageID   = "8544db6616ca04518c523d3e1e5f4c4916f0827b9e34dcbb19c01a022088044c"
 	SDKVersion  = "3.4.11"
 )
 
@@ -33,6 +33,7 @@ type Template interface {
 }
 
 const (
+	MaxCCVsPerMessage        = types.INT64(255)
 	WaitForFinalityFlag      = types.TEXT("00000000")
 	MinBlockDepth            = types.INT64(1)
 	MaxBlockDepth            = types.INT64(65535)

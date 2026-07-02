@@ -26,7 +26,7 @@ import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 import qualified Splice.Api.Token.HoldingV1
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
@@ -93,10 +93,10 @@ computeRequiredCCVsForSend destConfig message extraArgs senderRequestedCCVs =
             [] ->
                 if isTokenOnlyTransfer
                 then []
-                else CCIP.Internal.resolveRequiredCCVsWithDefaults
+                else CCIP.CCVCodec.resolveRequiredCCVsWithDefaults
                     destConfig.defaultCCVs
                     senderRequestedCCVs
-            _ -> CCIP.Internal.resolveRequiredCCVsWithDefaults
+            _ -> CCIP.CCVCodec.resolveRequiredCCVsWithDefaults
                 destConfig.defaultCCVs
                 senderRequestedCCVs
     in dedup (resolvedSenderRequiredCCVs ++ destConfig.laneMandatedCCVs)
@@ -296,8 +296,8 @@ template OnRamp
                                 CCIP.Client.V3 v3 -> pure v3
                                 _ -> abort "onramp: unsupported extraArgs version"
                         let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
-                        CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
-                        CCIP.Internal.assertMaxCCVListLength "onramp: pool-reported CCVs" poolReportedCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "onramp: pool-reported CCVs" poolReportedCCVs
                         assertMsg "onramp: pool-reported CCVs cannot contain duplicates"
                             (unique poolReportedCCVs)
                         let senderRequiredCCVs =
@@ -309,10 +309,10 @@ template OnRamp
                         let finalRequiredCCVs = case message.tokenTransfer of
                                 None -> senderRequiredCCVs
                                 Some _ ->
-                                    dedup (senderRequiredCCVs ++ CCIP.Internal.resolveRequiredCCVsWithDefaults
+                                    dedup (senderRequiredCCVs ++ CCIP.CCVCodec.resolveRequiredCCVsWithDefaults
                                         config.defaultCCVs
                                         poolReportedCCVs)
-                        CCIP.Internal.assertMaxCCVListLength "onramp: required CCVs" finalRequiredCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "onramp: required CCVs" finalRequiredCCVs
                         pure finalRequiredCCVs
 
         -- | Build SendingMessageV1 for outbound message.
@@ -374,7 +374,7 @@ template OnRamp
                 extraArgs <- case message.extraArgs of
                         CCIP.Client.V3 v3 -> pure v3
                 let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
-                CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
                 assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
@@ -409,7 +409,7 @@ template OnRamp
                             message
                             extraArgs
                             senderRequestedCCVs
-                CCIP.Internal.assertMaxCCVListLength "onramp: required CCVs" resolvedSenderRequiredCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "onramp: required CCVs" resolvedSenderRequiredCCVs
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 assertMsg "onramp: sequence number exceeds uint64"
@@ -513,8 +513,8 @@ template OnRamp
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
                 let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
-                CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
-                CCIP.Internal.assertMaxCCVListLength "onramp: CCV fee quotes" ccvFeeQuotes
+                CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "onramp: CCV fee quotes" ccvFeeQuotes
                 assertMsg "onramp: CCVs cannot contain duplicates"
                     (unique senderRequestedCCVs)
                 let executorArgs = case extraArgs.executor of

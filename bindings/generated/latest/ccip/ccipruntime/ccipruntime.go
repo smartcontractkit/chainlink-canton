@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	ccipapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
@@ -30,7 +31,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "bb5a95d0d9237dc3fe1f3a6a44b0ad6318332d5ef464231cdf2fc5c5d7120a0f"
+	PackageID   = "96c450ce8b87912aafd181b106b6c1efd0ab98a362fa0d53fab393b9cdbc5450"
 	SDKVersion  = "3.4.11"
 )
 
@@ -773,12 +774,12 @@ func (t *ExecuteFromRouterResult) UnmarshalHex(data string) error {
 
 // ExecuteResult is a Record type
 type ExecuteResult struct {
-	Router                types.CONTRACT_ID          `json:"router"`
-	TokenReceiveTicket    *types.CONTRACT_ID         `json:"tokenReceiveTicket" hex:"optional"`
-	ExecutionStateChanged types.CONTRACT_ID          `json:"executionStateChanged"`
-	MessageId             types.TEXT                 `json:"messageId"`
-	Message               ccipcodec.MessageV1        `json:"message"`
-	State                 core.MessageExecutionState `json:"state"`
+	Router                types.CONTRACT_ID             `json:"router"`
+	TokenReceiveTicket    *types.CONTRACT_ID            `json:"tokenReceiveTicket" hex:"optional"`
+	ExecutionStateChanged types.CONTRACT_ID             `json:"executionStateChanged"`
+	MessageId             types.TEXT                    `json:"messageId"`
+	Message               ccipcodec.MessageV1           `json:"message"`
+	State                 ccipapi.MessageExecutionState `json:"state"`
 }
 
 // ToMap converts ExecuteResult to a map for DAML arguments
