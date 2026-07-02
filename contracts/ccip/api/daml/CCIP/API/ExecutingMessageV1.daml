@@ -1,5 +1,7 @@
 module CCIP.API.ExecutingMessageV1 where
 
+import DA.Crypto.Text (BytesHex)
+
 import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
@@ -9,6 +11,16 @@ import qualified CCIP.MessageCodecV1
 interface ExecutingMessage where
     viewtype ExecutingMessageView
 
+    executingMessage_addCCVVerificationImpl : ContractId ExecutingMessage -> ExecutingMessage_AddCCVVerification -> Update (ContractId ExecutingMessage)
+
+    nonconsuming choice ExecutingMessage_AddCCVVerification : ContractId ExecutingMessage
+        with
+            ccvInstanceId : Text
+            versionTag : BytesHex
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do executingMessage_addCCVVerificationImpl this self arg
 
 data ExecutingMessageView = ExecutingMessageView
     with

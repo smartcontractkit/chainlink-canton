@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "f87b1a88cf3aa7202b9eae902e71f2dc735d0bfe5ed3b757f01cbaae19f971d7"
+	PackageID   = "58eed00f28de17c78720498418a85c75299add5028d52786d9d5d2348b895fc8"
 	SDKVersion  = "3.4.11"
 )
 
@@ -230,9 +230,10 @@ func (t *AddCCVFeeMCMSParams) UnmarshalHex(data string) error {
 
 // AddCCVVerification is a Record type
 type AddCCVVerification struct {
-	CcvInstanceId types.TEXT  `json:"ccvInstanceId"`
-	VersionTag    types.TEXT  `json:"versionTag" hex:"bytes"`
-	Caller        types.PARTY `json:"caller"`
+	CcvInstanceId types.TEXT                                 `json:"ccvInstanceId"`
+	VersionTag    types.TEXT                                 `json:"versionTag" hex:"bytes"`
+	Context       splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller        types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts AddCCVVerification to a map for DAML arguments
@@ -242,6 +243,8 @@ func (t AddCCVVerification) ToMap() map[string]any {
 	m["ccvInstanceId"] = string(t.CcvInstanceId)
 
 	m["versionTag"] = string(t.VersionTag)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -273,8 +276,9 @@ func (t *AddCCVVerification) UnmarshalHex(data string) error {
 // AddCCVVerificationMCMSParams is AddCCVVerification without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type AddCCVVerificationMCMSParams struct {
-	CcvInstanceId types.TEXT `json:"ccvInstanceId"`
-	VersionTag    types.TEXT `json:"versionTag" hex:"bytes"`
+	CcvInstanceId types.TEXT                                 `json:"ccvInstanceId"`
+	VersionTag    types.TEXT                                 `json:"versionTag" hex:"bytes"`
+	Context       splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes AddCCVVerificationMCMSParams to hex string for MCMS operationData.
@@ -2555,6 +2559,27 @@ func (t ExecutingMessageV1) ArchiveWithPackageID(contractID string, packageID st
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
+	}
+}
+
+// ExecutingMessageAddCCVVerification exercises the ExecutingMessage_AddCCVVerification choice on this ExecutingMessageV1 contract via the IExecutingMessage interface
+// This method uses the package name in the template ID
+func (t ExecutingMessageV1) ExecutingMessageAddCCVVerification(contractID string, args ccipapi.ExecutingMessageAddCCVVerification) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ExecutingMessageV1", "ExecutingMessage"),
+		ContractID: contractID,
+		Choice:     "ExecutingMessage_AddCCVVerification",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ExecutingMessageAddCCVVerificationWithPackageID exercises the ExecutingMessage_AddCCVVerification choice using the provided package ID instead of package name
+func (t ExecutingMessageV1) ExecutingMessageAddCCVVerificationWithPackageID(contractID string, packageID string, args ccipapi.ExecutingMessageAddCCVVerification) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessage"),
+		ContractID: contractID,
+		Choice:     "ExecutingMessage_AddCCVVerification",
+		Arguments:  argsToMap(args),
 	}
 }
 

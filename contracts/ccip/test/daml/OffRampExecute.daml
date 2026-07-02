@@ -13,6 +13,8 @@ import qualified DA.TextMap as TextMap
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
+import qualified CCIP.API.ExecutingMessageV1
+
 import qualified CCIP.Context
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
@@ -229,9 +231,10 @@ testExecuteWithCCVVerification = script do
     -- Exercise AddCCVVerification directly on ExecutingMessageV1
     -- (In production, CommitteeVerifier does this after signature verification)
     executingMessageCid <- submit receiver do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = receiver
 
     debug ("CCV verification added to ExecutingMessageV1")
@@ -385,9 +388,10 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
 
     -- Add CCV verification
     executingMessageCid <- submit (actAs defaultCCVOwner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = defaultCCVInstanceId
             versionTag = ""
+            context = MetadataV1.emptyChoiceContext
             caller = defaultCCVOwner
 
     disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
@@ -667,9 +671,10 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
     -- Exercise AddCCVVerification directly on ExecutingMessageV1
     -- (In production, CommitteeVerifier does this after signature verification)
     executingMessageCid <- submit (actAs ccv1Owner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = ccv1Owner
     debug ("CCV1 verification added to ExecutingMessageV1")
 
@@ -687,9 +692,10 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
     -- Exercise AddCCVVerification directly on ExecutingMessageV1
     -- (In production, CommitteeVerifier does this after signature verification)
     executingMessageCid <- submit (actAs ccv2Owner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = ccv2Owner
     debug ("CCV2 verification added to ExecutingMessageV1")
 
@@ -843,16 +849,18 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
 
     -- Add CCV1 verification
     executingMessageCid <- submit (actAs ccv1Owner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = ccv1Owner
     debug ("CCV1 verification added to ExecutingMessageV1")
     -- Add CCV3 verification
     executingMessageCid <- submit (actAs ccv3Owner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage @ExecutingMessageV1.ExecutingMessageV1 executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = ccv3Owner
     debug ("CCV3 verification added to ExecutingMessageV1")
 
@@ -868,9 +876,10 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
 
     -- Add CCV2 verification
     executingMessageCid <- submit (actAs ccv2Owner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = ccv2Owner
     debug ("CCV2 verification added to ExecutingMessageV1")
 
@@ -1043,16 +1052,18 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
 
     -- Add CCV1 verification
     executingMessageCid <- submit (actAs ccv1Owner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = ccv1Owner
 
     -- Add CCV2 verification
     executingMessageCid <- submit (actAs ccv2Owner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage @ExecutingMessageV1.ExecutingMessageV1 executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = ccv2Owner
 
     -- Execute via PerPartyRouter - must fail due to optional threshold not being met
@@ -1067,9 +1078,10 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
 
     -- Add CCV3 verification
     executingMessageCid <- submit (actAs ccv3Owner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
+            context = MetadataV1.emptyChoiceContext
             caller = ccv3Owner
 
     -- Execute again, now that optional threshold is met it should succeed
@@ -1713,9 +1725,10 @@ testExecuteAllowsMultipleOnRamps = script do
 
     -- Add CCV verification
     executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+        coerceContractId <$> exerciseCmd (toInterfaceContractId @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ""
+            context = MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do

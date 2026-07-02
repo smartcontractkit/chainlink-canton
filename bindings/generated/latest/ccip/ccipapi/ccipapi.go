@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-api"
-	PackageID   = "5dfef9205c54431003ecf65ccb14833aedf20c0d3b6eab035c50fee1a609837d"
+	PackageID   = "cd98b70f630d985eaa625ac08ea6931c1337a11315b689a2eac84d16642aabc7"
 	SDKVersion  = "3.4.11"
 )
 
@@ -38,6 +38,9 @@ type Template interface {
 
 // IExecutingMessage is a DAML interface
 type IExecutingMessage interface {
+
+	// ExecutingMessageAddCCVVerification executes the ExecutingMessage_AddCCVVerification choice
+	ExecutingMessageAddCCVVerification(contractID string, args ExecutingMessageAddCCVVerification) *model.ExerciseCommand
 
 	// Archive executes the Archive choice
 	Archive(contractID string) *model.ExerciseCommand
@@ -233,6 +236,51 @@ func (t ExecutingMessageView) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ExecutingMessageView from hex string (Canton MCMS format)
 func (t *ExecutingMessageView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ExecutingMessageAddCCVVerification is a Record type
+type ExecutingMessageAddCCVVerification struct {
+	CcvInstanceId types.TEXT                                 `json:"ccvInstanceId"`
+	VersionTag    types.TEXT                                 `json:"versionTag" hex:"bytes"`
+	Context       splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller        types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts ExecutingMessageAddCCVVerification to a map for DAML arguments
+func (t ExecutingMessageAddCCVVerification) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["ccvInstanceId"] = string(t.CcvInstanceId)
+
+	m["versionTag"] = string(t.VersionTag)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ExecutingMessageAddCCVVerification) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutingMessageAddCCVVerification) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutingMessageAddCCVVerification to hex string (Canton MCMS format)
+func (t ExecutingMessageAddCCVVerification) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutingMessageAddCCVVerification from hex string (Canton MCMS format)
+func (t *ExecutingMessageAddCCVVerification) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

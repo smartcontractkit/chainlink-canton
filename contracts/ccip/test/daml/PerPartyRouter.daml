@@ -12,9 +12,14 @@ import DA.Set qualified as Set
 import qualified DA.Text as Text
 import qualified DA.TextMap as TextMap
 
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified CCIP.API.ExecutingMessageV1
+
 import qualified CCIP.Client
 import qualified CCIP.Context
-import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FinalityConfig
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
@@ -34,10 +39,6 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Executor
 import qualified CCIP.ExecutorTypes as CCIP.Executor
 import qualified CommitteeVerifier.DummyCommitteeVerifier
-
-import qualified Splice.Api.Token.HoldingV1
-import qualified Splice.Api.Token.MetadataV1
-import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified TestToken
 
@@ -951,10 +952,11 @@ testCCIPExecute = script do
             caller = receiver
 
     -- Add CCV verification
-    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+    executingMessageCid <- coerceContractId <$> submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd (coerceContractId @_ @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ""
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     -- Execute
@@ -1593,10 +1595,11 @@ testExecuteRollsOverExecutedMessages = script do
             receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
-    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+    executingMessageCid <- coerceContractId <$> submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd (coerceContractId @_ @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ""
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do

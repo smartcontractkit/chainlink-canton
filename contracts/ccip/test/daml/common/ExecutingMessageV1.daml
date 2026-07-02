@@ -4,12 +4,16 @@ import Daml.Script
 import DA.Optional (fromSome, fromSomeNote)
 import DA.Assert
 
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified CCIP.API.ExecutingMessageV1
+
 import CCIP.ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.Internal qualified as Internal
 import qualified CCIP.MessageCodecV1
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 
 finalityConfig n =
     if n == 0
@@ -57,7 +61,7 @@ testAddCCVVerification = do
             messageData = "48656c6c6f20576f726c64"
 
     -- Create ExecutingMessageV1
-    executingMessageCid <- submit ccipOwner do
+    executingMessageCid <- coerceContractId @_ @CCIP.API.ExecutingMessageV1.ExecutingMessage <$> submit ccipOwner do
         createCmd ExecutingMessageV1 with
             ccipOwner = ccipOwner
             message = message
@@ -86,43 +90,48 @@ testAddCCVVerification = do
 
     -- Add first CCV verification
     executingMessageCid <- submit [ccipOwner, ccvOwner1] do
-        exerciseCmd executingMessageCid AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV1"
             versionTag = "0x01"
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner1
 
     -- Try to add a verification with the same party, but different instance ID, must succeed
     -- This is to prevent CCV poisoning where a malicious CCV owner could prevent other CCVs from adding their verification
     executingMessageCid <- submit  [ccipOwner, ccvOwner1] do
-        exerciseCmd executingMessageCid AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV2"
             versionTag = "0x02"
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner1 -- same party as first verification, different instance ID
 
     -- Add second CCV verification, must succeed
     -- The previous step already added a verification for this instance ID, but with a different party, so this should not be considered a duplicate
     executingMessageCid <- submit [ccipOwner, ccvOwner2] do
-        exerciseCmd executingMessageCid AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV2"
             versionTag = "0x02"
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner2
 
     -- Try to add the same verification again, must fail
     submitMustFail [ccipOwner, ccvOwner2] do
-        exerciseCmd executingMessageCid AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV2"
             versionTag = "0x02"
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner2
 
     -- Try to add a verification with an unauthorized caller party, must fail
     submitMustFail [ccipOwner, ccvOwner2] do
-        exerciseCmd executingMessageCid AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV3"
             versionTag = "0x03"
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner3 -- not part of the authorizing parties for this submit
 
     -- Fetch final state and assert both CCV verifications are recorded
-    finalMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
+    Some finalMessage <- queryContractId ccipOwner (coerceContractId @_ @ExecutingMessageV1 executingMessageCid)
     length finalMessage.ccvVerifications === 3
     finalMessage.ccvOwners === [ccvOwner1, ccvOwner2]
     finalMessage.ccvVerifications ===
@@ -160,7 +169,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
                 extraData = "")
             messageData = ""
 
-    executingMessageCid <- submit ccipOwner do
+    executingMessageCid <- coerceContractId @_ @CCIP.API.ExecutingMessageV1.ExecutingMessage <$> submit ccipOwner do
         createCmd ExecutingMessageV1 with
             ccipOwner = ccipOwner
             message = message
@@ -185,24 +194,26 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
             state = ExecutingMessageState_RequirePoolCCVs
 
     submitMustFail [ccipOwner, ccvOwner] do
-        exerciseCmd executingMessageCid AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV1"
             versionTag = "0x01"
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
-    executingMessageCid <- submit (actAs ccipOwner <> actAs poolOwner) do
-        exerciseCmd executingMessageCid SetInboundPoolCCVs with
+    executingMessageCid <- coerceContractId @_ @CCIP.API.ExecutingMessageV1.ExecutingMessage <$> submit (actAs ccipOwner <> actAs poolOwner) do
+        exerciseCmd (coerceContractId @_ @ExecutingMessageV1 executingMessageCid) SetInboundPoolCCVs with
             poolInstanceId = "test-pool"
             poolOwner = poolOwner
             poolCCVs = []
 
     executingMessageCid <- submit (actAs ccipOwner <> actAs ccvOwner) do
-        exerciseCmd executingMessageCid AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV1"
             versionTag = "0x01"
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
-    finalMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
+    Some finalMessage <- queryContractId ccipOwner (coerceContractId @_ @ExecutingMessageV1 executingMessageCid)
     length finalMessage.ccvVerifications === 1
 
 testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs : Script ()

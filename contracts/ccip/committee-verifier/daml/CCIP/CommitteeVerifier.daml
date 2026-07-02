@@ -17,14 +17,13 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import qualified Chainlink.InstanceAddress
 
+import qualified CCIP.API.ExecutingMessageV1
 import qualified CCIP.API.RMNRemoteV1
 import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.Interfaces.CrossChainVerifier
-
-import qualified CCIP.Crypto.DerEncoding
-import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 
+import qualified CCIP.Crypto.DerEncoding
 import CCIP.CommitteeVerifierCodecGen (
     decodeApplySignatureConfigsParamsAt,
     decodeSetDynamicConfigParamsAt,
@@ -114,11 +113,11 @@ template CommitteeVerifier
                 storageLocations = storageLocations
 
             crossChainVerifier_verifyMessageImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @CommitteeVerifier self) VerifyMessage
+                exercise (fromInterfaceContractId @CommitteeVerifier self) VerifyMessage
                     with
-                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        executingMessageCid = coerceContractId arg.executingMessageCid
+                        executingMessageCid = arg.executingMessageCid
                         verifierResults = arg.verifierResults
                         caller = arg.caller
 
@@ -139,7 +138,7 @@ template CommitteeVerifier
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) ForwardToVerifier
                     with
-                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         verifierArgs = arg.verifierArgs
@@ -305,25 +304,26 @@ template CommitteeVerifier
         -- | Verify an inbound message and append CCV verification to ExecutingMessageV1.
         -- Fetches ExecutingMessageV1 for decoded message content and re-encodes
         -- for signature verification (encoding is deterministic).
-        nonconsuming choice VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+        nonconsuming choice VerifyMessage : ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage
             with
                 rmnRemoteCid : ContractId CCIP.API.RMNRemoteV1.RMNRemote
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+                executingMessageCid : ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage
                 verifierResults : BytesHex
                 caller : Party
             controller caller
             do
                 execMsg <- fetch executingMessageCid
+                let execMsgView = view execMsg
 
                 -- Domain separation: the verifier and the executing message must share a ccipOwner.
                 -- Without this, a verification produced under a different ccipOwner domain could still
                 -- satisfy the executing message's required verifier set because AddCCVVerification
                 -- records identity as (ccvInstanceId, ccvOwner) only.
                 assertMsg "verifier: executing message ccipOwner mismatch"
-                    (execMsg.ccipOwner == ccipOwner)
+                    (execMsgView.ccipOwner == ccipOwner)
 
-                let message = execMsg.message
+                let message = execMsgView.message
 
                 -- Get source chain signature config
                 let signerConfig = fromSomeNote "source chain not configured"
@@ -335,7 +335,7 @@ template CommitteeVerifier
                 Chainlink.InstanceAddress.assertEqual "verifier: rmn mismatch"
                     rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
                 assertMsg "verifier: executing message rmn mismatch"
-                    (execMsg.deps.rmnRemote == deps.rmnRemote)
+                    (execMsgView.rmnRemote == deps.rmnRemote)
                 isCursed <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_IsCursedForChain with
                     chainSelector = message.sourceChainSelector
                     context = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -354,10 +354,7 @@ template CommitteeVerifier
                 let signatures = parseSignatures signatureData
 
                 -- re-calculate messageId hash for signature verification.
-                let messageId = CCIP.MessageCodecV1.messageId execMsg.message
-
-                -- validate that exec message content matches the calculated messageId
-                assertMsg "verifier: executing message ID mismatch" (messageId == execMsg.messageId)
+                let messageId = CCIP.MessageCodecV1.messageId execMsgView.message
 
                 -- Matches EVM: signers sign keccak256(versionTag ++ messageHash)
                 let signedHash = keccak256 (versionTag <> messageId)
@@ -374,9 +371,10 @@ template CommitteeVerifier
                     (validSignerCount >= signerConfig.threshold)
 
                 -- Append CCV verification to ExecutingMessageV1
-                exercise executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+                exercise executingMessageCid CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
                     ccvInstanceId = instanceId
                     versionTag = versionTag
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = owner
 
         -- | Calculate fee for outbound message (USD cents only).

@@ -110,6 +110,13 @@ template ExecutingMessageV1
 
                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
+            executingMessage_addCCVVerificationImpl self arg = do
+                coerceContractId <$> exercise (fromInterfaceContractId @ExecutingMessageV1 self) AddCCVVerification
+                    with
+                        ccvInstanceId = arg.ccvInstanceId
+                        versionTag = arg.versionTag
+                        context = arg.context
+                        caller = arg.caller
 
         -- Cleanup choice for failed or abandoned flows. Not used for the success path
         -- (which goes through FinalizeExecute).
@@ -128,6 +135,7 @@ template ExecutingMessageV1
             with
                 ccvInstanceId : Text
                 versionTag : BytesHex
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
