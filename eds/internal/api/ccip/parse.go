@@ -146,7 +146,7 @@ func ParseTokenAdminRegistry(createdEvent *apiv2.CreatedEvent) (*TokenAdminRegis
 		return nil, fmt.Errorf("failed to unmarshal TokenAdminRegistry: %w", err)
 	}
 
-	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.Owner)
+	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.CcipOwner)
 
 	return &TokenAdminRegistry{
 		Address:    address,

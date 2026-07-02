@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	ccipruntime "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	committeeverifier "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
@@ -34,7 +35,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "9fe505c991e91a2e1b1cdaf3bb666a4354415bdd72e906b2fce2cfd4e8bd6edd"
+	PackageID   = "3a0488400478fb77bc058e40be4b9289be53b861136adbb9de704e023dc7b2e1"
 	SDKVersion  = "3.4.11"
 )
 
@@ -814,11 +815,11 @@ func (t *DeployExecutor) UnmarshalHex(data string) error {
 
 // DeployExecutorParams is a Record type
 type DeployExecutorParams struct {
-	InstanceId            types.TEXT          `json:"instanceId"`
-	Owner                 types.PARTY         `json:"owner"`
-	MaxCCVsPerMsg         types.INT64         `json:"maxCCVsPerMsg"`
-	AllowedFinalityConfig core.FinalityConfig `json:"allowedFinalityConfig"`
-	CcvAllowlistEnabled   types.BOOL          `json:"ccvAllowlistEnabled"`
+	InstanceId            types.TEXT               `json:"instanceId"`
+	Owner                 types.PARTY              `json:"owner"`
+	MaxCCVsPerMsg         types.INT64              `json:"maxCCVsPerMsg"`
+	AllowedFinalityConfig ccipcodec.FinalityConfig `json:"allowedFinalityConfig"`
+	CcvAllowlistEnabled   types.BOOL               `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts DeployExecutorParams to a map for DAML arguments

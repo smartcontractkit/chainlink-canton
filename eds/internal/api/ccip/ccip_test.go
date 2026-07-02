@@ -170,7 +170,7 @@ func TestServer_GetTokenAdminRegistryToken(t *testing.T) {
 
 	tokenAdminRegistry := core.TokenAdminRegistry{
 		InstanceId: types.TEXT(tokenAdminRegistryAddress.InstanceID()),
-		Owner:      types.PARTY(tokenAdminRegistryAddress.Owner()),
+		CcipOwner:  types.PARTY(tokenAdminRegistryAddress.Owner()),
 		EntryCount: 2,
 	}
 	tokenConfig := core.TokenConfig{
@@ -472,7 +472,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			},
 			CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 				InstanceId: "tokenadminregistry",
-				Owner:      "owner",
+				CcipOwner:  "owner",
 				EntryCount: 1,
 			}),
 		}}, true)
@@ -1153,7 +1153,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1192,7 +1192,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1230,7 +1230,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1338,7 +1338,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 			},
 			CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 				InstanceId: "tokenadminregistry",
-				Owner:      "owner",
+				CcipOwner:  "owner",
 				EntryCount: 1,
 			}),
 		}}, true)
@@ -1572,7 +1572,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1595,7 +1595,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1617,7 +1617,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)

@@ -70,7 +70,7 @@ func TestDeployTokenPool(t *testing.T) {
 	// Deploy TAR so we have an instance address for register-with-TAR
 	tarAddrRef, err := cld_ops.ExecuteOperation(bundle, token_admin_registry.Deploy, *cantonChain, contract.DeployInput[core.TokenAdminRegistry]{
 		Template: core.TokenAdminRegistry{
-			Owner:      types.PARTY(party),
+			CcipOwner:  types.PARTY(party),
 			InstanceId: "",
 			EntryCount: 0,
 		},

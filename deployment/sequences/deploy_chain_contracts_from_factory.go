@@ -90,7 +90,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		}
 		tokenAdminRegistryTemplate := core.TokenAdminRegistry{
 			InstanceId: types.TEXT(tokenAdminRegistryInstanceID),
-			Owner:      ccipOwnerParty,
+			CcipOwner:  ccipOwnerParty,
 			EntryCount: 0,
 		}
 		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, factoryops.DeployTokenAdminRegistry, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployTokenAdminRegistry{Contract: tokenAdminRegistryTemplate}, input.ProposalDriven))

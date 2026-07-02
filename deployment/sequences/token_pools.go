@@ -25,6 +25,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
@@ -64,7 +65,7 @@ type tokenPoolChainUpdate struct {
 	RemoteTokenAddress                         types.TEXT
 	InboundCCVs                                []chainlinkapi.RawInstanceAddress
 	OutboundCCVs                               []chainlinkapi.RawInstanceAddress
-	FinalityConfig                             core.FinalityConfig
+	FinalityConfig                             ccipcodec.FinalityConfig
 	InboundRateLimiter                         chainlinkapi.RawInstanceAddress
 	InboundCustomBlockConfirmationsRateLimiter chainlinkapi.RawInstanceAddress
 	OutboundRateLimiter                        chainlinkapi.RawInstanceAddress
@@ -620,16 +621,16 @@ var DeployTokenPoolForToken = operations.NewSequence(
 	},
 )
 
-func toCantonFinalityConfig(cfg tokenadaptersfinality.Config) core.FinalityConfig {
+func toCantonFinalityConfig(cfg tokenadaptersfinality.Config) ccipcodec.FinalityConfig {
 	switch {
 	case cfg.BlockDepth > 0:
-		return core.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
+		return ccipcodec.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
 	case cfg.WaitForSafe:
-		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}
+		return ccipcodec.FinalityConfig{WaitForSafe: &types.UNIT{}}
 	case cfg.WaitForFinality:
-		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}
+		return ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}}
 	default:
-		return core.FinalityConfig{}
+		return ccipcodec.FinalityConfig{}
 	}
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
@@ -477,18 +478,18 @@ func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Byte
 	}, nil
 }
 
-func encodeReceiverFinalityConfig(finality int64) (core.FinalityConfig, error) {
+func encodeReceiverFinalityConfig(finality int64) (ccipcodec.FinalityConfig, error) {
 	switch {
 	case finality < 0:
-		return core.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
+		return ccipcodec.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
 	case finality == 0:
-		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
+		return ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
 	case finality == 0x00010000:
-		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
+		return ccipcodec.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
 	case finality > 0xFFFF:
-		return core.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
+		return ccipcodec.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
 	default:
-		return core.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
+		return ccipcodec.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}
 }
 

@@ -316,7 +316,7 @@ func createTokenAdminRegistryEmpty(
 
 	tarContract := core.TokenAdminRegistry{
 		InstanceId: types.TEXT(instanceID),
-		Owner:      types.PARTY(owner),
+		CcipOwner:  types.PARTY(owner),
 		EntryCount: 0,
 	}
 

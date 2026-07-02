@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
@@ -164,7 +165,7 @@ func GetOrCreateSender(ctx context.Context, participant canton.Participant) (str
 	return contract.GetCreatedEvent().GetContractId(), nil
 }
 
-func finalityConfigEqual(a, b core.FinalityConfig) bool {
+func finalityConfigEqual(a, b ccipcodec.FinalityConfig) bool {
 	switch a.GetVariantTag() {
 	case "WaitForFinality":
 		return b.GetVariantTag() == "WaitForFinality"
@@ -183,7 +184,7 @@ func finalityConfigEqual(a, b core.FinalityConfig) bool {
 	}
 }
 
-func receiverFinalityLabel(cfg core.FinalityConfig) string {
+func receiverFinalityLabel(cfg ccipcodec.FinalityConfig) string {
 	switch cfg.GetVariantTag() {
 	case "BlockDepth":
 		depth, ok := cfg.GetVariantValue().(*types.INT64)
@@ -197,7 +198,7 @@ func receiverFinalityLabel(cfg core.FinalityConfig) string {
 	}
 }
 
-func receiverInstanceID(cfg core.FinalityConfig) string {
+func receiverInstanceID(cfg ccipcodec.FinalityConfig) string {
 	switch cfg.GetVariantTag() {
 	case "WaitForFinality":
 		return "ccipreceiver-WaitForFinality"
@@ -243,7 +244,7 @@ func receiverRequiredCCVConfigured(recv *receiver.CCIPReceiver, requiredCCV cont
 func findActiveReceiverByFinality(
 	ctx context.Context,
 	participant canton.Participant,
-	receiverFinality core.FinalityConfig,
+	receiverFinality ccipcodec.FinalityConfig,
 ) (string, *receiver.CCIPReceiver, error) {
 	active, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, ccipReceiverTemplateID)
 	if err != nil {
@@ -325,7 +326,7 @@ func extractCreatedReceiverCID(tx *apiv2.Transaction) (string, error) {
 func waitForReceiverWithFinality(
 	ctx context.Context,
 	participant canton.Participant,
-	receiverFinality core.FinalityConfig,
+	receiverFinality ccipcodec.FinalityConfig,
 ) (string, error) {
 	deadline := time.Now().Add(propagationTimeout)
 	for {
@@ -351,7 +352,7 @@ func waitForReceiverWithFinality(
 	}
 }
 
-func receiverFinalityField(cfg core.FinalityConfig) *apiv2.Value {
+func receiverFinalityField(cfg ccipcodec.FinalityConfig) *apiv2.Value {
 	switch cfg.GetVariantTag() {
 	case "WaitForFinality":
 		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
@@ -384,7 +385,7 @@ func receiverFinalityField(cfg core.FinalityConfig) *apiv2.Value {
 func GetOrCreateReceiver(
 	ctx context.Context,
 	participant canton.Participant,
-	receiverFinality core.FinalityConfig,
+	receiverFinality ccipcodec.FinalityConfig,
 	requiredCCV contracts.RawInstanceAddress,
 ) (string, error) {
 	requiredCCVs := []contracts.RawInstanceAddress{requiredCCV}
