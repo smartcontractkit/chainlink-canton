@@ -7,7 +7,7 @@ environment that includes Canton.
 
 Make sure to checkout [chainlink-ccv](https://github.com/smartcontractkit/chainlink-ccv/) in a parallel directory,
 i.e. so that chainlink-canton and chainlink-ccv have the same parent directory. This is needed so that we can build
-needed docker images. Use ref **`695181f87033217a197386366e1ab563198f482e`** (matches `go.mod` and CI).
+needed docker images. Use ref **`b85afc4a2ec56c8e9bcdba44c10d641c08ffecb9`** (matches `go.mod` and CI).
 
 ## Spin up an environment
 
@@ -167,7 +167,7 @@ The **CCIP Canton Load Tests** workflow (`ccip-load-tests.yml`) can be triggered
 | `test_timeout` | `40m` | `go test -timeout` |
 | `canton_ref` | workflow ref | chainlink-canton checkout |
 
-chainlink-ccv is pinned to **`695181f87033217a197386366e1ab563198f482e`** in `.github/actions/setup-ccip-devenv` and `go.mod` (same as CCIP E2E).
+chainlink-ccv is pinned to **`b85afc4a2ec56c8e9bcdba44c10d641c08ffecb9`** in `.github/actions/setup-ccip-devenv` and `go.mod` (same as CCIP E2E).
 
 ## Shortcut
 

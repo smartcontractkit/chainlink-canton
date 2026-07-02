@@ -36,6 +36,7 @@ func loadConfig(path string) (*ccip.Config, error) {
 	return &cfg, nil
 }
 
+//nolint:staticcheck // SA1019: chainaccess.Register still requires GenericConfig.
 func CreateCantonAccessorFactory(lggr logger.Logger, genericConfig chainaccess.GenericConfig) (chainaccess.AccessorFactory, error) {
 	configPath, ok := os.LookupEnv(CantonConfigPathEnv)
 	if !ok {
