@@ -25,3 +25,23 @@ func IsTopologyMappingAlreadyExists(err error) bool {
 
 	return false
 }
+
+// IsKmsPublicKeyConflict reports whether err is Canton's signal that the KMS
+// key material is already registered in the vault under a different name.
+func IsKmsPublicKeyConflict(err error) bool {
+	for err != nil {
+		msg := err.Error()
+		if strings.Contains(msg, "Existing public key") && strings.Contains(msg, "different than inserted key") {
+			return true
+		}
+		if st, ok := status.FromError(err); ok {
+			msg = st.Message()
+			if strings.Contains(msg, "Existing public key") && strings.Contains(msg, "different than inserted key") {
+				return true
+			}
+		}
+		err = errors.Unwrap(err)
+	}
+
+	return false
+}

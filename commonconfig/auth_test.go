@@ -196,6 +196,49 @@ func TestAuthConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 
+		// --- Audience: optional for clientCredentials and authorizationCode, excluded otherwise ---
+		{
+			name: "clientCredentials_with_audience",
+			config: AuthConfig{
+				Type:         AuthTypeClientCredentials,
+				UserID:       "user-1",
+				AuthURL:      "https://auth.example.com/",
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+				Audience:     "https://ledger.example.com",
+			},
+			wantErr: false,
+		},
+		{
+			name: "authorizationCode_with_audience",
+			config: AuthConfig{
+				Type:     AuthTypeAuthorizationCode,
+				UserID:   "user-1",
+				AuthURL:  "https://auth.example.com/",
+				ClientID: "client-id",
+				Audience: "https://ledger.example.com",
+			},
+			wantErr: false,
+		},
+		{
+			name: "static_audience_must_be_unset",
+			config: AuthConfig{
+				Type:     AuthTypeStatic,
+				JWT:      validJWT,
+				Audience: "https://ledger.example.com",
+			},
+			wantErr: true,
+		},
+		{
+			name: "insecureStatic_audience_must_be_unset",
+			config: AuthConfig{
+				Type:     AuthTypeInsecureStatic,
+				JWT:      validJWT,
+				Audience: "https://ledger.example.com",
+			},
+			wantErr: true,
+		},
+
 		// --- Type validation ---
 		{
 			name: "missing_type",

@@ -14,6 +14,7 @@ import (
 	tokenadaptersfinality "github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccipsequences "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldfcanton "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -100,36 +101,18 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 			return ccipsequences.OnChainOutput{}, err
 		}
 
-		parsedPool, err := loadConfiguredCantonTokenPool(b.GetContext(), participant, logicalPoolType, poolAddress)
+		parsedPool, err := loadConfiguredCantonTokenPool(
+			b.GetContext(),
+			participant,
+			input.ExistingDataStore,
+			input.ChainSelector,
+			logicalPoolType,
+			poolAddress,
+			b.Logger,
+		)
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, err
 		}
-
-		registryRef, err := input.ExistingDataStore.Addresses().Get(datastore.NewAddressRefKey(
-			input.ChainSelector,
-			datastore.ContractType(token_admin_registry.ContractType),
-			token_admin_registry.Version,
-			"",
-		))
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("resolve token admin registry: %w", err)
-		}
-		tarRaw, err := dsutils.GetRawInstanceAddressFromAddressRef(registryRef)
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("resolve token admin registry raw address: %w", err)
-		}
-		regOut, err := operations.ExecuteSequence(b, RegisterTokenPool, cantonChain, RegisterTokenPoolInput{
-			TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(registryRef.Address),
-			TokenAdminRegistryRawInstanceAddress: tarRaw,
-			InstrumentId:                         parsedPool.InstrumentId,
-			PoolInstanceID:                       string(parsedPool.InstanceId),
-			CcipParty:                            string(parsedPool.CcipOwner),
-			PoolOwnerParty:                       string(parsedPool.PoolOwner),
-		})
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("register token pool with token admin registry: %w", err)
-		}
-		batchOps = append(batchOps, regOut.Output.BatchOps...)
 
 		factoryRefs := input.ExistingDataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
@@ -458,12 +441,6 @@ var DeployTokenPoolForToken = operations.NewSequence(
 		var batchOps []mcms_types.BatchOperation
 		var proposalOutputs []contract.ExerciseOutput
 
-		if logicalPoolType == burnMintPoolType {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf(
-				"burn/mint token pools must be deployed through CCIPFactory; factory does not yet expose DeployBurnMintTokenPool",
-			)
-		}
-
 		factoryRefs := input.ExistingDataStore.Addresses().Filter(
 			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(factoryops.ContractType)),
@@ -514,51 +491,93 @@ var DeployTokenPoolForToken = operations.NewSequence(
 		}
 		ccipOwner := types.PARTY(ccipOwnerParty)
 		poolOwner := types.PARTY(poolOwnerParty)
-		poolInstanceID := contracts.InstanceID(fmt.Sprintf("lockreleasetokenpool-%s", qualifier))
-		deployReport, err := operations.ExecuteOperation(b, factoryops.DeployLockReleaseTokenPool, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployLockReleaseTokenPool{
-			Contract: lockreleasetokenpool.LockReleaseTokenPool{
-				InstanceId:              types.TEXT(poolInstanceID),
-				CcipOwner:               ccipOwner,
-				PoolOwner:               poolOwner,
-				InstrumentId:            instrumentID,
-				Decimals:                types.INT64(10),
-				RemoteChainConfigs:      map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{},
-				TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{},
-				PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{
-					Values: map[string]splice_api_token_metadata_v1.AnyValue{},
-				},
-				TransferTimeout: lockreleasetokenpool.TransferTimeout{
-					RelativeHours: new(types.INT64(24)),
-				},
-				Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
-					TokenAdminRegistry: tokenAdminRegistryRaw.Binding(),
-					RmnRemote:          rmnRemoteRaw.Binding(),
-					FeeQuoter:          feeQuoterRaw.Binding(),
-				},
-			},
-		}, mcmsEnabled))
-		if err != nil {
-			return ccipsequences.OnChainOutput{}, fmt.Errorf("deploy Canton lock/release pool from factory: %w", err)
+		poolReceiveContext := splice_api_token_metadata_v1.ChoiceContext{
+			Values: map[string]splice_api_token_metadata_v1.AnyValue{},
 		}
-		if mcmsEnabled && !deployReport.Output.Executed() {
-			proposalOutputs = append(proposalOutputs, deployReport.Output)
+
+		var (
+			rawPoolAddr  contracts.RawInstanceAddress
+			canonicalRef datastore.AddressRef
+		)
+		switch logicalPoolType {
+		case lockReleasePoolType:
+			poolInstanceID := contracts.InstanceID(fmt.Sprintf("lockreleasetokenpool-%s", qualifier))
+			deployReport, err := operations.ExecuteOperation(b, factoryops.DeployLockReleaseTokenPool, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployLockReleaseTokenPool{
+				Contract: lockreleasetokenpool.LockReleaseTokenPool{
+					InstanceId:              types.TEXT(poolInstanceID),
+					CcipOwner:               ccipOwner,
+					PoolOwner:               poolOwner,
+					InstrumentId:            instrumentID,
+					Decimals:                types.INT64(10),
+					RemoteChainConfigs:      map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{},
+					TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{},
+					PoolReceiveContext:      poolReceiveContext,
+					TransferTimeout: lockreleasetokenpool.TransferTimeout{
+						RelativeHours: new(types.INT64(24)),
+					},
+					Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
+						TokenAdminRegistry: tokenAdminRegistryRaw.Binding(),
+						RmnRemote:          rmnRemoteRaw.Binding(),
+						FeeQuoter:          feeQuoterRaw.Binding(),
+					},
+				},
+			}, mcmsEnabled))
+			if err != nil {
+				return ccipsequences.OnChainOutput{}, fmt.Errorf("deploy Canton lock/release pool from factory: %w", err)
+			}
+			if mcmsEnabled && !deployReport.Output.Executed() {
+				proposalOutputs = append(proposalOutputs, deployReport.Output)
+			}
+			rawPoolAddr = poolInstanceID.RawInstanceAddress(poolOwner)
+			canonicalRef = newAddressRef(input.ChainSelector, rawPoolAddr, lock_release_token_pool.ContractType, lock_release_token_pool.Version, qualifier)
+		case burnMintPoolType:
+			poolInstanceID := contracts.InstanceID(fmt.Sprintf("burnminttokenpool-%s", qualifier))
+			deployReport, err := operations.ExecuteOperation(b, factoryops.DeployBurnMintTokenPool, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployBurnMintTokenPool{
+				Contract: burnminttokenpool.BurnMintTokenPool{
+					InstanceId:              types.TEXT(poolInstanceID),
+					CcipOwner:               ccipOwner,
+					PoolOwner:               poolOwner,
+					InstrumentId:            instrumentID,
+					Decimals:                types.INT64(10),
+					RemoteChainConfigs:      map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{},
+					TokenTransferFeeConfigs: map[types.NUMERIC]burnminttokenpool.TokenTransferFeeConfig{},
+					PoolReceiveContext:      poolReceiveContext,
+					TransferTimeout: burnminttokenpool.TransferTimeout{
+						RelativeHours: new(types.INT64(24)),
+					},
+					Deps: burnminttokenpool.BurnMintTokenPoolDeps{
+						TokenAdminRegistry: tokenAdminRegistryRaw.Binding(),
+						RmnRemote:          rmnRemoteRaw.Binding(),
+						FeeQuoter:          feeQuoterRaw.Binding(),
+					},
+				},
+			}, mcmsEnabled))
+			if err != nil {
+				return ccipsequences.OnChainOutput{}, fmt.Errorf("deploy Canton burn/mint pool from factory: %w", err)
+			}
+			if mcmsEnabled && !deployReport.Output.Executed() {
+				proposalOutputs = append(proposalOutputs, deployReport.Output)
+			}
+			rawPoolAddr = poolInstanceID.RawInstanceAddress(poolOwner)
+			canonicalRef = newAddressRef(input.ChainSelector, rawPoolAddr, burn_mint_token_pool.ContractType, burn_mint_token_pool.Version, qualifier)
+		default:
+			return ccipsequences.OnChainOutput{}, fmt.Errorf("unsupported Canton token pool type %q", logicalPoolType)
 		}
-		rawPoolAddr := poolInstanceID.RawInstanceAddress(poolOwner)
 
 		regOut, err := operations.ExecuteSequence(b, RegisterTokenPool, cantonChain, RegisterTokenPoolInput{
 			TokenAdminRegistryInstanceAddress:    contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address),
 			TokenAdminRegistryRawInstanceAddress: tokenAdminRegistryRaw,
 			InstrumentId:                         instrumentID,
 			PoolInstanceID:                       rawPoolAddr.InstanceID(),
-			CcipParty:                            participant.PartyID,
-			PoolOwnerParty:                       participant.PartyID,
+			CcipParty:                            ccipOwnerParty,
+			PoolOwnerParty:                       poolOwnerParty,
+			PoolAdminParty:                       ccipOwnerParty,
 		})
 		if err != nil {
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("register Canton token pool: %w", err)
 		}
 		batchOps = append(batchOps, regOut.Output.BatchOps...)
 
-		canonicalRef := newAddressRef(input.ChainSelector, rawPoolAddr, lock_release_token_pool.ContractType, lock_release_token_pool.Version, qualifier)
 		logicalRef := datastore.AddressRef{
 			Address:       canonicalRef.Address,
 			Labels:        canonicalRef.Labels,
@@ -603,12 +622,12 @@ var DeployTokenPoolForToken = operations.NewSequence(
 
 func toCantonFinalityConfig(cfg tokenadaptersfinality.Config) core.FinalityConfig {
 	switch {
-	case cfg.WaitForFinality:
-		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}
-	case cfg.WaitForSafe:
-		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}
 	case cfg.BlockDepth > 0:
 		return core.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
+	case cfg.WaitForSafe:
+		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}
+	case cfg.WaitForFinality:
+		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}
 	default:
 		return core.FinalityConfig{}
 	}
@@ -833,7 +852,180 @@ func partyFromTokenRefLabels(ref *datastore.AddressRef, prefix string) string {
 	return ""
 }
 
+const defaultCantonTokenPoolDecimals int64 = 10
+
+// IsCantonPoolNotOnLedgerErr reports whether err is the standard "pool not yet deployed" ledger lookup failure.
+func IsCantonPoolNotOnLedgerErr(err error) bool {
+	return isCantonPoolNotOnLedgerErr(err)
+}
+
+func isCantonPoolNotOnLedgerErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no active contract found")
+}
+
+// CantonTokenPoolDecimalsFromDataStore resolves pool decimals from address_refs when the pool
+// contract is not yet active on the Canton ledger (e.g. deploy MCMS still pending).
+func CantonTokenPoolDecimalsFromDataStore(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	poolRef datastore.AddressRef,
+) (uint8, error) {
+	logicalPoolType, err := resolveCantonTokenPoolType(string(poolRef.Type))
+	if err != nil {
+		return 0, err
+	}
+	poolAddress := contracts.HexToInstanceAddress(poolRef.Address)
+	pool, err := loadConfiguredCantonTokenPoolFromDataStore(ds, chainSelector, logicalPoolType, poolAddress)
+	if err != nil {
+		return 0, err
+	}
+
+	//nolint:gosec // Decimals should never exceed uint8
+	return uint8(pool.Decimals), nil
+}
+
 func loadConfiguredCantonTokenPool(
+	ctx context.Context,
+	participant cldfcanton.Participant,
+	ds datastore.DataStore,
+	chainSelector uint64,
+	logicalPoolType datastore.ContractType,
+	poolAddress contracts.InstanceAddress,
+	logger logger.Logger,
+) (*configuredCantonTokenPool, error) {
+	pool, err := loadConfiguredCantonTokenPoolFromLedger(ctx, participant, logicalPoolType, poolAddress)
+	if err == nil {
+		return pool, nil
+	}
+	if ds == nil || !isCantonPoolNotOnLedgerErr(err) {
+		return nil, err
+	}
+
+	fallbackPool, fallbackErr := loadConfiguredCantonTokenPoolFromDataStore(ds, chainSelector, logicalPoolType, poolAddress)
+	if fallbackErr != nil {
+		return nil, fmt.Errorf("%w (datastore fallback: %w)", err, fallbackErr)
+	}
+	if logger != nil {
+		logger.Infof(
+			"token pool %s not active on Canton ledger; using address_refs fallback (instanceId=%s owner=%s)",
+			poolAddress.Hex(),
+			fallbackPool.InstanceId,
+			fallbackPool.PoolOwner,
+		)
+	}
+
+	return fallbackPool, nil
+}
+
+func loadConfiguredCantonTokenPoolFromDataStore(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	logicalPoolType datastore.ContractType,
+	poolAddress contracts.InstanceAddress,
+) (*configuredCantonTokenPool, error) {
+	poolRef, err := findCantonTokenPoolRefInDataStore(ds, chainSelector, logicalPoolType, poolAddress)
+	if err != nil {
+		return nil, err
+	}
+	rawPoolAddr, err := dsutils.GetRawInstanceAddressFromAddressRef(poolRef)
+	if err != nil {
+		return nil, fmt.Errorf("parse token pool raw instance address from datastore: %w", err)
+	}
+
+	tokenRefs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(chainSelector),
+		datastore.AddressRefByType(datastore.ContractType("Token")),
+		datastore.AddressRefByQualifier(poolRef.Qualifier),
+	)
+	if len(tokenRefs) != 1 {
+		return nil, fmt.Errorf(
+			"expected exactly one token ref for pool qualifier %q on chain %d, got %d",
+			poolRef.Qualifier,
+			chainSelector,
+			len(tokenRefs),
+		)
+	}
+
+	instrumentID, _, err := parseInstrumentIDFromTokenRefLabels(tokenRefs[0])
+	if err != nil {
+		return nil, fmt.Errorf("parse instrument from token ref for pool %s: %w", poolAddress.Hex(), err)
+	}
+
+	poolOwner := types.PARTY(rawPoolAddr.Owner())
+	ccipOwner := types.PARTY(partyFromTokenRefLabels(&tokenRefs[0], "ccip-owner:"))
+	if ccipOwner == "" {
+		ccipOwner = poolOwner
+	}
+
+	return &configuredCantonTokenPool{
+		InstrumentId:       instrumentID,
+		InstanceId:         types.TEXT(rawPoolAddr.InstanceID()),
+		CcipOwner:          ccipOwner,
+		PoolOwner:          poolOwner,
+		Decimals:           decimalsFromRefLabels(poolRef, tokenRefs[0]),
+		RemoteChainConfigs: map[types.NUMERIC]any{},
+	}, nil
+}
+
+func findCantonTokenPoolRefInDataStore(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	logicalPoolType datastore.ContractType,
+	poolAddress contracts.InstanceAddress,
+) (datastore.AddressRef, error) {
+	if ds == nil {
+		return datastore.AddressRef{}, fmt.Errorf("datastore is required")
+	}
+
+	wantAddress := strings.ToLower(poolAddress.Hex())
+	candidateTypes := []datastore.ContractType{logicalPoolType}
+	if logicalPoolType == burnMintPoolType {
+		candidateTypes = append(candidateTypes, datastore.ContractType("CantonBurnMintTokenPool"))
+	}
+
+	var matches []datastore.AddressRef
+	for _, contractType := range candidateTypes {
+		for _, ref := range ds.Addresses().Filter(
+			datastore.AddressRefByChainSelector(chainSelector),
+			datastore.AddressRefByType(contractType),
+		) {
+			if strings.EqualFold(ref.Address, wantAddress) {
+				matches = append(matches, ref)
+			}
+		}
+	}
+	if len(matches) == 0 {
+		return datastore.AddressRef{}, fmt.Errorf("no token pool ref in datastore for address %s", poolAddress.Hex())
+	}
+	for _, ref := range matches {
+		if ref.Type == logicalPoolType {
+			return ref, nil
+		}
+	}
+
+	return matches[0], nil
+}
+
+func decimalsFromRefLabels(refs ...datastore.AddressRef) types.INT64 {
+	for _, ref := range refs {
+		for _, label := range ref.Labels.List() {
+			value, ok := strings.CutPrefix(label, "decimals:")
+			if !ok {
+				continue
+			}
+			decimals, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+			if err != nil {
+				continue
+			}
+
+			return types.INT64(decimals)
+		}
+	}
+
+	return types.INT64(defaultCantonTokenPoolDecimals)
+}
+
+func loadConfiguredCantonTokenPoolFromLedger(
 	ctx context.Context,
 	participant cldfcanton.Participant,
 	logicalPoolType datastore.ContractType,

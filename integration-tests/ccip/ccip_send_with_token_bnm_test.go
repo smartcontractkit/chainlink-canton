@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"slices"
 	"strconv"
@@ -46,7 +47,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_burn_mint_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -165,7 +165,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		Id:    types.TEXT("Amulet"),
 	}
 	linkInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(partyCCIP),
+		Admin: types.PARTY(partySender),
 		Id:    "ChainLink",
 	}
 	hashedLinkInstrumentId := contracts.EncodeInstrumentID(linkInstrumentId)
@@ -367,9 +367,10 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 
 	// Deploy Link Token
 	linkTokenOut, err := cld_ops.ExecuteOperation(bundle, linkregistry.Deploy, env.Chain, contractops.DeployInput[link.LinkRegistry]{
-		OwnerParty: types.PARTY(partyCCIP),
+		ParticipantIndex: 1,
+		OwnerParty:       types.PARTY(partySender),
 		Template: link.LinkRegistry{
-			RegistryAdmin:        types.PARTY(partyCCIP),
+			RegistryAdmin:        types.PARTY(partySender),
 			RegistryInstrumentId: linkInstrumentId,
 			RegistryMeta:         splice_api_token_metadata_v1.Metadata{},
 		},
@@ -381,10 +382,11 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Setup token pool for outbound token transfer in Send.
 	poolInstanceID := "test-pool-send"
 	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[core.RateLimiter]{
-		OwnerParty: types.PARTY(partyCCIP),
+		ParticipantIndex: 1,
+		OwnerParty:       types.PARTY(partySender),
 		Template: core.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceID),
-			PoolOwner:           types.PARTY(partyCCIP),
+			PoolOwner:           types.PARTY(partySender),
 			RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 			Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
 			Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
@@ -413,7 +415,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		Participant:   1,
 		Config: changesets.DeployBurnMintTokenPoolConfig{
 			CcipOwner:    partyCCIP,
-			PoolOwner:    partyCCIP,
+			PoolOwner:    partySender,
 			InstrumentId: linkInstrumentId,
 			Decimals:     10,
 			InstanceID:   poolInstanceID,
@@ -448,35 +450,48 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				RmnRemote:          rmnRemoteAddress.Binding(),
 				FeeQuoter:          feeQuoterAddress.Binding(),
 			},
-			// By setting the TAR address, the CS will automatically register the newly deployed pool with the TAR
-			TokenAdminRegistryInstanceAddress: tokenAdminRegistryAddress.InstanceAddress(),
 		},
 	})
 	require.NoError(t, err, "failed to deploy burn mint token pool via changeset")
 	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
 	cldfEnv.DataStore = out.DataStore.Seal()
+	_, err = changesets.RegisterTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.RegisterTokenPoolConfig]{
+		ChainSelector: env.Chain.ChainSelector(),
+		Participant:   0,
+		Config: changesets.RegisterTokenPoolConfig{
+			CcipOwner:      partyCCIP,
+			PoolOwner:      partySender,
+			PoolAdmin:      partyCCIP,
+			InstrumentId:   linkInstrumentId,
+			PoolInstanceID: poolInstanceID,
+		},
+	})
+	require.NoError(t, err, "failed to register burn mint token pool with TAR")
 	_, tokenPoolAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), burn_mint_token_pool.ContractType, burn_mint_token_pool.Version, "")
 	require.NoError(t, err, "failed to get Token Pool address")
 
-	// Run EDS
-	edsParticipant := env.Chain.Participants[0]
-	edsToken, _ := edsParticipant.TokenSource.Token()
-	edsPort := freeport.GetOne(t)
+	// Run dual EDS: CCIP contracts on P0 (ccipOwner), token pool on P1 (poolOwner).
+	edsCCIPPort := freeport.GetOne(t)
+	edsPoolPort := freeport.GetOne(t)
+
+	ccipEDSToken, _ := ccipParticipant.TokenSource.Token()
+	edsCCIPCtx, edsCCIPCancel := context.WithCancel(t.Context())
+	t.Cleanup(edsCCIPCancel)
 	go func() {
-		log.Info().Msg("Running EDS...")
-		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
+		log.Info().Int("port", edsCCIPPort).Msg("Running EDS-ccip...")
+		err := service.RunEDS(edsCCIPCtx, log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
 			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
 			Server: config.ServerConfig{
 				Host: "0.0.0.0",
-				Port: uint16(edsPort),
+				Port: uint16(edsCCIPPort),
 			},
 			Node: config.NodeConfig{
-				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
+				URL: ccipParticipant.Endpoints.GRPCLedgerAPIURL,
 				AuthConfig: commonconfig.AuthConfig{
 					Type:   commonconfig.AuthTypeInsecureStatic,
-					UserID: edsParticipant.UserID,
-					JWT:    edsToken.AccessToken,
+					UserID: ccipParticipant.UserID,
+					JWT:    ccipEDSToken.AccessToken,
 				},
 				MaxRetries: 0,
 			},
@@ -534,62 +549,89 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
+				Enabled: false,
+			},
+			TokenStandardAPIConfig: config.TokenStandardAPIConfig{
+				Enabled: false,
+			},
+		})
+		log.Info().Err(err).Msg("EDS-ccip terminated")
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("EDS-ccip server exited with error: %v", err)
+		}
+	}()
+
+	poolEDSToken, _ := senderParticipant.TokenSource.Token()
+	edsPoolCtx, edsPoolCancel := context.WithCancel(t.Context())
+	t.Cleanup(edsPoolCancel)
+	go func() {
+		log.Info().Int("port", edsPoolPort).Msg("Running EDS-pool...")
+		err := service.RunEDS(edsPoolCtx, log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
+			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
+			Server: config.ServerConfig{
+				Host: "0.0.0.0",
+				Port: uint16(edsPoolPort),
+			},
+			Node: config.NodeConfig{
+				URL: senderParticipant.Endpoints.GRPCLedgerAPIURL,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   commonconfig.AuthTypeInsecureStatic,
+					UserID: senderParticipant.UserID,
+					JWT:    poolEDSToken.AccessToken,
+				},
+				MaxRetries: 0,
+			},
+			CCIPAPIConfig: config.CCIPAPIConfig{
+				Enabled: false,
+			},
+			CCVAPIConfig: config.CCVAPIConfig{
+				Enabled: false,
+			},
+			ExecutorAPIConfig: config.ExecutorAPIConfig{
+				Enabled: false,
+			},
+			TokenPoolAPIConfig: config.TokenPoolAPIConfig{
 				Enabled: true,
 				TokenPools: map[string]config.TokenPool{
 					tokenPoolAddress.InstanceAddress().Hex(): {
 						Type: config.TokenPoolTypeBurnMint,
 						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         partyCCIP,
+							PartyID:         partySender,
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
-						PoolOwner: partyCCIP,
-						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
+						PoolOwner: partySender,
 						BurnMintFactory: &config.BurnMintFactory{
 							Type:            config.FactoryTypeAddress,
 							TemplateId:      new(link.LinkRegistry{}.GetTemplateID()),
-							Party:           new(partyCCIP),
+							Party:           new(partySender),
 							InstanceAddress: new(linkRegistryAddress.InstanceAddress()),
 						},
 					},
 				},
 			},
 			TokenStandardAPIConfig: config.TokenStandardAPIConfig{
-				Enabled: true,
-				Admin:   partyCCIP,
-				Registries: map[string]config.Registry{
-					linkRegistryAddress.InstanceAddress().Hex(): {
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: linkRegistryAddress.InstanceAddress(),
-						},
-						TokenType: config.TokenTypeLINK,
-						TokenId:   "LINK",
-					},
-				},
+				Enabled: false,
 			},
 		})
-		log.Info().Err(err).Msg("EDS terminated")
+		log.Info().Err(err).Msg("EDS-pool terminated")
 		if !errors.Is(err, context.Canceled) {
-			log.Error().Err(err).Msg("EDS server exited with error")
-			t.Fail()
-			return
+			t.Errorf("EDS-pool server exited with error: %v", err)
 		}
 	}()
 
-	// Create EDS clients
-	globalAPIClient, err := oapiGlobal.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	// Create EDS clients — CCIP global/CCV/executor on P0; token pool on P1.
+	globalAPIClient, err := oapiGlobal.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsCCIPPort))
 	require.NoError(t, err, "Failed to create GlobalConfig API client")
-	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	ccipAPIClient, err := oapiCCIP.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsCCIPPort))
 	require.NoError(t, err, "Failed to create CCIP API client")
-	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	ccvAPIClient, err := oapiCCV.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsCCIPPort))
 	require.NoError(t, err, "Failed to create CCV API client")
-	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
-	require.NoError(t, err, "Failed to create Token Pool API client")
-	executorAPIClient, err := oapiExecutor.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	executorAPIClient, err := oapiExecutor.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsCCIPPort))
 	require.NoError(t, err, "Failed to create Executor API client")
+	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPoolPort))
+	require.NoError(t, err, "Failed to create Token Pool API client")
 
-	// wait for EDS to start up
-	time.Sleep(1 * time.Second)
+	waitForEDSListening(t, edsCCIPPort, edsPoolPort)
 
 	// Create PerPartyRouter for sender via EDS
 	perPartyRouterFactoryDisclosure, err := edsTesthelpers.GetPerPartyRouterFactoryDisclosure(t.Context(), ccipAPIClient, partySender)
@@ -663,11 +705,11 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
 
-	// Mint LINK
-	linkRegistryCid, err := contractops.FindActiveContractIDByInstanceAddress(t.Context(), ccipParticipant.LedgerServices.State, []string{partyCCIP}, contracts.TemplateIDFromBinding(link.LinkRegistry{}).String(), linkRegistryAddress.InstanceAddress())
+	// Mint LINK to sender (pool owner / token admin)
+	linkRegistryCid, err := contractops.FindActiveContractIDByInstanceAddress(t.Context(), senderParticipant.LedgerServices.State, []string{partySender}, contracts.TemplateIDFromBinding(link.LinkRegistry{}).String(), linkRegistryAddress.InstanceAddress())
 	require.NoError(t, err)
 	t.Logf("LinkRegistry ContractId: %v", linkRegistryCid)
-	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
@@ -676,77 +718,16 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 					ContractId: linkRegistryCid,
 					Choice:     "BurnMintFactory_BurnMint",
 					ChoiceArgument: ledger.MapToValue(splice_api_token_burn_mint_v1.BurnMintFactoryBurnMint{
-						ExpectedAdmin:    types.PARTY(partyCCIP),
+						ExpectedAdmin:    types.PARTY(partySender),
 						InstrumentId:     linkInstrumentId,
 						InputHoldingCids: nil,
 						Outputs: []splice_api_token_burn_mint_v1.BurnMintOutput{
 							{
-								Owner:   types.PARTY(partyCCIP),
-								Amount:  "100.0",
+								Owner:   types.PARTY(partySender),
+								Amount:  "50.0",
 								Context: splice_api_token_metadata_v1.ChoiceContext{},
 							},
 						},
-						ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{},
-					}),
-				}},
-			}},
-			ActAs: []string{partyCCIP},
-		},
-	})
-	require.NoError(t, err)
-	linkHoldings, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), ccipParticipant, contracts.TemplateIDFromBinding(link.LinkHolding{}).ToLedgerIdentifier())
-	require.NoError(t, err)
-	require.NotEmpty(t, linkHoldings, "expected at least one active LinkHolding after minting")
-	t.Logf("Minted 100 LINK to ccipOwner. Current LINK holdings %v", len(linkHoldings))
-	for _, holding := range linkHoldings {
-		t.Logf("- Holding CID: %s", holding.GetCreatedEvent().GetContractId())
-	}
-	// Transfer LINK to sender
-	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferFactory"},
-					ContractId: linkRegistryCid,
-					Choice:     "TransferFactory_Transfer",
-					ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferFactoryTransfer{
-						ExpectedAdmin: types.PARTY(partyCCIP),
-						Transfer: splice_api_token_transfer_instruction_v1.Transfer{
-							Sender:        types.PARTY(partyCCIP),
-							Receiver:      types.PARTY(partySender),
-							Amount:        "50.0",
-							InstrumentId:  linkInstrumentId,
-							RequestedAt:   types.TIMESTAMP(time.Now()),
-							ExecuteBefore: types.TIMESTAMP(time.Now().Add(1 * time.Hour)),
-							// Only using the last holding here - since that's the one that should have been minted just now
-							InputHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(linkHoldings[len(linkHoldings)-1].GetCreatedEvent().GetContractId())},
-							Meta:             splice_api_token_metadata_v1.Metadata{},
-						},
-						ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{},
-					}),
-				}},
-			}},
-			ActAs: []string{partyCCIP},
-		},
-	})
-	require.NoError(t, err)
-	// Wait for transaction to propagate
-	time.Sleep(time.Second * 5)
-	linkTransferInstructions, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), senderParticipant, contracts.TemplateIDFromBinding(link.LinkTransferInstruction{}).ToLedgerIdentifier())
-	require.NoError(t, err)
-	require.NotEmpty(t, linkTransferInstructions, "expected at least one active LinkTransferInstruction after initiating transfer")
-	t.Logf("Initiated transfer of 50 LINK to sender party. Current TransferInstructions %v", len(linkTransferInstructions))
-	// Accept incoming transfer
-	_, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferInstruction"},
-					ContractId: linkTransferInstructions[0].GetCreatedEvent().GetContractId(),
-					Choice:     "TransferInstruction_Accept",
-					ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferInstructionAccept{
 						ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{},
 					}),
 				}},
@@ -755,17 +736,22 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	senderLinkHoldings, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), senderParticipant, contracts.TemplateIDFromBinding(link.LinkHolding{}).ToLedgerIdentifier())
-	require.NoError(t, err)
-	t.Logf("Accepted transfer of 50 LINK to sender party. Current holdings:")
-	senderHoldingCids := make([]types.CONTRACT_ID, len(linkHoldings))
+	var senderLinkHoldings []*apiv2.ActiveContract
+	require.Eventually(t, func() bool {
+		var listErr error
+		senderLinkHoldings, listErr = testhelpers.ListActiveContractsByTemplateId(t.Context(), senderParticipant, contracts.TemplateIDFromBinding(link.LinkHolding{}).ToLedgerIdentifier())
+		if listErr != nil {
+			return false
+		}
+
+		return len(senderLinkHoldings) > 0
+	}, 15*time.Second, 200*time.Millisecond, "expected at least one active LinkHolding after minting")
+	t.Logf("Minted 50 LINK to sender. Current holdings: %v", len(senderLinkHoldings))
+	senderHoldingCids := make([]types.CONTRACT_ID, len(senderLinkHoldings))
 	for i, holding := range senderLinkHoldings {
 		t.Logf("- Holding CID: %s", holding.GetCreatedEvent().GetContractId())
 		senderHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
 	}
-
-	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
-	require.NoError(t, err)
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
 	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
@@ -812,9 +798,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 
 	const tokenTransferAmountDecimal = "0.0000010000"
 
-	senderLinkBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &linkInstrumentId)
-	require.NoError(t, err)
-
 	executorRawOrHashedAddress := oapiCommon.RawOrHashedAddress{}
 	_ = executorRawOrHashedAddress.FromRawInstanceAddress(executorAddress.String())
 	msg := oapiCommon.Message{
@@ -856,8 +839,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	executorSendDisclosure, err := edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
 
-	// Sanity check - validate that all disclosures can be queried from the Global EDS API endpoint
-	// TODO: these EDS-specific tests should be separated
+	// Sanity check - CCIP global batch covers P0 contracts only (LinkRegistry lives on pool EDS).
 	disclosedContracts, err := edsTesthelpers.GetGlobalDisclosureBatch(t.Context(), globalAPIClient, []contracts.InstanceAddress{
 		perPartyRouterFactoryAddress.InstanceAddress(),
 		globalConfigAddress.InstanceAddress(),
@@ -868,10 +850,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		rmnRemoteAddress.InstanceAddress(),
 		committeeVerifierAddress.InstanceAddress(),
 		executorAddress.InstanceAddress(),
-		linkRegistryAddress.InstanceAddress(),
 	})
 	require.NoError(t, err)
-	require.Lenf(t, disclosedContracts, 10, "expected to retrieve disclosures for all queried addresses")
+	require.Lenf(t, disclosedContracts, 9, "expected to retrieve disclosures for all CCIP global addresses")
 
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
@@ -983,6 +964,11 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		executorSendDisclosure.DisclosedContracts,
 	)...)
 
+	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
+	require.NoError(t, err)
+	senderLinkBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &linkInstrumentId)
+	require.NoError(t, err)
+
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction.
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -1032,43 +1018,61 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Verify pool feeBps haircut: 10,000 smallest units with 5% feeBps => 9,500 bridged.
 	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
 
-	senderBalanceAfter, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
-	require.NoError(t, err)
-	senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
-
-	t.Logf(
-		"Sender balance: before=%s after=%s deducted=%s",
-		senderBalanceBefore,
-		senderBalanceAfter,
-		senderDelta,
-	)
-	require.Positive(t, senderDelta.Sign(), "sender balance should decrease after send")
-
 	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
 	require.True(t, ok, "quoted fee should parse as a decimal value")
-	// Fee token is Amulet (native); the bridged asset is LINK. Native holdings only pay
-	// the CCIP fee — unlike ccip_send_with_token_lnr_test where fee and transfer share
-	// the same instrument.
-	expectedSenderDelta := new(big.Rat).Set(quotedFeeAmount)
-	require.Zero(t, senderDelta.Cmp(expectedSenderDelta), "sender fee-token deduction should equal GetFee feeTokenAmount")
-
-	senderLinkBalanceAfter, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &linkInstrumentId)
-	require.NoError(t, err)
-	linkDelta := new(big.Rat).Sub(senderLinkBalanceBefore, senderLinkBalanceAfter)
+	poolFeeAmountRat, ok := new(big.Rat).SetString(poolFeeStr)
+	require.True(t, ok, "pool fee should parse as a decimal value")
 	tokenTransferAmountRat, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
 	require.True(t, ok, "token transfer amount should parse as a decimal value")
-	t.Logf(
-		"Sender LINK: before=%s after=%s deducted=%s",
-		senderLinkBalanceBefore,
-		senderLinkBalanceAfter,
-		linkDelta,
-	)
-	require.Positive(t, linkDelta.Sign(), "sender LINK balance should decrease after send")
-	require.Zero(t, linkDelta.Cmp(tokenTransferAmountRat), "sender LINK deduction should equal message token transfer amount")
+	// When poolOwner == sender, pool feeBps is retained by the sender's pool; only net LINK leaves total balance.
+	netLinkTransferAmountRat := new(big.Rat).Sub(tokenTransferAmountRat, poolFeeAmountRat)
+
+	require.Eventually(t, func() bool {
+		senderBalanceAfter, balanceErr := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
+		if balanceErr != nil {
+			return false
+		}
+		senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
+
+		return senderDelta.Cmp(quotedFeeAmount) == 0
+	}, 15*time.Second, 200*time.Millisecond, "sender fee-token deduction should equal GetFee feeTokenAmount")
+
+	require.Eventually(t, func() bool {
+		senderLinkBalanceAfter, balanceErr := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &linkInstrumentId)
+		if balanceErr != nil {
+			return false
+		}
+		linkDelta := new(big.Rat).Sub(senderLinkBalanceBefore, senderLinkBalanceAfter)
+
+		return linkDelta.Cmp(netLinkTransferAmountRat) == 0
+	}, 15*time.Second, 200*time.Millisecond, "sender LINK deduction should equal net token transfer amount after pool feeBps")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 
 	t.Logf("✅ Success")
+}
+
+func waitForEDSListening(t *testing.T, ports ...int) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Minute)
+	for time.Now().Before(deadline) {
+		allReady := true
+		for _, port := range ports {
+			d := net.Dialer{Timeout: 200 * time.Millisecond}
+			conn, err := d.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+			if err != nil {
+				allReady = false
+
+				break
+			}
+			_ = conn.Close()
+		}
+		if allReady {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for EDS on ports %v", ports)
 }

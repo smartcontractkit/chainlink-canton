@@ -90,7 +90,7 @@ build-eds:
 ## Assuming chainlink-ccv is checked out in ../chainlink-ccv.
 .PHONY: build-ccv-images
 build-ccv-images:
-	cd ../chainlink-ccv/build/devenv && just build-docker-dev
+	cd ../chainlink-ccv/build/devenv && just build-docker
 
 .PHONY: start-devenv
 start-devenv: build-ccv-images build-committeeverifier build-eds
@@ -98,7 +98,7 @@ start-devenv: build-ccv-images build-committeeverifier build-eds
 
 .PHONY: run-e2e-tests
 run-e2e-tests:
-	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run TestCanton2EVM_Basic
+	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run 'TestCanton2EVM_(Basic|SendValidation)'
 
 .PHONY: run-canton2evm-load
 run-canton2evm-load: ## Canton→EVM WASP load (requires running devenv + env-canton-evm-out.toml).

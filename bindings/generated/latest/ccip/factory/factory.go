@@ -34,7 +34,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "d241b4c7086dd7d483c5041de8727cd97e2861be53189743bd57d5d76e96b2d1"
+	PackageID   = "9fe505c991e91a2e1b1cdaf3bb666a4354415bdd72e906b2fce2cfd4e8bd6edd"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1859,7 +1859,7 @@ func (t *GetFactoryState) UnmarshalHex(data string) error {
 }
 
 // GetFactoryStateMCMSParams is GetFactoryState without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFactoryStateMCMSParams struct {
 }
 

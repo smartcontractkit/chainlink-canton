@@ -8,9 +8,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -155,12 +153,6 @@ var ApplyAllowListUpdates = contract.NewExercise(contract.ExerciseParams[committ
 	Description:  "Applies allow lists updates to a Canton CommitteeVerifier instance",
 	ContractType: ContractType,
 	Validate:     nil,
-	Modifier: func(chain canton.Chain, input committeeverifier.ApplyAllowListUpdates) (committeeverifier.ApplyAllowListUpdates, error) {
-		// Automatically set the caller
-		input.Caller = types.PARTY(chain.Participants[0].PartyID)
-
-		return input, nil
-	},
 	Template:     committeeverifier.CommitteeVerifier{},
 	Method:       committeeverifier.CommitteeVerifier{}.ApplyAllowListUpdates,
 	EncodeMethod: ccvsEncoder.ApplyAllowListUpdates,

@@ -9,6 +9,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
+func validContractIdentifier() ContractIdentifier {
+	return ContractIdentifier{
+		PartyID:         "party",
+		InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	t.Parallel()
 
@@ -340,6 +347,42 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: true,
 				},
 			},
+		}, {
+			structName: "CCIPAPIConfig",
+			tests: []test{
+				{
+					name: "disabled with empty identifiers valid",
+					s: CCIPAPIConfig{
+						Enabled: false,
+					},
+					wantErr: false,
+				}, {
+					name: "enabled with empty OnRamp invalid",
+					s: CCIPAPIConfig{
+						Enabled:               true,
+						PerPartyRouterFactory: validContractIdentifier(),
+						OffRamp:               validContractIdentifier(),
+						GlobalConfig:          validContractIdentifier(),
+						TokenAdminRegistry:    validContractIdentifier(),
+						RMNRemote:             validContractIdentifier(),
+						FeeQuoter:             validContractIdentifier(),
+					},
+					wantErr: true,
+				}, {
+					name: "enabled with all fields populated valid",
+					s: CCIPAPIConfig{
+						Enabled:               true,
+						PerPartyRouterFactory: validContractIdentifier(),
+						OnRamp:                validContractIdentifier(),
+						OffRamp:               validContractIdentifier(),
+						GlobalConfig:          validContractIdentifier(),
+						TokenAdminRegistry:    validContractIdentifier(),
+						RMNRemote:             validContractIdentifier(),
+						FeeQuoter:             validContractIdentifier(),
+					},
+					wantErr: false,
+				},
+			},
 		},
 	}
 
@@ -358,5 +401,97 @@ func TestConfigValidation(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestCCIPAPIConfigConfigValidate(t *testing.T) {
+	t.Parallel()
+
+	cfg := &Config{
+		ChainSelector: "8706591216959472610",
+		Server: ServerConfig{
+			Host:                "0.0.0.0",
+			Port:                8088,
+			MaxRequestSizeBytes: 1024,
+		},
+		Node: NodeConfig{
+			URL: "http://localhost:8545",
+			AuthConfig: commonconfig.AuthConfig{
+				Type: commonconfig.AuthTypeInsecureStatic,
+				JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+			},
+		},
+		GlobalAPIConfig: GlobalAPIConfig{
+			MaxBatchSize: 1024,
+		},
+		CCIPAPIConfig: CCIPAPIConfig{
+			Enabled: false,
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate: error = %v, want nil", err)
+	}
+}
+
+func TestPoolOnlyEDSConfigValidate(t *testing.T) {
+	t.Parallel()
+
+	poolAddr := contracts.HexToInstanceAddress("0x1bb561b507d97da922c4d13e356e9d6006f02d34ef2ca8c16459e51bf1db51c9")
+	linkRegistryAddr := contracts.HexToInstanceAddress("0x690ac078553724389b1de2d9b6f88345cf57f4fc8c3188e51cc0326e11639bf9")
+	partySender := "participant2-localparty-1::1220aadfaafa35194855870540bd335c44b32595fe7545e01769b51610dc71b4a6ff"
+
+	cfg := &Config{
+		ChainSelector: "8706591216959472610",
+		Server: ServerConfig{
+			Host:                "0.0.0.0",
+			Port:                8089,
+			MaxRequestSizeBytes: 1024,
+		},
+		Node: NodeConfig{
+			URL: "http://localhost:8545",
+			AuthConfig: commonconfig.AuthConfig{
+				Type: commonconfig.AuthTypeInsecureStatic,
+				JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+			},
+		},
+		GlobalAPIConfig: GlobalAPIConfig{
+			MaxBatchSize: 1024,
+		},
+		CCIPAPIConfig: CCIPAPIConfig{
+			Enabled: false,
+		},
+		CCVAPIConfig: CCVAPIConfig{
+			Enabled: false,
+		},
+		ExecutorAPIConfig: ExecutorAPIConfig{
+			Enabled: false,
+		},
+		TokenPoolAPIConfig: TokenPoolAPIConfig{
+			Enabled: true,
+			TokenPools: map[string]TokenPool{
+				poolAddr.Hex(): {
+					Type: TokenPoolTypeBurnMint,
+					ContractIdentifier: ContractIdentifier{
+						PartyID:         partySender,
+						InstanceAddress: poolAddr,
+					},
+					PoolOwner: partySender,
+					BurnMintFactory: &BurnMintFactory{
+						Type:            FactoryTypeAddress,
+						TemplateId:      new("#link.module.entity"),
+						Party:           new(partySender),
+						InstanceAddress: new(linkRegistryAddr),
+					},
+				},
+			},
+		},
+		TokenStandardAPIConfig: TokenStandardAPIConfig{
+			Enabled: false,
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate: error = %v, want nil", err)
 	}
 }

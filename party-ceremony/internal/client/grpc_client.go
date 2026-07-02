@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/helpers"
@@ -20,6 +22,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const defaultHost = "localhost"
@@ -78,23 +81,31 @@ func jwtStreamInterceptor(token string) grpc.StreamClientInterceptor {
 
 // GRPCCantonClient implements [CantonClient] using real Canton Admin gRPC APIs.
 type GRPCCantonClient struct {
-	conn   *grpc.ClientConn
-	topo   topoadminv30.TopologyManagerWriteServiceClient
-	reader topoadminv30.TopologyManagerReadServiceClient
-	vault  cryptoadminv30.VaultServiceClient
-	id     topoadminv30.IdentityInitializationServiceClient
-	pkg    participantv30.PackageServiceClient
+	conn         *grpc.ClientConn
+	topo         topoadminv30.TopologyManagerWriteServiceClient
+	reader       topoadminv30.TopologyManagerReadServiceClient
+	vault        cryptoadminv30.VaultServiceClient
+	id           topoadminv30.IdentityInitializationServiceClient
+	pkg          participantv30.PackageServiceClient
+	repair       participantv30.ParticipantRepairServiceClient
+	connectivity participantv30.SynchronizerConnectivityServiceClient
+	partyMgmt    participantv30.PartyManagementServiceClient
+	inspection   participantv30.ParticipantInspectionServiceClient
 }
 
 // NewGRPCClient creates a new [GRPCCantonClient] from an established gRPC connection.
 func NewGRPCClient(conn *grpc.ClientConn) *GRPCCantonClient {
 	return &GRPCCantonClient{
-		conn:   conn,
-		topo:   topoadminv30.NewTopologyManagerWriteServiceClient(conn),
-		reader: topoadminv30.NewTopologyManagerReadServiceClient(conn),
-		vault:  cryptoadminv30.NewVaultServiceClient(conn),
-		id:     topoadminv30.NewIdentityInitializationServiceClient(conn),
-		pkg:    participantv30.NewPackageServiceClient(conn),
+		conn:         conn,
+		topo:         topoadminv30.NewTopologyManagerWriteServiceClient(conn),
+		reader:       topoadminv30.NewTopologyManagerReadServiceClient(conn),
+		vault:        cryptoadminv30.NewVaultServiceClient(conn),
+		id:           topoadminv30.NewIdentityInitializationServiceClient(conn),
+		pkg:          participantv30.NewPackageServiceClient(conn),
+		repair:       participantv30.NewParticipantRepairServiceClient(conn),
+		connectivity: participantv30.NewSynchronizerConnectivityServiceClient(conn),
+		partyMgmt:    participantv30.NewPartyManagementServiceClient(conn),
+		inspection:   participantv30.NewParticipantInspectionServiceClient(conn),
 	}
 }
 
@@ -199,6 +210,35 @@ func (c *GRPCCantonClient) RegisterKmsSigningKey(
 	}
 
 	return resp.GetPublicKey(), nil
+}
+
+func (c *GRPCCantonClient) LookupKmsSigningKey(
+	ctx context.Context,
+	kmsKeyID string,
+	usage []cryptov30.SigningKeyUsage,
+) (*cryptov30.SigningPublicKey, error) {
+	vaultResp, err := c.vault.ListMyKeys(ctx, &cryptoadminv30.ListMyKeysRequest{
+		Filters: &cryptoadminv30.ListKeysFilters{
+			Usage: usage,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ListMyKeys: %w", err)
+	}
+
+	for _, km := range vaultResp.GetPrivateKeysMetadata() {
+		if km.GetKmsKeyId() != kmsKeyID {
+			continue
+		}
+		spk := km.GetPublicKeyWithName().GetPublicKey().GetSigningPublicKey()
+		if spk == nil || len(spk.GetPublicKey()) == 0 {
+			continue
+		}
+
+		return spk, nil
+	}
+
+	return nil, fmt.Errorf("no registered KMS signing key %q found in vault", kmsKeyID)
 }
 
 func (c *GRPCCantonClient) GetNamespaceFingerprint(ctx context.Context, keyName string, synchronizerID string, knownOwners []string) (string, error) {
@@ -620,4 +660,142 @@ func (c *GRPCCantonClient) UploadDar(ctx context.Context, darBytes []byte) (stri
 	}
 
 	return darIDs[0], nil
+}
+
+// ── ACS Replication ──────────────────────────────────────────────────────────
+
+func (c *GRPCCantonClient) ExportAcs(ctx context.Context, partyIDs []string, synchronizerID string, ledgerOffset int64) ([]byte, error) {
+	stream, err := c.repair.ExportAcs(ctx, &participantv30.ExportAcsRequest{
+		PartyIds:       partyIDs,
+		SynchronizerId: synchronizerID,
+		LedgerOffset:   ledgerOffset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ExportAcs: %w", err)
+	}
+
+	var snapshot []byte
+	for {
+		resp, recvErr := stream.Recv()
+		if recvErr != nil {
+			if errors.Is(recvErr, io.EOF) {
+				break
+			}
+
+			return nil, fmt.Errorf("ExportAcs recv: %w", recvErr)
+		}
+		snapshot = append(snapshot, resp.GetChunk()...)
+	}
+
+	return snapshot, nil
+}
+
+func (c *GRPCCantonClient) ImportAcs(ctx context.Context, acsSnapshot []byte, synchronizerID string) error {
+	if synchronizerID == "" {
+		return fmt.Errorf("ImportAcs: synchronizer_id is required")
+	}
+
+	stream, err := c.repair.ImportAcs(ctx)
+	if err != nil {
+		return fmt.Errorf("ImportAcs: %w", err)
+	}
+
+	// Send the ACS snapshot in chunks to avoid exceeding gRPC message size limits.
+	// The first chunk carries contract_import_mode and synchronizer_id (required by
+	// Canton ≥3.4); subsequent chunks only carry acs_snapshot bytes.
+	const chunkSize = 1 << 20 // 1 MB
+	for offset := 0; offset < len(acsSnapshot); offset += chunkSize {
+		end := min(offset+chunkSize, len(acsSnapshot))
+		req := &participantv30.ImportAcsRequest{
+			AcsSnapshot: acsSnapshot[offset:end],
+		}
+		if offset == 0 {
+			if metaErr := setImportAcsFirstChunkMetadata(req, synchronizerID); metaErr != nil {
+				return fmt.Errorf("ImportAcs: %w", metaErr)
+			}
+		}
+		if sendErr := stream.Send(req); sendErr != nil {
+			return fmt.Errorf("ImportAcs send: %w", sendErr)
+		}
+	}
+
+	if _, err := stream.CloseAndRecv(); err != nil {
+		return fmt.Errorf("ImportAcs close: %w", err)
+	}
+
+	return nil
+}
+
+// ── Synchronizer Connectivity ────────────────────────────────────────────────
+
+func (c *GRPCCantonClient) DisconnectSynchronizer(ctx context.Context, synchronizerAlias string) error {
+	_, err := c.connectivity.DisconnectSynchronizer(ctx, &participantv30.DisconnectSynchronizerRequest{
+		SynchronizerAlias: synchronizerAlias,
+	})
+	if err != nil {
+		return fmt.Errorf("DisconnectSynchronizer: %w", err)
+	}
+
+	return nil
+}
+
+func (c *GRPCCantonClient) ReconnectSynchronizer(ctx context.Context, synchronizerAlias string) error {
+	_, err := c.connectivity.ReconnectSynchronizer(ctx, &participantv30.ReconnectSynchronizerRequest{
+		SynchronizerAlias: synchronizerAlias,
+		Retry:             true,
+	})
+	if err != nil {
+		return fmt.Errorf("ReconnectSynchronizer: %w", err)
+	}
+
+	return nil
+}
+
+func (c *GRPCCantonClient) ListConnectedSynchronizers(ctx context.Context) ([]SynchronizerInfo, error) {
+	resp, err := c.connectivity.ListConnectedSynchronizers(ctx, &participantv30.ListConnectedSynchronizersRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("ListConnectedSynchronizers: %w", err)
+	}
+
+	var infos []SynchronizerInfo
+	for _, s := range resp.GetConnectedSynchronizers() {
+		infos = append(infos, SynchronizerInfo{
+			Alias:          s.GetSynchronizerAlias(),
+			SynchronizerID: s.GetSynchronizerId(),
+		})
+	}
+
+	return infos, nil
+}
+
+// ── Party Management ─────────────────────────────────────────────────────────
+
+func (c *GRPCCantonClient) ClearPartyOnboardingFlag(ctx context.Context, partyID string, synchronizerID string, beginOffsetExclusive int64) (bool, error) {
+	resp, err := c.partyMgmt.ClearPartyOnboardingFlag(ctx, &participantv30.ClearPartyOnboardingFlagRequest{
+		PartyId:              partyID,
+		SynchronizerId:       synchronizerID,
+		BeginOffsetExclusive: beginOffsetExclusive,
+	})
+	if err != nil {
+		return false, fmt.Errorf("ClearPartyOnboardingFlag: %w", err)
+	}
+
+	return resp.GetOnboarded(), nil
+}
+
+// ── Inspection ───────────────────────────────────────────────────────────────
+
+func (c *GRPCCantonClient) LookupOffsetByTime(ctx context.Context, timestamp int64) (int64, error) {
+	resp, err := c.inspection.LookupOffsetByTime(ctx, &participantv30.LookupOffsetByTimeRequest{
+		Timestamp: &timestamppb.Timestamp{Seconds: timestamp},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("LookupOffsetByTime: %w", err)
+	}
+
+	if resp.Offset == nil {
+		return 0, fmt.Errorf("LookupOffsetByTime: no offset found for timestamp %d", timestamp)
+	}
+
+	return *resp.Offset, nil
 }

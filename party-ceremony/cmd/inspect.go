@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
@@ -66,6 +67,8 @@ func runInspect(cmd *cobra.Command, args []string) error {
 		return runInspectContractDeploy(ceremonyDir, workflowID, workflowType, asJSON)
 	case ceremony.WorkflowTypeKeyRotation:
 		return runInspectKeyRotation(ceremonyDir, workflowID, workflowType, asJSON)
+	case ceremony.WorkflowTypeAddParticipantWithAcs:
+		return runInspectAddParticipantWithAcs(ceremonyDir, workflowID, workflowType, asJSON)
 	default:
 		return fmt.Errorf("ceremony %q: state inspection is not yet supported for workflow type %q", workflowID, workflowType)
 	}
@@ -610,5 +613,95 @@ func printDNSProgress(w *tabwriter.Writer, proposalHash string, requiredSigners,
 				fmt.Fprintf(w, "  [pending]\t%s\n", signer)
 			}
 		}
+	}
+}
+
+// ── Add Participant With ACS ─────────────────────────────────────────────────
+
+func runInspectAddParticipantWithAcs(ceremonyDir, workflowID, workflowType string, asJSON bool) error {
+	wf, err := ceremony.LoadWorkflow[addparticipantwithacs.AddParticipantWithAcsInput](ceremonyDir)
+	if err != nil {
+		return fmt.Errorf("loading workflow: %w", err)
+	}
+
+	reports, err := ceremony.LoadReports(ceremonyDir)
+	if err != nil {
+		return fmt.Errorf("loading reports: %w", err)
+	}
+
+	reporter := operations.NewMemoryReporter(operations.WithReports(reports))
+	out, found := addparticipantwithacs.QueryState(reporter, wf.Input)
+
+	if asJSON {
+		return emitJSON(workflowID, workflowType, found, string(out.State.Phase), &out.State)
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	defer w.Flush()
+
+	fmt.Fprintf(w, "Ceremony ID:\t%s\n", workflowID)
+	fmt.Fprintf(w, "Type:\t%s\n", workflowType)
+
+	if !found {
+		fmt.Fprintf(w, "Phase:\tinit  (no runs recorded yet)\n")
+		return nil
+	}
+
+	s := out.State
+	fmt.Fprintf(w, "Phase:\t%s\n", addParticipantWithAcsPhaseLabel(s.Phase))
+	fmt.Fprintf(w, "New member key ready:\t%v\n", s.NewMemberKeyReady)
+	fmt.Fprintf(w, "NSD proposed:\t%v\n", s.NSDProposed)
+	fmt.Fprintf(w, "Ledger offset recorded:\t%v\n", s.LedgerOffsetRecorded)
+	fmt.Fprintf(w, "ACS exported:\t%v\n", s.AcsExported)
+	fmt.Fprintf(w, "ACS imported:\t%v\n", s.AcsImported)
+	fmt.Fprintf(w, "Onboarding flag cleared:\t%v\n", s.OnboardingFlagCleared)
+	fmt.Fprintln(w)
+
+	printDNSProgress(w, s.ProposalHash, s.RequiredSigners, s.CollectedSigners, s.DNSThreshold)
+
+	if out.DNSUpdated {
+		fmt.Fprintf(w, "DNS updated:\t%v\n", out.DNSUpdated)
+	}
+	if out.P2PUpdated {
+		fmt.Fprintf(w, "P2P updated:\t%v\n", out.P2PUpdated)
+	}
+
+	return nil
+}
+
+func addParticipantWithAcsPhaseLabel(p addparticipantwithacs.Phase) string {
+	switch p {
+	case addparticipantwithacs.PhaseKeyGen:
+		return "key-gen — waiting for new member to generate keys"
+	case addparticipantwithacs.PhaseRecordTargetOffset:
+		return "record-target-offset — recording ledger offset on target"
+	case addparticipantwithacs.PhaseNSD:
+		return "nsd — waiting for NSD proposal"
+	case addparticipantwithacs.PhaseReadState:
+		return readState
+	case addparticipantwithacs.PhaseDNSProposal:
+		return dnsProposal
+	case addparticipantwithacs.PhaseDNSSigning:
+		return dnsSigning
+	case addparticipantwithacs.PhaseDNSSubmit:
+		return dnsSubmit
+	case addparticipantwithacs.PhaseRecordOffset:
+		return "record-offset — recording ledger offset on source"
+	case addparticipantwithacs.PhaseP2POnboarding:
+		return "p2p-onboarding — collecting P2P proposals with onboarding flag"
+	case addparticipantwithacs.PhaseTargetDisconnect:
+		return "target-disconnect — target disconnects from synchronizer"
+	case addparticipantwithacs.PhaseAcsExport:
+		return "acs-export — exporting ACS from source participant"
+	case addparticipantwithacs.PhaseAcsImport:
+		return "acs-import — importing ACS into target participant"
+	case addparticipantwithacs.PhaseTargetReconnect:
+		return "target-reconnect — target reconnects to synchronizer"
+	case addparticipantwithacs.PhaseClearOnboarding:
+		return "clear-onboarding — clearing onboarding flag on target"
+	case addparticipantwithacs.PhaseCompleted:
+		return completed
+	default:
+		return string(p)
 	}
 }

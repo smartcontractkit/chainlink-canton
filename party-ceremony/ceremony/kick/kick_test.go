@@ -156,6 +156,15 @@ func (m *mockCantonClient) RegisterKmsSigningKey(_ context.Context, kmsKeyID str
 	}, nil
 }
 
+func (m *mockCantonClient) LookupKmsSigningKey(_ context.Context, kmsKeyID string, _ []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error) {
+	raw := sha256.Sum256([]byte(m.participantID + ":" + kmsKeyID))
+
+	return &cryptov30.SigningPublicKey{
+		PublicKey: raw[:],
+		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
+	}, nil
+}
+
 func (m *mockCantonClient) GetNamespaceFingerprint(_ context.Context, keyName string, _ string, _ []string) (string, error) {
 	raw := sha256.Sum256([]byte(m.participantID + ":" + keyName))
 	return fmt.Sprintf("1220%x", raw[:8]), nil
@@ -308,6 +317,21 @@ func (m *mockCantonClient) GetProtocolKeyFingerprint(_ context.Context, knownKey
 
 func (m *mockCantonClient) UploadDar(_ context.Context, _ []byte) (string, error) {
 	return "mock-package-id", nil
+}
+func (m *mockCantonClient) ExportAcs(_ context.Context, _ []string, _ string, _ int64) ([]byte, error) {
+	return nil, nil
+}
+func (m *mockCantonClient) ImportAcs(_ context.Context, _ []byte, _ string) error    { return nil }
+func (m *mockCantonClient) DisconnectSynchronizer(_ context.Context, _ string) error { return nil }
+func (m *mockCantonClient) ReconnectSynchronizer(_ context.Context, _ string) error  { return nil }
+func (m *mockCantonClient) ListConnectedSynchronizers(_ context.Context) ([]client.SynchronizerInfo, error) {
+	return nil, nil
+}
+func (m *mockCantonClient) ClearPartyOnboardingFlag(_ context.Context, _ string, _ string, _ int64) (bool, error) {
+	return true, nil
+}
+func (m *mockCantonClient) LookupOffsetByTime(_ context.Context, _ int64) (int64, error) {
+	return 0, nil
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

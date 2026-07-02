@@ -6,7 +6,6 @@ import (
 	"crypto/ed25519"
 	cryptorand "crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -71,6 +70,7 @@ import (
 // TODO: move this to share between devenv and integration tests
 // and define a const for LINK instrument
 const AMTInstrument = types.TEXT("Amulet")
+const amuletTransferPreapprovalTemplateID = "#splice-amulet:Splice.AmuletRules:TransferPreapproval"
 
 var _ cciptestinterfaces.CCIP17 = &Chain{}
 
@@ -163,7 +163,12 @@ func (i *ImplFactory) DefaultFeeAggregator(env *deployment.Environment, chainSel
 		return ""
 	}
 
-	return chain.Participants[0].PartyID
+	owner, err := ownerParticipantFromBlockchain(chain)
+	if err != nil {
+		return ""
+	}
+
+	return owner.PartyID
 }
 
 func (i *ImplFactory) SupportsFunding() bool {
@@ -301,10 +306,15 @@ func (c *Chain) PreDeployContractsForSelector(ctx context.Context, env *deployme
 		return nil, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
 
-	participant := chain.Participants[0]
-	for _, pkg := range cantonDeployDarPackages {
-		if err := uploadAndVetDar(ctx, participant, pkg); err != nil {
-			return nil, err
+	participant, err := ownerParticipantFromBlockchain(chain)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range chain.Participants {
+		for _, pkg := range cantonDeployDarPackages {
+			if err := uploadAndVetDar(ctx, p, pkg); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -341,7 +351,12 @@ func (c *Chain) GetDeployChainContractsCfg(env *deployment.Environment, selector
 		return ccipChangesets.DeployChainContractsPerChainCfg{}, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
 
-	deployerContract := fmt.Sprintf("canton:%s", chain.Participants[0].PartyID)
+	owner, err := ownerParticipantFromBlockchain(chain)
+	if err != nil {
+		return ccipChangesets.DeployChainContractsPerChainCfg{}, err
+	}
+
+	deployerContract := fmt.Sprintf("canton:%s", owner.PartyID)
 
 	return ccipChangesets.DeployChainContractsPerChainCfg{
 		DeployerContract: &deployerContract,
@@ -371,17 +386,21 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 		return nil, fmt.Errorf("resolve FeeQuoter for chain %d: %w", selector, err)
 	}
 
-	participant := chain.Participants[0]
-	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
+	owner, err := ownerParticipantFromBlockchain(chain)
+	if err != nil {
+		return nil, err
+	}
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, owner)
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry admin: %w", err)
 	}
 
 	feeQuoterAddress := contracts.HexToInstanceAddress(feeQuoterRef.Address)
 	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[core.ApplyPriceUpdatersUpdate]{
-		InstanceAddress: feeQuoterAddress,
+		InstanceAddress:  feeQuoterAddress,
+		ParticipantIndex: OwnerParticipantIndex,
 		Args: core.ApplyPriceUpdatersUpdate{
-			AddedPriceUpdaters: []types.PARTY{types.PARTY(participant.PartyID)},
+			AddedPriceUpdaters: []types.PARTY{types.PARTY(owner.PartyID)},
 		},
 	})
 	if err != nil {
@@ -389,7 +408,8 @@ func (c *Chain) PostDeployContractsForSelector(ctx context.Context, env *deploym
 	}
 
 	_, err = operations.ExecuteOperation(env.OperationsBundle, feequoterop.UpdatePrices, chain, contract.ChoiceInput[core.UpdatePrices]{
-		InstanceAddress: feeQuoterAddress,
+		InstanceAddress:  feeQuoterAddress,
+		ParticipantIndex: OwnerParticipantIndex,
 		Args: core.UpdatePrices{
 			PriceUpdates: core.PriceUpdates{
 				TokenPriceUpdates: []core.TokenPriceUpdate{{
@@ -421,7 +441,15 @@ func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint6
 	}
 	c.logger.Debug().Str("GlobalConfig", globalConfig.Address).Msg("Resolved GlobalConfig")
 
-	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), c.chain.Participants[0])
+	chain, ok := env.BlockChains.CantonChains()[selector]
+	if !ok || len(chain.Participants) == 0 {
+		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("canton chain %d not found or has no participants", selector)
+	}
+	owner, err := ownerParticipantFromBlockchain(chain)
+	if err != nil {
+		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, err
+	}
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), owner)
 	if err != nil {
 		return lanes.ChainDefinition{}, lanes.CommitteeVerifierRemoteChainInput{}, fmt.Errorf("resolve registry admin for token prices: %w", err)
 	}
@@ -492,7 +520,11 @@ func (c *Chain) GetTokenExpansionConfigs(
 	if !ok || len(chain.Participants) == 0 {
 		return nil, fmt.Errorf("canton chain %d not found or has no participants", selector)
 	}
-	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), chain.Participants[0])
+	owner, err := ownerParticipantFromBlockchain(chain)
+	if err != nil {
+		return nil, fmt.Errorf("owner participant not found: %w", err)
+	}
+	registryAdmin, err := testhelpers.ResolveRegistryAdmin(context.Background(), owner)
 	if err != nil {
 		return nil, fmt.Errorf("resolve registry admin for token expansion: %w", err)
 	}
@@ -540,17 +572,68 @@ func (c *Chain) PostTokenDeploy(
 		return nil
 	}
 
-	chain := env.BlockChains.CantonChains()[selector]
-	if len(chain.Participants) == 0 {
-		return fmt.Errorf("canton chain %d has no participants", selector)
-	}
 	ctx := context.Background()
 	if env.GetContext != nil {
 		ctx = env.GetContext()
 	}
-	if _, _, _, err := mintTwoAmuletHoldings(ctx, chain.Participants[0], chain.Participants[0].PartyID, "1000000.00"); err != nil {
+	chain := env.BlockChains.CantonChains()[selector]
+	if len(chain.Participants) == 0 {
+		return fmt.Errorf("canton chain %d has no participants", selector)
+	}
+	// gently hydrating the Chain impl from env here, because it's not populated by caller
+	c.chain = chain
+	clientParticipant, _, err := c.ClientParticipant()
+	if err != nil {
+		return err
+	}
+	if _, _, _, err := mintTwoAmuletHoldings(ctx, clientParticipant, clientParticipant.PartyID, "1000000.00"); err != nil {
 		return fmt.Errorf("seed AMT liquidity: %w", err)
 	}
+
+	ownerParticipant, err := c.OwnerParticipant()
+	if err != nil {
+		return err
+	}
+	if err := ensurePoolOwnerTransferPreapproval(ctx, ownerParticipant); err != nil {
+		return fmt.Errorf("ensure pool owner transfer preapproval: %w", err)
+	}
+
+	return nil
+}
+
+// ensurePoolOwnerTransferPreapproval creates a one-time Amulet TransferPreapproval for ccipOwner
+// (pool owner on participant 0). Pool EDS looks up this contract when building canton2evm send context.
+func ensurePoolOwnerTransferPreapproval(ctx context.Context, ownerParticipant canton.Participant) error {
+	poolOwner := ownerParticipant.PartyID
+
+	templateID, err := contracts.TemplateIDFromString(amuletTransferPreapprovalTemplateID)
+	if err != nil {
+		return fmt.Errorf("parse transfer preapproval template id: %w", err)
+	}
+	existing, err := testhelpers.ListActiveContractsByTemplateId(ctx, ownerParticipant, templateID.ToLedgerIdentifier())
+	if err != nil {
+		return fmt.Errorf("check existing transfer preapproval: %w", err)
+	}
+	if len(existing) > 0 {
+		log.Info().Str("party", poolOwner).Msg("TransferPreapproval already exists, skipping setup")
+		return nil
+	}
+
+	scanClient, metadataClient, transferClient, err := testhelpers.NewValidatorAPIClients(ownerParticipant)
+	if err != nil {
+		return err
+	}
+
+	holdingCID, err := testhelpers.MintAMT(ctx, ownerParticipant, metadataClient, transferClient, scanClient, poolOwner, "100")
+	if err != nil {
+		return fmt.Errorf("mint AMT for pool owner preapproval: %w", err)
+	}
+
+	if _, err := testhelpers.CreateTransferPreapproval(ctx, ownerParticipant, scanClient, poolOwner, holdingCID); err != nil {
+		return fmt.Errorf("create transfer preapproval for pool owner: %w", err)
+	}
+
+	log.Info().Str("party", poolOwner).Msg("Created TransferPreapproval for pool owner")
 
 	return nil
 }
@@ -750,11 +833,12 @@ func (c *Chain) ExposeMetrics(ctx context.Context, source, dest uint64) ([]strin
 
 // GetEOAReceiverAddress implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetEOAReceiverAddress() (protocol.UnknownAddress, error) {
-	if len(c.chain.Participants) == 0 {
-		return nil, fmt.Errorf("no canton participants configured")
+	participant, _, err := c.ClientParticipant()
+	if err != nil {
+		return nil, fmt.Errorf("no canton participants configured: %w", err)
 	}
 
-	receiver := contracts.HashedPartyFromString(c.chain.Participants[0].PartyID)
+	receiver := contracts.HashedPartyFromString(participant.PartyID)
 
 	return protocol.UnknownAddress(receiver.Bytes()), nil
 }
@@ -764,11 +848,6 @@ func (c *Chain) GetExpectedNextSequenceNumber(ctx context.Context, to uint64) (u
 	return c.nextSeq + 1, nil
 }
 
-// GetMaxDataBytes implements cciptestinterfaces.CCIP17.
-func (c *Chain) GetMaxDataBytes(ctx context.Context, remoteChainSelector uint64) (uint32, error) {
-	return 0, nil // TODO: implement
-}
-
 // GetSenderAddress implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetSenderAddress() (protocol.UnknownAddress, error) {
 	return protocol.UnknownAddress{}, nil // TODO: implement
@@ -776,11 +855,11 @@ func (c *Chain) GetSenderAddress() (protocol.UnknownAddress, error) {
 
 // GetTokenBalance implements cciptestinterfaces.CCIP17.
 func (c *Chain) GetTokenBalance(ctx context.Context, address, tokenAddress protocol.UnknownAddress) (*big.Int, error) {
-	if len(c.chain.Participants) == 0 {
-		return nil, fmt.Errorf("no canton participants configured")
+	participant, _, err := c.ClientParticipant()
+	if err != nil {
+		return nil, fmt.Errorf("no canton participants configured: %w", err)
 	}
 
-	participant := c.chain.Participants[0]
 	ownerParty := participant.PartyID
 	if len(address) > 0 {
 		for _, p := range c.chain.Participants {
@@ -872,8 +951,9 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 	if !c.verifierObs.wired() {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("verifier observation not wired (test runner must call WireVerifierObservationFromLib)")
 	}
-	if len(c.chain.Participants) == 0 {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no participants on chain")
+	participant, _, err := c.ClientParticipant()
+	if err != nil {
+		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no participants on chain: %w", err)
 	}
 
 	if timeout > 0 {
@@ -882,7 +962,7 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 		defer cancel()
 	}
 
-	receiverParty := c.chain.Participants[0].PartyID
+	receiverParty := participant.PartyID
 	unlock := c.lockForParty(receiverParty)
 	defer unlock()
 
@@ -911,6 +991,24 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 	)
 }
 
+// SetupReceive deploys the client party's PerPartyRouter before inbound messages arrive.
+// Call this when Canton is the destination (e.g. EVM→Canton) instead of SetupSend.
+func (c *Chain) SetupReceive(ctx context.Context) error {
+	participant, _, err := c.ClientParticipant()
+	if err != nil {
+		return fmt.Errorf("no canton participants configured: %w", err)
+	}
+	party := participant.PartyID
+
+	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, party)
+	if err != nil {
+		return fmt.Errorf("failed to deploy per-party router: %w", err)
+	}
+	c.routerAddress = routerAddress
+
+	return nil
+}
+
 // SetupSend sets up Canton sender specific prerequisites for sending a message.
 // eg: deploy per-party router, deploy ccipsender contract...
 func (c *Chain) SetupSend(
@@ -918,7 +1016,10 @@ func (c *Chain) SetupSend(
 	feeAmountPerMessage uint64,
 	transferAmountPerMessage uint64,
 ) error {
-	participant := c.chain.Participants[0]
+	participant, clientIdx, err := c.ClientParticipant()
+	if err != nil {
+		return fmt.Errorf("no canton participants configured: %w", err)
+	}
 	party := participant.PartyID
 
 	// Deploy contracts //
@@ -931,7 +1032,8 @@ func (c *Chain) SetupSend(
 	// Deploy a sender-owned CCIPSender contract.
 	senderInstanceID := contracts.MustNewInstanceID("devenv-ccipsender")
 	out, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Deploy, c.chain, contract.DeployInput[ccipsender.CCIPSender]{
-		Qualifier: nil,
+		Qualifier:        nil,
+		ParticipantIndex: clientIdx,
 		Template: ccipsender.CCIPSender{
 			InstanceId: types.TEXT(senderInstanceID),
 			Owner:      types.PARTY(party),
@@ -1015,7 +1117,10 @@ func (c *Chain) SetupSend(
 // this method won't work in staging/prod tests
 // TODO: add support for LINK instrument
 func (c *Chain) MintTokens(ctx context.Context, amount uint64) error {
-	participant := c.chain.Participants[0]
+	participant, _, err := c.ClientParticipant()
+	if err != nil {
+		return fmt.Errorf("no canton participants configured: %w", err)
+	}
 	party := participant.PartyID
 
 	validatorAPIClients, err := c.getValidatorAPIClients()
@@ -1055,20 +1160,27 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		)
 	}
 
+	if c.transferTokenInstrument != nil && fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() == 0 {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage: token transfer amount must be positive")
+	}
+
 	hasTokenTransfer := c.transferTokenInstrument != nil && fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
 
-	participant := c.chain.Participants[0]
+	participant, clientIdx, err := c.ClientParticipant()
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no canton participants configured: %w", err)
+	}
 	party := participant.PartyID
 
 	if strings.TrimSpace(c.nextFeeCID) == "" {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
-			"canton SendMessage: next fee holding CID is unset; call SetupSend after minting",
+			"canton SendMessage: next fee holding CID is unset; call SetupSend after minting or mint more holdings",
 		)
 	}
 	if hasTokenTransfer {
 		if strings.TrimSpace(c.nextTransferCID) == "" {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
-				"canton SendMessage: next transfer holding CID is unset; call SetupSend after minting",
+				"canton SendMessage: next transfer holding CID is unset; call SetupSend after minting or mint more holdings",
 			)
 		}
 		if c.nextFeeCID == c.nextTransferCID {
@@ -1076,6 +1188,19 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				"canton SendMessage: fee and transfer holding CIDs must be different contracts",
 			)
 		}
+	}
+
+	maxDataBytes, err := c.GetMaxDataBytes(ctx, dest)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+			"canton SendMessage: resolve max data bytes for destination %d: %w", dest, err,
+		)
+	}
+	if len(fields.Data) > int(maxDataBytes) {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+			"canton SendMessage: payload exceeds destination maxDataBytes (%d > %d)",
+			len(fields.Data), maxDataBytes,
+		)
 	}
 
 	sendLog := c.logger.Info().Str("NextFeeCID", c.nextFeeCID)
@@ -1267,6 +1392,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	// Call CCIPSend
 	ccipSendReport, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Send, c.chain, contract.ChoiceInput[ccipsender.Send]{
 		InstanceAddress:    c.senderAddress,
+		ParticipantIndex:   clientIdx,
 		Args:               sendArgs,
 		MCMSEnabled:        false,
 		DisclosedContracts: contract.DisclosedContractsFromProto(disclosedContracts),
@@ -1434,10 +1560,16 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 	}, nil
 }
 
-// setNextHoldings sets fee and transfer holdings on Chain struct for next MessageSend
-// based on the events from the send update.
+// setNextHoldings rotates fee and transfer holdings for the next SendMessage using only
+// Created events from the send transaction. When no qualifying holding appears in those
+// events, the corresponding next CID is cleared (empty means no next holding available);
+// the current send already succeeded and a future SendMessage will fail its holding checks.
 func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Int) error {
-	party := c.chain.Participants[0].PartyID
+	participant, _, err := c.ClientParticipant()
+	if err != nil {
+		return fmt.Errorf("no canton participants configured: %w", err)
+	}
+	party := participant.PartyID
 
 	previousFeeCID := c.nextFeeCID
 	previousTransferCID := c.nextTransferCID
@@ -1458,59 +1590,75 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 		testhelpers.ExcludeCIDs(spentCIDs),
 	}
 
-	// Select next fee holding
-	freshFeeHoldings, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(
+	nextFeeCID, exhaustion, err := pickNextHolding(
 		events,
 		c.feeTokenInstrument,
+		big.NewRat(0, 1), // TODO: we'll have to consider real fee here once we go load tests
 		refreshFilters...,
 	)
-	if err != nil {
-		return fmt.Errorf("parse fee holdings from send update: %w", err)
-	}
-	pickedFee, err := testhelpers.SelectHoldingsForInstrument(freshFeeHoldings, []*big.Rat{big.NewRat(0, 1)}) // TODO: we'll have to consider real fee here once we go load tests
-	if err != nil {
+	if err != nil && !exhaustion {
 		return fmt.Errorf("refresh next fee holding from update: %w", err)
 	}
-	c.nextFeeCID = pickedFee[0].ContractID
-	c.logger.Info().Str("NextFeeCID", c.nextFeeCID).Msg("Selected next fee holding")
-	if payload, err := json.MarshalIndent(freshFeeHoldings, "", "  "); err != nil {
-		c.logger.Warn().Err(err).Msg("marshal freshFeeHoldings for log")
+	if !exhaustion {
+		c.nextFeeCID = nextFeeCID
+		c.logger.Info().Str("NextFeeCID", c.nextFeeCID).Msg("Selected next fee holding")
 	} else {
-		c.logger.Debug().
-			RawJSON("freshFeeHoldings", payload).
-			Msg("Fresh fee holdings parsed from send update")
+		c.nextFeeCID = ""
+		c.logger.Info().Msg("No next fee holding available after send; clearing for future sends")
 	}
 
 	if !hasTokenTransfer {
 		return nil
 	}
 
-	// Select next transfer holding
-	refreshFilters = append(refreshFilters[:len(refreshFilters)-1], testhelpers.ExcludeCIDs(append(spentCIDs, c.nextFeeCID))) // includes one more item in the filter to exclude the fee holding
-	freshTransferHoldings, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(
+	transferFilters := append(
+		slices.Clone(refreshFilters),
+		testhelpers.ExcludeCIDs(append(spentCIDs, c.nextFeeCID)),
+	)
+	transferValue := new(big.Rat).SetInt(tokenAmount)
+	nextTransferCID, exhaustion, err := pickNextHolding(
 		events,
 		*c.transferTokenInstrument,
-		refreshFilters...,
+		transferValue,
+		transferFilters...,
 	)
-	if err != nil {
-		return fmt.Errorf("parse transfer holdings from send update: %w", err)
-	}
-	transferValue := new(big.Rat).SetInt(tokenAmount)
-	pickedTransfer, err := testhelpers.SelectHoldingsForInstrument(freshTransferHoldings, []*big.Rat{transferValue})
-	if err != nil {
+	if err != nil && !exhaustion {
 		return fmt.Errorf("refresh next transfer holding from update: %w", err)
 	}
-	c.nextTransferCID = pickedTransfer[0].ContractID
-	c.logger.Info().Str("NextTransferCID", c.nextTransferCID).Msg("Selected next transfer holding")
-	if payload, err := json.MarshalIndent(freshTransferHoldings, "", "  "); err != nil {
-		c.logger.Warn().Err(err).Msg("marshal freshTransferHoldings for log")
+	if !exhaustion {
+		c.nextTransferCID = nextTransferCID
+		c.logger.Info().Str("NextTransferCID", c.nextTransferCID).Msg("Selected next transfer holding")
 	} else {
-		c.logger.Debug().
-			RawJSON("freshTransferHoldings", payload).
-			Msg("Fresh transfer holdings parsed from send update")
+		c.nextTransferCID = ""
+		c.logger.Info().Msg("No next transfer holding available after send; clearing for future sends")
 	}
 
 	return nil
+}
+
+// pickNextHolding chooses an unused holding for the next send from Created events in the
+// send transaction only. Returns an empty CID when nothing meets minAmount (not an error).
+func pickNextHolding(
+	events []*apiv2.Event,
+	instrument splice_api_token_holding_v1.InstrumentId,
+	minAmount *big.Rat,
+	filters ...testhelpers.Filter,
+) (string, bool, error) {
+	minAmounts := []*big.Rat{minAmount}
+
+	fromEvents, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(events, instrument, filters...)
+	if err != nil {
+		return "", false, err
+	}
+	if len(fromEvents) == 0 {
+		return "", true, nil // no qualifying Created events → exhaustion, next send will fail
+	}
+	picked, err := testhelpers.SelectHoldingsForInstrument(fromEvents, minAmounts)
+	if err != nil || len(picked) == 0 {
+		return "", true, fmt.Errorf("refresh next fee holding from update: %w", err)
+	}
+
+	return picked[0].ContractID, false, nil
 }
 
 func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
@@ -1536,7 +1684,10 @@ func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, tim
 // getValidatorAPIClients gets validator API clients from Chain struct cache or
 // creates them if they are not already created.
 func (c *Chain) getValidatorAPIClients() (validatorAPIClients, error) {
-	participant := c.chain.Participants[0]
+	participant, _, err := c.ClientParticipant()
+	if err != nil {
+		return validatorAPIClients{}, fmt.Errorf("no canton participants configured: %w", err)
+	}
 	if c.validatorAPIClients.scanClient != nil {
 		return c.validatorAPIClients, nil
 	}

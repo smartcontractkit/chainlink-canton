@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "6205e5225b69dd35d89a85aa180864fd9aadc3605aa8579aadb08d66830317b5"
+	PackageID   = "5ae7d01fcbf94b3a26bb9b5b8c8d1431eeebb652a951d3f6cbdf4d8991e62499"
 	SDKVersion  = "3.4.11"
 )
 
@@ -196,7 +196,7 @@ func (t *ApplyAllowListUpdates) UnmarshalHex(data string) error {
 }
 
 // ApplyAllowListUpdatesMCMSParams is ApplyAllowListUpdates without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type ApplyAllowListUpdatesMCMSParams struct {
 	AllowListConfigArgsItems []AllowListConfigArgs `json:"allowListConfigArgsItems"`
 }
@@ -487,10 +487,9 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 }
 
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type CalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -1233,12 +1232,10 @@ func (t *ForwardToVerifier) UnmarshalHex(data string) error {
 }
 
 // ForwardToVerifierMCMSParams is ForwardToVerifier without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type ForwardToVerifierMCMSParams struct {
-	RmnRemoteCid      types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	VerifierArgs types.TEXT                                 `json:"verifierArgs"`
 }
 
 // MarshalHex encodes ForwardToVerifierMCMSParams to hex string for MCMS operationData.
@@ -1293,7 +1290,7 @@ func (t *GetFee) UnmarshalHex(data string) error {
 }
 
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeMCMSParams struct {
 	DestChainSelector types.NUMERIC `json:"destChainSelector"`
 }
@@ -1819,12 +1816,10 @@ func (t *VerifyMessage) UnmarshalHex(data string) error {
 }
 
 // VerifyMessageMCMSParams is VerifyMessage without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type VerifyMessageMCMSParams struct {
-	RmnRemoteCid        types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext        splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
-	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+	ExtraContext    splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	VerifierResults types.TEXT                                 `json:"verifierResults"`
 }
 
 // MarshalHex encodes VerifyMessageMCMSParams to hex string for MCMS operationData.
