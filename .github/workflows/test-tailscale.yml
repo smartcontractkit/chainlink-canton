@@ -88,7 +88,6 @@ jobs:
       - name: Verify RPC Proxy connectivity
         run: |
           curl -s -X POST "https://rpc-proxy-main-prod.tailec47a7.ts.net/gha-canton/ethereum/sepolia" \
-            -H "Host: rpcs.cldev.sh" \
             -H "Content-Type: application/json" \
             --data '{
               "jsonrpc":"2.0",
