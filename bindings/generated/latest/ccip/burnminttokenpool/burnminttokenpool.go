@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-burn-mint-token-pool"
-	PackageID   = "f2b41266b392b6862dde78af38de4e4320bc915dba79769d46eb691d04a758b7"
+	PackageID   = "85a0973f7447e904b66f14d4d230ae5aa6c6a04de9d343a07fb72eaca8459f98"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1271,7 +1271,7 @@ type ChainUpdate struct {
 	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress" hex:"bytes"`
 	InboundCCVs                                []chainlinkapi.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []chainlinkapi.RawInstanceAddress `json:"outboundCCVs"`
-	FinalityConfig                             core.FinalityConfig               `json:"finalityConfig"`
+	FinalityConfig                             ccipcodec.FinalityConfig          `json:"finalityConfig"`
 	InboundRateLimiter                         chainlinkapi.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter chainlinkapi.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        chainlinkapi.RawInstanceAddress   `json:"outboundRateLimiter"`
@@ -1442,7 +1442,7 @@ func (t *GetFeeMCMSParams) UnmarshalHex(data string) error {
 type GetRequiredCCVs struct {
 	RemoteChainSelector types.NUMERIC                  `json:"remoteChainSelector"`
 	SourceAmount        types.TEXT                     `json:"sourceAmount"`
-	Finality            core.FinalityConfig            `json:"finality"`
+	Finality            ccipcodec.FinalityConfig       `json:"finality"`
 	ExtraData           types.TEXT                     `json:"extraData"`
 	Direction           extensionapi.TransferDirection `json:"direction"`
 	Caller              types.PARTY                    `json:"caller"`
@@ -1494,7 +1494,7 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 type GetRequiredCCVsMCMSParams struct {
 	RemoteChainSelector types.NUMERIC                  `json:"remoteChainSelector"`
 	SourceAmount        types.TEXT                     `json:"sourceAmount"`
-	Finality            core.FinalityConfig            `json:"finality"`
+	Finality            ccipcodec.FinalityConfig       `json:"finality"`
 	ExtraData           types.TEXT                     `json:"extraData"`
 	Direction           extensionapi.TransferDirection `json:"direction"`
 }
@@ -1714,7 +1714,7 @@ type RemoteChainConfig struct {
 	RemoteTokenAddress                         types.TEXT                        `json:"remoteTokenAddress" hex:"bytes"`
 	InboundCCVs                                []chainlinkapi.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []chainlinkapi.RawInstanceAddress `json:"outboundCCVs"`
-	FinalityConfig                             core.FinalityConfig               `json:"finalityConfig"`
+	FinalityConfig                             ccipcodec.FinalityConfig          `json:"finalityConfig"`
 	InboundRateLimiter                         chainlinkapi.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter chainlinkapi.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        chainlinkapi.RawInstanceAddress   `json:"outboundRateLimiter"`

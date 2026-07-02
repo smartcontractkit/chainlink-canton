@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
@@ -29,7 +30,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "7d91e0314c86b90a5b703f13f2b15680048203be39880809179c827f5974435b"
+	PackageID   = "abeca7a1cc541bb5680c4946893511241ec95dd2fcd42224aee80eec93d0ba81"
 	SDKVersion  = "3.4.11"
 )
 
@@ -711,12 +712,12 @@ func (t *ExecuteFromRouter) UnmarshalHex(data string) error {
 
 // ExecuteFromRouterResult is a Record type
 type ExecuteFromRouterResult struct {
-	MessageId             types.TEXT         `json:"messageId"`
-	Message               core.MessageV1     `json:"message"`
-	SourceChainSelector   types.NUMERIC      `json:"sourceChainSelector"`
-	SequenceNumber        types.NUMERIC      `json:"sequenceNumber"`
-	TokenReceiveTicket    *types.CONTRACT_ID `json:"tokenReceiveTicket" hex:"optional"`
-	ExecutionStateChanged types.CONTRACT_ID  `json:"executionStateChanged"`
+	MessageId             types.TEXT          `json:"messageId"`
+	Message               ccipcodec.MessageV1 `json:"message"`
+	SourceChainSelector   types.NUMERIC       `json:"sourceChainSelector"`
+	SequenceNumber        types.NUMERIC       `json:"sequenceNumber"`
+	TokenReceiveTicket    *types.CONTRACT_ID  `json:"tokenReceiveTicket" hex:"optional"`
+	ExecutionStateChanged types.CONTRACT_ID   `json:"executionStateChanged"`
 }
 
 // ToMap converts ExecuteFromRouterResult to a map for DAML arguments
@@ -776,7 +777,7 @@ type ExecuteResult struct {
 	TokenReceiveTicket    *types.CONTRACT_ID         `json:"tokenReceiveTicket" hex:"optional"`
 	ExecutionStateChanged types.CONTRACT_ID          `json:"executionStateChanged"`
 	MessageId             types.TEXT                 `json:"messageId"`
-	Message               core.MessageV1             `json:"message"`
+	Message               ccipcodec.MessageV1        `json:"message"`
 	State                 core.MessageExecutionState `json:"state"`
 }
 
@@ -1342,7 +1343,7 @@ func (t *GetFeeFromRouterResult) UnmarshalHex(data string) error {
 // GetRequiredCCVsForExecute is a Record type
 type GetRequiredCCVsForExecute struct {
 	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Message                   core.MessageV1                             `json:"message"`
+	Message                   ccipcodec.MessageV1                        `json:"message"`
 	ReceiverRequiredCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
@@ -1411,7 +1412,7 @@ func (t *GetRequiredCCVsForExecute) UnmarshalHex(data string) error {
 // GetRequiredCCVsForExecuteFromRouter is a Record type
 type GetRequiredCCVsForExecuteFromRouter struct {
 	GlobalConfigCid           types.CONTRACT_ID                 `json:"globalConfigCid"`
-	Message                   core.MessageV1                    `json:"message"`
+	Message                   ccipcodec.MessageV1               `json:"message"`
 	ReceiverRequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                       `json:"receiverOptionalThreshold"`
@@ -2999,7 +3000,7 @@ type PrepareExecute struct {
 	ReceiverRequiredCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    core.FinalityConfig                        `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    ccipcodec.FinalityConfig                   `json:"receiverFinalityConfig"`
 	Caller                    types.PARTY                                `json:"caller"`
 }
 
@@ -3082,7 +3083,7 @@ type PrepareExecuteMCMSParams struct {
 	ReceiverRequiredCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
-	ReceiverFinalityConfig    core.FinalityConfig                        `json:"receiverFinalityConfig"`
+	ReceiverFinalityConfig    ccipcodec.FinalityConfig                   `json:"receiverFinalityConfig"`
 }
 
 // MarshalHex encodes PrepareExecuteMCMSParams to hex string for MCMS operationData.
