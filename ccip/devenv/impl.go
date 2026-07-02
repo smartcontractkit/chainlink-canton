@@ -1437,7 +1437,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Msg("CCIP Send executed")
 
 	// Set next holdings
-	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, new(big.Rat).SetFrac(fields.TokenAmount.Amount, big.NewInt(CantonFixedPointScale)))
+	var tokenAmount *big.Rat
+	if hasTokenTransfer {
+		tokenAmount = new(big.Rat).SetFrac(fields.TokenAmount.Amount, big.NewInt(CantonFixedPointScale))
+	}
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, tokenAmount)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
 	}

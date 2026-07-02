@@ -39,14 +39,14 @@ out.nodes = []
 
 [[blockchains.out.network_specific_data.canton_data.external_endpoints.participants]]
 grpc_ledger_api_url = "testnet.cv1.bcy-v.metalhosts.com:443"
-json_ledger_api_url = "https://canton-testnet.bcy-v.metalhosts.com/api/json/"
-validator_api_url = "https://canton-testnet.bcy-v.metalhosts.com/api/validator/"
+json_ledger_api_url = "https://testnet.cv1.bcy-v.metalhosts.com/api/json/"
+validator_api_url = "https://testnet.cv1.bcy-v.metalhosts.com/api/validator/"
 user_id = ""
 jwt = ""
 
 [[blockchains.out.network_specific_data.canton_data.internal_endpoints.participants]]
 grpc_ledger_api_url = "testnet.cv1.bcy-v.metalhosts.com:443"
-json_ledger_api_url = "https://canton-testnet.bcy-v.metalhosts.com/api/json/"
-validator_api_url = "https://canton-testnet.bcy-v.metalhosts.com/api/validator/"
+json_ledger_api_url = "https://testnet.cv1.bcy-v.metalhosts.com/api/json/"
+validator_api_url = "https://testnet.cv1.bcy-v.metalhosts.com/api/validator/"
 user_id = ""
 jwt = ""
