@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-lock-release-token-pool"
-	PackageID   = "0cffd1fa7f60cfe503033776e75f8ea3f1540ad3ac49b4095b5a7598fb5fc3ba"
+	PackageID   = "91d0fb5eebbd1eab9139f8d95db42b3c0ea9bb3669cb34f48f1f2d597d65b119"
 	SDKVersion  = "3.4.11"
 )
 
@@ -480,14 +480,10 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 }
 
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type CalculateFeeMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	FeeQuoterCid          types.CONTRACT_ID                          `json:"feeQuoterCid"`
-	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -658,9 +654,8 @@ func (t *GetFee) UnmarshalHex(data string) error {
 }
 
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeMCMSParams struct {
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
 	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
 	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
 }
@@ -729,7 +724,7 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 }
 
 // GetRequiredCCVsMCMSParams is GetRequiredCCVs without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetRequiredCCVsMCMSParams struct {
 	RemoteChainSelector types.NUMERIC                  `json:"remoteChainSelector"`
 	SourceAmount        types.TEXT                     `json:"sourceAmount"`
@@ -814,15 +809,11 @@ func (t *LockOrBurn) UnmarshalHex(data string) error {
 }
 
 // LockOrBurnMCMSParams is LockOrBurn without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type LockOrBurnMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
-	Amount                types.NUMERIC                              `json:"amount"`
+	ExtraContext    splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	SenderInputCids []types.CONTRACT_ID                        `json:"senderInputCids"`
+	Amount          types.NUMERIC                              `json:"amount"`
 }
 
 // MarshalHex encodes LockOrBurnMCMSParams to hex string for MCMS operationData.
@@ -1701,13 +1692,9 @@ func (t *ReleaseFromTicket) UnmarshalHex(data string) error {
 }
 
 // ReleaseFromTicketMCMSParams is ReleaseFromTicket without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type ReleaseFromTicketMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
+	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 }
 
 // MarshalHex encodes ReleaseFromTicketMCMSParams to hex string for MCMS operationData.
@@ -2010,12 +1997,11 @@ func (t *SetRateLimitConfig) UnmarshalHex(data string) error {
 }
 
 // SetRateLimitConfigMCMSParams is SetRateLimitConfig without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type SetRateLimitConfigMCMSParams struct {
-	RateLimiterCid types.CONTRACT_ID `json:"rateLimiterCid"`
-	NewIsEnabled   types.BOOL        `json:"newIsEnabled"`
-	NewCapacity    types.NUMERIC     `json:"newCapacity"`
-	NewRate        types.NUMERIC     `json:"newRate"`
+	NewIsEnabled types.BOOL    `json:"newIsEnabled"`
+	NewCapacity  types.NUMERIC `json:"newCapacity"`
+	NewRate      types.NUMERIC `json:"newRate"`
 }
 
 // MarshalHex encodes SetRateLimitConfigMCMSParams to hex string for MCMS operationData.
@@ -2458,12 +2444,9 @@ func (t *VerifyInboundMessage) UnmarshalHex(data string) error {
 }
 
 // VerifyInboundMessageMCMSParams is VerifyInboundMessage without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type VerifyInboundMessageMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	ExecutingMessageCid   types.CONTRACT_ID                          `json:"executingMessageCid"`
+	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 }
 
 // MarshalHex encodes VerifyInboundMessageMCMSParams to hex string for MCMS operationData.
@@ -2530,13 +2513,10 @@ func (t *VerifyOutboundCCVs) UnmarshalHex(data string) error {
 }
 
 // VerifyOutboundCCVsMCMSParams is VerifyOutboundCCVs without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type VerifyOutboundCCVsMCMSParams struct {
-	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
-	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	Amount                types.NUMERIC                              `json:"amount"`
+	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Amount       types.NUMERIC                              `json:"amount"`
 }
 
 // MarshalHex encodes VerifyOutboundCCVsMCMSParams to hex string for MCMS operationData.

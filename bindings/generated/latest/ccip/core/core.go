@@ -6,11 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	ccipapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -28,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "78669a275f92a3daad67ef946e890e7e1cbc32e302e659284277b7d606865156"
+	PackageID   = "3c0d1879db1609b9905505a25500909a49f47918d7b4b121115f45a010e612f1"
 	SDKVersion  = "3.4.11"
 )
 
@@ -159,33 +157,13 @@ func (t *AcceptAdminRole) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// AcceptAdminRoleMCMSParams is AcceptAdminRole without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type AcceptAdminRoleMCMSParams struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-}
-
-// MarshalHex encodes AcceptAdminRoleMCMSParams to hex string for MCMS operationData.
-func (t AcceptAdminRoleMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes AcceptAdminRoleMCMSParams from hex string.
-func (t *AcceptAdminRoleMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // AddCCVFee is a Record type
 type AddCCVFee struct {
-	CcvInstanceId     types.TEXT                                 `json:"ccvInstanceId"`
-	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
-	DestGasLimit      types.INT64                                `json:"destGasLimit"`
-	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller            types.PARTY                                `json:"caller"`
+	CcvInstanceId     types.TEXT    `json:"ccvInstanceId"`
+	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
+	DestGasLimit      types.INT64   `json:"destGasLimit"`
+	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
+	Caller            types.PARTY   `json:"caller"`
 }
 
 // ToMap converts AddCCVFee to a map for DAML arguments
@@ -199,8 +177,6 @@ func (t AddCCVFee) ToMap() map[string]any {
 	m["destGasLimit"] = int64(t.DestGasLimit)
 
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -230,13 +206,12 @@ func (t *AddCCVFee) UnmarshalHex(data string) error {
 }
 
 // AddCCVFeeMCMSParams is AddCCVFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type AddCCVFeeMCMSParams struct {
-	CcvInstanceId     types.TEXT                                 `json:"ccvInstanceId"`
-	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
-	DestGasLimit      types.INT64                                `json:"destGasLimit"`
-	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	CcvInstanceId     types.TEXT    `json:"ccvInstanceId"`
+	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
+	DestGasLimit      types.INT64   `json:"destGasLimit"`
+	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
 }
 
 // MarshalHex encodes AddCCVFeeMCMSParams to hex string for MCMS operationData.
@@ -294,7 +269,7 @@ func (t *AddCCVVerification) UnmarshalHex(data string) error {
 }
 
 // AddCCVVerificationMCMSParams is AddCCVVerification without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type AddCCVVerificationMCMSParams struct {
 	CcvInstanceId types.TEXT `json:"ccvInstanceId"`
 	VersionTag    types.TEXT `json:"versionTag" hex:"bytes"`
@@ -398,11 +373,10 @@ func (t *AddCustomObserversParams) UnmarshalHex(data string) error {
 
 // AddExecutorFee is a Record type
 type AddExecutorFee struct {
-	ExecutorInstanceId types.TEXT                                 `json:"executorInstanceId"`
-	ExecutorArgs       types.TEXT                                 `json:"executorArgs"`
-	FeeUSDCents        types.NUMERIC                              `json:"feeUSDCents"`
-	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller             types.PARTY                                `json:"caller"`
+	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
+	ExecutorArgs       types.TEXT    `json:"executorArgs"`
+	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
+	Caller             types.PARTY   `json:"caller"`
 }
 
 // ToMap converts AddExecutorFee to a map for DAML arguments
@@ -414,8 +388,6 @@ func (t AddExecutorFee) ToMap() map[string]any {
 	m["executorArgs"] = string(t.ExecutorArgs)
 
 	m["feeUSDCents"] = t.FeeUSDCents
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -445,12 +417,11 @@ func (t *AddExecutorFee) UnmarshalHex(data string) error {
 }
 
 // AddExecutorFeeMCMSParams is AddExecutorFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type AddExecutorFeeMCMSParams struct {
-	ExecutorInstanceId types.TEXT                                 `json:"executorInstanceId"`
-	ExecutorArgs       types.TEXT                                 `json:"executorArgs"`
-	FeeUSDCents        types.NUMERIC                              `json:"feeUSDCents"`
-	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
+	ExecutorArgs       types.TEXT    `json:"executorArgs"`
+	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
 }
 
 // MarshalHex encodes AddExecutorFeeMCMSParams to hex string for MCMS operationData.
@@ -509,13 +480,12 @@ func (t *AddPriceUpdaters) UnmarshalHex(data string) error {
 
 // AddTokenSend is a Record type
 type AddTokenSend struct {
-	PoolInstanceId   types.TEXT                                 `json:"poolInstanceId"`
-	PoolOwner        types.PARTY                                `json:"poolOwner"`
-	InstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
-	Amount           types.TEXT                                 `json:"amount"`
-	DestTokenAddress types.TEXT                                 `json:"destTokenAddress"`
-	ExtraData        types.TEXT                                 `json:"extraData"`
-	Context          splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	PoolInstanceId   types.TEXT                               `json:"poolInstanceId"`
+	PoolOwner        types.PARTY                              `json:"poolOwner"`
+	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Amount           types.TEXT                               `json:"amount"`
+	DestTokenAddress types.TEXT                               `json:"destTokenAddress"`
+	ExtraData        types.TEXT                               `json:"extraData"`
 }
 
 // ToMap converts AddTokenSend to a map for DAML arguments
@@ -533,8 +503,6 @@ func (t AddTokenSend) ToMap() map[string]any {
 	m["destTokenAddress"] = string(t.DestTokenAddress)
 
 	m["extraData"] = string(t.ExtraData)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -563,12 +531,11 @@ func (t *AddTokenSend) UnmarshalHex(data string) error {
 
 // AddTokenSendFee is a Record type
 type AddTokenSendFee struct {
-	PoolInstanceId    types.TEXT                                 `json:"poolInstanceId"`
-	PoolOwner         types.PARTY                                `json:"poolOwner"`
-	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64                                `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
+	PoolOwner         types.PARTY   `json:"poolOwner"`
+	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
+	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
+	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
 }
 
 // ToMap converts AddTokenSendFee to a map for DAML arguments
@@ -584,8 +551,6 @@ func (t AddTokenSendFee) ToMap() map[string]any {
 	m["destGasOverhead"] = int64(t.DestGasOverhead)
 
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -614,12 +579,11 @@ func (t *AddTokenSendFee) UnmarshalHex(data string) error {
 
 // AddVerifierData is a Record type
 type AddVerifierData struct {
-	CcvInstanceId        types.TEXT                                 `json:"ccvInstanceId"`
-	VersionTag           types.TEXT                                 `json:"versionTag" hex:"bytes"`
-	VerifierBlob         types.TEXT                                 `json:"verifierBlob"`
-	MessageSentObservers []types.PARTY                              `json:"messageSentObservers"`
-	Context              splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller               types.PARTY                                `json:"caller"`
+	CcvInstanceId        types.TEXT    `json:"ccvInstanceId"`
+	VersionTag           types.TEXT    `json:"versionTag" hex:"bytes"`
+	VerifierBlob         types.TEXT    `json:"verifierBlob"`
+	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
+	Caller               types.PARTY   `json:"caller"`
 }
 
 // ToMap converts AddVerifierData to a map for DAML arguments
@@ -639,8 +603,6 @@ func (t AddVerifierData) ToMap() map[string]any {
 		}
 		return res
 	}()
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -670,13 +632,12 @@ func (t *AddVerifierData) UnmarshalHex(data string) error {
 }
 
 // AddVerifierDataMCMSParams is AddVerifierData without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type AddVerifierDataMCMSParams struct {
-	CcvInstanceId        types.TEXT                                 `json:"ccvInstanceId"`
-	VersionTag           types.TEXT                                 `json:"versionTag" hex:"bytes"`
-	VerifierBlob         types.TEXT                                 `json:"verifierBlob"`
-	MessageSentObservers []types.PARTY                              `json:"messageSentObservers"`
-	Context              splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	CcvInstanceId        types.TEXT    `json:"ccvInstanceId"`
+	VersionTag           types.TEXT    `json:"versionTag" hex:"bytes"`
+	VerifierBlob         types.TEXT    `json:"verifierBlob"`
+	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
 }
 
 // MarshalHex encodes AddVerifierDataMCMSParams to hex string for MCMS operationData.
@@ -1047,14 +1008,14 @@ func (t *ApplySourceChainConfigUpdatesParams) UnmarshalHex(data string) error {
 
 // BuildMessage is a Record type
 type BuildMessage struct {
-	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller types.PARTY `json:"caller"`
 }
 
 // ToMap converts BuildMessage to a map for DAML arguments
 func (t BuildMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = model.NestedToDAMLValue(t.Context)
+	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -1077,6 +1038,23 @@ func (t BuildMessage) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes BuildMessage from hex string (Canton MCMS format)
 func (t *BuildMessage) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// BuildMessageMCMSParams is BuildMessage without the Caller field for MCMS operationData encoding.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
+type BuildMessageMCMSParams struct {
+}
+
+// MarshalHex encodes BuildMessageMCMSParams to hex string for MCMS operationData.
+func (t BuildMessageMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BuildMessageMCMSParams from hex string.
+func (t *BuildMessageMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1448,7 +1426,7 @@ func (t *CancelExecute) UnmarshalHex(data string) error {
 }
 
 // CancelExecuteMCMSParams is CancelExecute without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type CancelExecuteMCMSParams struct {
 }
 
@@ -1681,10 +1659,8 @@ func (t *ConsumeReceiveTicket) UnmarshalHex(data string) error {
 }
 
 // ConsumeReceiveTicketMCMSParams is ConsumeReceiveTicket without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type ConsumeReceiveTicketMCMSParams struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	TicketCid      types.CONTRACT_ID                        `json:"ticketCid"`
 	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	PoolInstanceId types.TEXT                               `json:"poolInstanceId"`
 }
@@ -3730,7 +3706,7 @@ func (t *FeeTokenAmount) UnmarshalHex(data string) error {
 }
 
 // FeeTokenAmountMCMSParams is FeeTokenAmount without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type FeeTokenAmountMCMSParams struct {
 }
 
@@ -4141,7 +4117,7 @@ func (t *FinalizeSendResult) UnmarshalHex(data string) error {
 // GasPriceUpdate is a Record type
 type GasPriceUpdate struct {
 	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-	UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas"`
+	UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas" hex:"decimal"`
 }
 
 // ToMap converts GasPriceUpdate to a map for DAML arguments
@@ -4268,7 +4244,7 @@ func (t *Get) UnmarshalHex(data string) error {
 }
 
 // GetMCMSParams is Get without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetMCMSParams struct {
 }
 
@@ -4286,15 +4262,12 @@ func (t *GetMCMSParams) UnmarshalHex(data string) error {
 
 // GetCursedSubjects is a Record type
 type GetCursedSubjects struct {
-	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller  types.PARTY                                `json:"caller"`
+	Caller types.PARTY `json:"caller"`
 }
 
 // ToMap converts GetCursedSubjects to a map for DAML arguments
 func (t GetCursedSubjects) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -4324,9 +4297,8 @@ func (t *GetCursedSubjects) UnmarshalHex(data string) error {
 }
 
 // GetCursedSubjectsMCMSParams is GetCursedSubjects without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetCursedSubjectsMCMSParams struct {
-	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetCursedSubjectsMCMSParams to hex string for MCMS operationData.
@@ -4381,7 +4353,7 @@ func (t *GetDestChainConfig) UnmarshalHex(data string) error {
 }
 
 // GetDestChainConfigMCMSParams is GetDestChainConfig without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetDestChainConfigMCMSParams struct {
 	DestChainSelector types.NUMERIC `json:"destChainSelector"`
 }
@@ -4438,7 +4410,7 @@ func (t *GetDestinationChainGasPrice) UnmarshalHex(data string) error {
 }
 
 // GetDestinationChainGasPriceMCMSParams is GetDestinationChainGasPrice without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetDestinationChainGasPriceMCMSParams struct {
 	DestChainSelector types.NUMERIC `json:"destChainSelector"`
 }
@@ -4492,7 +4464,7 @@ func (t *GetFeeTokens) UnmarshalHex(data string) error {
 }
 
 // GetFeeTokensMCMSParams is GetFeeTokens without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeTokensMCMSParams struct {
 }
 
@@ -4548,7 +4520,7 @@ func (t *GetSourceChainConfig) UnmarshalHex(data string) error {
 }
 
 // GetSourceChainConfigMCMSParams is GetSourceChainConfig without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetSourceChainConfigMCMSParams struct {
 	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
 }
@@ -4608,10 +4580,9 @@ func (t *GetTokenConfigByCid) UnmarshalHex(data string) error {
 }
 
 // GetTokenConfigByCidMCMSParams is GetTokenConfigByCid without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetTokenConfigByCidMCMSParams struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 }
 
 // MarshalHex encodes GetTokenConfigByCidMCMSParams to hex string for MCMS operationData.
@@ -4666,7 +4637,7 @@ func (t *GetTokenPrice) UnmarshalHex(data string) error {
 }
 
 // GetTokenPriceMCMSParams is GetTokenPrice without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetTokenPriceMCMSParams struct {
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 }
@@ -4726,7 +4697,7 @@ func (t *GetTokenTransferFee) UnmarshalHex(data string) error {
 }
 
 // GetTokenTransferFeeMCMSParams is GetTokenTransferFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetTokenTransferFeeMCMSParams struct {
 	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
 	Token             splice_api_token_holding_v1.InstrumentId `json:"token"`
@@ -5093,11 +5064,10 @@ func (t *IsAdministrator) UnmarshalHex(data string) error {
 }
 
 // IsAdministratorMCMSParams is IsAdministrator without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type IsAdministratorMCMSParams struct {
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	TokenConfigCid *types.CONTRACT_ID                       `json:"tokenConfigCid" hex:"optional"`
-	Administrator  types.PARTY                              `json:"administrator"`
+	InstrumentId  splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Administrator types.PARTY                              `json:"administrator"`
 }
 
 // MarshalHex encodes IsAdministratorMCMSParams to hex string for MCMS operationData.
@@ -5114,15 +5084,12 @@ func (t *IsAdministratorMCMSParams) UnmarshalHex(data string) error {
 
 // IsCursed is a Record type
 type IsCursed struct {
-	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller  types.PARTY                                `json:"caller"`
+	Caller types.PARTY `json:"caller"`
 }
 
 // ToMap converts IsCursed to a map for DAML arguments
 func (t IsCursed) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -5152,9 +5119,8 @@ func (t *IsCursed) UnmarshalHex(data string) error {
 }
 
 // IsCursedMCMSParams is IsCursed without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type IsCursedMCMSParams struct {
-	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes IsCursedMCMSParams to hex string for MCMS operationData.
@@ -5171,20 +5137,17 @@ func (t *IsCursedMCMSParams) UnmarshalHex(data string) error {
 
 // IsCursedForChain is a Record type
 type IsCursedForChain struct {
-	ChainSelector types.NUMERIC                              `json:"chainSelector"`
-	Context       splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller        types.PARTY                                `json:"caller"`
+	Caller        types.PARTY   `json:"caller"`
+	ChainSelector types.NUMERIC `json:"chainSelector"`
 }
 
 // ToMap converts IsCursedForChain to a map for DAML arguments
 func (t IsCursedForChain) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["chainSelector"] = t.ChainSelector
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
-
 	m["caller"] = t.Caller.ToMap()
+
+	m["chainSelector"] = t.ChainSelector
 
 	return m
 }
@@ -5212,10 +5175,9 @@ func (t *IsCursedForChain) UnmarshalHex(data string) error {
 }
 
 // IsCursedForChainMCMSParams is IsCursedForChain without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type IsCursedForChainMCMSParams struct {
-	ChainSelector types.NUMERIC                              `json:"chainSelector"`
-	Context       splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ChainSelector types.NUMERIC `json:"chainSelector"`
 }
 
 // MarshalHex encodes IsCursedForChainMCMSParams to hex string for MCMS operationData.
@@ -5637,26 +5599,6 @@ func (t *ProposeAdministrator) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ProposeAdministratorMCMSParams is ProposeAdministrator without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type ProposeAdministratorMCMSParams struct {
-	TokenConfigCid *types.CONTRACT_ID                       `json:"tokenConfigCid" hex:"optional"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	NewAdmin       types.PARTY                              `json:"newAdmin"`
-}
-
-// MarshalHex encodes ProposeAdministratorMCMSParams to hex string for MCMS operationData.
-func (t ProposeAdministratorMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ProposeAdministratorMCMSParams from hex string.
-func (t *ProposeAdministratorMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // ProposeAdministratorResult is a Record type
 type ProposeAdministratorResult struct {
 	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
@@ -5751,7 +5693,7 @@ func (t *QuoteGasForExec) UnmarshalHex(data string) error {
 }
 
 // QuoteGasForExecMCMSParams is QuoteGasForExec without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type QuoteGasForExecMCMSParams struct {
 	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
 	NonCalldataGas    types.INT64                              `json:"nonCalldataGas"`
@@ -6143,11 +6085,11 @@ func (t RMNRemote) IsCursedWithPackageID(contractID string, packageID string, ar
 	}
 }
 
-// Archive exercises the Archive choice on this RMNRemote contract via the IRMNRemote interface
+// Archive exercises the Archive choice on this RMNRemote contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -6157,10 +6099,31 @@ func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
+	}
+}
+
+// Get exercises the Get choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) Get(contractID string, args Get) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "Get",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetWithPackageID exercises the Get choice using the provided package ID instead of package name
+func (t RMNRemote) GetWithPackageID(contractID string, packageID string, args Get) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "Get",
+		Arguments:  argsToMap(args),
 	}
 }
 
@@ -6269,95 +6232,9 @@ func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 	}
 }
 
-// RMNRemotePublicFetch exercises the RMNRemote_PublicFetch choice on this RMNRemote contract via the IRMNRemote interface
-// This method uses the package name in the template ID
-func (t RMNRemote) RMNRemotePublicFetch(contractID string, args ccipapi.RMNRemotePublicFetch) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "RMNRemote_PublicFetch",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// RMNRemotePublicFetchWithPackageID exercises the RMNRemote_PublicFetch choice using the provided package ID instead of package name
-func (t RMNRemote) RMNRemotePublicFetchWithPackageID(contractID string, packageID string, args ccipapi.RMNRemotePublicFetch) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "RMNRemote_PublicFetch",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// RMNRemoteIsCursed exercises the RMNRemote_IsCursed choice on this RMNRemote contract via the IRMNRemote interface
-// This method uses the package name in the template ID
-func (t RMNRemote) RMNRemoteIsCursed(contractID string, args ccipapi.RMNRemoteIsCursed) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "RMNRemote_IsCursed",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// RMNRemoteIsCursedWithPackageID exercises the RMNRemote_IsCursed choice using the provided package ID instead of package name
-func (t RMNRemote) RMNRemoteIsCursedWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteIsCursed) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "RMNRemote_IsCursed",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// RMNRemoteIsCursedForChain exercises the RMNRemote_IsCursedForChain choice on this RMNRemote contract via the IRMNRemote interface
-// This method uses the package name in the template ID
-func (t RMNRemote) RMNRemoteIsCursedForChain(contractID string, args ccipapi.RMNRemoteIsCursedForChain) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "RMNRemote_IsCursedForChain",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// RMNRemoteIsCursedForChainWithPackageID exercises the RMNRemote_IsCursedForChain choice using the provided package ID instead of package name
-func (t RMNRemote) RMNRemoteIsCursedForChainWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteIsCursedForChain) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "RMNRemote_IsCursedForChain",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// RMNRemoteGetCursedSubjects exercises the RMNRemote_GetCursedSubjects choice on this RMNRemote contract via the IRMNRemote interface
-// This method uses the package name in the template ID
-func (t RMNRemote) RMNRemoteGetCursedSubjects(contractID string, args ccipapi.RMNRemoteGetCursedSubjects) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "RMNRemote_GetCursedSubjects",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// RMNRemoteGetCursedSubjectsWithPackageID exercises the RMNRemote_GetCursedSubjects choice using the provided package ID instead of package name
-func (t RMNRemote) RMNRemoteGetCursedSubjectsWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteGetCursedSubjects) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "RMNRemote_GetCursedSubjects",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // Verify interface implementations for RMNRemote
 
 var _ api.IMCMSReceiver = (*RMNRemote)(nil)
-
-var _ ccipapi.IRMNRemote = (*RMNRemote)(nil)
 
 // RateLimitDirection is an enum type
 type RateLimitDirection string
@@ -6403,6 +6280,36 @@ func (e *RateLimitDirection) UnmarshalHex(data string) error {
 
 var _ types.ENUM = RateLimitDirection("")
 
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e RateLimitDirection) GetEnumTagByte() byte {
+
+	if string(e) == "RateLimitDirection_Outbound" {
+		return 0
+	}
+
+	if string(e) == "RateLimitDirection_Inbound" {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e RateLimitDirection) EnumConstructorForTagByte(tag byte) (string, bool) {
+
+	if tag == 0 {
+		return "RateLimitDirection_Outbound", true
+	}
+
+	if tag == 1 {
+		return "RateLimitDirection_Inbound", true
+	}
+
+	return "", false
+}
+
+var _ types.EnumWithTagByte = RateLimitDirection("")
+
 // RateLimitMode is an enum type
 type RateLimitMode string
 
@@ -6446,6 +6353,36 @@ func (e *RateLimitMode) UnmarshalHex(data string) error {
 }
 
 var _ types.ENUM = RateLimitMode("")
+
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e RateLimitMode) GetEnumTagByte() byte {
+
+	if string(e) == "RateLimitMode_DefaultFinality" {
+		return 0
+	}
+
+	if string(e) == "RateLimitMode_CustomFinality" {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e RateLimitMode) EnumConstructorForTagByte(tag byte) (string, bool) {
+
+	if tag == 0 {
+		return "RateLimitMode_DefaultFinality", true
+	}
+
+	if tag == 1 {
+		return "RateLimitMode_CustomFinality", true
+	}
+
+	return "", false
+}
+
+var _ types.EnumWithTagByte = RateLimitMode("")
 
 // RateLimiter is a Template type
 type RateLimiter struct {
@@ -7877,11 +7814,11 @@ func (t SendingMessageV1) FeeTokenAmountWithPackageID(contractID string, package
 	}
 }
 
-// Archive exercises the Archive choice on this SendingMessageV1 contract via the ISendingMessage interface
+// Archive exercises the Archive choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
 func (t SendingMessageV1) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -7891,79 +7828,12 @@ func (t SendingMessageV1) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t SendingMessageV1) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
 	}
 }
-
-// SendingMessageAddCCVFee exercises the SendingMessage_AddCCVFee choice on this SendingMessageV1 contract via the ISendingMessage interface
-// This method uses the package name in the template ID
-func (t SendingMessageV1) SendingMessageAddCCVFee(contractID string, args ccipapi.SendingMessageAddCCVFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
-		ContractID: contractID,
-		Choice:     "SendingMessage_AddCCVFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SendingMessageAddCCVFeeWithPackageID exercises the SendingMessage_AddCCVFee choice using the provided package ID instead of package name
-func (t SendingMessageV1) SendingMessageAddCCVFeeWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddCCVFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
-		ContractID: contractID,
-		Choice:     "SendingMessage_AddCCVFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SendingMessageAddVerifierData exercises the SendingMessage_AddVerifierData choice on this SendingMessageV1 contract via the ISendingMessage interface
-// This method uses the package name in the template ID
-func (t SendingMessageV1) SendingMessageAddVerifierData(contractID string, args ccipapi.SendingMessageAddVerifierData) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
-		ContractID: contractID,
-		Choice:     "SendingMessage_AddVerifierData",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SendingMessageAddVerifierDataWithPackageID exercises the SendingMessage_AddVerifierData choice using the provided package ID instead of package name
-func (t SendingMessageV1) SendingMessageAddVerifierDataWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddVerifierData) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
-		ContractID: contractID,
-		Choice:     "SendingMessage_AddVerifierData",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SendingMessageAddExecutorFee exercises the SendingMessage_AddExecutorFee choice on this SendingMessageV1 contract via the ISendingMessage interface
-// This method uses the package name in the template ID
-func (t SendingMessageV1) SendingMessageAddExecutorFee(contractID string, args ccipapi.SendingMessageAddExecutorFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessage"),
-		ContractID: contractID,
-		Choice:     "SendingMessage_AddExecutorFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SendingMessageAddExecutorFeeWithPackageID exercises the SendingMessage_AddExecutorFee choice using the provided package ID instead of package name
-func (t SendingMessageV1) SendingMessageAddExecutorFeeWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddExecutorFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessage"),
-		ContractID: contractID,
-		Choice:     "SendingMessage_AddExecutorFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// Verify interface implementations for SendingMessageV1
-
-var _ ccipapi.ISendingMessage = (*SendingMessageV1)(nil)
 
 // SetBurnMintFactory is a Record type
 type SetBurnMintFactory struct {
@@ -8021,9 +7891,8 @@ func (t *SetBurnMintFactory) UnmarshalHex(data string) error {
 }
 
 // SetBurnMintFactoryMCMSParams is SetBurnMintFactory without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type SetBurnMintFactoryMCMSParams struct {
-	TokenConfigCid  types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	BurnMintFactory *types.CONTRACT_ID                       `json:"burnMintFactory" hex:"optional"`
 }
@@ -8277,11 +8146,10 @@ func (t *SetPool) UnmarshalHex(data string) error {
 }
 
 // SetPoolMCMSParams is SetPool without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type SetPoolMCMSParams struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	TokenPool      *PoolRegistration                        `json:"tokenPool" hex:"optional"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	TokenPool    *PoolRegistration                        `json:"tokenPool" hex:"optional"`
 }
 
 // MarshalHex encodes SetPoolMCMSParams to hex string for MCMS operationData.
@@ -8401,9 +8269,8 @@ func (t *SetTransferFactory) UnmarshalHex(data string) error {
 }
 
 // SetTransferFactoryMCMSParams is SetTransferFactory without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type SetTransferFactoryMCMSParams struct {
-	TokenConfigCid  types.CONTRACT_ID                        `json:"tokenConfigCid"`
 	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	TransferFactory *types.CONTRACT_ID                       `json:"transferFactory" hex:"optional"`
 }
@@ -9326,7 +9193,7 @@ func (t TokenConfig) ArchiveWithPackageID(contractID string, packageID string) *
 // TokenPriceUpdate is a Record type
 type TokenPriceUpdate struct {
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	UsdPerToken  types.NUMERIC                            `json:"usdPerToken"`
+	UsdPerToken  types.NUMERIC                            `json:"usdPerToken" hex:"decimal"`
 }
 
 // ToMap converts TokenPriceUpdate to a map for DAML arguments
@@ -10273,26 +10140,6 @@ func (t *TransferAdminRole) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TransferAdminRoleMCMSParams is TransferAdminRole without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type TransferAdminRoleMCMSParams struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	NewAdmin       types.PARTY                              `json:"newAdmin"`
-}
-
-// MarshalHex encodes TransferAdminRoleMCMSParams to hex string for MCMS operationData.
-func (t TransferAdminRoleMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes TransferAdminRoleMCMSParams from hex string.
-func (t *TransferAdminRoleMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // Uncurse is a Record type
 type Uncurse struct {
 	Subject types.TEXT `json:"subject" hex:"bytes"`
@@ -10629,7 +10476,7 @@ func (t *UpdatePrices) UnmarshalHex(data string) error {
 }
 
 // UpdatePricesMCMSParams is UpdatePrices without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type UpdatePricesMCMSParams struct {
 	PriceUpdates PriceUpdates `json:"priceUpdates"`
 }
@@ -10742,8 +10589,7 @@ func (t *VerifierData) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	AcceptAdminRole(args AcceptAdminRole) (*bind.EncodedChoice, error)
-	AcceptAdminRoleMCMSParams(args AcceptAdminRoleMCMSParams) (*bind.EncodedChoice, error)
+	AcceptAdminRole(args AcceptAdminParams) (*bind.EncodedChoice, error)
 	AddCCVFee(args AddCCVFee) (*bind.EncodedChoice, error)
 	AddCCVFeeMCMSParams(args AddCCVFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddCCVVerification(args AddCCVVerification) (*bind.EncodedChoice, error)
@@ -10766,6 +10612,7 @@ type MCMSEncoder interface {
 	ApplySourceChainConfigUpdates(args ApplySourceChainConfigUpdates) (*bind.EncodedChoice, error)
 	ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfigUpdatesParams) (*bind.EncodedChoice, error)
 	BuildMessage(args BuildMessage) (*bind.EncodedChoice, error)
+	BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
 	CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.EncodedChoice, error)
 	Consume(args Consume) (*bind.EncodedChoice, error)
@@ -10808,8 +10655,7 @@ type MCMSEncoder interface {
 	IsCursedMCMSParams(args IsCursedMCMSParams) (*bind.EncodedChoice, error)
 	IsCursedForChain(args IsCursedForChain) (*bind.EncodedChoice, error)
 	IsCursedForChainMCMSParams(args IsCursedForChainMCMSParams) (*bind.EncodedChoice, error)
-	ProposeAdministrator(args ProposeAdministrator) (*bind.EncodedChoice, error)
-	ProposeAdministratorMCMSParams(args ProposeAdministratorMCMSParams) (*bind.EncodedChoice, error)
+	ProposeAdministrator(args ProposeAdminParams) (*bind.EncodedChoice, error)
 	QuoteGasForExec(args QuoteGasForExec) (*bind.EncodedChoice, error)
 	QuoteGasForExecMCMSParams(args QuoteGasForExecMCMSParams) (*bind.EncodedChoice, error)
 	RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error)
@@ -10829,8 +10675,7 @@ type MCMSEncoder interface {
 	SetTransferFactory(args SetTransferFactory) (*bind.EncodedChoice, error)
 	SetTransferFactoryMCMSParams(args SetTransferFactoryMCMSParams) (*bind.EncodedChoice, error)
 	SetTransferFactoryParams(args SetTransferFactoryParams) (*bind.EncodedChoice, error)
-	TransferAdminRole(args TransferAdminRole) (*bind.EncodedChoice, error)
-	TransferAdminRoleMCMSParams(args TransferAdminRoleMCMSParams) (*bind.EncodedChoice, error)
+	TransferAdminRole(args TransferAdminParams) (*bind.EncodedChoice, error)
 	Uncurse(args Uncurse) (*bind.EncodedChoice, error)
 	UncurseChain(args UncurseChain) (*bind.EncodedChoice, error)
 	UncurseChainParams(args UncurseChainParams) (*bind.EncodedChoice, error)
@@ -10872,12 +10717,7 @@ func (c *Contract) Encoder() MCMSEncoder {
 }
 
 // AcceptAdminRole encodes parameters for the AcceptAdminRole choice.
-func (e *encoder) AcceptAdminRole(args AcceptAdminRole) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AcceptAdminRole", args)
-}
-
-// AcceptAdminRoleMCMSParams encodes MCMS parameters (without Caller) for the AcceptAdminRole choice.
-func (e *encoder) AcceptAdminRoleMCMSParams(args AcceptAdminRoleMCMSParams) (*bind.EncodedChoice, error) {
+func (e *encoder) AcceptAdminRole(args AcceptAdminParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AcceptAdminRole", args)
 }
 
@@ -10988,6 +10828,11 @@ func (e *encoder) ApplySourceChainConfigUpdatesParams(args ApplySourceChainConfi
 
 // BuildMessage encodes parameters for the BuildMessage choice.
 func (e *encoder) BuildMessage(args BuildMessage) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("BuildMessage", args)
+}
+
+// BuildMessageMCMSParams encodes MCMS parameters (without Caller) for the BuildMessage choice.
+func (e *encoder) BuildMessageMCMSParams(args BuildMessageMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("BuildMessage", args)
 }
 
@@ -11202,12 +11047,7 @@ func (e *encoder) IsCursedForChainMCMSParams(args IsCursedForChainMCMSParams) (*
 }
 
 // ProposeAdministrator encodes parameters for the ProposeAdministrator choice.
-func (e *encoder) ProposeAdministrator(args ProposeAdministrator) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ProposeAdministrator", args)
-}
-
-// ProposeAdministratorMCMSParams encodes MCMS parameters (without Caller) for the ProposeAdministrator choice.
-func (e *encoder) ProposeAdministratorMCMSParams(args ProposeAdministratorMCMSParams) (*bind.EncodedChoice, error) {
+func (e *encoder) ProposeAdministrator(args ProposeAdminParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ProposeAdministrator", args)
 }
 
@@ -11307,12 +11147,7 @@ func (e *encoder) SetTransferFactoryParams(args SetTransferFactoryParams) (*bind
 }
 
 // TransferAdminRole encodes parameters for the TransferAdminRole choice.
-func (e *encoder) TransferAdminRole(args TransferAdminRole) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("TransferAdminRole", args)
-}
-
-// TransferAdminRoleMCMSParams encodes MCMS parameters (without Caller) for the TransferAdminRole choice.
-func (e *encoder) TransferAdminRoleMCMSParams(args TransferAdminRoleMCMSParams) (*bind.EncodedChoice, error) {
+func (e *encoder) TransferAdminRole(args TransferAdminParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("TransferAdminRole", args)
 }
 

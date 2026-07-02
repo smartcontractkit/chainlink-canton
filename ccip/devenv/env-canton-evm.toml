@@ -100,7 +100,7 @@ execution_interval = 15_000_000_000
   port = "8575"
   type = "canton"
   image = "0.6.7"
-  number_of_canton_validators = 1
+  number_of_canton_validators = 2
 
 [fake]
   image = "ccv-fakes:latest"
@@ -149,7 +149,7 @@ execution_interval = 15_000_000_000
   port = 8100
   # path is relative from "devenv" dir
   committee_name = "default"
-  node_index = 0
+  node_index = 2
   disable_finality_checkers = ["8706591216959472610"] # Disable finality detection on Canton.
   chain_family = "canton"
   [verifier.db]
@@ -183,7 +183,7 @@ execution_interval = 15_000_000_000
   nop_alias = "canton-default-verifier-2"
   port = 8200
   committee_name = "default"
-  node_index = 1
+  node_index = 3
   disable_finality_checkers = ["8706591216959472610"] # Disable finality detection on Canton.
   chain_family = "canton"
   [verifier.db]
@@ -232,6 +232,10 @@ execution_interval = 15_000_000_000
   metric_reader_interval = 5
   trace_sample_ratio = 1.0
   trace_batch_timeout = 10
+
+[generic_services.8706591216959472610.input.eds_config.lock_release_transfer_preapproval]
+  context_key = 'transfer-preapproval'
+  template_id = '#splice-amulet:Splice.AmuletRules:TransferPreapproval'
 
 [[executor]]
   image = "executor:latest"

@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
@@ -610,6 +611,96 @@ func executeKeyRotationSequence(
 	if seqErr != nil {
 		if strings.Contains(seqErr.Error(), keyrotation.ErrThresholdNotMet.Error()) {
 			fmt.Fprintf(os.Stderr, "key-rotation ceremony not yet complete: %v\n", seqErr)
+			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have acted.")
+			os.Exit(2) //nolint:gocritic // intentional early exit for UX
+		}
+
+		return seqErr
+	}
+
+	return nil
+}
+
+// executeAddParticipantWithAcsSequence is the execution kernel for the combined
+// add-participant + ACS replication ceremony. It dials the Canton admin API,
+// runs AddParticipantWithAcsSequence, and persists the ceremony state.
+func executeAddParticipantWithAcsSequence(
+	ctx context.Context,
+	cfg client.ClientConfig,
+	input addparticipantwithacs.AddParticipantWithAcsInput,
+	stateDir string,
+	workflowId string,
+	confirmer ceremony.Confirmer,
+) error {
+	lggr, err := newCLILogger()
+	if err != nil {
+		return fmt.Errorf("creating logger: %w", err)
+	}
+
+	var previousReports []operations.Report[any, any]
+	if workflowId != "" {
+		ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+		previousReports, err = ceremony.LoadReports(ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("loading previous reports: %w", err)
+		}
+	}
+	initialRun := workflowId == ""
+
+	reporter := operations.NewMemoryReporter(operations.WithReports(previousReports))
+	bundle := operations.NewBundle(
+		func() context.Context { return ctx },
+		logger.Nop(),
+		reporter,
+	)
+
+	conn, err := client.Dial(cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to Canton admin API: %w", err)
+	}
+	defer conn.Close()
+
+	grpcClient := client.NewGRPCClient(conn)
+	deps := ceremony.CantonDeps{Client: grpcClient, KMS: cfg.KMS(), Logger: lggr, Confirmer: confirmer}
+
+	lggr.Infow("Running add-participant-with-acs sequence",
+		"party", input.DecentralizedPartyID,
+		"new_participant", input.NewParticipantID,
+		"source_participant", input.SourceParticipantID,
+		"participant", cfg.ParticipantID,
+	)
+
+	sr, seqErr := operations.ExecuteSequence(bundle, addparticipantwithacs.AddParticipantWithAcsSequence, deps, input)
+
+	if workflowId == "" {
+		workflowId = sr.ID
+	}
+	ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
+	if mkErr := os.MkdirAll(ceremonyDir, 0o755); mkErr != nil {
+		lggr.Errorw("Failed to create ceremony directory", "dir", ceremonyDir, "err", mkErr)
+	}
+	allReports, reportErr := reporter.GetReports()
+	if reportErr != nil {
+		lggr.Errorw("Failed to collect reports", "err", reportErr)
+	}
+	if saveErr := ceremony.SaveReportUpdates(ceremonyDir, previousReports, allReports); saveErr != nil {
+		lggr.Errorw("Failed to save reports", "err", saveErr)
+	}
+
+	if initialRun {
+		state := ceremony.WorkflowState[addparticipantwithacs.AddParticipantWithAcsInput]{
+			CeremonyID: workflowId,
+			Type:       ceremony.WorkflowTypeAddParticipantWithAcs,
+			Input:      input,
+		}
+		if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
+			lggr.Errorw("Failed to save workflow.json", "err", saveErr)
+		}
+	}
+
+	if seqErr != nil {
+		if strings.Contains(seqErr.Error(), addparticipantwithacs.ErrThresholdNotMet.Error()) {
+			fmt.Fprintf(os.Stderr, "add-participant-with-acs ceremony not yet complete: %v\n", seqErr)
 			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have acted.")
 			os.Exit(2) //nolint:gocritic // intentional early exit for UX
 		}

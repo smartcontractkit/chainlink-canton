@@ -2,7 +2,10 @@ package onboarding
 
 // OnboardingInput is the top-level input to [OnboardingSequence].
 type OnboardingInput struct {
-	NamespaceName  string   `json:"namespace_name"`
+	NamespaceName string `json:"namespace_name"`
+	// KmsVaultName optionally overrides NamespaceName for KMS vault registration.
+	// Use when reusing KMS keys already registered under another ceremony name.
+	KmsVaultName   string   `json:"kms_vault_name,omitempty"`
 	PartyPrefix    string   `json:"party_prefix"`
 	Participants   []string `json:"participants"`
 	SynchronizerID string   `json:"synchronizer_id"`

@@ -1,7 +1,6 @@
 package sequences
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -110,6 +109,10 @@ var DeployChainContracts = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, err
 		}
+		nativeInstrumentID, err := resolveNativeInstrumentID(b, deps, input.NativeInstrumentId)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve native fee token instrument: %w", err)
+		}
 
 		// Deploy RMNRemote
 		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[core.RMNRemote]{
@@ -197,7 +200,7 @@ var DeployChainContracts = operations.NewSequence(
 					PriceUpdates: core.PriceUpdates{
 						TokenPriceUpdates: []core.TokenPriceUpdate{
 							{
-								InstrumentId: input.NativeInstrumentId,
+								InstrumentId: nativeInstrumentID,
 								UsdPerToken:  types.NUMERIC(input.FeeQuoterConfig.USDPerNative.String()),
 							},
 						},
@@ -207,17 +210,19 @@ var DeployChainContracts = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to update native token price on FeeQuoter: %w", err)
 			}
+		}
 
-			err = ensureNativeFeeTokenConfig(
-				b,
-				deps,
-				tokenAdminRegistryRawInstanceAddress.InstanceAddress(),
-				input.CCIPOwnerParty,
-				input.NativeInstrumentId,
-			)
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure native fee token config: %w", err)
-			}
+		_, err = ensureNativeFeeTokenConfig(
+			b,
+			deps,
+			tokenAdminRegistryRawInstanceAddress.InstanceAddress(),
+			tokenAdminRegistryRawInstanceAddress,
+			input.CCIPOwnerParty,
+			nativeInstrumentID,
+			false,
+		)
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure native fee token config: %w", err)
 		}
 
 		// Deploy OffRamp
@@ -335,55 +340,19 @@ func ensureNativeFeeTokenConfig(
 	b operations.Bundle,
 	deps canton.Chain,
 	tokenAdminRegistryAddress contracts.InstanceAddress,
+	tokenAdminRegistryRaw contracts.RawInstanceAddress,
 	ccipOwnerParty string,
 	instrumentId splice_api_token_holding_v1.InstrumentId,
-) error {
-	if instrumentId.Admin == "" || instrumentId.Id == "" {
-		return nil
-	}
-
-	tokenConfigAddress := contracts.InstanceID(hex.EncodeToString(contracts.EncodeInstrumentID(instrumentId).Bytes())).
-		RawInstanceAddress(types.PARTY(ccipOwnerParty)).
-		InstanceAddress()
-
-	if _, found, err := findTokenConfigCid(b, deps, tokenConfigAddress); err != nil {
-		return fmt.Errorf("failed to lookup native fee token config: %w", err)
-	} else if found {
-		return nil
-	}
-
-	_, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[core.ProposeAdministrator]{
-		InstanceAddress: tokenAdminRegistryAddress,
-		Args: core.ProposeAdministrator{
-			TokenConfigCid: nil,
-			InstrumentId:   instrumentId,
-			NewAdmin:       types.PARTY(ccipOwnerParty),
-			Caller:         types.PARTY(ccipOwnerParty),
-		},
+	proposalDriven bool,
+) ([]contract.ExerciseOutput, error) {
+	outputs, _, err := registerNativeFeeTokenInTARCore(b, deps, RegisterNativeFeeTokenInTARInput{
+		TokenAdminRegistryInstanceAddress:    tokenAdminRegistryAddress,
+		TokenAdminRegistryRawInstanceAddress: tokenAdminRegistryRaw,
+		InstrumentId:                         instrumentId,
+		CcipOwnerParty:                       ccipOwnerParty,
+		ChainSelector:                        deps.ChainSelector(),
+		ProposalDriven:                       proposalDriven,
 	})
-	if err != nil {
-		return fmt.Errorf("failed to propose native fee token admin: %w", err)
-	}
 
-	tokenConfigCid, found, err := findTokenConfigCid(b, deps, tokenConfigAddress)
-	if err != nil {
-		return fmt.Errorf("failed to lookup native fee token config after propose: %w", err)
-	}
-	if !found {
-		return fmt.Errorf("native fee token config not found after propose")
-	}
-
-	_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[core.AcceptAdminRole]{
-		InstanceAddress: tokenAdminRegistryAddress,
-		Args: core.AcceptAdminRole{
-			TokenConfigCid: tokenConfigCid,
-			InstrumentId:   instrumentId,
-			Caller:         types.PARTY(ccipOwnerParty),
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to accept native fee token admin: %w", err)
-	}
-
-	return nil
+	return outputs, err
 }

@@ -33,6 +33,10 @@ const (
 
 	// WorkflowTypeKeyRotation identifies a key rotation ceremony.
 	WorkflowTypeKeyRotation = "key-rotation"
+
+	// WorkflowTypeAddParticipantWithAcs identifies a combined add-participant
+	// + ACS replication ceremony.
+	WorkflowTypeAddParticipantWithAcs = "add-participant-with-acs"
 )
 
 // WorkflowState is persisted to workflow.json inside the ceremony directory.

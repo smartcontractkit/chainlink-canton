@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "7d91e0314c86b90a5b703f13f2b15680048203be39880809179c827f5974435b"
+	PackageID   = "e72c7b81e9cc09ed2d35ba3333f561851d5f8a5f81527d05249060ad1edd1eb5"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1123,7 +1123,7 @@ func (t *GetExecutionState) UnmarshalHex(data string) error {
 }
 
 // GetExecutionStateMCMSParams is GetExecutionState without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetExecutionStateMCMSParams struct {
 	MessageHash types.TEXT `json:"messageHash"`
 }
@@ -1655,7 +1655,7 @@ func (t *HasRouter) UnmarshalHex(data string) error {
 }
 
 // HasRouterMCMSParams is HasRouter without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type HasRouterMCMSParams struct {
 	PartyOwner types.PARTY `json:"partyOwner"`
 }
@@ -3073,7 +3073,7 @@ func (t *PrepareExecute) UnmarshalHex(data string) error {
 }
 
 // PrepareExecuteMCMSParams is PrepareExecute without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type PrepareExecuteMCMSParams struct {
 	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	EncodedMessage            types.TEXT                                 `json:"encodedMessage"`

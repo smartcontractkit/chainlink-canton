@@ -97,6 +97,11 @@ func main() {
 			"apGroupQuorums": true, // used in AdminParams.AP_SetConfig
 			"apGroupParents": true, // used in AdminParams.AP_SetConfig
 		},
+		// hex:"decimal" — Daml Decimal fields encoded via MCMS.Codec.encodeDecimal (sign byte + 10^10 shift).
+		DecimalFields: map[string]bool{
+			"usdPerUnitGas": true, // FeeQuoter gas price updates
+			"usdPerToken":   true, // FeeQuoter token price updates
+		},
 		VariantTagByteMap: map[string]map[string]byte{
 			"CCIP.LockReleaseTokenPoolTypes.TransferTimeout": {
 				"Indefinite":    0x00,
@@ -113,12 +118,32 @@ func main() {
 				"BlockDepth":      0x02,
 			},
 		},
+		// EnumTagByteMap: enums decoded as a single uint8 ordinal byte by the Daml MCMS codec.
+		// Tags must match the decodeXxxAt case statement in the corresponding Daml contract.
+		EnumTagByteMap: map[string]map[string]byte{
+			// Tags match decodeRateLimitDirectionAt in contracts/ccip/factory/daml/CCIP/Factory.daml.
+			"CCIP.RateLimiter.RateLimitDirection": {
+				"RateLimitDirection_Outbound": 0x00,
+				"RateLimitDirection_Inbound":  0x01,
+			},
+			// Tags match decodeRateLimitModeAt in contracts/ccip/factory/daml/CCIP/Factory.daml.
+			"CCIP.RateLimiter.RateLimitMode": {
+				"RateLimitMode_DefaultFinality": 0x00,
+				"RateLimitMode_CustomFinality":  0x01,
+			},
+		},
 		// Dispatcher operationData payloads decoded by MCMS.Main.ExecuteOp.
 		ChoiceParamEncoderNames: map[string]bool{
 			"SetConfig":            true,
 			"ScheduleBatch":        true,
 			"CancelBatch":          true,
 			"BypasserExecuteBatch": true,
+		},
+		// TokenAdminRegistry mcmsEntrypoint decodes Params records whose names do not match choice names.
+		ChoiceOperationDataParams: map[string]string{
+			"ProposeAdministrator": "ProposeAdminParams",
+			"AcceptAdminRole":      "AcceptAdminParams",
+			"TransferAdminRole":    "TransferAdminParams",
 		},
 	}
 

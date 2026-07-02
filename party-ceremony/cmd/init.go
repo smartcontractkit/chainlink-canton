@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
@@ -55,6 +56,7 @@ func init() {
 	f.String("new-party-name", "", "Party ID prefix used to derive the final party identifier (required)")
 	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
 	f.Int("threshold", 0, "Minimum signatures required before submission. 0 = strict majority (floor(n/2)+1)")
+	f.String("kms-vault-name", "", "Optional KMS vault registration name (defaults to --new-namespace-name). Use to reuse keys registered under another ceremony name.")
 	f.String("config", "participant-config.json", "Path to participant config JSON file")
 	f.String("state-dir", "ceremonies", "Root directory under which ceremony state is stored")
 
@@ -75,6 +77,7 @@ func runInitOnboarding(cmd *cobra.Command, _ []string) error {
 	partyName, _ := f.GetString("new-party-name")
 	synchronizerID, _ := f.GetString("synchronizer-id")
 	threshold, _ := f.GetInt("threshold")
+	kmsVaultName, _ := f.GetString("kms-vault-name")
 	configPath, _ := f.GetString("config")
 	stateDir, _ := f.GetString("state-dir")
 
@@ -91,6 +94,7 @@ func runInitOnboarding(cmd *cobra.Command, _ []string) error {
 
 	input := onboarding.OnboardingInput{
 		NamespaceName:  namespaceName,
+		KmsVaultName:   kmsVaultName,
 		PartyPrefix:    partyName,
 		Participants:   participants,
 		SynchronizerID: synchronizerID,
@@ -577,4 +581,81 @@ func parsePackageRefs(raw string) ([]contractdeploy.PackageRef, error) {
 	}
 
 	return refs, nil
+}
+
+// initAddParticipantWithAcsCmd initialises a combined add-participant + ACS
+// replication ceremony.
+//
+// Usage:
+//
+//	canton-party-ceremony init add-participant-with-acs \
+//	  --decentralized-party-id "prefix::namespace" \
+//	  --new-participant-id "PAR::newnode::fp" \
+//	  --namespace-name "add-2026" \
+//	  --source-participant-id "PAR::source::fp" \
+//	  --synchronizer-id global \
+//	  --synchronizer-alias global \
+//	  --config ./participant-config.json
+var initAddParticipantWithAcsCmd = &cobra.Command{
+	Use:   "add-participant-with-acs",
+	Short: "Initialise a new add-participant ceremony with ACS replication",
+	Long: `Create the ceremony directory, write workflow.json, and run the first
+sequence step. This ceremony adds a new participant to an existing decentralized
+party with the onboarding flag set, exports the Active Contract Set from a
+source participant, imports it into the new participant, and clears the flag.`,
+	RunE: runInitAddParticipantWithAcs,
+}
+
+func init() {
+	f := initAddParticipantWithAcsCmd.Flags()
+
+	f.String("decentralized-party-id", "", "Full party ID in the format <prefix>::<namespace> (required)")
+	f.String("new-participant-id", "", "Canton UID of the participant to add (required)")
+	f.String("namespace-name", "", "Label for the new participant's key generation (required)")
+	f.String("source-participant-id", "", "Canton UID of the existing participant that exports ACS (required)")
+	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
+	f.String("synchronizer-alias", "", "Human-readable synchronizer alias for disconnect/reconnect (required)")
+	f.Int("new-threshold", 0, "Signing threshold after the addition. 0 = keep current")
+	f.String("config", "participant-config.json", "Path to participant config JSON file")
+	f.String("state-dir", "ceremonies", "Root directory under which ceremony state is stored")
+
+	_ = initAddParticipantWithAcsCmd.MarkFlagRequired("decentralized-party-id")
+	_ = initAddParticipantWithAcsCmd.MarkFlagRequired("new-participant-id")
+	_ = initAddParticipantWithAcsCmd.MarkFlagRequired("namespace-name")
+	_ = initAddParticipantWithAcsCmd.MarkFlagRequired("source-participant-id")
+	_ = initAddParticipantWithAcsCmd.MarkFlagRequired("synchronizer-id")
+	_ = initAddParticipantWithAcsCmd.MarkFlagRequired("synchronizer-alias")
+
+	initCmd.AddCommand(initAddParticipantWithAcsCmd)
+}
+
+func runInitAddParticipantWithAcs(cmd *cobra.Command, _ []string) error {
+	f := cmd.Flags()
+
+	partyID, _ := f.GetString("decentralized-party-id")
+	newUID, _ := f.GetString("new-participant-id")
+	namespaceName, _ := f.GetString("namespace-name")
+	sourceUID, _ := f.GetString("source-participant-id")
+	synchronizerID, _ := f.GetString("synchronizer-id")
+	synchronizerAlias, _ := f.GetString("synchronizer-alias")
+	newThreshold, _ := f.GetInt("new-threshold")
+	configPath, _ := f.GetString("config")
+	stateDir, _ := f.GetString("state-dir")
+
+	cfg, err := client.LoadConfig(configPath)
+	if err != nil {
+		return err
+	}
+
+	input := addparticipantwithacs.AddParticipantWithAcsInput{
+		DecentralizedPartyID: partyID,
+		NewParticipantID:     newUID,
+		NamespaceName:        namespaceName,
+		SynchronizerID:       synchronizerID,
+		SynchronizerAlias:    synchronizerAlias,
+		SourceParticipantID:  sourceUID,
+		NewThreshold:         newThreshold,
+	}
+
+	return executeAddParticipantWithAcsSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
 }

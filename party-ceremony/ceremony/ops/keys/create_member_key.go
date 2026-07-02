@@ -51,8 +51,10 @@ var CreateMemberKeyOp = operations.NewOperation(
 			)
 		}
 
+		vaultName := vaultRegistrationName(in.NamespaceName, in.KmsVaultName)
+
 		// Obtain the NAMESPACE signing key.
-		key, err := obtainSigningKey(ctx, deps.Client, deps.KMS.NamespaceKeyID, in.NamespaceName, []cryptov30.SigningKeyUsage{
+		key, err := obtainSigningKey(ctx, deps.Client, deps.KMS.NamespaceKeyID, vaultName, []cryptov30.SigningKeyUsage{
 			cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_NAMESPACE,
 		})
 		if err != nil {
@@ -60,7 +62,7 @@ var CreateMemberKeyOp = operations.NewOperation(
 		}
 
 		// Obtain the PROTOCOL (DAML) signing key.
-		damlKey, err := obtainSigningKey(ctx, deps.Client, deps.KMS.ProtocolKeyID, in.NamespaceName+"-protocol", []cryptov30.SigningKeyUsage{
+		damlKey, err := obtainSigningKey(ctx, deps.Client, deps.KMS.ProtocolKeyID, vaultName+"-protocol", []cryptov30.SigningKeyUsage{
 			cryptov30.SigningKeyUsage_SIGNING_KEY_USAGE_PROTOCOL,
 		})
 		if err != nil {

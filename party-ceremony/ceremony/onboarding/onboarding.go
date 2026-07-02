@@ -75,6 +75,7 @@ var OnboardingSequence = operations.NewSequence(
 			deps.Logger.Info("creating key for participant", pid)
 			r, err := operations.ExecuteOperation(b, keys.CreateMemberKeyOp, deps, keys.CreateMemberKeyInput{
 				NamespaceName: in.NamespaceName,
+				KmsVaultName:  in.KmsVaultName,
 				ParticipantID: pid,
 			})
 			if err != nil {
