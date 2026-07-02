@@ -10,7 +10,6 @@ import DA.Set qualified as Set
 import qualified DA.TextMap as TextMap
 
 import qualified CCIP.CCIPReceiver
-import qualified CCIP.Context
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
 import qualified CCIP.CCVCodec
@@ -56,7 +55,7 @@ mkContext
 mkContext rmnRemoteCid tokenAdminRegistryCid globalConfigCid offRampCid =
     MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.Context.rmnRemoteKey, MetadataV1.AV_ContractId (coerceContractId rmnRemoteCid))
+            [ (CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId (coerceContractId rmnRemoteCid))
             , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId (coerceContractId tokenAdminRegistryCid))
             , (CCIP.GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId (coerceContractId globalConfigCid))
             , (CCIP.OffRamp.offRampKey, MetadataV1.AV_ContractId (coerceContractId offRampCid))

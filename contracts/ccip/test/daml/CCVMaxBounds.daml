@@ -10,7 +10,6 @@ import DA.Set qualified as Set
 import qualified DA.TextMap as TextMap
 
 import qualified CCIP.Client
-import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.FinalityConfig
@@ -87,7 +86,7 @@ outboundContext : OutboundFixture -> MetadataV1.ChoiceContext
 outboundContext f =
     MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.Context.rmnRemoteKey, MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
+            [ (CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
             , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
             , (CCIP.FeeQuoter.feeQuoterKey, MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
             , (CCIP.GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
@@ -407,7 +406,7 @@ executeContext : ExecuteFixture -> MetadataV1.ChoiceContext
 executeContext f =
     MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.Context.rmnRemoteKey, MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
+            [ (CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
             , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
             , (CCIP.GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
             , (CCIP.OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId f.offRamp)

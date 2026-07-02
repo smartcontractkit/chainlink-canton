@@ -10,7 +10,7 @@ import DA.Map qualified as Map
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
-import qualified CCIP.Context
+import qualified CCIP.Utils.Context
 import CCIP.GlobalConfigTypes (
     DestChainConfig(..),
     DestChainConfigArgs(..),
@@ -25,6 +25,12 @@ import Chainlink.InstanceAddress (assertValidInstanceId)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Crypto (assertValidHex)
+
+globalConfigKey : Text
+globalConfigKey = "global-config"
+
+lookupGlobalConfigCid : ChoiceContext -> Update (ContractId GlobalConfig)
+lookupGlobalConfigCid ctx = CCIP.Utils.Context.getFromContextU ctx globalConfigKey
 
 template GlobalConfig
     with
@@ -148,9 +154,3 @@ template GlobalConfig
                                     sourceChainConfigUpdates = sourceChainConfigArgs
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
-globalConfigKey : Text
-globalConfigKey = "global-config"
-
-lookupGlobalConfigCid : ChoiceContext -> Update (ContractId GlobalConfig)
-lookupGlobalConfigCid ctx = CCIP.Context.getFromContextU ctx globalConfigKey

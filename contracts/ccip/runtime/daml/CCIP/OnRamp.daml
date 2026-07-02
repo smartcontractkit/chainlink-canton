@@ -16,6 +16,7 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
 
 import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.Utils.Context
 
 import qualified CCIP.Client
 import qualified CCIP.Events
@@ -25,7 +26,6 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.Context
 import qualified CCIP.CCVCodec
 import qualified Splice.Api.Token.HoldingV1
 import qualified CCIP.RMNRemote
@@ -73,7 +73,7 @@ onRampKey : Text
 onRampKey = "on-ramp"
 
 lookupOnRampCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId OnRamp)
-lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
+lookupOnRampCid ctx = CCIP.Utils.Context.getFromContextU ctx onRampKey
 
 rawInstanceAddress : OnRamp -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress onRamp = RawInstanceAddress.make onRamp.instanceId onRamp.ccipOwner

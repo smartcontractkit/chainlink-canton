@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "3b16f01cfd31ecc348c91407c18f1a9ab3977d30033f5d04bf17adfa73386f6f"
+	PackageID   = "13bbf726a51b467edb86eeb0d23618d475839fffe002c3378a49ebb5ffa9610c"
 	SDKVersion  = "3.4.11"
 )
 
@@ -41,6 +41,7 @@ type Template interface {
 const (
 	TokenConfigKey         = types.TEXT("token-config")
 	TokenAdminRegistryKey  = types.TEXT("token-admin-registry")
+	RmnRemoteContextKey    = types.TEXT("rmn-remote")
 	GlobalCurseSubject     = types.TEXT("01000000000000000000000000000001")
 	UsdPerUsdCent          = types.NUMERIC("100000000.")
 	PremiumIdentity        = types.NUMERIC("10000000000.")
@@ -51,7 +52,6 @@ const (
 	BaseInt                = types.INT64(100000000)
 	MaxUint256DecimalText  = types.TEXT("115792089237316195423570985008687907853269984665640564039457584007913129639935")
 	MaxNumeric0DecimalText = types.TEXT("99999999999999999999999999999999999999")
-	RmnRemoteKey           = types.TEXT("rmn-remote")
 	FeeQuoterKey           = types.TEXT("fee-quoter")
 	GlobalConfigKey        = types.TEXT("global-config")
 	RateLimiterKey         = types.TEXT("rate-limiter")

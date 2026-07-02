@@ -25,7 +25,7 @@ import CCIP.BurnMintTokenPoolCodecGen (
     encodeRemovePoolReceiveContextValueParams,
     )
 
-import CCIP.ContextCodec (encodeAnyValue)
+import CCIP.Utils.Context (encodeAnyValue)
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import qualified CCIP.RateLimiter
 

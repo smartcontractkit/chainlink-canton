@@ -25,6 +25,7 @@ packages:
   - ccip/factory
   - ccip/test
   - ccip/tickets
+  - ccip/utils
 
   - test/interfaces
   - test/proxy

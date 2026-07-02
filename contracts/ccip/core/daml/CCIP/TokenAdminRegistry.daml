@@ -10,7 +10,18 @@ import qualified Splice.Api.Token.BurnMintV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
-import qualified CCIP.Context
+import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.API.TokenAdminRegistryV1
+import qualified CCIP.Utils.Context
+
+import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.SendingMessageV1
+import qualified CCIP.Tickets
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
 import CCIP.TokenAdminRegistryCodecGen (
     decodeAcceptAdminParamsAt,
     decodeProposeAdminParamsAt,
@@ -29,17 +40,6 @@ import CCIP.TokenAdminRegistryTypes (
     TransferAdminParams(..),
     )
 
-import qualified CCIP.API.SendingMessageV1
-import qualified CCIP.API.TokenAdminRegistryV1
-
-import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.MessageCodecV1
-import qualified CCIP.SendingMessageV1
-import qualified CCIP.Tickets
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
-
 tokenAdminRegistryKey : Text
 tokenAdminRegistryKey = "token-admin-registry"
 
@@ -48,15 +48,15 @@ tokenConfigKey = "token-config"
 
 lookupTokenAdminRegistryCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId TokenAdminRegistry)
 lookupTokenAdminRegistryCid ctx =
-    CCIP.Context.getFromContextU ctx tokenAdminRegistryKey
+    CCIP.Utils.Context.getFromContextU ctx tokenAdminRegistryKey
 
 lookupTokenConfigCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId TokenConfig)
 lookupTokenConfigCid ctx =
-    CCIP.Context.getFromContextU ctx tokenConfigKey
+    CCIP.Utils.Context.getFromContextU ctx tokenConfigKey
 
 lookupOptionalTokenConfigCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (Optional (ContractId TokenConfig))
 lookupOptionalTokenConfigCid ctx =
-    CCIP.Context.lookupFromContextU ctx tokenConfigKey
+    CCIP.Utils.Context.lookupFromContextU ctx tokenConfigKey
 
 tokenConfigInstanceId : Splice.Api.Token.HoldingV1.InstrumentId -> Text
 tokenConfigInstanceId = CCIP.MessageCodecV1.encodeInstrumentId

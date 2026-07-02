@@ -49,7 +49,7 @@ import qualified CCIP.Executor
 import qualified CCIP.ExecutorTypes
 import qualified CCIP.RateLimiter
 import qualified CCIP.FinalityConfig
-import CCIP.ContextCodec (decodeChoiceContextAt)
+import CCIP.Utils.Context (decodeChoiceContextAt)
 import CCIP.LockReleaseTokenPoolCodecGen (decodeTransferTimeoutAt)
 import qualified CCIP.BurnMintTokenPoolCodecGen
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))

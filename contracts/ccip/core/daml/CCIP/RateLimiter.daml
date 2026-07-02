@@ -6,7 +6,7 @@ import DA.Crypto.Text (BytesHex, byteCount)
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
-import qualified CCIP.Context
+import qualified CCIP.Utils.Context
 
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
@@ -40,7 +40,7 @@ rateLimiterKey : Text
 rateLimiterKey = "rate-limiter"
 
 lookupRateLimiterCid : ChoiceContext -> Update (ContractId RateLimiter)
-lookupRateLimiterCid ctx = CCIP.Context.getFromContextU ctx rateLimiterKey
+lookupRateLimiterCid ctx = CCIP.Utils.Context.getFromContextU ctx rateLimiterKey
 
 rawInstanceAddress : RateLimiter -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress rl = RawInstanceAddress.make rl.instanceId rl.poolOwner

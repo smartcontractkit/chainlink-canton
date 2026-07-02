@@ -13,7 +13,7 @@ import DA.Set qualified as Set
 import Splice.Api.Token.HoldingV1
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
-import qualified CCIP.Context
+import qualified CCIP.Utils.Context
 import CCIP.Math qualified
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
@@ -42,7 +42,7 @@ feeQuoterKey : Text
 feeQuoterKey = "fee-quoter"
 
 lookupFeeQuoterCid : ChoiceContext -> Update (ContractId FeeQuoter)
-lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
+lookupFeeQuoterCid ctx = CCIP.Utils.Context.getFromContextU ctx feeQuoterKey
 
 rawInstanceAddress : FeeQuoter -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress feeQuoter = RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner

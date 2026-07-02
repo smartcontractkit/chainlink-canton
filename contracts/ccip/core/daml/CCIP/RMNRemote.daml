@@ -15,6 +15,7 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import qualified Chainlink.InstanceAddress
 
 import qualified CCIP.API.RMNRemoteV1
+import qualified CCIP.Utils.Context
 import CCIP.NumericHex qualified as NumericHex
 
 import CCIP.RMNRemoteCodecGen (
@@ -57,6 +58,12 @@ mergeCustomObservers rmnOwner ccipOwner current additions =
 removeCustomObservers : [Party] -> [Party] -> [Party]
 removeCustomObservers current removals =
     filter (`notElem` removals) current
+
+rmnRemoteContextKey : Text
+rmnRemoteContextKey = "rmn-remote"
+
+lookupRmnRemoteCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId RMNRemote)
+lookupRmnRemoteCid ctx = CCIP.Utils.Context.getFromContextU ctx rmnRemoteContextKey
 
 -- | RMN contract providing curse capability for emergency stops.
 -- Separate rmnOwner party allows independent control from ccipOwner.

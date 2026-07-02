@@ -21,7 +21,7 @@ import qualified CCIP.API.SendingMessageV1
 
 import qualified CCIP.CCVCodec
 
-import qualified CCIP.Context
+import qualified CCIP.Utils.Context
 import CCIP.Events qualified as Events
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
@@ -80,9 +80,9 @@ mkPoolContext rateLimiterCid burnMintFactoryCid tokenPoolHoldings preapprovals =
         _  -> [(LockReleaseTokenPool.transferFactoryExtraArgsContextValuesContextKey, MetadataV1.AV_Map preapprovalMap)]
   in MetadataV1.ChoiceContext with
        values = TextMap.fromList (
-         [ (RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)
-         , (LockReleaseTokenPool.transferFactoryContextKey, CCIP.Context.toAnyValue burnMintFactoryCid)
-         , (LockReleaseTokenPool.tokenPoolHoldingsContextKey, CCIP.Context.toAnyValue tokenPoolHoldings)
+         [ (RateLimiter.rateLimiterKey, CCIP.Utils.Context.toAnyValue rateLimiterCid)
+         , (LockReleaseTokenPool.transferFactoryContextKey, CCIP.Utils.Context.toAnyValue burnMintFactoryCid)
+         , (LockReleaseTokenPool.tokenPoolHoldingsContextKey, CCIP.Utils.Context.toAnyValue tokenPoolHoldings)
          ] ++ extraArgsContextEntry)
 
 template ParseSourcePoolDecimalsHarness

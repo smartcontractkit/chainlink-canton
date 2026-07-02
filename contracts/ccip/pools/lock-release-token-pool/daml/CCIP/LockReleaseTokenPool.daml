@@ -34,7 +34,7 @@ import qualified CCIP.API.RMNRemoteV1
 import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.API.TokenAdminRegistryV1
 
-import qualified CCIP.Context
+import qualified CCIP.Utils.Context
 import qualified CCIP.Events
 import qualified CCIP.FinalityConfig
 import qualified CCIP.FeeQuoter
@@ -45,7 +45,6 @@ import qualified CCIP.Uint256
 import qualified CCIP.RateLimiter
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
-import CCIP.ContextCodec (decodeAnyValueAt)
 
 import CCIP.LockReleaseTokenPoolCodecGen (
     decodeSetDynamicConfigParamsAt,
@@ -85,25 +84,25 @@ transferFactoryContextKey : Text
 transferFactoryContextKey = "transfer-factory"
 
 lookupTransferFactory : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory)
-lookupTransferFactory ctx = CCIP.Context.getFromContextU ctx transferFactoryContextKey
+lookupTransferFactory ctx = CCIP.Utils.Context.getFromContextU ctx transferFactoryContextKey
 
 transferFactoryExtraArgsContextValuesContextKey : Text
 transferFactoryExtraArgsContextValuesContextKey = "transfer-factory-extra-args-context-values"
 
 lookupTransferFactoryExtraArgsContextValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Splice.Api.Token.MetadataV1.AnyValue)
-lookupTransferFactoryExtraArgsContextValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx transferFactoryExtraArgsContextValuesContextKey
+lookupTransferFactoryExtraArgsContextValues ctx = fromOptional TextMap.empty <$> CCIP.Utils.Context.lookupFromContextU ctx transferFactoryExtraArgsContextValuesContextKey
 
 transferFactoryExtraArgsMetaValuesContextKey : Text
 transferFactoryExtraArgsMetaValuesContextKey = "transfer-factory-extra-args-meta-values"
 
 lookupTransferFactoryExtraArgsMetaValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Text)
-lookupTransferFactoryExtraArgsMetaValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx transferFactoryExtraArgsMetaValuesContextKey
+lookupTransferFactoryExtraArgsMetaValues ctx = fromOptional TextMap.empty <$> CCIP.Utils.Context.lookupFromContextU ctx transferFactoryExtraArgsMetaValuesContextKey
 
 tokenPoolHoldingsContextKey : Text
 tokenPoolHoldingsContextKey = "token-pool-holdings"
 
 lookupTokenPoolHoldings : Splice.Api.Token.MetadataV1.ChoiceContext -> Update [ContractId Splice.Api.Token.HoldingV1.Holding]
-lookupTokenPoolHoldings ctx = CCIP.Context.getFromContextU ctx tokenPoolHoldingsContextKey
+lookupTokenPoolHoldings ctx = CCIP.Utils.Context.getFromContextU ctx tokenPoolHoldingsContextKey
 
 data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
     with
@@ -1266,7 +1265,7 @@ template LockReleaseTokenPool
                         None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue"
                         Some (AddPoolReceiveContextNonContractValueParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue" (finalOffset == byteCount operationData)
-                            (value, innerOff) <- case decodeAnyValueAt valuePayload 0 of
+                            (value, innerOff) <- case CCIP.Utils.Context.decodeAnyValueAt valuePayload 0 of
                                 None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue:valuePayload"
                                 Some p -> pure p
                             assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue:valuePayload" (innerOff == byteCount valuePayload)

@@ -24,7 +24,7 @@ import CCIP.LockReleaseTokenPoolCodecGen (
     encodeRemovePoolReceiveContextValueParams,
     )
 
-import CCIP.ContextCodec (encodeAnyValue)
+import CCIP.Utils.Context (encodeAnyValue)
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 

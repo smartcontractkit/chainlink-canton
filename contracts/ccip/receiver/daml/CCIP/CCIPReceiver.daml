@@ -14,12 +14,12 @@ import DA.Optional (fromSomeNote)
 
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
-import qualified CCIP.Context
 import qualified CCIP.FinalityConfig
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.PerPartyRouter
+import qualified CCIP.RMNRemote
 import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import qualified CCIP.TokenAdminRegistry
 
@@ -131,7 +131,7 @@ template CCIPReceiver
             controller owner
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
-                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1

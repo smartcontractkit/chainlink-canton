@@ -31,7 +31,7 @@ import qualified CCIP.CommitteeVerifier
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
-import CCIP.ContextCodec (encodeChoiceContext)
+import CCIP.Utils.Context (encodeChoiceContext)
 import CCIP.LockReleaseTokenPoolCodecGen (encodeTransferTimeout)
 import qualified CCIP.BurnMintTokenPoolCodecGen
 import qualified CCIP.BurnMintTokenPoolTypes
