@@ -36,6 +36,16 @@ func (a *CantonCommitteeVerifierOnchain) ApplySignatureConfigs(ctx context.Conte
 	panic("unimplemented")
 }
 
+// SetAllowedFinalityConfig implements [adapters.CommitteeVerifierOnchainAdapter].
+func (a *CantonCommitteeVerifierOnchain) SetAllowedFinalityConfig(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, waitForFinality bool, waitForSafe bool, blockDepth uint16) error {
+	panic("unimplemented")
+}
+
+// ApplyAllowlistUpdates implements [adapters.CommitteeVerifierOnchainAdapter].
+func (a *CantonCommitteeVerifierOnchain) ApplyAllowlistUpdates(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, destChainSelector uint64, allowlistEnabled bool, addedSenders []string, removedSenders []string) error {
+	panic("unimplemented")
+}
+
 // ScanCommitteeStates implements [adapters.CommitteeVerifierOnchainAdapter].
 func (a *CantonCommitteeVerifierOnchain) ScanCommitteeStates(ctx context.Context, env deployment.Environment, chainSelector uint64) ([]*adapters.CommitteeState, error) {
 	refs := env.DataStore.Addresses().Filter(
